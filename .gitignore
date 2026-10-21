@@ -1,0 +1,15 @@
+# IDE and local configuration
+.idea/
+*.iml
+.DS_Store
+local.properties
+
+# Kotlin and Gradle outputs
+.kotlin/
+.gradle/
+**/build/
+
+# Web dependencies and outputs
+node_modules/
+web/dist/
+web/*.tsbuildinfo
