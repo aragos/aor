@@ -73,7 +73,7 @@ class TurnBoundaryTest {
     }
 
     @Test
-    fun firstPlayerCannotCancelTwoShortages() {
+    fun doubleShortageMarkersAreBoughtOffSeparately() {
         val state =
             game()
                 .copy(
@@ -82,15 +82,16 @@ class TurnBoundaryTest {
                     adjustments =
                         mapOf(
                             Commodity.STONE to
-                                listOf(CommodityAdjustment.SHORTAGE, CommodityAdjustment.SHORTAGE)
+                                listOf(CommodityAdjustment.SHORTAGE, CommodityAdjustment.SHORTAGE),
+                            Commodity.WOOL to listOf(CommodityAdjustment.SURPLUS),
                         ),
                 )
-        val cancelled = state.step(TextCodec.parse("p1: cancel-adjustment stone shortage"))
-        val failure =
-            assertFailsWith<RuleViolation> {
-                cancelled.step(TextCodec.parse("p1: cancel-adjustment stone shortage"))
-            }
-        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_ADJUSTMENT)
+        val cancelled =
+            state
+                .step(TextCodec.parse("p1: cancel-adjustment stone shortage"))
+                .step(TextCodec.parse("p1: cancel-adjustment stone shortage"))
+        assertThat(cancelled.adjustments[Commodity.STONE]).isEmpty()
+        assertThat(cancelled.playerState(p1).cash).isEqualTo(38)
     }
 
     @Test

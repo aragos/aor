@@ -139,7 +139,7 @@ sealed interface TurnCommand : Command {
             )
             val markers = state.adjustments[commodity].orEmpty()
             checkRule(
-                adjustment in markers && adjustment !in state.flow.cancelledAdjustments,
+                adjustment in markers,
                 ViolationCode.INVALID_ADJUSTMENT,
             )
             val cost =
@@ -160,13 +160,7 @@ sealed interface TurnCommand : Command {
                 }
             return state
                 .replacePlayer(player.copy(cash = player.cash - cost))
-                .copy(
-                    adjustments = updated,
-                    flow =
-                        state.flow.copy(
-                            cancelledAdjustments = state.flow.cancelledAdjustments + adjustment
-                        ),
-                )
+                .copy(adjustments = updated)
         }
     }
 
