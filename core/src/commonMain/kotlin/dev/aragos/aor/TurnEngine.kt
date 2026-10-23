@@ -114,6 +114,9 @@ internal object TurnEngine {
                 state = beginPhase(state)
                 if (state.flow.decisions.isNotEmpty()) return state
             }
+            if (!state.flow.phaseBookkeepingApplied) {
+                state = applyPhaseBookkeeping(state)
+            }
             val actor = state.flow.actor
             if (state.stage == Stage.INCOME) {
                 if (state.flow.shortageRolls < 2) return state.pushDecision(ShortageDecision)
@@ -173,6 +176,7 @@ internal object TurnEngine {
                 flow =
                     initial.flow.copy(
                         phaseStarted = true,
+                        phaseBookkeepingApplied = false,
                         actor = initial.turnOrder.firstOrNull(),
                         cursor = 0,
                         purchaseStep = PurchaseStep.SHIPPING,
@@ -189,23 +193,28 @@ internal object TurnEngine {
             state.copy(
                 flow = state.flow.copy(decisions = candidates.reversed().map(::RenaissanceDecision))
             )
+        return opened
+    }
+
+    private fun applyPhaseBookkeeping(initial: GameState): GameState {
+        val state = initial.copy(flow = initial.flow.copy(phaseBookkeepingApplied = true))
         return if (state.stage == Stage.INCOME) {
-            opened.copy(
-                board = opened.board.flipWhitePieces(),
+            state.copy(
+                board = state.board.flipWhitePieces(),
                 players =
-                    opened.players.mapValues { (id, player) ->
+                    state.players.mapValues { (id, player) ->
                         if (player.misery == MiseryStep.CHAOS) player
                         else
                             PlayerEconomy.collectIncome(
                                     player,
-                                    opened.playerIds.size,
-                                    opened.board.markerCount(id),
+                                    state.playerIds.size,
+                                    state.board.markerCount(id),
                                 )
                                 .player
                     },
                 adjustments = emptyMap(),
             )
-        } else if (state.stage == Stage.EXPANSION) opened.applyHolyIndulgence() else opened
+        } else if (state.stage == Stage.EXPANSION) state.applyHolyIndulgence() else state
     }
 
     fun finishActor(state: GameState): GameState {
@@ -268,7 +277,13 @@ internal object TurnEngine {
     private fun open(state: GameState, stage: Stage): GameState =
         state.copy(
             stage = stage,
-            flow = state.flow.copy(actor = null, cursor = 0, phaseStarted = false),
+            flow =
+                state.flow.copy(
+                    actor = null,
+                    cursor = 0,
+                    phaseStarted = false,
+                    phaseBookkeepingApplied = false,
+                ),
         )
 
     fun shortage(state: GameState, values: List<DieRoll>): GameState {
