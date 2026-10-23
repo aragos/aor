@@ -36,6 +36,9 @@ internal fun GameState.replacePlayer(player: PlayerState): GameState {
             )
         else player
     return copy(
+        activeWar =
+            if (chaos && (activeWar?.initiator == id || activeWar?.opponent == id)) null
+            else activeWar,
         players = players + (id to cleaned),
         flow =
             flow.copy(
