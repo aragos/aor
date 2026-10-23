@@ -72,7 +72,14 @@ object ExpansionReach {
                 ShippingFleet.OCEAN -> routes += directShipping(base, destination)
             }
         }
-        return routes.distinct()
+        return routes.distinct().sortedBy { route ->
+            when (route) {
+                is ExpansionRoute.Local -> 0
+                is ExpansionRoute.Land -> 1
+                is ExpansionRoute.Caravan -> 2
+                is ExpansionRoute.Shipping -> 3
+            }
+        }
     }
 
     /** Validates the supplied route itself, so a longer but legal galley route remains usable. */
