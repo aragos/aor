@@ -9,7 +9,17 @@ enum class Stage {
     CAPITAL_CHOICE,
     TOKEN_PURCHASE,
     TURN_ORDER_TIE,
-    DRAW_CARD;
+    DRAW_CARD,
+    BUY_CARD,
+    PLAY_CARDS,
+    PURCHASE,
+    EXPANSION,
+    INCOME,
+    FINAL_CARD_PLAY,
+    FINISHED;
+
+    val isTurnPhase: Boolean
+        get() = ordinal >= DRAW_CARD.ordinal
 
     fun prompt(state: GameState): Prompt? =
         when (this) {
@@ -62,7 +72,14 @@ enum class Stage {
                     player = state.turnOrderSelection.ties.first().choosingPlayer,
                     choice = "choose-turn-position",
                 )
-            DRAW_CARD -> null
+            DRAW_CARD,
+            BUY_CARD,
+            PLAY_CARDS,
+            PURCHASE,
+            EXPANSION,
+            INCOME,
+            FINAL_CARD_PLAY,
+            FINISHED -> null
         }
 
     fun legalChoices(state: GameState, player: PlayerId): LegalChoices =
@@ -71,7 +88,7 @@ enum class Stage {
                 if (player == state.header.creatorId) {
                     LegalChoices(
                         commands =
-                            (1..3).map { epochs -> Command.SetEpochs(epochs).toText() } +
+                            (1..1).map { epochs -> Command.SetEpochs(epochs).toText() } +
                                 RebuiltMarkerBonus.entries.map { policy ->
                                     Command.SetRebuiltMarkerBonus(policy).toText()
                                 } +

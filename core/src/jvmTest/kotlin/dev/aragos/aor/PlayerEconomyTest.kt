@@ -234,7 +234,7 @@ class PlayerEconomyTest {
 
     @Test
     fun incomeUsesTheSuppliedBoardCountAndInitialPlayerCount() {
-        val player = buyer().copy(boardMarkers = 25, cash = 0)
+        val player = buyer().copy(cash = 0)
 
         val result =
             PlayerEconomy.collectIncome(player, initialPlayerCount = 3, boardMarkerCount = 1)

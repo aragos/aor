@@ -12,7 +12,7 @@ sealed interface Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
-            checkRule(epochs in 1..3, ViolationCode.INVALID_EPOCHS)
+            checkRule(epochs == 1, ViolationCode.INVALID_EPOCHS)
             return state.copy(epochs = epochs)
         }
 
@@ -49,6 +49,7 @@ sealed interface Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
+            checkRule(state.epochs == 1, ViolationCode.INVALID_EPOCHS)
             return state.copy(stage = Stage.SHUFFLE)
         }
 
@@ -116,12 +117,14 @@ sealed interface Command {
             )
             val chosen =
                 state.updatePlayer(actor) { player ->
-                    player.copy(capital = capital, boardMarkers = 1)
+                    player.copy(capital = capital)
                 }
+            val home = ProvinceData.definitions.single { province -> province.capital == capital }
+            val placed = chosen.copy(board = chosen.board.placeMarker(home.id, actor).board)
             return if (chosen.players.values.all { player -> player.capital != null }) {
-                chosen.copy(stage = Stage.TOKEN_PURCHASE, turnNumber = 1)
+                placed.copy(stage = Stage.TOKEN_PURCHASE, turnNumber = 1)
             } else {
-                chosen
+                placed
             }
         }
 
@@ -140,11 +143,18 @@ sealed interface Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             checkRule(state.stage == Stage.TOKEN_PURCHASE, ViolationCode.WRONG_PHASE)
             val player = state.playerState(actor)
-            checkRule(player.tokenPurchase == null, ViolationCode.WRONG_PLAYER)
+            checkRule(
+                player.tokenPurchase == null && player.misery != MiseryStep.CHAOS,
+                ViolationCode.WRONG_PLAYER,
+            )
             TokenPurchase.affordable(amount = amount, cash = player.cash)
             val submitted =
                 state.updatePlayer(actor) { buying -> buying.copy(tokenPurchase = amount) }
-            if (submitted.players.values.any { buying -> buying.tokenPurchase == null }) {
+            if (
+                submitted.players.values.any { buying ->
+                    buying.tokenPurchase == null && buying.misery != MiseryStep.CHAOS
+                }
+            ) {
                 return submitted
             }
             val purchases =
@@ -165,7 +175,7 @@ sealed interface Command {
                                     },
                                 cash = buying.cash,
                             )
-                        purchase.applyTo(buying)
+                        purchase.applyTo(buying).let { paid -> paid.copy(writtenCash = paid.cash) }
                     },
                 turnOrderSelection = selection,
                 stage = if (selection.isResolved) Stage.DRAW_CARD else Stage.TURN_ORDER_TIE,

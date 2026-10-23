@@ -18,7 +18,7 @@ object TextCodec {
             "choose-capital" -> Command.ChooseCapital.parse(arguments)
             "buy-tokens" -> Command.BuyTokens.parse(arguments)
             "choose-turn-position" -> Command.ChooseTurnPosition.parse(arguments)
-            else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
+            else -> TurnCommand.parse(parts.first(), arguments)
         }
     }
 
@@ -36,7 +36,11 @@ object TextCodec {
         return when (parts.first()) {
             "!shuffle" -> Entry.Shuffle.parse(arguments)
             "!deal" -> Entry.Deal.parse(arguments)
-            "!roll" -> Entry.CapitalRoll.parse(arguments)
+            "!roll" ->
+                if (arguments.firstOrNull() == "capital-tie") Entry.CapitalRoll.parse(arguments)
+                else GameOutcome.parse(parts.first(), arguments)
+            "!draw",
+            "!trade" -> GameOutcome.parse(parts.first(), arguments)
             else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
         }
     }
