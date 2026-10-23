@@ -405,6 +405,109 @@ th, td {
     overflow-y: auto;
 }
 
+.game-actions, .guided-form, .leader-list article {
+    margin-top: 1.2rem;
+}
+
+.action-buttons, .board-filters, .action-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .7rem;
+}
+
+.guided-form > select, .guided-form > input {
+    width: 100%;
+}
+
+.guided-form > button {
+    margin-top: 1rem;
+}
+
+.action-fields > label, .board-filters > label {
+    flex: 1 1 170px;
+    min-width: 0;
+}
+
+.action-fields select, .action-fields input, .board-filters input, .board-filters select {
+    display: block;
+    width: 100%;
+    margin-top: .5rem;
+}
+
+.inline-form select {
+    flex: 1;
+    min-width: 0;
+}
+
+.check-label {
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+}
+
+.check-label input[type=checkbox] {
+    width: auto;
+    margin: 0;
+}
+
+.board-panel .table-scroll {
+    max-height: 620px;
+}
+
+.board-table td {
+    white-space: normal;
+    vertical-align: top;
+}
+
+.board-table td:first-child {
+    min-width: 150px;
+}
+
+.board-table details p {
+    min-width: 200px;
+    max-width: 300px;
+}
+
+.board-table summary {
+    cursor: pointer;
+}
+
+.new-piece {
+    background: #f5edce;
+    border: 1px solid #d1c493;
+    border-radius: 3px;
+    padding: .15rem .3rem;
+}
+
+.ending-notice, .winner-announcement {
+    background: #eff4e8;
+    border-left: 3px solid #647b47;
+    padding: .8rem 1rem;
+}
+
+.burden-badge {
+    margin-bottom: 0;
+    color: #804e39;
+    font-size: .8rem;
+}
+
+.resources dd {
+    overflow-wrap: anywhere;
+}
+
+.plain-list {
+    padding-left: 1.2rem;
+}
+
+.leader-list article {
+    border-top: 1px solid #dfdfd2;
+    padding-top: 1rem;
+}
+
+.leader-list article p {
+    margin: .4rem 0;
+}
+
 @media (max-width: 850px) {
     .game-layout {
         grid-template-columns: minmax(0, 1fr);
