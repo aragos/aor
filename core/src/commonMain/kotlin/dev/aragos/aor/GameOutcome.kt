@@ -18,15 +18,22 @@ sealed interface GameOutcome : Entry {
             val definition =
                 CardData.epochOne.singleOrNull { definition -> definition.id == card }
                     ?: throw RuleViolation(ViolationCode.INVALID_OUTCOME)
-            return state
-                .popDecision()
-                .updatePlayer(player) { owner ->
+            val drawn =
+                state.popDecision().updatePlayer(player) { owner ->
                     owner.copy(hand = owner.hand + HandCard(reference, definition))
                 }
-                .copy(
-                    deck = state.deck.drop(1),
-                    endingTriggered = state.endingTriggered || state.deck.size == 1,
-                )
+            val exhausted = state.deck.size == 1
+            return drawn.copy(
+                deck = state.deck.drop(1),
+                endingTriggered = state.endingTriggered || exhausted,
+                flow =
+                    drawn.flow.copy(
+                        decisions =
+                            if (exhausted) {
+                                drawn.flow.decisions.filterNot { frame -> frame is DrawDecision }
+                            } else drawn.flow.decisions
+                    ),
+            )
         }
     }
 
