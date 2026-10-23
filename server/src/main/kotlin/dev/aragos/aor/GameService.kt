@@ -144,6 +144,9 @@ class GameService(
                             when {
                                 entry.actor != player && entry.command is TurnCommand.DiscardCard ->
                                     "${entry.actor}: discard-card <hidden>"
+                                entry.command is BoardCommand.OfferCard &&
+                                    player !in BoardGame.tradeParticipants(before) ->
+                                    "${entry.actor}: offer-card <hidden>"
                                 entry.command.toText().startsWith("play-card ") -> {
                                     val reference = entry.command.toText().split(' ')[1]
                                     val card =
