@@ -64,7 +64,8 @@ sealed interface TurnCommand : Command {
             val other = state.turnOrder.indexOf(target)
             checkRule(
                 kotlin.math.abs(index - other) == 1 &&
-                    !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE),
+                    !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE) &&
+                    state.playerState(target).misery != MiseryStep.CHAOS,
                 ViolationCode.INVALID_TURN_POSITION,
             )
             val order =

@@ -46,15 +46,23 @@ internal object TurnEngine {
                 Stage.DRAW_CARD ->
                     listOf("pass") +
                         state.adjustments.flatMap { (commodity, markers) ->
-                            markers.distinct().map { adjustment ->
-                                "cancel-adjustment ${commodity.name.lowercase()} ${adjustment.name.lowercase()}"
-                            }
+                            val cost =
+                                CommodityData.definitions
+                                    .single { definition -> definition.id == commodity }
+                                    .baseValue
+                            if (actor != state.turnOrder.first() || cost > player.cash) emptyList()
+                            else
+                                markers.distinct().map { adjustment ->
+                                    "cancel-adjustment ${commodity.name.lowercase()} ${adjustment.name.lowercase()}"
+                                }
                         }
                 Stage.BUY_CARD ->
                     listOf("pass") +
                         (if (
                             player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
                                 actor !in state.flow.boughtCards &&
+                                actor !in state.flow.discardedCards &&
+                                player.cash >= 10 &&
                                 state.deck.isNotEmpty()
                         )
                             listOf("buy-card")
@@ -65,19 +73,65 @@ internal object TurnEngine {
                         )
                             player.hand.map { card -> "discard-card ${card.reference}" }
                         else emptyList())
-                Stage.PLAY_CARDS,
-                Stage.FINAL_CARD_PLAY -> listOf("pass") + CardGame.playChoices(state, actor)
+                Stage.PLAY_CARDS -> listOf("pass") + CardGame.playChoices(state, actor)
+                Stage.FINAL_CARD_PLAY ->
+                    CardGame.playChoices(state, actor) +
+                        if (
+                            player.hand.all { card ->
+                                CardRules.isBurden(state.cardContext(), card.definition.id)
+                            }
+                        )
+                            listOf("pass")
+                        else emptyList()
                 Stage.PURCHASE ->
                     when (state.flow.purchaseStep) {
-                        PurchaseStep.SHIPPING -> listOf("done", "upgrade-ships")
+                        PurchaseStep.SHIPPING ->
+                            listOf("done") +
+                                if (
+                                    player.cash >= 10 &&
+                                        player.lastShipUpgradeTurn != state.currentTurn() &&
+                                        ShippingPurchases.nextUpgrade(player.ships) != null
+                                )
+                                    listOf("upgrade-ships")
+                                else emptyList()
                         PurchaseStep.ADVANCES ->
                             listOf("done") +
                                 state.patronageChoices(actor) +
                                 AdvanceId.entries
-                                    .filter { advance -> !player.advances.owns(advance) }
+                                    .filter { advance ->
+                                        try {
+                                            AdvancePurchases.quote(
+                                                    player,
+                                                    advance,
+                                                    state.purchaseContext(actor),
+                                                )
+                                                .price <= player.cash
+                                        } catch (_: RuleViolation) {
+                                            false
+                                        }
+                                    }
                                     .map { advance -> "buy-advance ${advance.letter}" }
-                        PurchaseStep.STABILIZATION -> listOf("stabilize cash", "stabilize misery")
-                        PurchaseStep.RELIEF -> listOf("done", "relieve-misery")
+                        PurchaseStep.STABILIZATION ->
+                            listOf("stabilize misery") +
+                                if (PlayerEconomy.stabilizationCost(player) <= player.cash.toLong())
+                                    listOf("stabilize cash")
+                                else emptyList()
+                        PurchaseStep.RELIEF ->
+                            listOf("done") +
+                                (1..player.advances.tierCount)
+                                    .filter { spaces ->
+                                        try {
+                                            PlayerEconomy.reliefQuote(
+                                                    player,
+                                                    spaces,
+                                                    state.currentTurn(),
+                                                )
+                                                .cashCost <= player.cash
+                                        } catch (_: RuleViolation) {
+                                            false
+                                        }
+                                    }
+                                    .map { spaces -> "relieve-misery $spaces" }
                     }
                 Stage.EXPANSION -> BoardGame.choices(state, actor)
                 else -> emptyList()
@@ -155,6 +209,7 @@ internal object TurnEngine {
                     if (
                         !(player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
                             actor !in state.flow.boughtCards &&
+                            player.cash >= 10 &&
                             state.deck.isNotEmpty()) &&
                             !(player.advances.owns(AdvanceId.MASTER_ART) &&
                                 actor !in state.flow.discardedCards &&

@@ -87,7 +87,9 @@ internal data class RenaissanceDecision(override val player: PlayerId) : TurnDec
                 .filter { target ->
                     kotlin.math.abs(
                         state.turnOrder.indexOf(player) - state.turnOrder.indexOf(target)
-                    ) == 1 && !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE)
+                    ) == 1 &&
+                        !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE) &&
+                        state.playerState(target).misery != MiseryStep.CHAOS
                 }
                 .map { target -> "swap-order $target" }
 }
