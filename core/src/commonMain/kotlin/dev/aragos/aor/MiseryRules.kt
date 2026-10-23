@@ -28,6 +28,23 @@ object MiseryRules {
             (current.ordinal.toLong() + spaces).coerceIn(0L, MiseryStep.CHAOS.ordinal.toLong())
         return MiseryStep.entries[target.toInt()]
     }
+
+    /**
+     * Pay an unpaid stabilization [cost] in the fewest upward spaces. Box differences telescope;
+     * Chaos follows when no printed box can cover the debt. Zero debt moves no spaces.
+     */
+    fun payDebt(current: MiseryStep, cost: Long): MiseryStep {
+        require(cost >= 0) { "A misery debt cannot be negative." }
+        if (current == MiseryStep.CHAOS || cost == 0L) return current
+        val currentValue =
+            requireNotNull(current.value) { "A printed misery box requires a value." }
+        val target =
+            MiseryStep.entries.firstOrNull { candidate ->
+                candidate.ordinal >= current.ordinal &&
+                    candidate.value?.let { value -> value.toLong() - currentValue >= cost } == true
+            }
+        return target ?: MiseryStep.CHAOS
+    }
 }
 
 internal fun PlayerState.requireActive() {
