@@ -119,6 +119,9 @@ class WarRulesTest {
             cardContext("war")
                 .withMarkers("china" to cardPlayerTwo)
                 .withAdvances(cardPlayerOne, AdvanceId.OCEAN_NAVIGATION)
+                .withPlayer(cardPlayerOne) { player ->
+                    player.copy(ships = ShippingCapability.OCEAN_1)
+                }
 
         assertThat(WarRules.eligibleProvinces(context, cardPlayerOne, cardPlayerTwo))
             .containsExactly(ProvinceId("china"))
@@ -170,5 +173,43 @@ class WarRulesTest {
             }
 
         assertThat(failure.code).isEqualTo(CardRuleCode.INVALID_SURRENDER)
+    }
+
+    @Test
+    fun overseasMaintenanceCapacityLimitsWarCessions() {
+        val context =
+            cardContext("war")
+                .withMarkers("china" to cardPlayerTwo, "india" to cardPlayerTwo)
+                .withAdvances(cardPlayerOne, AdvanceId.OCEAN_NAVIGATION)
+                .withPlayer(cardPlayerOne) { player ->
+                    player.copy(ships = ShippingCapability.OCEAN_1)
+                }
+        val result =
+            WarResult.Victory(
+                cardPlayerOne,
+                cardPlayerTwo,
+                requiredTransfers = 2,
+                totals = mapOf(cardPlayerOne to 5, cardPlayerTwo to 3),
+            )
+
+        val settled = WarRules.surrender(context, result, setOf(ProvinceId("china")))
+
+        assertThat(settled.additionalLoserMisery).isEqualTo(1)
+    }
+
+    @Test
+    fun existingOverseasTokensUseCapacityEvenWithoutADominationMarker() {
+        val context =
+            cardContext("war")
+                .withMarkers("india" to cardPlayerTwo)
+                .withAdvances(cardPlayerOne, AdvanceId.OCEAN_NAVIGATION)
+                .withPlayer(cardPlayerOne) { player ->
+                    player.copy(
+                        ships = ShippingCapability.OCEAN_1,
+                        overseasPresence = setOf(ProvinceId("china")),
+                    )
+                }
+
+        assertThat(WarRules.eligibleProvinces(context, cardPlayerOne, cardPlayerTwo)).isEmpty()
     }
 }

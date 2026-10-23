@@ -66,26 +66,20 @@ internal object TurnEngine {
                             player.hand.map { card -> "discard-card ${card.reference}" }
                         else emptyList())
                 Stage.PLAY_CARDS,
-                Stage.FINAL_CARD_PLAY -> listOf("pass", "play-card")
+                Stage.FINAL_CARD_PLAY -> listOf("pass") + CardGame.playChoices(state, actor)
                 Stage.PURCHASE ->
                     when (state.flow.purchaseStep) {
                         PurchaseStep.SHIPPING -> listOf("done", "upgrade-ships")
                         PurchaseStep.ADVANCES ->
                             listOf("done") +
+                                state.patronageChoices(actor) +
                                 AdvanceId.entries
                                     .filter { advance -> !player.advances.owns(advance) }
                                     .map { advance -> "buy-advance ${advance.letter}" }
                         PurchaseStep.STABILIZATION -> listOf("stabilize cash", "stabilize misery")
                         PurchaseStep.RELIEF -> listOf("done", "relieve-misery")
                     }
-                Stage.EXPANSION ->
-                    listOf(
-                        "end-expansion",
-                        "place",
-                        "attack",
-                        "rebuild-marker",
-                        "buy-expansion-card",
-                    )
+                Stage.EXPANSION -> BoardGame.choices(state, actor)
                 else -> emptyList()
             }
         return LegalChoices(commands)
@@ -121,6 +115,9 @@ internal object TurnEngine {
                 state = beginPhase(state)
                 if (state.flow.decisions.isNotEmpty()) return state
             }
+            if (!state.flow.phaseBookkeepingApplied) {
+                state = applyPhaseBookkeeping(state)
+            }
             val actor = state.flow.actor
             if (state.stage == Stage.INCOME) {
                 if (state.flow.shortageRolls < 2) return state.pushDecision(ShortageDecision)
@@ -132,6 +129,9 @@ internal object TurnEngine {
                 return@repeat
             }
             if (state.playerState(actor).misery == MiseryStep.CHAOS) {
+                if (state.stage == Stage.DRAW_CARD && state.flow.cursor == 0) {
+                    state = state.copy(flow = state.flow.copy(cancelComplete = true))
+                }
                 state = finishActor(state)
                 return@repeat
             }
@@ -165,6 +165,8 @@ internal object TurnEngine {
                 }
                 Stage.PLAY_CARDS,
                 Stage.FINAL_CARD_PLAY -> {
+                    state = CardGame.prepareRound(state)
+                    if (state.flow.decisions.isNotEmpty()) return state
                     if (state.playerState(actor).hand.isEmpty()) state = finishActor(state)
                     else return state
                 }
@@ -175,12 +177,21 @@ internal object TurnEngine {
     }
 
     private fun beginPhase(initial: GameState): GameState {
+        val order =
+            if (initial.stage == Stage.EXPANSION) {
+                initial.effects.civilWarVictims.fold(initial.turnOrder) { current, victim ->
+                    current.filterNot { player -> player == victim } + victim
+                }
+            } else initial.turnOrder
+        val ordered =
+            initial.copy(turnOrderSelection = initial.turnOrderSelection.copy(order = order))
         val state =
-            initial.copy(
+            ordered.copy(
                 flow =
-                    initial.flow.copy(
+                    ordered.flow.copy(
                         phaseStarted = true,
-                        actor = initial.turnOrder.firstOrNull(),
+                        phaseBookkeepingApplied = false,
+                        actor = order.firstOrNull(),
                         cursor = 0,
                         purchaseStep = PurchaseStep.SHIPPING,
                     )
@@ -196,23 +207,28 @@ internal object TurnEngine {
             state.copy(
                 flow = state.flow.copy(decisions = candidates.reversed().map(::RenaissanceDecision))
             )
+        return opened
+    }
+
+    private fun applyPhaseBookkeeping(initial: GameState): GameState {
+        val state = initial.copy(flow = initial.flow.copy(phaseBookkeepingApplied = true))
         return if (state.stage == Stage.INCOME) {
-            opened.copy(
-                board = opened.board.flipWhitePieces(),
+            state.copy(
+                board = state.board.flipWhitePieces(),
                 players =
-                    opened.players.mapValues { (id, player) ->
+                    state.players.mapValues { (id, player) ->
                         if (player.misery == MiseryStep.CHAOS) player
                         else
                             PlayerEconomy.collectIncome(
                                     player,
-                                    opened.playerIds.size,
-                                    opened.board.markerCount(id),
+                                    state.playerIds.size,
+                                    state.board.markerCount(id),
                                 )
                                 .player
                     },
                 adjustments = emptyMap(),
             )
-        } else if (state.stage == Stage.EXPANSION) opened.applyHolyIndulgence() else opened
+        } else if (state.stage == Stage.EXPANSION) state.applyHolyIndulgence() else state
     }
 
     fun finishActor(state: GameState): GameState {
@@ -233,7 +249,7 @@ internal object TurnEngine {
             Stage.DRAW_CARD -> open(state, Stage.BUY_CARD)
             Stage.BUY_CARD -> open(state, Stage.PLAY_CARDS)
             Stage.PLAY_CARDS -> open(state, Stage.PURCHASE)
-            Stage.PURCHASE -> open(state, Stage.EXPANSION)
+            Stage.PURCHASE -> open(CardGame.endPurchase(state), Stage.EXPANSION)
             Stage.EXPANSION -> {
                 val winner =
                     state.turnOrder
@@ -275,7 +291,13 @@ internal object TurnEngine {
     private fun open(state: GameState, stage: Stage): GameState =
         state.copy(
             stage = stage,
-            flow = state.flow.copy(actor = null, cursor = 0, phaseStarted = false),
+            flow =
+                state.flow.copy(
+                    actor = null,
+                    cursor = 0,
+                    phaseStarted = false,
+                    phaseBookkeepingApplied = false,
+                ),
         )
 
     fun shortage(state: GameState, values: List<DieRoll>): GameState {

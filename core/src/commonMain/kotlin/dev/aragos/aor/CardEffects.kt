@@ -15,6 +15,8 @@ enum class CardRuleCode {
     INVALID_LEADER_CLAIM,
     INVALID_WAR,
     INVALID_SURRENDER,
+    MARKER_RULING_REQUIRED,
+    PAYOUT_RULING_REQUIRED,
 }
 
 class CardRuleViolation(val code: CardRuleCode, val explanation: String) : Exception(explanation)
@@ -39,6 +41,9 @@ data class CardPlayerContext(
     val capital: ProvinceId,
     val misery: MiseryStep,
     val handCardIds: Set<String> = emptySet(),
+    val ships: ShippingCapability = ShippingCapability.NONE,
+    /** Overseas boxes containing any of this player's square tokens or markers. */
+    val overseasPresence: Set<ProvinceId> = emptySet(),
 ) {
     val isActive: Boolean
         get() = misery != MiseryStep.CHAOS
@@ -189,6 +194,9 @@ data class CivilWarLosses(val cash: Int, val expansionTokens: Int) {
  * Finite card-specific outcomes. The driver applies them and records any ensuing victim decisions.
  */
 sealed interface CardResolution {
+    /** A non-burden targeted event with no eligible target may be played without a target. */
+    data class NoEffect(val event: EventId) : CardResolution
+
     data class CommodityPayment(
         val commodity: Commodity,
         val payments: Map<PlayerId, Int>,
@@ -317,6 +325,14 @@ object CardRules {
             CardRuleCode.MISERY_BURDEN,
             "A misery burden cannot be played: ${play.cardId}.",
         )
+        if (
+            spec is CardEffectSpec.Event &&
+                play.choice == CardChoice.None &&
+                spec.event in targetedEvents &&
+                !hasLegalTarget(context, actor, spec.event)
+        ) {
+            return CardResolution.NoEffect(spec.event)
+        }
         return when (spec) {
             is CardEffectSpec.CommodityChoices -> {
                 val choice = play.choice as? CardChoice.CommodityChoice
@@ -347,6 +363,46 @@ object CardRules {
             is CardEffectSpec.Event -> event(context, actor, spec.event, play.choice)
         }
     }
+
+    private val targetedEvents =
+        setOf(
+            EventId.ALCHEMISTS_GOLD,
+            EventId.CIVIL_WAR,
+            EventId.WAR,
+            EventId.PIRATES_VIKINGS,
+            EventId.REBELLION,
+            EventId.THE_CRUSADES,
+        )
+
+    /** Target existence is distinct from permanent burden status and temporary effect immunity. */
+    fun hasLegalTarget(context: CardContext, actor: PlayerId, event: EventId): Boolean =
+        when (event) {
+            EventId.ALCHEMISTS_GOLD,
+            EventId.CIVIL_WAR,
+            EventId.WAR ->
+                context.activePlayers.keys.any { target ->
+                    (event != EventId.WAR || target != actor) && !immune(context, target, event)
+                }
+            EventId.PIRATES_VIKINGS,
+            EventId.REBELLION ->
+                context.markers.any { (province, marker) ->
+                    val definition = context.province(province)
+                    marker.coloured &&
+                        (!context.player(marker.owner).isActive ||
+                            !immune(context, marker.owner, event)) &&
+                        if (event == EventId.PIRATES_VIKINGS) definition.coastal
+                        else {
+                            definition.overseas != OverseasGroup.NEW_WORLD &&
+                                (definition.capital == null ||
+                                    province == context.player(actor).capital)
+                        }
+                }
+            EventId.THE_CRUSADES ->
+                context.provinces.values.any { province ->
+                    province.area == GeographicalArea.VI && !province.isSatellite
+                }
+            else -> true
+        }
 
     private fun event(
         context: CardContext,
@@ -461,12 +517,8 @@ object CardRules {
                 val targetMarker =
                     requireNotNull(marker) { "A validated event target has a marker." }
                 cardRule(
-                    context.player(targetMarker.owner).isActive,
-                    CardRuleCode.ILLEGAL_TARGET,
-                    "An event cannot target a player in Chaos.",
-                )
-                cardRule(
-                    !immune(context, targetMarker.owner, event),
+                    !context.player(targetMarker.owner).isActive ||
+                        !immune(context, targetMarker.owner, event),
                     CardRuleCode.IMMUNE_TARGET,
                     "The marker's owner is protected against this event.",
                 )
@@ -494,6 +546,12 @@ object CardRules {
                     definition.area == GeographicalArea.VI && !definition.isSatellite,
                     CardRuleCode.ILLEGAL_TARGET,
                     "The Crusades requires a market in Area VI.",
+                )
+                val owned = context.markers.values.count { marker -> marker.owner == actor }
+                cardRule(
+                    owned < 25 || context.markers[province]?.owner == actor,
+                    CardRuleCode.MARKER_RULING_REQUIRED,
+                    "Crusades with no available domination marker requires the counter-capacity ruling.",
                 )
                 CardResolution.CrusadesPlacement(
                     province,
@@ -580,6 +638,11 @@ object CardRules {
                                 (adjustment?.payoutOffset ?: 0) +
                                 if (AdvanceId.INDUSTRY in player.advances) 1 else 0)
                             .coerceAtLeast(0)
+                    cardRule(
+                        box <= 10,
+                        CardRuleCode.PAYOUT_RULING_REQUIRED,
+                        "A payout beyond the ten printed card boxes requires the overflow ruling.",
+                    )
                     definition.baseValue * box * box
                 }
             }
