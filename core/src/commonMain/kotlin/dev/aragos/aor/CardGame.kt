@@ -362,7 +362,15 @@ object CardGame {
             state.copy(
                 flow = state.flow.copy(eventReduced = state.flow.eventReduced + reduction.province)
             )
-        return when (reduction.replacement) {
+        val owner = marked.playerState(reduction.owner)
+        // Civil War may eliminate the owner before reducing its capital. Chaos returns its pool
+        // to stock, and an eliminated player cannot answer an optional pool replacement frame.
+        val replacement =
+            if (owner.misery == MiseryStep.CHAOS) {
+                if (owner.stockTokens > 0) EventTokenReplacement.STOCK
+                else EventTokenReplacement.EMPTY
+            } else reduction.replacement
+        return when (replacement) {
             EventTokenReplacement.STOCK ->
                 marked.withBoardChange(
                     marked.board.replaceWithToken(reduction.province, reduction.owner)
