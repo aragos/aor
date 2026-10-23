@@ -6,6 +6,9 @@ sealed interface TurnCommand : Command {
         override fun toText(): String = "pass"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
+            BoardGame.passDecision(state, actor)?.let { resumed ->
+                return resumed
+            }
             val decision = state.flow.decisions.lastOrNull()
             if (decision is RenaissanceDecision) {
                 checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
