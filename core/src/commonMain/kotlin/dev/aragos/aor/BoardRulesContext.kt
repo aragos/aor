@@ -31,6 +31,7 @@ data class BoardRulesContext(
     val board: BoardState,
     val players: Map<PlayerId, BoardPlayerProfile>,
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
+    val militaryPlays: List<MilitaryPlay> = emptyList(),
 ) {
     init {
         require(
@@ -67,6 +68,15 @@ data class BoardRulesContext(
             }
         ) {
             "Shipping usage requires registered players, available provinces and nonnegative counts."
+        }
+    }
+
+    init {
+        require(
+            militaryPlays.all { play -> play.player in players } &&
+                militaryPlays.map(MilitaryPlay::card).distinct().size == militaryPlays.size
+        ) {
+            "Military cards must each have one registered player for the current turn."
         }
     }
 
