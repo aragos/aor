@@ -18,15 +18,13 @@ internal fun GameState.popDecision(): GameState {
 }
 
 /**
- * Reserve one remaining card for a beneficiary. Consecutively queued draws resolve in request order
- * while preserving any outer decision below them. Reserving the last card does not trigger the
- * ending until its recorded draw is accepted.
+ * Queue an earned draw in request order, preserving any outer decision below consecutive draws.
+ * Keep every beneficiary until resolution: an earlier beneficiary may enter Chaos before drawing.
+ * Consuming the last card removes any remaining draw requests and triggers the ending.
  */
 internal fun GameState.queueDraw(player: PlayerId): GameState {
     if (playerState(player).misery == MiseryStep.CHAOS) return this
     if (deck.isEmpty()) return copy(endingTriggered = true)
-    val reserved = flow.decisions.count { decision -> decision is DrawDecision }
-    if (reserved >= deck.size) return this
     val insertion = flow.decisions.indexOfLast { decision -> decision !is DrawDecision } + 1
     val decisions =
         flow.decisions.take(insertion) + DrawDecision(player) + flow.decisions.drop(insertion)

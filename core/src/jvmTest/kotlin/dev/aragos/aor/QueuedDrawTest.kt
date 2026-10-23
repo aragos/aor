@@ -35,7 +35,7 @@ class QueuedDrawTest {
     }
 
     @Test
-    fun resolvingAllReservedDrawsConsumesEachCardExactlyOnce() {
+    fun resolvingAllQueuedDrawsConsumesEachCardExactlyOnce() {
         val state = income(cards = 2).pushDecision(ShortageDecision)
 
         val drawn = state.step(TextCodec.parse("!roll shortage 1 2 1")).acceptDraw().acceptDraw()
@@ -61,14 +61,67 @@ class QueuedDrawTest {
     }
 
     @Test
-    fun reservingTheLastCardDoesNotTriggerEndingBeforeItsRecordedDraw() {
+    fun queuingMoreDrawsThanCardsKeepsEveryBeneficiaryUntilARecordedDraw() {
         val state = income(cards = 1)
 
         val queued = state.queueDraw(p1).queueDraw(p2)
 
         assertThat(queued.endingTriggered).isFalse()
         assertThat(queued.flow.decisions.filterIsInstance<DrawDecision>())
-            .containsExactly(DrawDecision(p1))
+            .containsExactly(DrawDecision(p2), DrawDecision(p1))
+            .inOrder()
+    }
+
+    @Test
+    fun aLaterBeneficiaryReceivesTheLastCardWhenTheFirstBeneficiaryEntersChaos() {
+        val initial = income(cards = 1)
+        val state =
+            initial
+                .copy(
+                    adjustments =
+                        mapOf(
+                            Commodity.GOLD to listOf(CommodityAdjustment.SHORTAGE),
+                            Commodity.IVORY to listOf(CommodityAdjustment.SHORTAGE),
+                        ),
+                    board =
+                        BoardState()
+                            .placeMarker(ProvinceId("suez"), p1)
+                            .board
+                            .placeMarker(ProvinceId("cairo"), p2)
+                            .board
+                            .placeMarker(ProvinceId("smyrna"), p1)
+                            .board,
+                    players =
+                        initial.players +
+                            (p1 to
+                                initial
+                                    .playerState(p1)
+                                    .copy(cash = 0, misery = MiseryStep.THOUSAND)),
+                )
+                .pushDecision(ShortageDecision)
+
+        val drawn = state.step(TextCodec.parse("!roll shortage 1 2 6")).acceptDraw()
+
+        assertThat(drawn.playerState(p1).misery).isEqualTo(MiseryStep.CHAOS)
+        assertThat(drawn.playerState(p1).hand).isEmpty()
+        assertThat(drawn.playerState(p2).hand.map(HandCard::definition))
+            .containsExactly(CardData.epochOne[0])
+        assertThat(drawn.deck).isEmpty()
+        assertThat(drawn.endingTriggered).isTrue()
+        assertThat(drawn.flow.decisions.filterIsInstance<DrawDecision>()).isEmpty()
+    }
+
+    @Test
+    fun consumingTheLastCardPreservesAnOuterDecisionWhileDroppingOtherDraws() {
+        val outer = RenaissanceDecision(p3)
+        val state = income(cards = 1).pushDecision(outer).queueDraw(p1).queueDraw(p2)
+
+        val drawn = state.acceptDraw()
+
+        assertThat(drawn.flow.decisions).containsExactly(outer)
+        assertThat(drawn.playerState(p1).hand).hasSize(1)
+        assertThat(drawn.playerState(p2).hand).isEmpty()
+        assertThat(drawn.endingTriggered).isTrue()
     }
 
     @Test
