@@ -6,7 +6,13 @@ object TextCodec {
         val parts = text.trim().split(Regex("\\s+"))
         val arguments = parts.drop(1)
         return when (parts.first()) {
-            "set-option" -> Command.SetEpochs.parse(arguments)
+            "set-option" ->
+                when (arguments.firstOrNull()) {
+                    "epochs" -> Command.SetEpochs.parse(arguments)
+                    "rebuilt-marker-bonus" -> Command.SetRebuiltMarkerBonus.parse(arguments)
+                    null -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
+                    else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION)
+                }
             "start" -> Command.Start.parse(arguments)
             "bid-capital" -> Command.BidCapital.parse(arguments)
             "choose-capital" -> Command.ChooseCapital.parse(arguments)

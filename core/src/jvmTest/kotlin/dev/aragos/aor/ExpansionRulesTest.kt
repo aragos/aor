@@ -72,6 +72,30 @@ class ExpansionRulesTest {
         }
     }
 
+    @Test
+    fun newExpansionMarkersCountUnderEitherRebuildingPolicy() {
+        for (policy in RebuiltMarkerBonus.entries) {
+            assertThat(policy.counts(MarkerPlacementOrigin.EXPANSION)).isTrue()
+        }
+    }
+
+    @Test
+    fun eventRebuildsDoNotCountWhenTheOptionIsExcluded() {
+        assertThat(RebuiltMarkerBonus.EXCLUDE.counts(MarkerPlacementOrigin.EVENT_REBUILD)).isFalse()
+    }
+
+    @Test
+    fun eventRebuildsCountWhenTheOptionIsIncluded() {
+        assertThat(RebuiltMarkerBonus.INCLUDE.counts(MarkerPlacementOrigin.EVENT_REBUILD)).isTrue()
+    }
+
+    @Test
+    fun voluntaryRebuildsNeverCountTowardTheExpansionBonus() {
+        for (policy in RebuiltMarkerBonus.entries) {
+            assertThat(policy.counts(MarkerPlacementOrigin.VOLUNTARY_REBUILD)).isFalse()
+        }
+    }
+
     private fun invalidCommitment(action: () -> Unit) {
         val failure = assertFailsWith<RuleViolation>(block = action)
 

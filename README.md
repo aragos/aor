@@ -32,6 +32,15 @@ Keep the player links: only their credential hashes are saved, so the server can
 The local server listens on `127.0.0.1`; account authentication, general undo, variants and phases after Order of Play
 are deferred.
 
+During configuration, the creator can choose whether markers rebuilt after events count toward the
+expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
+`set-option rebuilt-marker-bonus include`. The browser has the same selector. The choice is public,
+saved in the log and frozen when setup starts. Both eligibility policies are implemented; board play
+and awarding the bonus remain part of a later milestone.
+
+New games use file format 2, which explicitly records the default bonus option. Earlier development
+game files are unsupported; no migration is provided under the current-format-only policy.
+
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 Run server tests with `./gradlew :server:test` and core JVM tests with `./gradlew :core:jvmTest`. Use
 `./gradlew :core:compileKotlinJs` to check the core JS target.

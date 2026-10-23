@@ -26,6 +26,11 @@ class GameDriverTest {
                     epochs = 2,
                 )
 
-        assertThat(stored.revisions.single().entries).containsExactly("p2: set-option epochs 2")
+        assertThat(stored.revisions.single().entries)
+            .containsExactly(
+                "p2: set-option epochs 2",
+                "p2: set-option rebuilt-marker-bonus exclude",
+            )
+            .inOrder()
     }
 }

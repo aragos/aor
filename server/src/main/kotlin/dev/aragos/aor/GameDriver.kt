@@ -12,7 +12,7 @@ data class Revision(
 )
 
 data class StoredGame(
-    val fileVersion: Int = 1,
+    val fileVersion: Int = 2,
     val id: String,
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
@@ -53,7 +53,15 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         epochs: Int,
     ): StoredGame {
         val entry = Entry.Action(actor = header.creatorId, command = Command.SetEpochs(epochs))
-        GameState(header).step(entry)
+        val entries =
+            listOf(
+                entry,
+                Entry.Action(
+                    actor = header.creatorId,
+                    command = Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE),
+                ),
+            )
+        entries.fold(GameState(header)) { state, action -> state.step(action) }
         return StoredGame(
             id = id,
             header = header,
@@ -65,7 +73,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                         parent = null,
                         author = entry.actor,
                         command = entry.command.toText(),
-                        entries = listOf(TextCodec.print(entry)),
+                        entries = entries.map(TextCodec::print),
                     )
                 ),
         )
