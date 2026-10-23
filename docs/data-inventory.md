@@ -33,7 +33,7 @@ unlicensed repositories listed in the rules.
 The typed builders reject invalid local definitions, duplicate identifiers, incomplete economic
 catalogs and cyclic advance prerequisites. Cross-catalog validation checks graph references,
 connection types, capital coverage, all geographical areas and overseas boxes, and that commodity
-market counts match every printed payout-track length.
+market counts match every printed commodity ownership-track length.
 
 `GameCatalog.validateFor(playerCount)` validates each configuration for 3–6 starting players and
 returns its static board. Unused areas and all their coastal connections are removed together;

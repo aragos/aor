@@ -319,7 +319,7 @@ class EconomicDataTest {
     fun commodityValuesAndPrintedLimitsMatchTheBoard() {
         val rows =
             CommodityData.definitions.map { commodity ->
-                listOf(commodity.baseValue, commodity.diceTotal, commodity.payoutBoxes)
+                listOf(commodity.baseValue, commodity.diceTotal, commodity.ownershipTrackBoxes)
             }
 
         assertThat(CommodityData.definitions.map(CommodityDefinition::id))
@@ -346,10 +346,12 @@ class EconomicDataTest {
     }
 
     @Test
-    fun winePayoutsStopAtTheSixthPrintedBox() {
+    fun commodityCardPrintsTenPaymentBoxesIndependentlyOfOwnershipTrack() {
         val wine = CommodityData.definitions.single { commodity -> commodity.id == Commodity.WINE }
 
-        assertThat(wine.printedPayouts).containsExactly(5, 20, 45, 80, 125, 180).inOrder()
+        assertThat(wine.printedPayouts)
+            .containsExactly(5, 20, 45, 80, 125, 180, 245, 320, 405, 500)
+            .inOrder()
     }
 
     @Test
@@ -376,10 +378,10 @@ class EconomicDataTest {
     fun commodityDefinitionsRequirePrintedPayoutBoxes() {
         val failure =
             assertFailsWith<IllegalArgumentException> {
-                CommodityData.definitions.first().copy(payoutBoxes = 0)
+                CommodityData.definitions.first().copy(ownershipTrackBoxes = 0)
             }
 
-        assertThat(failure).hasMessageThat().contains("at least one printed payout box")
+        assertThat(failure).hasMessageThat().contains("at least one printed ownership box")
     }
 
     @Test
@@ -501,6 +503,11 @@ class EconomicDataTest {
     }
 
     private fun CommodityCatalogBuilder.add(definition: CommodityDefinition) {
-        commodity(definition.id, definition.baseValue, definition.diceTotal, definition.payoutBoxes)
+        commodity(
+            definition.id,
+            definition.baseValue,
+            definition.diceTotal,
+            definition.ownershipTrackBoxes,
+        )
     }
 }
