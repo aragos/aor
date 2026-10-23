@@ -99,6 +99,22 @@ class CardGameTest {
     }
 
     @Test
+    fun civilWarEnteringChaosUsesReturnedStockWithoutRequestingAnEliminatedPlayersChoice() {
+        val initial =
+            running("civil-war").withMarker("genoa", p2).withPlayer(p2) { player ->
+                player.copy(stockTokens = 0, poolTokens = 5, misery = MiseryStep.THOUSAND)
+            }
+
+        val played = initial.play("p1: play-card hand-1 player p2")
+
+        assertThat(played.playerState(p2).misery).isEqualTo(MiseryStep.CHAOS)
+        assertThat(played.flow.decisions).isEmpty()
+        assertThat(played.board.pieces[ProvinceId("genoa")])
+            .isEqualTo(ProvincePieces.Tokens(persistentMapOf(p2 to TokenHolding(coloured = 1))))
+        assertThat(played.playerState(p2).stockTokens).isEqualTo(4)
+    }
+
+    @Test
     fun anEventVictimMayDeclineSpendingAPoolToken() {
         val initial =
             running("pirates-vikings").withMarker("tunis", p2).withPlayer(p2) { player ->
@@ -521,6 +537,33 @@ class CardGameTest {
         assertThat(awaiting.playerState(p1).misery).isEqualTo(MiseryStep.THOUSAND)
         assertThat(awaiting.board.pieces[ProvinceId("tunis")])
             .isEqualTo(ProvincePieces.Marker(p2, PieceSide.COLOURED))
+    }
+
+    @Test
+    fun aWarSurrenderChoiceRespectsRemainingOverseasMaintenanceCapacity() {
+        val initial =
+            running("war").withMarker("east-indies", p2).withMarker("china", p2).withPlayer(p1) {
+                player ->
+                player.copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.OCEAN_NAVIGATION, 1))),
+                    ships = ShippingCapability.OCEAN_1,
+                )
+            }
+        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 5 3")
+        val offered = awaiting.legalChoices(p2).commands.single()
+
+        val ceded = awaiting.play("p2: $offered")
+
+        assertThat(
+                ceded.board.pieces.values.filterIsInstance<ProvincePieces.Marker>().count { marker
+                    ->
+                    marker.owner == p1
+                }
+            )
+            .isEqualTo(1)
+        assertThat(ceded.playerState(p2).misery).isEqualTo(MiseryStep.THIRTY)
+        assertThat(ceded.flow.decisions).isEmpty()
     }
 
     @Test
