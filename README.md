@@ -3,15 +3,18 @@
 A Kotlin Multiplatform engine, Ktor server and React web client for
 [Age of Renaissance](https://boardgamegeek.com/boardgame/26/age-of-renaissance), inspired by
 [Snellman's command-log approach](https://www.snellman.net/blog/archive/2014-12-08-command-languages-as-game-ui/).
-The application implements standard setup and turn 1's Order of Play for 3–6 human players: private cards,
-sealed capital bids, recorded tie rolls, capital selection, sealed token purchases and turn-order choices.
-It stops at **Turn 1 — Draw Card**, with the order and expansion pools ready for that turn.
+The application runs one-epoch games for 3–6 human players: setup, repeatable turns, purchases,
+board expansion and competitions, every epoch-one card, nested player decisions, income and final scoring.
+Private hands and simultaneous bids remain private; authoritative outcomes are recorded for replay and restart.
+Two rare source gaps still await project rulings: exhausting domination markers during War/Crusades and
+Wool payment box 11. Affected actions report a typed rejection until those rulings are resolved.
 
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
-- [Manual walkthrough](docs/manual-setup.md): setup, Order of Play, restart and API instructions.
-- [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, next milestone and session handoff.
+- [Setup walkthrough](docs/manual-setup.md): creation, sealed decisions, restart and API instructions.
+- [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
+- [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, delivery checkpoints and remaining rulings.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
 
 ```text
@@ -29,19 +32,18 @@ Open <http://localhost:5173>, create a table and save the private player links. 
 use the same engine validation. Player tabs refresh automatically.
 
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
-Set `AOR_DATA_DIR` to an absolute directory to choose another location. Use one server process per data directory.
+Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_HTTP_PORT` to change the server port. Use one server process per data directory.
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
-The local server listens on `127.0.0.1`; account authentication, general undo, other variants and phases after Order of Play
-are deferred.
+The local server listens on `127.0.0.1`. Additional epochs, accounts, general undo, bots and other variants remain deferred.
 
 During configuration, the creator can choose whether markers rebuilt after events count toward the
 expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
 `set-option rebuilt-marker-bonus include`. The browser has the same selector. The choice is public,
-saved in the log and frozen when setup starts. Both eligibility policies are implemented; board play
-and awarding the bonus remain part of a later milestone.
+saved in the log and frozen when setup starts. Both settings apply to actual expansion rewards. Voluntary marker rebuilds never count.
 
-New games use file format 2, which explicitly records the default bonus option. Earlier development
-game files are unsupported; no migration is provided under the current-format-only policy.
+New games use file format 2 with rules version `ah1996-epoch-one-1` and data version
+`ah1996-catalog-1`. The initial revision records resolved setup options. Earlier development rules
+versions are unsupported; no migration is provided under the current-format-only policy.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 Run server tests with `./gradlew :server:test` and core JVM tests with `./gradlew :core:jvmTest`. Use

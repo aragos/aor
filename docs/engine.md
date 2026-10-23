@@ -1,6 +1,6 @@
 # Core Game Engine
 
-Status: **design draft**. The engine implements [rules.md](rules.md); application architecture and policies live in
+Status: the one-epoch engine is implemented; later epochs, planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
 [design.md](design.md). Rules section references below refer to rules.md.
 
 ## 1. Contract
@@ -29,22 +29,22 @@ Game options are setup commands. `start` validates and freezes configuration; se
 Waiting players and completion status are derived from state and prompts.
 
 All clients submit the same commands using locale-independent text with lossless round trips.
-One entry occupies one line; `!` introduces a system outcome. Syntax remains illustrative:
+One entry occupies one line; `!` introduces a system outcome. The full command reference is in [the playing guide](manual-full-game.md). Examples:
 
 ```text
-creator: set-option epochs 3
-start
+p1: set-option epochs 1
+p1: start
 ...
-alice: bid-capital 12
-bob: bid-capital 12
-!roll capital-tie alice=4 bob=2
-alice: choose-capital venice
+p1: bid-capital 12
+p2: bid-capital 12
+!roll capital-tie p1=4 p2=2
+p1: choose-capital venice
 ...
-genoa: place 3 marseilles
-genoa: attack florence
-!roll competition white=2 black=5 green=4
-venice: buy-card-with-tokens
-!draw venice <card:armor>
+p2: place 3 marseilles
+p2: attack florence
+!roll competition 2 5 4
+p1: buy-expansion-card
+!draw p1 hand-12 armor
 ```
 
 Record dice, shuffle orders, draws and random trade selections as outcomes, not an RNG seed. Tests may supply any

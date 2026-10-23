@@ -202,9 +202,8 @@ Recorded cash at the end of each turn is public.
 ### 5.2 Draw Card
 
 1. **Cancel shortage/surplus.**
-    - The player first in turn order may pay a commodity's base value ([§9.1](#91-commodity-values)) to remove one
-      shortage and/or one surplus marker.
-    - Each marker is removed separately. Gold and Ivory share the roll "12", so removing that marker costs $10 once.
+    - The player first in turn order may pay a commodity's base value ([§9.1](#91-commodity-values)) to remove shortage/surplus markers.
+    - Each marker is removed separately. Gold and Ivory share the roll "12", so removing that joint marker costs $10 once. Double markers may each be bought off separately (Boone FAQ §3.2g).
 2. **Draw.**
     - Each player in turn order draws one card.
     - When the draw pile is empty, the next epoch begins ([§11.1](#111-epochs-and-recycling)).
@@ -909,7 +908,9 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | ID | Question | Current reading |
 | --- | --- | --- |
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
-| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | After the draw of turn 1 (3–4 players) or turn 2 (5–6 players). |
+| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
+| Q15 | No domination marker available for Crusades or War transfers. | Awaiting project ruling; typed rejection. Proposed: block new Crusades placement and cap War transfers by winner stock without penalizing loser for that stock shortage. |
+| Q16 | Nine Wool markets + Industry + shortage requires payment box 11. | Awaiting formula ($242) versus printed-box-10 cap ($200) ruling; typed rejection. |
 
 **Resolved implementation decisions (2026-10-23):**
 

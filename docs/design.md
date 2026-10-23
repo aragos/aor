@@ -46,7 +46,7 @@ The following is a feature catalog, not a promise to implement every option init
 
 | Concern                   | Choices / baseline                                                                                       |
 |---------------------------|----------------------------------------------------------------------------------------------------------|
-| Players and epochs        | 3–6 registered players, 1–3 epochs (default 3).                                                          |
+| Players and epochs        | 3–6 registered players; only one epoch is currently supported.                                                          |
 | Setup                     | Deal/keep counts, deck adjustments, private returns and delayed reinsertion; standard setup by default.  |
 | Commerce advances         | Ordering, prices and prerequisites of Improved Agriculture and Wind/Watermill.                           |
 | Wind/Watermill            | Takeover card trade, or last-player shortage/surplus adjustment.                                         |
@@ -69,7 +69,7 @@ The supported `rebuilt-marker-bonus` setup command records `exclude` or `include
 Its default is recorded alongside epochs in the initial revision; changing the option uses an ordinary
 creator command before `start`. Both choices are public and survive replay and restart. The domain
 policy implements bonus eligibility for ordinary expansion, event rebuilds and voluntary rebuilds;
-the board-play milestone will connect it to marker placement and the expansion reward.
+board placements and the actual expansion reward use this policy.
 
 Snapshots, waiting-player lists and completion flags are derived caches, never sources of game truth. Pending secret
 submissions, private plans and operational controller settings may be stored separately. A snapshot is tied to its

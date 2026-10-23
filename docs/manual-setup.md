@@ -12,9 +12,9 @@ npm install
 In a second terminal, run `npm start` and open <http://localhost:5173>. Vite proxies `/api` to the local server on
 port 8080. The server is required even after `npm run build`; the production bundle does not host an API.
 
-Create a game with Alice, Bob and Carol, leaving the epoch setting at 3. Save all three private seat links and open
+Create a game with Alice, Bob and Carol, using the supported one-epoch setting. Save all three private seat links and open
 each in its own tab. Links identify players independently of cookies, so the tabs may share a browser profile.
-The first player, Alice, is the creator and can change the epoch setting or start setup. The links grant access to
+The first player, Alice, is the creator and can select the rebuilt-marker option or start setup. The links grant access to
 their respective seats; share only the intended player's link.
 
 ## Complete setup
@@ -53,14 +53,15 @@ their respective seats; share only the intended player's link.
 5. Restart while Carol's decision is pending. The provisional sequence and required chooser must be identical.
    Carol, the last capital chooser, can insert before, between or after the two players. Choose the middle button.
    Its effect must match `choose-turn-position 2`; earlier players cannot act again.
-6. Every tab now shows **Turn 1 — Draw Card** and the finalized order with boxes **2, 4, 6**. Resources are unchanged
-   by tie choices. Each private hand still has only its original card. Drawing and later phases are outside this
-   milestone, so there is no draw action or further command form.
+6. Every tab now shows **Turn 1 — Play Cards** and the finalized order with boxes **2, 4, 6**.
+   Draw Card resolves automatically in this opening turn and no player yet owns an optional Buy Card advance.
+   Each private hand contains its original card plus one new private draw. Cash and tokens are unchanged by the
+   tie choices. Continue with [the full-game guide](manual-full-game.md).
 7. Restart again. Purchases, resources, finalized order, boxes, cards and history must remain identical.
 
 Repeat with 4–6 players. Paris, London and Hamburg become available in that order. Order boxes are **1,3,5,6** for
 four players, **1–5** for five and **1–6** for six. The tie choices must also work for larger groups and for multiple
-separate tied groups. Epochs 1–3 are accepted; epoch transitions are deferred.
+separate tied groups. Only one epoch is supported; other lengths are rejected.
 
 ## Negative and over-stock purchases
 
@@ -82,7 +83,7 @@ apply to this turn. No tie prompt is needed for distinct amounts.
 The command input accepts one command without an actor prefix. Forms generate the same commands:
 
 ```text
-set-option epochs 2
+set-option epochs 1
 start
 bid-capital 12
 choose-capital venice
@@ -98,7 +99,7 @@ submitted by clients. Unsupported options, actor prefixes and multiple commands 
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/games` | `{"players":["Alice","Bob","Carol"],"epochs":3}` | Game id and private relative seat links; 201 |
+| `POST /api/games` | `{"players":["Alice","Bob","Carol"],"epochs":1}` | Game id and private relative seat links; 201 |
 | `GET /api/games/{id}` | `Authorization: Bearer <token>` | Caller-specific state, prompts, legal choices, history and active revision |
 | `POST /api/games/{id}/commands` | Same authorization; `{"expectedRevision":6,"command":"buy-tokens 5"}` | Updated caller-specific state |
 | `GET /api/health` | None | `{"status":"ok"}` |
