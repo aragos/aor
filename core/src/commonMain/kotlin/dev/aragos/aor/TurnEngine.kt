@@ -93,6 +93,23 @@ internal object TurnEngine {
 
     fun normalise(initial: GameState): GameState {
         var state = initial
+        if (
+            state.turnNumber != null &&
+                state.players.values.all { player -> player.misery == MiseryStep.CHAOS }
+        ) {
+            return state.copy(
+                stage = Stage.FINISHED,
+                activeWar = null,
+                flow = state.flow.copy(actor = null, decisions = emptyList()),
+            )
+        }
+        if (
+            state.stage == Stage.TOKEN_PURCHASE &&
+                !state.flow.phaseStarted &&
+                state.turnOrder.isNotEmpty()
+        ) {
+            state = beginPhase(state)
+        }
         repeat(1000) {
             if (
                 !state.stage.isTurnPhase ||
@@ -195,7 +212,7 @@ internal object TurnEngine {
                     },
                 adjustments = emptyMap(),
             )
-        } else opened
+        } else if (state.stage == Stage.EXPANSION) opened.applyHolyIndulgence() else opened
     }
 
     fun finishActor(state: GameState): GameState {
@@ -247,7 +264,11 @@ internal object TurnEngine {
                 if (eligible == null) next else next.queueDraw(eligible)
             }
             Stage.FINAL_CARD_PLAY ->
-                state.copy(stage = Stage.FINISHED, flow = state.flow.copy(actor = null))
+                state.copy(
+                    stage = Stage.FINISHED,
+                    activeWar = null,
+                    flow = state.flow.copy(actor = null),
+                )
             else -> state
         }
 
@@ -335,7 +356,7 @@ internal object TurnEngine {
                             tokenPurchase = if (player.misery == MiseryStep.CHAOS) 0 else null
                         )
                     },
-                turnOrderSelection = TurnOrderSelection(),
+                effects = CardTurnEffects(),
                 flow = TurnFlow(),
             )
 }

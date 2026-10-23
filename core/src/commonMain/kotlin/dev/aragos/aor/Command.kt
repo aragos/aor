@@ -141,7 +141,10 @@ sealed interface Command {
         override fun toText(): String = "buy-tokens $amount"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
-            checkRule(state.stage == Stage.TOKEN_PURCHASE, ViolationCode.WRONG_PHASE)
+            checkRule(
+                state.stage == Stage.TOKEN_PURCHASE && state.flow.decisions.isEmpty(),
+                ViolationCode.WRONG_PHASE,
+            )
             val player = state.playerState(actor)
             checkRule(
                 player.tokenPurchase == null && player.misery != MiseryStep.CHAOS,
@@ -179,6 +182,7 @@ sealed interface Command {
                     },
                 turnOrderSelection = selection,
                 stage = if (selection.isResolved) Stage.DRAW_CARD else Stage.TURN_ORDER_TIE,
+                flow = submitted.flow.copy(phaseStarted = false, actor = null),
             )
         }
 
@@ -200,6 +204,7 @@ sealed interface Command {
             return state.copy(
                 turnOrderSelection = selection,
                 stage = if (selection.isResolved) Stage.DRAW_CARD else Stage.TURN_ORDER_TIE,
+                flow = state.flow.copy(phaseStarted = false, actor = null),
             )
         }
 
