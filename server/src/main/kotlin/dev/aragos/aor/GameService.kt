@@ -22,6 +22,7 @@ data class GameSnapshot(
     val prompt: PromptView?,
     val legalChoices: LegalChoices,
     val submitted: List<PlayerId>,
+    /** The viewer's unrevealed capital bid or signed token-purchase amount, when submitted. */
     val pendingBid: Int?,
     val history: List<String>,
 )

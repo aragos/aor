@@ -323,6 +323,34 @@ th, td {
     margin-bottom: 0;
 }
 
+.purchase-preview {
+    padding: 1rem;
+    background: #f0f3e9;
+    border: 1px solid #dce3d1;
+    border-radius: 5px;
+}
+
+.purchase-preview .resources {
+    margin: 0;
+}
+
+.turn-order ol {
+    padding-left: 1.5rem;
+    margin-bottom: 0;
+}
+
+.turn-order li {
+    padding: .65rem .4rem;
+    border-bottom: 1px solid #e9eadd;
+}
+
+.turn-order li span {
+    display: inline-block;
+    margin-left: .9rem;
+    font-size: .8rem;
+    color: #637063;
+}
+
 .resources {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

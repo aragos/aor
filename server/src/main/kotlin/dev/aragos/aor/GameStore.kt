@@ -174,14 +174,18 @@ class FileGameStore(
             "A game must have an initial configuration revision."
         }
         val state = validateRevisions(game.header, game.revisions)
-        require(
-            game.pendingBids.isEmpty() ||
-                state.stage == Stage.BIDDING && game.pendingBids.size < game.header.players.size
-        ) {
-            "Pending bids must form an incomplete batch during capital bidding."
+        require(game.pendingBids.size < game.header.players.size) {
+            "Pending sealed decisions must form an incomplete batch."
         }
-        game.pendingBids.forEach { (player, bid) ->
-            state.step(Entry.Action(actor = player, command = Command.BidCapital(bid)))
+        game.pendingBids.forEach { (player, amount) ->
+            val command =
+                when (state.stage) {
+                    Stage.BIDDING -> Command.BidCapital(amount)
+                    Stage.TOKEN_PURCHASE -> Command.BuyTokens(amount)
+                    else ->
+                        error("Pending sealed decisions require a bidding or token-purchase phase.")
+                }
+            state.step(Entry.Action(actor = player, command = command))
         }
     }
 
@@ -216,6 +220,12 @@ class FileGameStore(
                     ) {
                         "Sealed bids may enter history only as a complete, revealed batch."
                     }
+                    require(
+                        next.stage != Stage.TOKEN_PURCHASE ||
+                            next.players.values.all { player -> player.tokenPurchase == null }
+                    ) {
+                        "Sealed token purchases may enter history only as a complete, revealed batch."
+                    }
                 }
         }
 
@@ -226,27 +236,51 @@ class FileGameStore(
         entries: List<Entry>,
         index: Int,
     ) {
-        if (revision.command == "reveal-capital-bids") {
-            require(state.stage == Stage.BIDDING) { "Capital bids can only reveal during bidding." }
-            require(
-                actions.map(Entry.Action::actor) == state.playerIds &&
-                    actions.all { action -> action.command is Command.BidCapital }
-            ) {
-                "A revealed bid batch must include all players in registration order."
+        when (revision.command) {
+            "reveal-capital-bids" -> {
+                require(state.stage == Stage.BIDDING) {
+                    "Capital bids can only reveal during bidding."
+                }
+                validateSealedActions(state, actions) { command -> command is Command.BidCapital }
             }
-        } else {
-            val command = TextCodec.parseCommand(revision.command)
-            require(revision.command == command.toText()) {
-                "Revision commands must use canonical text."
+            "reveal-token-purchases" -> {
+                require(state.stage == Stage.TOKEN_PURCHASE) {
+                    "Token purchases can only reveal during the token-purchase phase."
+                }
+                validateSealedActions(state, actions) { command -> command is Command.BuyTokens }
             }
-            require(actions == listOf(Entry.Action(actor = revision.author, command = command))) {
-                "A command revision must contain exactly the author's command."
-            }
-            if (index == 0) {
-                require(command is Command.SetEpochs && entries.size == 1) {
-                    "The initial revision must contain only the epoch configuration command."
+            else -> {
+                val command = TextCodec.parseCommand(revision.command)
+                require(command !is Command.BidCapital && command !is Command.BuyTokens) {
+                    "Sealed decisions must be committed together under their reveal marker."
+                }
+                require(revision.command == command.toText()) {
+                    "Revision commands must use canonical text."
+                }
+                require(
+                    actions == listOf(Entry.Action(actor = revision.author, command = command))
+                ) {
+                    "A command revision must contain exactly the author's command."
+                }
+                if (index == 0) {
+                    require(command is Command.SetEpochs && entries.size == 1) {
+                        "The initial revision must contain only the epoch configuration command."
+                    }
                 }
             }
+        }
+    }
+
+    private fun validateSealedActions(
+        state: GameState,
+        actions: List<Entry.Action>,
+        accepts: (Command) -> Boolean,
+    ) {
+        require(
+            actions.map(Entry.Action::actor) == state.playerIds &&
+                actions.all { action -> accepts(action.command) }
+        ) {
+            "A revealed batch must include the current sealed decision for every player in registration order."
         }
     }
 
@@ -258,7 +292,9 @@ class FileGameStore(
                 Stage.CONFIGURATION,
                 Stage.BIDDING,
                 Stage.CAPITAL_CHOICE,
-                Stage.SETUP_COMPLETE,
+                Stage.TOKEN_PURCHASE,
+                Stage.TURN_ORDER_TIE,
+                Stage.DRAW_CARD,
             )
     }
 }

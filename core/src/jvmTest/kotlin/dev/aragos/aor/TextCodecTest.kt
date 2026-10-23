@@ -8,7 +8,14 @@ class TextCodecTest {
     @Test
     fun playerCommandsHaveCanonicalText() {
         for (text in
-            listOf("set-option epochs 1", "start", "bid-capital 12", "choose-capital venice")) {
+            listOf(
+                "set-option epochs 1",
+                "start",
+                "bid-capital 12",
+                "choose-capital venice",
+                "buy-tokens -2",
+                "choose-turn-position 2",
+            )) {
             assertThat(TextCodec.parseCommand(text).toText()).isEqualTo(text)
         }
     }
@@ -54,6 +61,12 @@ class TextCodecTest {
                 "bid-capital 9999999999999",
                 "bid-capital",
                 "choose-capital",
+                "buy-tokens",
+                "buy-tokens 1.5",
+                "buy-tokens 2147483648",
+                "buy-tokens -2147483649",
+                "choose-turn-position",
+                "choose-turn-position 999999999999999",
                 "",
             )
 
@@ -100,5 +113,9 @@ class TextCodecTest {
             "p2: choose-capital venice",
             "p1: choose-capital genoa",
             "p3: choose-capital barcelona",
+            "p1: buy-tokens 2",
+            "p2: buy-tokens 2",
+            "p3: buy-tokens -1",
+            "p1: choose-turn-position 1",
         )
 }

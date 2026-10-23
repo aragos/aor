@@ -7,7 +7,9 @@ enum class Stage {
     BIDDING,
     CAPITAL_TIE,
     CAPITAL_CHOICE,
-    SETUP_COMPLETE;
+    TOKEN_PURCHASE,
+    TURN_ORDER_TIE,
+    DRAW_CARD;
 
     fun prompt(state: GameState): Prompt? =
         when (this) {
@@ -47,7 +49,20 @@ enum class Stage {
                         },
                     choice = "choose-capital",
                 )
-            SETUP_COMPLETE -> null
+            TOKEN_PURCHASE ->
+                Prompt.MultiPlayer(
+                    players =
+                        state.playerIds.filter { playerId ->
+                            state.playerState(playerId).tokenPurchase == null
+                        },
+                    choice = "buy-tokens",
+                )
+            TURN_ORDER_TIE ->
+                Prompt.SinglePlayer(
+                    player = state.turnOrderSelection.ties.first().choosingPlayer,
+                    choice = "choose-turn-position",
+                )
+            DRAW_CARD -> null
         }
 
     fun legalChoices(state: GameState, player: PlayerId): LegalChoices =
@@ -78,6 +93,26 @@ enum class Stage {
                 } else {
                     LegalChoices()
                 }
+            TOKEN_PURCHASE ->
+                if (state.playerState(player).tokenPurchase == null) {
+                    val cash = state.playerState(player).cash
+                    LegalChoices(commands = listOf("buy-tokens"), bidMin = -cash, bidMax = cash)
+                } else {
+                    LegalChoices()
+                }
+            TURN_ORDER_TIE -> {
+                val tie = state.turnOrderSelection.ties.first()
+                if (tie.choosingPlayer == player) {
+                    LegalChoices(
+                        commands =
+                            (1..tie.placed.size + 1).map { slot ->
+                                Command.ChooseTurnPosition(slot).toText()
+                            }
+                    )
+                } else {
+                    LegalChoices()
+                }
+            }
             else -> LegalChoices()
         }
 }

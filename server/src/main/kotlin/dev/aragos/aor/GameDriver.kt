@@ -17,6 +17,7 @@ data class StoredGame(
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
     val revisions: List<Revision>,
+    /** Unrevealed amounts for the current capital-bid or token-purchase batch. */
     val pendingBids: Map<PlayerId, Int> = emptyMap(),
 ) {
     val revision: Int
@@ -73,37 +74,56 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
     fun submit(stored: StoredGame, player: PlayerId, command: Command): StoredGame {
         val state = stored.state()
         state.step(Entry.Action(actor = player, command = command))
-        return if (command is Command.BidCapital) {
-            submitBid(stored = stored, state = state, player = player, command = command)
-        } else {
-            commit(
-                stored = stored,
-                state = state,
-                player = player,
-                command = command.toText(),
-                actions = listOf(Entry.Action(actor = player, command = command)),
-            )
+        return when (command) {
+            is Command.BidCapital ->
+                submitSealedDecision(
+                    stored = stored,
+                    state = state,
+                    player = player,
+                    amount = command.amount,
+                    revealCommand = "reveal-capital-bids",
+                    createCommand = { amount -> Command.BidCapital(amount) },
+                )
+            is Command.BuyTokens ->
+                submitSealedDecision(
+                    stored = stored,
+                    state = state,
+                    player = player,
+                    amount = command.amount,
+                    revealCommand = "reveal-token-purchases",
+                    createCommand = { amount -> Command.BuyTokens(amount) },
+                )
+            else ->
+                commit(
+                    stored = stored,
+                    state = state,
+                    player = player,
+                    command = command.toText(),
+                    actions = listOf(Entry.Action(actor = player, command = command)),
+                )
         }
     }
 
-    private fun submitBid(
+    private fun submitSealedDecision(
         stored: StoredGame,
         state: GameState,
         player: PlayerId,
-        command: Command.BidCapital,
+        amount: Int,
+        revealCommand: String,
+        createCommand: (Int) -> Command,
     ): StoredGame {
-        val pending = stored.pendingBids + (player to command.amount)
+        val pending = stored.pendingBids + (player to amount)
         if (pending.size < stored.header.players.size) return stored.copy(pendingBids = pending)
         return commit(
             stored = stored.copy(pendingBids = emptyMap()),
             state = state,
             player = player,
-            command = "reveal-capital-bids",
+            command = revealCommand,
             actions =
                 stored.header.players.map { registered ->
                     Entry.Action(
                         actor = registered.id,
-                        command = Command.BidCapital(pending.getValue(registered.id)),
+                        command = createCommand(pending.getValue(registered.id)),
                     )
                 },
         )

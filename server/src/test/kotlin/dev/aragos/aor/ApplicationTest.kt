@@ -105,7 +105,7 @@ class ApplicationTest {
     }
 
     @Test
-    fun setupCompletesThroughTheHttpApi() = withGame {
+    fun capitalSelectionStartsTurnOneTokenPurchaseThroughTheHttpApi() = withGame {
         revealBids()
         command(1, 3, "choose-capital venice")
         command(0, 4, "choose-capital genoa")
@@ -114,8 +114,9 @@ class ApplicationTest {
         val complete = json.readTree(response.bodyAsText())
 
         assertThat(response.status).isEqualTo(HttpStatusCode.OK)
-        assertThat(complete["game"]["stage"].asText()).isEqualTo("SETUP_COMPLETE")
-        assertThat(complete["prompt"].isNull).isTrue()
+        assertThat(complete["game"]["stage"].asText()).isEqualTo("TOKEN_PURCHASE")
+        assertThat(complete["game"]["turnNumber"].asInt()).isEqualTo(1)
+        assertThat(complete["prompt"]["messageId"].asText()).isEqualTo("prompt.buy-tokens")
         assertThat(complete["game"]["players"].map { player -> player["cash"].asInt() })
             .containsExactly(28, 28, 40)
             .inOrder()
@@ -126,6 +127,42 @@ class ApplicationTest {
             .containsExactly(24, 24, 24)
         assertThat(complete["game"]["players"].map { player -> player["boardMarkers"].asInt() })
             .containsExactly(1, 1, 1)
+    }
+
+    @Test
+    fun signedTokenPurchasesRemainPrivateThroughTheHttpApi() = withGame {
+        selectCapitals()
+
+        val submitted = command(0, 6, "buy-tokens -7")
+        val own = json.readTree(submitted.bodyAsText())
+        val other = json.readTree(view(1).bodyAsText())
+
+        assertThat(submitted.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(own["pendingBid"].asInt()).isEqualTo(-7)
+        assertThat(other["pendingBid"].isNull).isTrue()
+        assertThat(other["game"]["revealedTokenPurchases"].size()).isEqualTo(0)
+        assertThat(other["history"].none { entry -> entry.asText().contains("buy-tokens") })
+            .isTrue()
+        assertThat(other["game"]["players"][0]["cash"].asInt()).isEqualTo(28)
+    }
+
+    @Test
+    fun tokenPurchasesReachTheDrawCardBoundaryThroughTheHttpApi() = withGame {
+        selectCapitals()
+        command(0, 6, "buy-tokens -7")
+        command(1, 6, "buy-tokens 5")
+
+        val response = command(2, 6, "buy-tokens 1")
+        val snapshot = json.readTree(response.bodyAsText())
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(snapshot["game"]["stage"].asText()).isEqualTo("DRAW_CARD")
+        assertThat(snapshot["game"]["turnNumber"].asInt()).isEqualTo(1)
+        assertThat(snapshot["game"]["turnOrder"].size()).isEqualTo(3)
+        assertThat(snapshot["game"]["orderBoxes"].size()).isEqualTo(3)
+        assertThat(snapshot["game"]["revealedTokenPurchases"]["p1"].asInt()).isEqualTo(-7)
+        assertThat(snapshot["submitted"].size()).isEqualTo(0)
+        assertThat(snapshot["pendingBid"].isNull).isTrue()
     }
 
     @Test
@@ -222,6 +259,13 @@ private class ApiGame(
                 json.writeValueAsString(mapOf("expectedRevision" to revision, "command" to text))
             )
         }
+
+    suspend fun selectCapitals() {
+        revealBids()
+        command(1, 3, "choose-capital venice")
+        command(0, 4, "choose-capital genoa")
+        command(2, 5, "choose-capital barcelona")
+    }
 
     suspend fun revealBids() {
         command(0, 1, "start")

@@ -71,7 +71,7 @@ class SetupTest {
     }
 
     @Test
-    fun choosingEveryCapitalCompletesSetup() {
+    fun choosingEveryCapitalBeginsTheFirstTurn() {
         for (count in 3..6) {
             val bidding = dealt(count)
             val choosing =
@@ -83,8 +83,12 @@ class SetupTest {
                     state.play("$player: choose-capital ${state.availableCapitals.first()}")
                 }
 
-            assertThat(complete.stage).isEqualTo(Stage.SETUP_COMPLETE)
-            assertThat(complete.prompts()).isEmpty()
+            assertThat(complete.stage).isEqualTo(Stage.TOKEN_PURCHASE)
+            assertThat(complete.turnNumber).isEqualTo(1)
+            assertThat(complete.prompts())
+                .containsExactly(
+                    Prompt.MultiPlayer(players = complete.playerIds, choice = "buy-tokens")
+                )
             assertThat(complete.players.values.map(PlayerState::capital)).hasSize(count)
             assertThat(complete.players.values.map(PlayerState::capital)).containsNoDuplicates()
             assertThat(complete.availableCapitals).isEmpty()

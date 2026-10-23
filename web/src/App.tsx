@@ -46,18 +46,39 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
     const [command, setCommand] = useState('');
     const previousEpochs = useRef(snapshot.game.epochs);
     const previousBid = useRef(snapshot.pendingBid);
+    const previousStage = useRef(snapshot.game.stage);
     useEffect(() => {
         const previous = String(previousEpochs.current);
         setEpochs(current => current === previous ? String(snapshot.game.epochs) : current);
         previousEpochs.current = snapshot.game.epochs;
     }, [snapshot.game.epochs]);
     useEffect(() => {
+        if (previousStage.current !== snapshot.game.stage) {
+            setBid(String(snapshot.pendingBid ?? 0));
+            setCommand('');
+            previousStage.current = snapshot.game.stage;
+            previousBid.current = snapshot.pendingBid;
+            return;
+        }
         const previous = String(previousBid.current ?? 0);
         setBid(current => current === previous ? String(snapshot.pendingBid ?? 0) : current);
         previousBid.current = snapshot.pendingBid;
-    }, [snapshot.pendingBid]);
+    }, [snapshot.pendingBid, snapshot.game.stage]);
     const stage = snapshot.game.stage;
-    const canChoose = snapshot.legalChoices.commands.some(choice => choice.startsWith('choose-capital '));
+    const capitalChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-capital '));
+    const turnChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-turn-position '));
+    const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
+    const nameFor = (playerId: string) => snapshot.game.players.find(player => player.id === playerId)?.name ?? playerId;
+    const isTokenPurchase = stage === 'TOKEN_PURCHASE';
+    const amount = Number(bid);
+    const validPurchase = bid.trim() !== '' && Number.isInteger(amount) && Math.abs(amount) <= me.cash;
+    const positionLabel = (slot: number) => {
+        const order = snapshot.game.provisionalTieOrder;
+        if (order.length === 0) return t('controls.firstPosition');
+        if (slot === 1) return t('controls.before').replace('{name}', nameFor(order[0]));
+        if (slot > order.length) return t('controls.after').replace('{name}', nameFor(order[order.length - 1]));
+        return t('controls.between').replace('{before}', nameFor(order[slot - 2])).replace('{after}', nameFor(order[slot - 1]));
+    };
     return <>
         {stage === 'CONFIGURATION' && snapshot.viewerId === snapshot.creatorId && <>
             <form className="inline-form" onSubmit={event => { event.preventDefault(); void submit(`set-option epochs ${epochs}`); }}>
@@ -67,15 +88,26 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
             </form>
             <button disabled={busy || Number(epochs) !== snapshot.game.epochs} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
         </>}
-        {stage === 'BIDDING' && <form onSubmit={event => { event.preventDefault(); void submit(`bid-capital ${bid}`); }}>
-            <label htmlFor="bid">{t('controls.bid')}</label>
-            <div className="inline-form"><input id="bid" type="number" min={0} max={40} step={1} value={bid} onChange={event => setBid(event.target.value)} required/>
-                <button disabled={busy}>{t(snapshot.pendingBid === null ? 'controls.saveBid' : 'controls.replaceBid')}</button></div>
-            {snapshot.pendingBid !== null && <p className="sealed">{t('controls.pending')}: ${snapshot.pendingBid}</p>}
-            <p className="muted small">{t('controls.bidHint')}</p>
+        {(stage === 'BIDDING' || isTokenPurchase) && <form onSubmit={event => { event.preventDefault(); void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
+            <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
+            <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-hint purchase-preview' : 'bid-hint'} required/>
+                <button disabled={busy || (isTokenPurchase && !validPurchase)}>{t(isTokenPurchase ? snapshot.pendingBid === null ? 'controls.savePurchase' : 'controls.replacePurchase' : snapshot.pendingBid === null ? 'controls.saveBid' : 'controls.replaceBid')}</button></div>
+            {snapshot.pendingBid !== null && <p className="sealed">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
+            <p id={isTokenPurchase ? 'purchase-hint' : 'bid-hint'} className="muted small">{t(isTokenPurchase ? 'controls.purchaseHint' : 'controls.bidHint')}</p>
+            {isTokenPurchase && <div id="purchase-preview" className="purchase-preview" aria-live="polite">
+                {validPurchase ? <dl className="resources">
+                    <div><dt>{t('controls.purchaseCost')}</dt><dd>${Math.abs(amount)}</dd></div>
+                    <div><dt>{t('controls.purchaseTokens')}</dt><dd>{Math.max(0, Math.min(me.stockTokens, amount))}</dd></div>
+                    <div><dt>{t('controls.remainingCash')}</dt><dd>${me.cash - Math.abs(amount)}</dd></div>
+                </dl> : <p className="small">{t('controls.purchaseRange').split('{cash}').join(String(me.cash))}</p>}
+            </div>}
         </form>}
-        {canChoose && <div className="capital-choices">{snapshot.legalChoices.commands.map(choice => <button key={choice} disabled={busy} onClick={() => { void submit(choice); }}>{t(`capital.${choice.split(' ')[1]}`)}</button>)}</div>}
-        {stage !== 'SETUP_COMPLETE' && <form className="console" onSubmit={async event => { event.preventDefault(); if (await submit(command)) setCommand(current => current === command ? '' : current); }}>
+        {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button key={choice} disabled={busy} onClick={() => { void submit(choice); }}>{t(`capital.${choice.split(' ')[1]}`)}</button>)}</div>}
+        {stage === 'TURN_ORDER_TIE' && <div className="turn-tie">
+            <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? snapshot.game.provisionalTieOrder.map(nameFor).join(' → ') : t('controls.noPositions')}</p>
+            {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button key={choice} disabled={busy} onClick={() => { void submit(choice); }}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}</div>}
+        </div>}
+        {stage !== 'DRAW_CARD' && <form className="console" onSubmit={async event => { event.preventDefault(); if (await submit(command)) setCommand(current => current === command ? '' : current); }}>
             <label htmlFor="command">{t('controls.command')}</label><p className="muted small">{t('controls.commandHint')}</p>
             <div className="inline-form"><input id="command" className="command-input" value={command} onChange={event => setCommand(event.target.value)} placeholder={t('controls.commandPlaceholder')} autoComplete="off" required/>
                 <button className="secondary" disabled={busy || !command.trim()}>{t('controls.send')}</button></div>
@@ -131,28 +163,37 @@ function Game({id, token}: {id: string; token: string}) {
     if (!snapshot) return <main className="landing panel"><h1>{t('app.title')}</h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
     const nameFor = (playerId: string) => snapshot.game.players.find(player => player.id === playerId)?.name ?? playerId;
-    const complete = snapshot.game.stage === 'SETUP_COMPLETE';
+    const ready = snapshot.game.stage === 'DRAW_CARD';
+    const sealedStatus = (playerId: string, stage: string) => snapshot.game.stage === stage
+        ? t(snapshot.submitted.includes(playerId) ? 'game.submitted' : 'game.waiting') : '—';
     return <main className="game-shell">
         <header className="game-header"><div><p className="eyebrow">{t('game.seat')}: {me.name}</p><h1>{t('app.title')}</h1></div>
-            <div className="header-meta"><span>{t(`stage.${snapshot.game.stage}`)}</span><small>{t('game.epochs')}: {snapshot.game.epochs} · {t('game.revision')}: {snapshot.revision}</small><a href="/">{t('game.new')}</a></div></header>
+            <div className="header-meta"><span>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</span><small>{t('game.epochs')}: {snapshot.game.epochs} · {t('game.revision')}: {snapshot.revision}</small><a href="/">{t('game.new')}</a></div></header>
         {connectionError && <ErrorMessage code={connectionError}/>}
         <div className="game-layout"><div className="main-column">
-            <section className={`panel decision ${complete ? 'complete' : ''}`}>
-                <p className="eyebrow">{t(`stage.${snapshot.game.stage}`)}</p>
-                <h2>{complete ? t('game.complete') : snapshot.prompt ? t(snapshot.prompt.messageId) : ''}</h2>
-                {complete ? <p>{t('game.completeDetail')}</p> : snapshot.prompt && <p className="muted">{t('prompt.waitingFor')}: {snapshot.prompt.players.map(nameFor).join(', ')}</p>}
+            <section className={`panel decision ${ready ? 'complete' : ''}`}>
+                <p className="eyebrow">{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</p>
+                <h2>{ready ? t('game.drawReady') : snapshot.prompt ? t(snapshot.prompt.messageId) : ''}</h2>
+                {ready ? <p>{t('game.drawReadyDetail')}</p> : snapshot.prompt && <p className="muted">{t('prompt.waitingFor')}: {snapshot.prompt.players.map(nameFor).join(', ')}</p>}
                 <Controls snapshot={snapshot} busy={busy} submit={submit}/>
                 {actionError && <ErrorMessage code={actionError}/>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
             </section>
             <section className="panel"><h2 id="table-title">{t('game.table')}</h2><div className="table-scroll" tabIndex={0} role="region" aria-labelledby="table-title"><table aria-labelledby="table-title"><thead><tr>
-                {['player', 'capital', 'cash', 'cards', 'bid'].map(key => <th key={key} scope="col">{t(`game.${key}`)}</th>)}
+                {['player', 'capital', 'cash', 'pool', 'tokens', 'cards', 'bid', 'tokenPurchase'].map(key => <th key={key} scope="col">{t(`game.${key}`)}</th>)}
             </tr></thead><tbody>{snapshot.game.players.map(player => <tr key={player.id} className={player.id === me.id ? 'my-row' : ''}>
-                <td><strong>{player.name}</strong></td><td>{player.capital ? t(`capital.${player.capital}`) : t('game.unassigned')}</td><td>${player.cash}</td><td>{player.handCount}</td>
-                <td>{snapshot.game.revealedBids[player.id] !== undefined ? `$${snapshot.game.revealedBids[player.id]}` : t(snapshot.submitted.includes(player.id) ? 'game.submitted' : 'game.waiting')}</td>
+                <td><strong>{player.name}</strong></td><td>{player.capital ? t(`capital.${player.capital}`) : t('game.unassigned')}</td><td>${player.cash}</td><td>{player.poolTokens}</td><td>{player.stockTokens}</td><td>{player.handCount}</td>
+                <td>{snapshot.game.revealedBids[player.id] !== undefined ? `$${snapshot.game.revealedBids[player.id]}` : sealedStatus(player.id, 'BIDDING')}</td>
+                <td>{snapshot.game.revealedTokenPurchases[player.id] !== undefined ? snapshot.game.revealedTokenPurchases[player.id] : sealedStatus(player.id, 'TOKEN_PURCHASE')}</td>
             </tr>)}</tbody></table></div>
                 {snapshot.game.capitalOrder.length > 0 && <p className="order"><span className="muted">{t('game.order')}: </span>{snapshot.game.capitalOrder.map(nameFor).join(' → ')}</p>}
             </section>
+            {snapshot.game.turnOrder.length > 0 && <section className="panel turn-order">
+                <h2>{t('game.turnOrder').replace('{turn}', String(snapshot.game.turnNumber))}</h2>
+                <ol>{snapshot.game.turnOrder.map(playerId => <li key={playerId}>
+                    <strong>{nameFor(playerId)}</strong><span>{t('game.orderBox')} {snapshot.game.orderBoxes[playerId]}</span>
+                </li>)}</ol>
+            </section>}
             <section className="panel"><h2>{t('game.resources')}</h2><dl className="resources">{([
                 ['tokens', me.stockTokens], ['pool', me.poolTokens], ['stockMarkers', me.stockMarkers], ['boardMarkers', me.boardMarkers], ['misery', me.misery ?? t('game.chaos')], ['ships', me.ships],
             ] as const).map(([key, value]) => <div key={key}><dt>{t(`game.${key}`)}</dt><dd>{value}</dd></div>)}</dl></section>

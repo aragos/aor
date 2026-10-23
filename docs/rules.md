@@ -22,7 +22,7 @@ part of the baseline.
 | **Token** | A square piece representing market penetration. 36 per player. |
 | **Domination marker** | A round piece representing control of a market. 25 per player. Counts as *market number* tokens. |
 | **Stock** | Tokens not on the board and not in the expansion pool. |
-| **Expansion pool** | Tokens bought in the Order of Play phase, to be placed in the next Expansion phase. |
+| **Expansion pool** | Tokens bought in the Order of Play phase, to be placed during that turn's Expansion phase. |
 | **New / white piece** | A token or marker placed this turn. It is white side up until the Income phase flips it. |
 | **Coloured piece** | A piece placed in an earlier turn. Only coloured pieces act as a base for expansion and as "control" for Caravan. |
 | **Area** | One of eight regions I–VIII, bounded by thick coloured borders. Which areas are in play depends on player count. |
@@ -133,8 +133,9 @@ All fractions are **rounded up** unless stated otherwise.
       higher roll chooses first.
     - **Every player pays their own bid.** Starting cash is $40 minus the bid.
     - The capital order is kept; it breaks later turn-order ties ([§5.1](#51-order-of-play)).
-5. **First Order of Play.** Run the Order of Play phase once ([§5.1](#51-order-of-play)) before turn 1. It sets turn 1's
-   order and each player's expansion pool.
+
+Setup ends after capital selection. Turn 1 begins with the regular Order of Play phase
+([§5.1](#51-order-of-play)), which establishes that turn's order and expansion pools.
 
 ---
 
@@ -145,7 +146,7 @@ unless the phase is simultaneous.
 
 | # | Phase | Summary |
 | --- | --- | --- |
-| 1 | [Order of Play](#51-order-of-play) | Secretly buy tokens for next turn; this sets next turn's order. |
+| 1 | [Order of Play](#51-order-of-play) | Secretly buy expansion tokens and establish this turn's order. |
 | 2 | [Draw Card](#52-draw-card) | First player may cancel a shortage/surplus; every player draws one card. |
 | 3 | [Buy Card](#53-buy-card) | Urban Ascendancy owners may buy one extra card; Master Art owners may discard one. |
 | 4 | [Play Cards](#54-play-cards) | Players play any number of commodity, event and leader cards. |
@@ -168,14 +169,18 @@ does not own it ([§10.3](#103-advance-effects)).
     - Each player secretly records its total cash, the number of tokens it buys, and the cash remaining (its *written
       cash*).
     - Tokens cost $1 each.
-    - **Negative bid.** A player may instead bid a negative amount *−k*. It pays $k, receives no tokens, and is ranked
-      below any non-negative bid.
+    - The absolute bid must not exceed the player's available cash.
+    - **Negative bid.** A player may instead bid a negative amount *−k*. It pays $k, receives no tokens, and acts
+      before any non-negative bid. More negative bids act earlier.
     - **Over-bid.** A player may bid more tokens than its stock holds. It pays the full bid and receives only what stock
       holds.
 2. **Reveal and pay.** Each player pays the bank and moves the purchased tokens from stock to its expansion pool.
 3. **Reorder.**
-    - Players are ordered from **fewest tokens bought (first) to most (last)**.
+    - Players are ordered by **signed bid, lowest first**. An over-bid retains its full amount for ordering, even if
+      fewer tokens are available in stock.
     - Ties: the player that chose its capital later decides its position relative to the other tied players.
+      Resolve a tied group in capital-choice order: the earliest chooser forms the initial sequence, and each later
+      chooser inserts itself before, between or after those already placed. Later capital choosers decide last.
     - Players in Chaos count as bidding 0.
 4. **Boxes.** Players occupy the order-of-play boxes for the player count:
 
@@ -186,8 +191,11 @@ does not own it ([§10.3](#103-advance-effects)).
 | 5 | 1, 2, 3, 4, 5 |
 | 6 | 1, 2, 3, 4, 5, 6 |
 
-5. **Advance bookkeeping.** Advances bought this turn become "old". This matters for misery relief, which uses only the
-   MR of advances bought in the current turn.
+5. **Advance bookkeeping.** At the start of this phase, previously purchased advances become "old". This matters for
+   misery relief, which uses only the MR of advances bought later in the current turn.
+
+The order established here applies from Draw Card onward. The purchased pool is available during the same turn's
+Expansion phase; neither the order nor the pool is deferred to a different turn.
 
 Recorded cash at the end of each turn is public.
 
@@ -307,7 +315,8 @@ Each player in turn order completes these steps in sequence:
         - Shortage: the majority holder draws a free card (one per marker).
         - Surplus: the majority holder pays $1 per province of that commodity it dominates (once per marker).
 
-    - A marker lasts until a card of that commodity is played or the end of next turn.
+    - A marker is consumed when a card of that commodity is played. Remaining markers are removed at the start of
+      Income's shortage/surplus step, before rolling new markers.
 
 ---
 
@@ -516,7 +525,7 @@ The game ends **at the end of the turn** in which:
 - a player acquires its 26th advance; or
 - the last card of the final epoch's deck is drawn.
 
-The final turn is played in full, including Income. No Order of Play phase follows it. Once the final deck is exhausted,
+The final turn is played in full, including Income, then proceeds to Final Card Play. Once the final deck is exhausted,
 no more cards can be drawn for any reason.
 
 ### Final Card Play
@@ -870,8 +879,6 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 
 **Reference issues still to resolve:**
 
-- **Order/pool timing (§3–5).** Setup requires an initial Order of Play. Section 4 describes the normal phase as buying
-  for the next turn, while §5.1 moves purchases directly into the pool spent in §5.6. The handoff is not specified.
 - **Expansion bonus (§5.6).** Confirm whether rebuilt markers after events are excluded (existing TODO).
 - **Caravan (§6.3).** Confirm the full-intermediate-province attack-through requirement (existing TODO).
 

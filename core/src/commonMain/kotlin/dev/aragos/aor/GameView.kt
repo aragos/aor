@@ -19,7 +19,13 @@ data class PlayerView(
         get() = 25 - boardMarkers
 }
 
-/** Public game information plus only the requesting player's private hand. */
+/**
+ * Public game information plus only the requesting player's private hand.
+ *
+ * [turnNumber] is null during setup. [turnOrder] and [orderBoxes] remain empty until every tie is
+ * resolved. [revealedTokenPurchases] contains signed amounts only after simultaneous reveal.
+ * [provisionalTieOrder] contains only players already inserted in the current unresolved tie.
+ */
 data class GameView(
     val stage: Stage,
     val epochs: Int,
@@ -27,6 +33,11 @@ data class GameView(
     val hand: List<HandCard>,
     val capitalOrder: List<PlayerId>,
     val revealedBids: Map<PlayerId, Int>,
+    val turnNumber: Int?,
+    val turnOrder: List<PlayerId>,
+    val orderBoxes: Map<PlayerId, Int>,
+    val revealedTokenPurchases: Map<PlayerId, Int>,
+    val provisionalTieOrder: List<PlayerId>,
 ) {
     companion object {
         internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
@@ -53,6 +64,11 @@ data class GameView(
                 capitalOrder =
                     if (state.capitalSelection.isResolved) state.capitalOrder else emptyList(),
                 revealedBids = SetupProjection.revealedCapitalBids(state),
+                turnNumber = state.turnNumber,
+                turnOrder = state.turnOrder,
+                orderBoxes = state.orderBoxes,
+                revealedTokenPurchases = TurnOrderProjection.revealedPurchases(state),
+                provisionalTieOrder = state.turnOrderSelection.ties.firstOrNull()?.placed.orEmpty(),
             )
     }
 }

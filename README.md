@@ -3,13 +3,14 @@
 A Kotlin Multiplatform engine, Ktor server and React web client for
 [Age of Renaissance](https://boardgamegeek.com/boardgame/26/age-of-renaissance), inspired by
 [Snellman's command-log approach](https://www.snellman.net/blog/archive/2014-12-08-command-languages-as-game-ui/).
-The application implements standard setup for 3–6 human players: private cards, sealed capital bids,
-recorded tie rolls and capital selection. It stops before the initial Order of Play.
+The application implements standard setup and turn 1's Order of Play for 3–6 human players: private cards,
+sealed capital bids, recorded tie rolls, capital selection, sealed token purchases and turn-order choices.
+It stops at **Turn 1 — Draw Card**, with the order and expansion pools ready for that turn.
 
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
-- [Manual setup walkthrough](docs/manual-setup.md): run, test, restart and API instructions.
+- [Manual walkthrough](docs/manual-setup.md): setup, Order of Play, restart and API instructions.
 
 ```text
 core/     platform-independent Kotlin engine and game data (JVM/JS)
@@ -28,7 +29,8 @@ use the same engine validation. Player tabs refresh automatically.
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
 Set `AOR_DATA_DIR` to an absolute directory to choose another location. Use one server process per data directory.
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
-The local server listens on `127.0.0.1`; account authentication, general undo, variants and turn play are deferred.
+The local server listens on `127.0.0.1`; account authentication, general undo, variants and phases after Order of Play
+are deferred.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 Run server tests with `./gradlew :server:test` and core JVM tests with `./gradlew :core:jvmTest`. Use

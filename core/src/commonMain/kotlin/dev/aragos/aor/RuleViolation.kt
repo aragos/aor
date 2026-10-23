@@ -7,6 +7,10 @@ enum class ViolationCode(val description: String) {
     WRONG_PHASE("The action is not allowed in the current phase."),
     INVALID_EPOCHS("Game length must be 1, 2, or 3 epochs."),
     INVALID_BID("A capital bid must be between 0 and 40."),
+    INVALID_TOKEN_PURCHASE(
+        "A token purchase must be a whole number between negative and positive available cash."
+    ),
+    INVALID_TURN_POSITION("Choose an available insertion position in the current turn-order tie."),
     UNAVAILABLE_CAPITAL("The selected capital is unavailable."),
     INVALID_OUTCOME("The system outcome does not match the pending request."),
     UNSUPPORTED_OPTION("The requested game option is unsupported."),

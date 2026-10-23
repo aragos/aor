@@ -9,7 +9,9 @@ export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
     game: {stage: string; epochs: number; players: PlayerView[];
         hand: {reference: string; definition: CardDefinition}[];
-        capitalOrder: string[]; revealedBids: Record<string, number>};
+        capitalOrder: string[]; revealedBids: Record<string, number>;
+        turnNumber: number | null; turnOrder: string[]; orderBoxes: Record<string, number>;
+        revealedTokenPurchases: Record<string, number>; provisionalTieOrder: string[]};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; history: string[];

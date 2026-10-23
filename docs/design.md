@@ -85,7 +85,7 @@ replays one effective revision. Requests name the expected revision; reject stal
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
 
-The current setup implementation stores each revision's new log entries as a delta. Reconstructing
+The current implementation stores each revision's new log entries as a delta. Reconstructing
 the active game therefore replays the accumulated deltas; the latest revision alone is not a complete
 log. Each committed log transaction advances the concurrency revision used by `expectedRevision`;
 unrevealed pending-bid replacements leave it unchanged. This detects stale committed-state submissions

@@ -10,6 +10,8 @@ object TextCodec {
             "start" -> Command.Start.parse(arguments)
             "bid-capital" -> Command.BidCapital.parse(arguments)
             "choose-capital" -> Command.ChooseCapital.parse(arguments)
+            "buy-tokens" -> Command.BuyTokens.parse(arguments)
+            "choose-turn-position" -> Command.ChooseTurnPosition.parse(arguments)
             else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
         }
     }

@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-const val RULES_VERSION = "ah1996-setup-1"
+const val RULES_VERSION = "ah1996-turn-1"
 const val DATA_VERSION = "ah1996-setup-1"
 
 /**
@@ -41,11 +41,17 @@ data class GameHeader(
     }
 }
 
-/** Authoritative player-owned information; projections determine what another player may see. */
+/**
+ * Authoritative player-owned information; projections determine what another player may see.
+ *
+ * [tokenPurchase] is the signed amount submitted for the current turn, hidden until all players
+ * submit. Its absolute amount is paid and only a positive amount buys expansion tokens.
+ */
 data class PlayerState(
     val player: Player,
     val hand: List<HandCard> = emptyList(),
     val capitalBid: Int? = null,
+    val tokenPurchase: Int? = null,
     val capital: String? = null,
     val cash: Int = 40,
     val stockTokens: Int = 36,
@@ -55,7 +61,12 @@ data class PlayerState(
     val ships: ShippingCapability = ShippingCapability.NONE,
 )
 
-/** Pure engine state. Every registered player has an empty hand before the initial deal. */
+/**
+ * Pure engine state. Every registered player has an empty hand before the initial deal.
+ *
+ * [turnNumber] is null during setup and begins at 1 after all capitals are chosen.
+ * [turnOrderSelection] ranks purchases for the current turn independently of capital choice.
+ */
 data class GameState(
     val header: GameHeader,
     val epochs: Int = 3,
@@ -66,12 +77,20 @@ data class GameState(
             player.id to PlayerState(player = player)
         },
     val capitalSelection: CapitalSelection = CapitalSelection(),
+    val turnNumber: Int? = null,
+    val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
 ) {
     val playerIds: List<PlayerId>
         get() = header.players.map(Player::id)
 
     val capitalOrder: List<PlayerId>
         get() = capitalSelection.order
+
+    val turnOrder: List<PlayerId>
+        get() = if (turnOrderSelection.isResolved) turnOrderSelection.order else emptyList()
+
+    val orderBoxes: Map<PlayerId, Int>
+        get() = if (turnOrder.isEmpty()) emptyMap() else OrderBoxes.forOrder(turnOrder)
 
     val availableCapitals: List<String>
         get() {

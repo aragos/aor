@@ -96,8 +96,9 @@ Choices and diagnostics must not expose another player's private information.
 Use the detailed rules as the single source of mechanics. Frames must retain these timing distinctions:
 
 | Sequence      | Engine requirement                                                                                                                                                                               | Rules             |
-|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| Setup/order   | Deal before capital selection; retain capital-choice order, initial purchase and printed box numbers for the starting player count. Handle negative bids, over-bids and tie choices.             | §3, §5.1          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| Setup         | Deal before capital selection; retain capital-choice order for later turn-order ties. Setup ends after capital selection.                                                                        | §3                |
+| Order of Play | Begin every turn, including turn 1, with signed token purchases, stock caps and tie choices. Assign printed boxes for the starting player count. Order and pool apply to the current turn.       | §5.1              |
 | Draw/Buy Card | Cancellation precedes draws; Master Art's discard does not require Urban Ascendancy's purchase.                                                                                                  | §5.2–5.3          |
 | Play Cards    | One ordinary round per player; War re-rolls at following players' round starts. Distinguish Leader Display and Patronage eligibility; clean up leaders/protection money after Purchase.          | §5.4, §11.4       |
 | Purchase      | Ship upgrade → advances → stabilization → relief per player. New prerequisites/abilities apply immediately; category credits exclude this phase's purchases; MR uses this turn's purchases.      | §5.5, §7.3, §10.2 |
@@ -108,8 +109,8 @@ Use the detailed rules as the single source of mechanics. Frames must retain the
 | Ending        | Log the trigger, finish the current turn and Income, then Final Card Play before cleanup/scoring. Preserve same-turn effects and final shortages/surpluses; enforce forced plays and exceptions. | §8                |
 
 Preserve once-per-turn limits, general rounding up and distinctions between misery spaces and values. Do not resolve
-uncertain rules implicitly: the order/pool timing conflict, rebuilt-marker bonus exclusion and full-intermediate
-Caravan rule remain flagged in [rules §14](rules.md#14-open-questions).
+uncertain rules implicitly: rebuilt-marker bonus exclusion and the full-intermediate Caravan rule remain flagged in
+[rules §14](rules.md#14-open-questions).
 
 ## 4. Information boundaries
 

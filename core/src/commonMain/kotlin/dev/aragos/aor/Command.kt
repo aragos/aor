@@ -101,7 +101,7 @@ sealed interface Command {
                     player.copy(capital = capital, boardMarkers = 1)
                 }
             return if (chosen.players.values.all { player -> player.capital != null }) {
-                chosen.copy(stage = Stage.SETUP_COMPLETE)
+                chosen.copy(stage = Stage.TOKEN_PURCHASE, turnNumber = 1)
             } else {
                 chosen
             }
@@ -111,6 +111,74 @@ sealed interface Command {
             fun parse(arguments: List<String>): ChooseCapital {
                 arguments.requireSize(1)
                 return ChooseCapital(capital = arguments.single())
+            }
+        }
+    }
+
+    /** A signed purchase, affordable in full even when available token stock is lower. */
+    data class BuyTokens(val amount: Int) : Command {
+        override fun toText(): String = "buy-tokens $amount"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState {
+            checkRule(state.stage == Stage.TOKEN_PURCHASE, ViolationCode.WRONG_PHASE)
+            val player = state.playerState(actor)
+            checkRule(player.tokenPurchase == null, ViolationCode.WRONG_PLAYER)
+            TokenPurchase.affordable(amount = amount, cash = player.cash)
+            val submitted =
+                state.updatePlayer(actor) { buying -> buying.copy(tokenPurchase = amount) }
+            if (submitted.players.values.any { buying -> buying.tokenPurchase == null }) {
+                return submitted
+            }
+            val purchases =
+                submitted.playerIds.associateWith { playerId ->
+                    requireNotNull(submitted.playerState(playerId).tokenPurchase) {
+                        "Every player must have a token purchase at reveal."
+                    }
+                }
+            val selection = TurnOrderSelection.fromPurchases(purchases, state.capitalOrder)
+            return submitted.copy(
+                players =
+                    submitted.players.mapValues { (_, buying) ->
+                        val purchase =
+                            TokenPurchase.affordable(
+                                amount =
+                                    requireNotNull(buying.tokenPurchase) {
+                                        "Every player must have a token purchase at reveal."
+                                    },
+                                cash = buying.cash,
+                            )
+                        purchase.applyTo(buying)
+                    },
+                turnOrderSelection = selection,
+                stage = if (selection.isResolved) Stage.DRAW_CARD else Stage.TURN_ORDER_TIE,
+            )
+        }
+
+        companion object {
+            fun parse(arguments: List<String>): BuyTokens {
+                arguments.requireSize(1)
+                return BuyTokens(amount = arguments.single().commandNumber())
+            }
+        }
+    }
+
+    /** One-based insertion position within the current unresolved equal-purchase group. */
+    data class ChooseTurnPosition(val slot: Int) : Command {
+        override fun toText(): String = "choose-turn-position $slot"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState {
+            checkRule(state.stage == Stage.TURN_ORDER_TIE, ViolationCode.WRONG_PHASE)
+            val selection = state.turnOrderSelection.choosePosition(actor = actor, slot = slot)
+            return state.copy(
+                turnOrderSelection = selection,
+                stage = if (selection.isResolved) Stage.DRAW_CARD else Stage.TURN_ORDER_TIE,
+            )
+        }
+
+        companion object {
+            fun parse(arguments: List<String>): ChooseTurnPosition {
+                arguments.requireSize(1)
+                return ChooseTurnPosition(slot = arguments.single().commandNumber())
             }
         }
     }
