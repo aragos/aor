@@ -49,6 +49,8 @@ data class TurnFlow(
     val actor: PlayerId? = null,
     val cursor: Int = 0,
     val phaseStarted: Boolean = false,
+    /** Phase-opening automatic effects run once, after every Renaissance window is answered. */
+    val phaseBookkeepingApplied: Boolean = false,
     val decisions: List<TurnDecision> = emptyList(),
     val purchaseStep: PurchaseStep = PurchaseStep.SHIPPING,
     val drawn: Set<PlayerId> = emptySet(),
