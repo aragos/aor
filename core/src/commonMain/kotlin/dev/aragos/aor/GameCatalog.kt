@@ -95,9 +95,9 @@ object GameCatalog {
         for (commodity in CommodityData.definitions) {
             require(
                 definitions.count { province -> commodity.id in province.commodities } ==
-                    commodity.payoutBoxes
+                    commodity.ownershipTrackBoxes
             ) {
-                "Commodity market assignments must match the printed payout track for ${commodity.id}."
+                "Commodity market assignments must match the printed ownership track for ${commodity.id}."
             }
         }
         require(

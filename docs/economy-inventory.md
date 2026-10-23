@@ -13,7 +13,7 @@ sources below. Economy data has no outstanding transcription question.
   Advance Log on PDF page 14, advance reference panels on pages 22–24, official errata on pages 1–3, and
   M. Boone's FAQ starting on page 5. Page numbers here count PDF pages starting with one.
 - [Photograph of the printed gameboard, BGG image 192678](https://boardgamegeek.com/image/192678/age-of-renaissance):
-  the commodity log at the lower left gives the finite printed payout tracks.
+  the commodity log at the lower left gives ownership tracks, whose lengths match the map's commodity-market counts. These tracks are not payment limits. AH1996 §7.11 states that commodity cards print ten payment boxes.
 - [Hexagonia rules rewrite](http://www.hexagonia.com/rules/AgeOfRenaissance.pdf), page 6 (§3.14): reproduces the
   physical player mat showing income positions 0–25, including the 5- and 6-player values; §5.5.3 records the
   stabilization schedule and §5.5.1 the shipping upgrade cost.
@@ -77,31 +77,30 @@ unknown prerequisite references.
 
 ## Commodities
 
-The photographed board confirms every count below, independently of the reference bundle's extended player aids.
-The printed payout is `base value × box²`; the listed arrays include every printed box and exclude box zero.
-Gold and Ivory share a two-dice total of 12; each other two-dice total selects exactly one commodity.
+The photographed board confirms the ownership-track lengths below, matching the map's market counts.
+AH1996 §7.11 separately states that commodity cards print ten payment boxes. Payment box n pays
+`base value × n²`; the ownership-track length does not cap this payment. Gold and Ivory share
+roll 12; every other total selects one commodity.
 
-| Commodity | Base | Dice total | Printed boxes | Printed payouts |
+| Commodity | Base | Dice total | Ownership boxes | Card payments, boxes 1–10 |
 | --- | ---: | ---: | ---: | --- |
-| Stone | 1 | 2 | 8 | 1, 4, 9, 16, 25, 36, 49, 64 |
-| Wool | 2 | 3 | 9 | 2, 8, 18, 32, 50, 72, 98, 128, 162 |
-| Timber | 3 | 4 | 7 | 3, 12, 27, 48, 75, 108, 147 |
-| Grain | 4 | 5 | 8 | 4, 16, 36, 64, 100, 144, 196, 256 |
-| Cloth | 5 | 6 | 8 | 5, 20, 45, 80, 125, 180, 245, 320 |
-| Wine | 5 | 7 | 6 | 5, 20, 45, 80, 125, 180 |
-| Metal | 6 | 8 | 7 | 6, 24, 54, 96, 150, 216, 294 |
-| Fur | 7 | 9 | 5 | 7, 28, 63, 112, 175 |
-| Silk | 8 | 10 | 6 | 8, 32, 72, 128, 200, 288 |
-| Spice | 9 | 11 | 7 | 9, 36, 81, 144, 225, 324, 441 |
-| Gold | 10 | 12 | 5 | 10, 40, 90, 160, 250 |
-| Ivory | 10 | 12 | 4 | 10, 40, 90, 160 |
+| Stone | 1 | 2 | 8 | 1, 4, 9, 16, 25, 36, 49, 64, 81, 100 |
+| Wool | 2 | 3 | 9 | 2, 8, 18, 32, 50, 72, 98, 128, 162, 200 |
+| Timber | 3 | 4 | 7 | 3, 12, 27, 48, 75, 108, 147, 192, 243, 300 |
+| Grain | 4 | 5 | 8 | 4, 16, 36, 64, 100, 144, 196, 256, 324, 400 |
+| Cloth | 5 | 6 | 8 | 5, 20, 45, 80, 125, 180, 245, 320, 405, 500 |
+| Wine | 5 | 7 | 6 | 5, 20, 45, 80, 125, 180, 245, 320, 405, 500 |
+| Metal | 6 | 8 | 7 | 6, 24, 54, 96, 150, 216, 294, 384, 486, 600 |
+| Fur | 7 | 9 | 5 | 7, 28, 63, 112, 175, 252, 343, 448, 567, 700 |
+| Silk | 8 | 10 | 6 | 8, 32, 72, 128, 200, 288, 392, 512, 648, 800 |
+| Spice | 9 | 11 | 7 | 9, 36, 81, 144, 225, 324, 441, 576, 729, 900 |
+| Gold | 10 | 12 | 5 | 10, 40, 90, 160, 250, 360, 490, 640, 810, 1000 |
+| Ivory | 10 | 12 | 4 | 10, 40, 90, 160, 250, 360, 490, 640, 810, 1000 |
 
-The boxes' small map annotations include overseas production; they are not an additional payout or a new box.
-The catalog exposes the printed boundary. State-dependent shifts for shortages, surplus and Industry, including
-handling a requested box above that boundary, belong to the payout milestone.
-
-Validation requires all twelve unique commodities, base values 1–10, dice totals 2–12, positive printed lengths,
-every possible two-dice total, and the exact Gold/Ivory sharing rule.
+The maximum ownership count is nine Wool markets. Industry plus a shortage can therefore request
+payment box 11, beyond the printed card. Neither the original rules nor official errata located so
+far states an overflow policy; a project ruling is pending. This does not affect catalog values or
+payments within the ten printed boxes.
 
 ## Income
 

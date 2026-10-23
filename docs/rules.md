@@ -584,7 +584,7 @@ When a commodity card is played, each player dominating **n ≥ 1** provinces of
 - **Surplus.** Read one box lower (n − 1). A single province on surplus pays $0.
 - **Industry.** The owner reads one box higher than it otherwise would.
 - **Overseas boxes.** An overseas box counts as one province for each commodity it produces.
-- Each track has a fixed number of printed boxes [data].
+- Commodity cards print ten payment boxes (AH1996 §7.11). Board ownership-track lengths count markets; they do not cap payments. The box-11 Wool/Industry/shortage edge case awaits a project ruling.
 
 ---
 
