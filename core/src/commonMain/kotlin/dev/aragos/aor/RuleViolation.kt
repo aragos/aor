@@ -1,6 +1,19 @@
 package dev.aragos.aor
 
 enum class ViolationCode(val description: String) {
+    UNKNOWN_PROVINCE("The province is not available in this game."),
+    INVALID_BOARD_PLAYER("The board action references an unavailable player."),
+    INVALID_BOARD_MUTATION("The board change is incompatible with its current pieces."),
+    INVALID_PLACEMENT("The token placement is incompatible with the province's pieces."),
+    UNREACHABLE_PROVINCE("The province cannot be reached by the selected expansion route."),
+    PROVINCE_ACCESS_DENIED("The required advance for entering this province is missing."),
+    INSUFFICIENT_EXPANSION_TOKENS("The expansion pool cannot supply the committed tokens."),
+    SHIPPING_CAPACITY_EXCEEDED("The fleet's per-destination capacity would be exceeded."),
+    OVERSEAS_LIMIT_EXCEEDED("The fleet cannot occupy another overseas box."),
+    CARAVAN_INTERMEDIATE_OCCUPIED("Win competition in the full intermediate province first."),
+    NO_DOMINATION_MARKERS("The player's domination markers are all on the board."),
+    INVALID_COMPETITION("The province is not awaiting the specified competition."),
+    INVALID_CATHEDRAL_USE("Cathedral cannot be used against these opponents."),
     INVALID_COMMAND("The command syntax is invalid."),
     UNKNOWN_PLAYER("The player is not registered in this game."),
     WRONG_PLAYER("The action belongs to another player."),
