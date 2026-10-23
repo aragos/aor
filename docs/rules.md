@@ -288,7 +288,10 @@ Each player in turn order completes these steps in sequence:
 4. **Expansion bonus.**
     - The player with the most *new* (white) domination markers draws one free card.
     - Ties go to the player that expanded earliest.
-    - Markers rebuilt after an event do not count. (TODO: Verify this.)
+    - **Rebuilt-marker option:** markers rebuilt after an event count only when
+      `rebuilt-marker-bonus` is `include`. The default is `exclude`. This setup choice is frozen
+      when the game starts; both interpretations are supported.
+    - Rebuilding a marker voluntarily exchanged for a token never earns bonus credit.
 
 ### 5.7 Income
 
@@ -344,7 +347,7 @@ stacking limits below.
   block.
 - Placing tokens in the intermediate province is optional.
 - If the intermediate province is full (at its market number), the player must win a competition there before
-  passing through. (TODO: Verify this.)
+  passing through. The official May 1998 errata confirms this requirement.
 - A player may attack a second province *through* a province it has just won.
 - Caravan cannot be combined with shipping in one placement.
 
@@ -409,9 +412,10 @@ number.
     - Against several defenders, add all their strengths. A plus-modifier applies if it applies for *any* defender. A
       minus-modifier applies only if it would apply against *every* defender.
 - **Attacker's existing tokens.** The attacker's own tokens already in the province count toward the requirement.
-- **Exact commitment (project ruling).** Existing attacker tokens plus newly committed tokens must
-  equal the calculated requirement. Reject insufficient or excess commitments before spending tokens
-  or requesting a roll. This restriction concerns the attack requirement, not the market number.
+- **Exact commitment (project ruling).** The existing attacker tokens plus newly committed tokens
+  must equal the calculated requirement. Reject both insufficient commitments and excess tokens
+  before taking any tokens or requesting a roll. The restriction is against exceeding the attack
+  requirement, not against exceeding the province's market number.
 - **Capital doubling.** The original owner's pieces count double in its own capital, for both defence and attack. Apply
   doubling after Nationalism.
     - Defending: Genoa's marker in Genoa (market 5) needs 5 + 2·5 = **15** tokens to attack.
@@ -451,8 +455,9 @@ The attacker's chance without modifiers is 1 − (box/6)· (21/36). For box 1 to
     - All defending pieces in the province return to their owners' stocks or mats.
     - If the attacker's tokens reach the market number, they become a white domination marker.
     - Defenders' satellite tokens are not affected.
-    - Domination conversion returns the attacking tokens to stock as in §6.5. The exact requirement
-      may exceed the market number to overcome defenders; no tokens beyond that requirement may be committed.
+    - Domination conversion returns the attacker's tokens to stock as in §6.5. An exact required
+      commitment may exceed the market number because it must also overcome defenders and modifiers;
+      no tokens beyond that calculated requirement may be committed.
 - **Defender wins:** **all** attacking tokens committed, including those already present, return to stock.
 
 **Wind/Watermill (baseline edition).** Right after taking a province the victim *controlled*, the winner may try a card
@@ -841,7 +846,17 @@ These notes are for the engine.
 
 ## 13. Variants
 
-These are not part of the baseline. Each would be a game option.
+These are not part of the baseline. The rebuilt-marker option below is supported; other variants
+remain deferred.
+
+**Supported project option: rebuilt-marker expansion bonus**
+
+- `set-option rebuilt-marker-bonus exclude` (default): a domination marker rebuilt after an event
+  does not count toward the expansion bonus.
+- `set-option rebuilt-marker-bonus include`: it does count toward the expansion bonus.
+- The creator selects the option during configuration. The public setting is recorded in the replay
+  log and frozen at `start`.
+- Both settings count ordinary expansion markers and exclude markers rebuilt after a voluntary swap.
 
 **Improved setup** (widely used, adopted by the 2nd edition):
 
@@ -880,28 +895,34 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
 | Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | After the draw of turn 1 (3–4 players) or turn 2 (5–6 players). |
 
-**Reference issues still to resolve:**
+**Resolved implementation decisions (2026-10-23):**
 
-**Q10 resolved, 2026-10-23:** the user disallowed excess attack commitments. Existing plus added
-attacker tokens must equal the calculated requirement. `AttackRequirement` enforces this before
-the board-play milestone spends tokens or requests randomness.
+- **Q10 / attack commitment:** the user disallowed attacks with excess tokens. Commit exactly the
+  calculated requirement, including attacker tokens already present; reject extra committed tokens.
+- **Expansion bonus (§5.6):** the user requested both interpretations of event-rebuilt markers as
+  a game option. `rebuilt-marker-bonus` supports `exclude` (default) and `include`.
+- **Caravan (§6.3):** the official May 1998 errata requires a successful competition in a fully
+  occupied intermediate province before passing through it.
 
-- **Expansion bonus (§5.6).** Confirm whether rebuilt markers after events are excluded (existing TODO).
-- **Caravan (§6.3).** Confirm the full-intermediate-province attack-through requirement (existing TODO).
-
-**Map data questions** (to resolve when encoding the map):
-
-- whether there is a Loire market;
-- whether Area I has 5 or 6 satellites;
-- whether Libya is in Area VI or VIII;
-- which sea areas exist (an Aegean sea?);
-- full adjacency and coastal-water links.
+**Map transcription:** the [catalog inventory](data-inventory.md) records the component references,
+province and economic tables, connections and outstanding review questions. The photographed board has no
+Loire market, six Area I satellites (including Smolensk), Libya in Area VI and a separately printed Aegean Sea.
+The user confirmed on 2026-10-23 that Gallipoli and Angora do not touch; they have no direct coastal-water
+connection. This resolves the final recorded map question. The inventory records the source checks and ruling.
 
 ---
 
 ## Sources
 
-All sources are secondary. None of them is the original rulebook.
+The original rules summary was assembled from secondary sources. The catalog milestone also uses photographs
+of the printed board and a scan of the original rulebook; exact locators and source discrepancies are in the
+[review inventory](data-inventory.md).
+
+- Printed Avalon Hill board photographs:
+  <https://boardgamegeek.com/image/192678/age-of-renaissance>,
+  <https://boardgamegeek.com/image/667248/age-of-renaissance> and the sharper
+  <https://boardgamegeek.com/image/4041958/age-of-renaissance>.
+- Original AH1996 rulebook scan: <https://www.scribd.com/document/709810410/Age-of-Renaissance-regles-VO>.
 
 - Official Avalon Hill *Errata and Clarifications* (7 May 1998), M. Boone FAQ v0.5 (1999), the EuroGames 2nd-edition
   change list, the Advance Log and the commodity log, all bundled in one

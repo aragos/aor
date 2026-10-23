@@ -58,11 +58,18 @@ The following is a feature catalog, not a promise to implement every option init
 | Master Art                | Buy Card phase discard; optional immediate discard on purchase.                                          |
 | Map support               | Printed arrows; optional St. Gall → Nuremberg support.                                                   |
 | Initial card restriction  | Any history card, or commodity-only first card.                                                          |
+| Event-rebuilt marker bonus | Exclude (default), or include event-rebuilt markers in the expansion bonus; both are supported.          |
 | Undo                      | Four scopes below; regular-turn undo by default. All edits preserve recorded random events and outcomes. |
-| Open rulings              | Q7 recycling, Q10 excess attacker tokens and Q14 reinsertion timing.                                     |
+| Open rulings              | Q7 recycling and Q14 reinsertion timing.                                                               |
 
 The first choice in each variant row is the baseline; declarative data and behavior handlers must both match the
 chosen options. A different advance table alone does not implement an edition.
+
+The supported `rebuilt-marker-bonus` setup command records `exclude` or `include` explicitly.
+Its default is recorded alongside epochs in the initial revision; changing the option uses an ordinary
+creator command before `start`. Both choices are public and survive replay and restart. The domain
+policy implements bonus eligibility for ordinary expansion, event rebuilds and voluntary rebuilds;
+the board-play milestone will connect it to marker placement and the expansion reward.
 
 Snapshots, waiting-player lists and completion flags are derived caches, never sources of game truth. Pending secret
 submissions, private plans and operational controller settings may be stored separately. A snapshot is tied to its

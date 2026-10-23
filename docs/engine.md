@@ -109,7 +109,8 @@ Use the detailed rules as the single source of mechanics. Frames must retain the
 | Ending        | Log the trigger, finish the current turn and Income, then Final Card Play before cleanup/scoring. Preserve same-turn effects and final shortages/surpluses; enforce forced plays and exceptions. | §8                |
 
 Preserve once-per-turn limits, general rounding up and distinctions between misery spaces and values. Do not resolve
-uncertain rules implicitly: rebuilt-marker bonus exclusion and the full-intermediate Caravan rule remain flagged in
+uncertain rules implicitly. Event-rebuilt marker eligibility follows the configured `RebuiltMarkerBonus`
+policy; voluntary rebuilds never qualify. Caravan attack-through follows the official errata recorded in
 [rules §14](rules.md#14-open-questions).
 
 ## 4. Information boundaries
@@ -159,8 +160,11 @@ overseas commodities/areas in play, advance category totals (300/300/300/300/400
 counts before setup adjustments. Validate the supported configurations' data, prerequisites and effect handlers.
 Required missing data prevents a playable configuration; placeholders belong only in labeled test fixtures.
 
-The misery ladder, income formula, order boxes and commodity values are specified in rules.md. Printed payout-track
-lengths and map details still need transcription. Recycling classification uses the current Q7 reading.
+The static board and economic definitions and their source references are recorded in the
+[catalog review inventory](data-inventory.md). Printed payout lengths are transcribed and all recorded connection
+questions are resolved, including the user-confirmed absence of Gallipoli–Angora contact. Catalog validation and
+reference readiness cover all four supported player counts without changing gameplay.
+Recycling classification uses the current Q7 reading.
 
 Implement behavior at fixed hook points:
 
@@ -182,7 +186,8 @@ voiding and conditional bonuses belong in history, not just the current-turn car
   areas, access advances, per-destination shipping and overseas occupancy limits (rules §6).
 - Count existing attacker tokens, combine multi-defender modifiers correctly and apply capital doubling after
   Nationalism. Cathedral precedes rolling, cannot defeat a Cathedral-owning defender and never applies to War. Return
-  all committed attackers on failure; use Q10 for excess tokens on success (rules §6.6).
+  all committed attackers on failure. `AttackRequirement` rejects any commitment other than the exact
+  calculated requirement, counting existing attacker tokens before added tokens (rules §6.6).
 - Wind/Watermill requires taking controlled territory, both players holding cards, payment and a successful roll.
   The winner chooses the card given; the card taken is random (rules §6.6).
 - Printed Word rebates occur when a leader is played for already-owned advances; neither Patronage nor Written
@@ -198,10 +203,12 @@ resolved functionality, not edition labels. Data-changing options select definit
 handlers. Application defaults, feature catalog and rollout scope are
 in [design §3](design.md#3-game-storage-and-configuration).
 
-Use the current readings of the three open rulings as defaults:
+Use these recorded project rulings and current readings of the remaining open questions:
 
 - **Q7:** remove leaders, Armor, Stirrups, Long Bow, Gunpowder and Mongol Armies; recycle other cards.
-- **Q10:** excess attacking tokens return to stock.
+- **Attack commitment:** reject excess tokens; existing plus added tokens must equal the requirement.
+- **Rebuilt-marker bonus:** support `exclude` (default) and `include`, configured before `start` and
+  recorded explicitly in the replay log. `RebuiltMarkerBonus.counts` implements both eligibility policies.
 - **Q14:** reinsert improved setup's five held-out cards after turn 1's draw for 3–4 players or turn 2's for 5–6.
 
 Resolved baseline rules are not extra switches: turn 1 draws, Holy Indulgence shortfalls use cash, unused coastal
