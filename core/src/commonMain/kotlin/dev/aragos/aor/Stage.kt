@@ -63,7 +63,8 @@ enum class Stage {
                 Prompt.MultiPlayer(
                     players =
                         state.playerIds.filter { playerId ->
-                            state.playerState(playerId).tokenPurchase == null
+                            state.playerState(playerId).tokenPurchase == null &&
+                                state.playerState(playerId).misery != MiseryStep.CHAOS
                         },
                     choice = "buy-tokens",
                 )
@@ -115,7 +116,10 @@ enum class Stage {
                     LegalChoices()
                 }
             TOKEN_PURCHASE ->
-                if (state.playerState(player).tokenPurchase == null) {
+                if (
+                    state.playerState(player).tokenPurchase == null &&
+                        state.playerState(player).misery != MiseryStep.CHAOS
+                ) {
                     val cash = state.playerState(player).cash
                     LegalChoices(commands = listOf("buy-tokens"), bidMin = -cash, bidMax = cash)
                 } else {
