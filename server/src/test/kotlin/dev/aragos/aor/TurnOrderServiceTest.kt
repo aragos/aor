@@ -62,7 +62,7 @@ class TurnOrderServiceTest {
         val stored = FileGameStore(fixture.directory).read(fixture.game.gameId)
 
         assertThat(revealed.revision).isEqualTo(7)
-        assertThat(revealed.game.stage).isEqualTo(Stage.DRAW_CARD)
+        assertThat(revealed.game.stage).isEqualTo(Stage.PLAY_CARDS)
         assertThat(revealed.game.revealedTokenPurchases)
             .containsExactly(PlayerId("p1"), 9, PlayerId("p2"), -5, PlayerId("p3"), 1)
         assertThat(revealed.history.filter { entry -> entry.contains("buy-tokens") })
@@ -118,7 +118,7 @@ class TurnOrderServiceTest {
         val final = fixture.view(0)
 
         assertThat(results.count { snapshot -> snapshot.revision == 7 }).isEqualTo(1)
-        assertThat(final.game.stage).isEqualTo(Stage.DRAW_CARD)
+        assertThat(final.game.stage).isEqualTo(Stage.PLAY_CARDS)
         assertThat(final.history.filter { entry -> entry.contains("buy-tokens") })
             .containsExactly("p1: buy-tokens 9", "p2: buy-tokens 8", "p3: buy-tokens 7")
             .inOrder()
@@ -180,7 +180,7 @@ class TurnOrderServiceTest {
         val finalized = fixture.restart().submit(2, "choose-turn-position 2")
         val recovered = fixture.restart().view(2)
 
-        assertThat(finalized.game.stage).isEqualTo(Stage.DRAW_CARD)
+        assertThat(finalized.game.stage).isEqualTo(Stage.PLAY_CARDS)
         assertThat(finalized.game.turnOrder)
             .containsExactly(PlayerId("p2"), PlayerId("p3"), PlayerId("p1"))
             .inOrder()
@@ -265,7 +265,7 @@ class TurnOrderServiceTest {
     private fun ready(writer: GameWriter = AtomicGameWriter): TurnFixture {
         val directory = Files.createTempDirectory("aor-turn-order-").also(directories::add)
         val service = createGameService(directory, FixedRandom(), writer)
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 3)
+        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
         val fixture = TurnFixture(directory, service, game)
         fixture.submit(0, "start")
         fixture.submit(0, "bid-capital 3")

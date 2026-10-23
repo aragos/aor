@@ -174,8 +174,15 @@ class FileGameStore(
             "A game must have an initial configuration revision."
         }
         val state = validateRevisions(game.header, game.revisions)
-        require(game.pendingBids.size < game.header.players.size) {
-            "Pending sealed decisions must form an incomplete batch."
+        if (game.pendingBids.isNotEmpty()) {
+            val participants =
+                (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
+            require(
+                participants.containsAll(game.pendingBids.keys) &&
+                    game.pendingBids.size < participants.size
+            ) {
+                "Pending sealed decisions must form an incomplete batch of the current participants."
+            }
         }
         game.pendingBids.forEach { (player, amount) ->
             val command =
@@ -211,7 +218,7 @@ class FileGameStore(
             entries
                 .fold(state) { current, entry -> current.step(entry) }
                 .also { next ->
-                    require(next.stage in COMMITTED_STAGES) {
+                    require(next.prompts().none { prompt -> prompt is Prompt.System }) {
                         "A revision cannot stop before required system outcomes have completed."
                     }
                     require(
@@ -222,7 +229,9 @@ class FileGameStore(
                     }
                     require(
                         next.stage != Stage.TOKEN_PURCHASE ||
-                            next.players.values.all { player -> player.tokenPurchase == null }
+                            next.players.values
+                                .filter { player -> player.misery != MiseryStep.CHAOS }
+                                .all { player -> player.tokenPurchase == null }
                     ) {
                         "Sealed token purchases may enter history only as a complete, revealed batch."
                     }
@@ -286,8 +295,11 @@ class FileGameStore(
         accepts: (Command) -> Boolean,
     ) {
         require(
-            actions.map(Entry.Action::actor) == state.playerIds &&
-                actions.all { action -> accepts(action.command) }
+            actions.map(Entry.Action::actor) ==
+                state.playerIds.filter { player ->
+                    player in
+                        (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
+                } && actions.all { action -> accepts(action.command) }
         ) {
             "A revealed batch must include the current sealed decision for every player in registration order."
         }
@@ -296,14 +308,5 @@ class FileGameStore(
     private companion object {
         val GAME_ID_PATTERN = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         val CREDENTIAL_PATTERN = Regex("[0-9a-f]{64}")
-        val COMMITTED_STAGES =
-            setOf(
-                Stage.CONFIGURATION,
-                Stage.BIDDING,
-                Stage.CAPITAL_CHOICE,
-                Stage.TOKEN_PURCHASE,
-                Stage.TURN_ORDER_TIE,
-                Stage.DRAW_CARD,
-            )
     }
 }

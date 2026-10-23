@@ -47,6 +47,18 @@ private val gameValueModule =
             },
         )
         addSerializer(
+            ProvinceId::class.java,
+            object : JsonSerializer<ProvinceId>() {
+                override fun serialize(
+                    value: ProvinceId,
+                    output: JsonGenerator,
+                    provider: SerializerProvider,
+                ) {
+                    output.writeString(value.value)
+                }
+            },
+        )
+        addSerializer(
             CardKind::class.java,
             object : JsonSerializer<CardKind>() {
                 override fun serialize(
@@ -83,7 +95,10 @@ private val gameValueModule =
                     output: JsonGenerator,
                     provider: SerializerProvider,
                 ) {
-                    output.writeNumber(value.level)
+                    output.writeStartObject()
+                    output.writeStringField("fleet", value.fleet.name)
+                    output.writeNumberField("level", value.level)
+                    output.writeEndObject()
                 }
             },
         )
