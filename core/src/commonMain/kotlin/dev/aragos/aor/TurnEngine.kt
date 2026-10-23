@@ -78,14 +78,7 @@ internal object TurnEngine {
                         PurchaseStep.STABILIZATION -> listOf("stabilize cash", "stabilize misery")
                         PurchaseStep.RELIEF -> listOf("done", "relieve-misery")
                     }
-                Stage.EXPANSION ->
-                    listOf(
-                        "end-expansion",
-                        "place",
-                        "attack",
-                        "rebuild-marker",
-                        "buy-expansion-card",
-                    )
+                Stage.EXPANSION -> BoardGame.choices(state, actor)
                 else -> emptyList()
             }
         return LegalChoices(commands)
