@@ -16,6 +16,19 @@ internal fun GameState.cardContext(): CardContext =
                             .id,
                     misery = owner.misery,
                     handCardIds = owner.hand.map { card -> card.definition.id }.toSet(),
+                    ships = owner.ships,
+                    overseasPresence =
+                        board.pieces
+                            .filter { (province, occupants) ->
+                                ProvinceData.byId.getValue(province).overseas != null &&
+                                    when (occupants) {
+                                        is ProvincePieces.Marker ->
+                                            occupants.owner == owner.player.id
+                                        is ProvincePieces.Tokens ->
+                                            owner.player.id in occupants.holdings
+                                    }
+                            }
+                            .keys,
                 )
             },
         markers =

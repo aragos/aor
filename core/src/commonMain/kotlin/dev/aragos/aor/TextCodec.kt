@@ -20,6 +20,7 @@ object TextCodec {
             "choose-turn-position" -> Command.ChooseTurnPosition.parse(arguments)
             else ->
                 BoardCommand.parse(parts.first(), arguments)
+                    ?: CardCommand.parse(parts.first(), arguments)
                     ?: TurnCommand.parse(parts.first(), arguments)
         }
     }

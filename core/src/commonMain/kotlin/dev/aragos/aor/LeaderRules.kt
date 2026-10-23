@@ -52,6 +52,8 @@ data class CardTurnEffects(
     val military: List<CardMilitaryPlay> = emptyList(),
     val papalCategory: AdvanceCategory? = null,
     val crusadesPlayed: Boolean = false,
+    /** Card-play order, applied as move-to-last penalties when Expansion begins. */
+    val civilWarVictims: List<PlayerId> = emptyList(),
 ) {
     init {
         require(leaders.map(CardLeaderInPlay::leader).distinct().size == leaders.size) {
