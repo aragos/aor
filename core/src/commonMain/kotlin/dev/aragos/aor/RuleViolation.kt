@@ -1,6 +1,11 @@
 package dev.aragos.aor
 
 enum class ViolationCode(val description: String) {
+    UNPLAYED_FINAL_CARDS("Play every non-burden card before passing Final Card Play."),
+    STABILIZATION_REQUIRED("Pay stabilization in cash or misery before continuing."),
+    INVALID_CARD_PURCHASE("This player cannot buy another card in this phase."),
+    INVALID_CARD_DISCARD("Master Art permits one held card to be discarded in Buy Card."),
+    INVALID_ADJUSTMENT("Choose a shortage or surplus marker currently on this commodity."),
     UNKNOWN_PROVINCE("The province is not available in this game."),
     INVALID_BOARD_PLAYER("The board action references an unavailable player."),
     INVALID_BOARD_MUTATION("The board change is incompatible with its current pieces."),
@@ -18,7 +23,7 @@ enum class ViolationCode(val description: String) {
     UNKNOWN_PLAYER("The player is not registered in this game."),
     WRONG_PLAYER("The action belongs to another player."),
     WRONG_PHASE("The action is not allowed in the current phase."),
-    INVALID_EPOCHS("Game length must be 1, 2, or 3 epochs."),
+    INVALID_EPOCHS("Only one-epoch games are supported."),
     INVALID_REBUILT_MARKER_BONUS("Choose include or exclude for rebuilt-marker bonus credit."),
     INVALID_ATTACK_TOKEN_COUNT(
         "Commit exactly the required attacker tokens, including those already present."

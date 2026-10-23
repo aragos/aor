@@ -39,7 +39,7 @@ class TurnOrderTest {
             .containsExactly(PlayerId("p3"), PlayerId("p2"), PlayerId("p1"))
             .inOrder()
         assertThat(state.stage).isEqualTo(Stage.DRAW_CARD)
-        assertThat(state.prompts()).isEmpty()
+        assertThat(state.prompts().single()).isInstanceOf(Prompt.System::class.java)
         assertThat(state.legalChoices(PlayerId("p1")).commands).isEmpty()
     }
 

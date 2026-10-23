@@ -57,7 +57,7 @@ data class GameView(
                             handCount = player.hand.size,
                             stockTokens = player.stockTokens,
                             poolTokens = player.poolTokens,
-                            boardMarkers = player.boardMarkers,
+                            boardMarkers = state.board.markerCount(playerId),
                             misery = player.misery,
                             ships = player.ships,
                         )
