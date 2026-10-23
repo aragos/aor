@@ -68,4 +68,73 @@ class PublicGameViewTest {
         assertThat(serialized).doesNotContain("secret-reference")
         assertThat(serialized).doesNotContain("stone-1")
     }
+
+    @Test
+    fun advanceOffersUseTheViewersCashAndCurrentPhaseCredits() {
+        val initial = turnState()
+        val viewer =
+            initial
+                .playerState(PlayerId("p1"))
+                .copy(
+                    cash = 35,
+                    advances = PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.THE_HEAVENS, 1))),
+                )
+        val state = initial.copy(players = initial.players + (viewer.player.id to viewer))
+
+        val offers =
+            state
+                .viewForPlayer(viewer.player.id)
+                .advanceOffers
+                .associateBy(AdvanceOfferView::advance)
+
+        assertThat(offers).doesNotContainKey(AdvanceId.THE_HEAVENS)
+        assertThat(offers.getValue(AdvanceId.HUMAN_BODY).price).isEqualTo(60)
+        assertThat(offers.getValue(AdvanceId.HUMAN_BODY).unavailableReason)
+            .isEqualTo("INSUFFICIENT_CASH")
+        assertThat(offers.getValue(AdvanceId.CARAVAN).price).isEqualTo(20)
+        assertThat(offers.getValue(AdvanceId.CARAVAN).unavailableReason).isNull()
+    }
+
+    @Test
+    fun burdenReferencesBelongOnlyToTheViewersHand() {
+        val initial = turnState()
+        val player =
+            initial
+                .playerState(PlayerId("p1"))
+                .copy(
+                    hand =
+                        listOf(
+                            HandCard(
+                                "burden-reference",
+                                CardData.epochOne.single { card -> card.id == "the-crusades" },
+                            )
+                        ),
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.ENLIGHTENMENT, 1))),
+                )
+        val state =
+            initial.copy(
+                players = initial.players + (player.player.id to player),
+                voids = CardVoids(crusades = true),
+            )
+
+        assertThat(state.viewForPlayer(player.player.id).burdenReferences)
+            .containsExactly("burden-reference")
+        assertThat(state.viewForPlayer(PlayerId("p2")).burdenReferences).isEmpty()
+    }
+
+    private fun turnState(): GameState {
+        val initial = GameState(header)
+        val capitals = listOf("venice", "genoa", "barcelona")
+        return initial.copy(
+            stage = Stage.PURCHASE,
+            turnNumber = 1,
+            players =
+                initial.playerIds
+                    .mapIndexed { index, id ->
+                        id to initial.playerState(id).copy(capital = capitals[index])
+                    }
+                    .toMap(),
+        )
+    }
 }
