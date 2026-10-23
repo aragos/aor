@@ -20,7 +20,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 fun main() {
-    embeddedServer(Netty, port = 8080, host = "127.0.0.1", module = { module() }).start(wait = true)
+    val port =
+        System.getenv("AOR_HTTP_PORT")?.let { configured ->
+            requireNotNull(configured.toIntOrNull()) {
+                "AOR_HTTP_PORT must be a whole-number port."
+            }
+        } ?: 8080
+    require(port in 1..65535) { "AOR_HTTP_PORT must be between one and 65535." }
+    embeddedServer(Netty, port = port, host = "127.0.0.1", module = { module() }).start(wait = true)
 }
 
 fun Application.module(service: GameService = createGameService()) {
@@ -34,7 +41,7 @@ fun Application.module(service: GameService = createGameService()) {
                     withContext(Dispatchers.IO) {
                         service.create(
                             names = body.field("players").array().map(JsonNode::string),
-                            epochs = body.get("epochs")?.integer() ?: 3,
+                            epochs = body.get("epochs")?.integer() ?: 1,
                         )
                     }
                 call.respondJson(result, HttpStatusCode.Created)

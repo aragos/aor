@@ -42,7 +42,7 @@ class GameServiceTest {
     private fun token(game: CreatedGame, player: Int) =
         game.links[player].path.substringAfter("token=")
 
-    private fun create(service: GameService) = service.create(listOf("Alice", "Bob", "Carol"), 3)
+    private fun create(service: GameService) = service.create(listOf("Alice", "Bob", "Carol"), 1)
 
     @AfterTest
     fun clean() {
@@ -182,7 +182,7 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "set-option epochs 2")
+        service.submit(game.gameId, token(game, 0), 1, "set-option epochs 1")
         service.submit(game.gameId, token(game, 0), 2, "start")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
@@ -194,7 +194,7 @@ class GameServiceTest {
             )
             .isEqualTo("STALE_REVISION")
         assertThat(Files.readString(path)).isEqualTo(before)
-        assertThat(service.get(game.gameId, token(game, 0)).game.epochs).isEqualTo(2)
+        assertThat(service.get(game.gameId, token(game, 0)).game.epochs).isEqualTo(1)
     }
 
     @Test
@@ -243,7 +243,7 @@ class GameServiceTest {
                             author = PlayerId("p2"),
                             entries =
                                 listOf(
-                                    "p2: set-option epochs 3",
+                                    "p2: set-option epochs 1",
                                     "p2: set-option rebuilt-marker-bonus exclude",
                                 ),
                         )
@@ -251,10 +251,10 @@ class GameServiceTest {
             )
         }
 
-        val configured = service.submit(game.gameId, token(game, 1), 1, "set-option epochs 2")
+        val configured = service.submit(game.gameId, token(game, 1), 1, "set-option epochs 1")
 
         assertThat(configured.creatorId).isEqualTo(PlayerId("p2"))
-        assertThat(configured.game.epochs).isEqualTo(2)
+        assertThat(configured.game.epochs).isEqualTo(1)
     }
 
     @Test
@@ -271,7 +271,7 @@ class GameServiceTest {
                             author = PlayerId("p2"),
                             entries =
                                 listOf(
-                                    "p2: set-option epochs 3",
+                                    "p2: set-option epochs 1",
                                     "p2: set-option rebuilt-marker-bonus exclude",
                                 ),
                         )
@@ -336,7 +336,7 @@ class GameServiceTest {
                 "not json",
                 original.replace("\"fileVersion\":2", "\"fileVersion\":99"),
                 original.replace(RULES_VERSION, "future-rules"),
-                original.replace("set-option epochs 3", "invented-command"),
+                original.replace("set-option epochs 1", "invented-command"),
             )) {
             Files.writeString(path, contents)
             assertThat(

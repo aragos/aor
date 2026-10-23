@@ -1,5 +1,6 @@
 package dev.aragos.aor
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.google.common.truth.Truth.assertThat
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
@@ -60,7 +61,7 @@ class ApplicationTest {
         assertThat(raw).doesNotContain("stone-2")
         assertThat(raw).doesNotContain("wool-1")
         assertThat(raw).doesNotContain("wool-2")
-        assertThat(raw).doesNotContain("deck")
+        assertThat(json.readTree(raw)["game"].has("deck")).isFalse()
         assertThat(other["game"]["hand"][0]["definition"]["id"].asText()).isEqualTo("stone-2")
     }
 
@@ -167,7 +168,7 @@ class ApplicationTest {
     }
 
     @Test
-    fun tokenPurchasesReachTheDrawCardBoundaryThroughTheHttpApi() = withGame {
+    fun tokenPurchasesResolveDrawsAndReachCardPlayThroughTheHttpApi() = withGame {
         selectCapitals()
         command(0, 6, "buy-tokens -7")
         command(1, 6, "buy-tokens 5")
@@ -176,13 +177,45 @@ class ApplicationTest {
         val snapshot = json.readTree(response.bodyAsText())
 
         assertThat(response.status).isEqualTo(HttpStatusCode.OK)
-        assertThat(snapshot["game"]["stage"].asText()).isEqualTo("DRAW_CARD")
+        assertThat(snapshot["game"]["stage"].asText()).isEqualTo("PLAY_CARDS")
         assertThat(snapshot["game"]["turnNumber"].asInt()).isEqualTo(1)
         assertThat(snapshot["game"]["turnOrder"].size()).isEqualTo(3)
         assertThat(snapshot["game"]["orderBoxes"].size()).isEqualTo(3)
         assertThat(snapshot["game"]["revealedTokenPurchases"]["p1"].asInt()).isEqualTo(-7)
         assertThat(snapshot["submitted"].size()).isEqualTo(0)
         assertThat(snapshot["pendingBid"].isNull).isTrue()
+    }
+
+    @Test
+    fun phaseDrawsStayPrivateInTheHttpSnapshotAndHistory() = withGame {
+        selectCapitals()
+        command(0, 6, "buy-tokens 0")
+        command(1, 6, "buy-tokens 1")
+        command(2, 6, "buy-tokens 2")
+
+        val own = json.readTree(view(0).bodyAsText())
+        val other = json.readTree(view(1).bodyAsText())
+
+        assertThat(own["game"]["hand"].map { card -> card["definition"]["id"].asText() })
+            .containsExactly("stone-1", "wool-2")
+        assertThat(own["history"].map(JsonNode::asText)).contains("!draw p1 hand-4 wool-2")
+        assertThat(other["history"].map(JsonNode::asText)).contains("!draw p1 hand-4 <hidden>")
+        assertThat(other.toString()).doesNotContain("wool-2")
+        assertThat(other["game"]["deckRemaining"].asInt()).isEqualTo(23)
+    }
+
+    @Test
+    fun phaseDrawsAndPublicBoardRecoverFromSavedEntriesWithoutRandomness() = withGame {
+        selectCapitals()
+        command(0, 6, "buy-tokens 0")
+        command(1, 6, "buy-tokens 1")
+        command(2, 6, "buy-tokens 2")
+        val before = json.readTree(view(0).bodyAsText())
+        val recovered = createGameService(directory, NoApiRandom).get(id, tokens[0])
+
+        assertThat(json.valueToTree<JsonNode>(recovered)).isEqualTo(before)
+        assertThat(recovered.game.board.map(ProvinceView::id))
+            .containsExactly(ProvinceId("venice"), ProvinceId("genoa"), ProvinceId("barcelona"))
     }
 
     @Test
@@ -242,7 +275,7 @@ class ApplicationTest {
             val response =
                 client.post("/api/games") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"players":["Alice","Bob","Carol"],"epochs":3}""")
+                    setBody("""{"players":["Alice","Bob","Carol"],"epochs":1}""")
                 }
             val created = json.readTree(response.bodyAsText())
             ApiGame(
@@ -259,6 +292,13 @@ class ApplicationTest {
             directory.toFile().deleteRecursively()
         }
     }
+}
+
+private object NoApiRandom : SetupRandom {
+    override fun shuffle(cards: List<String>): List<String> = error("Replay requested a shuffle")
+
+    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> =
+        error("Replay requested dice")
 }
 
 private class ApiGame(
