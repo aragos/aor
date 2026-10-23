@@ -409,6 +409,9 @@ number.
     - Against several defenders, add all their strengths. A plus-modifier applies if it applies for *any* defender. A
       minus-modifier applies only if it would apply against *every* defender.
 - **Attacker's existing tokens.** The attacker's own tokens already in the province count toward the requirement.
+- **Exact commitment (project ruling).** Existing attacker tokens plus newly committed tokens must
+  equal the calculated requirement. Reject insufficient or excess commitments before spending tokens
+  or requesting a roll. This restriction concerns the attack requirement, not the market number.
 - **Capital doubling.** The original owner's pieces count double in its own capital, for both defence and attack. Apply
   doubling after Nationalism.
     - Defending: Genoa's marker in Genoa (market 5) needs 5 + 2·5 = **15** tokens to attack.
@@ -448,7 +451,8 @@ The attacker's chance without modifiers is 1 − (box/6)· (21/36). For box 1 to
     - All defending pieces in the province return to their owners' stocks or mats.
     - If the attacker's tokens reach the market number, they become a white domination marker.
     - Defenders' satellite tokens are not affected.
-    - What happens to attacker tokens beyond the market number is unclear [Q10].
+    - Domination conversion returns the attacking tokens to stock as in §6.5. The exact requirement
+      may exceed the market number to overcome defenders; no tokens beyond that requirement may be committed.
 - **Defender wins:** **all** attacking tokens committed, including those already present, return to stock.
 
 **Wind/Watermill (baseline edition).** Right after taking a province the victim *controlled*, the winner may try a card
@@ -874,10 +878,13 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | ID | Question | Current reading |
 | --- | --- | --- |
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
-| Q10 | After a successful attack, what happens to attacking tokens beyond the market number? | They return to stock. |
 | Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | After the draw of turn 1 (3–4 players) or turn 2 (5–6 players). |
 
 **Reference issues still to resolve:**
+
+**Q10 resolved, 2026-10-23:** the user disallowed excess attack commitments. Existing plus added
+attacker tokens must equal the calculated requirement. `AttackRequirement` enforces this before
+the board-play milestone spends tokens or requests randomness.
 
 - **Expansion bonus (§5.6).** Confirm whether rebuilt markers after events are excluded (existing TODO).
 - **Caravan (§6.3).** Confirm the full-intermediate-province attack-through requirement (existing TODO).
