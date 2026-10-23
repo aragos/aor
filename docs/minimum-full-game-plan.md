@@ -37,7 +37,7 @@ Produce a complete, reviewable catalog with validation before implementing the r
   coastal-water connections, sea areas, directed satellite support, overseas boxes and access restrictions.
   Cover the areas and capitals used by every supported player count.
 - **Economy:** all 26 advances and their categories, costs, credits, prerequisites and misery-relief ratings;
-  commodity values and printed payout limits; income, stabilization and shipping tables.
+  commodity values, ownership tracks and printed payment boxes; income, stabilization and shipping tables.
 - **Validation:** unique identifiers, valid references, symmetric connections where applicable, directed satellite
   links, valid market and commodity assignments, correct advance totals and complete player-count coverage.
   Reuse existing verified misery, shipping and order-box definitions.
@@ -57,7 +57,7 @@ Transcribe facts from references; the unlicensed implementation repositories lis
 
 The board questions currently include the Loire market, Area I satellite count, Libya's area, sea-area definitions,
 and complete land/coastal-water connections. Resolve them against the reference and isolate any discrepancies for
-a user ruling. Verify the printed commodity payout limits as well.
+a user ruling. Distinguish the board ownership tracks from the commodity cards' payment boxes.
 
 The user resolved the gameplay decisions on 2026-10-23: reject attack commitments above the calculated
 requirement, counting existing attacker tokens; support both `exclude` (default) and `include` for event-rebuilt
