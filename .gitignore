@@ -13,3 +13,6 @@ local.properties
 node_modules/
 web/dist/
 web/*.tsbuildinfo
+
+# Local games, credentials and private history
+.aor-data/

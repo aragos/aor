@@ -23,24 +23,13 @@ outcomes and never generates randomness.
 
 ## 2. Log and configuration
 
-```kotlin
-data class GameHeader(
-    val rulesVersion: Version,
-    val dataVersion: Version,
-)
-
-sealed interface LogEntry {
-    data class Action(val actor: Actor, val command: Command) : LogEntry
-    data class Outcome(val result: SystemResult) : LogEntry
-}
-```
-
-The header records compatible rules and immutable static data, plus player registration and controller assignments.
+Each game records its rules and data versions, registered players, creator and controller assignments.
+The creator's role is independent of registration order. The log records player actions and authority outcomes.
 Game options are setup commands. `start` validates and freezes configuration; setup cannot be edited once play starts.
 Waiting players and completion status are derived from state and prompts.
 
-Commands are Kotlin sealed types with a handwritten parser/printer and lossless text round trips. The UI builds the
-same objects. One entry occupies one line; `!` introduces a system outcome. Syntax remains illustrative:
+All clients submit the same commands using locale-independent text with lossless round trips.
+One entry occupies one line; `!` introduces a system outcome. Syntax remains illustrative:
 
 ```text
 creator: set-option epochs 3
@@ -92,13 +81,7 @@ A frame is a small state machine for a phase, a player's activity, a competition
 frame emits a prompt or automatically pushes/pops frames. The stack is replayable state; use no domain coroutines or
 callbacks.
 
-```kotlin
-sealed interface Prompt {
-    data class Player(val player: PlayerId, val choice: ChoiceKind) : Prompt
-    data class Simultaneous(val players: Set<PlayerId>, val choice: ChoiceKind) : Prompt
-    data class System(val need: SystemNeed) : Prompt
-}
-```
+Prompts address one player, several players making simultaneous decisions, or the authority supplying an outcome.
 
 Open optional windows only for eligible players: Renaissance, Patronage claims and a defender's Cathedral declaration.
 Accept an action or pass. Mandatory interruptions include Civil War's loss choice, the War loser's province choices

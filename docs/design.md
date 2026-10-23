@@ -26,6 +26,9 @@ The web client communicates with the server; it needs no Kotlin/JS build or clie
 JS target remains available for future client replay. Keep source packages flat until implemented features justify
 more structure. Build and run commands are in [README.md](../README.md).
 
+The server separates game progression and authority outcomes from authorization, private views and
+storage. Replaceable storage provides atomic updates for each game.
+
 ## 3. Game storage and configuration
 
 A game consists of player identities, metadata (e.g. when the game was created), rules/data compatibility versions and a
@@ -81,6 +84,15 @@ Keep immutable revision history: revision id, parent, author, edit command and r
 replays one effective revision. Requests name the expected revision; reject stale requests after an edit. Publishing
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
+
+The current setup implementation stores each revision's new log entries as a delta. Reconstructing
+the active game therefore replays the accumulated deltas; the latest revision alone is not a complete
+log. Each committed log transaction advances the concurrency revision used by `expectedRevision`;
+unrevealed pending-bid replacements leave it unchanged. This detects stale committed-state submissions
+without a separate log-position token. Keeping one revision id until a history edit would reduce
+ordinary revision records, but would require another
+monotonic version for command and pending-submission concurrency. General history editing and branch
+selection remain future work.
 
 “During their turn” means the player's activity within one phase, including nested interruptions such as Cathedral.
 It does not span several phases. The engine supplies activity ownership and boundaries. Completing an activity closes
