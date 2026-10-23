@@ -31,6 +31,14 @@ enum class ViolationCode(val description: String) {
     UNAVAILABLE_CAPITAL("The selected capital is unavailable."),
     INVALID_OUTCOME("The system outcome does not match the pending request."),
     UNSUPPORTED_OPTION("The requested game option is unsupported."),
+    PLAYER_IN_CHAOS("A player in Chaos cannot perform this action."),
+    ADVANCE_ALREADY_OWNED("The player already owns this advance."),
+    MISSING_ADVANCE_PREREQUISITE("Acquire every prerequisite before buying this advance."),
+    ADVANCE_CATEGORY_FORBIDDEN("Papal Decree forbids buying this advance category this turn."),
+    INSUFFICIENT_CASH("The player cannot afford the full cost of this purchase."),
+    SHIP_UPGRADE_ALREADY_BOUGHT("The player has already bought a shipping upgrade this turn."),
+    SHIP_UPGRADE_UNAVAILABLE("The current fleet has no further paid upgrade."),
+    INVALID_MISERY_RELIEF("Choose positive relief spaces within the remaining tier allowance."),
 }
 
 class RuleViolation(

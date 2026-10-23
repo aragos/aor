@@ -59,6 +59,10 @@ data class PlayerState(
     val boardMarkers: Int = 0,
     val misery: MiseryStep = MiseryStep.ZERO,
     val ships: ShippingCapability = ShippingCapability.NONE,
+    val advances: PlayerAdvances = PlayerAdvances(),
+    /** Turn of the last paid shipping upgrade; advance-driven fleet changes do not count. */
+    val lastShipUpgradeTurn: Int? = null,
+    val miseryReliefUsage: MiseryReliefUsage? = null,
 )
 
 /**
