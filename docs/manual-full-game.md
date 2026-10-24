@@ -18,7 +18,7 @@ submitted through a private player link omit the actor prefix; replay logs inclu
 | Buy Card | Eligible owners may use `buy-card` ($10) and, with Master Art, `discard-card hand-4` in either order. Each is optional and available once; `pass` continues. |
 | Play Cards | `play-card hand-4` with any required choice below. Play as many as desired, then `pass`. |
 | Purchase | `upgrade-ships` or `pass`; `buy-advance A` as often as affordable, then `pass`; mandatory `stabilize cash` or `stabilize misery`; `relieve-misery 1` as allowed, then `pass`. |
-| Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `end-expansion`. Unused pool tokens return to stock. |
+| Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `pass`. Unused pool tokens return to stock. |
 | Income | Automatic piece flips, income and two recorded shortage/surplus rolls. Eligible majority draws resolve automatically. |
 
 A placement may specify `land`, `ship`, or `caravan <intermediate-province>` after the destination.
