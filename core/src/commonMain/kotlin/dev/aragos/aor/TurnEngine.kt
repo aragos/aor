@@ -429,9 +429,7 @@ internal object TurnEngine {
             when (adjustment) {
                 CommodityAdjustment.SHORTAGE -> current.queueDraw(majority)
                 CommodityAdjustment.SURPLUS ->
-                    current.replacePlayer(
-                        paySurplus(current.playerState(majority), counts.getValue(majority))
-                    )
+                    current.replacePlayer(paySurplus(current.playerState(majority), maximum))
             }
         }
     }
