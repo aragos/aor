@@ -74,18 +74,18 @@ class ExpansionReplayTest {
     @Test
     fun aRecordedFailedShipmentPreventsASecondOverCapacityAttack() {
         val initial =
-            game(BoardState().placeMarker(id("florence"), p2).board).updatePlayer(p1) { owner ->
+            game(BoardState().placeMarker(id("rome"), p2).board).updatePlayer(p1) { owner ->
                 owner.copy(
                     ships = ShippingCapability.SEAWORTHY_10,
                     advances = ownership(AdvanceId.SEAWORTHY_VESSELS),
                 )
             }
-        val failed = initial.play("p1: attack florence ship", "!roll competition 6 1 1")
+        val failed = initial.play("p1: attack rome", "!roll competition 6 1 1")
 
-        val failure = assertFailsWith<RuleViolation> { failed.play("p1: attack florence ship") }
+        val failure = assertFailsWith<RuleViolation> { failed.play("p1: attack rome") }
 
         assertThat(failure.code).isEqualTo(ViolationCode.SHIPPING_CAPACITY_EXCEEDED)
-        assertThat(failed.flow.shipped[p1]).containsExactly(id("florence"), 8)
+        assertThat(failed.flow.shipped[p1]).containsExactly(id("rome"), 8)
         assertThat(physicalPieces(failed, p1)).isEqualTo(36)
     }
 

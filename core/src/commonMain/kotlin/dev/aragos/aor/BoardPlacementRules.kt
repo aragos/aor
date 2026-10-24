@@ -40,6 +40,31 @@ sealed interface PlacementPlan {
 }
 
 object BoardPlacementRules {
+    /**
+     * Chooses the first feasible route in [ExpansionReach.routesTo] preference order for the
+     * requested commitment. Queries and execution use the same plan, including capacity checks.
+     */
+    fun evaluate(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
+        addedTokens: Int,
+        poolTokens: Int,
+    ): PlacementPlan {
+        context.province(destination)
+        var firstFailure: RuleViolation? = null
+        for (route in ExpansionReach.routesTo(context, player, destination)) {
+            try {
+                return evaluate(context, player, destination, addedTokens, route, poolTokens)
+            } catch (failure: RuleViolation) {
+                if (firstFailure == null) {
+                    firstFailure = failure
+                }
+            }
+        }
+        throw firstFailure ?: RuleViolation(ViolationCode.UNREACHABLE_PROVINCE)
+    }
+
     /** All rejection checks run before the driver spends tokens, shipping capacity or any dice. */
     fun evaluate(
         context: BoardRulesContext,
