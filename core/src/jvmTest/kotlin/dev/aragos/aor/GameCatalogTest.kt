@@ -130,8 +130,11 @@ class GameCatalogTest {
     fun coastalConnectionsRejectInlandEndpoints() {
         val badCoast =
             ProvinceData.definitions.map { province ->
-                if (province.id == ProvinceId("venice")) province.copy(coastal = false)
-                else province
+                if (province.id == ProvinceId("venice")) {
+                    province.copy(coastal = false)
+                } else {
+                    province
+                }
             }
         val failure =
             assertFailsWith<IllegalArgumentException> {
