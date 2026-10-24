@@ -1,54 +1,23 @@
 package dev.aragos.aor
 
-enum class BoardRouteKind {
-    AUTO,
-    LAND,
-    CARAVAN,
-    SHIP,
-}
-
-/** A route preference; Caravan's intermediate province is explicit in canonical command text. */
-data class BoardRouteChoice(
-    val kind: BoardRouteKind = BoardRouteKind.AUTO,
-    val via: ProvinceId? = null,
-) {
-    init {
-        require((kind == BoardRouteKind.CARAVAN) == (via != null)) {
-            "Only a Caravan route requires an intermediate province."
-        }
-    }
-
-    fun toText(): String =
-        when (kind) {
-            BoardRouteKind.AUTO -> ""
-            BoardRouteKind.LAND -> " land"
-            BoardRouteKind.SHIP -> " ship"
-            BoardRouteKind.CARAVAN -> " caravan $via"
-        }
-}
-
 /** Expansion commands and the optional interruptions produced by a successful competition. */
 sealed interface BoardCommand : Command {
     data class Place(
         val tokens: Int,
         val province: ProvinceId,
-        val route: BoardRouteChoice = BoardRouteChoice(),
     ) : BoardCommand {
-        override fun toText(): String = "place $tokens $province${route.toText()}"
+        override fun toText(): String = "place $tokens $province"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            BoardGame.place(state, actor, province, tokens, route)
+            BoardGame.place(state, actor, province, tokens)
     }
 
     /** Calculates the exact additional commitment, including the attacker's existing tokens. */
-    data class Attack(
-        val province: ProvinceId,
-        val route: BoardRouteChoice = BoardRouteChoice(),
-    ) : BoardCommand {
-        override fun toText(): String = "attack $province${route.toText()}"
+    data class Attack(val province: ProvinceId) : BoardCommand {
+        override fun toText(): String = "attack $province"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            BoardGame.attack(state, actor, province, route)
+            BoardGame.attack(state, actor, province)
     }
 
     data class ReduceMarker(val province: ProvinceId) : BoardCommand {
@@ -92,16 +61,15 @@ sealed interface BoardCommand : Command {
             try {
                 when (name) {
                     "place" -> {
-                        checkRule(arguments.size >= 2, ViolationCode.INVALID_COMMAND)
+                        checkRule(arguments.size == 2, ViolationCode.INVALID_COMMAND)
                         Place(
                             arguments[0].toInt(),
                             ProvinceId(arguments[1]),
-                            route(arguments.drop(2)),
                         )
                     }
                     "attack" -> {
-                        checkRule(arguments.isNotEmpty(), ViolationCode.INVALID_COMMAND)
-                        Attack(ProvinceId(arguments[0]), route(arguments.drop(1)))
+                        checkRule(arguments.size == 1, ViolationCode.INVALID_COMMAND)
+                        Attack(ProvinceId(arguments.single()))
                     }
                     "reduce-marker" -> {
                         checkRule(arguments.size == 1, ViolationCode.INVALID_COMMAND)
@@ -122,16 +90,6 @@ sealed interface BoardCommand : Command {
                 }
             } catch (failure: IllegalArgumentException) {
                 throw RuleViolation(ViolationCode.INVALID_COMMAND)
-            }
-
-        private fun route(arguments: List<String>): BoardRouteChoice =
-            when {
-                arguments.isEmpty() -> BoardRouteChoice()
-                arguments == listOf("land") -> BoardRouteChoice(BoardRouteKind.LAND)
-                arguments == listOf("ship") -> BoardRouteChoice(BoardRouteKind.SHIP)
-                arguments.size == 2 && arguments[0] == "caravan" ->
-                    BoardRouteChoice(BoardRouteKind.CARAVAN, ProvinceId(arguments[1]))
-                else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
             }
 
         private fun noArguments(arguments: List<String>, command: BoardCommand): BoardCommand {

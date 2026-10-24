@@ -119,18 +119,15 @@ object BoardGame {
         actor: PlayerId,
         province: ProvinceId,
         tokens: Int,
-        preference: BoardRouteChoice = BoardRouteChoice(),
     ): GameState {
         state.requireActor(actor, Stage.EXPANSION)
         val context = context(state)
-        val route = selectRoute(context, actor, province, preference)
         val plan =
             BoardPlacementRules.evaluate(
                 context,
                 actor,
                 province,
                 tokens,
-                route,
                 state.playerState(actor).poolTokens,
             )
         val reserved =
@@ -163,11 +160,10 @@ object BoardGame {
         state: GameState,
         actor: PlayerId,
         province: ProvinceId,
-        preference: BoardRouteChoice = BoardRouteChoice(),
     ): GameState {
         state.requireActor(actor, Stage.EXPANSION)
         val tokens = attackTokens(context(state), actor, province)
-        return place(state, actor, province, tokens, preference)
+        return place(state, actor, province, tokens)
     }
 
     fun endExpansion(state: GameState, actor: PlayerId): GameState {
@@ -489,13 +485,11 @@ object BoardGame {
         province: ProvinceId,
         poolTokens: Int,
     ): List<String> {
-        val route =
-            ExpansionReach.routesTo(context, actor, province).firstOrNull() ?: return emptyList()
         return buildList {
-            if (canPlace(context, actor, province, 1, route, poolTokens)) {
+            if (canPlace(context, actor, province, 1, poolTokens)) {
                 add("place 1 $province")
             }
-            if (canAttack(context, actor, province, route, poolTokens)) {
+            if (canAttack(context, actor, province, poolTokens)) {
                 add("attack $province")
             }
         }
@@ -518,7 +512,6 @@ object BoardGame {
         context: BoardRulesContext,
         actor: PlayerId,
         province: ProvinceId,
-        route: ExpansionRoute,
         poolTokens: Int,
     ): Boolean =
         try {
@@ -527,7 +520,6 @@ object BoardGame {
                 actor,
                 province,
                 attackTokens(context, actor, province),
-                route,
                 poolTokens,
             )
         } catch (failure: RuleViolation) {
@@ -540,45 +532,12 @@ object BoardGame {
         actor: PlayerId,
         province: ProvinceId,
         tokens: Int,
-        route: ExpansionRoute,
         pool: Int,
     ): Boolean =
         try {
-            BoardPlacementRules.evaluate(context, actor, province, tokens, route, pool)
+            BoardPlacementRules.evaluate(context, actor, province, tokens, pool)
             true
         } catch (failure: RuleViolation) {
             false
         }
-
-    private fun selectRoute(
-        context: BoardRulesContext,
-        actor: PlayerId,
-        province: ProvinceId,
-        preference: BoardRouteChoice,
-    ): ExpansionRoute {
-        context.province(province)
-        if (preference.kind == BoardRouteKind.CARAVAN) {
-            val via =
-                requireNotNull(preference.via) {
-                    "A Caravan route requires its intermediate province."
-                }
-            context.province(via)
-            val base =
-                context.bases(actor).firstOrNull { candidate ->
-                    ExpansionReach.connected(context.configuration.landBorders, candidate, via) &&
-                        ExpansionReach.connected(context.configuration.landBorders, via, province)
-                } ?: throw RuleViolation(ViolationCode.UNREACHABLE_PROVINCE)
-            return ExpansionRoute.Caravan(base, via)
-        }
-        val routes = ExpansionReach.routesTo(context, actor, province)
-        val selected = routes.firstOrNull { route ->
-            when (preference.kind) {
-                BoardRouteKind.AUTO -> true
-                BoardRouteKind.LAND -> route is ExpansionRoute.Local || route is ExpansionRoute.Land
-                BoardRouteKind.SHIP -> route is ExpansionRoute.Shipping
-                BoardRouteKind.CARAVAN -> false
-            }
-        }
-        return selected ?: throw RuleViolation(ViolationCode.UNREACHABLE_PROVINCE)
-    }
 }
