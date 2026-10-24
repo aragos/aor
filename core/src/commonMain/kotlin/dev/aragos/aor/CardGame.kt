@@ -126,6 +126,9 @@ object CardGame {
 
     /** The ordinary pass command doubles as declining the optional pre-reroll military window. */
     fun passDecision(state: GameState, actor: PlayerId): GameState? {
+        VariantInteractions.passDecision(state, actor)?.let {
+            return it
+        }
         val decision =
             state.flow.decisions.lastOrNull() as? CardDecision.WarPreparation ?: return null
         checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
@@ -173,7 +176,7 @@ object CardGame {
             state.replacePlayer(
                 player.copy(hand = player.hand.filterNot { held -> held.reference == reference })
             )
-        return apply(committed, resolution)
+        return apply(committed.discardCards(listOf(card)), resolution)
     }
 
     fun chooseCivilWarLoss(
@@ -334,7 +337,17 @@ object CardGame {
                         player.copy(cash = player.cash - resolution.cash)
                     }
                 )
-            is CardResolution.Military -> state.copy(effects = resolution.effects)
+            is CardResolution.Military ->
+                state.copy(
+                    effects = resolution.effects,
+                    voids =
+                        state.voids.copy(
+                            armorAndStirrups =
+                                state.voids.armorAndStirrups ||
+                                    resolution.play.event in
+                                        setOf(EventId.GUNPOWDER, EventId.LONG_BOW)
+                        ),
+                )
             is CardResolution.EnlightenedRuler -> state.copy(effects = resolution.effects)
             is CardResolution.PapalDecree -> state.copy(effects = resolution.effects)
             is CardResolution.MiseryEvent ->
@@ -343,6 +356,36 @@ object CardGame {
                 }
             is CardResolution.CivilWar -> civilWar(state, resolution)
             is CardResolution.MarkerReduction -> reduceMarker(state, resolution)
+            is CardResolution.MarkerReductions -> resolution.reductions.fold(state, ::reduceMarker)
+            is CardResolution.BlackDeath -> {
+                val cleared =
+                    resolution.tokenProvinces.fold(state) { current, province ->
+                        current.withBoardChange(current.board.remove(province))
+                    }
+                resolution.reductions.fold(cleared, ::reduceMarker)
+            }
+            is CardResolution.MongolArmies ->
+                state
+                    .copy(voids = state.voids.copy(crusades = true))
+                    .replacePlayer(
+                        state.playerState(resolution.player).let { owner ->
+                            owner.copy(cash = owner.cash + 10)
+                        }
+                    )
+            is CardResolution.ReligiousStrife -> {
+                val canceled =
+                    state.copy(
+                        effects =
+                            state.effects.copy(papalCategory = null, religiousStrifePlayed = true),
+                        voids =
+                            state.voids.copy(
+                                papalDecree = state.voids.papalDecree || resolution.permanent
+                            ),
+                    )
+                resolution.spaces.entries.fold(canceled) { current, (player, spaces) ->
+                    current.gainMisery(player, spaces)
+                }
+            }
             is CardResolution.CrusadesPlacement -> CardMarkerPlacements.crusades(state, resolution)
             is CardResolution.WarBattle ->
                 state
@@ -401,8 +444,9 @@ object CardGame {
         // to stock, and an eliminated player cannot answer an optional pool replacement frame.
         val replacement =
             when {
-                owner.misery != MiseryStep.CHAOS -> reduction.replacement
                 owner.stockTokens > 0 -> EventTokenReplacement.STOCK
+                owner.misery != MiseryStep.CHAOS && owner.poolTokens > 0 ->
+                    EventTokenReplacement.POOL_OR_EMPTY
                 else -> EventTokenReplacement.EMPTY
             }
         return when (replacement) {
@@ -450,7 +494,8 @@ object CardGame {
     }
 
     private fun CardEffectSpec.isMilitary(): Boolean =
-        this is CardEffectSpec.Event && event in setOf(EventId.ARMOR, EventId.STIRRUPS)
+        this is CardEffectSpec.Event &&
+            event in setOf(EventId.ARMOR, EventId.STIRRUPS, EventId.GUNPOWDER, EventId.LONG_BOW)
 
     private fun choices(context: CardContext, spec: CardEffectSpec): List<CardChoice> =
         when (spec) {
@@ -463,7 +508,12 @@ object CardGame {
                     EventId.WAR ->
                         listOf(CardChoice.None) +
                             context.activePlayers.keys.map(CardChoice::PlayerChoice)
-                    EventId.PIRATES_VIKINGS,
+                    EventId.BLACK_DEATH ->
+                        context.provinces.values
+                            .mapNotNull(ProvinceDefinition::area)
+                            .distinct()
+                            .map(CardChoice::AreaChoice)
+                    EventId.PIRATES_VIKINGS -> listOf(CardChoice.None) + pirateChoices(context)
                     EventId.REBELLION ->
                         listOf(CardChoice.None) +
                             context.markers.keys.map(CardChoice::ProvinceChoice)
@@ -483,6 +533,18 @@ object CardGame {
                     else -> listOf(CardChoice.None)
                 }
         }
+
+    private fun pirateChoices(context: CardContext): List<CardChoice> {
+        val targets =
+            CardRules.pirateTargets(context)
+                .sortedBy(ProvinceId::value)
+                .take(CardRules.piratesRequiredCount(context))
+        return when (targets.size) {
+            0 -> emptyList()
+            1 -> listOf(CardChoice.ProvinceChoice(targets.single()))
+            else -> listOf(CardChoice.ProvincesChoice(targets))
+        }
+    }
 
     private fun currentRound(state: GameState): WarRound =
         WarRound(

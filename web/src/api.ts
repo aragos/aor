@@ -8,7 +8,7 @@ export interface ProvinceDefinition {
     commodities: string[]; capital: string | null; coastal: boolean; access: string[]; satellite: boolean;
 }
 export interface AdvanceDefinition {
-    id: string; category: string; cost: number; credit: number; miseryRelief: number;
+    id: string; letter: string; category: string; cost: number; credit: number; miseryRelief: number;
     prerequisites: string[]; messageId: string; purchaseMisery: number;
 }
 export interface PublicCatalog {
@@ -26,7 +26,7 @@ export interface ScoreView {
     total: number | null; winner: boolean;
 }
 export interface CardTurnEffects {
-    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; protectionCash: number; patronageClaimants: string[]}[];
+    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; displayBox: number | null; protectionCash: number; patronageClaimants: string[]}[];
     enlightenedRulers: string[]; military: {player: string; event: string}[];
     papalCategory: string | null; crusadesPlayed: boolean;
 }
@@ -36,7 +36,9 @@ export interface CardDefinition {
 export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
 export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
-    game: {stage: string; epochs: number; rebuiltMarkerBonus: RebuiltMarkerBonus; players: PlayerView[];
+    game: {stage: string; currentEpoch: number;
+        rules: {patronage: 'PROTECTION_MONEY' | 'THREE_BOX_DISPLAY'; [key: string]: string | boolean};
+        ruleOptions: {key: string; value: string; choices: string[]}[]; rebuiltMarkerBonus: RebuiltMarkerBonus; players: PlayerView[];
         hand: {reference: string; definition: CardDefinition}[];
         capitalOrder: string[]; revealedBids: Record<string, number>;
         turnNumber: number | null; turnOrder: string[]; orderBoxes: Record<string, number>;
@@ -44,6 +46,7 @@ export interface Snapshot {
         board: ProvinceView[]; catalog: PublicCatalog | null; deckRemaining: number; endingTriggered: boolean;
         scores: ScoreView[]; adjustments: Record<string, ('SHORTAGE' | 'SURPLUS')[]>;
         effects: CardTurnEffects; activeWar: {initiator: string; opponent: string; startedTurn: number; ties: number} | null;
+        pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number} | null;
@@ -53,7 +56,7 @@ export interface Snapshot {
         stabilizationCost: number | null; burdenReferences: string[]};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
-    submitted: string[]; pendingBid: number | null; history: string[];
+    submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];
 }
 export interface CreatedGame {gameId: string; links: {id: string; name: string; path: string}[]}
 export class ApiError extends Error {

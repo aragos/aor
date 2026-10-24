@@ -6,26 +6,6 @@ sealed interface Command {
 
     fun applyTo(state: GameState, actor: PlayerId): GameState
 
-    /** The minimum full-game scope supports one epoch; later decks are not implemented. */
-    data class SetEpochs(val epochs: Int) : Command {
-        override fun toText(): String = "set-option epochs $epochs"
-
-        override fun applyTo(state: GameState, actor: PlayerId): GameState {
-            checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
-            checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
-            checkRule(epochs == 1, ViolationCode.INVALID_EPOCHS)
-            return state.copy(epochs = epochs)
-        }
-
-        companion object {
-            fun parse(arguments: List<String>): SetEpochs {
-                arguments.requireSize(2)
-                checkRule(arguments[0] == "epochs", ViolationCode.UNSUPPORTED_OPTION)
-                return SetEpochs(epochs = arguments[1].commandNumber())
-            }
-        }
-    }
-
     data class SetRebuiltMarkerBonus(val policy: RebuiltMarkerBonus) : Command {
         override fun toText(): String = "set-option rebuilt-marker-bonus ${policy.commandValue}"
 
@@ -50,9 +30,8 @@ sealed interface Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
-            checkRule(state.epochs == 1, ViolationCode.INVALID_EPOCHS)
-            GameCatalog.requireResolvedFor(state.playerIds.size)
-            return state.copy(stage = Stage.SHUFFLE)
+            GameCatalog.requireResolvedFor(state.playerIds.size, state.rules)
+            return SetupDeal.prepare(state).copy(stage = Stage.SHUFFLE)
         }
 
         fun parse(arguments: List<String>): Start {

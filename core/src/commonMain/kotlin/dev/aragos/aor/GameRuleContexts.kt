@@ -39,8 +39,14 @@ internal fun GameState.cardContext(): CardContext =
         voids = voids,
         finalCardPlay = stage == Stage.FINAL_CARD_PLAY,
         turn = currentTurn(),
+        epoch = currentEpoch,
+        rules = rules,
+        tokenProvinces =
+            board.pieces.filterValues { pieces -> pieces is ProvincePieces.Tokens }.keys,
         provinces =
-            CatalogConfiguration(playerIds.size).provinces.associateBy(ProvinceDefinition::id),
+            CatalogConfiguration(playerIds.size, rules)
+                .provinces
+                .associateBy(ProvinceDefinition::id),
     )
 
 internal fun GameState.purchaseContext(actor: PlayerId): PurchaseContext =
@@ -54,21 +60,23 @@ internal fun GameState.purchaseContext(actor: PlayerId): PurchaseContext =
                     AuthorizedLeaderDiscount(
                         played.leader.cardId,
                         credit.advance,
-                        credit.amountFor(effects.crusadesPlayed),
+                        credit.amountFor(effects.crusadesPlayed, played.mongolEnhanced),
                     )
                 }
             },
+        rules = rules,
     )
 
 internal fun GameState.patronageChoices(actor: PlayerId): List<String> {
     val player = playerState(actor)
     if (!player.advances.owns(AdvanceId.PATRONAGE)) return emptyList()
-    return effects.leaders
-        .filter { played ->
-            played.role == CardLeaderRole.EXPOSED &&
-                played.owner != actor &&
-                actor !in played.patronageClaimants &&
-                player.cash >= played.protectionCash
+    val context = cardContext()
+    return effects.leaders.mapNotNull { played ->
+        try {
+            LeaderRules.claim(context, actor, played.leader)
+            "patronize ${played.leader.cardId}"
+        } catch (_: CardRuleViolation) {
+            null
         }
-        .map { played -> "patronize ${played.leader.cardId}" }
+    }
 }

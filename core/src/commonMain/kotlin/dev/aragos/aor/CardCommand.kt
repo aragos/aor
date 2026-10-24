@@ -18,6 +18,9 @@ sealed interface CardCommand : Command {
                         " commodity ${choice.commodity.name.lowercase()}"
                     is CardChoice.PlayerChoice -> " player ${choice.player}"
                     is CardChoice.ProvinceChoice -> " province ${choice.province}"
+                    is CardChoice.ProvincesChoice ->
+                        " provinces ${choice.provinces.joinToString(" ")}"
+                    is CardChoice.AreaChoice -> " area ${choice.area.name.lowercase()}"
                     is CardChoice.CategoryChoice ->
                         " category ${choice.category?.name?.lowercase() ?: "none"}"
                     is CardChoice.LeaderProtection -> " protect ${choice.cash}"
@@ -28,6 +31,12 @@ sealed interface CardCommand : Command {
 
         companion object {
             fun parse(arguments: List<String>): PlayCard {
+                if (arguments.size >= 3 && arguments[1] == "provinces") {
+                    return PlayCard(
+                        arguments[0],
+                        CardChoice.ProvincesChoice(arguments.drop(2).map(::ProvinceId)),
+                    )
+                }
                 checkRule(
                     arguments.size == 1 || arguments.size == 3,
                     ViolationCode.INVALID_COMMAND,
@@ -44,6 +53,7 @@ sealed interface CardCommand : Command {
                     "commodity" -> CardChoice.CommodityChoice(Commodity.valueOf(value.uppercase()))
                     "player" -> CardChoice.PlayerChoice(PlayerId(value))
                     "province" -> CardChoice.ProvinceChoice(ProvinceId(value))
+                    "area" -> CardChoice.AreaChoice(GeographicalArea.valueOf(value.uppercase()))
                     "category" -> {
                         val category =
                             if (value == "none") {
@@ -57,6 +67,17 @@ sealed interface CardCommand : Command {
                     else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
                 }
         }
+    }
+
+    data class AdjustMarket(
+        val commodity: Commodity,
+        val adjustment: CommodityAdjustment?,
+    ) : CardCommand {
+        override fun toText(): String =
+            "adjust-market ${commodity.name.lowercase()} ${adjustment?.name?.lowercase() ?: "neutral"}"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState =
+            VariantInteractions.adjustMarket(state, actor, commodity, adjustment)
     }
 
     data class ChooseCivilWarLoss(val loss: CivilWarLossChoice) : CardCommand {
@@ -115,6 +136,14 @@ sealed interface CardCommand : Command {
             try {
                 when (name) {
                     "play" -> PlayCard.parse(arguments)
+                    "adjust-market" -> {
+                        size(arguments, 2)
+                        AdjustMarket(
+                            Commodity.valueOf(arguments[0].uppercase()),
+                            if (arguments[1] == "neutral") null
+                            else CommodityAdjustment.valueOf(arguments[1].uppercase()),
+                        )
+                    }
                     "civil-war-loss" -> {
                         size(arguments, 1)
                         ChooseCivilWarLoss(

@@ -40,6 +40,18 @@ sealed interface BoardDecision : TurnDecision {
         override fun choices(state: GameState): List<String> = listOf("windmill", "pass")
     }
 
+    data class WrittenRecordOpportunity(
+        override val player: PlayerId,
+        val victims: List<PlayerId>,
+    ) : BoardDecision {
+        override val choice: String = "written-record"
+
+        override fun choices(state: GameState): List<String> =
+            listOf("pass") +
+                if (victims.size == 1) listOf("written-record")
+                else victims.map { victim -> "written-record $victim" }
+    }
+
     data class WindmillDice(val winner: PlayerId, val victim: PlayerId, val marketNumber: Int) :
         BoardDecision, TurnDecision.Roll {
         override val choice: String
@@ -82,7 +94,7 @@ sealed interface BoardDecision : TurnDecision {
 object BoardGame {
     fun context(state: GameState): BoardRulesContext =
         BoardRulesContext(
-            configuration = CatalogConfiguration(state.playerIds.size),
+            configuration = CatalogConfiguration(state.playerIds.size, state.rules),
             board = state.board,
             players =
                 state.players.mapValues { entry ->
@@ -108,7 +120,9 @@ object BoardGame {
                         when (play.event) {
                             EventId.ARMOR -> MilitaryCard.ARMOR
                             EventId.STIRRUPS -> MilitaryCard.STIRRUPS
-                            else -> error("Only epoch-one military cards can enter board play.")
+                            EventId.GUNPOWDER -> MilitaryCard.GUNPOWDER
+                            EventId.LONG_BOW -> MilitaryCard.LONG_BOW
+                            else -> error("Only military advantage cards can enter board play.")
                         },
                     )
                 },
@@ -225,6 +239,10 @@ object BoardGame {
                 checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
                 openCathedral(state.popDecision(), decision.plan, decision.remaining)
             }
+            is BoardDecision.WrittenRecordOpportunity -> {
+                checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
+                state.popDecision()
+            }
             is BoardDecision.WindmillOpportunity -> {
                 checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
                 state.popDecision()
@@ -256,6 +274,25 @@ object BoardGame {
         return paid
             .copy(flow = paid.flow.copy(windmillUsed = paid.flow.windmillUsed + actor))
             .pushDecision(BoardDecision.WindmillDice(actor, frame.victim, number))
+    }
+
+    fun writtenRecord(state: GameState, actor: PlayerId, target: PlayerId?): GameState {
+        val decision = state.flow.decisions.lastOrNull() as? BoardDecision.WrittenRecordOpportunity
+        checkRule(decision?.player == actor, ViolationCode.WRONG_PLAYER)
+        val frame =
+            requireNotNull(decision) { "Written Record requires a pending trade opportunity." }
+        val victim = target ?: frame.victims.singleOrNull()
+        checkRule(victim in frame.victims, ViolationCode.INVALID_CARD_DISCARD)
+        val selected =
+            requireNotNull(victim) { "A Written Record exchange requires a defeated player." }
+        checkRule(
+            VariantInteractions.canWrittenRecordTrade(state, actor, selected),
+            ViolationCode.INVALID_CARD_DISCARD,
+        )
+        val next = state.popDecision()
+        return next
+            .copy(flow = next.flow.copy(writtenRecordUsed = next.flow.writtenRecordUsed + actor))
+            .pushDecision(BoardDecision.TradeOffer(actor, selected))
     }
 
     fun offerCard(state: GameState, actor: PlayerId, reference: String): GameState {
@@ -379,12 +416,23 @@ object BoardGame {
     ): GameState {
         val changed = recordCathedralUse(state.withBoardChange(resolution.change), resolution)
         if (!resolution.attackerWon) return changed
-        val conquered = recordMarkerOrigin(changed, plan, newAcquisition = true)
+        val acquired = recordMarkerOrigin(changed, plan, newAcquisition = true)
+        val eligible =
+            resolution.defeatedPlayers
+                .filter { defeated ->
+                    VariantInteractions.canWrittenRecordTrade(acquired, plan.player, defeated)
+                }
+                .sortedBy(PlayerId::value)
+        val conquered =
+            if (eligible.isNotEmpty()) {
+                acquired.pushDecision(BoardDecision.WrittenRecordOpportunity(plan.player, eligible))
+            } else acquired
         val victim = resolution.previousController ?: return conquered
         val winner = conquered.playerState(plan.player)
         val defeated = conquered.playerState(victim)
         if (
-            winner.advances.owns(AdvanceId.WIND_WATERMILL) &&
+            conquered.rules.windWatermill == WindWatermillRule.TAKEOVER_TRADE &&
+                winner.advances.owns(AdvanceId.WIND_WATERMILL) &&
                 plan.player !in conquered.flow.windmillUsed &&
                 winner.poolTokens >= ProvinceData.definition(plan.destination).marketNumber &&
                 winner.hand.isNotEmpty() &&
@@ -479,7 +527,7 @@ object BoardGame {
 
     private fun canBuyExpansionCard(state: GameState, actor: PlayerId): Boolean =
         actor !in state.flow.expansionCards &&
-            state.deck.isNotEmpty() &&
+            (state.deck.isNotEmpty() || state.currentEpoch != Epoch.THREE) &&
             state.playerState(actor).poolTokens >=
                 EconomyTables.expansionCardCost(state.flow.expansionCardCount)
 

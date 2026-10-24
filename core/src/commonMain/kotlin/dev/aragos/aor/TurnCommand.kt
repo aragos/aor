@@ -13,6 +13,10 @@ sealed interface TurnCommand : Command {
                 return resumed
             }
             val decision = state.flow.decisions.lastOrNull()
+            if (decision is ImmediateMasterArtDecision) {
+                checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
+                return state.popDecision()
+            }
             if (decision is RenaissanceDecision) {
                 checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
                 return state.popDecision()
@@ -87,7 +91,7 @@ sealed interface TurnCommand : Command {
             checkRule(
                 player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
                     actor !in state.flow.boughtCards &&
-                    state.deck.isNotEmpty(),
+                    (state.deck.isNotEmpty() || state.currentEpoch != Epoch.THREE),
                 ViolationCode.INVALID_CARD_PURCHASE,
             )
             checkRule(
@@ -105,21 +109,32 @@ sealed interface TurnCommand : Command {
         override fun toText(): String = "discard-card $reference"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
-            state.requireActor(actor, Stage.BUY_CARD)
+            val immediate = state.flow.decisions.lastOrNull() as? ImmediateMasterArtDecision
+            if (immediate == null) {
+                state.requireActor(actor, Stage.BUY_CARD)
+            } else {
+                checkRule(immediate.player == actor, ViolationCode.WRONG_PLAYER)
+            }
             val player = state.playerState(actor)
+            val card = player.hand.singleOrNull { held -> held.reference == reference }
             checkRule(
                 player.advances.owns(AdvanceId.MASTER_ART) &&
-                    actor !in state.flow.discardedCards &&
-                    player.hand.any { card -> card.reference == reference },
+                    (immediate != null || actor !in state.flow.discardedCards) &&
+                    card != null,
                 ViolationCode.INVALID_CARD_DISCARD,
             )
-            return state
-                .replacePlayer(
-                    player.copy(
-                        hand = player.hand.filterNot { card -> card.reference == reference }
-                    )
+            val selected = requireNotNull(card) { "A validated discard requires a held card." }
+            val next = if (immediate == null) state else state.popDecision()
+            val discarded =
+                next
+                    .discardCards(listOf(selected))
+                    .replacePlayer(player.copy(hand = player.hand - selected))
+            return if (immediate != null) discarded
+            else
+                discarded.copy(
+                    flow =
+                        discarded.flow.copy(discardedCards = discarded.flow.discardedCards + actor)
                 )
-                .copy(flow = state.flow.copy(discardedCards = state.flow.discardedCards + actor))
         }
     }
 
@@ -177,19 +192,35 @@ sealed interface TurnCommand : Command {
         }
     }
 
-    data class BuyAdvance(val advance: AdvanceId) : TurnCommand {
-        override fun toText(): String = "buy-advance ${advance.letter}"
+    data class BuyAdvance(val letter: Char) : TurnCommand {
+        init {
+            require(letter in 'A'..'Z') {
+                "An advance command requires a printed letter A through Z."
+            }
+        }
+
+        override fun toText(): String = "buy-advance $letter"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             state.requirePurchaseStep(actor, PurchaseStep.ADVANCES)
             val context = state.purchaseContext(actor)
-            val result = AdvancePurchases.purchase(state.playerState(actor), advance, context)
-            return state
-                .replacePlayer(result.player)
-                .copy(
-                    endingTriggered =
-                        state.endingTriggered || result.player.advances.owned.size == 26
-                )
+            val selected = state.rules.advance(letter)
+            val result = AdvancePurchases.purchase(state.playerState(actor), selected, context)
+            val purchased =
+                state
+                    .replacePlayer(result.player)
+                    .copy(
+                        endingTriggered =
+                            state.endingTriggered || result.player.advances.owned.size == 26
+                    )
+            return if (
+                selected == AdvanceId.MASTER_ART &&
+                    state.rules.immediateMasterArtDiscard &&
+                    result.player.hand.isNotEmpty() &&
+                    result.player.misery != MiseryStep.CHAOS
+            ) {
+                purchased.pushDecision(ImmediateMasterArtDecision(actor))
+            } else purchased
         }
     }
 
@@ -212,7 +243,12 @@ sealed interface TurnCommand : Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             state.requirePurchaseStep(actor, PurchaseStep.RELIEF)
             return state.replacePlayer(
-                PlayerEconomy.buyRelief(state.playerState(actor), spaces, state.currentTurn())
+                PlayerEconomy.buyRelief(
+                        state.playerState(actor),
+                        spaces,
+                        state.currentTurn(),
+                        state.rules,
+                    )
                     .player
             )
         }
@@ -244,11 +280,12 @@ sealed interface TurnCommand : Command {
                     }
                     "buy-advance" -> {
                         arguments.sizeIs(1)
-                        BuyAdvance(
-                            AdvanceId.entries.singleOrNull { advance ->
-                                advance.letter.toString() == arguments.single().uppercase()
-                            } ?: throw RuleViolation(ViolationCode.INVALID_COMMAND)
+                        val letter = arguments.single().uppercase().singleOrNull()
+                        checkRule(
+                            letter != null && letter in 'A'..'Z',
+                            ViolationCode.INVALID_COMMAND,
                         )
+                        BuyAdvance(requireNotNull(letter) { "A validated advance has one letter." })
                     }
                     "stabilize" -> {
                         arguments.sizeIs(1)

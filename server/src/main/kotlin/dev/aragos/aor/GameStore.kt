@@ -49,7 +49,7 @@ object AtomicGameWriter : GameWriter {
     }
 }
 
-/** Version-two local storage. Revisions remain immutable deltas in one append-only chain. */
+/** Version-three local storage. Revisions remain immutable deltas in one append-only chain. */
 class FileGameStore(
     private val directory: Path,
     private val writer: GameWriter = AtomicGameWriter,
@@ -127,6 +127,8 @@ class FileGameStore(
         require(credentialNode.isObject) {
             "Credentials must be an object keyed by player identifier."
         }
+        val returnNode = root.field("pendingReturns")
+        require(returnNode.isObject) { "Pending returns must be keyed by player identifier." }
         val pendingNode = root.field("pendingBids")
         require(pendingNode.isObject) {
             "Pending bids must be an object keyed by player identifier."
@@ -152,6 +154,10 @@ class FileGameStore(
                         entries = revision.field("entries").array().map(JsonNode::string),
                     )
                 },
+            pendingReturns =
+                returnNode.properties().associate { (player, reference) ->
+                    PlayerId(player) to reference.string()
+                },
             pendingBids =
                 pendingNode.properties().associate { (player, bid) ->
                     PlayerId(player) to bid.integer()
@@ -160,7 +166,7 @@ class FileGameStore(
     }
 
     private fun validate(game: StoredGame) {
-        require(game.fileVersion == 2) { "Only game file version 2 is supported." }
+        require(game.fileVersion == 3) { "Only game file version 3 is supported." }
         require(game.credentials.keys == game.header.players.map(Player::id).toSet()) {
             "Every registered player must have exactly one credential."
         }
@@ -182,6 +188,21 @@ class FileGameStore(
                     game.pendingBids.size < participants.size
             ) {
                 "Pending sealed decisions must form an incomplete batch of the current participants."
+            }
+        }
+        if (game.pendingReturns.isNotEmpty()) {
+            val participants =
+                (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
+            require(
+                state.stage == Stage.SETUP_RETURN &&
+                    participants.containsAll(game.pendingReturns.keys) &&
+                    game.pendingReturns.size < participants.size &&
+                    game.pendingBids.isEmpty()
+            ) {
+                "Pending setup returns must be an incomplete batch in the setup-return phase."
+            }
+            game.pendingReturns.forEach { (player, reference) ->
+                state.step(Entry.Action(player, SetupCommand.ReturnCard(reference)))
             }
         }
         game.pendingBids.forEach { (player, amount) ->
@@ -232,6 +253,9 @@ class FileGameStore(
         ) {
             "Sealed bids may enter history only as a complete, revealed batch."
         }
+        require(state.stage != Stage.SETUP_RETURN || state.deckHistory.setupReturns.isEmpty()) {
+            "Setup returns may enter history only as a complete private batch."
+        }
         require(
             state.stage != Stage.TOKEN_PURCHASE ||
                 state.players.values
@@ -262,18 +286,31 @@ class FileGameStore(
                 }
                 validateSealedActions(state, actions) { command -> command is Command.BuyTokens }
             }
-            else -> validateCommandActions(revision, actions, entries, index)
+            "reveal-setup-returns" -> {
+                require(state.stage == Stage.SETUP_RETURN) {
+                    "Setup returns can only reveal during improved setup."
+                }
+                validateSealedActions(state, actions) { command ->
+                    command is SetupCommand.ReturnCard
+                }
+            }
+            else -> validateCommandActions(state, revision, actions, entries, index)
         }
     }
 
     private fun validateCommandActions(
+        state: GameState,
         revision: Revision,
         actions: List<Entry.Action>,
         entries: List<Entry>,
         index: Int,
     ) {
         val command = TextCodec.parseCommand(revision.command)
-        require(command !is Command.BidCapital && command !is Command.BuyTokens) {
+        require(
+            command !is Command.BidCapital &&
+                command !is Command.BuyTokens &&
+                command !is SetupCommand.ReturnCard
+        ) {
             "Sealed decisions must be committed together under their reveal marker."
         }
         require(revision.command == command.toText()) {
@@ -281,21 +318,23 @@ class FileGameStore(
         }
         val action = Entry.Action(actor = revision.author, command = command)
         if (index != 0) {
-            require(actions == listOf(action)) {
+            val expected =
+                if (command is RuleOptionCommand && command.key == "preset") {
+                    command.resolve(state.rules).configurationCommands().map { option ->
+                        Entry.Action(revision.author, option)
+                    }
+                } else listOf(action)
+            require(actions == expected) {
                 "A command revision must contain exactly the author's command."
             }
             return
         }
-        val configuration =
-            listOf(
-                action,
-                Entry.Action(
-                    actor = revision.author,
-                    command = Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE),
-                ),
-            )
-        require(command is Command.SetEpochs && entries == configuration) {
-            "The initial revision must configure epochs and the default rebuilt-marker bonus."
+        require(
+            revision.author == state.header.creatorId &&
+                action == initialConfiguration(revision.author).first() &&
+                entries == initialConfiguration(revision.author)
+        ) {
+            "The initial revision must explicitly configure every resolved default."
         }
     }
 

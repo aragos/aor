@@ -1,7 +1,7 @@
-# Playing a one-epoch game
+# Playing a three-epoch game
 
-Create a table with three through six names and keep each private player link. Only one epoch is
-supported. The creator selects the rebuilt-marker bonus option before starting. See the
+Create a table with three through six names and keep each private player link. Games always use three epochs.
+The creator selects functional rule options and the rebuilt-marker policy before starting. See the
 [setup walkthrough](manual-setup.md) for sealed bids and access links.
 
 The browser shows the current phase, the player who must act, public board pieces and advances,
@@ -42,6 +42,8 @@ play hand-8 player p2
 play hand-12 province acre
 play hand-16 category science
 play hand-20 protect 10
+play hand-24 area vi
+play hand-28 provinces paris london genoa
 ```
 
 A non-burden event with no eligible effect can be played without a target and resolves with no
@@ -67,12 +69,30 @@ Tied Wars continue at later players' card rounds, including later turns. An unre
 last Final Card Play round is cleared. Chaos skips ordinary phase activities and discards the player's hand; its pieces
 remain neutral defenders. Income and order boxes retain the starting player count.
 
+## Alternate interactions
+
+With the selected second-edition rules, the last active Wind/Watermill owner may use
+`adjust-market grain shortage` (or `surplus`) from neutral, or `adjust-market grain neutral`
+to clear an adjustment, after the first player's buy-off window. `pass` declines.
+Written Record offers `written-record` or `pass` after defeating a non-owner, including a
+partial-token defender. Use `written-record p2` to choose among multiple defeated players; an accepted trade
+uses `offer-card`, with no token payment or selection roll. It is available once per turn.
+Three-box Patronage protects the first leader, allows one claimant on the second and two on the
+third; later leaders are unprotected and claims require no protection payment.
+
+Immediate Master Art, when selected, offers `discard-card <reference>` or `pass` immediately upon
+purchase. It resumes the same purchase activity before stabilization. Completion-based misery
+relief replaces the cash-purchase relief step and is awarded on the selected category thresholds.
+The selected commerce table controls printed advance letters, prerequisites and prices throughout.
+
 ## Ending, replay and recovery
 
-Drawing the last card or acquiring all 26 advances makes the current turn final. Finish Purchase,
+Drawing the last card of epoch three or acquiring all 26 advances makes the current turn final. Finish Purchase,
 Expansion and Income, then play every non-burden card in Final Card Play. That final round retains
 the final turn's events and newly rolled shortages/surpluses. It has no Master Art discard or
-shortage cancellation. The empty deck never produces another draw.
+shortage cancellation. After epoch-three exhaustion no further draw is possible. Earlier empty piles advance only when
+a draw is requested, recycling discarded circle cards with the next printed deck. Cards still held
+are excluded; square cards leave play. The suspended draw then resumes with a fresh reference.
 
 Scores are printed advance costs plus cash minus the misery box's value. Tied active players can
 share victory. Chaos has no numeric score or victory; if everyone enters Chaos, the engine stops

@@ -6,31 +6,33 @@ import {t} from './messages';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
-const simpleActions = ['pass', 'buy-card', 'upgrade-ships', 'buy-expansion-card', 'windmill', 'cathedral', 'stabilize cash', 'stabilize misery'];
+const simpleActions = ['pass', 'buy-card', 'upgrade-ships', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
     const [advance, setAdvance] = useState('');
     const [relief, setRelief] = useState('');
     const commands = snapshot.legalChoices.commands;
     const offers = commands.filter(command => command.startsWith('buy-advance ')).map(command => {
-        const definition = snapshot.game.catalog?.advances.find(candidate => candidate.messageId.endsWith(`.${command.split(' ')[1]}`));
+        const definition = snapshot.game.catalog?.advances.find(candidate => candidate.letter === command.split(' ')[1]);
         const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === definition?.id);
         return {command, definition, offer};
     });
     const currentOffer = offers.find(offer => offer.command === advance);
     const finite = commands.filter(command => !simpleActions.includes(command) &&
-        (command.startsWith('swap-order ') || command.startsWith('cancel-adjustment ') ||
-            command.startsWith('discard-card ') || command.startsWith('civil-war-loss ') ||
+        (command.startsWith('written-record ') || command.startsWith('swap-order ') || command.startsWith('cancel-adjustment ') ||
+            command.startsWith('return-card ') || command.startsWith('adjust-market ') || command.startsWith('discard-card ') || command.startsWith('civil-war-loss ') ||
             command.startsWith('replace-event-token ') || command.startsWith('cathedral ') || command.startsWith('patronize ') || command.startsWith('offer-card ') || command.startsWith('reduce-marker ')));
     const finiteLabel = (command: string) => {
         const [action, first, second] = command.split(' ');
+        if (action === 'written-record') return `${t('action.written-record')} · ${playerName(snapshot, first)}`;
         if (action === 'swap-order') return `${t('action.swapOrder')} ${playerName(snapshot, first)}`;
         if (action === 'cancel-adjustment') return `${t('action.cancel')} ${label(first.toUpperCase(), 'commodity')} ${label(second.toUpperCase(), 'adjustment')}`;
-        if (action === 'discard-card' || action === 'offer-card') {
+        if (action === 'discard-card' || action === 'offer-card' || action === 'return-card') {
             const card = snapshot.game.hand.find(card => card.reference === first);
-            const actionKey = action === 'discard-card' ? 'action.discard' : 'action.offerCard';
+            const actionKey = action === 'discard-card' ? 'action.discard' : action === 'return-card' ? 'action.returnCard' : 'action.offerCard';
             return `${t(actionKey)} ${card ? t(card.definition.messageId) : first}`;
         }
+        if (action === 'adjust-market') return `${label(first.toUpperCase(), 'commodity')} · ${label(second.toUpperCase(), 'adjustment')}`;
         if (action === 'patronize') return `${t('action.patronize')} ${label(first, 'leader')}`;
         if (action === 'reduce-marker') return `${t('action.reduceMarker')} ${provinceName(first)}`;
         return `${label(action, 'action')} ${label(first)}`;
@@ -62,11 +64,12 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
 }
 
 interface CardTarget {
-    prefix: 'player' | 'province' | 'commodity' | 'category';
+    prefix: 'player' | 'province' | 'commodity' | 'category' | 'area';
     options: {value: string; label: string}[];
 }
 
 function cardTarget(snapshot: Snapshot, id: string): CardTarget | null {
+    if (id === 'black-death') return {prefix: 'area', options: [...new Set((snapshot.game.catalog?.provinces ?? []).map(province => province.area).filter((area): area is string => area !== null))].map(area => ({value: area.toLowerCase(), label: area}))};
     if (['alchemists-gold', 'civil-war', 'war'].includes(id)) {
         return {
             prefix: 'player',
@@ -131,35 +134,43 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
     const [reference, setReference] = useState('');
     const [choice, setChoice] = useState('');
     const [protection, setProtection] = useState('0');
+    const [provinces, setProvinces] = useState<string[]>([]);
     const card = snapshot.game.hand.find(candidate => candidate.reference === reference);
     const id = card?.definition.id ?? '';
+    const pirates = id === 'pirates-vikings' ? snapshot.game.pirateTargets : null;
+    const multiTarget = pirates !== null && pirates.requiredCount > 1;
     const target = cardTarget(snapshot, id);
-    const protectedLeader = card?.definition.kind === 'leader' && snapshot.game.effects.leaders.length > 0;
+    const protectedLeader = card?.definition.kind === 'leader' && snapshot.game.effects.leaders.length > 0 && snapshot.game.rules.patronage === 'PROTECTION_MONEY';
     const noArgumentAllowed = snapshot.legalChoices.commands.includes(`play ${reference}`);
-    const needsChoice = !noArgumentAllowed && target !== null;
+    const needsChoice = !noArgumentAllowed && target !== null && !multiTarget;
     const cash = Number(protection);
     const validProtection = !protectedLeader || (protection.trim() !== '' && Number.isInteger(cash) && cash >= 0 && cash <= 2147483647);
     const playable = playableCards(snapshot);
     const concreteChoices = snapshot.legalChoices.commands.filter(command => command.startsWith(`play ${reference} `));
     const targetOptions = target?.options ?? [];
-    const options = concreteChoices.length > 0 && needsChoice
+    const options = pirates && pirates.requiredCount === 1
+        ? pirates.eligibleProvinces.map(province => ({value: province, label: provinceName(province)}))
+        : concreteChoices.length > 0 && needsChoice
         ? targetOptions.filter(option => concreteChoices.some(command => command.endsWith(` ${target.prefix} ${option.value}`)))
         : targetOptions;
     async function play(event: FormEvent) {
         event.preventDefault();
         let argument = '';
-        if (needsChoice) argument = ` ${target.prefix} ${choice}`;
+        if (multiTarget) argument = ` provinces ${[...provinces].sort().join(' ')}`;
+        else if (needsChoice) argument = ` ${target.prefix} ${choice}`;
         else if (protectedLeader) argument = ` protect ${cash}`;
         if (!await submit(`play ${reference}${argument}`)) return;
         setReference('');
         setChoice('');
         setProtection('0');
+        setProvinces([]);
     }
     return <form className="guided-form play-card-form" onSubmit={play}>
         <label htmlFor="play-card">{t('action.playCard')}</label>
         <select id="play-card" value={reference} onChange={event => {
             setReference(event.target.value);
             setChoice('');
+            setProvinces([]);
         }} required>
             <option value="">{t('controls.chooseCard')}</option>
             {playable.map(card => <option
@@ -178,12 +189,19 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
                 {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
         </>}
+        {multiTarget && pirates && <fieldset className="province-checks">
+            <legend>{t('controls.pirateTargets').replace('{count}', String(pirates.requiredCount))}</legend>
+            {pirates.eligibleProvinces.map(province => <label className="check-label" key={province}>
+                <input type="checkbox" checked={provinces.includes(province)} disabled={busy || (!provinces.includes(province) && provinces.length >= pirates.requiredCount)} onChange={event => setProvinces(current => event.target.checked ? [...current, province] : current.filter(selected => selected !== province))}/>
+                {provinceName(province)}
+            </label>)}
+        </fieldset>}
         {protectedLeader && <>
             <label htmlFor="leader-protection">{t('game.protection')}</label>
             <input id="leader-protection" type="number" min={0} max={2147483647} step={1}
                 value={protection} onChange={event => setProtection(event.target.value)}/>
         </>}
-        <button disabled={busy || !card || (needsChoice && !choice) || !validProtection || snapshot.game.burdenReferences.includes(reference)}>
+        <button disabled={busy || !card || (needsChoice && !choice) || !validProtection || (multiTarget && provinces.length !== pirates?.requiredCount) || snapshot.game.burdenReferences.includes(reference)}>
             {t('action.playCard')}
         </button>
     </form>;

@@ -18,7 +18,7 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 | `<capital>` | Available catalog id: `venice`, `genoa`, `barcelona`, `paris`, `london`, or `hamburg`. Starting player count restricts availability. |
 | `<reference>` | Opaque reference to a physical card in the acting player's hand, such as `hand-4`; it does not encode the card's identity. |
 | `<card-id>` | Catalog identity of a history card, such as `stone-1`; only authority outcomes or revealed plays expose it. |
-| `<advance>` | One of the 26 advance letters, `A` through `Z`. |
+| `<advance>` | One of the selected table's 26 printed letters, `A` through `Z`. |
 | `<commodity>` | `stone`, `wool`, `timber`, `grain`, `cloth`, `wine`, `metal`, `fur`, `silk`, `spice`, `gold`, or `ivory`. |
 | `<adjustment>` | `shortage` or `surplus`. |
 | `<amount>`, `<spaces>`, `<slot>` | Base-10 integers. Cash amounts are dollars; misery spaces count boxes, not their printed values; slots are one-based. |
@@ -28,7 +28,6 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 
 | Command | Who and when; parameter constraints |
 | --- | --- |
-| `set-option epochs 1` | Creator, before `start`. Only one epoch is implemented. |
 | `set-option rebuilt-marker-bonus exclude` | Creator, before `start`; default policy excludes event-rebuilt markers from expansion-bonus credit. |
 | `set-option rebuilt-marker-bonus include` | Creator, before `start`; includes event-rebuilt markers. Voluntary rebuilds never qualify. |
 | `start` | Creator; freezes configuration and requests the shuffle and starting draws. |
@@ -37,9 +36,41 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 | `buy-tokens <amount>` | Each active player during sealed Order of Play. Pays the absolute amount, including negative bids; only positive amounts buy pool tokens, capped by stock. Must be affordable in full. |
 | `choose-turn-position <slot>` | Current chooser within an equal-purchase group. Insert into slots 1 through the provisional group's size plus 1. |
 
-The [agreed minimum-game plan](minimum-full-game-plan.md) selects a complete one-epoch game. The
-1996 rules allow one, two or three epochs; additional decks, recycling and epoch transitions are
-deferred. Unsupported lengths are rejected rather than offered as playable configurations.
+Games always use three epochs. There is no `set-option epochs` command or `epochs` creation
+field. The existing 26th-advance ending can still finish a game before the third deck is exhausted.
+
+### Functional rule options
+
+Only the creator may configure these before `start`; configuration freezes when setup begins.
+Every default is recorded explicitly in the initial revision. Presets expand into the same explicit
+functional commands in history; later options can override individual choices.
+
+| Command key (`set-option <key> <value>`) | Values (default first) |
+| --- | --- |
+| `setup` | `standard`, `improved` |
+| `initial-card` | `any`, `commodity-only` |
+| `commerce` | `ah1996`, `second-edition` |
+| `wind-watermill` | `takeover-trade`, `market-adjustment` |
+| `written-record` | `leader-bonus`, `takeover-trade` |
+| `income-relief` | `new-world`, `enlightenment` |
+| `credits` | `ah1996`, `second-edition` |
+| `misery-relief` | `purchased`, `category-completion` |
+| `patronage` | `protection-money`, `three-box-display` |
+| `immediate-master-art-discard` | `disabled`, `enabled` |
+| `st-gall-support` | `disabled`, `enabled` |
+| `preset` | `ah1996`, `second-edition`, `tournament` (shorthand, not a stored edition) |
+
+Improved setup uses `return-card <reference>`: each player privately selects one of three starting
+cards, keeps two, and returns one to the deck. Selections remain durable private submissions until
+all players submit; replacing an unrevealed return does not advance the committed revision.
+The complete batch and shuffle are recorded atomically. The user-approved setup rule makes
+"get three, choose two" incompatible with reduced initial-deal decks for now. Combining improved
+setup with commodity-only initial dealing is therefore rejected at `start`.
+
+A printed advance letter resolves through the selected commerce table: second edition uses J for
+Improved Agriculture and K for Wind/Watermill. Domain advance identities remain stable in views,
+leader credits and acquisition history. See [the variant inventory](variant-inventory.md) for source
+locators and discrepancies.
 
 ## Turn actions
 
@@ -68,6 +99,8 @@ skips another player's response. Purchase steps retain their order even when no 
 | `reduce-marker <province>` | Expansion actor; replaces an owned coloured marker with one coloured token. A voluntary rebuild never earns expansion-bonus credit. |
 | `buy-expansion-card` | Expansion actor; trades pool tokens for one card, at most once per player. Shared price starts at 3 tokens and rises by 3 per purchase this phase. |
 | `cathedral` | Eligible attacker or defender before competition dice; declares an automatic win against non-owners. Once per turn against each opponent; cannot defeat a Cathedral-owning defender or apply to War. `pass` declines. |
+| `written-record [<player>]` | Selected takeover-trade rule; accept a free once-per-turn exchange after defeating a non-owner, including a partial-token defender. Name the player when several eligible defenders were defeated. `pass` declines. |
+| `adjust-market <commodity> <status>` | Selected Wind/Watermill market rule; Grain, Cloth, Wine or Metal, status `shortage`, `surplus` or `neutral`. Change neutral to an adjustment or clear an existing adjustment. `pass` declines. |
 | `windmill` | Player answering a Wind/Watermill opportunity; requests its selection die. `pass` declines. |
 | `offer-card <reference>` | Wind/Watermill trader; selects the owned card to exchange. The other card is chosen by a recorded random transfer. |
 
@@ -85,6 +118,8 @@ unused pool.
 | `play <reference>` | Current card-round actor; plays a card requiring no explicit choice. A playable event with no eligible effect may be played without a target. |
 | `play <reference> commodity <commodity>` | Selects one of the commodity card's offered commodities. |
 | `play <reference> player <player>` | Selects an eligible target player, for example for War. |
+| `play <reference> area <area>` | Black Death; a geographical area in play, `i` through `viii`. |
+| `play <reference> provinces <province> ...` | Pirates/Vikings in later epochs; distinct eligible coastal markers. Choose the required count, limited by available targets. Canonical text sorts province ids. |
 | `play <reference> province <province>` | Selects an eligible target province, for example for Crusades. |
 | `play <reference> category <category>` | Papal Decree; category is `science`, `religion`, `exploration`, or `none` to decline a ban. |
 | `play <reference> protect <amount>` | Leader play; nonnegative dollars of protection on an exposed leader. |
@@ -106,12 +141,14 @@ The outer phase actor resumes after another player's required answer. In a War m
 `pass` proceeds to the recorded roll. Passing the Advances step forgoes further leader claims.
 `pass` cannot skip Civil War losses, required replacements, War cessions or trade offers.
 In Final Card Play, every non-burden card must be played before passing; Master Art cannot discard.
+When immediate Master Art is enabled, acquiring it offers one `discard-card <reference>` or `pass`
+before resuming the same purchase activity. This does not consume a later Buy Card discard.
 
 ## Authority outcomes and replay
 
 | Entry | Request and value ordering |
 | --- | --- |
-| `!shuffle <card-id> ...` | Exact permutation of the configured epoch-one deck. |
+| `!shuffle <card-id> ...` | Exact permutation of the current authority request: initial deck, next epoch plus eligible discards, setup returns, or delayed reserve reinsertion. Never a player command. |
 | `!draw <player> <reference> <card-id>` | Delivers the requested top card and reference, both during setup and later draws. |
 | `!roll capital-tie <player>=<die> ...` | One attributed die for each player in the current highest unresolved capital tie. Canonical text orders the player ids; tied subgroups request another roll. |
 | `!roll competition <die> <die> <die>` | Competition dice in white, black, green order. |

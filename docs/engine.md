@@ -1,7 +1,11 @@
 # Core Game Engine
 
-Status: the one-epoch engine is implemented; later epochs, planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
+Status: the fixed three-epoch engine and functional rule variants are implemented; planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
 [design.md](design.md). Rules section references below refer to rules.md.
+
+The [remaining rules plan](remaining-rules-plan.md) records work packets and parallel ownership.
+Epoch count is fixed at three; the 26th-advance ending remains supported.
+The [coverage inventory](rule-coverage.md) maps rules to implementations and verification.
 
 ## 1. Contract
 
@@ -150,7 +154,8 @@ The static board and economic definitions and their source references are record
 [catalog review inventory](data-inventory.md). Printed payout lengths are transcribed and all recorded connection
 questions are resolved, including the user-confirmed absence of Gallipoli–Angora contact. Catalog validation and
 reference readiness cover all four supported player counts without changing gameplay.
-Recycling classification uses the current Q7 reading.
+Recycling classification is verified against the user-supplied Liumas card reference, PDF pages 2–3;
+the [card inventory](card-inventory.md) records the complete comparison and source checksum.
 
 Implement behavior at fixed hook points:
 
@@ -189,13 +194,15 @@ resolved functionality, not edition labels. Data-changing options select definit
 handlers. Application defaults, feature catalog and rollout scope are
 in [design §3](design.md#3-game-storage-and-configuration).
 
-Use these recorded project rulings and current readings of the remaining open questions:
+Use these verified classifications and recorded project rulings:
 
-- **Q7:** remove leaders, Armor, Stirrups, Long Bow, Gunpowder and Mongol Armies; recycle other cards.
+- **Q7 (verified 2026-10-24):** remove leaders, Armor, Stirrups, Long Bow, Gunpowder and Mongol
+  Armies; recycle other cards. All 64 statuses match the Liumas card reference.
 - **Attack commitment:** reject excess tokens; existing plus added tokens must equal the requirement.
 - **Rebuilt-marker bonus:** support `exclude` (default) and `include`, configured before `start` and
   recorded explicitly in the replay log. `RebuiltMarkerBonus.counts` implements both eligibility policies.
-- **Q14:** reinsert improved setup's five held-out cards after turn 1's draw for 3–4 players or turn 2's for 5–6.
+- **Q14 (approved 2026-10-24):** reinsert improved setup's five held-out cards after turn 1's
+  regular draws for 3–4 players or turn 2's for 5–6. Other timings are future separate options.
 
 Resolved baseline rules are not extra switches: turn 1 draws, Holy Indulgence shortfalls use cash, unused coastal
 waters cannot be traversed and Industry adds a box to the otherwise applicable payout.

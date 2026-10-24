@@ -10,6 +10,7 @@ class GameEndingTest {
     fun twentySixthAdvanceMarksTheCurrentTurnAsFinal() {
         val state = almostComplete().step(TextCodec.parse("p1: buy-advance Z"))
         assertThat(state.endingTriggered).isTrue()
+        assertThat(state.currentEpoch).isEqualTo(Epoch.ONE)
         assertThat(state.stage).isEqualTo(Stage.PURCHASE)
         assertThat(state.deck).isNotEmpty()
     }
@@ -19,6 +20,7 @@ class GameEndingTest {
         val completed = Scenario(almostComplete()).play("p1: buy-advance Z").complete().state
         val score = completed.viewForPlayer(p1).scores.single { score -> score.player == p1 }
         assertThat(completed.stage).isEqualTo(Stage.FINISHED)
+        assertThat(completed.currentEpoch).isEqualTo(Epoch.ONE)
         assertThat(completed.deck).isNotEmpty()
         assertThat(score.advancePoints).isEqualTo(2100)
         assertThat(score.total)

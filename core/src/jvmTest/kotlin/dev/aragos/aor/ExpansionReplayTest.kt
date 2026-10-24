@@ -204,6 +204,7 @@ class ExpansionReplayTest {
             turnOrderSelection = TurnOrderSelection(ids),
             board = board,
             deck = CardData.epochOne.drop(3).map(CardDefinition::id),
+            deckHistory = DeckHistory(nextDraw = 4),
             flow = TurnFlow(actor = p1, phaseStarted = true, phaseBookkeepingApplied = true),
             players =
                 players

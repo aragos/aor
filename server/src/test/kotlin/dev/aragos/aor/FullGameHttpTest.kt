@@ -21,6 +21,7 @@ class FullGameHttpTest {
         completedGame { completed, _, _, _ ->
             assertThat(completed["game"]["stage"].asText()).isEqualTo("FINISHED")
             assertThat(completed["game"]["deckRemaining"].asInt()).isEqualTo(0)
+            assertThat(completed["game"]["currentEpoch"].asInt()).isEqualTo(3)
             assertThat(completed["game"]["endingTriggered"].asBoolean()).isTrue()
             assertThat(completed["game"]["scores"].size()).isEqualTo(3)
             assertThat(completed["game"]["scores"].any { score -> score["winner"].asBoolean() })
@@ -44,7 +45,7 @@ class FullGameHttpTest {
                     client
                         .post("/api/games") {
                             contentType(ContentType.Application.Json)
-                            setBody("""{"players":["Alice","Bob","Carol"],"epochs":1}""")
+                            setBody("""{"players":["Alice","Bob","Carol"]}""")
                         }
                         .bodyAsText()
                 )
@@ -83,7 +84,7 @@ class FullGameHttpTest {
             command(1, "choose-capital genoa")
             command(2, "choose-capital barcelona")
             var snapshot = view(0)
-            repeat(1000) {
+            repeat(5000) {
                 if (snapshot["game"]["stage"].asText() == "FINISHED") {
                     verify(view(0), directory, id, tokens[0])
                     return@testApplication
@@ -99,6 +100,9 @@ class FullGameHttpTest {
                             commands.first()
                         commands.any { command -> command.startsWith("play ") } ->
                             commands.first { command -> command.startsWith("play ") }
+                        "buy-card" in commands -> "buy-card"
+                        commands.any { command -> command.startsWith("buy-advance ") } ->
+                            commands.first { command -> command.startsWith("buy-advance ") }
                         "stabilize cash" in commands -> {
                             val cash = current["game"]["players"][actor]["cash"].asLong()
                             if (current["game"]["stabilizationCost"].asLong() <= cash) {
@@ -112,7 +116,7 @@ class FullGameHttpTest {
                     }
                 snapshot = command(actor, command)
             }
-            error("One finite epoch must reach final scores.")
+            error("The three-epoch deck sequence must reach final scores.")
         } finally {
             directory.toFile().deleteRecursively()
         }

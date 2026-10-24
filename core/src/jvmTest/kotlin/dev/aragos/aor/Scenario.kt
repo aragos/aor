@@ -31,9 +31,8 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
                 (current.state.prompts().singleOrNull() as? Prompt.System)?.need ?: return current
             val outcome =
                 when (need) {
-                    SystemNeed.Shuffle -> Entry.Shuffle(CardData.epochOne.map(CardDefinition::id))
-                    is SystemNeed.Draw ->
-                        GameOutcome.Draw(need.player, need.reference, current.state.deck.first())
+                    is SystemNeed.Shuffle -> Entry.Shuffle(need.cards)
+                    is SystemNeed.Draw -> GameOutcome.Draw(need.player, need.reference, need.card)
                     is SystemNeed.GameRoll ->
                         GameOutcome.Roll(
                             need.kind,
@@ -76,18 +75,26 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
 
     fun complete(): Scenario {
         var current = this
-        repeat(2000) {
+        repeat(5000) {
             if (current.state.stage == Stage.FINISHED) return current
             current = current.nextAction()
         }
-        error("A finite one-epoch deck must finish the game.")
+        error("The finite three-epoch sequence must finish the game.")
     }
 
     private fun nextAction(): Scenario {
         val prompt = state.prompts().single()
         if (prompt is Prompt.MultiPlayer) {
             val actor = prompt.players.first()
-            return play("$actor: buy-tokens ${state.playerIds.indexOf(actor)}")
+            val command =
+                when (state.stage) {
+                    Stage.SETUP_RETURN ->
+                        "return-card ${state.playerState(actor).hand.first().reference}"
+                    Stage.BIDDING ->
+                        "bid-capital ${state.playerIds.size - state.playerIds.indexOf(actor)}"
+                    else -> "buy-tokens ${state.playerIds.indexOf(actor)}"
+                }
+            return play("$actor: $command")
         }
         check(prompt is Prompt.SinglePlayer) { "Automatic outcomes must have resolved." }
         return play("${prompt.player}: ${nextCommand(prompt)}")
@@ -104,6 +111,7 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
 
     private fun phaseCommand(actor: PlayerId, choices: List<String>): String =
         when (state.stage) {
+            Stage.CAPITAL_CHOICE,
             Stage.TURN_ORDER_TIE -> choices.first()
             Stage.DRAW_CARD -> "pass"
             Stage.BUY_CARD ->
@@ -124,7 +132,7 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
             PurchaseStep.SHIPPING -> "pass"
             PurchaseStep.ADVANCES -> {
                 val advance = affordableAdvance(player)
-                if (advance == null) "pass" else "buy-advance ${advance.letter}"
+                if (advance == null) "pass" else "buy-advance ${state.rules.letter(advance)}"
             }
             PurchaseStep.STABILIZATION -> stabilizationCommand(player)
             PurchaseStep.RELIEF -> "pass"

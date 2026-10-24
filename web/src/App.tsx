@@ -32,13 +32,12 @@ function saveStatus(busy: boolean, saved: boolean): string {
 
 function CreateGame() {
     const [names, setNames] = useState('Alice\nBob\nCarol');
-    const [epochs, setEpochs] = useState('1');
     const [created, setCreated] = useState<CreatedGame | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n'), epochs: Number(epochs)})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n')})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
@@ -55,8 +54,7 @@ function CreateGame() {
             <h2>{t('create.title')}</h2><p className="muted">{t('create.description')}</p>
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
-            <label htmlFor="epochs">{t('create.epochs')}</label>
-            <select id="epochs" value={epochs} onChange={event => setEpochs(event.target.value)}><option value="1">{t('create.oneEpoch')}</option></select>
+            <p className="muted small">{t('create.threeEpochs')}</p>
             {error && <ErrorMessage code={error}/>}
             <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>
         </form>}
@@ -65,18 +63,11 @@ function CreateGame() {
 
 function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}) {
     const [bid, setBid] = useState(String(snapshot.pendingBid ?? 0));
-    const [epochs, setEpochs] = useState(String(snapshot.game.epochs));
     const [rebuiltMarkerBonus, setRebuiltMarkerBonus] = useState(snapshot.game.rebuiltMarkerBonus);
     const [command, setCommand] = useState('');
-    const previousEpochs = useRef(snapshot.game.epochs);
     const previousRebuiltMarkerBonus = useRef(snapshot.game.rebuiltMarkerBonus);
     const previousBid = useRef(snapshot.pendingBid);
     const previousStage = useRef(snapshot.game.stage);
-    useEffect(() => {
-        const previous = String(previousEpochs.current);
-        setEpochs(current => current === previous ? String(snapshot.game.epochs) : current);
-        previousEpochs.current = snapshot.game.epochs;
-    }, [snapshot.game.epochs]);
     useEffect(() => {
         const previous = previousRebuiltMarkerBonus.current;
         setRebuiltMarkerBonus(current => current === previous ? snapshot.game.rebuiltMarkerBonus : current);
@@ -112,11 +103,23 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
     };
     return <>
         {stage === 'CONFIGURATION' && snapshot.viewerId === snapshot.creatorId && <>
-            <form className="inline-form" onSubmit={event => { event.preventDefault(); void submit(`set-option epochs ${epochs}`); }}>
-                <label htmlFor="setup-epochs">{t('controls.epochs')}</label>
-                <select id="setup-epochs" value={epochs} onChange={event => setEpochs(event.target.value)}><option value="1">{t('create.oneEpoch')}</option></select>
-                <button className="secondary" disabled={busy}>{t('controls.saveEpochs')}</button>
-            </form>
+            <div className="rule-options">
+                <label htmlFor="rule-preset">{t('controls.preset')}</label>
+                <select id="rule-preset" defaultValue="" disabled={busy} onChange={event => {
+                    const value = event.target.value;
+                    event.target.value = '';
+                    if (value) void submit(`set-option preset ${value}`);
+                }}>
+                    <option value="">{t('controls.choosePreset')}</option>
+                    {['ah1996', 'second-edition', 'tournament'].map(value => <option key={value} value={value}>{t(`preset.${value}`)}</option>)}
+                </select>
+                {snapshot.game.ruleOptions.map(option => <label key={option.key}>
+                    {t(`option.${option.key}`)}
+                    <select value={option.value} disabled={busy} onChange={event => { void submit(`set-option ${option.key} ${event.target.value}`); }}>
+                        {option.choices.map(value => <option key={value} value={value}>{t(`optionValue.${value}`)}</option>)}
+                    </select>
+                </label>)}
+            </div>
             <form onSubmit={event => { event.preventDefault(); void submit(`set-option rebuilt-marker-bonus ${rebuiltMarkerBonus.toLowerCase()}`); }}>
                 <label htmlFor="setup-rebuilt-marker-bonus">{t('controls.rebuiltMarkerBonus')}</label>
                 <p id="rebuilt-marker-bonus-hint" className="muted small">{t('controls.rebuiltMarkerBonusHint')}</p>
@@ -127,7 +130,7 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
                     <button className="secondary" disabled={busy}>{t('controls.saveRebuiltMarkerBonus')}</button>
                 </div>
             </form>
-            <button disabled={busy || Number(epochs) !== snapshot.game.epochs || rebuiltMarkerBonus !== snapshot.game.rebuiltMarkerBonus} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
+            <button disabled={busy || rebuiltMarkerBonus !== snapshot.game.rebuiltMarkerBonus} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
         </>}
         {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <form onSubmit={event => { event.preventDefault(); void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
@@ -151,7 +154,7 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
             <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? snapshot.game.provisionalTieOrder.map(nameFor).join(' → ') : t('controls.noPositions')}</p>
             {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button key={choice} disabled={busy} onClick={() => { void submit(choice); }}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}</div>}
         </div>}
-        {canAct && <GameActions key={`${snapshot.game.turnNumber}-${stage}-${snapshot.game.activity?.startEntry}-${snapshot.game.activity?.choice}-${snapshot.game.activity?.purchaseStep}-${me.advances.length}-${snapshot.game.hand.length}`} snapshot={snapshot} busy={busy} submit={submit}/>}
+        {(canAct || stage === 'SETUP_RETURN') && <GameActions key={`${snapshot.game.turnNumber}-${stage}-${snapshot.game.activity?.startEntry}-${snapshot.game.activity?.choice}-${snapshot.game.activity?.purchaseStep}-${me.advances.length}-${snapshot.game.hand.length}`} snapshot={snapshot} busy={busy} submit={submit}/>}
         {stage !== 'FINISHED' && <form className="console" onSubmit={async event => { event.preventDefault(); if (await submit(command)) setCommand(current => current === command ? '' : current); }}>
             <label htmlFor="command">{t('controls.command')}</label><p className="muted small">{t('controls.commandHint')}</p>
             <div className="inline-form"><input id="command" className="command-input" value={command} onChange={event => setCommand(event.target.value)} placeholder={t('controls.commandPlaceholder')} autoComplete="off" required/>
@@ -213,7 +216,7 @@ function Game({id, token}: {id: string; token: string}) {
         ? t(snapshot.submitted.includes(playerId) ? 'game.submitted' : 'game.waiting') : '—';
     return <main className="game-shell">
         <header className="game-header"><div><p className="eyebrow">{t('game.seat')}: {me.name}</p><h1>{t('app.title')}</h1></div>
-            <div className="header-meta"><span>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</span><small>{t('game.epochs')}: {snapshot.game.epochs} · {t('game.revision')}: {snapshot.revision}</small><a href="/">{t('game.new')}</a></div></header>
+            <div className="header-meta"><span>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</span><small>{t('game.epoch')}: {snapshot.game.currentEpoch}/3 · {t('game.revision')}: {snapshot.revision}</small><a href="/">{t('game.new')}</a></div></header>
         {connectionError && <ErrorMessage code={connectionError}/>}
         <div className="game-layout"><div className="main-column">
             <FinalScores snapshot={snapshot}/>

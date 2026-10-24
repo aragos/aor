@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-/** AH1996 advance identifiers. Letters A–Z are the printed, locale-independent identifiers. */
+/** Stable advance identities. [letter] is the baseline printed letter, independent of options. */
 enum class AdvanceId(val letter: Char) {
     THE_HEAVENS('A'),
     HUMAN_BODY('B'),
@@ -39,7 +39,10 @@ enum class AdvanceCategory(val totalCost: Int) {
     CIVICS(500),
 }
 
-/** All amounts are dollars; [miseryRelief] is a discount, not a number of misery spaces. */
+/**
+ * All amounts are dollars; [miseryRelief] is a discount, not a number of misery spaces. [letter] is
+ * the printed identifier for the selected table; [id] remains the stable domain identity.
+ */
 data class AdvanceDefinition(
     val id: AdvanceId,
     val category: AdvanceCategory,
@@ -47,6 +50,7 @@ data class AdvanceDefinition(
     val credit: Int,
     val miseryRelief: Int,
     val prerequisites: Set<AdvanceId> = emptySet(),
+    val letter: Char = id.letter,
 ) {
     val messageId: String
         get() = "advance.${id.letter}"
@@ -61,6 +65,9 @@ data class AdvanceDefinition(
             }
 
     init {
+        require(letter in 'A'..'Z') {
+            "An advance requires a printed letter from A through Z: $id."
+        }
         require(cost > 0) { "Advance cost must be positive: $id." }
         require(credit >= 0) { "Advance credit cannot be negative: $id." }
         require(miseryRelief >= 0) { "Advance misery relief cannot be negative: $id." }

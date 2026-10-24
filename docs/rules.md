@@ -118,7 +118,10 @@ All fractions are **rounded up** unless stated otherwise.
 
 ## 3. Setup
 
-1. **Game length.** Agree the number of epochs (1, 2 or 3; standard is 3).
+1. **Game length.** Games use three epochs, with no setup option for a shorter game (project
+   decision, 2026-10-24). The 26th-advance ending trigger still applies ([§8](#8-end-of-game)).
+   The fixed three-epoch implementation follows the
+   [remaining rules plan](remaining-rules-plan.md).
 2. **Pieces.**
     - Each player places one domination marker on its capital.
     - The remaining markers go on the mat circles; the "0" circle is never covered.
@@ -224,6 +227,8 @@ or pass. War ties extend the phase ([§11.4](#114-event-cards)).
 - Cards may be held across turns.
 - Hands are secret. Showing cards or bribing is forbidden. The penalty is +1 misery and the loss of half of written
   cash.
+  This tabletop conduct rule is not implemented or enforced by the application (user decision,
+  2026-10-24).
 
 **Commodity cards:**
 
@@ -689,7 +694,8 @@ Excess discount is lost, with one exception: **Printed Word**.
 ### 11.1 Epochs and recycling
 
 - Each card carries its epoch number, printed in a **circle** (the card is recycled) or a **square** (the card leaves
-  the game after use) [data, Q7].
+  the game after use) [data]. Recycling classifications are verified against the Liumas card
+  reference, PDF pages 2–3; see the [card inventory](card-inventory.md).
 - When a card must be drawn and the pile is empty:
     - the new pile is the **next epoch's deck** plus all **circle cards already in the discard pile**;
     - cards still in hands are not included.
@@ -872,8 +878,10 @@ These notes are for the engine.
 
 ## 13. Variants
 
-These are not part of the baseline. The rebuilt-marker option below is supported; other variants
-remain deferred.
+These are not part of the baseline. The functional options below are supported through setup
+commands; defaults preserve AH1996. See the [command reference](commands.md) and
+[variant source inventory](variant-inventory.md) for exact options and source discrepancies.
+Showing-cards and bribery enforcement remain outside the application scope.
 
 **Supported project option: rebuilt-marker expansion bonus**
 
@@ -889,18 +897,27 @@ remain deferred.
 - Add one epoch 2 Timber card to epoch 1.
 - Remove The Crusades, Walter the Penniless, Rashid ad Din, Silk and Spice from epoch 1.
 - Deal 3 cards to each player; each keeps 2 and returns 1, and the returned cards are reshuffled.
-- Shuffle the 5 removed cards back in after turn 1's draw (3–4 players) or turn 2's draw (5–6 players) [Q14].
+- This "get three, choose two" deal is incompatible with reduced initial-deal decks for now,
+  including commodity-only initial dealing (user ruling, 2026-10-24). Its own required deck
+  adjustments above still apply.
+- Shuffle the 5 removed cards back in after turn 1's regular Draw Card phase (3–4 players) or
+  turn 2's regular Draw Card phase (5–6 players). The user approved this project rule on 2026-10-24
+  (Q14). Alternate timings may be added later as separate options.
 
 **EuroGames 2nd edition (1999):**
 
 - Improved Agriculture becomes J (40, needs I) and Wind/Watermill becomes K (50, needs J).
-- Wind/Watermill instead lets the last player in turn order adjust shortages/surpluses on Grain, Cloth, Wine or Metal.
+- Wind/Watermill instead lets the last-moving active owner adjust Grain, Cloth, Wine or Metal
+  after the first player's buy-off window. Change neutral to shortage/surplus, or an existing
+  adjustment to neutral. This follows the EuroGames supplement; published rewrites differ.
 - Written Record loses its +$10 and instead forces a card trade with a defeated non-owner after a successful attack,
   once per turn.
 - New World's −1 misery per turn moves to Enlightenment.
-- Communication credits become 30/20/10/0, and Civics credits rise by 10 each.
+- Communication credits become 30/20/10/0, Civics credits rise by 10 each, and Proselytism grants
+  30 credit. Patronage retains the reviewed 20 credit; source summaries disagree about that value.
 - Misery relief can no longer be bought. It is earned by completing 2, 3 or 4 advances in each of Science, Commerce and
-  Communication.
+  Communication. Completion grants 1/2/3 spaces once at the corresponding threshold, on
+  acquisition; completed thresholds do not award relief again each turn.
 - Patronage uses a three-box leader display instead of protection money.
 - Master Art also allows an immediate discard when bought.
 
@@ -914,12 +931,43 @@ remain deferred.
 
 ## 14. Open Questions
 
-Each needs to be settled from the physical game (board, player mat, rulebook scan) or decided as a custom rule.
+The previously open recycling and improved-setup questions are resolved below. Source disagreements
+and selected project rules remain documented separately.
 
-| ID | Question | Current reading |
-| --- | --- | --- |
-| Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
-| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
+**Verified recycling classification (2026-10-24):**
+
+- **Q7:** the user-supplied Liumas card reference confirms that every leader plus Armor,
+  Stirrups, Long Bow, Gunpowder and Mongol Armies is removed after use. All other cards recycle:
+  40 recyclable and 24 single-use cards. PDF page 2 marks event recycling; page 3 specifies that
+  all commodities recycle and no leaders do. Every implemented status matches this reference.
+
+**Resolved reinsertion ruling (2026-10-24):**
+
+- **Q14 / improved setup:** the user approved shuffling the five held-out cards back in after
+  turn 1's regular Draw Card phase for 3–4 players, or turn 2's for 5–6 players. Published sources
+  disagree; this is the approved project rule. Alternate timings may be introduced later as
+  separate options and are not part of the current implementation.
+
+**Resolved setup compatibility ruling (2026-10-24):**
+
+- The user selected treating "get three, choose two" as incompatible with reduced initial-deal
+  decks for now. The current reduced-deck option is commodity-only initial dealing; it cannot
+  be combined with improved setup. Each option remains available independently.
+
+**Additional approved rule defaults (2026-10-24):**
+
+- **Pirates/Vikings:** select the full epoch-dependent number of distinct eligible coastal
+  markers, or all eligible markers when fewer are available.
+- **Alternate Wind/Watermill:** making a commodity neutral clears its entire shortage/surplus
+  status, including both markers of a double adjustment.
+- **Second-edition Patronage credit:** use 20, preserving the reviewed value despite a source
+  table that prints 10.
+- **Completion-based misery relief:** grant 1/2/3 additional spaces immediately on reaching
+  2/3/4 advances in each of Science, Commerce and Communication. Each threshold is awarded once;
+  the final threshold requires four in each category, not every Commerce advance.
+
+The user approved these implemented defaults despite the source ambiguities recorded in the
+[card inventory](card-inventory.md) and [variant inventory](variant-inventory.md).
 
 **Resolved implementation decisions (2026-10-23):**
 
@@ -958,6 +1006,10 @@ of the printed board and a scan of the original rulebook; exact locators and sou
   <https://boardgamegeek.com/image/667248/age-of-renaissance> and the sharper
   <https://boardgamegeek.com/image/4041958/age-of-renaissance>.
 - Original AH1996 rulebook scan: <https://www.scribd.com/document/709810410/Age-of-Renaissance-regles-VO>.
+- Chris Conboy (Liumas), *Age Of Renaissance Cards Reference*, user-supplied local file
+  `AOR_Cards_Reference_by_Liumas_2008-09.pdf`: PDF page 2 covers all events and recycling marks;
+  page 3 covers commodity quantities and all leader discounts/recycling. The
+  [card inventory](card-inventory.md) records artifact metadata, checksum and verification.
 
 - Official Avalon Hill *Errata and Clarifications* (7 May 1998), M. Boone FAQ v0.5 (1999), the EuroGames 2nd-edition
   change list, the Advance Log and the commodity log, all bundled in one

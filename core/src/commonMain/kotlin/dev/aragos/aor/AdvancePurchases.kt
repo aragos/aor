@@ -27,6 +27,7 @@ data class PurchaseContext(
     val currentTurn: Int,
     val papalDecree: AdvanceCategory? = null,
     val leaderDiscounts: List<AuthorizedLeaderDiscount> = emptyList(),
+    val rules: RuleOptions = RuleOptions(),
 ) {
     init {
         require(
@@ -73,14 +74,14 @@ object AdvancePurchases {
      */
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
         player.requireActive()
-        val definition = AdvanceData.definition(advance)
-        val entity = listOf(advance.letter.toString())
+        val definition = context.rules.definition(advance)
+        val entity = listOf(context.rules.letter(advance).toString())
         checkRule(!player.advances.owns(advance), ViolationCode.ADVANCE_ALREADY_OWNED, entity)
         val missing = definition.prerequisites.filterNot(player.advances::owns)
         checkRule(
             missing.isEmpty(),
             ViolationCode.MISSING_ADVANCE_PREREQUISITE,
-            missing.map { prerequisite -> prerequisite.letter.toString() },
+            missing.map { prerequisite -> context.rules.letter(prerequisite).toString() },
         )
         checkRule(
             definition.category != context.papalDecree,
@@ -96,11 +97,18 @@ object AdvancePurchases {
             } else {
                 0
             }
-        val writtenRecord = if (player.advances.owns(AdvanceId.WRITTEN_RECORD)) 10 else 0
+        val writtenRecord =
+            if (
+                context.rules.writtenRecord == WrittenRecordRule.LEADER_BONUS &&
+                    player.advances.owns(AdvanceId.WRITTEN_RECORD)
+            )
+                10
+            else 0
         return AdvanceQuote(
             advance = advance,
             baseCost = definition.cost,
-            categoryCredit = player.advances.creditsFor(definition.category, context.currentTurn),
+            categoryCredit =
+                player.advances.creditsFor(definition.category, context.currentTurn, context.rules),
             institutionalResearchCredit = research,
             leaders =
                 context.leaderDiscounts
@@ -116,7 +124,7 @@ object AdvancePurchases {
         checkRule(
             player.cash >= quote.price,
             ViolationCode.INSUFFICIENT_CASH,
-            listOf(advance.letter.toString()),
+            listOf(context.rules.letter(advance).toString()),
         )
         val ships =
             when (advance) {
@@ -124,15 +132,22 @@ object AdvancePurchases {
                 AdvanceId.OCEAN_NAVIGATION -> ShippingCapability.OCEAN_1
                 else -> player.ships
             }
+        val acquired = player.advances.acquire(advance, context.currentTurn)
+        val completionRelief =
+            if (context.rules.miseryRelief == MiseryReliefRule.CATEGORY_COMPLETION) {
+                acquired.completionRelief - player.advances.completionRelief
+            } else {
+                0
+            }
         return EconomyResult.forPlayer(
             player.copy(
                 cash = player.cash - quote.price,
-                advances = player.advances.acquire(advance, context.currentTurn),
+                advances = acquired,
                 ships = ships,
                 misery =
                     MiseryRules.shift(
                         player.misery,
-                        AdvanceData.definition(advance).purchaseMisery,
+                        context.rules.definition(advance).purchaseMisery - completionRelief,
                     ),
             )
         )

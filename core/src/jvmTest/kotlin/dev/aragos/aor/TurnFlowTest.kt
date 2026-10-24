@@ -13,7 +13,8 @@ class TurnFlowTest {
     fun drawRequestsFollowTurnOrderAndHaveUniqueReferences() {
         val initial = running()
         val drawn = initial.play("!draw p1 hand-4 ${initial.deck.first()}")
-        assertThat(drawn.prompts().single()).isEqualTo(Prompt.System(SystemNeed.Draw(p2, "hand-5")))
+        assertThat(drawn.prompts().single())
+            .isEqualTo(Prompt.System(SystemNeed.Draw(p2, "hand-5", drawn.deck.first())))
         assertThat(drawn.playerState(p1).hand.last().reference).isEqualTo("hand-4")
     }
 
@@ -198,9 +199,10 @@ class TurnFlowTest {
     }
 
     @Test
-    fun lastDrawTriggersEndingWithoutSkippingRemainingPhases() {
-        val state = running().copy(deck = running().deck.take(1))
-        val drawn = state.play("!draw p1 hand-29 ${state.deck.first()}")
+    fun finalEpochLastDrawTriggersEndingWithoutSkippingRemainingPhases() {
+        val initial = running()
+        val state = initial.copy(currentEpoch = Epoch.THREE, deck = initial.deck.take(1))
+        val drawn = state.play("!draw p1 ${state.nextHandReference()} ${state.deck.first()}")
         assertThat(drawn.endingTriggered).isTrue()
         assertThat(drawn.stage).isEqualTo(Stage.PLAY_CARDS)
     }
@@ -219,10 +221,10 @@ class TurnFlowTest {
     }
 
     @Test
-    fun unsupportedEpochCountIsRejected() {
+    fun epochCountIsNotAConfigurationOption() {
         val state = GameState(header())
         assertThat(assertFailsWith<RuleViolation> { state.play("p1: set-option epochs 3") }.code)
-            .isEqualTo(ViolationCode.INVALID_EPOCHS)
+            .isEqualTo(ViolationCode.UNSUPPORTED_OPTION)
     }
 
     private fun optionalCardActions(): GameState {

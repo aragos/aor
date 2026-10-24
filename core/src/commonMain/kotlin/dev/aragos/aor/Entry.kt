@@ -29,16 +29,11 @@ sealed interface Entry {
     data class Shuffle(val cards: List<String>) : Entry {
         override fun toText(): String = "!shuffle ${cards.joinToString(" ")}"
 
-        override fun applyTo(state: GameState): GameState {
-            checkRule(state.stage == Stage.SHUFFLE, ViolationCode.WRONG_PHASE)
-            val expectedCards = CardData.epochOne.map(CardDefinition::id)
-            checkRule(cards.sorted() == expectedCards.sorted(), ViolationCode.INVALID_OUTCOME)
-            return state.copy(stage = Stage.INITIAL_DRAW, deck = cards.toList())
-        }
+        override fun applyTo(state: GameState): GameState = state.applyShuffle(cards)
 
         companion object {
             fun parse(arguments: List<String>): Shuffle {
-                checkRule(arguments.size == CardData.epochOne.size, ViolationCode.INVALID_COMMAND)
+                checkRule(arguments.isNotEmpty(), ViolationCode.INVALID_COMMAND)
                 return Shuffle(cards = arguments)
             }
         }

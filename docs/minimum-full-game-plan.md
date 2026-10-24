@@ -1,5 +1,10 @@
 # Minimum full game plan
 
+Historical delivery checkpoint. The [remaining rules plan](remaining-rules-plan.md) supersedes
+this document's scope and one-epoch target. The current implementation uses fixed three-epoch
+play and functional optional rules. The checkpoints and counts below describe the historical
+one-epoch delivery, not the current runtime.
+
 Agreed on 2026-10-23. The reviewed catalogs, repeatable engine, every advance and epoch-one card,
 board play, both ending triggers, durable service and playable browser are implemented and verified.
 The two remaining source-policy decisions have been resolved by the user and implemented,

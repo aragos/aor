@@ -25,18 +25,15 @@ class RebuiltMarkerBonusServiceTest {
     fun creationRecordsTheResolvedDefaultInTheReplayLog() {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
+        val game = service.create(listOf("Alice", "Bob", "Carol"))
 
         val snapshot = service.get(game.gameId, token(game, 1))
         val saved = FileGameStore(directory).read(game.gameId)
 
         assertThat(snapshot.game.rebuiltMarkerBonus).isEqualTo(RebuiltMarkerBonus.EXCLUDE)
-        assertThat(saved.fileVersion).isEqualTo(2)
+        assertThat(saved.fileVersion).isEqualTo(3)
         assertThat(saved.revisions.single().entries)
-            .containsExactly(
-                "p1: set-option epochs 1",
-                "p1: set-option rebuilt-marker-bonus exclude",
-            )
+            .containsExactlyElementsIn(defaultConfigurationText(PlayerId("p1")))
             .inOrder()
     }
 
@@ -44,7 +41,7 @@ class RebuiltMarkerBonusServiceTest {
     fun configuredBonusSurvivesStartAndRestartReplay() {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
+        val game = service.create(listOf("Alice", "Bob", "Carol"))
         service.submit(game.gameId, token(game, 0), 1, "set-option rebuilt-marker-bonus include")
         val started = service.submit(game.gameId, token(game, 0), 2, "start")
         val restartRandom = FixedRandom()
@@ -66,7 +63,7 @@ class RebuiltMarkerBonusServiceTest {
     fun nonCreatorCannotConfigureTheBonus() {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
+        val game = service.create(listOf("Alice", "Bob", "Carol"))
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
 
@@ -88,7 +85,7 @@ class RebuiltMarkerBonusServiceTest {
     fun startFreezesTheBonusOption() {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
+        val game = service.create(listOf("Alice", "Bob", "Carol"))
         service.submit(game.gameId, token(game, 0), 1, "start")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
@@ -111,7 +108,7 @@ class RebuiltMarkerBonusServiceTest {
     fun staleOptionChangesLeaveTheSelectedBonusUnchanged() {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
+        val game = service.create(listOf("Alice", "Bob", "Carol"))
         service.submit(game.gameId, token(game, 0), 1, "set-option rebuilt-marker-bonus include")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)

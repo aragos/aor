@@ -3,8 +3,8 @@
 A Kotlin Multiplatform engine, Ktor server and React web client for
 [Age of Renaissance](https://boardgamegeek.com/boardgame/26/age-of-renaissance), inspired by
 [Snellman's command-log approach](https://www.snellman.net/blog/archive/2014-12-08-command-languages-as-game-ui/).
-The application runs one-epoch games for 3–6 human players: setup, repeatable turns, purchases,
-board expansion and competitions, every epoch-one card, nested player decisions, income and final scoring.
+The application runs fixed three-epoch games for 3–6 human players: setup, repeatable turns, purchases,
+board expansion and competitions, all 64 history cards, nested player decisions, income and final scoring.
 Private hands and simultaneous bids remain private; authoritative outcomes are recorded for replay and restart.
 When War or Crusades needs a marker with all 25 deployed, its recipient may forgo placement or move
 a marker from another controlled province. Commodity payments continue their quadratic formula
@@ -17,7 +17,11 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
 - [Setup walkthrough](docs/manual-setup.md): creation, sealed decisions, restart and API instructions.
 - [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
 - [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, delivery checkpoints and verification.
+- [Remaining rules plan](docs/remaining-rules-plan.md): fixed three-epoch delivery, remaining variants,
+  parallel agent assignments, dependencies and verification gates.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
+- [Rule coverage](docs/rule-coverage.md), [card inventory](docs/card-inventory.md) and
+  [variant inventory](docs/variant-inventory.md): implementation evidence and selected source interpretations.
 
 ```text
 core/     platform-independent Kotlin engine and game data (JVM/JS)
@@ -36,15 +40,22 @@ use the same engine validation. Player tabs refresh automatically.
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
 Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_HTTP_PORT` to change the server port. Use one server process per data directory.
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
-The local server listens on `127.0.0.1`. Additional epochs, accounts, general undo, bots and other variants remain deferred.
+The local server listens on `127.0.0.1`. Accounts, general undo, private plans and bots remain deferred.
 
-During configuration, the creator can choose whether markers rebuilt after events count toward the
+During configuration, the creator can select standard or improved setup, individual functional
+rules, or a preset. The second-edition preset selects the alternate advance table, credits, relief,
+leader display and interaction rules. Tournament options include commodity-only initial cards,
+immediate Master Art discard and St. Gall support. Commands and guided controls use the same rules.
+Game length is fixed at three epochs; there is no epoch configuration field or command. The existing
+26th-advance ending can still finish a game earlier.
+
+The creator can also choose whether markers rebuilt after events count toward the
 expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
 `set-option rebuilt-marker-bonus include`. The browser has the same selector. The choice is public,
 saved in the log and frozen when setup starts. Both settings apply to actual expansion rewards. Voluntary marker rebuilds never count.
 
-New games use file format 2 with rules version `ah1996-epoch-one-2` and data version
-`ah1996-catalog-1`. The initial revision records resolved setup options. Earlier development rules
+New games use file format 3 with rules version `ah1996-three-epoch-1` and data version
+`ah1996-catalog-2`. The initial revision records resolved setup options. Earlier development rules
 versions are unsupported; no migration is provided under the current-format-only policy.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.

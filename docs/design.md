@@ -46,7 +46,7 @@ The following is a feature catalog, not a promise to implement every option init
 
 | Concern                   | Choices / baseline                                                                                       |
 |---------------------------|----------------------------------------------------------------------------------------------------------|
-| Players and epochs        | 3–6 registered players; only one epoch is currently supported.                                                          |
+| Players and epochs        | 3–6 registered players; fixed three-epoch sequence, with no length option.                                                          |
 | Setup                     | Deal/keep counts, deck adjustments, private returns and delayed reinsertion; standard setup by default.  |
 | Commerce advances         | Ordering, prices and prerequisites of Improved Agriculture and Wind/Watermill.                           |
 | Wind/Watermill            | Takeover card trade, or last-player shortage/surplus adjustment.                                         |
@@ -60,13 +60,18 @@ The following is a feature catalog, not a promise to implement every option init
 | Initial card restriction  | Any history card, or commodity-only first card.                                                          |
 | Event-rebuilt marker bonus | Exclude (default), or include event-rebuilt markers in the expansion bonus; both are supported.          |
 | Undo                      | Four scopes below; regular-turn undo by default. All edits preserve recorded random events and outcomes. |
-| Open rulings              | Q7 recycling and Q14 reinsertion timing.                                                               |
+| Resolved rulings          | Q7 recycling verified against the supplied card reference; Q14 reinsertion timing is an approved project rule. |
+
+The [remaining rules plan](remaining-rules-plan.md) organizes the completed implementation and its
+verification. Three epochs are fixed; `epochs` is not a command, creation field or selector.
+The functional variant rows are configurable through the [command reference](commands.md).
+Application features such as undo, controllers and private plans remain separate.
 
 The first choice in each variant row is the baseline; declarative data and behavior handlers must both match the
 chosen options. A different advance table alone does not implement an edition.
 
 The supported `rebuilt-marker-bonus` setup command records `exclude` or `include` explicitly.
-Its default is recorded alongside epochs in the initial revision; changing the option uses an ordinary
+Its default is recorded alongside every resolved functional option in the initial revision; changing the option uses an ordinary
 creator command before `start`. Both choices are public and survive replay and restart. The domain
 policy implements bonus eligibility for ordinary expansion, event rebuilds and voluntary rebuilds;
 board placements and the actual expansion reward use this policy.

@@ -32,6 +32,26 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
             AdvanceData.definition(acquisition.advance).cost
         }
 
+    /** Scores use the selected commerce prices; ownership never changes identity with a letter. */
+    fun score(rules: RuleOptions): Int = acquisitions.sumOf { acquisition ->
+        rules.definition(acquisition.advance).cost
+    }
+
+    /** Each completion threshold earns relief once, at the acquisition crossing that threshold. */
+    val completionRelief: Int
+        get() {
+            val counts =
+                listOf(
+                        AdvanceCategory.SCIENCE,
+                        AdvanceCategory.COMMERCE,
+                        AdvanceCategory.COMMUNICATION,
+                    )
+                    .map(::categoryCount)
+            return (2..4)
+                .filter { threshold -> counts.all { count -> count >= threshold } }
+                .sumOf { threshold -> threshold - 1 }
+        }
+
     fun owns(advance: AdvanceId): Boolean = acquisitions.any { acquisition ->
         acquisition.advance == advance
     }
@@ -53,13 +73,17 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
      * Category credits freeze for a turn; purchases during its Purchase phase cannot add to them.
      * [currentTurn] comes from the authoritative game, which owns history consistency.
      */
-    fun creditsFor(category: AdvanceCategory, currentTurn: Int): Int {
+    fun creditsFor(
+        category: AdvanceCategory,
+        currentTurn: Int,
+        rules: RuleOptions = RuleOptions(),
+    ): Int {
         return acquisitions
             .filter { acquisition ->
                 acquisition.turnNumber < currentTurn &&
                     AdvanceData.definition(acquisition.advance).category == category
             }
-            .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).credit }
+            .sumOf { acquisition -> rules.definition(acquisition.advance).credit }
     }
 
     /** Rating acquired in the authoritative game's [currentTurn]. */

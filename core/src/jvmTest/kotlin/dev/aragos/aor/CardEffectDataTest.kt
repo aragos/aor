@@ -28,7 +28,11 @@ class CardEffectDataTest {
 
     @Test
     fun allFiveLeadersHaveTheirPrintedCredits() {
-        assertThat(LeaderData.definitions)
+        assertThat(
+                LeaderData.definitions.filter { leader ->
+                    CardData.definition(leader.id.cardId).epoch == Epoch.ONE
+                }
+            )
             .containsExactly(
                 LeaderDefinition(
                     LeaderId.CHARLEMAGNE,
@@ -55,7 +59,12 @@ class CardEffectDataTest {
                 LeaderDefinition(
                     LeaderId.WALTER_THE_PENNILESS,
                     listOf(
-                        LeaderDiscount(AdvanceId.OVERLAND_EAST, amount = 20, crusadesAmount = 30)
+                        LeaderDiscount(
+                            AdvanceId.OVERLAND_EAST,
+                            amount = 20,
+                            condition = LeaderDiscountCondition.CRUSADES_THIS_TURN,
+                            increasedAmount = 30,
+                        )
                     ),
                 ),
             )

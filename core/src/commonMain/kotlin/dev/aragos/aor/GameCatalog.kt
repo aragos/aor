@@ -5,7 +5,10 @@ package dev.aragos.aor
  * to their access requirements. Unused provinces and their coastal waters are removed together; sea
  * areas always remain. This contains no ownership, reachability or other game state.
  */
-data class CatalogConfiguration(val playerCount: Int) {
+data class CatalogConfiguration(
+    val playerCount: Int,
+    val rules: RuleOptions = RuleOptions(),
+) {
     init {
         require(playerCount in 3..6) { "Catalog configurations require three through six players." }
     }
@@ -27,9 +30,15 @@ data class CatalogConfiguration(val playerCount: Int) {
     }
 
     val satelliteSupports: Set<SatelliteSupport> by lazy {
-        BoardConnectionData.satelliteSupports.filterTo(mutableSetOf()) { support ->
-            support.satellite in provinceIds && support.market in provinceIds
-        }
+        (BoardConnectionData.satelliteSupports +
+                if (rules.stGallSupport) {
+                    setOf(SatelliteSupport(ProvinceId("st-gall"), ProvinceId("nuremberg")))
+                } else {
+                    emptySet()
+                })
+            .filterTo(mutableSetOf()) { support ->
+                support.satellite in provinceIds && support.market in provinceIds
+            }
     }
 
     val seaCoasts: Set<SeaCoastConnection> by lazy {
@@ -53,8 +62,11 @@ object GameCatalog {
      * Rejects a configuration with unresolved source data. This is a data readiness guard, not
      * approval of the transcription; the review inventory must also be checked by a reviewer.
      */
-    fun requireResolvedFor(playerCount: Int): CatalogConfiguration {
-        val configuration = validateFor(playerCount)
+    fun requireResolvedFor(
+        playerCount: Int,
+        rules: RuleOptions = RuleOptions(),
+    ): CatalogConfiguration {
+        val configuration = validateFor(playerCount, rules)
         require(configuration.unresolvedReferences.isEmpty()) {
             "Catalog references remain unresolved for $playerCount players: " +
                 configuration.unresolvedReferences.joinToString { issue -> issue.id }
@@ -62,8 +74,11 @@ object GameCatalog {
         return configuration
     }
 
-    fun validateFor(playerCount: Int): CatalogConfiguration {
-        val configuration = CatalogConfiguration(playerCount)
+    fun validateFor(
+        playerCount: Int,
+        rules: RuleOptions = RuleOptions(),
+    ): CatalogConfiguration {
+        val configuration = CatalogConfiguration(playerCount, rules)
         val definitions = ProvinceData.definitions
         BoardConnectionData.validate(definitions)
         require(definitions.map(ProvinceDefinition::id).distinct().size == definitions.size) {

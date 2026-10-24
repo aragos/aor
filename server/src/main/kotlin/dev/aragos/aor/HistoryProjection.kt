@@ -41,6 +41,8 @@ internal object HistoryProjection {
     private fun action(before: GameState, entry: Entry.Action, viewer: PlayerId): String {
         val command = entry.command
         return when {
+            entry.actor != viewer && command is SetupCommand.ReturnCard ->
+                "${entry.actor}: return-card <hidden>"
             entry.actor != viewer && command is TurnCommand.DiscardCard ->
                 "${entry.actor}: discard-card <hidden>"
             command is BoardCommand.OfferCard && viewer !in BoardGame.tradeParticipants(before) ->

@@ -70,6 +70,10 @@ data class CardContext(
     val voids: CardVoids = CardVoids(),
     val finalCardPlay: Boolean = false,
     val turn: Int = 1,
+    val epoch: Epoch = Epoch.ONE,
+    val rules: RuleOptions = RuleOptions(),
+    /** Provinces containing square tokens, returned to stock before Black Death reductions. */
+    val tokenProvinces: Set<ProvinceId> = emptySet(),
     val provinces: Map<ProvinceId, ProvinceDefinition> =
         ProvinceData.definitions
             .filter { province ->
@@ -111,6 +115,11 @@ sealed interface CardChoice {
     data class PlayerChoice(val player: PlayerId) : CardChoice
 
     data class ProvinceChoice(val province: ProvinceId) : CardChoice
+
+    /** A complete simultaneous choice, validated before any marker is reduced. */
+    data class ProvincesChoice(val provinces: List<ProvinceId>) : CardChoice
+
+    data class AreaChoice(val area: GeographicalArea) : CardChoice
 
     /** Null declines to forbid a category when playing Papal Decree. */
     data class CategoryChoice(val category: AdvanceCategory?) : CardChoice
@@ -195,6 +204,18 @@ sealed interface CardResolution {
         val effects: CardTurnEffects,
     ) : CardResolution
 
+    data class MarkerReductions(val reductions: List<MarkerReduction>) : CardResolution
+
+    data class BlackDeath(
+        val tokenProvinces: Set<ProvinceId>,
+        val reductions: List<MarkerReduction>,
+    ) : CardResolution
+
+    data class MongolArmies(val player: PlayerId) : CardResolution
+
+    data class ReligiousStrife(val spaces: Map<PlayerId, Int>, val permanent: Boolean) :
+        CardResolution
+
     data class WarBattle(val war: WarState) : CardResolution
 
     /** [rebate] is immediate; [leader]'s protection cash is separately paid into escrow. */
@@ -217,10 +238,10 @@ object CardRules {
     /** Checks permanent conditions only. A temporarily immune player is filtered as a target. */
     fun isBurden(context: CardContext, cardId: String): Boolean {
         val spec =
-            CardEffectData.epochOne[cardId]
+            CardEffectData.all[cardId]
                 ?: throw CardRuleViolation(
                     CardRuleCode.UNKNOWN_CARD,
-                    "Unknown epoch-one card: $cardId.",
+                    "Unknown physical card: $cardId.",
                 )
         if (spec !is CardEffectSpec.Event) return false
         val players = context.activePlayers.values
@@ -254,6 +275,7 @@ object CardRules {
                         EventId.MYSTICISM_ABOUNDS,
                         EventId.REBELLION,
                         EventId.REVOLUTIONARY_UPRISINGS,
+                        EventId.RELIGIOUS_STRIFE,
                     ))
 
     /**
@@ -267,10 +289,10 @@ object CardRules {
             "A player in Chaos cannot play cards.",
         )
         val spec =
-            CardEffectData.epochOne[play.cardId]
+            CardEffectData.all[play.cardId]
                 ?: throw CardRuleViolation(
                     CardRuleCode.UNKNOWN_CARD,
-                    "Unknown epoch-one card: ${play.cardId}.",
+                    "Unknown physical card: ${play.cardId}.",
                 )
         cardRule(
             play.cardId in player.handCardIds,
@@ -397,7 +419,9 @@ object CardRules {
                 )
             }
             EventId.ARMOR,
-            EventId.STIRRUPS -> {
+            EventId.STIRRUPS,
+            EventId.GUNPOWDER,
+            EventId.LONG_BOW -> {
                 noChoice(choice)
                 val military = CardMilitaryPlay(actor, event)
                 CardResolution.Military(military, context.effects.withMilitary(military))
@@ -444,9 +468,15 @@ object CardRules {
                     CardRuleCode.INVALID_CHOICE,
                     "Papal Decree may forbid Science, Religion or Exploration.",
                 )
-                CardResolution.PapalDecree(category, context.effects.copy(papalCategory = category))
+                CardResolution.PapalDecree(
+                    category,
+                    context.effects.copy(
+                        papalCategory =
+                            if (context.effects.religiousStrifePlayed) null else category
+                    ),
+                )
             }
-            EventId.PIRATES_VIKINGS,
+            EventId.PIRATES_VIKINGS -> pirates(context, choice)
             EventId.REBELLION -> {
                 val province = provinceChoice(choice)
                 val definition = context.province(province)
@@ -495,6 +525,39 @@ object CardRules {
                     context.effects.copy(crusadesPlayed = true),
                 )
             }
+            EventId.BLACK_DEATH -> {
+                val area = (choice as? CardChoice.AreaChoice)?.area
+                cardRule(
+                    area != null &&
+                        context.provinces.values.any { province -> province.area == area },
+                    CardRuleCode.INVALID_CHOICE,
+                    "Black Death requires an area present in this game.",
+                )
+                val provinces =
+                    context.provinces.values
+                        .filter { province -> province.area == area }
+                        .map(ProvinceDefinition::id)
+                        .toSet()
+                CardResolution.BlackDeath(
+                    context.tokenProvinces.intersect(provinces),
+                    context.markers.filterKeys(provinces::contains).map { (province, marker) ->
+                        reduction(context, event, province, marker)
+                    },
+                )
+            }
+            EventId.MONGOL_ARMIES -> {
+                noChoice(choice)
+                CardResolution.MongolArmies(actor)
+            }
+            EventId.RELIGIOUS_STRIFE -> {
+                noChoice(choice)
+                CardResolution.ReligiousStrife(
+                    context.activePlayers.mapValues { (player, _) ->
+                        miserySpaces(context, player, event)
+                    },
+                    permanent = context.epoch == Epoch.THREE,
+                )
+            }
             EventId.WAR -> {
                 val target = target(context, event, choice)
                 cardRule(
@@ -505,6 +568,48 @@ object CardRules {
                 CardResolution.WarBattle(WarState(actor, target, startedTurn = context.turn))
             }
         }
+
+    private fun pirates(context: CardContext, choice: CardChoice): CardResolution {
+        val provinces =
+            when (choice) {
+                is CardChoice.ProvinceChoice -> listOf(choice.province)
+                is CardChoice.ProvincesChoice -> choice.provinces
+                else ->
+                    throw CardRuleViolation(
+                        CardRuleCode.INVALID_CHOICE,
+                        "Pirates/Vikings requires coastal provinces.",
+                    )
+            }
+        val eligible = pirateTargets(context)
+        cardRule(
+            provinces.distinct().size == provinces.size &&
+                provinces.size == piratesRequiredCount(context) &&
+                eligible.containsAll(provinces),
+            CardRuleCode.ILLEGAL_TARGET,
+            "Choose distinct coastal markers, up to the current epoch's number or all available targets.",
+        )
+        val reductions = provinces.map { province ->
+            reduction(
+                context,
+                EventId.PIRATES_VIKINGS,
+                province,
+                requireNotNull(context.markers[province]) {
+                    "A validated Pirates target has a marker."
+                },
+            )
+        }
+        return reductions.singleOrNull() ?: CardResolution.MarkerReductions(reductions)
+    }
+
+    fun pirateTargets(context: CardContext): Set<ProvinceId> =
+        context.markers
+            .filter { (province, marker) ->
+                marker.coloured && context.province(province).coastal
+            }
+            .keys
+
+    fun piratesRequiredCount(context: CardContext): Int =
+        minOf(context.epoch.number, pirateTargets(context).size)
 
     private fun miserySpaces(context: CardContext, playerId: PlayerId, event: EventId): Int {
         if (immune(context, playerId, event)) return 0
@@ -518,6 +623,10 @@ object CardRules {
             EventId.REVOLUTIONARY_UPRISINGS ->
                 player.advances.count { advance ->
                     AdvanceData.definition(advance).category == AdvanceCategory.COMMERCE
+                }
+            EventId.RELIGIOUS_STRIFE ->
+                player.advances.count { advance ->
+                    AdvanceData.definition(advance).category == AdvanceCategory.RELIGION
                 }
             else -> error("Only a misery event can calculate misery spaces.")
         }

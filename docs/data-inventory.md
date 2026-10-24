@@ -1,8 +1,9 @@
 # Board and economic catalog review
 
 The first milestone in [the minimum full game plan](minimum-full-game-plan.md) now has a static
-catalog and a review inventory. The engine still stops at Turn 1 — Draw Card. This work adds no
-gameplay commands, state transitions or public HTTP endpoints.
+catalog and a review inventory. This document records that original static-data milestone;
+the current [three-epoch implementation](remaining-rules-plan.md) builds on the reviewed baseline
+catalog and selects alternate definitions without changing the printed data recorded here.
 
 Review the transcription using these tables:
 

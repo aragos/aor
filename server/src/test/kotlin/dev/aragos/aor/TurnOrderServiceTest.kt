@@ -265,7 +265,7 @@ class TurnOrderServiceTest {
     private fun ready(writer: GameWriter = AtomicGameWriter): TurnFixture {
         val directory = Files.createTempDirectory("aor-turn-order-").also(directories::add)
         val service = createGameService(directory, FixedRandom(), writer)
-        val game = service.create(listOf("Alice", "Bob", "Carol"), 1)
+        val game = service.create(listOf("Alice", "Bob", "Carol"))
         val fixture = TurnFixture(directory, service, game)
         fixture.submit(0, "start")
         fixture.submit(0, "bid-capital 3")

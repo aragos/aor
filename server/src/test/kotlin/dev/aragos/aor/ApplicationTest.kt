@@ -238,6 +238,7 @@ class ApplicationTest {
                     "{}",
                     """{"players":"Alice"}""",
                     """{"players":["Alice","Bob","Carol"],"epochs":1.2}""",
+                    """{"players":["Alice","Bob","Carol"],"epochs":3}""",
                 )) {
                 val response = client.post("/api/games") { setBody(body) }
                 assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
@@ -275,7 +276,7 @@ class ApplicationTest {
             val response =
                 client.post("/api/games") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"players":["Alice","Bob","Carol"],"epochs":1}""")
+                    setBody("""{"players":["Alice","Bob","Carol"]}""")
                 }
             val created = json.readTree(response.bodyAsText())
             ApiGame(
