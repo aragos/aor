@@ -304,7 +304,7 @@ class TurnOrderTest {
                 )
         val dealt =
             (1..count).fold(started) { state, index ->
-                state.play("!deal p$index hand-$index ${state.deck.first()}")
+                state.play("!draw p$index hand-$index ${state.deck.first()}")
             }
         val bids = (1..count).fold(dealt) { state, index -> state.play("p$index: bid-capital 0") }
         val ordered =

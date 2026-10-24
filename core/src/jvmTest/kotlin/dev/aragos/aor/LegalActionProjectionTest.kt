@@ -9,7 +9,7 @@ class LegalActionProjectionTest {
     @Test
     fun shippingChoicesOmitAnUnaffordableUpgrade() {
         val state = purchasing(PurchaseStep.SHIPPING, cash = 9)
-        assertThat(state.legalChoices(p1).commands).containsExactly("done")
+        assertThat(state.legalChoices(p1).commands).containsExactly("pass")
     }
 
     @Test
@@ -19,7 +19,7 @@ class LegalActionProjectionTest {
                 .copy(effects = CardTurnEffects(papalCategory = AdvanceCategory.SCIENCE))
         assertThat(state.legalChoices(p1).commands)
             .containsExactly(
-                "done",
+                "pass",
                 "buy-advance E",
                 "buy-advance I",
                 "buy-advance N",
@@ -44,7 +44,7 @@ class LegalActionProjectionTest {
             purchasing(PurchaseStep.RELIEF, cash = 10).updatePlayer(p1) { player ->
                 player.copy(advances = advances, misery = MiseryStep.TEN)
             }
-        assertThat(state.legalChoices(p1).commands).containsExactly("done", "relieve-misery 1")
+        assertThat(state.legalChoices(p1).commands).containsExactly("pass", "relieve-misery 1")
     }
 
     @Test

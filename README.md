@@ -12,6 +12,7 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
 
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
+- [Command language](docs/commands.md): complete syntax, parameters and recorded outcomes.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
 - [Setup walkthrough](docs/manual-setup.md): creation, sealed decisions, restart and API instructions.
 - [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
