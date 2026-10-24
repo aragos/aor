@@ -56,27 +56,25 @@ internal object CardMarkerPlacements {
             requireNotNull(decision) { "A validated marker choice requires a pending frame." }
         checkRule(frame.player == actor, ViolationCode.WRONG_PLAYER)
         state.playerState(actor).requireActive()
-        if (source != null) {
-            cardRule(
-                source in sources(state, actor, frame.destination),
-                CardRuleCode.ILLEGAL_TARGET,
-                "Move a coloured domination marker from another province you control.",
-            )
-        }
         val resumed = state.popDecision()
+        if (source == null) {
+            return placeRemaining(resumed, frame.destinations.drop(1), frame.aftermath)
+        }
+        cardRule(
+            source in sources(state, actor, frame.destination),
+            CardRuleCode.ILLEGAL_TARGET,
+            "Move a coloured domination marker from another province you control.",
+        )
+        val freed = resumed.withBoardChange(resumed.board.remove(source))
+        val moved = freed.withBoardChange(freed.board.placeMarker(frame.destination, actor))
         val placed =
-            if (source == null) resumed
-            else {
-                val freed = resumed.withBoardChange(resumed.board.remove(source))
-                val moved = freed.withBoardChange(freed.board.placeMarker(frame.destination, actor))
-                moved.copy(
-                    flow =
-                        moved.flow.copy(
-                            voluntaryReduced = moved.flow.voluntaryReduced + source,
-                            markerOrigins = moved.flow.markerOrigins - source,
-                        )
-                )
-            }
+            moved.copy(
+                flow =
+                    moved.flow.copy(
+                        voluntaryReduced = moved.flow.voluntaryReduced + source,
+                        markerOrigins = moved.flow.markerOrigins - source,
+                    )
+            )
         return placeRemaining(placed, frame.destinations.drop(1), frame.aftermath)
     }
 

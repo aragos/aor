@@ -31,7 +31,9 @@ sealed interface GameOutcome : Entry {
                         decisions =
                             if (exhausted) {
                                 drawn.flow.decisions.filterNot { frame -> frame is DrawDecision }
-                            } else drawn.flow.decisions
+                            } else {
+                                drawn.flow.decisions
+                            }
                     ),
             )
         }

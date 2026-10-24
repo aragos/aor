@@ -98,7 +98,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     player = player,
                     amount = command.amount,
                     revealCommand = "reveal-capital-bids",
-                    createCommand = { amount -> Command.BidCapital(amount) },
+                    createCommand = Command::BidCapital,
                 )
             is Command.BuyTokens ->
                 submitSealedDecision(
@@ -107,7 +107,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     player = player,
                     amount = command.amount,
                     revealCommand = "reveal-token-purchases",
-                    createCommand = { amount -> Command.BuyTokens(amount) },
+                    createCommand = Command::BuyTokens,
                 )
             else ->
                 commit(
@@ -132,8 +132,9 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         val required =
             (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players
                 ?: error("Sealed submissions require a simultaneous player prompt.")
-        if (required.any { participant -> participant !in pending })
+        if (required.any { participant -> participant !in pending }) {
             return stored.copy(pendingBids = pending)
+        }
         return commit(
             stored = stored.copy(pendingBids = emptyMap()),
             state = state,

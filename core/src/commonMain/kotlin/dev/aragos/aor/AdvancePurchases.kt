@@ -74,7 +74,7 @@ object AdvancePurchases {
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
         player.requireActive()
         player.advances.requireValidTurn(context.currentTurn)
-        val definition = definition(advance)
+        val definition = AdvanceData.definition(advance)
         val entity = listOf(advance.letter.toString())
         checkRule(!player.advances.owns(advance), ViolationCode.ADVANCE_ALREADY_OWNED, entity)
         val missing = definition.prerequisites.filterNot(player.advances::owns)
@@ -92,9 +92,11 @@ object AdvancePurchases {
             if (
                 player.advances.owns(AdvanceId.INSTITUTIONAL_RESEARCH) &&
                     definition.category !in setOf(AdvanceCategory.CIVICS, AdvanceCategory.RELIGION)
-            )
+            ) {
                 10
-            else 0
+            } else {
+                0
+            }
         val writtenRecord = if (player.advances.owns(AdvanceId.WRITTEN_RECORD)) 10 else 0
         return AdvanceQuote(
             advance = advance,
@@ -128,29 +130,13 @@ object AdvancePurchases {
                 cash = player.cash - quote.price,
                 advances = player.advances.acquire(advance, context.currentTurn),
                 ships = ships,
-                misery = MiseryRules.shift(player.misery, definition(advance).purchaseMisery),
+                misery =
+                    MiseryRules.shift(
+                        player.misery,
+                        AdvanceData.definition(advance).purchaseMisery,
+                    ),
             )
         )
-    }
-
-    /**
-     * Immediate rebate when this player plays their own leader. Pass that leader's conditional base
-     * discounts only. Patronage and Written Record never increase a Printed Word rebate.
-     */
-    fun printedWordRebate(player: PlayerState, discounts: List<AuthorizedLeaderDiscount>): Long {
-        player.requireActive()
-        require(discounts.map(AuthorizedLeaderDiscount::leaderCardId).distinct().size <= 1) {
-            "A Printed Word rebate must describe one played leader."
-        }
-        require(
-            discounts.map(AuthorizedLeaderDiscount::advance).distinct().size == discounts.size
-        ) {
-            "A played leader cannot repeat an advance discount."
-        }
-        if (!player.advances.owns(AdvanceId.PRINTED_WORD)) return 0
-        return discounts
-            .filter { discount -> player.advances.owns(discount.advance) }
-            .sumOf { discount -> discount.amount.toLong() }
     }
 }
 
