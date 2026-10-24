@@ -297,8 +297,7 @@ class ApplicationTest {
 private object NoApiRandom : SetupRandom {
     override fun shuffle(cards: List<String>): List<String> = error("Replay requested a shuffle")
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> =
-        error("Replay requested dice")
+    override fun roll(count: Int): List<DieRoll> = error("Replay requested dice")
 }
 
 private class ApiGame(

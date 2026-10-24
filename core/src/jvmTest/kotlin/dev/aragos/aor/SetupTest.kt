@@ -187,7 +187,13 @@ class SetupTest {
             .containsExactly(listOf(PlayerId("p2"), PlayerId("p3")))
         assertThat(state.prompts())
             .containsExactly(
-                Prompt.System(SystemNeed.CapitalTie(listOf(PlayerId("p2"), PlayerId("p3"))))
+                Prompt.System(
+                    SystemNeed.GameRoll(
+                        GameRollKind.CAPITAL_TIE,
+                        2,
+                        listOf(PlayerId("p2"), PlayerId("p3")),
+                    )
+                )
             )
     }
 
@@ -317,14 +323,50 @@ class SetupTest {
     fun dealingMustFollowRegistrationOrder() {
         val dealing = GameState(header()).play("p1: start", shuffleText())
 
-        violation(ViolationCode.INVALID_OUTCOME) { dealing.play("!deal p2 hand-2 stone-1") }
+        violation(ViolationCode.INVALID_OUTCOME) { dealing.play("!draw p2 hand-2 stone-1") }
     }
 
     @Test
     fun dealingMustTakeTheTopCard() {
         val dealing = GameState(header()).play("p1: start", shuffleText())
 
-        violation(ViolationCode.INVALID_OUTCOME) { dealing.play("!deal p1 hand-1 wool-1") }
+        violation(ViolationCode.INVALID_OUTCOME) { dealing.play("!draw p1 hand-1 wool-1") }
+    }
+
+    @Test
+    fun setupDrawMustUseTheRequestedHandReference() {
+        val dealing = GameState(header()).play("p1: start", shuffleText())
+
+        violation(ViolationCode.INVALID_OUTCOME) { dealing.play("!draw p1 hand-2 stone-1") }
+    }
+
+    @Test
+    fun capitalRollAttributionDoesNotDependOnRecordedPlayerOrder() {
+        val state =
+            dealt()
+                .play(
+                    "p1: bid-capital 0",
+                    "p2: bid-capital 0",
+                    "p3: bid-capital 0",
+                    "!roll capital-tie p2=1 p3=4 p1=6",
+                )
+
+        assertThat(state.capitalOrder.map(PlayerId::value))
+            .containsExactly("p1", "p3", "p2")
+            .inOrder()
+    }
+
+    @Test
+    fun capitalRollRequiresPlayerAttribution() {
+        val tied =
+            dealt()
+                .play(
+                    "p1: bid-capital 0",
+                    "p2: bid-capital 0",
+                    "p3: bid-capital 0",
+                )
+
+        violation(ViolationCode.INVALID_OUTCOME) { tied.play("!roll capital-tie 6 4 1") }
     }
 
     @Test
@@ -367,7 +409,7 @@ class SetupTest {
     private fun dealt(count: Int = 3): GameState =
         (1..count).fold(GameState(header(count)).play("p1: start", shuffleText())) { state, number
             ->
-            state.play("!deal p$number hand-$number ${state.deck.first()}")
+            state.play("!draw p$number hand-$number ${state.deck.first()}")
         }
 
     private fun shuffleText() =

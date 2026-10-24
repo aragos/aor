@@ -29,18 +29,6 @@ enum class Stage {
                     choice = "configure",
                 )
             SHUFFLE -> Prompt.System(SystemNeed.Shuffle)
-            DEAL -> {
-                val player =
-                    state.playerIds.first { playerId ->
-                        state.playerState(playerId).hand.isEmpty()
-                    }
-                Prompt.System(
-                    SystemNeed.Deal(
-                        player = player,
-                        reference = "hand-${state.playerIds.indexOf(player) + 1}",
-                    )
-                )
-            }
             BIDDING ->
                 Prompt.MultiPlayer(
                     players =
@@ -49,8 +37,6 @@ enum class Stage {
                         },
                     choice = "bid-capital",
                 )
-            CAPITAL_TIE ->
-                Prompt.System(SystemNeed.CapitalTie(state.capitalSelection.ties.first().players))
             CAPITAL_CHOICE ->
                 Prompt.SinglePlayer(
                     player =
@@ -73,6 +59,8 @@ enum class Stage {
                     player = state.turnOrderSelection.ties.first().choosingPlayer,
                     choice = "choose-turn-position",
                 )
+            DEAL,
+            CAPITAL_TIE,
             DRAW_CARD,
             BUY_CARD,
             PLAY_CARDS,
@@ -89,7 +77,7 @@ enum class Stage {
                 if (player == state.header.creatorId) {
                     LegalChoices(
                         commands =
-                            (1..1).map { epochs -> Command.SetEpochs(epochs).toText() } +
+                            listOf(Command.SetEpochs(1).toText()) +
                                 RebuiltMarkerBonus.entries.map { policy ->
                                     Command.SetRebuiltMarkerBonus(policy).toText()
                                 } +
