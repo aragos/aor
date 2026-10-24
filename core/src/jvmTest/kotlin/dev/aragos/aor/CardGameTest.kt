@@ -545,7 +545,7 @@ class CardGameTest {
                 }
                 .withMarker("tunis", p2)
                 .withPlayer(p1) { player -> player.copy(misery = MiseryStep.THOUSAND) }
-        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 4 3")
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
 
         val failure = assertFailsWith<CardRuleViolation> { awaiting.play("p2: cede-war tunis") }
 
