@@ -25,13 +25,16 @@ sealed interface GameOutcome : Entry {
                         owner.copy(hand = owner.hand + HandCard(reference, definition))
                     }
                     .copy(deck = state.deck.drop(1))
-            if (state.stage != Stage.DEAL) {
+            if (state.stage != Stage.INITIAL_DRAW) {
                 return delivered
                     .popDecision()
                     .copy(endingTriggered = state.endingTriggered || state.deck.size == 1)
             }
-            val allDealt = delivered.players.values.all { owner -> owner.hand.isNotEmpty() }
-            return delivered.copy(stage = if (allDealt) Stage.BIDDING else Stage.DEAL)
+            val allStartingCardsDrawn =
+                delivered.players.values.all { owner -> owner.hand.isNotEmpty() }
+            return delivered.copy(
+                stage = if (allStartingCardsDrawn) Stage.BIDDING else Stage.INITIAL_DRAW
+            )
         }
     }
 
