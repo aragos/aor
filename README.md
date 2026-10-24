@@ -11,6 +11,8 @@ It stops at **Turn 1 — Draw Card**, with the order and expansion pools ready f
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
 - [Manual walkthrough](docs/manual-setup.md): setup, Order of Play, restart and API instructions.
+- [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, next milestone and session handoff.
+- [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
 
 ```text
 core/     platform-independent Kotlin engine and game data (JVM/JS)
@@ -29,7 +31,7 @@ use the same engine validation. Player tabs refresh automatically.
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
 Set `AOR_DATA_DIR` to an absolute directory to choose another location. Use one server process per data directory.
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
-The local server listens on `127.0.0.1`; account authentication, general undo, variants and phases after Order of Play
+The local server listens on `127.0.0.1`; account authentication, general undo, other variants and phases after Order of Play
 are deferred.
 
 During configuration, the creator can choose whether markers rebuilt after events count toward the
