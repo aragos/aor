@@ -587,7 +587,9 @@ When a commodity card is played, each player dominating **n ≥ 1** provinces of
 - **Surplus.** Read one box lower (n − 1). A single province on surplus pays $0.
 - **Industry.** The owner reads one box higher than it otherwise would.
 - **Overseas boxes.** An overseas box counts as one province for each commodity it produces.
-- Commodity cards print ten payment boxes (AH1996 §7.11). Board ownership-track lengths count markets; they do not cap payments. The box-11 Wool/Industry/shortage edge case awaits a project ruling.
+- Commodity cards print ten payment boxes (AH1996 §7.11). Board ownership-track lengths count
+  markets; they do not cap payments. The quadratic formula continues beyond the printed boxes;
+  nine Wool markets plus Industry and a shortage pay `2 × 11² = $242` (user ruling, 2026-10-23).
 
 ---
 
@@ -910,10 +912,11 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
 | Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
 | Q15 | No domination marker available for Crusades or War transfers. | Awaiting project ruling; typed rejection. Proposed: block new Crusades placement and cap War transfers by winner stock without penalizing loser for that stock shortage. |
-| Q16 | Nine Wool markets + Industry + shortage requires payment box 11. | Awaiting formula ($242) versus printed-box-10 cap ($200) ruling; typed rejection. |
 
 **Resolved implementation decisions (2026-10-23):**
 
+- **Q16 / commodity payout overflow:** the user chose to continue the quadratic formula beyond
+  the ten printed payment boxes. Nine Wool markets with Industry and a shortage pay $242.
 - **Q10 / attack commitment:** the user disallowed attacks with excess tokens. Commit exactly the
   calculated requirement, including attacker tokens already present; reject extra committed tokens.
 - **Expansion bonus (§5.6):** the user requested both interpretations of event-rebuilt markers as
