@@ -60,7 +60,8 @@ sealed interface TurnCommand : Command {
             val other = state.turnOrder.indexOf(target)
             checkRule(
                 kotlin.math.abs(index - other) == 1 &&
-                    !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE),
+                    !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE) &&
+                    state.playerState(target).misery != MiseryStep.CHAOS,
                 ViolationCode.INVALID_TURN_POSITION,
             )
             val order =
@@ -145,14 +146,18 @@ sealed interface TurnCommand : Command {
             val player = state.playerState(actor)
             checkRule(player.cash >= cost, ViolationCode.INSUFFICIENT_CASH)
             val affected =
-                if (commodity == Commodity.GOLD || commodity == Commodity.IVORY)
+                if (commodity == Commodity.GOLD || commodity == Commodity.IVORY) {
                     setOf(Commodity.GOLD, Commodity.IVORY)
-                else setOf(commodity)
+                } else {
+                    setOf(commodity)
+                }
             val updated =
                 state.adjustments.mapValues { (id, previous) ->
-                    if (id in affected)
+                    if (id in affected) {
                         previous.toMutableList().apply { remove(adjustment) }.toList()
-                    else previous
+                    } else {
+                        previous
+                    }
                 }
             return state
                 .replacePlayer(player.copy(cash = player.cash - cost))

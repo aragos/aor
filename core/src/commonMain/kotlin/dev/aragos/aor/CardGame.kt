@@ -268,11 +268,6 @@ object CardGame {
             .replacePlayer(recipient.copy(cash = recipient.cash + claim.cash))
     }
 
-    /**
-     * Escrow left cash at play time; retain turn leader history but make no refund or second debit.
-     */
-    fun endPurchase(state: GameState): GameState = state
-
     private fun apply(state: GameState, resolution: CardResolution): GameState =
         when (resolution) {
             is CardResolution.NoEffect -> state
