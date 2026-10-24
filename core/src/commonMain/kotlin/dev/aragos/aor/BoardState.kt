@@ -31,6 +31,9 @@ data class TokenHolding(val coloured: Int = 0, val white: Int = 0) {
 
 /** A province contains square tokens or a single domination marker, never both. */
 sealed interface ProvincePieces {
+    /** Preserve ownership and physical counts while making every piece available as a base. */
+    fun flipWhitePieces(): ProvincePieces
+
     data class Tokens(val holdings: PersistentMap<PlayerId, TokenHolding>) : ProvincePieces {
         init {
             require(holdings.isNotEmpty()) { "An occupied province requires at least one holding." }
@@ -38,9 +41,18 @@ sealed interface ProvincePieces {
 
         val total: Int
             get() = holdings.values.sumOf(TokenHolding::total)
+
+        override fun flipWhitePieces(): Tokens =
+            Tokens(
+                holdings
+                    .mapValues { holding -> TokenHolding(coloured = holding.value.total) }
+                    .toPersistentMap()
+            )
     }
 
-    data class Marker(val owner: PlayerId, val side: PieceSide) : ProvincePieces
+    data class Marker(val owner: PlayerId, val side: PieceSide) : ProvincePieces {
+        override fun flipWhitePieces(): Marker = copy(side = PieceSide.COLOURED)
+    }
 }
 
 /**
@@ -155,24 +167,7 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
     }
 
     fun flipWhitePieces(): BoardState =
-        copy(
-            pieces =
-                pieces
-                    .mapValues { entry ->
-                        when (val occupants = entry.value) {
-                            is ProvincePieces.Marker -> occupants.copy(side = PieceSide.COLOURED)
-                            is ProvincePieces.Tokens ->
-                                ProvincePieces.Tokens(
-                                    occupants.holdings
-                                        .mapValues { holding ->
-                                            TokenHolding(coloured = holding.value.total)
-                                        }
-                                        .toPersistentMap()
-                                )
-                        }
-                    }
-                    .toPersistentMap()
-        )
+        copy(pieces = pieces.mapValues { entry -> entry.value.flipWhitePieces() }.toPersistentMap())
 
     internal fun replace(province: ProvinceId, replacement: ProvincePieces?): BoardChange {
         checkRule(
@@ -184,8 +179,11 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
         val board =
             copy(
                 pieces =
-                    if (replacement == null) pieces.removing(province)
-                    else pieces.putting(province, replacement)
+                    if (replacement == null) {
+                        pieces.removing(province)
+                    } else {
+                        pieces.putting(province, replacement)
+                    }
             )
         return BoardChange(
             board = board,

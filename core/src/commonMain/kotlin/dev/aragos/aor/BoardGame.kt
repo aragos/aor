@@ -166,12 +166,8 @@ object BoardGame {
         preference: BoardRouteChoice = BoardRouteChoice(),
     ): GameState {
         state.requireActor(actor, Stage.EXPANSION)
-        val context = context(state)
-        val existing =
-            (state.board.pieces[province] as? ProvincePieces.Tokens)?.holdings?.get(actor)?.total
-                ?: 0
-        val requirement = CompetitionRules.requirement(context, actor, province).requirement
-        return place(state, actor, province, requirement.tokens - existing, preference)
+        val tokens = attackTokens(context(state), actor, province)
+        return place(state, actor, province, tokens, preference)
     }
 
     fun endExpansion(state: GameState, actor: PlayerId): GameState {
@@ -212,10 +208,12 @@ object BoardGame {
         )
         val change = state.board.replaceWithToken(province, actor)
         val changed =
-            if (owner.stockTokens > 0) state.withBoardChange(change)
-            else
+            if (owner.stockTokens > 0) {
+                state.withBoardChange(change)
+            } else {
                 spendPool(state, actor, 1, returnToStock = false)
                     .withBoardChange(change.copy(tokensRequired = emptyMap()))
+            }
         return changed.copy(
             flow =
                 changed.flow.copy(
@@ -297,51 +295,14 @@ object BoardGame {
             return emptyList()
         }
         val context = context(state)
+        val player = state.playerState(actor)
         val choices = mutableListOf("end-expansion")
         for (province in context.configuration.provinces) {
-            val routes = ExpansionReach.routesTo(context, actor, province.id)
-            if (routes.isNotEmpty()) {
-                if (
-                    canPlace(
-                        context,
-                        actor,
-                        province.id,
-                        1,
-                        routes.first(),
-                        state.playerState(actor).poolTokens,
-                    )
-                ) {
-                    choices += "place 1 ${province.id}"
-                }
-                try {
-                    val requirement =
-                        CompetitionRules.requirement(context, actor, province.id).requirement
-                    val existing =
-                        (state.board.pieces[province.id] as? ProvincePieces.Tokens)
-                            ?.holdings
-                            ?.get(actor)
-                            ?.total ?: 0
-                    if (
-                        canPlace(
-                            context,
-                            actor,
-                            province.id,
-                            requirement.tokens - existing,
-                            routes.first(),
-                            state.playerState(actor).poolTokens,
-                        )
-                    )
-                        choices += "attack ${province.id}"
-                } catch (failure: RuleViolation) {
-                    // Empty and friendly provinces have no competition action.
-                }
-            }
+            choices += placementChoices(context, actor, province.id, player.poolTokens)
             if (
                 state.board.pieces[province.id] ==
                     ProvincePieces.Marker(actor, PieceSide.COLOURED) &&
-                    state.playerState(actor).let { player ->
-                        player.stockTokens > 0 || player.poolTokens > 0
-                    }
+                    (player.stockTokens > 0 || player.poolTokens > 0)
             ) {
                 choices += "reduce-marker ${province.id}"
             }
@@ -381,7 +342,9 @@ object BoardGame {
         val next = state.popDecision()
         return if (values.single().value <= decision.marketNumber) {
             next.pushDecision(BoardDecision.TradeOffer(decision.winner, decision.victim))
-        } else next
+        } else {
+            next
+        }
     }
 
     internal fun resolveTrade(
@@ -413,37 +376,34 @@ object BoardGame {
         plan: PlacementPlan.Competition,
         resolution: CompetitionResolution,
     ): GameState {
-        var changed = state.withBoardChange(resolution.change)
-        val cathedralUser = resolution.cathedralUser
-        if (cathedralUser != null)
-            changed =
-                changed.copy(
-                    flow =
-                        changed.flow.copy(
-                            cathedralUses =
-                                changed.flow.cathedralUses +
-                                    resolution.cathedralOpponents.map { opponent ->
-                                        cathedralUser to opponent
-                                    }
-                        )
-                )
+        val changed = recordCathedralUse(state.withBoardChange(resolution.change), resolution)
         if (!resolution.attackerWon) return changed
-        changed = recordMarkerOrigin(changed, plan, newAcquisition = true)
-        val victim = resolution.previousController ?: return changed
-        val winner = changed.playerState(plan.player)
+        val conquered = recordMarkerOrigin(changed, plan, newAcquisition = true)
+        val victim = resolution.previousController ?: return conquered
+        val winner = conquered.playerState(plan.player)
+        val defeated = conquered.playerState(victim)
         if (
             winner.advances.owns(AdvanceId.WIND_WATERMILL) &&
-                plan.player !in changed.flow.windmillUsed &&
+                plan.player !in conquered.flow.windmillUsed &&
                 winner.poolTokens >= ProvinceData.byId.getValue(plan.destination).marketNumber &&
                 winner.hand.isNotEmpty() &&
-                changed.playerState(victim).hand.isNotEmpty() &&
-                changed.playerState(victim).misery != MiseryStep.CHAOS
+                defeated.hand.isNotEmpty() &&
+                defeated.misery != MiseryStep.CHAOS
         ) {
-            return changed.pushDecision(
+            return conquered.pushDecision(
                 BoardDecision.WindmillOpportunity(plan.player, victim, plan.destination)
             )
         }
-        return changed
+        return conquered
+    }
+
+    private fun recordCathedralUse(
+        state: GameState,
+        resolution: CompetitionResolution,
+    ): GameState {
+        val cathedralUser = resolution.cathedralUser ?: return state
+        val uses = resolution.cathedralOpponents.map { opponent -> cathedralUser to opponent }
+        return state.copy(flow = state.flow.copy(cathedralUses = state.flow.cathedralUses + uses))
     }
 
     private fun recordMarkerOrigin(
@@ -454,8 +414,9 @@ object BoardGame {
         if (
             state.board.pieces[plan.destination] !=
                 ProvincePieces.Marker(plan.player, PieceSide.WHITE)
-        )
+        ) {
             return state
+        }
         val origin =
             when {
                 newAcquisition -> MarkerPlacementOrigin.EXPANSION
@@ -477,11 +438,13 @@ object BoardGame {
         plan: PlacementPlan.Competition,
         candidates: List<PlayerId>,
     ): GameState =
-        if (candidates.isEmpty()) state.pushDecision(BoardDecision.CompetitionDice(plan))
-        else
+        if (candidates.isEmpty()) {
+            state.pushDecision(BoardDecision.CompetitionDice(plan))
+        } else {
             state.pushDecision(
                 BoardDecision.CathedralChoice(candidates.first(), plan, candidates.drop(1))
             )
+        }
 
     private fun cathedralOrder(state: GameState, plan: PlacementPlan.Competition): List<PlayerId> {
         val eligible = CompetitionRules.cathedralUsers(context(state), plan, cathedralUsage(state))
@@ -517,6 +480,56 @@ object BoardGame {
         actor !in state.flow.expansionCards &&
             state.deck.isNotEmpty() &&
             state.playerState(actor).poolTokens >= 3 * (state.flow.expansionCardCount + 1)
+
+    private fun placementChoices(
+        context: BoardRulesContext,
+        actor: PlayerId,
+        province: ProvinceId,
+        poolTokens: Int,
+    ): List<String> {
+        val route =
+            ExpansionReach.routesTo(context, actor, province).firstOrNull() ?: return emptyList()
+        return buildList {
+            if (canPlace(context, actor, province, 1, route, poolTokens)) {
+                add("place 1 $province")
+            }
+            if (canAttack(context, actor, province, route, poolTokens)) {
+                add("attack $province")
+            }
+        }
+    }
+
+    private fun attackTokens(
+        context: BoardRulesContext,
+        actor: PlayerId,
+        province: ProvinceId,
+    ): Int {
+        val existing =
+            (context.board.pieces[province] as? ProvincePieces.Tokens)?.holdings?.get(actor)?.total
+                ?: 0
+        return CompetitionRules.requirement(context, actor, province).requirement.tokens - existing
+    }
+
+    private fun canAttack(
+        context: BoardRulesContext,
+        actor: PlayerId,
+        province: ProvinceId,
+        route: ExpansionRoute,
+        poolTokens: Int,
+    ): Boolean =
+        try {
+            canPlace(
+                context,
+                actor,
+                province,
+                attackTokens(context, actor, province),
+                route,
+                poolTokens,
+            )
+        } catch (failure: RuleViolation) {
+            // Empty and friendly provinces have no competition action.
+            false
+        }
 
     private fun canPlace(
         context: BoardRulesContext,

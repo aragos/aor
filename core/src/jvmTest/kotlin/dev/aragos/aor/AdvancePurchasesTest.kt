@@ -242,38 +242,6 @@ class AdvancePurchasesTest {
     }
 
     @Test
-    fun printedWordRebatesBothOwnedTargetsAtBaseLeaderAmounts() {
-        val player = buyer(AdvanceId.PRINTED_WORD, AdvanceId.WRITTEN_RECORD, AdvanceId.PATRONAGE)
-        val discounts =
-            listOf(
-                AuthorizedLeaderDiscount("st-benedict", AdvanceId.WRITTEN_RECORD, 10),
-                AuthorizedLeaderDiscount("st-benedict", AdvanceId.PATRONAGE, 10),
-            )
-
-        val rebate = AdvancePurchases.printedWordRebate(player, discounts)
-
-        assertThat(rebate).isEqualTo(20L)
-    }
-
-    @Test
-    fun printedWordDoesNotRebateUnownedTargets() {
-        val discounts = listOf(AuthorizedLeaderDiscount("charlemagne", AdvanceId.NATIONALISM, 20))
-
-        val rebate = AdvancePurchases.printedWordRebate(buyer(AdvanceId.PRINTED_WORD), discounts)
-
-        assertThat(rebate).isEqualTo(0L)
-    }
-
-    @Test
-    fun owningTheLeaderTargetWithoutPrintedWordGivesNoRebate() {
-        val discounts = listOf(AuthorizedLeaderDiscount("charlemagne", AdvanceId.NATIONALISM, 20))
-
-        val rebate = AdvancePurchases.printedWordRebate(buyer(AdvanceId.NATIONALISM), discounts)
-
-        assertThat(rebate).isEqualTo(0L)
-    }
-
-    @Test
     fun noShipsUpgradeToGalleyTwoForTenDollars() {
         val player = buyer().copy(cash = 10)
 

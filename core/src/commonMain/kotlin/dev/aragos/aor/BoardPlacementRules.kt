@@ -61,6 +61,7 @@ object BoardPlacementRules {
         val definition = context.province(destination)
         val occupants = context.board.pieces[destination]
         val holdings = (occupants as? ProvincePieces.Tokens)?.holdings.orEmpty()
+        val totalTokens = holdings.values.sumOf(TokenHolding::total).toLong() + addedTokens
         val existing = holdings[player]?.total ?: 0
         val defenders =
             when (occupants) {
@@ -73,9 +74,7 @@ object BoardPlacementRules {
         )
         val competition =
             defenders.isNotEmpty() &&
-                (occupants is ProvincePieces.Marker ||
-                    holdings.values.sumOf(TokenHolding::total).toLong() + addedTokens >
-                        definition.marketNumber)
+                (occupants is ProvincePieces.Marker || totalTokens > definition.marketNumber)
         if (competition) {
             val breakdown = CompetitionRules.requirement(context, player, destination)
             breakdown.requirement.validateCommitment(existing, addedTokens)
@@ -92,9 +91,7 @@ object BoardPlacementRules {
             )
         }
         checkRule(
-            addedTokens > 0 &&
-                holdings.values.sumOf(TokenHolding::total).toLong() + addedTokens <=
-                    definition.marketNumber,
+            addedTokens > 0 && totalTokens <= definition.marketNumber,
             ViolationCode.INVALID_PLACEMENT,
         )
         if (defenders.isEmpty() && existing + addedTokens == definition.marketNumber) {
@@ -142,7 +139,9 @@ object BoardPlacementRules {
     fun recordShipping(context: BoardRulesContext, plan: PlacementPlan): BoardRulesContext =
         if (plan.route is ExpansionRoute.Shipping) {
             context.recordShipment(plan.player, plan.destination, plan.addedTokens)
-        } else context
+        } else {
+            context
+        }
 
     private fun requireMarkerAvailable(
         context: BoardRulesContext,
