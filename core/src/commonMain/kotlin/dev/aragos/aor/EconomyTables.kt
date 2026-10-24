@@ -3,6 +3,10 @@ package dev.aragos.aor
 /** Static baseline schedules, before advance abilities or any other state-dependent modifiers. */
 object EconomyTables {
     const val shipUpgradeCost: Int = 10
+    const val cardPurchaseCost: Int = 10
+
+    /** Pool-token price after [cardsPurchased] purchases by all players this Expansion phase. */
+    fun expansionCardCost(cardsPurchased: Int): Int = 3 * (cardsPurchased + 1)
 
     /**
      * Income in dollars, indexed by domination markers on the map, starting at zero. [playerCount]

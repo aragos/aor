@@ -27,9 +27,7 @@ sealed interface TurnCommand : Command {
                 Stage.EXPANSION -> BoardGame.endExpansion(state, actor)
                 Stage.FINAL_CARD_PLAY -> {
                     checkRule(
-                        state.playerState(actor).hand.all { card ->
-                            CardRules.isBurden(state.cardContext(), card.definition.id)
-                        },
+                        CardGame.canPassFinalCards(state, actor),
                         ViolationCode.UNPLAYED_FINAL_CARDS,
                     )
                     state.finishActor()
@@ -92,10 +90,12 @@ sealed interface TurnCommand : Command {
                     state.deck.isNotEmpty(),
                 ViolationCode.INVALID_CARD_PURCHASE,
             )
-            // TODO: Extract raw rule values, including this card cost, into named constants.
-            checkRule(player.cash >= 10, ViolationCode.INSUFFICIENT_CASH)
+            checkRule(
+                player.cash >= EconomyTables.cardPurchaseCost,
+                ViolationCode.INSUFFICIENT_CASH,
+            )
             return state
-                .replacePlayer(player.copy(cash = player.cash - 10))
+                .replacePlayer(player.copy(cash = player.cash - EconomyTables.cardPurchaseCost))
                 .copy(flow = state.flow.copy(boughtCards = state.flow.boughtCards + actor))
                 .queueDraw(actor)
         }

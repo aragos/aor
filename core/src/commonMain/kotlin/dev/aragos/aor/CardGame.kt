@@ -421,6 +421,13 @@ object CardGame {
         }
     }
 
+    internal fun canPassFinalCards(state: GameState, actor: PlayerId): Boolean {
+        val context = state.cardContext()
+        return state.playerState(actor).hand.all { card ->
+            CardRules.isBurden(context, card.definition.id)
+        }
+    }
+
     /** Concrete legal card commands, including targets, also used in the military reroll window. */
     fun playChoices(
         state: GameState,

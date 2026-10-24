@@ -175,7 +175,7 @@ object BoardGame {
     fun buyExpansionCard(state: GameState, actor: PlayerId): GameState {
         state.requireActor(actor, Stage.EXPANSION)
         checkRule(canBuyExpansionCard(state, actor), ViolationCode.INVALID_CARD_PURCHASE)
-        val price = 3 * (state.flow.expansionCardCount + 1)
+        val price = EconomyTables.expansionCardCost(state.flow.expansionCardCount)
         val paid = spendPool(state, actor, price, returnToStock = true)
         return paid
             .copy(
@@ -292,19 +292,22 @@ object BoardGame {
         }
         val context = context(state)
         val player = state.playerState(actor)
-        val choices = mutableListOf("pass")
-        for (province in context.configuration.provinces) {
-            choices += placementChoices(context, actor, province.id, player.poolTokens)
-            if (
-                state.board.pieces[province.id] ==
-                    ProvincePieces.Marker(actor, PieceSide.COLOURED) &&
-                    (player.stockTokens > 0 || player.poolTokens > 0)
-            ) {
-                choices += "reduce-marker ${province.id}"
+        return buildList {
+            add("pass")
+            for (province in context.configuration.provinces) {
+                addAll(placementChoices(context, actor, province.id, player.poolTokens))
+                if (
+                    state.board.pieces[province.id] ==
+                        ProvincePieces.Marker(actor, PieceSide.COLOURED) &&
+                        (player.stockTokens > 0 || player.poolTokens > 0)
+                ) {
+                    add("reduce-marker ${province.id}")
+                }
+            }
+            if (canBuyExpansionCard(state, actor)) {
+                add("buy-expansion-card")
             }
         }
-        if (canBuyExpansionCard(state, actor)) choices += "buy-expansion-card"
-        return choices
     }
 
     internal fun resolveCompetition(
@@ -477,7 +480,8 @@ object BoardGame {
     private fun canBuyExpansionCard(state: GameState, actor: PlayerId): Boolean =
         actor !in state.flow.expansionCards &&
             state.deck.isNotEmpty() &&
-            state.playerState(actor).poolTokens >= 3 * (state.flow.expansionCardCount + 1)
+            state.playerState(actor).poolTokens >=
+                EconomyTables.expansionCardCost(state.flow.expansionCardCount)
 
     private fun placementChoices(
         context: BoardRulesContext,

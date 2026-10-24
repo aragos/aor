@@ -83,7 +83,7 @@ internal object TurnEngine {
     private fun canBuyCard(state: GameState, player: PlayerState): Boolean =
         player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
             player.player.id !in state.flow.boughtCards &&
-            player.cash >= 10 &&
+            player.cash >= EconomyTables.cardPurchaseCost &&
             state.deck.isNotEmpty()
 
     private fun canDiscardCard(state: GameState, player: PlayerState): Boolean =
@@ -96,14 +96,7 @@ internal object TurnEngine {
 
     private fun finalCardChoices(state: GameState, actor: PlayerId): List<String> =
         CardGame.playChoices(state, actor) +
-            listOfNotNull("pass".takeIf { canPassFinalCards(state, actor) })
-
-    private fun canPassFinalCards(state: GameState, actor: PlayerId): Boolean {
-        val context = state.cardContext()
-        return state.playerState(actor).hand.all { card ->
-            CardRules.isBurden(context, card.definition.id)
-        }
-    }
+            listOfNotNull("pass".takeIf { CardGame.canPassFinalCards(state, actor) })
 
     private fun purchaseChoices(state: GameState, actor: PlayerId): List<String> =
         when (state.flow.purchaseStep) {
@@ -115,7 +108,7 @@ internal object TurnEngine {
 
     private fun shippingChoices(state: GameState, player: PlayerState): List<String> {
         val canUpgrade =
-            player.cash >= 10 &&
+            player.cash >= EconomyTables.shipUpgradeCost &&
                 player.lastShipUpgradeTurn != state.currentTurn() &&
                 ShippingPurchases.nextUpgrade(player.ships) != null
         return listOfNotNull("pass", "upgrade-ships".takeIf { canUpgrade })

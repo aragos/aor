@@ -209,29 +209,23 @@ object CompetitionRules {
     ): Set<PlayerId> {
         validatePending(context, plan)
         val attacker = context.player(plan.player)
-        val eligible = mutableSetOf<PlayerId>()
         val attackerOwns = AdvanceId.CATHEDRAL in attacker.advances
-        if (
-            attackerOwns &&
-                plan.defenders.all { defender ->
-                    val profile = context.player(defender)
-                    !profile.chaos &&
-                        AdvanceId.CATHEDRAL !in profile.advances &&
-                        defender !in usedAgainst[plan.player].orEmpty()
-                }
-        ) {
-            eligible += plan.player
-        }
         if (!attackerOwns) {
-            eligible +=
-                plan.defenders.filter { defender ->
-                    val profile = context.player(defender)
-                    !profile.chaos &&
-                        AdvanceId.CATHEDRAL in profile.advances &&
-                        plan.player !in usedAgainst[defender].orEmpty()
-                }
+            return plan.defenders.filterTo(mutableSetOf()) { defender ->
+                val profile = context.player(defender)
+                !profile.chaos &&
+                    AdvanceId.CATHEDRAL in profile.advances &&
+                    plan.player !in usedAgainst[defender].orEmpty()
+            }
         }
-        return eligible
+        val canDeclare =
+            plan.defenders.all { defender ->
+                val profile = context.player(defender)
+                !profile.chaos &&
+                    AdvanceId.CATHEDRAL !in profile.advances &&
+                    defender !in usedAgainst[plan.player].orEmpty()
+            }
+        return if (canDeclare) setOf(plan.player) else emptySet()
     }
 
     fun resolveCathedral(
