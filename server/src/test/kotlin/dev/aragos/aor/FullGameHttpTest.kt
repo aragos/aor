@@ -101,9 +101,11 @@ class FullGameHttpTest {
                             commands.first { command -> command.startsWith("play-card ") }
                         "stabilize cash" in commands -> {
                             val cash = current["game"]["players"][actor]["cash"].asLong()
-                            if (current["game"]["stabilizationCost"].asLong() <= cash)
+                            if (current["game"]["stabilizationCost"].asLong() <= cash) {
                                 "stabilize cash"
-                            else "stabilize misery"
+                            } else {
+                                "stabilize misery"
+                            }
                         }
                         "done" in commands -> "done"
                         "end-expansion" in commands -> "end-expansion"

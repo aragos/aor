@@ -147,8 +147,11 @@ object PlayerEconomy {
             baseIncome = baseIncome,
             middleClassBonus = middleClass,
             interestProfit =
-                if (player.advances.owns(AdvanceId.INTEREST_PROFIT)) minOf(player.cash, income)
-                else 0,
+                if (player.advances.owns(AdvanceId.INTEREST_PROFIT)) {
+                    minOf(player.cash, income)
+                } else {
+                    0
+                },
             newWorldRelief = if (player.advances.owns(AdvanceId.NEW_WORLD)) 1 else 0,
         )
     }
