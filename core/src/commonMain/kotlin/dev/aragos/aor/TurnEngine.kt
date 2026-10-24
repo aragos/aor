@@ -4,18 +4,14 @@ package dev.aragos.aor
 internal object TurnEngine {
     fun prompt(state: GameState): Prompt? {
         val decision = state.flow.decisions.lastOrNull()
-        if (decision != null) return decisionPrompt(state, decision)
+        if (decision != null) return decisionPrompt(decision)
         if (!state.stage.isTurnPhase || state.stage == Stage.FINISHED) return null
         val actor = state.flow.actor ?: return null
         return Prompt.SinglePlayer(actor, phaseChoice(state))
     }
 
-    private fun decisionPrompt(state: GameState, decision: TurnDecision): Prompt? =
+    private fun decisionPrompt(decision: TurnDecision): Prompt? =
         when (decision) {
-            is DrawDecision ->
-                Prompt.System(SystemNeed.Draw(decision.owner, state.nextHandReference()))
-            is TurnDecision.Roll ->
-                Prompt.System(SystemNeed.GameRoll(decision.kind, decision.diceCount))
             is TurnDecision.RandomCard ->
                 Prompt.System(SystemNeed.Trade(decision.owner, decision.recipient))
             else -> decision.player?.let { actor -> Prompt.SinglePlayer(actor, decision.choice) }
