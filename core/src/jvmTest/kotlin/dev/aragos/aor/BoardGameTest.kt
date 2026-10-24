@@ -23,14 +23,14 @@ class BoardGameTest {
                 "attack sicily ship",
                 "attack rome caravan florence",
                 "reduce-marker venice",
-                "end-expansion",
+                "pass",
                 "buy-expansion-card",
                 "cathedral",
                 "windmill",
                 "offer-card hand-17",
             )
 
-        val roundTripped = commands.map { text -> command(text).toText() }
+        val roundTripped = commands.map { text -> TextCodec.parseCommand(text).toText() }
 
         assertThat(roundTripped).containsExactlyElementsIn(commands).inOrder()
     }
@@ -38,7 +38,9 @@ class BoardGameTest {
     @Test
     fun unsupportedRouteArgumentsAreRejectedAsTypedSyntaxErrors() {
         val failure =
-            assertFailsWith<RuleViolation> { command("place 2 rome ship caravan florence") }
+            assertFailsWith<RuleViolation> {
+                TextCodec.parseCommand("place 2 rome ship caravan florence")
+            }
 
         assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
     }
@@ -328,7 +330,7 @@ class BoardGameTest {
     fun endingExpansionReturnsTheUnusedPoolAndAdvancesTheActor() {
         val state = expansion()
 
-        val ended = state.act("end-expansion")
+        val ended = state.act("pass")
 
         assertThat(ended.playerState(p1).poolTokens).isEqualTo(0)
         assertThat(ended.playerState(p1).stockTokens).isEqualTo(36)
@@ -390,7 +392,7 @@ class BoardGameTest {
                         ),
                 )
 
-        val ended = state.act("end-expansion", p3)
+        val ended = state.act("pass", p3)
 
         assertThat(ended.prompts()).containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4")))
     }
@@ -410,7 +412,7 @@ class BoardGameTest {
                         )
                 )
 
-        val ended = state.act("end-expansion", p3)
+        val ended = state.act("pass", p3)
 
         assertThat(ended.prompts())
             .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.SHORTAGE, 3)))
@@ -428,7 +430,7 @@ class BoardGameTest {
                 )
                 .copy(flow = TurnFlow(actor = p3, cursor = 2, phaseStarted = true))
 
-        val ended = state.act("end-expansion", p3)
+        val ended = state.act("pass", p3)
 
         assertThat(ended.prompts()).containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4")))
     }
@@ -581,7 +583,7 @@ class BoardGameTest {
     }
 
     private fun GameState.act(text: String, actor: PlayerId = p1): GameState =
-        step(Entry.Action(actor, command(text)))
+        step(Entry.Action(actor, TextCodec.parseCommand(text)))
 
     private fun GameState.win(): GameState =
         step(
@@ -590,13 +592,6 @@ class BoardGameTest {
                 listOf(DieRoll(1), DieRoll(6), DieRoll(6)),
             )
         )
-
-    private fun command(text: String): BoardCommand {
-        val parts = text.split(" ")
-        return requireNotNull(BoardCommand.parse(parts.first(), parts.drop(1))) {
-            "The fixture requires a board command."
-        }
-    }
 
     private fun id(value: String): ProvinceId = ProvinceId(value)
 }
