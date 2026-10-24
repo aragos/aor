@@ -153,12 +153,12 @@ object ExpansionReach {
         )
         if (
             context.province(destination).overseas != null &&
-                !hasPresence(context.board, player, destination)
+                !context.board.hasPresence(player, destination)
         ) {
             val occupied =
                 context.board.pieces.keys.count { province ->
                     context.province(province).overseas != null &&
-                        hasPresence(context.board, player, province)
+                        context.board.hasPresence(player, province)
                 }
             checkRule(occupied < profile.ships.level, ViolationCode.OVERSEAS_LIMIT_EXCEEDED)
         }
@@ -351,13 +351,6 @@ object ExpansionReach {
             is ProvincePieces.Tokens ->
                 occupants.total == context.province(province).marketNumber &&
                     occupants.holdings.keys.any { owner -> owner != player }
-            null -> false
-        }
-
-    private fun hasPresence(board: BoardState, player: PlayerId, province: ProvinceId): Boolean =
-        when (val occupants = board.pieces[province]) {
-            is ProvincePieces.Marker -> occupants.owner == player
-            is ProvincePieces.Tokens -> player in occupants.holdings
             null -> false
         }
 

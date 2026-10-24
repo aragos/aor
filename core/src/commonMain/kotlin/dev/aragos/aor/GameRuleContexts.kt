@@ -19,14 +19,9 @@ internal fun GameState.cardContext(): CardContext =
                     ships = owner.ships,
                     overseasPresence =
                         board.pieces
-                            .filter { (province, occupants) ->
+                            .filter { (province, _) ->
                                 ProvinceData.definition(province).overseas != null &&
-                                    when (occupants) {
-                                        is ProvincePieces.Marker ->
-                                            occupants.owner == owner.player.id
-                                        is ProvincePieces.Tokens ->
-                                            owner.player.id in occupants.holdings
-                                    }
+                                    board.hasPresence(owner.player.id, province)
                             }
                             .keys,
                 )

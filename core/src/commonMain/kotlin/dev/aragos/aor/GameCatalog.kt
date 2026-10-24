@@ -10,42 +10,38 @@ data class CatalogConfiguration(val playerCount: Int) {
         require(playerCount in 3..6) { "Catalog configurations require three through six players." }
     }
 
-    val provinces: List<ProvinceDefinition>
-        get() = ProvinceData.availableFor(playerCount)
+    val provinces: List<ProvinceDefinition> by lazy { ProvinceData.availableFor(playerCount) }
 
-    private val provinceIds: Set<ProvinceId>
-        get() = provinces.map(ProvinceDefinition::id).toSet()
+    val provinceIds: Set<ProvinceId> by lazy { provinces.map(ProvinceDefinition::id).toSet() }
 
-    val capitals: List<String>
-        get() = CapitalData.availableFor(playerCount)
+    val capitals: List<String> by lazy { CapitalData.availableFor(playerCount) }
 
-    val seas: List<SeaArea>
-        get() = SeaArea.entries.toList()
+    val seas: List<SeaArea> = SeaArea.entries.toList()
 
-    val landBorders: Set<ProvinceConnection>
-        get() = BoardConnectionData.landBorders.filterTo(mutableSetOf(), ::containsBoth)
+    val landBorders: Set<ProvinceConnection> by lazy {
+        BoardConnectionData.landBorders.filterTo(mutableSetOf(), ::containsBoth)
+    }
 
-    val coastalConnections: Set<ProvinceConnection>
-        get() = BoardConnectionData.coastalConnections.filterTo(mutableSetOf(), ::containsBoth)
+    val coastalConnections: Set<ProvinceConnection> by lazy {
+        BoardConnectionData.coastalConnections.filterTo(mutableSetOf(), ::containsBoth)
+    }
 
-    val satelliteSupports: Set<SatelliteSupport>
-        get() =
-            BoardConnectionData.satelliteSupports.filterTo(mutableSetOf()) { support ->
-                support.satellite in provinceIds && support.market in provinceIds
-            }
+    val satelliteSupports: Set<SatelliteSupport> by lazy {
+        BoardConnectionData.satelliteSupports.filterTo(mutableSetOf()) { support ->
+            support.satellite in provinceIds && support.market in provinceIds
+        }
+    }
 
-    val seaCoasts: Set<SeaCoastConnection>
-        get() =
-            BoardConnectionData.seaCoasts.filterTo(mutableSetOf()) { coast ->
-                coast.province in provinceIds
-            }
+    val seaCoasts: Set<SeaCoastConnection> by lazy {
+        BoardConnectionData.seaCoasts.filterTo(mutableSetOf()) { coast ->
+            coast.province in provinceIds
+        }
+    }
 
     /** Open source questions are retained even when the graph is structurally valid. */
-    val unresolvedReferences: List<ConnectionReviewBlocker>
-        get() =
-            BoardConnectionData.reviewBlockers.filter { issue ->
-                issue.minimumPlayers <= playerCount
-            }
+    val unresolvedReferences: List<ConnectionReviewBlocker> by lazy {
+        BoardConnectionData.reviewBlockers.filter { issue -> issue.minimumPlayers <= playerCount }
+    }
 
     private fun containsBoth(connection: ProvinceConnection): Boolean =
         connection.first in provinceIds && connection.second in provinceIds

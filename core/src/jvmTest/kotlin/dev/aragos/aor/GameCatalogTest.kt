@@ -20,6 +20,31 @@ class GameCatalogTest {
     }
 
     @Test
+    fun copiedConfigurationUsesItsOwnPlayerCountForBoardQueries() {
+        val original = CatalogConfiguration(3)
+        val excludedProvince = ProvinceId("hamburg")
+        val originalIds = original.provinceIds
+        val originalBorders = original.landBorders
+
+        val expanded = original.copy(playerCount = 6)
+
+        assertThat(originalIds).doesNotContain(excludedProvince)
+        assertThat(
+                originalBorders.any { edge ->
+                    edge.first == excludedProvince || edge.second == excludedProvince
+                }
+            )
+            .isFalse()
+        assertThat(expanded.provinceIds).contains(excludedProvince)
+        assertThat(
+                expanded.landBorders.any { edge ->
+                    edge.first == excludedProvince || edge.second == excludedProvince
+                }
+            )
+            .isTrue()
+    }
+
+    @Test
     fun unusedAreasRemoveTheirCoastalWatersAndSupportArrows() {
         val board = GameCatalog.validateFor(3)
         val excluded =

@@ -110,6 +110,14 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
             (occupants as? ProvincePieces.Tokens)?.holdings.orEmpty()[player]?.total ?: 0
         }
 
+    /** Any owned piece counts as presence, including white pieces and partial token holdings. */
+    fun hasPresence(player: PlayerId, province: ProvinceId): Boolean =
+        when (val occupants = pieces[province]) {
+            is ProvincePieces.Marker -> occupants.owner == player
+            is ProvincePieces.Tokens -> player in occupants.holdings
+            null -> false
+        }
+
     fun commodityCount(player: PlayerId, commodity: Commodity): Int = pieces.count { entry ->
         val marker = entry.value as? ProvincePieces.Marker
         marker?.owner == player && commodity in ProvinceData.definition(entry.key).commodities

@@ -36,7 +36,7 @@ data class BoardRulesContext(
     val militaryPlays: List<MilitaryPlay> = emptyList(),
 ) {
     val provinceIds: Set<ProvinceId>
-        get() = configuration.provinces.map(ProvinceDefinition::id).toSet()
+        get() = configuration.provinceIds
 
     fun player(player: PlayerId): BoardPlayerProfile =
         players[player]
