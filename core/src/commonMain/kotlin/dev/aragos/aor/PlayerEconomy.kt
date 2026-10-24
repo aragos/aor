@@ -45,7 +45,8 @@ data class IncomeQuote(
 /**
  * Pure player-local economy. The caller enforces phase/substep order, supplies current board
  * counts, and handles the global consequences reported by [EconomyResult]. No board count or credit
- * snapshot is duplicated here.
+ * snapshot is duplicated here. Turn validity and acquisition/usage history consistency belong to
+ * the authoritative game.
  */
 object PlayerEconomy {
     /** Cost of every card still held, including burdens, before choosing cash or misery payment. */
@@ -83,7 +84,6 @@ object PlayerEconomy {
      */
     fun reliefQuote(player: PlayerState, spaces: Int, currentTurn: Int): MiseryReliefQuote {
         player.requireActive()
-        player.advances.requireValidTurn(currentTurn)
         val usage = currentReliefUsage(player, currentTurn)
         val remainingSpaces = minOf(player.advances.tierCount - usage.spaces, player.misery.ordinal)
         checkRule(spaces in 1..remainingSpaces, ViolationCode.INVALID_MISERY_RELIEF)
@@ -174,9 +174,6 @@ object PlayerEconomy {
 
     private fun currentReliefUsage(player: PlayerState, currentTurn: Int): MiseryReliefUsage {
         val previous = player.miseryReliefUsage
-        require(previous == null || previous.turnNumber <= currentTurn) {
-            "A player's misery relief usage cannot be in a future turn."
-        }
         return if (previous?.turnNumber == currentTurn) previous else MiseryReliefUsage(currentTurn)
     }
 
