@@ -22,9 +22,9 @@ class ExpansionReplayTest {
                 val ended =
                     reduced.play(
                         "p1: place 4 venice",
-                        "p1: end-expansion",
-                        "p2: end-expansion",
-                        "p3: end-expansion",
+                        "p1: pass",
+                        "p2: pass",
+                        "p3: pass",
                     )
                 val rewarded =
                     if (policy == RebuiltMarkerBonus.INCLUDE) {
@@ -59,9 +59,9 @@ class ExpansionReplayTest {
             state.play(
                 "p1: reduce-marker venice",
                 "p1: place 4 venice",
-                "p1: end-expansion",
-                "p2: end-expansion",
-                "p3: end-expansion",
+                "p1: pass",
+                "p2: pass",
+                "p3: pass",
             )
 
         assertThat(ended.playerState(p1).stockTokens).isEqualTo(36)

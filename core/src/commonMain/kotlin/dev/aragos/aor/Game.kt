@@ -113,7 +113,35 @@ data class GameState(
             return CapitalData.availableFor(playerIds.size).filterNot(assigned::contains)
         }
 
-    fun prompts(): List<Prompt> = listOfNotNull(TurnEngine.prompt(this) ?: stage.prompt(this))
+    fun prompts(): List<Prompt> {
+        val need =
+            pendingDraw()
+                ?: pendingRoll()?.let { decision ->
+                    SystemNeed.GameRoll(decision.kind, decision.diceCount, decision.players)
+                }
+        return listOfNotNull(
+            need?.let(Prompt::System) ?: TurnEngine.prompt(this) ?: stage.prompt(this)
+        )
+    }
+
+    /** Draw requests share card references and validation across setup and repeatable turns. */
+    internal fun pendingDraw(): SystemNeed.Draw? {
+        val owner =
+            if (stage == Stage.DEAL) {
+                playerIds.first { player -> playerState(player).hand.isEmpty() }
+            } else {
+                (flow.decisions.lastOrNull() as? DrawDecision)?.owner ?: return null
+            }
+        return SystemNeed.Draw(owner, nextHandReference())
+    }
+
+    /** Capital tie dice and interrupted turn dice use one request and recorded-outcome contract. */
+    internal fun pendingRoll(): TurnDecision.Roll? =
+        if (stage == Stage.CAPITAL_TIE) {
+            CapitalTieDecision(capitalSelection.ties.first().players)
+        } else {
+            flow.decisions.lastOrNull() as? TurnDecision.Roll
+        }
 
     fun legalChoices(player: PlayerId): LegalChoices {
         playerState(player)

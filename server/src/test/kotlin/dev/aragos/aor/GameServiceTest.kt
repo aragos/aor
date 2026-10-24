@@ -18,19 +18,16 @@ internal class FixedRandom : SetupRandom {
 
     override fun shuffle(cards: List<String>) = cards.also { shuffles++ }
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> {
+    override fun roll(count: Int): List<DieRoll> {
         rolls++
-        return players
-            .mapIndexed { index, player -> player to DieRoll(if (rolls == 1) 3 else index + 1) }
-            .toMap()
+        return List(count) { index -> DieRoll(if (rolls == 1) 3 else index + 1) }
     }
 }
 
 private object NoRandom : SetupRandom {
     override fun shuffle(cards: List<String>): List<String> = error("Replay requested a shuffle")
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> =
-        error("Replay requested dice")
+    override fun roll(count: Int): List<DieRoll> = error("Replay requested dice")
 }
 
 class GameServiceTest {
