@@ -90,49 +90,65 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
             return play("$actor: buy-tokens ${state.playerIds.indexOf(actor)}")
         }
         check(prompt is Prompt.SinglePlayer) { "Automatic outcomes must have resolved." }
-        val actor = prompt.player
-        val player = state.playerState(actor)
-        val choices = state.legalChoices(actor).commands
-        val command =
-            if (state.flow.decisions.isNotEmpty()) {
-                choices.firstOrNull()
-                    ?: error("A pending decision requires a legal command: $prompt")
-            } else
-                when (state.stage) {
-                    Stage.TURN_ORDER_TIE -> choices.first()
-                    Stage.DRAW_CARD -> "pass"
-                    Stage.BUY_CARD ->
-                        if ("buy-card" in choices && player.cash >= 10) "buy-card" else "pass"
-                    Stage.PLAY_CARDS,
-                    Stage.FINAL_CARD_PLAY ->
-                        CardGame.playChoices(state, actor).firstOrNull() ?: "pass"
-                    Stage.PURCHASE ->
-                        when (state.flow.purchaseStep) {
-                            PurchaseStep.SHIPPING -> "pass"
-                            PurchaseStep.ADVANCES -> {
-                                val advance =
-                                    AdvanceId.entries.firstOrNull { advance ->
-                                        try {
-                                            AdvancePurchases.quote(
-                                                    player,
-                                                    advance,
-                                                    state.purchaseContext(actor),
-                                                )
-                                                .price <= player.cash
-                                        } catch (_: RuleViolation) {
-                                            false
-                                        }
-                                    }
-                                if (advance == null) "pass" else "buy-advance ${advance.letter}"
-                            }
-                            PurchaseStep.STABILIZATION ->
-                                "stabilize ${if (player.cash.toLong() >= PlayerEconomy.stabilizationCost(player)) "cash" else "misery"}"
-                            PurchaseStep.RELIEF -> "pass"
-                        }
-                    Stage.EXPANSION -> "pass"
-                    else -> error("Unhandled player phase ${state.stage}.")
+        return play("${prompt.player}: ${nextCommand(prompt)}")
+    }
+
+    private fun nextCommand(prompt: Prompt.SinglePlayer): String {
+        val choices = state.legalChoices(prompt.player).commands
+        if (state.flow.decisions.isNotEmpty()) {
+            return choices.firstOrNull()
+                ?: error("A pending decision requires a legal command: $prompt")
+        }
+        return phaseCommand(prompt.player, choices)
+    }
+
+    private fun phaseCommand(actor: PlayerId, choices: List<String>): String =
+        when (state.stage) {
+            Stage.TURN_ORDER_TIE -> choices.first()
+            Stage.DRAW_CARD -> "pass"
+            Stage.BUY_CARD ->
+                if ("buy-card" in choices && state.playerState(actor).cash >= 10) {
+                    "buy-card"
+                } else {
+                    "pass"
                 }
-        return play("$actor: $command")
+            Stage.PLAY_CARDS,
+            Stage.FINAL_CARD_PLAY -> CardGame.playChoices(state, actor).firstOrNull() ?: "pass"
+            Stage.PURCHASE -> purchaseCommand(state.playerState(actor))
+            Stage.EXPANSION -> "pass"
+            else -> error("Unhandled player phase ${state.stage}.")
+        }
+
+    private fun purchaseCommand(player: PlayerState): String =
+        when (state.flow.purchaseStep) {
+            PurchaseStep.SHIPPING -> "pass"
+            PurchaseStep.ADVANCES -> {
+                val advance = affordableAdvance(player)
+                if (advance == null) "pass" else "buy-advance ${advance.letter}"
+            }
+            PurchaseStep.STABILIZATION -> stabilizationCommand(player)
+            PurchaseStep.RELIEF -> "pass"
+        }
+
+    private fun affordableAdvance(player: PlayerState): AdvanceId? {
+        val context = state.purchaseContext(player.player.id)
+        return AdvanceId.entries.firstOrNull { advance ->
+            try {
+                AdvancePurchases.quote(player, advance, context).price <= player.cash
+            } catch (_: RuleViolation) {
+                false
+            }
+        }
+    }
+
+    private fun stabilizationCommand(player: PlayerState): String {
+        val payment =
+            if (player.cash.toLong() >= PlayerEconomy.stabilizationCost(player)) {
+                "cash"
+            } else {
+                "misery"
+            }
+        return "stabilize $payment"
     }
 
     companion object {
