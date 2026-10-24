@@ -14,8 +14,11 @@ data class EconomyResult(val player: PlayerState, val status: EconomyStatus) {
         internal fun forPlayer(player: PlayerState): EconomyResult =
             EconomyResult(
                 player,
-                if (player.misery == MiseryStep.CHAOS) EconomyStatus.ENTERED_CHAOS
-                else EconomyStatus.ACTIVE,
+                if (player.misery == MiseryStep.CHAOS) {
+                    EconomyStatus.ENTERED_CHAOS
+                } else {
+                    EconomyStatus.ACTIVE
+                },
             )
     }
 }
