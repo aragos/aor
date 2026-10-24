@@ -24,7 +24,7 @@ class CommodityPayoutOverflowTest {
     fun anOverflowPayoutConsumesOnlyOneOfTwoShortages() {
         val initial = woolPayoutState()
 
-        val paid = initial.step(TextCodec.parse("p1: play-card hand-1"))
+        val paid = initial.step(TextCodec.parse("p1: play hand-1"))
 
         assertThat(paid.playerState(owner).cash).isEqualTo(282)
         assertThat(paid.adjustments[Commodity.WOOL]).containsExactly(CommodityAdjustment.SHORTAGE)

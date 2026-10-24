@@ -97,8 +97,8 @@ class FullGameHttpTest {
                         current["game"]["stage"].asText() == "TOKEN_PURCHASE" -> "buy-tokens $actor"
                         commands.any { command -> command.startsWith("choose-turn-position ") } ->
                             commands.first()
-                        commands.any { command -> command.startsWith("play-card ") } ->
-                            commands.first { command -> command.startsWith("play-card ") }
+                        commands.any { command -> command.startsWith("play ") } ->
+                            commands.first { command -> command.startsWith("play ") }
                         "stabilize cash" in commands -> {
                             val cash = current["game"]["players"][actor]["cash"].asLong()
                             if (current["game"]["stabilizationCost"].asLong() <= cash) {
