@@ -1,14 +1,22 @@
 package dev.aragos.aor
 
+internal data class PlayerHistory(val state: GameState, val lines: List<String>)
+
 /** History follows the same private audiences as live hands, including both sides of a trade. */
 internal object HistoryProjection {
-    fun forPlayer(stored: StoredGame, viewer: PlayerId): List<String> = buildList {
-        var before = GameState(stored.header)
-        for (text in stored.revisions.flatMap(Revision::entries)) {
-            val entry = TextCodec.parse(text)
-            add(line(before, entry, viewer))
-            before = before.step(entry)
+    /** Projects private history and the final state in the same replay of every revision delta. */
+    fun forPlayer(stored: StoredGame, viewer: PlayerId): PlayerHistory {
+        var state = GameState(stored.header)
+        val lines = buildList {
+            for (revision in stored.revisions) {
+                for (text in revision.entries) {
+                    val entry = TextCodec.parse(text)
+                    add(line(state, entry, viewer))
+                    state = state.step(entry)
+                }
+            }
         }
+        return PlayerHistory(state, lines)
     }
 
     fun line(before: GameState, entry: Entry, viewer: PlayerId): String =

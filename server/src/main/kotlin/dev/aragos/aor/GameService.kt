@@ -110,7 +110,8 @@ class GameService(
     }
 
     private fun snapshot(stored: StoredGame, player: PlayerId): GameSnapshot {
-        val state = stored.state()
+        val history = HistoryProjection.forPlayer(stored, player)
+        val state = history.state
         val prompt =
             when (val current = state.prompts().singleOrNull()) {
                 is Prompt.SinglePlayer ->
@@ -125,7 +126,6 @@ class GameService(
                     )
                 else -> null
             }
-        val history = HistoryProjection.forPlayer(stored, player)
         return GameSnapshot(
             gameId = stored.id,
             revision = stored.revision,
@@ -136,16 +136,16 @@ class GameService(
             legalChoices = state.legalChoices(player),
             submitted = state.playerIds.filter(stored.pendingBids::containsKey),
             pendingBid = stored.pendingBids[player],
-            history = history,
+            history = history.lines,
         )
     }
 
     private fun authenticate(stored: StoredGame, token: String): PlayerId {
         if (token.length !in 20..100) throw ServiceFailure(401, "UNAUTHORIZED")
-        val hash = digest(token)
+        val hash = digest(token).toByteArray()
         return stored.credentials.entries
             .firstOrNull { (_, credential) ->
-                MessageDigest.isEqual(credential.toByteArray(), hash.toByteArray())
+                MessageDigest.isEqual(credential.toByteArray(), hash)
             }
             ?.key ?: throw ServiceFailure(401, "UNAUTHORIZED")
     }

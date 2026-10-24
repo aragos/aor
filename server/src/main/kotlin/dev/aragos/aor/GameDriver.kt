@@ -83,7 +83,6 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
 
     fun submit(stored: StoredGame, player: PlayerId, command: Command): StoredGame {
         val state = stored.state()
-        state.step(Entry.Action(actor = player, command = command))
         return when (command) {
             is Command.BidCapital ->
                 submitSealedDecision(
@@ -122,6 +121,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         revealCommand: String,
         createCommand: (Int) -> Command,
     ): StoredGame {
+        state.step(Entry.Action(actor = player, command = createCommand(amount)))
         val pending = stored.pendingBids + (player to amount)
         val required =
             (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players

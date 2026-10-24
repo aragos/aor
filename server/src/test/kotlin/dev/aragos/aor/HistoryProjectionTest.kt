@@ -19,6 +19,35 @@ class HistoryProjectionTest {
     private val state = GameState(header)
 
     @Test
+    fun projectedStateIncludesEveryRevisionDelta() {
+        val stored = startedGame()
+
+        val projected = HistoryProjection.forPlayer(stored, owner)
+
+        assertThat(projected.state).isEqualTo(stored.state())
+        assertThat(projected.state.stage).isEqualTo(Stage.BIDDING)
+    }
+
+    @Test
+    fun projectedHistoryRetainsEntryOrderAndPrivateDrawAudiencesAcrossRevisions() {
+        val stored = startedGame()
+
+        val projected = HistoryProjection.forPlayer(stored, owner)
+
+        assertThat(projected.lines)
+            .containsExactly(
+                "p1: set-option epochs 1",
+                "p1: set-option rebuilt-marker-bonus exclude",
+                "p1: start",
+                "!shuffle <hidden>",
+                "!draw p1 hand-1 stone-1",
+                "!draw p2 hand-2 <hidden>",
+                "!draw p3 hand-3 <hidden>",
+            )
+            .inOrder()
+    }
+
+    @Test
     fun privateDrawIdentityIsVisibleToItsOwner() {
         val entry = GameOutcome.Draw(owner, "hand-4", "stone-1")
 
@@ -94,5 +123,11 @@ class HistoryProjectionTest {
                 }
             )
             .containsExactly(entry.toText(), entry.toText())
+    }
+
+    private fun startedGame(): StoredGame {
+        val driver = GameDriver(FixedRandom())
+        val created = driver.create("history-test", header, emptyMap(), epochs = 1)
+        return driver.submit(created, owner, Command.Start)
     }
 }
