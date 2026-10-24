@@ -39,16 +39,19 @@ object ExpansionReach {
         ) {
             return emptyList()
         }
-        val routes = mutableListOf<ExpansionRoute>()
-        for (base in context.bases(player)) {
-            if (base == destination) routes += ExpansionRoute.Local(base)
-            if (connected(context.configuration.landBorders, base, destination)) {
-                routes += ExpansionRoute.Land(base)
+        return context
+            .bases(player)
+            .flatMap { base ->
+                listOfNotNull(
+                    ExpansionRoute.Local(base).takeIf { base == destination },
+                    ExpansionRoute.Land(base).takeIf {
+                        connected(context.configuration.landBorders, base, destination)
+                    },
+                ) +
+                    caravanRoutes(context, profile, base, destination) +
+                    shippingRoutes(context, profile, base, destination)
             }
-            routes += caravanRoutes(context, profile, base, destination)
-            routes += shippingRoutes(context, profile, base, destination)
-        }
-        return routes.distinct()
+            .distinct()
     }
 
     /** Validates the supplied route itself, so a longer but legal galley route remains usable. */
@@ -247,13 +250,9 @@ object ExpansionReach {
         val start = Visit(ShippingSpace.Coast(base), 0)
         val paths = mutableMapOf(start to listOf(start.space))
         val queue = ArrayDeque<Visit>().apply { addLast(start) }
-        val routes = mutableListOf<ExpansionRoute.Shipping>()
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
             val path = paths.getValue(current)
-            if (current.space == ShippingSpace.Coast(destination)) {
-                routes += ExpansionRoute.Shipping(base, path)
-            }
             if (path.size - 1 >= profile.ships.level) continue
             for (neighbor in waterNeighbors(context, current.space)) {
                 val seaCount = current.seas + if (neighbor is ShippingSpace.Sea) 1 else 0
@@ -277,7 +276,10 @@ object ExpansionReach {
                 queue.addLast(visit)
             }
         }
-        return routes
+        return paths
+            .filterKeys { visit -> visit.space == ShippingSpace.Coast(destination) }
+            .values
+            .map { path -> ExpansionRoute.Shipping(base, path) }
     }
 
     private fun waterNeighbors(
