@@ -19,13 +19,15 @@ class PublicGameViewTest {
         val initial = GameState(header)
         val players =
             initial.players.mapValues { (id, player) ->
-                if (id == PlayerId("p3")) player.copy(cash = 10_000, misery = MiseryStep.CHAOS)
-                else
+                if (id == PlayerId("p3")) {
+                    player.copy(cash = 10_000, misery = MiseryStep.CHAOS)
+                } else {
                     player.copy(
                         cash = 100,
                         advances =
                             PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.THE_HEAVENS, 1))),
                     )
+                }
             }
 
         val view =
