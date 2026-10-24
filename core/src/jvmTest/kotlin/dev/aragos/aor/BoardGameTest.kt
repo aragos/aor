@@ -226,6 +226,126 @@ class BoardGameTest {
     }
 
     @Test
+    fun anAttackerWithCathedralCanDeclareOrPassBeforeCompetitionDice() {
+        val state =
+            expansion(
+                BoardState().placeMarker(id("florence"), p2).board,
+                advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+            )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts()).containsExactly(Prompt.SinglePlayer(p1, "cathedral"))
+        assertThat(pending.legalChoices(p1).commands).containsExactly("cathedral", "pass")
+        assertThat(pending.flow.actor).isEqualTo(p1)
+    }
+
+    @Test
+    fun attackingCathedralWinsWithoutDiceAndRecordsEveryDefendingOpponent() {
+        val board =
+            BoardState(
+                persistentMapOf(
+                    id("florence") to
+                        ProvincePieces.Tokens(
+                            persistentMapOf(
+                                p2 to TokenHolding(coloured = 1),
+                                p3 to TokenHolding(coloured = 1),
+                            )
+                        )
+                )
+            )
+        val pending =
+            expansion(board, advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)))
+                .act("attack florence")
+
+        val conquered = pending.act("cathedral")
+
+        assertThat(conquered.board.pieces[id("florence")])
+            .isEqualTo(ProvincePieces.Marker(p1, PieceSide.WHITE))
+        assertThat(conquered.flow.cathedralUses).containsExactly(p1 to p2, p1 to p3)
+        assertThat(conquered.flow.decisions).isEmpty()
+        assertThat(conquered.flow.actor).isEqualTo(p1)
+    }
+
+    @Test
+    fun passingAttackingCathedralRequestsDiceWithoutSpendingItsUseOrChangingTheActor() {
+        val pending =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        val passed = pending.act("pass")
+
+        assertThat(passed.prompts())
+            .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.COMPETITION, 3)))
+        assertThat(passed.flow.cathedralUses).isEmpty()
+        assertThat(passed.flow.actor).isEqualTo(p1)
+    }
+
+    @Test
+    fun attackingCathedralCannotBeOfferedAgainAgainstTheSameOpponent() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .copy(
+                    flow =
+                        TurnFlow(
+                            actor = p1,
+                            phaseStarted = true,
+                            cathedralUses = setOf(p1 to p2),
+                        )
+                )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts())
+            .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.COMPETITION, 3)))
+    }
+
+    @Test
+    fun attackingCathedralRemainsAvailableAgainstADifferentOpponent() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p3).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .copy(
+                    flow =
+                        TurnFlow(
+                            actor = p1,
+                            phaseStarted = true,
+                            cathedralUses = setOf(p1 to p2),
+                        )
+                )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts()).containsExactly(Prompt.SinglePlayer(p1, "cathedral"))
+    }
+
+    @Test
+    fun neitherSideCanDeclareCathedralWhenTheAttackerAndDefenderBothOwnIt() {
+        val state =
+            expansion(
+                BoardState().placeMarker(id("florence"), p2).board,
+                advances =
+                    mapOf(
+                        p1 to setOf(AdvanceId.CATHEDRAL),
+                        p2 to setOf(AdvanceId.CATHEDRAL),
+                    ),
+            )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts())
+            .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.COMPETITION, 3)))
+    }
+
+    @Test
     fun aDefendersCathedralInterruptionPreservesTheAttackingActor() {
         val state =
             expansion(
