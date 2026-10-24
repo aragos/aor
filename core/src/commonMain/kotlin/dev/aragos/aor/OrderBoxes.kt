@@ -12,8 +12,8 @@ object OrderBoxes {
             }
             .build()
 
+    /** Project an order whose player membership and uniqueness are owned by game state. */
     fun forOrder(order: List<PlayerId>): Map<PlayerId, Int> {
-        require(order.distinct().size == order.size) { "Turn order cannot repeat a player." }
         val boxes =
             requireNotNull(byPlayerCount[order.size]) {
                 "Printed order boxes require three through six players."
