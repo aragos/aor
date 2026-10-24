@@ -104,7 +104,7 @@ class CardGameTest {
                 player.copy(stockTokens = 0, poolTokens = 5, misery = MiseryStep.THOUSAND)
             }
 
-        val played = initial.play("p1: play-card hand-1 player p2")
+        val played = initial.play("p1: play hand-1 player p2")
 
         assertThat(played.playerState(p2).misery).isEqualTo(MiseryStep.CHAOS)
         assertThat(played.flow.decisions).isEmpty()
@@ -582,7 +582,7 @@ class CardGameTest {
                     ships = ShippingCapability.OCEAN_1,
                 )
             }
-        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 5 3")
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 5 3")
         val offered = awaiting.legalChoices(p2).commands.single()
 
         val ceded = awaiting.play("p2: $offered")
