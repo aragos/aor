@@ -8,5 +8,5 @@ export default defineConfig({
         outDir: 'dist',
         emptyOutDir: true,
     },
-    server: {port: 5173},
+    server: {port: 5173, strictPort: true, proxy: {'/api': process.env.AOR_API_TARGET ?? 'http://127.0.0.1:8080'}},
 });

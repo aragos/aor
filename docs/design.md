@@ -26,6 +26,9 @@ The web client communicates with the server; it needs no Kotlin/JS build or clie
 JS target remains available for future client replay. Keep source packages flat until implemented features justify
 more structure. Build and run commands are in [README.md](../README.md).
 
+The server separates game progression and authority outcomes from authorization, private views and
+storage. Replaceable storage provides atomic updates for each game.
+
 ## 3. Game storage and configuration
 
 A game consists of player identities, metadata (e.g. when the game was created), rules/data compatibility versions and a
@@ -43,7 +46,7 @@ The following is a feature catalog, not a promise to implement every option init
 
 | Concern                   | Choices / baseline                                                                                       |
 |---------------------------|----------------------------------------------------------------------------------------------------------|
-| Players and epochs        | 3–6 registered players, 1–3 epochs (default 3).                                                          |
+| Players and epochs        | 3–6 registered players; only one epoch is currently supported.                                                          |
 | Setup                     | Deal/keep counts, deck adjustments, private returns and delayed reinsertion; standard setup by default.  |
 | Commerce advances         | Ordering, prices and prerequisites of Improved Agriculture and Wind/Watermill.                           |
 | Wind/Watermill            | Takeover card trade, or last-player shortage/surplus adjustment.                                         |
@@ -55,11 +58,18 @@ The following is a feature catalog, not a promise to implement every option init
 | Master Art                | Buy Card phase discard; optional immediate discard on purchase.                                          |
 | Map support               | Printed arrows; optional St. Gall → Nuremberg support.                                                   |
 | Initial card restriction  | Any history card, or commodity-only first card.                                                          |
+| Event-rebuilt marker bonus | Exclude (default), or include event-rebuilt markers in the expansion bonus; both are supported.          |
 | Undo                      | Four scopes below; regular-turn undo by default. All edits preserve recorded random events and outcomes. |
-| Open rulings              | Q7 recycling, Q10 excess attacker tokens and Q14 reinsertion timing.                                     |
+| Open rulings              | Q7 recycling and Q14 reinsertion timing.                                                               |
 
 The first choice in each variant row is the baseline; declarative data and behavior handlers must both match the
 chosen options. A different advance table alone does not implement an edition.
+
+The supported `rebuilt-marker-bonus` setup command records `exclude` or `include` explicitly.
+Its default is recorded alongside epochs in the initial revision; changing the option uses an ordinary
+creator command before `start`. Both choices are public and survive replay and restart. The domain
+policy implements bonus eligibility for ordinary expansion, event rebuilds and voluntary rebuilds;
+board placements and the actual expansion reward use this policy.
 
 Snapshots, waiting-player lists and completion flags are derived caches, never sources of game truth. Pending secret
 submissions, private plans and operational controller settings may be stored separately. A snapshot is tied to its
@@ -81,6 +91,15 @@ Keep immutable revision history: revision id, parent, author, edit command and r
 replays one effective revision. Requests name the expected revision; reject stale requests after an edit. Publishing
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
+
+The current implementation stores each revision's new log entries as a delta. Reconstructing
+the active game therefore replays the accumulated deltas; the latest revision alone is not a complete
+log. Each committed log transaction advances the concurrency revision used by `expectedRevision`;
+unrevealed pending-bid replacements leave it unchanged. This detects stale committed-state submissions
+without a separate log-position token. Keeping one revision id until a history edit would reduce
+ordinary revision records, but would require another
+monotonic version for command and pending-submission concurrency. General history editing and branch
+selection remain future work.
 
 “During their turn” means the player's activity within one phase, including nested interruptions such as Cathedral.
 It does not span several phases. The engine supplies activity ownership and boundaries. Completing an activity closes

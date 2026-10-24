@@ -9,8 +9,14 @@ kotlin {
     }
 
     sourceSets {
+        commonMain.dependencies {
+            api(libs.collections.immutable)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        jvmTest.dependencies {
+            implementation(libs.truth)
         }
     }
 }

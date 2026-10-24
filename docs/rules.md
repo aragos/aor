@@ -22,7 +22,7 @@ part of the baseline.
 | **Token** | A square piece representing market penetration. 36 per player. |
 | **Domination marker** | A round piece representing control of a market. 25 per player. Counts as *market number* tokens. |
 | **Stock** | Tokens not on the board and not in the expansion pool. |
-| **Expansion pool** | Tokens bought in the Order of Play phase, to be placed in the next Expansion phase. |
+| **Expansion pool** | Tokens bought in the Order of Play phase, to be placed during that turn's Expansion phase. |
 | **New / white piece** | A token or marker placed this turn. It is white side up until the Income phase flips it. |
 | **Coloured piece** | A piece placed in an earlier turn. Only coloured pieces act as a base for expansion and as "control" for Caravan. |
 | **Area** | One of eight regions I–VIII, bounded by thick coloured borders. Which areas are in play depends on player count. |
@@ -133,8 +133,9 @@ All fractions are **rounded up** unless stated otherwise.
       higher roll chooses first.
     - **Every player pays their own bid.** Starting cash is $40 minus the bid.
     - The capital order is kept; it breaks later turn-order ties ([§5.1](#51-order-of-play)).
-5. **First Order of Play.** Run the Order of Play phase once ([§5.1](#51-order-of-play)) before turn 1. It sets turn 1's
-   order and each player's expansion pool.
+
+Setup ends after capital selection. Turn 1 begins with the regular Order of Play phase
+([§5.1](#51-order-of-play)), which establishes that turn's order and expansion pools.
 
 ---
 
@@ -145,7 +146,7 @@ unless the phase is simultaneous.
 
 | # | Phase | Summary |
 | --- | --- | --- |
-| 1 | [Order of Play](#51-order-of-play) | Secretly buy tokens for next turn; this sets next turn's order. |
+| 1 | [Order of Play](#51-order-of-play) | Secretly buy expansion tokens and establish this turn's order. |
 | 2 | [Draw Card](#52-draw-card) | First player may cancel a shortage/surplus; every player draws one card. |
 | 3 | [Buy Card](#53-buy-card) | Urban Ascendancy owners may buy one extra card; Master Art owners may discard one. |
 | 4 | [Play Cards](#54-play-cards) | Players play any number of commodity, event and leader cards. |
@@ -168,14 +169,18 @@ does not own it ([§10.3](#103-advance-effects)).
     - Each player secretly records its total cash, the number of tokens it buys, and the cash remaining (its *written
       cash*).
     - Tokens cost $1 each.
-    - **Negative bid.** A player may instead bid a negative amount *−k*. It pays $k, receives no tokens, and is ranked
-      below any non-negative bid.
+    - The absolute bid must not exceed the player's available cash.
+    - **Negative bid.** A player may instead bid a negative amount *−k*. It pays $k, receives no tokens, and acts
+      before any non-negative bid. More negative bids act earlier.
     - **Over-bid.** A player may bid more tokens than its stock holds. It pays the full bid and receives only what stock
       holds.
 2. **Reveal and pay.** Each player pays the bank and moves the purchased tokens from stock to its expansion pool.
 3. **Reorder.**
-    - Players are ordered from **fewest tokens bought (first) to most (last)**.
+    - Players are ordered by **signed bid, lowest first**. An over-bid retains its full amount for ordering, even if
+      fewer tokens are available in stock.
     - Ties: the player that chose its capital later decides its position relative to the other tied players.
+      Resolve a tied group in capital-choice order: the earliest chooser forms the initial sequence, and each later
+      chooser inserts itself before, between or after those already placed. Later capital choosers decide last.
     - Players in Chaos count as bidding 0.
 4. **Boxes.** Players occupy the order-of-play boxes for the player count:
 
@@ -186,17 +191,19 @@ does not own it ([§10.3](#103-advance-effects)).
 | 5 | 1, 2, 3, 4, 5 |
 | 6 | 1, 2, 3, 4, 5, 6 |
 
-5. **Advance bookkeeping.** Advances bought this turn become "old". This matters for misery relief, which uses only the
-   MR of advances bought in the current turn.
+5. **Advance bookkeeping.** At the start of this phase, previously purchased advances become "old". This matters for
+   misery relief, which uses only the MR of advances bought later in the current turn.
+
+The order established here applies from Draw Card onward. The purchased pool is available during the same turn's
+Expansion phase; neither the order nor the pool is deferred to a different turn.
 
 Recorded cash at the end of each turn is public.
 
 ### 5.2 Draw Card
 
 1. **Cancel shortage/surplus.**
-    - The player first in turn order may pay a commodity's base value ([§9.1](#91-commodity-values)) to remove one
-      shortage and/or one surplus marker.
-    - Each marker is removed separately. Gold and Ivory share the roll "12", so removing that marker costs $10 once.
+    - The player first in turn order may pay a commodity's base value ([§9.1](#91-commodity-values)) to remove shortage/surplus markers.
+    - Each marker is removed separately. Gold and Ivory share the roll "12", so removing that joint marker costs $10 once. Double markers may each be bought off separately (Boone FAQ §3.2g).
 2. **Draw.**
     - Each player in turn order draws one card.
     - When the draw pile is empty, the next epoch begins ([§11.1](#111-epochs-and-recycling)).
@@ -229,6 +236,13 @@ or pass. War ties extend the phase ([§11.4](#114-event-cards)).
 - The player chooses the target where one is needed.
 - Unless stated otherwise, effects last for the rest of the turn.
 - A voided event becomes a **misery burden** ([§11.4](#114-event-cards)).
+- History-card counter symbols refer to coloured counters (AH1996 §11.5). Event replacement tokens,
+  Crusades markers and markets ceded in War are coloured; in particular a Crusades marker can be an
+  expansion base during the same turn. This differs from white pieces newly placed during Expansion.
+- **Implementation inference for an otherwise unplayable target:** a non-burden event with no eligible target may be
+  played without naming a target, consuming it with no effect. If any eligible target exists, one must be selected.
+  Temporary protection still excludes protected targets; it does not create a permanent burden. This keeps mandatory
+  Final Card Play possible when every potential target is temporarily protected or no eligible marker remains.
 
 **Leader cards** ([§11.3](#113-leader-cards)):
 
@@ -280,7 +294,10 @@ Each player in turn order completes these steps in sequence:
 4. **Expansion bonus.**
     - The player with the most *new* (white) domination markers draws one free card.
     - Ties go to the player that expanded earliest.
-    - Markers rebuilt after an event do not count. (TODO: Verify this.)
+    - **Rebuilt-marker option:** markers rebuilt after an event count only when
+      `rebuilt-marker-bonus` is `include`. The default is `exclude`. This setup choice is frozen
+      when the game starts; both interpretations are supported.
+    - Rebuilding a marker voluntarily exchanged for a token never earns bonus credit.
 
 ### 5.7 Income
 
@@ -307,7 +324,8 @@ Each player in turn order completes these steps in sequence:
         - Shortage: the majority holder draws a free card (one per marker).
         - Surplus: the majority holder pays $1 per province of that commodity it dominates (once per marker).
 
-    - A marker lasts until a card of that commodity is played or the end of next turn.
+    - A marker is consumed when a card of that commodity is played. Remaining markers are removed at the start of
+      Income's shortage/surplus step, before rolling new markers.
 
 ---
 
@@ -335,7 +353,7 @@ stacking limits below.
   block.
 - Placing tokens in the intermediate province is optional.
 - If the intermediate province is full (at its market number), the player must win a competition there before
-  passing through. (TODO: Verify this.)
+  passing through. The official May 1998 errata confirms this requirement.
 - A player may attack a second province *through* a province it has just won.
 - Caravan cannot be combined with shipping in one placement.
 
@@ -400,6 +418,10 @@ number.
     - Against several defenders, add all their strengths. A plus-modifier applies if it applies for *any* defender. A
       minus-modifier applies only if it would apply against *every* defender.
 - **Attacker's existing tokens.** The attacker's own tokens already in the province count toward the requirement.
+- **Exact commitment (project ruling).** The existing attacker tokens plus newly committed tokens
+  must equal the calculated requirement. Reject both insufficient commitments and excess tokens
+  before taking any tokens or requesting a roll. The restriction is against exceeding the attack
+  requirement, not against exceeding the province's market number.
 - **Capital doubling.** The original owner's pieces count double in its own capital, for both defence and attack. Apply
   doubling after Nationalism.
     - Defending: Genoa's marker in Genoa (market 5) needs 5 + 2·5 = **15** tokens to attack.
@@ -439,7 +461,9 @@ The attacker's chance without modifiers is 1 − (box/6)· (21/36). For box 1 to
     - All defending pieces in the province return to their owners' stocks or mats.
     - If the attacker's tokens reach the market number, they become a white domination marker.
     - Defenders' satellite tokens are not affected.
-    - What happens to attacker tokens beyond the market number is unclear [Q10].
+    - Domination conversion returns the attacker's tokens to stock as in §6.5. An exact required
+      commitment may exceed the market number because it must also overcome defenders and modifiers;
+      no tokens beyond that calculated requirement may be committed.
 - **Defender wins:** **all** attacking tokens committed, including those already present, return to stock.
 
 **Wind/Watermill (baseline edition).** Right after taking a province the victim *controlled*, the winner may try a card
@@ -516,7 +540,7 @@ The game ends **at the end of the turn** in which:
 - a player acquires its 26th advance; or
 - the last card of the final epoch's deck is drawn.
 
-The final turn is played in full, including Income. No Order of Play phase follows it. Once the final deck is exhausted,
+The final turn is played in full, including Income, then proceeds to Final Card Play. Once the final deck is exhausted,
 no more cards can be drawn for any reason.
 
 ### Final Card Play
@@ -563,7 +587,9 @@ When a commodity card is played, each player dominating **n ≥ 1** provinces of
 - **Surplus.** Read one box lower (n − 1). A single province on surplus pays $0.
 - **Industry.** The owner reads one box higher than it otherwise would.
 - **Overseas boxes.** An overseas box counts as one province for each commodity it produces.
-- Each track has a fixed number of printed boxes [data].
+- Commodity cards print ten payment boxes (AH1996 §7.11). Board ownership-track lengths count
+  markets; they do not cap payments. The quadratic formula continues beyond the printed boxes;
+  nine Wool markets plus Industry and a shortage pay `2 × 11² = $242` (user ruling, 2026-10-23).
 
 ---
 
@@ -716,7 +742,9 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
 - A **voided** event that is still in hand becomes a **misery burden**.
     - It cannot be played, counts for stabilization, and cannot be discarded except by Master Art or traded away by
       Wind/Watermill.
-- An event is also a burden if every player is immune (for example, all own Laws of Matter against Alchemist's Gold).
+- Alchemist's Gold becomes a burden once every active player owns Laws of Matter; Mysticism Abounds becomes a burden
+  once every active player owns all four Science advances. These are explicit permanent card conditions. Temporary
+  Enlightened Ruler protection filters event targets for the turn and does not permanently turn another card into a burden.
 
 **Epoch 1**
 
@@ -742,6 +770,7 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
     - See [§7.4](#74-misery-triggers).
 - **Mysticism Abounds**
     - See [§7.4](#74-misery-triggers).
+    - It becomes an unplayable misery burden once every active player owns all four Science advances.
 - **Papal Decree**
     - The player may forbid all players from buying one category (Science, Religion or Exploration) this turn.
     - It is voided by Religious Strife in the same turn.
@@ -760,14 +789,29 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
     - The player gains +1 misery.
     - Boosts Walter the Penniless.
     - It becomes a burden once Mongol Armies has been played.
+**Physical marker exhaustion (project ruling, 2026-10-23).** After Crusades or War removes the
+destination's old pieces, place a coloured marker from stock if available. With all 25 deployed,
+the receiving player chooses separately for each award: forgo the new marker, or move a coloured
+marker from another controlled province. A moved marker leaves its source empty and spends no
+square tokens. A forgone destination stays empty. The card's other effects still resolve; a War
+loser gains no additional misery for a marker its winner forgoes. Existing access and overseas
+support limits still govern which provinces may be ceded. Voluntarily vacated sources do not earn
+expansion-bonus credit if rebuilt later in the turn.
+
 - **War!** (on target player)
     1. Both players roll one die. Nationalism and military advantage each add +1.
     2. The higher roller gains +1 misery and the lower +2.
     3. The loser cedes a number equal to the roll difference (after modifiers) of domination markers (province control)
        to the winner. The loser chooses the provinces and removes their markers, the winner adds their markers instead.
+       Only provinces the winner can support may be ceded: Area V requires Overland East, overseas boxes require Ocean
+       Navigation, and the New World also requires New World. Shipping range does not restrict ceding a province. If the
+       loser cannot cede the required number, it gains one additional misery space for each missing marker (AH1996 §11.5).
     4. **On a tie,** both gain +1 misery and roll again at the start of each following player's Play Cards round.
         - A military-advantage card played before a re-roll still applies.
-        - If the tie is still unbroken when the turn ends, the war ends unresolved.
+        - A sole applicable military advantage wins a modified tie, as the military cards specify. The modified roll
+          difference is then zero, so no markers change hands, but winner/loser misery still applies.
+        - A tied War can continue into the next turn's Play Cards phase. It ends unresolved only after the last player's
+          Final Card Play round (official AH errata, 7 May 1998, §11.2 and §11.4).
 
 **Epoch 2**
 
@@ -828,7 +872,17 @@ These notes are for the engine.
 
 ## 13. Variants
 
-These are not part of the baseline. Each would be a game option.
+These are not part of the baseline. The rebuilt-marker option below is supported; other variants
+remain deferred.
+
+**Supported project option: rebuilt-marker expansion bonus**
+
+- `set-option rebuilt-marker-bonus exclude` (default): a domination marker rebuilt after an event
+  does not count toward the expansion bonus.
+- `set-option rebuilt-marker-bonus include`: it does count toward the expansion bonus.
+- The creator selects the option during configuration. The public setting is recorded in the replay
+  log and frozen at `start`.
+- Both settings count ordinary expansion markers and exclude markers rebuilt after a voluntary swap.
 
 **Improved setup** (widely used, adopted by the 2nd edition):
 
@@ -865,29 +919,45 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | ID | Question | Current reading |
 | --- | --- | --- |
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
-| Q10 | After a successful attack, what happens to attacking tokens beyond the market number? | They return to stock. |
-| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | After the draw of turn 1 (3–4 players) or turn 2 (5–6 players). |
+| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
 
-**Reference issues still to resolve:**
+**Resolved implementation decisions (2026-10-23):**
 
-- **Order/pool timing (§3–5).** Setup requires an initial Order of Play. Section 4 describes the normal phase as buying
-  for the next turn, while §5.1 moves purchases directly into the pool spent in §5.6. The handoff is not specified.
-- **Expansion bonus (§5.6).** Confirm whether rebuilt markers after events are excluded (existing TODO).
-- **Caravan (§6.3).** Confirm the full-intermediate-province attack-through requirement (existing TODO).
+- **Q15 / card-marker exhaustion:** the user allows the receiving player to forgo a new marker
+  or move one from another controlled province. The vacated source becomes empty; the destination's
+  prior pieces are removed even when placement is forgone. A War award declined by its winner
+  adds no extra misery to its loser.
+- **Q16 / commodity overflow:** the user selected the quadratic progression beyond printed box 10.
+  All nine Wool markets plus Industry and a shortage pay $242.
 
-**Map data questions** (to resolve when encoding the map):
+- **Q16 / commodity payout overflow:** the user chose to continue the quadratic formula beyond
+  the ten printed payment boxes. Nine Wool markets with Industry and a shortage pay $242.
+- **Q10 / attack commitment:** the user disallowed attacks with excess tokens. Commit exactly the
+  calculated requirement, including attacker tokens already present; reject extra committed tokens.
+- **Expansion bonus (§5.6):** the user requested both interpretations of event-rebuilt markers as
+  a game option. `rebuilt-marker-bonus` supports `exclude` (default) and `include`.
+- **Caravan (§6.3):** the official May 1998 errata requires a successful competition in a fully
+  occupied intermediate province before passing through it.
 
-- whether there is a Loire market;
-- whether Area I has 5 or 6 satellites;
-- whether Libya is in Area VI or VIII;
-- which sea areas exist (an Aegean sea?);
-- full adjacency and coastal-water links.
+**Map transcription:** the [catalog inventory](data-inventory.md) records the component references,
+province and economic tables, connections and outstanding review questions. The photographed board has no
+Loire market, six Area I satellites (including Smolensk), Libya in Area VI and a separately printed Aegean Sea.
+The user confirmed on 2026-10-23 that Gallipoli and Angora do not touch; they have no direct coastal-water
+connection. This resolves the final recorded map question. The inventory records the source checks and ruling.
 
 ---
 
 ## Sources
 
-All sources are secondary. None of them is the original rulebook.
+The original rules summary was assembled from secondary sources. The catalog milestone also uses photographs
+of the printed board and a scan of the original rulebook; exact locators and source discrepancies are in the
+[review inventory](data-inventory.md).
+
+- Printed Avalon Hill board photographs:
+  <https://boardgamegeek.com/image/192678/age-of-renaissance>,
+  <https://boardgamegeek.com/image/667248/age-of-renaissance> and the sharper
+  <https://boardgamegeek.com/image/4041958/age-of-renaissance>.
+- Original AH1996 rulebook scan: <https://www.scribd.com/document/709810410/Age-of-Renaissance-regles-VO>.
 
 - Official Avalon Hill *Errata and Clarifications* (7 May 1998), M. Boone FAQ v0.5 (1999), the EuroGames 2nd-edition
   change list, the Advance Log and the commodity log, all bundled in one

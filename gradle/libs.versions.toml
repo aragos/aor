@@ -2,10 +2,18 @@
 kotlin = "2.4.20"
 ktor = "3.6.0"
 logback = "1.6.5"
+jackson = "2.21.1"
+ktfmt = "0.64"
+truth = "1.4.5"
+collectionsImmutable = "0.5.2"
 
 [libraries]
+collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "collectionsImmutable" }
+ktfmt = { module = "com.facebook:ktfmt", version.ref = "ktfmt" }
+truth = { module = "com.google.truth:truth", version.ref = "truth" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 ktor-serverCore = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-serverNetty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }

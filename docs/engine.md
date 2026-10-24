@@ -1,6 +1,6 @@
 # Core Game Engine
 
-Status: **design draft**. The engine implements [rules.md](rules.md); application architecture and policies live in
+Status: the one-epoch engine is implemented; later epochs, planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
 [design.md](design.md). Rules section references below refer to rules.md.
 
 ## 1. Contract
@@ -23,40 +23,15 @@ outcomes and never generates randomness.
 
 ## 2. Log and configuration
 
-```kotlin
-data class GameHeader(
-    val rulesVersion: Version,
-    val dataVersion: Version,
-)
-
-sealed interface LogEntry {
-    data class Action(val actor: Actor, val command: Command) : LogEntry
-    data class Outcome(val result: SystemResult) : LogEntry
-}
-```
-
-The header records compatible rules and immutable static data, plus player registration and controller assignments.
+Each game records its rules and data versions, registered players, creator and controller assignments.
+The creator's role is independent of registration order. The log records player actions and authority outcomes.
 Game options are setup commands. `start` validates and freezes configuration; setup cannot be edited once play starts.
 Waiting players and completion status are derived from state and prompts.
 
-Commands are Kotlin sealed types with a handwritten parser/printer and lossless text round trips. The UI builds the
-same objects. One entry occupies one line; `!` introduces a system outcome. Syntax remains illustrative:
-
-```text
-creator: set-option epochs 3
-start
-...
-alice: bid-capital 12
-bob: bid-capital 12
-!roll capital-tie alice=4 bob=2
-alice: choose-capital venice
-...
-genoa: place 3 marseilles
-genoa: attack florence
-!roll competition white=2 black=5 green=4
-venice: buy-card-with-tokens
-!draw venice <card:armor>
-```
+All clients submit the same commands using locale-independent text with lossless round trips.
+One entry occupies one line; `!` introduces a system outcome. The complete implemented syntax,
+parameter meanings, decision windows and recorded-outcome formats are documented in the
+[command language reference](commands.md).
 
 Record dice, shuffle orders, draws and random trade selections as outcomes, not an RNG seed. Tests may supply any
 valid outcome; live outcomes come from the server. Storage, secret-batch acceptance, revision authorization and
@@ -92,15 +67,9 @@ A frame is a small state machine for a phase, a player's activity, a competition
 frame emits a prompt or automatically pushes/pops frames. The stack is replayable state; use no domain coroutines or
 callbacks.
 
-```kotlin
-sealed interface Prompt {
-    data class Player(val player: PlayerId, val choice: ChoiceKind) : Prompt
-    data class Simultaneous(val players: Set<PlayerId>, val choice: ChoiceKind) : Prompt
-    data class System(val need: SystemNeed) : Prompt
-}
-```
+Prompts address one player, several players making simultaneous decisions, or the authority supplying an outcome.
 
-Open optional windows only for eligible players: Renaissance, Patronage claims and a defender's Cathedral declaration.
+Open optional windows only for eligible players: Renaissance, Patronage claims and an attacker's or defender's Cathedral declaration.
 Accept an action or pass. Mandatory interruptions include Civil War's loss choice, the War loser's province choices
 and capital-order-based token-bid tie choices. Preserve nested activity ownership through these interruptions.
 
@@ -113,8 +82,9 @@ Choices and diagnostics must not expose another player's private information.
 Use the detailed rules as the single source of mechanics. Frames must retain these timing distinctions:
 
 | Sequence      | Engine requirement                                                                                                                                                                               | Rules             |
-|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| Setup/order   | Deal before capital selection; retain capital-choice order, initial purchase and printed box numbers for the starting player count. Handle negative bids, over-bids and tie choices.             | §3, §5.1          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| Setup         | Deal before capital selection; retain capital-choice order for later turn-order ties. Setup ends after capital selection.                                                                        | §3                |
+| Order of Play | Begin every turn, including turn 1, with signed token purchases, stock caps and tie choices. Assign printed boxes for the starting player count. Order and pool apply to the current turn.       | §5.1              |
 | Draw/Buy Card | Cancellation precedes draws; Master Art's discard does not require Urban Ascendancy's purchase.                                                                                                  | §5.2–5.3          |
 | Play Cards    | One ordinary round per player; War re-rolls at following players' round starts. Distinguish Leader Display and Patronage eligibility; clean up leaders/protection money after Purchase.          | §5.4, §11.4       |
 | Purchase      | Ship upgrade → advances → stabilization → relief per player. New prerequisites/abilities apply immediately; category credits exclude this phase's purchases; MR uses this turn's purchases.      | §5.5, §7.3, §10.2 |
@@ -125,8 +95,9 @@ Use the detailed rules as the single source of mechanics. Frames must retain the
 | Ending        | Log the trigger, finish the current turn and Income, then Final Card Play before cleanup/scoring. Preserve same-turn effects and final shortages/surpluses; enforce forced plays and exceptions. | §8                |
 
 Preserve once-per-turn limits, general rounding up and distinctions between misery spaces and values. Do not resolve
-uncertain rules implicitly: the order/pool timing conflict, rebuilt-marker bonus exclusion and full-intermediate
-Caravan rule remain flagged in [rules §14](rules.md#14-open-questions).
+uncertain rules implicitly. Event-rebuilt marker eligibility follows the configured `RebuiltMarkerBonus`
+policy; voluntary rebuilds never qualify. Caravan attack-through follows the official errata recorded in
+[rules §14](rules.md#14-open-questions).
 
 ## 4. Information boundaries
 
@@ -175,8 +146,11 @@ overseas commodities/areas in play, advance category totals (300/300/300/300/400
 counts before setup adjustments. Validate the supported configurations' data, prerequisites and effect handlers.
 Required missing data prevents a playable configuration; placeholders belong only in labeled test fixtures.
 
-The misery ladder, income formula, order boxes and commodity values are specified in rules.md. Printed payout-track
-lengths and map details still need transcription. Recycling classification uses the current Q7 reading.
+The static board and economic definitions and their source references are recorded in the
+[catalog review inventory](data-inventory.md). Printed payout lengths are transcribed and all recorded connection
+questions are resolved, including the user-confirmed absence of Gallipoli–Angora contact. Catalog validation and
+reference readiness cover all four supported player counts without changing gameplay.
+Recycling classification uses the current Q7 reading.
 
 Implement behavior at fixed hook points:
 
@@ -198,7 +172,8 @@ voiding and conditional bonuses belong in history, not just the current-turn car
   areas, access advances, per-destination shipping and overseas occupancy limits (rules §6).
 - Count existing attacker tokens, combine multi-defender modifiers correctly and apply capital doubling after
   Nationalism. Cathedral precedes rolling, cannot defeat a Cathedral-owning defender and never applies to War. Return
-  all committed attackers on failure; use Q10 for excess tokens on success (rules §6.6).
+  all committed attackers on failure. `AttackRequirement` rejects any commitment other than the exact
+  calculated requirement, counting existing attacker tokens before added tokens (rules §6.6).
 - Wind/Watermill requires taking controlled territory, both players holding cards, payment and a successful roll.
   The winner chooses the card given; the card taken is random (rules §6.6).
 - Printed Word rebates occur when a leader is played for already-owned advances; neither Patronage nor Written
@@ -214,10 +189,12 @@ resolved functionality, not edition labels. Data-changing options select definit
 handlers. Application defaults, feature catalog and rollout scope are
 in [design §3](design.md#3-game-storage-and-configuration).
 
-Use the current readings of the three open rulings as defaults:
+Use these recorded project rulings and current readings of the remaining open questions:
 
 - **Q7:** remove leaders, Armor, Stirrups, Long Bow, Gunpowder and Mongol Armies; recycle other cards.
-- **Q10:** excess attacking tokens return to stock.
+- **Attack commitment:** reject excess tokens; existing plus added tokens must equal the requirement.
+- **Rebuilt-marker bonus:** support `exclude` (default) and `include`, configured before `start` and
+  recorded explicitly in the replay log. `RebuiltMarkerBonus.counts` implements both eligibility policies.
 - **Q14:** reinsert improved setup's five held-out cards after turn 1's draw for 3–4 players or turn 2's for 5–6.
 
 Resolved baseline rules are not extra switches: turn 1 draws, Holy Indulgence shortfalls use cash, unused coastal
