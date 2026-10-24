@@ -267,8 +267,11 @@ class EconomicDataTest {
                 advances {
                     AdvanceData.definitions.forEach { definition ->
                         add(
-                            if (definition.id == AdvanceId.THE_HEAVENS) definition.copy(cost = 31)
-                            else definition
+                            if (definition.id == AdvanceId.THE_HEAVENS) {
+                                definition.copy(cost = 31)
+                            } else {
+                                definition
+                            }
                         )
                     }
                 }
@@ -416,8 +419,11 @@ class EconomicDataTest {
                 commodities {
                     CommodityData.definitions.forEach { definition ->
                         add(
-                            if (definition.id == Commodity.STONE) definition.copy(diceTotal = 3)
-                            else definition
+                            if (definition.id == Commodity.STONE) {
+                                definition.copy(diceTotal = 3)
+                            } else {
+                                definition
+                            }
                         )
                     }
                 }
@@ -433,8 +439,11 @@ class EconomicDataTest {
                 commodities {
                     CommodityData.definitions.forEach { definition ->
                         add(
-                            if (definition.id == Commodity.GOLD) definition.copy(diceTotal = 11)
-                            else definition
+                            if (definition.id == Commodity.GOLD) {
+                                definition.copy(diceTotal = 11)
+                            } else {
+                                definition
+                            }
                         )
                     }
                 }
