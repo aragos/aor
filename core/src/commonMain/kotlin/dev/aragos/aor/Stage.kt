@@ -88,7 +88,7 @@ enum class Stage {
                 if (player == state.header.creatorId) {
                     LegalChoices(
                         commands =
-                            (1..1).map { epochs -> Command.SetEpochs(epochs).toText() } +
+                            listOf(Command.SetEpochs(1).toText()) +
                                 RebuiltMarkerBonus.entries.map { policy ->
                                     Command.SetRebuiltMarkerBonus(policy).toText()
                                 } +

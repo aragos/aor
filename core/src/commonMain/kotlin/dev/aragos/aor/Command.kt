@@ -6,6 +6,7 @@ sealed interface Command {
 
     fun applyTo(state: GameState, actor: PlayerId): GameState
 
+    /** The minimum full-game scope supports one epoch; later decks are not implemented. */
     data class SetEpochs(val epochs: Int) : Command {
         override fun toText(): String = "set-option epochs $epochs"
 
