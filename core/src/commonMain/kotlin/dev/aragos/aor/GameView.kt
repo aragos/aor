@@ -113,32 +113,37 @@ data class GameView(
                 reliefOffers = reliefOffers(state, viewer),
                 stabilizationCost =
                     if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
-                burdenReferences =
-                    if (state.turnNumber == null) emptySet()
-                    else
-                        viewer.hand
-                            .filter { card ->
-                                CardRules.isBurden(state.cardContext(), card.definition.id)
-                            }
-                            .map(HandCard::reference)
-                            .toSet(),
+                burdenReferences = burdenReferences(state, viewer),
             )
+
+        private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
+            if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()
+            val context = state.cardContext()
+            return viewer.hand
+                .filter { card -> CardRules.isBurden(context, card.definition.id) }
+                .map(HandCard::reference)
+                .toSet()
+        }
 
         private fun advanceOffers(state: GameState, viewer: PlayerState): List<AdvanceOfferView> {
             if (state.turnNumber == null || viewer.misery == MiseryStep.CHAOS) return emptyList()
+            val context = state.purchaseContext(viewer.player.id)
             return AdvanceId.entries.filterNot(viewer.advances::owns).map { advance ->
                 try {
                     val quote =
                         AdvancePurchases.quote(
                             viewer,
                             advance,
-                            state.purchaseContext(viewer.player.id),
+                            context,
                         )
                     AdvanceOfferView(
                         advance,
                         quote.price,
-                        if (viewer.cash >= quote.price) null
-                        else ViolationCode.INSUFFICIENT_CASH.name,
+                        if (viewer.cash >= quote.price) {
+                            null
+                        } else {
+                            ViolationCode.INSUFFICIENT_CASH.name
+                        },
                     )
                 } catch (failure: RuleViolation) {
                     AdvanceOfferView(advance, null, failure.code.name)
@@ -158,7 +163,7 @@ data class GameView(
                         quote.ratingSpent,
                         viewer.cash >= quote.cashCost,
                     )
-                } catch (failure: RuleViolation) {
+                } catch (_: RuleViolation) {
                     null
                 }
             }
