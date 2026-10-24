@@ -4,9 +4,11 @@ package dev.aragos.aor
 object EconomyTables {
     const val shipUpgradeCost: Int = 10
 
-    /** Income in dollars, indexed by domination markers on the map, starting at zero. */
+    /**
+     * Income in dollars, indexed by domination markers on the map, starting at zero. [playerCount]
+     * is the starting player count already validated by game setup.
+     */
     fun incomeFor(playerCount: Int): List<Int> {
-        require(playerCount in 3..6) { "Income requires three through six starting players." }
         return (0..25).map { markers -> 15 + markers * playerCount }
     }
 
