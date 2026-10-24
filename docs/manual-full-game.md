@@ -15,9 +15,9 @@ submitted through a private player link omit the actor prefix; replay logs inclu
 | --- | --- |
 | Order of Play | `buy-tokens -2`, `buy-tokens 0`, `buy-tokens 12`. Purchases stay sealed until everyone submits. Tied players use `choose-turn-position 1`. |
 | Draw Card | The first box may `cancel-adjustment wine shortage` or `cancel-adjustment stone surplus`, paying each marker separately; `pass` starts automatic draws. |
-| Buy Card | Eligible owners use `buy-card` ($10), then optionally `discard-card hand-4` with Master Art. `pass` continues. |
+| Buy Card | Eligible owners may use `buy-card` ($10) and, with Master Art, `discard-card hand-4` in either order. Each is optional and available once; `pass` continues. |
 | Play Cards | `play-card hand-4` with any required choice below. Play as many as desired, then `pass`. |
-| Purchase | `upgrade-ships` or `done`; `buy-advance A` as often as affordable, then `done`; mandatory `stabilize cash` or `stabilize misery`; `relieve-misery 1` as allowed, then `done`. |
+| Purchase | `upgrade-ships` or `pass`; `buy-advance A` as often as affordable, then `pass`; mandatory `stabilize cash` or `stabilize misery`; `relieve-misery 1` as allowed, then `pass`. |
 | Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `end-expansion`. Unused pool tokens return to stock. |
 | Income | Automatic piece flips, income and two recorded shortage/surplus rolls. Eligible majority draws resolve automatically. |
 
