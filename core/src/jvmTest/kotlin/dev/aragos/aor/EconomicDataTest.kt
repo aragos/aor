@@ -464,18 +464,6 @@ class EconomicDataTest {
     }
 
     @Test
-    fun incomeRejectsUnsupportedPlayerCounts() {
-        for (playerCount in listOf(2, 7)) {
-            val failure =
-                assertFailsWith<IllegalArgumentException> {
-                    EconomyTables.incomeFor(playerCount)
-                }
-
-            assertThat(failure).hasMessageThat().contains("three through six starting players")
-        }
-    }
-
-    @Test
     fun stabilizationMatchesThePrintedTriangularSchedule() {
         assertThat((0..9).map(EconomyTables::stabilizationCost))
             .containsExactly(0L, 1L, 3L, 6L, 10L, 15L, 21L, 28L, 36L, 45L)

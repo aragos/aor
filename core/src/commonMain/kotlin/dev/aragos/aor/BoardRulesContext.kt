@@ -1,6 +1,9 @@
 package dev.aragos.aor
 
-/** Player-owned capabilities copied into a pure board-rules query by the game driver. */
+/**
+ * Player-owned capabilities copied from authoritative game state by the game driver. [capital] is
+ * the original capital chosen during setup; constructing a query does not repeat setup validation.
+ */
 data class BoardPlayerProfile(
     val player: PlayerId,
     val capital: ProvinceId,
@@ -8,12 +11,6 @@ data class BoardPlayerProfile(
     val ships: ShippingCapability = ShippingCapability.NONE,
     val chaos: Boolean = false,
 ) {
-    init {
-        require(CapitalData.definitions.any { definition -> definition.id == capital.value }) {
-            "A board player requires an original capital from the catalog: $capital."
-        }
-    }
-
     val homeArea: GeographicalArea
         get() =
             requireNotNull(ProvinceData.definition(capital).area) {
@@ -22,7 +19,11 @@ data class BoardPlayerProfile(
 }
 
 /**
- * Immutable inputs for board operations, separate from phase progression and player resources.
+ * Immutable inputs for board operations, separate from phase progression and player resources. The
+ * driver supplies registered players, their selected capitals, board pieces and shipping usage from
+ * authoritative game state for [configuration]. Query construction trusts that state; each
+ * operation validates its requested player, province, route and resource use.
+ *
  * [shipped] counts newly delivered physical tokens per destination in this Expansion phase,
  * including failed attacks. Existing tokens already in a province are never charged again.
  */
@@ -32,44 +33,6 @@ data class BoardRulesContext(
     val players: Map<PlayerId, BoardPlayerProfile>,
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
 ) {
-    init {
-        require(
-            players.size == configuration.playerCount &&
-                players.all { entry -> entry.key == entry.value.player }
-        ) {
-            "Board profiles must identify every player in the configured game exactly once."
-        }
-        require(
-            players.values.map(BoardPlayerProfile::capital).distinct().size == players.size &&
-                players.values.all { profile -> profile.capital.value in configuration.capitals }
-        ) {
-            "Board profiles must use the configured original capitals exactly once."
-        }
-        require(board.pieces.keys.all { province -> province in provinceIds }) {
-            "The board cannot contain pieces in an unavailable geographical area."
-        }
-        require(
-            board.pieces.values.all { occupants ->
-                when (occupants) {
-                    is ProvincePieces.Marker -> occupants.owner in players
-                    is ProvincePieces.Tokens -> occupants.holdings.keys.all(players::containsKey)
-                }
-            }
-        ) {
-            "Every board piece requires a registered owner, including neutral owners in chaos."
-        }
-        require(
-            shipped.all { entry ->
-                entry.key in players &&
-                    entry.value.all { delivery ->
-                        delivery.key in provinceIds && delivery.value >= 0
-                    }
-            }
-        ) {
-            "Shipping usage requires registered players, available provinces and nonnegative counts."
-        }
-    }
-
     val provinceIds: Set<ProvinceId>
         get() = configuration.provinces.map(ProvinceDefinition::id).toSet()
 

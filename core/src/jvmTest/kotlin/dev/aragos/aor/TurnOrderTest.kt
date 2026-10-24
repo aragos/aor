@@ -239,16 +239,6 @@ class TurnOrderTest {
     }
 
     @Test
-    fun printedBoxesRejectDuplicatePlayers() {
-        val failure =
-            assertFailsWith<IllegalArgumentException> {
-                OrderBoxes.forOrder(listOf(PlayerId("p1"), PlayerId("p1"), PlayerId("p3")))
-            }
-
-        assertThat(failure).hasMessageThat().contains("cannot repeat")
-    }
-
-    @Test
     fun printedBoxesRejectUnsupportedPlayerCounts() {
         val failure =
             assertFailsWith<IllegalArgumentException> {

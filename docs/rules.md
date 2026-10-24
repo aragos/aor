@@ -237,6 +237,9 @@ or pass. War ties extend the phase ([§11.4](#114-event-cards)).
 - The player chooses the target where one is needed.
 - Unless stated otherwise, effects last for the rest of the turn.
 - A voided event becomes a **misery burden** ([§11.4](#114-event-cards)).
+- History-card counter symbols refer to coloured counters (AH1996 §11.5). Event replacement tokens,
+  Crusades markers and markets ceded in War are coloured; in particular a Crusades marker can be an
+  expansion base during the same turn. This differs from white pieces newly placed during Expansion.
 
 **Leader cards** ([§11.3](#113-leader-cards)):
 
@@ -734,7 +737,9 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
 - A **voided** event that is still in hand becomes a **misery burden**.
     - It cannot be played, counts for stabilization, and cannot be discarded except by Master Art or traded away by
       Wind/Watermill.
-- An event is also a burden if every player is immune (for example, all own Laws of Matter against Alchemist's Gold).
+- Alchemist's Gold becomes a burden once every active player owns Laws of Matter; Mysticism Abounds becomes a burden
+  once every active player owns all four Science advances. These are explicit permanent card conditions. Temporary
+  Enlightened Ruler protection filters event targets for the turn and does not permanently turn another card into a burden.
 
 **Epoch 1**
 
@@ -760,6 +765,7 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
     - See [§7.4](#74-misery-triggers).
 - **Mysticism Abounds**
     - See [§7.4](#74-misery-triggers).
+    - It becomes an unplayable misery burden once every active player owns all four Science advances.
 - **Papal Decree**
     - The player may forbid all players from buying one category (Science, Religion or Exploration) this turn.
     - It is voided by Religious Strife in the same turn.
@@ -783,9 +789,15 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
     2. The higher roller gains +1 misery and the lower +2.
     3. The loser cedes a number equal to the roll difference (after modifiers) of domination markers (province control)
        to the winner. The loser chooses the provinces and removes their markers, the winner adds their markers instead.
+       Only provinces the winner can support may be ceded: Area V requires Overland East, overseas boxes require Ocean
+       Navigation, and the New World also requires New World. Shipping range does not restrict ceding a province. If the
+       loser cannot cede the required number, it gains one additional misery space for each missing marker (AH1996 §11.5).
     4. **On a tie,** both gain +1 misery and roll again at the start of each following player's Play Cards round.
         - A military-advantage card played before a re-roll still applies.
-        - If the tie is still unbroken when the turn ends, the war ends unresolved.
+        - A sole applicable military advantage wins a modified tie, as the military cards specify. The modified roll
+          difference is then zero, so no markers change hands, but winner/loser misery still applies.
+        - A tied War can continue into the next turn's Play Cards phase. It ends unresolved only after the last player's
+          Final Card Play round (official AH errata, 7 May 1998, §11.2 and §11.4).
 
 **Epoch 2**
 
