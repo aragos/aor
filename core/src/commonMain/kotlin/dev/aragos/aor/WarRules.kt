@@ -79,15 +79,13 @@ object WarRules {
                 secondMilitary > 0 && firstMilitary == 0 -> war.opponent
                 else -> null
             }
-        return if (winner == null) WarResult.Tie(war.copy(ties = war.ties + 1), totals)
-        else {
-            WarResult.Victory(
-                winner,
-                if (winner == war.initiator) war.opponent else war.initiator,
-                requiredTransfers = kotlin.math.abs(first - second),
-                totals,
-            )
-        }
+        if (winner == null) return WarResult.Tie(war.copy(ties = war.ties + 1), totals)
+        return WarResult.Victory(
+            winner,
+            if (winner == war.initiator) war.opponent else war.initiator,
+            requiredTransfers = kotlin.math.abs(first - second),
+            totals,
+        )
     }
 
     /**
