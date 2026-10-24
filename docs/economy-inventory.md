@@ -98,9 +98,9 @@ roll 12; every other total selects one commodity.
 | Ivory | 10 | 12 | 4 | 10, 40, 90, 160, 250, 360, 490, 640, 810, 1000 |
 
 The maximum ownership count is nine Wool markets. Industry plus a shortage can therefore request
-payment box 11, beyond the printed card. Neither the original rules nor official errata located so
-far states an overflow policy; a project ruling is pending. This does not affect catalog values or
-payments within the ten printed boxes.
+payment box 11, beyond the printed card. The user ruled on 2026-10-23 that the quadratic formula
+continues beyond the printed boxes, so this pays `2 × 11² = $242`. Printed ownership and payment
+tracks do not impose a payout cap.
 
 ## Income
 
