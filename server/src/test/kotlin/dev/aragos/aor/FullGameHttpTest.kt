@@ -107,7 +107,6 @@ class FullGameHttpTest {
                                 "stabilize misery"
                             }
                         }
-                        "end-expansion" in commands -> "end-expansion"
                         "pass" in commands -> "pass"
                         else -> commands.first()
                     }
