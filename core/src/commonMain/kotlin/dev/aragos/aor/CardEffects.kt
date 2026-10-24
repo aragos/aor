@@ -16,7 +16,6 @@ enum class CardRuleCode {
     INVALID_WAR,
     INVALID_SURRENDER,
     MARKER_RULING_REQUIRED,
-    PAYOUT_RULING_REQUIRED,
 }
 
 class CardRuleViolation(val code: CardRuleCode, val explanation: String) : Exception(explanation)
@@ -621,7 +620,7 @@ object CardRules {
         return CardResolution.MarkerReduction(event, province, marker.owner, replacement)
     }
 
-    /** Payout progression is quadratic; the board's ownership-track length is not a payout cap. */
+    /** Payouts continue quadratically beyond the ten printed card boxes. */
     fun commodityPayment(
         context: CardContext,
         commodity: Commodity,
@@ -638,11 +637,6 @@ object CardRules {
                                 (adjustment?.payoutOffset ?: 0) +
                                 if (AdvanceId.INDUSTRY in player.advances) 1 else 0)
                             .coerceAtLeast(0)
-                    cardRule(
-                        box <= 10,
-                        CardRuleCode.PAYOUT_RULING_REQUIRED,
-                        "A payout beyond the ten printed card boxes requires the overflow ruling.",
-                    )
                     definition.baseValue * box * box
                 }
             }
