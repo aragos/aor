@@ -140,7 +140,10 @@ sealed interface TurnCommand : Command {
                 ViolationCode.WRONG_PLAYER,
             )
             val markers = state.adjustments[commodity].orEmpty()
-            checkRule(adjustment in markers, ViolationCode.INVALID_ADJUSTMENT)
+            checkRule(
+                adjustment in markers,
+                ViolationCode.INVALID_ADJUSTMENT,
+            )
             val cost =
                 CommodityData.definitions
                     .single { definition -> definition.id == commodity }

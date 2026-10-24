@@ -145,7 +145,7 @@ data class GameState(
 
     fun legalChoices(player: PlayerId): LegalChoices {
         playerState(player)
-        return if (stage.isTurnPhase) {
+        return if (stage.isTurnPhase || flow.decisions.isNotEmpty()) {
             TurnEngine.choices(this, player)
         } else {
             stage.legalChoices(state = this, player = player)
