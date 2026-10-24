@@ -90,7 +90,10 @@ data class CardContext(
         require(
             markers.all { (province, marker) ->
                 province in provinces &&
-                    !provinces.getValue(province).isSatellite &&
+                    !requireNotNull(provinces[province]) {
+                            "Every card marker must reference a configured province: $province."
+                        }
+                        .isSatellite &&
                     marker.owner in players
             }
         ) {

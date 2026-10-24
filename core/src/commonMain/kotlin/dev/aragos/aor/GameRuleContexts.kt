@@ -20,7 +20,7 @@ internal fun GameState.cardContext(): CardContext =
                     overseasPresence =
                         board.pieces
                             .filter { (province, occupants) ->
-                                ProvinceData.byId.getValue(province).overseas != null &&
+                                ProvinceData.definition(province).overseas != null &&
                                     when (occupants) {
                                         is ProvincePieces.Marker ->
                                             occupants.owner == owner.player.id
