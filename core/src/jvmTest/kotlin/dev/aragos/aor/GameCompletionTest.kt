@@ -27,7 +27,7 @@ class GameCompletionTest {
         assertThat(completed.lines.any { line -> line.contains(": attack ") }).isTrue()
         assertThat(completed.lines.any { line -> line.startsWith("!roll competition ") }).isTrue()
         assertThat(completed.lines.any { line -> line.contains(": buy-advance ") }).isTrue()
-        assertThat(completed.lines.any { line -> line.contains(": play-card ") }).isTrue()
+        assertThat(completed.lines.any { line -> line.contains(": play ") }).isTrue()
         assertThat(completed.lines.any { line -> line.startsWith("!roll war ") }).isTrue()
         assertThat(completed.lines.any { line -> line.contains(": civil-war-loss ") }).isTrue()
     }
