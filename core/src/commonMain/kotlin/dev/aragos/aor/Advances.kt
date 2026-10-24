@@ -316,4 +316,8 @@ object AdvanceData {
             AdvanceId.IMPROVED_AGRICULTURE,
         )
     }
+
+    fun definition(advance: AdvanceId): AdvanceDefinition = definitions.single { candidate ->
+        candidate.id == advance
+    }
 }
