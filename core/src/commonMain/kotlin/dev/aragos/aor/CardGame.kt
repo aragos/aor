@@ -26,7 +26,7 @@ sealed interface CardDecision : TurnDecision {
             get() = "prepare-war"
 
         override fun choices(state: GameState): List<String> =
-            listOf("resolve-war") + CardGame.playChoices(state, player, militaryOnly = true)
+            listOf("pass") + CardGame.playChoices(state, player, militaryOnly = true)
     }
 
     data class WarRoll(val war: WarState) : CardDecision, TurnDecision.Roll {
@@ -189,12 +189,6 @@ object CardGame {
         return next
             .withBoardChange(change.copy(tokensRequired = emptyMap()))
             .replacePlayer(owner.copy(poolTokens = owner.poolTokens - 1))
-    }
-
-    fun resolveWar(state: GameState, actor: PlayerId): GameState {
-        val frame = state.flow.decisions.lastOrNull() as? CardDecision.WarPreparation
-        checkRule(frame?.player == actor, ViolationCode.WRONG_PLAYER)
-        return prepareWarRoll(state)
     }
 
     private fun prepareWarRoll(state: GameState): GameState {

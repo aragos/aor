@@ -196,7 +196,7 @@ class CardGameTest {
             }
         val preparing = CardGame.prepareRound(nextRound)
 
-        val armed = preparing.play("p2: play-card hand-2", "p2: resolve-war")
+        val armed = preparing.play("p2: play-card hand-2", "p2: pass")
 
         assertThat(armed.effects.military).containsExactly(CardMilitaryPlay(p2, EventId.ARMOR))
         assertThat(armed.flow.decisions.last()).isInstanceOf(CardDecision.WarRoll::class.java)
