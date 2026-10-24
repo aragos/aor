@@ -15,27 +15,36 @@ internal object HistoryProjection {
         when (entry) {
             is Entry.Shuffle -> "!shuffle <hidden>"
             is Entry.Deal ->
-                if (entry.player == viewer) entry.toText()
-                else "!deal ${entry.player} ${entry.reference} <hidden>"
+                if (entry.player == viewer) {
+                    entry.toText()
+                } else {
+                    "!deal ${entry.player} ${entry.reference} <hidden>"
+                }
             is GameOutcome.Draw ->
-                if (entry.player == viewer) entry.toText()
-                else "!draw ${entry.player} ${entry.reference} <hidden>"
+                if (entry.player == viewer) {
+                    entry.toText()
+                } else {
+                    "!draw ${entry.player} ${entry.reference} <hidden>"
+                }
             is GameOutcome.Trade ->
-                if (viewer == entry.owner || viewer == entry.recipient) entry.toText()
-                else "!trade ${entry.owner} ${entry.recipient} <hidden>"
+                if (viewer == entry.owner || viewer == entry.recipient) {
+                    entry.toText()
+                } else {
+                    "!trade ${entry.owner} ${entry.recipient} <hidden>"
+                }
             is Entry.Action -> action(before, entry, viewer)
             else -> entry.toText()
         }
 
-    private fun action(before: GameState, entry: Entry.Action, viewer: PlayerId): String =
-        when {
-            entry.actor != viewer && entry.command is TurnCommand.DiscardCard ->
+    private fun action(before: GameState, entry: Entry.Action, viewer: PlayerId): String {
+        val command = entry.command
+        return when {
+            entry.actor != viewer && command is TurnCommand.DiscardCard ->
                 "${entry.actor}: discard-card <hidden>"
-            entry.command is BoardCommand.OfferCard &&
-                viewer !in BoardGame.tradeParticipants(before) ->
+            command is BoardCommand.OfferCard && viewer !in BoardGame.tradeParticipants(before) ->
                 "${entry.actor}: offer-card <hidden>"
-            entry.command.toText().startsWith("play-card ") -> {
-                val reference = entry.command.toText().split(' ')[1]
+            command is CardCommand.PlayCard -> {
+                val reference = command.reference
                 val card =
                     before.playerState(entry.actor).hand.singleOrNull { card ->
                         card.reference == reference
@@ -44,4 +53,5 @@ internal object HistoryProjection {
             }
             else -> entry.toText()
         }
+    }
 }

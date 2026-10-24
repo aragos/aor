@@ -25,6 +25,35 @@ sealed interface CardCommand : Command {
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState =
             CardGame.play(state, actor, reference, choice)
+
+        companion object {
+            fun parse(arguments: List<String>): PlayCard {
+                checkRule(
+                    arguments.size == 1 || arguments.size == 3,
+                    ViolationCode.INVALID_COMMAND,
+                )
+                if (arguments.size == 1) return PlayCard(arguments.single())
+                return PlayCard(arguments[0], parseChoice(arguments[1], arguments[2]))
+            }
+
+            private fun parseChoice(kind: String, value: String): CardChoice =
+                when (kind) {
+                    "commodity" -> CardChoice.CommodityChoice(Commodity.valueOf(value.uppercase()))
+                    "player" -> CardChoice.PlayerChoice(PlayerId(value))
+                    "province" -> CardChoice.ProvinceChoice(ProvinceId(value))
+                    "category" -> {
+                        val category =
+                            if (value == "none") {
+                                null
+                            } else {
+                                AdvanceCategory.valueOf(value.uppercase())
+                            }
+                        CardChoice.CategoryChoice(category)
+                    }
+                    "protect" -> CardChoice.LeaderProtection(value.toInt())
+                    else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
+                }
+        }
     }
 
     data class ChooseCivilWarLoss(val loss: CivilWarLossChoice) : CardCommand {
@@ -75,32 +104,7 @@ sealed interface CardCommand : Command {
         fun parse(name: String, arguments: List<String>): CardCommand? =
             try {
                 when (name) {
-                    "play-card" -> {
-                        checkRule(
-                            arguments.size == 1 || arguments.size == 3,
-                            ViolationCode.INVALID_COMMAND,
-                        )
-                        val choice =
-                            if (arguments.size == 1) CardChoice.None
-                            else
-                                when (arguments[1]) {
-                                    "commodity" ->
-                                        CardChoice.CommodityChoice(
-                                            Commodity.valueOf(arguments[2].uppercase())
-                                        )
-                                    "player" -> CardChoice.PlayerChoice(PlayerId(arguments[2]))
-                                    "province" ->
-                                        CardChoice.ProvinceChoice(ProvinceId(arguments[2]))
-                                    "category" ->
-                                        CardChoice.CategoryChoice(
-                                            if (arguments[2] == "none") null
-                                            else AdvanceCategory.valueOf(arguments[2].uppercase())
-                                        )
-                                    "protect" -> CardChoice.LeaderProtection(arguments[2].toInt())
-                                    else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
-                                }
-                        PlayCard(arguments[0], choice)
-                    }
+                    "play-card" -> PlayCard.parse(arguments)
                     "civil-war-loss" -> {
                         size(arguments, 1)
                         ChooseCivilWarLoss(

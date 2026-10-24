@@ -36,18 +36,23 @@ internal fun GameState.replacePlayer(player: PlayerState): GameState {
     val id = player.player.id
     val chaos = player.misery == MiseryStep.CHAOS
     val cleaned =
-        if (chaos)
+        if (chaos) {
             player.copy(
                 hand = emptyList(),
                 stockTokens = player.stockTokens + player.poolTokens,
                 poolTokens = 0,
                 tokenPurchase = player.tokenPurchase ?: 0,
             )
-        else player
+        } else {
+            player
+        }
     return copy(
         activeWar =
-            if (chaos && (activeWar?.initiator == id || activeWar?.opponent == id)) null
-            else activeWar,
+            if (chaos && (activeWar?.initiator == id || activeWar?.opponent == id)) {
+                null
+            } else {
+                activeWar
+            },
         players = players + (id to cleaned),
         flow =
             flow.copy(

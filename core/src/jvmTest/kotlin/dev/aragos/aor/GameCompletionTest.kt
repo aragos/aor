@@ -139,8 +139,9 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
             if (
                 current.state.stage != Stage.PLAY_CARDS &&
                     current.state.stage != Stage.FINAL_CARD_PLAY
-            )
+            ) {
                 return current
+            }
             current = current.nextAction()
         }
         error("Every card round must finish.")

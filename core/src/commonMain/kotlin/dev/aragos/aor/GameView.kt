@@ -18,6 +18,23 @@ data class PlayerView(
 ) {
     val stockMarkers: Int
         get() = 25 - boardMarkers
+
+    companion object {
+        internal fun from(player: PlayerState, board: BoardState): PlayerView =
+            PlayerView(
+                id = player.player.id,
+                name = player.player.name,
+                cash = player.cash,
+                capital = player.capital,
+                handCount = player.hand.size,
+                stockTokens = player.stockTokens,
+                poolTokens = player.poolTokens,
+                boardMarkers = board.markerCount(player.player.id),
+                misery = player.misery,
+                ships = player.ships,
+                advances = player.advances.owned,
+            )
+    }
 }
 
 /**
@@ -63,20 +80,7 @@ data class GameView(
                 rebuiltMarkerBonus = state.rebuiltMarkerBonus,
                 players =
                     state.playerIds.map { playerId ->
-                        val player = state.playerState(playerId)
-                        PlayerView(
-                            id = player.player.id,
-                            name = player.player.name,
-                            cash = player.cash,
-                            capital = player.capital,
-                            handCount = player.hand.size,
-                            stockTokens = player.stockTokens,
-                            poolTokens = player.poolTokens,
-                            boardMarkers = state.board.markerCount(playerId),
-                            misery = player.misery,
-                            ships = player.ships,
-                            advances = player.advances.owned,
-                        )
+                        PlayerView.from(state.playerState(playerId), state.board)
                     },
                 hand = viewer.hand,
                 capitalOrder =
@@ -89,29 +93,18 @@ data class GameView(
                 provisionalTieOrder = state.turnOrderSelection.ties.firstOrNull()?.placed.orEmpty(),
                 board =
                     state.board.pieces.map { (province, pieces) ->
-                        when (pieces) {
-                            is ProvincePieces.Marker ->
-                                ProvinceView(
-                                    province,
-                                    marker = MarkerView(pieces.owner, pieces.side),
-                                )
-                            is ProvincePieces.Tokens ->
-                                ProvinceView(
-                                    province,
-                                    tokens =
-                                        pieces.holdings.map { (owner, holding) ->
-                                            TokenView(owner, holding.coloured, holding.white)
-                                        },
-                                )
-                        }
+                        ProvinceView.from(province, pieces)
                     },
                 catalog = PublicCatalog.forPlayers(state.playerIds.size),
                 activity = ActivityView.from(state),
                 deckRemaining = state.deck.size,
                 endingTriggered = state.endingTriggered,
                 scores =
-                    if (state.stage == Stage.FINISHED) ScoreView.finalScores(state)
-                    else emptyList(),
+                    if (state.stage == Stage.FINISHED) {
+                        ScoreView.finalScores(state)
+                    } else {
+                        emptyList()
+                    },
                 adjustments = state.adjustments,
                 effects = state.effects,
                 activeWar = state.activeWar,
@@ -120,32 +113,37 @@ data class GameView(
                 reliefOffers = reliefOffers(state, viewer),
                 stabilizationCost =
                     if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
-                burdenReferences =
-                    if (state.turnNumber == null) emptySet()
-                    else
-                        viewer.hand
-                            .filter { card ->
-                                CardRules.isBurden(state.cardContext(), card.definition.id)
-                            }
-                            .map(HandCard::reference)
-                            .toSet(),
+                burdenReferences = burdenReferences(state, viewer),
             )
+
+        private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
+            if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()
+            val context = state.cardContext()
+            return viewer.hand
+                .filter { card -> CardRules.isBurden(context, card.definition.id) }
+                .map(HandCard::reference)
+                .toSet()
+        }
 
         private fun advanceOffers(state: GameState, viewer: PlayerState): List<AdvanceOfferView> {
             if (state.turnNumber == null || viewer.misery == MiseryStep.CHAOS) return emptyList()
+            val context = state.purchaseContext(viewer.player.id)
             return AdvanceId.entries.filterNot(viewer.advances::owns).map { advance ->
                 try {
                     val quote =
                         AdvancePurchases.quote(
                             viewer,
                             advance,
-                            state.purchaseContext(viewer.player.id),
+                            context,
                         )
                     AdvanceOfferView(
                         advance,
                         quote.price,
-                        if (viewer.cash >= quote.price) null
-                        else ViolationCode.INSUFFICIENT_CASH.name,
+                        if (viewer.cash >= quote.price) {
+                            null
+                        } else {
+                            ViolationCode.INSUFFICIENT_CASH.name
+                        },
                     )
                 } catch (failure: RuleViolation) {
                     AdvanceOfferView(advance, null, failure.code.name)
@@ -165,7 +163,7 @@ data class GameView(
                         quote.ratingSpent,
                         viewer.cash >= quote.cashCost,
                     )
-                } catch (failure: RuleViolation) {
+                } catch (_: RuleViolation) {
                     null
                 }
             }
@@ -187,7 +185,23 @@ data class ProvinceView(
     val id: ProvinceId,
     val marker: MarkerView? = null,
     val tokens: List<TokenView> = emptyList(),
-)
+) {
+    companion object {
+        internal fun from(province: ProvinceId, pieces: ProvincePieces): ProvinceView =
+            when (pieces) {
+                is ProvincePieces.Marker ->
+                    ProvinceView(province, marker = MarkerView(pieces.owner, pieces.side))
+                is ProvincePieces.Tokens ->
+                    ProvinceView(
+                        province,
+                        tokens =
+                            pieces.holdings.map { (owner, holding) ->
+                                TokenView(owner, holding.coloured, holding.white)
+                            },
+                    )
+            }
+    }
+}
 
 data class MarkerView(val owner: PlayerId, val side: PieceSide)
 
