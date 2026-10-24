@@ -102,6 +102,21 @@ class TurnFlowTest {
     }
 
     @Test
+    fun passingExpansionReturnsUnusedTokensAndContinuesToTheNextPlayer() {
+        val initial =
+            running()
+                .copy(stage = Stage.EXPANSION, flow = TurnFlow(actor = p1, phaseStarted = true))
+        val player = initial.playerState(p1)
+
+        val state = initial.play("p1: pass")
+
+        assertThat(state.playerState(p1).stockTokens)
+            .isEqualTo(player.stockTokens + player.poolTokens)
+        assertThat(state.playerState(p1).poolTokens).isEqualTo(0)
+        assertThat(state.flow.actor).isEqualTo(p2)
+    }
+
+    @Test
     fun doneIsNotACommandAlias() {
         val failure = assertFailsWith<RuleViolation> { TextCodec.parseCommand("done") }
 
