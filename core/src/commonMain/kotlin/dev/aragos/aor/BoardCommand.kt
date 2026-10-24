@@ -58,13 +58,6 @@ sealed interface BoardCommand : Command {
             BoardGame.reduceMarker(state, actor, province)
     }
 
-    data object EndExpansion : BoardCommand {
-        override fun toText(): String = "end-expansion"
-
-        override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            BoardGame.endExpansion(state, actor)
-    }
-
     data object BuyExpansionCard : BoardCommand {
         override fun toText(): String = "buy-expansion-card"
 
@@ -122,7 +115,6 @@ sealed interface BoardCommand : Command {
                         )
                         OfferCard(arguments.single())
                     }
-                    "end-expansion" -> noArguments(arguments, EndExpansion)
                     "buy-expansion-card" -> noArguments(arguments, BuyExpansionCard)
                     "cathedral" -> noArguments(arguments, Cathedral)
                     "windmill" -> noArguments(arguments, Windmill)

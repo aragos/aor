@@ -29,23 +29,9 @@ Game options are setup commands. `start` validates and freezes configuration; se
 Waiting players and completion status are derived from state and prompts.
 
 All clients submit the same commands using locale-independent text with lossless round trips.
-One entry occupies one line; `!` introduces a system outcome. The full command reference is in [the playing guide](manual-full-game.md). Examples:
-
-```text
-p1: set-option epochs 1
-p1: start
-...
-p1: bid-capital 12
-p2: bid-capital 12
-!roll capital-tie p1=4 p2=2
-p1: choose-capital venice
-...
-p2: place 3 marseilles
-p2: attack florence
-!roll competition 2 5 4
-p1: buy-expansion-card
-!draw p1 hand-12 armor
-```
+One entry occupies one line; `!` introduces a system outcome. The complete implemented syntax,
+parameter meanings, decision windows and recorded-outcome formats are documented in the
+[command language reference](commands.md).
 
 Record dice, shuffle orders, draws and random trade selections as outcomes, not an RNG seed. Tests may supply any
 valid outcome; live outcomes come from the server. Storage, secret-batch acceptance, revision authorization and

@@ -296,7 +296,7 @@ object BoardGame {
         }
         val context = context(state)
         val player = state.playerState(actor)
-        val choices = mutableListOf("end-expansion")
+        val choices = mutableListOf("pass")
         for (province in context.configuration.provinces) {
             choices += placementChoices(context, actor, province.id, player.poolTokens)
             if (

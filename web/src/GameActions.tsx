@@ -6,7 +6,7 @@ import {t} from './messages';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
-const simpleActions = ['pass', 'done', 'buy-card', 'upgrade-ships', 'end-expansion', 'buy-expansion-card', 'resolve-war', 'windmill', 'cathedral', 'roll', 'stabilize cash', 'stabilize misery'];
+const simpleActions = ['pass', 'buy-card', 'upgrade-ships', 'buy-expansion-card', 'windmill', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
     const [advance, setAdvance] = useState('');
