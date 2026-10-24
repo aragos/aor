@@ -11,8 +11,11 @@ data class ProvinceConnection(val first: ProvinceId, val second: ProvinceId) {
     companion object {
         fun of(first: ProvinceId, second: ProvinceId): ProvinceConnection {
             require(first != second) { "A province cannot connect to itself: $first." }
-            return if (first.value < second.value) ProvinceConnection(first, second)
-            else ProvinceConnection(second, first)
+            return if (first.value < second.value) {
+                ProvinceConnection(first, second)
+            } else {
+                ProvinceConnection(second, first)
+            }
         }
     }
 }
