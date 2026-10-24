@@ -81,7 +81,6 @@ sealed interface TurnCommand : Command {
             checkRule(
                 player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
                     actor !in state.flow.boughtCards &&
-                    actor !in state.flow.discardedCards &&
                     state.deck.isNotEmpty(),
                 ViolationCode.INVALID_CARD_PURCHASE,
             )
@@ -111,13 +110,7 @@ sealed interface TurnCommand : Command {
                         hand = player.hand.filterNot { card -> card.reference == reference }
                     )
                 )
-                .copy(
-                    flow =
-                        state.flow.copy(
-                            discardedCards = state.flow.discardedCards + actor,
-                            boughtCards = state.flow.boughtCards + actor,
-                        )
-                )
+                .copy(flow = state.flow.copy(discardedCards = state.flow.discardedCards + actor))
         }
     }
 

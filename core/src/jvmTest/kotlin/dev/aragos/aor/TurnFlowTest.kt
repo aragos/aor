@@ -87,6 +87,67 @@ class TurnFlowTest {
     }
 
     @Test
+    fun masterArtDiscardCanPrecedeUrbanAscendancyPurchase() {
+        val initial = optionalCardActions()
+        val discarded =
+            initial.play("p1: discard-card ${initial.playerState(p1).hand.first().reference}")
+        val state =
+            discarded.play(
+                "p1: buy-card",
+                "!draw p1 ${discarded.nextHandReference()} ${discarded.deck.first()}",
+            )
+
+        assertThat(state.playerState(p1).cash).isEqualTo(initial.playerState(p1).cash - 10)
+        assertThat(state.playerState(p1).hand).hasSize(initial.playerState(p1).hand.size)
+        assertThat(state.flow.boughtCards).contains(p1)
+        assertThat(state.flow.discardedCards).contains(p1)
+    }
+
+    @Test
+    fun urbanAscendancyPurchaseCanPrecedeMasterArtDiscard() {
+        val initial = optionalCardActions()
+        val state =
+            initial.play(
+                "p1: buy-card",
+                "!draw p1 ${initial.nextHandReference()} ${initial.deck.first()}",
+                "p1: discard-card ${initial.playerState(p1).hand.first().reference}",
+            )
+
+        assertThat(state.playerState(p1).cash).isEqualTo(initial.playerState(p1).cash - 10)
+        assertThat(state.playerState(p1).hand).hasSize(initial.playerState(p1).hand.size)
+        assertThat(state.flow.boughtCards).contains(p1)
+        assertThat(state.flow.discardedCards).contains(p1)
+    }
+
+    @Test
+    fun urbanAscendancyCannotBuyTwiceDuringBuyCardPhase() {
+        val initial = optionalCardActions()
+        val purchased =
+            initial.play(
+                "p1: buy-card",
+                "!draw p1 ${initial.nextHandReference()} ${initial.deck.first()}",
+            )
+        val failure = assertFailsWith<RuleViolation> { purchased.play("p1: buy-card") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_CARD_PURCHASE)
+    }
+
+    @Test
+    fun masterArtCannotDiscardTwiceDuringBuyCardPhase() {
+        val initial = optionalCardActions()
+        val discarded =
+            initial.play("p1: discard-card ${initial.playerState(p1).hand.first().reference}")
+        val failure =
+            assertFailsWith<RuleViolation> {
+                discarded.play(
+                    "p1: discard-card ${discarded.playerState(p1).hand.first().reference}"
+                )
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_CARD_DISCARD)
+    }
+
+    @Test
     fun incomeIsFollowedByANewSealedPurchaseRound() {
         val state =
             allDrawn()
@@ -125,6 +186,27 @@ class TurnFlowTest {
         val state = GameState(header())
         assertThat(assertFailsWith<RuleViolation> { state.play("p1: set-option epochs 3") }.code)
             .isEqualTo(ViolationCode.INVALID_EPOCHS)
+    }
+
+    private fun optionalCardActions(): GameState {
+        val initial = allDrawn()
+        val player =
+            initial
+                .playerState(p1)
+                .copy(
+                    advances =
+                        PlayerAdvances(
+                            listOf(
+                                AdvanceAcquisition(AdvanceId.URBAN_ASCENDANCY, turnNumber = 1),
+                                AdvanceAcquisition(AdvanceId.MASTER_ART, turnNumber = 1),
+                            )
+                        )
+                )
+        return initial.copy(
+            stage = Stage.BUY_CARD,
+            players = initial.players + (p1 to player),
+            flow = TurnFlow(actor = p1, phaseStarted = true),
+        )
     }
 
     private fun purchase(): GameState = allDrawn().play("p1: pass", "p2: pass", "p3: pass")
