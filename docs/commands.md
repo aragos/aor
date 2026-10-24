@@ -88,11 +88,12 @@ per-destination shipping limits still apply. `pass` completes Expansion and retu
 | `play-card <reference> protect <amount>` | Leader play; nonnegative dollars of protection on an exposed leader. |
 | `civil-war-loss cash` / `civil-war-loss tokens` | Civil War victim; chooses the loss type. |
 | `replace-event-token pool` / `replace-event-token none` | Counter's owner; spend one pool token on replacement or leave the province empty. |
-| `resolve-war` | Player answering the military window; proceeds to the War roll. `pass` has the same effect after any military plays. |
 | `cede-war <province> ...` | War loser; names the required distinct eligible provinces, respecting support and overseas limits. Canonical text sorts province ids. |
 | `patronize-leader <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
 
-The outer phase actor resumes after another player's required answer. Passing the Advances step forgoes further leader claims; `pass` cannot skip Civil War losses, required replacements, War cessions or trade offers.
+The outer phase actor resumes after another player's required answer. In a War military window,
+`pass` proceeds to the recorded roll. Passing the Advances step forgoes further leader claims.
+`pass` cannot skip Civil War losses, required replacements, War cessions or trade offers.
 In Final Card Play, every non-burden card must be played before passing; Master Art cannot discard.
 
 ## Authority outcomes and replay
