@@ -95,7 +95,7 @@ export const en: Record<string, string> = {
     'status.working': 'Saving…', 'status.saved': 'Saved',
     'stage.CONFIGURATION': 'Configuration', 'stage.BIDDING': 'Capital bids', 'stage.CAPITAL_CHOICE': 'Capital selection',
     'stage.TOKEN_PURCHASE': 'Order of Play', 'stage.TURN_ORDER_TIE': 'Order of Play — tied positions', 'stage.DRAW_CARD': 'Draw Card',
-    'stage.SHUFFLE': 'Shuffling', 'stage.DEAL': 'Dealing', 'stage.CAPITAL_TIE': 'Resolving capital ties',
+    'stage.SHUFFLE': 'Shuffling', 'stage.INITIAL_DRAW': 'Drawing starting cards', 'stage.CAPITAL_TIE': 'Resolving capital ties',
     'capital.venice': 'Venice', 'capital.genoa': 'Genoa', 'capital.barcelona': 'Barcelona',
     'capital.paris': 'Paris', 'capital.london': 'London', 'capital.hamburg': 'Hamburg',
     'kind.commodity': 'Commodity', 'kind.event': 'Event', 'kind.leader': 'Leader',
