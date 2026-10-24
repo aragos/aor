@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-const val RULES_VERSION = "ah1996-epoch-one-1"
+const val RULES_VERSION = "ah1996-epoch-one-2"
 const val DATA_VERSION = "ah1996-catalog-1"
 
 /**

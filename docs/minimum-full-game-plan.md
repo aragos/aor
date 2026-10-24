@@ -2,8 +2,9 @@
 
 Agreed on 2026-10-23. The reviewed catalogs, repeatable engine, every advance and epoch-one card,
 board play, both ending triggers, durable service and playable browser are implemented and verified.
-Two rare source-policy decisions remain pending; see the table below. They currently produce typed
-rejections, so the implementation is not declared complete for those edge cases.
+The two remaining source-policy decisions have been resolved by the user and implemented,
+including card-marker placement choices and quadratic payouts beyond the printed boxes.
+The agreed minimum full-game plan is complete.
 
 ## Target and current checkpoint
 
@@ -15,6 +16,11 @@ A complete three-player command scenario covers expansion, competition, purchase
 its recorded history replays to the identical state. Separate acceptance coverage verifies the 26th
 advance ending, final-turn completion, misery-value scoring and shared victories.
 
+Final verification after the approved rulings: **539 core JVM tests and 75 server tests pass**,
+including ordinary-command completion for each supported count (3, 4, 5 and 6 players). Kotlin/JS
+compilation, Kotlin formatting checks and the production web build pass. Marker-choice browser
+checks cover forgo, source selection, War support limits and the mobile layout.
+
 The HTTP acceptance scenario completes a game through ordinary commands, then recovers the same
 completed snapshot using a random provider that fails if called. Three real authenticated browser
 seats also completed a game in turn 8. Pending and completed state survived separate server restarts,
@@ -23,10 +29,10 @@ stale revisions returned 409, and the 390-pixel mobile layout had no page overfl
 The original setup/turn-order checkpoint was `ef7992e`; subsequent features are submitted as stacked
 PRs below. Do not merge the stack without the user's instruction.
 
-| Remaining ruling | Proposed policy, awaiting user answer |
+| Resolved ruling | Implemented behavior |
 | --- | --- |
-| All 25 domination markers deployed when War/Crusades needs more | Block a new Crusades placement; cap War transfers at the winner's available markers. Do not penalize the loser for the winner's counter shortage. An alternative is allowing voluntary marker reduction during Card Play. |
-| All nine Wool markets plus Industry and a shortage requests box 11 | Continue the quadratic formula ($242), or cap at printed box 10 ($200). Board ownership tracks are not payment caps; commodity cards print ten payment boxes. |
+| All 25 domination markers deployed when War/Crusades needs more | The recipient may forgo each new marker or move one from another controlled province. The source and forgone destination become empty; other card effects still resolve. |
+| All nine Wool markets plus Industry and a shortage requests box 11 | Continue the quadratic formula ($242). The ten printed card boxes do not cap payments. |
 
 Setup ends after capital selection. Every turn, including turn 1, begins with regular Order of Play.
 That phase establishes the order and expansion pool for the same turn. Use explicit phase boundaries in timing
@@ -94,7 +100,7 @@ check according to [AGENTS.md](../AGENTS.md). Make no gameplay or public HTTP AP
 | Repeatable turn flow/economy | Draws/discards, ordered phases, income, stabilization, misery, shortages/surpluses, phase-opening decisions and turn resets. |
 | Purchases/advances | All 26 advances, prerequisites, old credits, immediate effects, leaders, Patronage, shipping and relief. |
 | Board/competition | Pieces, reach, shipping quotas, domination, exact attacks, dice, Cathedral, Windmill, returns, shared card prices and both expansion-reward options. |
-| Cards/interruptions | All 29 epoch-one cards, victim decisions, temporary immunity, no-effect plays, persistent tied War and physical replacements. Marker exhaustion and box 11 await the rulings above. |
+| Cards/interruptions | All 29 epoch-one cards, victim decisions, temporary immunity, no-effect plays, persistent tied War and physical replacements. Marker exhaustion offers the recipient forgo/reuse choices; box-11 Wool pays $242. |
 | Ending/scoring | Both triggers, completing the current turn, forced Final Card Play, preserved effects and scores. Empty-deck queued draws and post-Chaos choices covered by regressions. |
 | Interface/service | Guided phase controls, readable searchable board, catalog/ownership/effects, private offers/history, scores, full-game HTTP/browser completion and restart recovery. |
 
@@ -142,12 +148,16 @@ Submitted checkpoints:
 | Private economy quotes | `feature/private-economy-quotes` | [#25](https://github.com/aragos/aor/pull/25) |
 | Complete browser interface | `feature/full-game-interface` | [#26](https://github.com/aragos/aor/pull/26) |
 | Versioned contract and playing guide | `feature/epoch-one-delivery` | [#27](https://github.com/aragos/aor/pull/27) |
+| Quadratic payout ruling | `feature/approved-quadratic-payout` | [#28](https://github.com/aragos/aor/pull/28) |
+| Marker forgo/reuse ruling | `feature/card-marker-reuse` | [#29](https://github.com/aragos/aor/pull/29) |
+| Ruling controls and public projections | `feature/card-ruling-interface` | [#30](https://github.com/aragos/aor/pull/30) |
+| Completed rulings and all-count acceptance | `feature/completed-game-rulings` | [#31](https://github.com/aragos/aor/pull/31) |
 
 ### Continuing implementation
 
 1. Read applicable instructions, inspect Git state and preserve unrelated work. Continue on a feature branch.
-2. Resolve the two pending project rulings above before removing their typed guards. Add focused
-   regressions for the selected policy and update rules, this checkpoint and the playing guide.
+2. The minimum full-game scope is complete. Keep future features and decisions on focused branches;
+   preserve recorded outcomes, privacy and optimistic concurrency. The deferred features above remain out of scope.
 3. Review the stacked PRs; do not merge automatically. Existing original development game files
    are unsupported under the current-format-only policy.
 

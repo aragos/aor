@@ -920,9 +920,15 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | --- | --- | --- |
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
 | Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
-| Q15 | No domination marker available for Crusades or War transfers. | Resolved by the user: forgo each new marker or move one from another controlled province; its source becomes empty. |
 
 **Resolved implementation decisions (2026-10-23):**
+
+- **Q15 / card-marker exhaustion:** the user allows the receiving player to forgo a new marker
+  or move one from another controlled province. The vacated source becomes empty; the destination's
+  prior pieces are removed even when placement is forgone. A War award declined by its winner
+  adds no extra misery to its loser.
+- **Q16 / commodity overflow:** the user selected the quadratic progression beyond printed box 10.
+  All nine Wool markets plus Industry and a shortage pay $242.
 
 - **Q16 / commodity payout overflow:** the user chose to continue the quadratic formula beyond
   the ten printed payment boxes. Nine Wool markets with Industry and a shortage pay $242.

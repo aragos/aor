@@ -6,15 +6,16 @@ A Kotlin Multiplatform engine, Ktor server and React web client for
 The application runs one-epoch games for 3–6 human players: setup, repeatable turns, purchases,
 board expansion and competitions, every epoch-one card, nested player decisions, income and final scoring.
 Private hands and simultaneous bids remain private; authoritative outcomes are recorded for replay and restart.
-Two rare source gaps still await project rulings: exhausting domination markers during War/Crusades and
-Wool payment box 11. Affected actions report a typed rejection until those rulings are resolved.
+When War or Crusades needs a marker with all 25 deployed, its recipient may forgo placement or move
+a marker from another controlled province. Commodity payments continue their quadratic formula
+beyond the printed boxes. Both project rulings are implemented and replayable.
 
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
 - [Setup walkthrough](docs/manual-setup.md): creation, sealed decisions, restart and API instructions.
 - [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
-- [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, delivery checkpoints and remaining rulings.
+- [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, delivery checkpoints and verification.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
 
 ```text
@@ -41,7 +42,7 @@ expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
 `set-option rebuilt-marker-bonus include`. The browser has the same selector. The choice is public,
 saved in the log and frozen when setup starts. Both settings apply to actual expansion rewards. Voluntary marker rebuilds never count.
 
-New games use file format 2 with rules version `ah1996-epoch-one-1` and data version
+New games use file format 2 with rules version `ah1996-epoch-one-2` and data version
 `ah1996-catalog-1`. The initial revision records resolved setup options. Earlier development rules
 versions are unsupported; no migration is provided under the current-format-only policy.
 

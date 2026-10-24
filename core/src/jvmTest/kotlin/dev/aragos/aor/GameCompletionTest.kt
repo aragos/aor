@@ -208,8 +208,9 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
     }
 
     companion object {
-        fun create(): Scenario {
-            val players = (1..3).map { number -> Player(PlayerId("p$number"), "Player $number") }
+        fun create(playerCount: Int = 3): Scenario {
+            val players =
+                (1..playerCount).map { number -> Player(PlayerId("p$number"), "Player $number") }
             return Scenario(GameState(GameHeader(players, players.first().id)))
         }
     }

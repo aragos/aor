@@ -59,6 +59,7 @@ the interruption:
 | Cathedral opportunity | `cathedral` or `pass`. Uses are tracked separately against each opponent. |
 | Military cards before a War reroll | Play eligible military cards, then `resolve-war` or `pass`. |
 | War loser cessions | `cede-war milan florence`. Choose the required supportable markets. |
+| No marker available for Crusades/War | The recipient chooses `forgo-marker` or `move-marker genoa`. The source must contain another coloured marker they control. |
 | Patronage during advance purchases | `patronize-leader rashid-ad-din`; pay the exposed leader's protection once. |
 | Wind/Watermill opportunity | `windmill` or `pass`; after a successful recorded roll, `offer-card hand-8`. The other card is chosen randomly and recorded privately. |
 
@@ -82,6 +83,11 @@ revisions without drawing new cards or rolling new dice. Draws, discards and exc
 redacted for players outside their permitted audience. Optimistic revision checks reject stale
 commands.
 
-Two source rulings remain pending: domination-marker exhaustion during War/Crusades and payment
-box 11 for all Wool markets plus Industry and a shortage. These cases return explicit typed
-rejections; they are not silently resolved with an invented rule. See [the rules reference](rules.md).
+War and Crusades automatically use available markers. At the 25-marker limit, resolve each award
+separately: forgo its new marker, or move one from another controlled province. Moving leaves the
+source empty and spends no square tokens; forgoing leaves the destination empty. The destination's
+old pieces are removed in either case. Other card effects still apply, and declining a War award
+adds no extra misery to the loser. Existing War access and overseas-support limits remain in force.
+
+Commodity payments continue `base value × box²` beyond the ten printed boxes. Nine Wool markets,
+Industry and a shortage therefore pay $242. See [the rules reference](rules.md) for the recorded rulings.
