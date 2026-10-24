@@ -69,7 +69,7 @@ callbacks.
 
 Prompts address one player, several players making simultaneous decisions, or the authority supplying an outcome.
 
-Open optional windows only for eligible players: Renaissance, Patronage claims and a defender's Cathedral declaration.
+Open optional windows only for eligible players: Renaissance, Patronage claims and an attacker's or defender's Cathedral declaration.
 Accept an action or pass. Mandatory interruptions include Civil War's loss choice, the War loser's province choices
 and capital-order-based token-bid tie choices. Preserve nested activity ownership through these interruptions.
 
