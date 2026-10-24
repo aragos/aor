@@ -337,9 +337,11 @@ object ProvinceData {
     fun definition(id: ProvinceId): ProvinceDefinition =
         requireNotNull(byId[id]) { "Unknown province in the reviewed catalog: $id." }
 
-    /** Includes all overseas boxes; access conditions remain separate from setup availability. */
+    /**
+     * Includes all overseas boxes; access conditions remain separate from setup availability.
+     * [playerCount] is the starting registration count validated during setup.
+     */
     fun availableFor(playerCount: Int): List<ProvinceDefinition> {
-        require(playerCount in 3..6) { "Province availability requires three through six players." }
         return definitions.filter { province ->
             province.area?.let { area -> area.minimumPlayers <= playerCount } ?: true
         }
