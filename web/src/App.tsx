@@ -3,12 +3,32 @@ import type {FormEvent} from 'react';
 import {errorCode, request} from './api';
 import type {CreatedGame, RebuiltMarkerBonus, Snapshot} from './api';
 import {t} from './messages';
-import {label} from './labels';
+import {label, playerName} from './labels';
 import {GameActions} from './GameActions';
 import {AdvancesPanel, BoardPanel, FinalScores, TurnEffects} from './FullGamePanels';
 import './app.css';
 
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
+
+function bidSubmitLabel(snapshot: Snapshot): string {
+    const pending = snapshot.pendingBid !== null;
+    if (snapshot.game.stage === 'TOKEN_PURCHASE') {
+        return t(pending ? 'controls.replacePurchase' : 'controls.savePurchase');
+    }
+    return t(pending ? 'controls.replaceBid' : 'controls.saveBid');
+}
+
+function decisionTitle(snapshot: Snapshot): string {
+    if (snapshot.game.stage === 'FINISHED') return t('game.finished');
+    if (!snapshot.prompt) return t('game.waiting');
+    return label(snapshot.prompt.messageId.slice('prompt.'.length), 'prompt');
+}
+
+function saveStatus(busy: boolean, saved: boolean): string {
+    if (busy) return t('status.working');
+    if (saved) return t('status.saved');
+    return '\u00a0';
+}
 
 function CreateGame() {
     const [names, setNames] = useState('Alice\nBob\nCarol');
@@ -78,7 +98,7 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
     const capitalChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-capital '));
     const turnChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-turn-position '));
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
-    const nameFor = (playerId: string) => snapshot.game.players.find(player => player.id === playerId)?.name ?? playerId;
+    const nameFor = (playerId: string) => playerName(snapshot, playerId);
     const isTokenPurchase = stage === 'TOKEN_PURCHASE';
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
     const amount = Number(bid);
@@ -112,7 +132,10 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
         {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <form onSubmit={event => { event.preventDefault(); void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
             <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-hint purchase-preview' : 'bid-hint'} required/>
-                <button disabled={busy || (isTokenPurchase && !validPurchase)}>{t(isTokenPurchase ? snapshot.pendingBid === null ? 'controls.savePurchase' : 'controls.replacePurchase' : snapshot.pendingBid === null ? 'controls.saveBid' : 'controls.replaceBid')}</button></div>
+                <button disabled={busy || (isTokenPurchase && !validPurchase)}>
+                    {bidSubmitLabel(snapshot)}
+                </button>
+            </div>
             {snapshot.pendingBid !== null && <p className="sealed">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
             <p id={isTokenPurchase ? 'purchase-hint' : 'bid-hint'} className="muted small">{t(isTokenPurchase ? 'controls.purchaseHint' : 'controls.bidHint')}</p>
             {isTokenPurchase && <div id="purchase-preview" className="purchase-preview" aria-live="polite">
@@ -184,7 +207,7 @@ function Game({id, token}: {id: string; token: string}) {
 
     if (!snapshot) return <main className="landing panel"><h1>{t('app.title')}</h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
-    const nameFor = (playerId: string) => snapshot.game.players.find(player => player.id === playerId)?.name ?? playerId;
+    const nameFor = (playerId: string) => playerName(snapshot, playerId);
     const finished = snapshot.game.stage === 'FINISHED';
     const sealedStatus = (playerId: string, stage: string) => snapshot.game.stage === stage
         ? t(snapshot.submitted.includes(playerId) ? 'game.submitted' : 'game.waiting') : '—';
@@ -196,13 +219,13 @@ function Game({id, token}: {id: string; token: string}) {
             <FinalScores snapshot={snapshot}/>
             <section className={`panel decision ${finished ? 'complete' : ''}`}>
                 <p className="eyebrow">{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</p>
-                <h2>{finished ? t('game.finished') : snapshot.prompt ? label(snapshot.prompt.messageId.slice('prompt.'.length), 'prompt') : t('game.waiting')}</h2>
+                <h2>{decisionTitle(snapshot)}</h2>
                 {snapshot.prompt && <p className="muted">{t('prompt.waitingFor')}: {snapshot.prompt.players.map(nameFor).join(', ')}</p>}
                 {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="muted small">{t('game.activityOwner')}: {nameFor(snapshot.game.activity.actor)}</p>}
                 <p className="muted small">{t(`rebuiltMarkerBonus.${snapshot.game.rebuiltMarkerBonus}`)}</p>
                 <Controls snapshot={snapshot} busy={busy} submit={submit}/>
                 {actionError && <ErrorMessage code={actionError}/>}
-                <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
+                <p className="save-status" aria-live="polite">{saveStatus(busy, saved)}</p>
             </section>
             <section className="panel"><h2 id="table-title">{t('game.table')}</h2><div className="table-scroll" tabIndex={0} role="region" aria-labelledby="table-title"><table aria-labelledby="table-title"><thead><tr>
                 {['player', 'capital', 'cash', 'pool', 'tokens', 'cards', 'misery', 'advances', 'bid', 'tokenPurchase'].map(key => <th key={key} scope="col">{t(`game.${key}`)}</th>)}

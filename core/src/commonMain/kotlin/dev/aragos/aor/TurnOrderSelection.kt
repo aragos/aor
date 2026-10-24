@@ -67,8 +67,11 @@ data class TurnOrderSelection(
         return copy(
             order = order.take(start) + inserted + pending + order.drop(start + tie.players.size),
             ties =
-                if (pending.isEmpty()) ties.drop(1)
-                else listOf(tie.copy(placed = inserted)) + ties.drop(1),
+                if (pending.isEmpty()) {
+                    ties.drop(1)
+                } else {
+                    listOf(tie.copy(placed = inserted)) + ties.drop(1)
+                },
         )
     }
 

@@ -1,6 +1,7 @@
 import {useState} from 'react';
-import type {Snapshot} from './api';
-import {advanceName, label, provinceName} from './labels';
+import type {FormEvent} from 'react';
+import type {ProvinceDefinition, Snapshot} from './api';
+import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
@@ -11,7 +12,6 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     const [advance, setAdvance] = useState('');
     const [relief, setRelief] = useState('');
     const commands = snapshot.legalChoices.commands;
-    const nameFor = (id: string) => snapshot.game.players.find(player => player.id === id)?.name ?? id;
     const offers = commands.filter(command => command.startsWith('buy-advance ')).map(command => {
         const definition = snapshot.game.catalog?.advances.find(candidate => candidate.messageId.endsWith(`.${command.split(' ')[1]}`));
         const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === definition?.id);
@@ -24,18 +24,15 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             command.startsWith('replace-event-token ') || command.startsWith('cathedral ') || command.startsWith('patronize-leader ') || command.startsWith('offer-card ') || command.startsWith('reduce-marker ')));
     const finiteLabel = (command: string) => {
         const [action, first, second] = command.split(' ');
-        if (action === 'swap-order') return `${t('action.swapOrder')} ${nameFor(first)}`;
+        if (action === 'swap-order') return `${t('action.swapOrder')} ${playerName(snapshot, first)}`;
         if (action === 'cancel-adjustment') return `${t('action.cancel')} ${label(first.toUpperCase(), 'commodity')} ${label(second.toUpperCase(), 'adjustment')}`;
-        if (action === 'discard-card') {
+        if (action === 'discard-card' || action === 'offer-card') {
             const card = snapshot.game.hand.find(card => card.reference === first);
-            return `${t('action.discard')} ${card ? t(card.definition.messageId) : first}`;
+            const actionKey = action === 'discard-card' ? 'action.discard' : 'action.offerCard';
+            return `${t(actionKey)} ${card ? t(card.definition.messageId) : first}`;
         }
         if (action === 'patronize-leader') return `${t('action.patronize')} ${label(first, 'leader')}`;
         if (action === 'reduce-marker') return `${t('action.reduceMarker')} ${provinceName(first)}`;
-        if (action === 'offer-card') {
-            const card = snapshot.game.hand.find(card => card.reference === first);
-            return `${t('action.offerCard')} ${card ? t(card.definition.messageId) : first}`;
-        }
         return `${label(action, 'action')} ${label(first)}`;
     };
     return <div className="game-actions">
@@ -63,49 +60,138 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     </div>;
 }
 
+interface CardTarget {
+    prefix: 'player' | 'province' | 'commodity' | 'category';
+    options: {value: string; label: string}[];
+}
+
+function cardTarget(snapshot: Snapshot, id: string): CardTarget | null {
+    if (['alchemists-gold', 'civil-war', 'war'].includes(id)) {
+        return {
+            prefix: 'player',
+            options: snapshot.game.players
+                .filter(player => player.misery !== null && (id !== 'war' || player.id !== snapshot.viewerId))
+                .map(player => ({value: player.id, label: player.name})),
+        };
+    }
+    if (['pirates-vikings', 'rebellion', 'the-crusades'].includes(id)) {
+        return {
+            prefix: 'province',
+            options: (snapshot.game.catalog?.provinces ?? [])
+                .filter(province => isCardProvince(snapshot, id, province))
+                .map(province => ({value: province.id, label: provinceName(province.id)})),
+        };
+    }
+    const dualCommodities: Record<string, string[]> = {
+        'cloth-wine': ['CLOTH', 'WINE'],
+        'ivory-gold': ['IVORY', 'GOLD'],
+    };
+    const commodities = dualCommodities[id];
+    if (commodities) {
+        return {
+            prefix: 'commodity',
+            options: commodities.map(commodity => ({
+                value: commodity.toLowerCase(),
+                label: label(commodity, 'commodity'),
+            })),
+        };
+    }
+    if (id === 'papal-decree') {
+        return {
+            prefix: 'category',
+            options: ['none', 'science', 'religion', 'exploration'].map(value => ({
+                value,
+                label: label(value.toUpperCase(), 'category'),
+            })),
+        };
+    }
+    return null;
+}
+
+function isCardProvince(snapshot: Snapshot, card: string, province: ProvinceDefinition): boolean {
+    if (card === 'the-crusades') return province.area === 'VI' && !province.satellite;
+    const pieces = snapshot.game.board.find(pieces => pieces.id === province.id);
+    if (!pieces?.marker || pieces.marker.side !== 'COLOURED') return false;
+    if (card === 'pirates-vikings') return province.coastal;
+    const capital = snapshot.game.players.find(player => player.id === snapshot.viewerId)?.capital;
+    return province.overseas !== 'NEW_WORLD' && (!province.capital || province.capital === capital);
+}
+
+function playableCards(snapshot: Snapshot) {
+    const commands = snapshot.legalChoices.commands;
+    if (commands.includes('play-card')) return snapshot.game.hand;
+    const references = new Set(commands
+        .filter(command => command.startsWith('play-card '))
+        .map(command => command.split(' ')[1]));
+    return snapshot.game.hand.filter(card => references.has(card.reference));
+}
+
 function PlayCard({snapshot, busy, submit}: ActionProps) {
     const [reference, setReference] = useState('');
     const [choice, setChoice] = useState('');
     const [protection, setProtection] = useState('0');
     const card = snapshot.game.hand.find(candidate => candidate.reference === reference);
     const id = card?.definition.id ?? '';
-    const playerTarget = ['alchemists-gold', 'civil-war', 'war'].includes(id);
-    const provinceTarget = ['pirates-vikings', 'rebellion', 'the-crusades'].includes(id);
-    const dual = id === 'cloth-wine' ? ['CLOTH', 'WINE'] : id === 'ivory-gold' ? ['IVORY', 'GOLD'] : [];
-    const category = id === 'papal-decree';
+    const target = cardTarget(snapshot, id);
     const protectedLeader = card?.definition.kind === 'leader' && snapshot.game.effects.leaders.length > 0;
     const noArgumentAllowed = snapshot.legalChoices.commands.includes(`play-card ${reference}`);
-    const needsChoice = !noArgumentAllowed && (playerTarget || provinceTarget || dual.length > 0 || category);
-    let options: {value: string; label: string}[] = [];
-    if (playerTarget) options = snapshot.game.players.filter(player => player.misery !== null && (id !== 'war' || player.id !== snapshot.viewerId)).map(player => ({value: player.id, label: player.name}));
-    else if (provinceTarget) options = snapshot.game.catalog?.provinces.filter(province => {
-        if (id === 'the-crusades') return province.area === 'VI' && !province.satellite;
-        const pieces = snapshot.game.board.find(pieces => pieces.id === province.id);
-        if (!pieces?.marker || pieces.marker.side !== 'COLOURED') return false;
-        if (id === 'pirates-vikings') return province.coastal;
-        const capital = snapshot.game.players.find(player => player.id === snapshot.viewerId)?.capital;
-        return province.overseas !== 'NEW_WORLD' && (!province.capital || province.capital === capital);
-    }).map(province => ({value: province.id, label: provinceName(province.id)})) ?? [];
-    else if (dual.length) options = dual.map(commodity => ({value: commodity.toLowerCase(), label: label(commodity, 'commodity')}));
-    else if (category) options = ['none', 'science', 'religion', 'exploration'].map(value => ({value, label: label(value.toUpperCase(), 'category')}));
-    const choicePrefix = playerTarget ? 'player' : provinceTarget ? 'province' : category ? 'category' : 'commodity';
+    const needsChoice = !noArgumentAllowed && target !== null;
     const cash = Number(protection);
     const validProtection = !protectedLeader || (protection.trim() !== '' && Number.isInteger(cash) && cash >= 0 && cash <= 2147483647);
-    const playable = snapshot.legalChoices.commands.includes('play-card') ? snapshot.game.hand : snapshot.game.hand.filter(card => snapshot.legalChoices.commands.some(command => command.split(' ')[0] === 'play-card' && command.split(' ')[1] === card.reference));
+    const playable = playableCards(snapshot);
     const concreteChoices = snapshot.legalChoices.commands.filter(command => command.startsWith(`play-card ${reference} `));
-    if (concreteChoices.length > 0 && needsChoice) options = options.filter(option => concreteChoices.some(command => command.endsWith(` ${choicePrefix} ${option.value}`)));
-    return <form className="guided-form play-card-form" onSubmit={async event => {
+    const targetOptions = target?.options ?? [];
+    const options = concreteChoices.length > 0 && needsChoice
+        ? targetOptions.filter(option => concreteChoices.some(command => command.endsWith(` ${target.prefix} ${option.value}`)))
+        : targetOptions;
+    async function play(event: FormEvent) {
         event.preventDefault();
-        const argument = needsChoice ? ` ${choicePrefix} ${choice}` : protectedLeader ? ` protect ${cash}` : '';
-        if (await submit(`play-card ${reference}${argument}`)) { setReference(''); setChoice(''); setProtection('0'); }
-    }}>
-        <label htmlFor="play-card">{t('action.playCard')}</label><select id="play-card" value={reference} onChange={event => { setReference(event.target.value); setChoice(''); }} required>
-            <option value="">{t('controls.chooseCard')}</option>{playable.map(card => <option key={card.reference} value={card.reference} disabled={snapshot.game.burdenReferences.includes(card.reference)}>{t(card.definition.messageId)} · {card.reference}{snapshot.game.burdenReferences.includes(card.reference) ? ` · ${t('game.burden')}` : ''}</option>)}
+        let argument = '';
+        if (needsChoice) argument = ` ${target.prefix} ${choice}`;
+        else if (protectedLeader) argument = ` protect ${cash}`;
+        if (!await submit(`play-card ${reference}${argument}`)) return;
+        setReference('');
+        setChoice('');
+        setProtection('0');
+    }
+    return <form className="guided-form play-card-form" onSubmit={play}>
+        <label htmlFor="play-card">{t('action.playCard')}</label>
+        <select id="play-card" value={reference} onChange={event => {
+            setReference(event.target.value);
+            setChoice('');
+        }} required>
+            <option value="">{t('controls.chooseCard')}</option>
+            {playable.map(card => <option
+                key={card.reference}
+                value={card.reference}
+                disabled={snapshot.game.burdenReferences.includes(card.reference)}
+            >
+                {t(card.definition.messageId)} · {card.reference}
+                {snapshot.game.burdenReferences.includes(card.reference) && ` · ${t('game.burden')}`}
+            </option>)}
         </select>
-        {needsChoice && <><label htmlFor="card-choice">{t('controls.cardChoice')}</label><select id="card-choice" value={choice} onChange={event => setChoice(event.target.value)} required><option value="">{t('controls.chooseTarget')}</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></>}
-        {protectedLeader && <><label htmlFor="leader-protection">{t('game.protection')}</label><input id="leader-protection" type="number" min={0} max={2147483647} step={1} value={protection} onChange={event => setProtection(event.target.value)}/></>}
-        <button disabled={busy || !card || (needsChoice && !choice) || !validProtection || snapshot.game.burdenReferences.includes(reference)}>{t('action.playCard')}</button>
+        {needsChoice && <>
+            <label htmlFor="card-choice">{t('controls.cardChoice')}</label>
+            <select id="card-choice" value={choice} onChange={event => setChoice(event.target.value)} required>
+                <option value="">{t('controls.chooseTarget')}</option>
+                {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+        </>}
+        {protectedLeader && <>
+            <label htmlFor="leader-protection">{t('game.protection')}</label>
+            <input id="leader-protection" type="number" min={0} max={2147483647} step={1}
+                value={protection} onChange={event => setProtection(event.target.value)}/>
+        </>}
+        <button disabled={busy || !card || (needsChoice && !choice) || !validProtection || snapshot.game.burdenReferences.includes(reference)}>
+            {t('action.playCard')}
+        </button>
     </form>;
+}
+
+function expansionRouteArgument(route: string, via: string): string {
+    if (route === 'auto') return '';
+    if (route === 'caravan') return ` caravan ${via}`;
+    return ` ${route}`;
 }
 
 function ExpansionActions({snapshot, busy, submit}: ActionProps) {
@@ -119,7 +205,7 @@ function ExpansionActions({snapshot, busy, submit}: ActionProps) {
     const count = Number(tokens);
     return <form className="guided-form expansion-form" onSubmit={event => {
         event.preventDefault();
-        const routeArgument = route === 'auto' ? '' : route === 'caravan' ? ` caravan ${via}` : ` ${route}`;
+        const routeArgument = expansionRouteArgument(route, via);
         void submit(`${operation} ${operation === 'place' ? `${count} ` : ''}${province}${routeArgument}`);
     }}>
         <h3>{t('action.expand')}</h3>

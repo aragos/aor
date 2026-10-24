@@ -97,9 +97,11 @@ object CompetitionRules {
         val strengthByDefender =
             when (occupants) {
                 is ProvincePieces.Marker ->
-                    if (occupants.owner != attacker)
+                    if (occupants.owner != attacker) {
                         mapOf(occupants.owner to definition.marketNumber)
-                    else emptyMap()
+                    } else {
+                        emptyMap()
+                    }
                 is ProvincePieces.Tokens ->
                     occupants.holdings
                         .filterKeys { owner -> owner != attacker }
@@ -120,11 +122,15 @@ object CompetitionRules {
         val nationalistDefence =
             if (!attackingNationalism && defendingNationalism.isNotEmpty()) {
                 defendingNationalism.maxOf(factors::getValue)
-            } else 0
+            } else {
+                0
+            }
         val nationalistAttack =
             if (attackingNationalism && defendingNationalism.isEmpty()) {
                 attackerFactor
-            } else 0
+            } else {
+                0
+            }
         val offensiveMilitary =
             MilitaryCard.entries
                 .filter { card ->
@@ -149,11 +155,15 @@ object CompetitionRules {
             defensiveSatellites =
                 if (occupants is ProvincePieces.Marker) {
                     satelliteSupport(context, occupants.owner, province)
-                } else 0,
+                } else {
+                    0
+                },
             offensiveSatellites =
                 if (advancesUsable && AdvanceId.COSMOPOLITAN in profile.advances) {
                     satelliteSupport(context, attacker, province)
-                } else 0,
+                } else {
+                    0
+                },
             defenderNationalism = nationalistDefence,
             attackerNationalism = nationalistAttack,
             defensiveMilitary = defensiveMilitary,
@@ -202,8 +212,9 @@ object CompetitionRules {
                         AdvanceId.CATHEDRAL !in profile.advances &&
                         defender !in usedAgainst[plan.player].orEmpty()
                 }
-        )
+        ) {
             eligible += plan.player
+        }
         if (!attackerOwns) {
             eligible +=
                 plan.defenders.filter { defender ->
@@ -230,7 +241,11 @@ object CompetitionRules {
             .copy(
                 cathedralUser = declaringPlayer,
                 cathedralOpponents =
-                    if (declaringPlayer == plan.player) plan.defenders else setOf(plan.player),
+                    if (declaringPlayer == plan.player) {
+                        plan.defenders
+                    } else {
+                        setOf(plan.player)
+                    },
             )
     }
 
@@ -248,52 +263,68 @@ object CompetitionRules {
         plan: PlacementPlan.Competition,
         attackerWon: Boolean,
     ): CompetitionResolution {
-        val previous = context.board.pieces.getValue(plan.destination)
-        val existingHoldings = (previous as? ProvincePieces.Tokens)?.holdings.orEmpty()
-        val totalAttackers = plan.existingTokens + plan.addedTokens
-        val definition = context.province(plan.destination)
-        val change =
-            if (attackerWon) {
-                val replacement: ProvincePieces =
-                    if (definition.isSatellite) {
-                        ProvincePieces.Tokens(
-                            persistentMapOf(plan.player to TokenHolding(white = 1))
-                        )
-                    } else ProvincePieces.Marker(plan.player, PieceSide.WHITE)
-                val replacementChange = context.board.replace(plan.destination, replacement)
-                val defendingTokens =
-                    existingHoldings
-                        .filterKeys { owner -> owner != plan.player }
-                        .mapValues { holding -> holding.value.total }
-                replacementChange.copy(
-                    tokensReturned =
-                        defendingTokens +
-                            mapOf(
-                                    plan.player to
-                                        (totalAttackers - if (definition.isSatellite) 1 else 0)
-                                )
-                                .filterValues { count -> count > 0 },
-                    tokensRequired = emptyMap(),
-                )
-            } else {
-                val remaining =
-                    existingHoldings.filterKeys { owner -> owner != plan.player }.toPersistentMap()
-                val replacement =
-                    if (previous is ProvincePieces.Marker) previous
-                    else ProvincePieces.Tokens(remaining)
-                BoardChange(
-                    board =
-                        context.board.copy(
-                            pieces = context.board.pieces.putting(plan.destination, replacement)
-                        ),
-                    tokensReturned = mapOf(plan.player to totalAttackers),
-                )
-            }
         return CompetitionResolution(
-            change = change,
+            change =
+                if (attackerWon) {
+                    attackerVictory(context, plan)
+                } else {
+                    attackerDefeat(context, plan)
+                },
             attackerWon = attackerWon,
             defeatedPlayers = if (attackerWon) plan.defenders else setOf(plan.player),
             previousController = context.board.controller(plan.destination),
+        )
+    }
+
+    private fun attackerVictory(
+        context: BoardRulesContext,
+        plan: PlacementPlan.Competition,
+    ): BoardChange {
+        val isSatellite = context.province(plan.destination).isSatellite
+        val replacement: ProvincePieces =
+            if (isSatellite) {
+                ProvincePieces.Tokens(persistentMapOf(plan.player to TokenHolding(white = 1)))
+            } else {
+                ProvincePieces.Marker(plan.player, PieceSide.WHITE)
+            }
+        val defendingTokens =
+            (context.board.pieces[plan.destination] as? ProvincePieces.Tokens)
+                ?.holdings
+                .orEmpty()
+                .filterKeys { owner -> owner != plan.player }
+                .mapValues { holding -> holding.value.total }
+        val returnedAttackers = plan.existingTokens + plan.addedTokens - if (isSatellite) 1 else 0
+        return context.board
+            .replace(plan.destination, replacement)
+            .copy(
+                tokensReturned =
+                    defendingTokens +
+                        mapOf(plan.player to returnedAttackers).filterValues { count -> count > 0 },
+                tokensRequired = emptyMap(),
+            )
+    }
+
+    private fun attackerDefeat(
+        context: BoardRulesContext,
+        plan: PlacementPlan.Competition,
+    ): BoardChange {
+        val previous = context.board.pieces.getValue(plan.destination)
+        val replacement =
+            when (previous) {
+                is ProvincePieces.Marker -> previous
+                is ProvincePieces.Tokens ->
+                    ProvincePieces.Tokens(
+                        previous.holdings
+                            .filterKeys { owner -> owner != plan.player }
+                            .toPersistentMap()
+                    )
+            }
+        return BoardChange(
+            board =
+                context.board.copy(
+                    pieces = context.board.pieces.putting(plan.destination, replacement)
+                ),
+            tokensReturned = mapOf(plan.player to plan.existingTokens + plan.addedTokens),
         )
     }
 
