@@ -56,7 +56,7 @@ class LegalActionProjectionTest {
                     player.copy(hand = listOf(HandCard("hand-1", CardData.epochOne.first())))
                 }
         assertThat(state.legalChoices(p1).commands).doesNotContain("pass")
-        assertThat(state.legalChoices(p1).commands).contains("play-card hand-1 commodity stone")
+        assertThat(state.legalChoices(p1).commands).contains("play hand-1 commodity stone")
     }
 
     @Test
