@@ -20,9 +20,10 @@ data class BoardPlayerProfile(
 
 /**
  * Immutable inputs for board operations, separate from phase progression and player resources. The
- * driver supplies registered players, their selected capitals, board pieces and shipping usage from
- * authoritative game state for [configuration]. Query construction trusts that state; each
- * operation validates its requested player, province, route and resource use.
+ * driver supplies registered players, their selected capitals, board pieces, shipping usage and
+ * active military cards from authoritative game state for [configuration]. Query construction
+ * trusts that state; each operation validates its requested player, province, route and resource
+ * use.
  *
  * [shipped] counts newly delivered physical tokens per destination in this Expansion phase,
  * including failed attacks. Existing tokens already in a province are never charged again.
@@ -34,15 +35,6 @@ data class BoardRulesContext(
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
     val militaryPlays: List<MilitaryPlay> = emptyList(),
 ) {
-    init {
-        require(
-            militaryPlays.all { play -> play.player in players } &&
-                militaryPlays.map(MilitaryPlay::card).distinct().size == militaryPlays.size
-        ) {
-            "Military cards must each have one registered player for the current turn."
-        }
-    }
-
     val provinceIds: Set<ProvinceId>
         get() = configuration.provinces.map(ProvinceDefinition::id).toSet()
 
