@@ -49,20 +49,20 @@ class GameCompletionTest {
                 )
                 .playAllCardRounds()
                 .play(
-                    "p1: done",
+                    "p1: pass",
                     "p1: buy-advance V",
-                    "p1: done",
+                    "p1: pass",
                     "p1: stabilize cash",
-                    "p1: done",
+                    "p1: pass",
                     "p2: upgrade-ships",
-                    "p2: done",
+                    "p2: pass",
                     "p2: stabilize cash",
-                    "p2: done",
-                    "p3: done",
+                    "p2: pass",
+                    "p3: pass",
                     "p3: buy-advance I",
-                    "p3: done",
+                    "p3: pass",
                     "p3: stabilize cash",
-                    "p3: done",
+                    "p3: pass",
                     "p1: place 4 florence",
                     "p1: buy-expansion-card",
                     "p1: end-expansion",
@@ -100,26 +100,21 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
             val outcome =
                 when (need) {
                     SystemNeed.Shuffle -> Entry.Shuffle(CardData.epochOne.map(CardDefinition::id))
-                    is SystemNeed.Deal ->
-                        Entry.Deal(need.player, need.reference, current.state.deck.first())
                     is SystemNeed.Draw ->
                         GameOutcome.Draw(need.player, need.reference, current.state.deck.first())
-                    is SystemNeed.CapitalTie ->
-                        Entry.CapitalRoll(
-                            need.players
-                                .mapIndexed { index, player -> player to DieRoll(6 - index) }
-                                .toMap()
-                        )
                     is SystemNeed.GameRoll ->
                         GameOutcome.Roll(
                             need.kind,
                             when (need.kind) {
+                                GameRollKind.CAPITAL_TIE ->
+                                    need.players.mapIndexed { index, _ -> DieRoll(6 - index) }
                                 GameRollKind.COMPETITION ->
                                     listOf(DieRoll(1), DieRoll(6), DieRoll(6))
                                 GameRollKind.WAR -> listOf(DieRoll(6), DieRoll(1))
                                 GameRollKind.SHORTAGE -> listOf(DieRoll(6), DieRoll(6), DieRoll(6))
                                 GameRollKind.WINDMILL -> listOf(DieRoll(1))
                             },
+                            players = need.players,
                         )
                     is SystemNeed.Trade ->
                         GameOutcome.Trade(
@@ -181,7 +176,7 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
                         CardGame.playChoices(state, actor).firstOrNull() ?: "pass"
                     Stage.PURCHASE ->
                         when (state.flow.purchaseStep) {
-                            PurchaseStep.SHIPPING -> "done"
+                            PurchaseStep.SHIPPING -> "pass"
                             PurchaseStep.ADVANCES -> {
                                 val advance =
                                     AdvanceId.entries.firstOrNull { advance ->
@@ -196,11 +191,11 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
                                             false
                                         }
                                     }
-                                if (advance == null) "done" else "buy-advance ${advance.letter}"
+                                if (advance == null) "pass" else "buy-advance ${advance.letter}"
                             }
                             PurchaseStep.STABILIZATION ->
                                 "stabilize ${if (player.cash.toLong() >= PlayerEconomy.stabilizationCost(player)) "cash" else "misery"}"
-                            PurchaseStep.RELIEF -> "done"
+                            PurchaseStep.RELIEF -> "pass"
                         }
                     Stage.EXPANSION -> "end-expansion"
                     else -> error("Unhandled player phase ${state.stage}.")
