@@ -26,6 +26,28 @@ class TurnFlowTest {
     }
 
     @Test
+    fun turnDrawMustUseTheRequestedHandReference() {
+        val state = running()
+        val failure =
+            assertFailsWith<RuleViolation> {
+                state.play("!draw p1 hand-5 ${state.deck.first()}")
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_OUTCOME)
+    }
+
+    @Test
+    fun turnDrawMustTakeTheTopCard() {
+        val state = running()
+        val failure =
+            assertFailsWith<RuleViolation> {
+                state.play("!draw p1 hand-4 ${state.deck[1]}")
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_OUTCOME)
+    }
+
+    @Test
     fun drawsSkipUnavailableOptionalBuyActionsAndOpenCardPlay() {
         val state = allDrawn()
         assertThat(state.stage).isEqualTo(Stage.PLAY_CARDS)
@@ -223,7 +245,7 @@ class TurnFlowTest {
                 )
         val dealt =
             (1..3).fold(shuffled) { state, index ->
-                state.play("!deal p$index hand-$index ${state.deck.first()}")
+                state.play("!draw p$index hand-$index ${state.deck.first()}")
             }
         return dealt.play(
             "p1: bid-capital 3",
