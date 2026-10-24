@@ -123,6 +123,60 @@ class PublicGameViewTest {
         assertThat(state.viewForPlayer(PlayerId("p2")).burdenReferences).isEmpty()
     }
 
+    @Test
+    fun completedWarPublishesTheWinnerDuringSurrender() {
+        val view = warSurrenderState().viewForPlayer(PlayerId("p2"))
+
+        assertThat(view.activeWar).isNull()
+        assertThat(view.warCession?.winner).isEqualTo(PlayerId("p1"))
+    }
+
+    @Test
+    fun warCessionPublishesSupportableChoicesAndOverseasLimit() {
+        val cession = warSurrenderState().viewForPlayer(PlayerId("p2")).warCession
+
+        assertThat(cession?.eligibleProvinces)
+            .containsExactly(ProvinceId("tunis"), ProvinceId("china"), ProvinceId("india"))
+        assertThat(cession?.requiredCount).isEqualTo(2)
+        assertThat(cession?.overseasCapacity).isEqualTo(1)
+    }
+
+    @Test
+    fun warCessionIsAbsentOutsideTheSurrenderDecision() {
+        assertThat(GameState(header).viewForPlayer(PlayerId("p1")).warCession).isNull()
+    }
+
+    private fun warSurrenderState(): GameState {
+        val initial = turnState()
+        val winner =
+            initial
+                .playerState(PlayerId("p1"))
+                .copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.OCEAN_NAVIGATION, 1))),
+                    ships = ShippingCapability.OCEAN_1,
+                )
+        val victory =
+            WarResult.Victory(
+                winner.player.id,
+                PlayerId("p2"),
+                requiredTransfers = 3,
+                totals = mapOf(winner.player.id to 4, PlayerId("p2") to 1),
+            )
+        val board =
+            listOf("tunis", "china", "india", "kiev").fold(BoardState()) { current, province ->
+                current.placeMarker(ProvinceId(province), PlayerId("p2")).board
+            }
+        return initial.copy(
+            players = initial.players + (winner.player.id to winner),
+            board = board,
+            flow =
+                initial.flow.copy(
+                    decisions = listOf(CardDecision.WarSurrender(PlayerId("p2"), victory))
+                ),
+        )
+    }
+
     private fun turnState(): GameState {
         val initial = GameState(header)
         val capitals = listOf("venice", "genoa", "barcelona")

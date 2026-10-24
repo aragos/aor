@@ -51,7 +51,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
                 </option>)}
             </select><button disabled={busy || !currentOffer?.offer || currentOffer.offer.unavailableReason !== null}>{t('action.buyAdvance')}</button></div>
         </form>}
-        {commands.includes('relieve-misery') && <form className="guided-form" onSubmit={event => { event.preventDefault(); void submit(`relieve-misery ${relief}`); }}>
+        {commands.some(command => command === 'relieve-misery' || command.startsWith('relieve-misery ')) && <form className="guided-form" onSubmit={event => { event.preventDefault(); void submit(`relieve-misery ${relief}`); }}>
             <label htmlFor="relief-spaces">{t('action.relieveMisery')}</label><div className="inline-form"><select id="relief-spaces" value={relief} onChange={event => setRelief(event.target.value)} required>
                 <option value="">{t('controls.chooseRelief')}</option>{snapshot.game.reliefOffers.map(offer => <option key={offer.spaces} value={offer.spaces} disabled={!offer.affordable}>{offer.spaces} {t('controls.spaces')} · ${offer.cashCost} · {offer.ratingSpent} {t('controls.mrUsed')}</option>)}
             </select><button disabled={busy || !snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)}>{t('action.relieveMisery')}</button></div>
@@ -136,21 +136,14 @@ function ExpansionActions({snapshot, busy, submit}: ActionProps) {
 
 function WarSurrender({snapshot, busy, submit}: ActionProps) {
     const [selected, setSelected] = useState<string[]>([]);
-    const suggested = snapshot.legalChoices.commands.find(command => command.startsWith('cede-war'))!;
-    const required = suggested.trim().split(/\s+/).length - 1;
-    const war = snapshot.game.activeWar;
-    const winnerId = war?.initiator === snapshot.viewerId ? war.opponent : war?.initiator;
-    const winner = snapshot.game.players.find(player => player.id === winnerId);
-    const provinces = snapshot.game.catalog?.provinces.filter(province => {
-        const holding = snapshot.game.board.find(pieces => pieces.id === province.id);
-        return holding?.marker?.owner === snapshot.viewerId && holding.marker.side === 'COLOURED' &&
-            (province.area !== 'V' || winner?.advances.includes('OVERLAND_EAST')) &&
-            (!province.overseas || winner?.advances.includes('OCEAN_NAVIGATION')) &&
-            (province.overseas !== 'NEW_WORLD' || winner?.advances.includes('NEW_WORLD'));
-    }) ?? [];
+    const cession = snapshot.game.warCession;
+    const required = cession?.requiredCount ?? 0;
+    const provinces = snapshot.game.catalog?.provinces.filter(province => cession?.eligibleProvinces.includes(province.id)) ?? [];
+    const overseasCount = provinces.filter(province => province.overseas && selected.includes(province.id)).length;
+    const winner = snapshot.game.players.find(player => player.id === cession?.winner);
     return <form className="guided-form" onSubmit={event => { event.preventDefault(); void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
-        <h3>{t('action.cedeWar')} · {required}</h3><p className="small muted">{t('controls.cedeWarHint')}</p>
-        <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} onChange={event => setSelected(current => event.target.checked ? [...current, province.id] : current.filter(id => id !== province.id))}/>{provinceName(province.id)}</label>)}</div>
-        <button disabled={busy || selected.length !== required}>{t('action.cedeWar')}</button>
+        <h3>{t('action.cedeWar')} · {required}</h3><p className="small muted">{t('controls.cedeWarHint')}</p><p>{t('controls.warWinner')}: {winner?.name}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
+        <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || (!selected.includes(province.id) && (selected.length >= required || (!!province.overseas && overseasCount >= (cession?.overseasCapacity ?? 0))))} onChange={event => setSelected(current => event.target.checked ? [...current, province.id] : current.filter(id => id !== province.id))}/>{provinceName(province.id)}</label>)}</div>
+        <button disabled={busy || !cession || selected.length !== required}>{t('action.cedeWar')}</button>
     </form>;
 }
