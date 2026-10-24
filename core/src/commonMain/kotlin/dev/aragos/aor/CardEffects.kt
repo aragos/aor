@@ -364,8 +364,9 @@ object CardRules {
                 val target = target(context, event, choice)
                 val player = context.player(target)
                 val losses =
-                    if (context.finalCardPlay) CivilWarLosses(0, 0)
-                    else {
+                    if (context.finalCardPlay) {
+                        CivilWarLosses(0, 0)
+                    } else {
                         CivilWarLosses(
                             minOf(halfUp(player.writtenCash), player.cash),
                             halfUp(player.poolTokens),
@@ -402,25 +403,8 @@ object CardRules {
                 noChoice(choice)
                 CardResolution.MiseryEvent(
                     event,
-                    context.activePlayers.mapValues { (id, player) ->
-                        if (immune(context, id, event)) 0
-                        else
-                            when (event) {
-                                EventId.FAMINE ->
-                                    (4 -
-                                            dominated(context, id, Commodity.GRAIN) -
-                                            if (AdvanceId.IMPROVED_AGRICULTURE in player.advances) 1
-                                            else 0)
-                                        .coerceAtLeast(0)
-                                EventId.MYSTICISM_ABOUNDS ->
-                                    4 - player.advances.count(sciences::contains)
-                                else ->
-                                    player.advances.count { advance ->
-                                        AdvanceData.definitions
-                                            .single { definition -> definition.id == advance }
-                                            .category == AdvanceCategory.COMMERCE
-                                    }
-                            }
+                    context.activePlayers.mapValues { (player, _) ->
+                        miserySpaces(context, player, event)
                     },
                 )
             }
@@ -512,6 +496,23 @@ object CardRules {
             }
         }
 
+    private fun miserySpaces(context: CardContext, playerId: PlayerId, event: EventId): Int {
+        if (immune(context, playerId, event)) return 0
+        val player = context.player(playerId)
+        return when (event) {
+            EventId.FAMINE -> {
+                val agriculture = if (AdvanceId.IMPROVED_AGRICULTURE in player.advances) 1 else 0
+                (4 - dominated(context, playerId, Commodity.GRAIN) - agriculture).coerceAtLeast(0)
+            }
+            EventId.MYSTICISM_ABOUNDS -> 4 - player.advances.count(sciences::contains)
+            EventId.REVOLUTIONARY_UPRISINGS ->
+                player.advances.count { advance ->
+                    AdvanceData.definition(advance).category == AdvanceCategory.COMMERCE
+                }
+            else -> error("Only a misery event can calculate misery spaces.")
+        }
+    }
+
     private fun target(context: CardContext, event: EventId, choice: CardChoice): PlayerId {
         val target =
             (choice as? CardChoice.PlayerChoice)?.player
@@ -573,8 +574,9 @@ object CardRules {
         val payments =
             context.activePlayers.mapValues { (id, player) ->
                 val count = dominated(context, id, commodity)
-                if (count == 0) 0
-                else {
+                if (count == 0) {
+                    0
+                } else {
                     val box =
                         (count +
                                 (adjustment?.payoutOffset ?: 0) +
