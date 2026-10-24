@@ -35,13 +35,7 @@ object TextCodec {
         val arguments = parts.drop(1)
         return when (parts.first()) {
             "!shuffle" -> Entry.Shuffle.parse(arguments)
-            "!deal" -> Entry.Deal.parse(arguments)
-            "!roll" ->
-                if (arguments.firstOrNull() == "capital-tie") {
-                    Entry.CapitalRoll.parse(arguments)
-                } else {
-                    GameOutcome.parse(parts.first(), arguments)
-                }
+            "!roll",
             "!draw",
             "!trade" -> GameOutcome.parse(parts.first(), arguments)
             else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)

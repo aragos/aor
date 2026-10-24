@@ -4,92 +4,90 @@ package dev.aragos.aor
 internal object TurnEngine {
     fun prompt(state: GameState): Prompt? {
         val decision = state.flow.decisions.lastOrNull()
-        return when (decision) {
-            is DrawDecision ->
-                Prompt.System(SystemNeed.Draw(decision.owner, state.nextHandReference()))
-            is TurnDecision.Roll ->
-                Prompt.System(SystemNeed.GameRoll(decision.kind, decision.diceCount))
+        if (decision != null) return decisionPrompt(decision)
+        if (!state.stage.isTurnPhase || state.stage == Stage.FINISHED) return null
+        val actor = state.flow.actor ?: return null
+        return Prompt.SinglePlayer(actor, phaseChoice(state))
+    }
+
+    private fun decisionPrompt(decision: TurnDecision): Prompt? =
+        when (decision) {
             is TurnDecision.RandomCard ->
                 Prompt.System(SystemNeed.Trade(decision.owner, decision.recipient))
-            null ->
-                if (state.stage.isTurnPhase && state.stage != Stage.FINISHED) {
-                    state.flow.actor?.let { actor ->
-                        Prompt.SinglePlayer(
-                            actor,
-                            when (state.stage) {
-                                Stage.DRAW_CARD -> "cancel-adjustment"
-                                Stage.BUY_CARD -> "buy-card"
-                                Stage.PLAY_CARDS,
-                                Stage.FINAL_CARD_PLAY -> "play-cards"
-                                Stage.PURCHASE ->
-                                    "purchase-${state.flow.purchaseStep.name.lowercase()}"
-                                Stage.EXPANSION -> "expand"
-                                else -> "waiting"
-                            },
-                        )
-                    }
-                } else null
             else -> decision.player?.let { actor -> Prompt.SinglePlayer(actor, decision.choice) }
         }
-    }
+
+    private fun phaseChoice(state: GameState): String =
+        when (state.stage) {
+            Stage.DRAW_CARD -> "cancel-adjustment"
+            Stage.BUY_CARD -> "buy-card"
+            Stage.PLAY_CARDS,
+            Stage.FINAL_CARD_PLAY -> "play-cards"
+            Stage.PURCHASE -> "purchase-${state.flow.purchaseStep.name.lowercase()}"
+            Stage.EXPANSION -> "expand"
+            else -> "waiting"
+        }
 
     fun choices(state: GameState, actor: PlayerId): LegalChoices {
         val decision = state.flow.decisions.lastOrNull()
-        if (decision != null)
-            return LegalChoices(
-                if (decision.player == actor) decision.choices(state) else emptyList()
-            )
+        if (decision != null) {
+            val commands = if (decision.player == actor) decision.choices(state) else emptyList()
+            return LegalChoices(commands)
+        }
         if (state.flow.actor != actor || state.stage == Stage.FINISHED) return LegalChoices()
-        val player = state.playerState(actor)
-        val commands =
-            when (state.stage) {
-                Stage.DRAW_CARD ->
-                    listOf("pass") +
-                        state.adjustments.flatMap { (commodity, markers) ->
-                            markers.distinct().map { adjustment ->
-                                "cancel-adjustment ${commodity.name.lowercase()} ${adjustment.name.lowercase()}"
-                            }
-                        }
-                Stage.BUY_CARD ->
-                    listOf("pass") +
-                        (if (
-                            player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
-                                actor !in state.flow.boughtCards &&
-                                state.deck.isNotEmpty()
-                        )
-                            listOf("buy-card")
-                        else emptyList()) +
-                        (if (
-                            player.advances.owns(AdvanceId.MASTER_ART) &&
-                                actor !in state.flow.discardedCards
-                        )
-                            player.hand.map { card -> "discard-card ${card.reference}" }
-                        else emptyList())
-                Stage.PLAY_CARDS,
-                Stage.FINAL_CARD_PLAY -> listOf("pass", "play-card")
-                Stage.PURCHASE ->
-                    when (state.flow.purchaseStep) {
-                        PurchaseStep.SHIPPING -> listOf("done", "upgrade-ships")
-                        PurchaseStep.ADVANCES ->
-                            listOf("done") +
-                                AdvanceId.entries
-                                    .filter { advance -> !player.advances.owns(advance) }
-                                    .map { advance -> "buy-advance ${advance.letter}" }
-                        PurchaseStep.STABILIZATION -> listOf("stabilize cash", "stabilize misery")
-                        PurchaseStep.RELIEF -> listOf("done", "relieve-misery")
-                    }
-                Stage.EXPANSION ->
-                    listOf(
-                        "end-expansion",
-                        "place",
-                        "attack",
-                        "rebuild-marker",
-                        "buy-expansion-card",
-                    )
-                else -> emptyList()
-            }
-        return LegalChoices(commands)
+        return LegalChoices(phaseCommands(state, actor))
     }
+
+    private fun phaseCommands(state: GameState, actor: PlayerId): List<String> =
+        when (state.stage) {
+            Stage.DRAW_CARD -> adjustmentCommands(state)
+            Stage.BUY_CARD -> buyCardCommands(state, state.playerState(actor))
+            Stage.PLAY_CARDS,
+            Stage.FINAL_CARD_PLAY -> listOf("pass", "play-card")
+            Stage.PURCHASE -> purchaseCommands(state, state.playerState(actor))
+            Stage.EXPANSION ->
+                listOf("end-expansion", "place", "attack", "rebuild-marker", "buy-expansion-card")
+            else -> emptyList()
+        }
+
+    private fun adjustmentCommands(state: GameState): List<String> =
+        listOf("pass") +
+            state.adjustments.flatMap { (commodity, markers) ->
+                markers.distinct().map { adjustment ->
+                    "cancel-adjustment ${commodity.name.lowercase()} ${adjustment.name.lowercase()}"
+                }
+            }
+
+    private fun buyCardCommands(state: GameState, player: PlayerState): List<String> =
+        listOfNotNull("pass", "buy-card".takeIf { canBuyCard(state, player) }) +
+            discardCommands(state, player)
+
+    private fun discardCommands(state: GameState, player: PlayerState): List<String> {
+        if (!canDiscardCard(state, player)) return emptyList()
+        return player.hand.map { card -> "discard-card ${card.reference}" }
+    }
+
+    private fun canBuyCard(state: GameState, player: PlayerState): Boolean =
+        player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
+            player.player.id !in state.flow.boughtCards &&
+            state.deck.isNotEmpty()
+
+    private fun canDiscardCard(state: GameState, player: PlayerState): Boolean =
+        player.advances.owns(AdvanceId.MASTER_ART) &&
+            player.player.id !in state.flow.discardedCards &&
+            player.hand.isNotEmpty()
+
+    private fun purchaseCommands(state: GameState, player: PlayerState): List<String> =
+        when (state.flow.purchaseStep) {
+            PurchaseStep.SHIPPING -> listOf("pass", "upgrade-ships")
+            PurchaseStep.ADVANCES ->
+                listOf("pass") +
+                    AdvanceId.entries
+                        .filter { advance -> !player.advances.owns(advance) }
+                        .map { advance -> "buy-advance ${advance.letter}" }
+            PurchaseStep.STABILIZATION -> listOf("stabilize cash", "stabilize misery")
+            PurchaseStep.RELIEF -> listOf("pass", "relieve-misery")
+        }
 
     fun normalise(initial: GameState): GameState {
         var state = initial
@@ -152,16 +150,8 @@ internal object TurnEngine {
                 }
                 Stage.BUY_CARD -> {
                     val player = state.playerState(actor)
-                    if (
-                        !(player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
-                            actor !in state.flow.boughtCards &&
-                            state.deck.isNotEmpty()) &&
-                            !(player.advances.owns(AdvanceId.MASTER_ART) &&
-                                actor !in state.flow.discardedCards &&
-                                player.hand.isNotEmpty())
-                    )
-                        state = finishActor(state)
-                    else return state
+                    if (canBuyCard(state, player) || canDiscardCard(state, player)) return state
+                    state = finishActor(state)
                 }
                 Stage.PLAY_CARDS,
                 Stage.FINAL_CARD_PLAY -> {
