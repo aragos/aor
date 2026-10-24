@@ -90,6 +90,8 @@ per-destination shipping limits still apply. `pass` completes Expansion and retu
 | `replace-event-token pool` / `replace-event-token none` | Counter's owner; spend one pool token on replacement or leave the province empty. |
 | `cede-war <province> ...` | War loser; names the required distinct eligible provinces, respecting support and overseas limits. Canonical text sorts province ids. |
 | `patronize-leader <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
+| `forgo-marker` | Recipient of a War/Crusades award with no spare marker; leaves that destination empty. |
+| `move-marker <province>` | Same recipient; moves an owned coloured marker from another controlled province to the award, leaving the source empty. |
 
 The outer phase actor resumes after another player's required answer. In a War military window,
 `pass` proceeds to the recorded roll. Passing the Advances step forgoes further leader claims.
