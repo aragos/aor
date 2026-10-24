@@ -12,7 +12,7 @@ npm install
 In a second terminal, run `npm start` and open <http://localhost:5173>. Vite proxies `/api` to the local server on
 port 8080. The server is required even after `npm run build`; the production bundle does not host an API.
 
-Create a game with Alice, Bob and Carol, using the supported one-epoch length. Save all three private seat links and open
+Create a game with Alice, Bob and Carol. Every game has a fixed three-epoch deck sequence. Save all three private seat links and open
 each in its own tab. Links identify players independently of cookies, so the tabs may share a browser profile.
 The first player, Alice, is the creator and can configure the rebuilt-marker bonus or start setup. The links grant access to
 their respective seats; share only the intended player's link.
@@ -61,7 +61,22 @@ their respective seats; share only the intended player's link.
 
 Repeat with 4–6 players. Paris, London and Hamburg become available in that order. Order boxes are **1,3,5,6** for
 four players, **1–5** for five and **1–6** for six. The tie choices must also work for larger groups and for multiple
-separate tied groups. Only one epoch is accepted. The agreed minimum-game scope defers additional decks and epoch transitions.
+separate tied groups. The next epoch begins on a draw request from an empty earlier pile; the
+authority records the shuffled next deck plus eligible discarded cards before resuming the draw.
+
+## Optional setup
+
+Before starting, select the individual rules or use `set-option preset second-edition`.
+With improved setup, each seat receives three cards and privately chooses one to return using
+`return-card hand-1` (with its own reference). Selections can be replaced until everyone submits.
+The final selection commits the whole batch and a recorded shuffle; each player keeps two cards.
+Other seats see submission status and redacted return actions, never the returned identity.
+Pending returns survive restart just like sealed bids.
+
+Commodity-only initial dealing is also available with standard setup. Combining it with improved
+setup is rejected under the approved rule that "get three, choose two" is incompatible with
+reduced initial-deal decks for now. See [the command reference](commands.md)
+for every option and [the rules](rules.md) for the reserve-card reinsertion policy.
 
 ## Negative and over-stock purchases
 
@@ -83,7 +98,7 @@ apply to this turn. No tie prompt is needed for distinct amounts.
 The command input accepts one command without an actor prefix. Forms generate the same commands:
 
 ```text
-set-option epochs 1
+set-option rebuilt-marker-bonus exclude
 start
 bid-capital 12
 choose-capital venice
@@ -99,7 +114,7 @@ submitted by clients. Unsupported options, actor prefixes and multiple commands 
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/games` | `{"players":["Alice","Bob","Carol"],"epochs":1}` | Game id and private relative seat links; 201 |
+| `POST /api/games` | `{"players":["Alice","Bob","Carol"]}` | Game id and private relative seat links; 201 |
 | `GET /api/games/{id}` | `Authorization: Bearer <token>` | Caller-specific state, prompts, legal choices, history and active revision |
 | `POST /api/games/{id}/commands` | Same authorization; `{"expectedRevision":6,"command":"buy-tokens 5"}` | Updated caller-specific state |
 | `GET /api/health` | None | `{"status":"ok"}` |

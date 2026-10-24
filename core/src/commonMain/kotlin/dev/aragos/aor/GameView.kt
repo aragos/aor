@@ -46,7 +46,9 @@ data class PlayerView(
  */
 data class GameView(
     val stage: Stage,
-    val epochs: Int,
+    val currentEpoch: Int,
+    val rules: RuleOptions,
+    val ruleOptions: List<RuleOptionView>,
     val rebuiltMarkerBonus: RebuiltMarkerBonus,
     val players: List<PlayerView>,
     val hand: List<HandCard>,
@@ -68,6 +70,7 @@ data class GameView(
     val activeWar: WarState? = null,
     val warCession: WarCessionView? = null,
     val markerPlacement: MarkerPlacementView? = null,
+    val pirateTargets: PirateTargetsView? = null,
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
     val reliefOffers: List<ReliefOfferView> = emptyList(),
@@ -78,7 +81,9 @@ data class GameView(
         internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
             GameView(
                 stage = state.stage,
-                epochs = state.epochs,
+                currentEpoch = state.currentEpoch.number,
+                rules = state.rules,
+                ruleOptions = RuleOptionView.from(state.rules),
                 rebuiltMarkerBonus = state.rebuiltMarkerBonus,
                 players =
                     state.playerIds.map { playerId ->
@@ -97,7 +102,7 @@ data class GameView(
                     state.board.pieces.map { (province, pieces) ->
                         ProvinceView.from(province, pieces)
                     },
-                catalog = PublicCatalog.forPlayers(state.playerIds.size),
+                catalog = PublicCatalog.forPlayers(state.playerIds.size, state.rules),
                 activity = ActivityView.from(state),
                 deckRemaining = state.deck.size,
                 endingTriggered = state.endingTriggered,
@@ -116,6 +121,19 @@ data class GameView(
                         decision ->
                         MarkerPlacementView(decision.player, decision.destination)
                     },
+                pirateTargets =
+                    if (
+                        state.turnNumber != null &&
+                            viewer.hand.any { card ->
+                                card.definition.id == EventId.PIRATES_VIKINGS.cardId
+                            }
+                    ) {
+                        val context = state.cardContext()
+                        PirateTargetsView(
+                            CardRules.piratesRequiredCount(context),
+                            CardRules.pirateTargets(context),
+                        )
+                    } else null,
                 voids = state.voids,
                 advanceOffers = advanceOffers(state, viewer),
                 reliefOffers = reliefOffers(state, viewer),
@@ -161,10 +179,14 @@ data class GameView(
 
         private fun reliefOffers(state: GameState, viewer: PlayerState): List<ReliefOfferView> {
             val turn = state.turnNumber ?: return emptyList()
-            if (viewer.misery == MiseryStep.CHAOS) return emptyList()
+            if (
+                viewer.misery == MiseryStep.CHAOS ||
+                    state.rules.miseryRelief != MiseryReliefRule.PURCHASED
+            )
+                return emptyList()
             return (1..viewer.advances.tierCount).mapNotNull { spaces ->
                 try {
-                    val quote = PlayerEconomy.reliefQuote(viewer, spaces, turn)
+                    val quote = PlayerEconomy.reliefQuote(viewer, spaces, turn, state.rules)
                     ReliefOfferView(
                         spaces,
                         quote.cashCost,
@@ -253,11 +275,11 @@ data class PublicCatalog(
     val satelliteSupports: Set<SatelliteSupport>,
 ) {
     companion object {
-        fun forPlayers(playerCount: Int): PublicCatalog {
-            val configuration = CatalogConfiguration(playerCount)
+        fun forPlayers(playerCount: Int, rules: RuleOptions = RuleOptions()): PublicCatalog {
+            val configuration = CatalogConfiguration(playerCount, rules)
             return PublicCatalog(
                 configuration.provinces,
-                AdvanceData.definitions,
+                rules.definitions,
                 CommodityData.definitions,
                 configuration.landBorders,
                 configuration.coastalConnections,
@@ -308,12 +330,13 @@ data class ScoreView(
                 state.playerIds.map { id ->
                     val player = state.playerState(id)
                     val misery = player.misery.value
+                    val points = player.advances.score(state.rules)
                     ScoreView(
                         id,
-                        player.advances.score,
+                        points,
                         player.cash,
                         misery,
-                        misery?.let { value -> player.advances.score + player.cash - value },
+                        misery?.let { value -> points + player.cash - value },
                         false,
                     )
                 }
@@ -330,3 +353,6 @@ data class LegalChoices(
     val bidMin: Int? = null,
     val bidMax: Int? = null,
 )
+
+/** Compact target projection avoids enumerating every combination of coastal markers. */
+data class PirateTargetsView(val requiredCount: Int, val eligibleProvinces: Set<ProvinceId>)

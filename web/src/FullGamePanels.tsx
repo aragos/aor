@@ -32,7 +32,7 @@ export function TurnEffects({snapshot}: {snapshot: Snapshot}) {
         {effects.enlightenedRulers.length > 0 && <p>{t('game.enlightenedRulers')}: {effects.enlightenedRulers.map(id => playerName(snapshot, id)).join(', ')}</p>}
         {snapshot.game.activeWar && <p>{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)} · {t('game.warTies')}: {snapshot.game.activeWar.ties}</p>}
         {effects.leaders.length > 0 && <div className="leader-list"><h3>{t('game.leaders')}</h3>{effects.leaders.map(leader => <article key={leader.leader}>
-            <strong>{label(leader.leader, 'leader')}</strong><p className="small">{playerName(snapshot, leader.owner)} · {label(leader.role, 'leaderRole')}{leader.role === 'EXPOSED' && ` · ${t('game.protection')}: $${leader.protectionCash}`}</p>
+            <strong>{label(leader.leader, 'leader')}</strong><p className="small">{playerName(snapshot, leader.owner)} · {leader.displayBox ? `${t('game.displayBox')} ${leader.displayBox}` : label(leader.role, 'leaderRole')}{leader.role === 'EXPOSED' && snapshot.game.rules.patronage === 'PROTECTION_MONEY' && ` · ${t('game.protection')}: $${leader.protectionCash}`}</p>
             {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: {leader.patronageClaimants.map(id => playerName(snapshot, id)).join(', ')}</p>}
         </article>)}</div>}
         {adjustments.length === 0 && effects.leaders.length === 0 && !effects.papalCategory && effects.military.length === 0 && effects.enlightenedRulers.length === 0 && !snapshot.game.activeWar && <p className="muted small">{t('game.noEffects')}</p>}
@@ -159,7 +159,7 @@ export function AdvancesPanel({snapshot}: {snapshot: Snapshot}) {
         <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="advances-title"><table><thead><tr>
             {['name', 'category', 'cost', 'credit', 'mr', 'prerequisites', 'owners'].map(key => <th key={key} scope="col">{t(`advance.${key}`)}</th>)}
         </tr></thead><tbody>{visible.map(advance => <tr key={advance.id}>
-            <td>{advance.messageId.slice(-1)} · {advanceName(advance.id)}</td><td>{label(advance.category, 'category')}</td><td>${advance.cost}</td><td>${advance.credit}</td><td>${advance.miseryRelief}</td>
+            <td>{advance.letter} · {advanceName(advance.id)}</td><td>{label(advance.category, 'category')}</td><td>${advance.cost}</td><td>${advance.credit}</td><td>${advance.miseryRelief}</td>
             <td>{advance.prerequisites.map(advanceName).join(', ') || '—'}</td><td>{snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.name).join(', ') || '—'}</td>
         </tr>)}</tbody></table></div>
         {visible.length === 0 && <p className="muted">{t('advance.noneOwned')}</p>}

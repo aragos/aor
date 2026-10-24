@@ -12,13 +12,15 @@ data class Revision(
 )
 
 data class StoredGame(
-    val fileVersion: Int = 2,
+    val fileVersion: Int = 3,
     val id: String,
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
     val revisions: List<Revision>,
     /** Unrevealed amounts for the current capital-bid or token-purchase batch. */
     val pendingBids: Map<PlayerId, Int> = emptyMap(),
+    /** Unrevealed hand references selected during improved setup. */
+    val pendingReturns: Map<PlayerId, String> = emptyMap(),
 ) {
     val revision: Int
         get() = revisions.last().id
@@ -52,17 +54,9 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         id: String,
         header: GameHeader,
         credentials: Map<PlayerId, String>,
-        epochs: Int,
     ): StoredGame {
-        val entry = Entry.Action(actor = header.creatorId, command = Command.SetEpochs(epochs))
-        val entries =
-            listOf(
-                entry,
-                Entry.Action(
-                    actor = header.creatorId,
-                    command = Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE),
-                ),
-            )
+        val entries = initialConfiguration(header.creatorId)
+        val entry = entries.first()
         entries.fold(GameState(header)) { state, action -> state.step(action) }
         return StoredGame(
             id = id,
@@ -102,15 +96,56 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     revealCommand = "reveal-token-purchases",
                     createCommand = Command::BuyTokens,
                 )
+            is SetupCommand.ReturnCard -> submitSetupReturn(stored, state, player, command)
             else ->
                 commit(
                     stored = stored,
                     state = state,
                     player = player,
                     command = command.toText(),
-                    actions = listOf(Entry.Action(actor = player, command = command)),
+                    actions =
+                        if (command is RuleOptionCommand && command.key == "preset") {
+                            command.resolve(state.rules).configurationCommands().map { option ->
+                                Entry.Action(actor = player, command = option)
+                            }
+                        } else {
+                            listOf(Entry.Action(actor = player, command = command))
+                        },
                 )
         }
+    }
+
+    private fun submitSetupReturn(
+        stored: StoredGame,
+        state: GameState,
+        player: PlayerId,
+        command: SetupCommand.ReturnCard,
+    ): StoredGame {
+        state.step(Entry.Action(player, command))
+        val pending = stored.pendingReturns + (player to command.reference)
+        val required =
+            (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players
+                ?: error("Setup returns require a simultaneous player prompt.")
+        if (required.any { participant -> participant !in pending }) {
+            return stored.copy(pendingReturns = pending)
+        }
+        return commit(
+            stored = stored.copy(pendingReturns = emptyMap()),
+            state = state,
+            player = player,
+            command = "reveal-setup-returns",
+            actions =
+                state.playerIds.filter(required::contains).map { participant ->
+                    Entry.Action(
+                        participant,
+                        SetupCommand.ReturnCard(
+                            requireNotNull(pending[participant]) {
+                                "Every setup participant requires a selected return."
+                            }
+                        ),
+                    )
+                },
+        )
     }
 
     private fun submitSealedDecision(
@@ -175,10 +210,8 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
             val need = (current.prompts().singleOrNull() as? Prompt.System)?.need ?: break
             val outcome =
                 when (need) {
-                    SystemNeed.Shuffle ->
-                        Entry.Shuffle(random.shuffle(CardData.epochOne.map(CardDefinition::id)))
-                    is SystemNeed.Draw ->
-                        GameOutcome.Draw(need.player, need.reference, current.deck.first())
+                    is SystemNeed.Shuffle -> Entry.Shuffle(random.shuffle(need.cards))
+                    is SystemNeed.Draw -> GameOutcome.Draw(need.player, need.reference, need.card)
                     is SystemNeed.GameRoll ->
                         GameOutcome.Roll(need.kind, random.roll(need.diceCount), need.players)
                     is SystemNeed.Trade -> {
@@ -196,3 +229,11 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         }
     }
 }
+
+/**
+ * The creation transaction records every resolved default, independent of future default changes.
+ */
+internal fun initialConfiguration(creator: PlayerId): List<Entry.Action> =
+    (listOf<Command>(Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE)) +
+            RuleOptions().configurationCommands())
+        .map { command -> Entry.Action(creator, command) }

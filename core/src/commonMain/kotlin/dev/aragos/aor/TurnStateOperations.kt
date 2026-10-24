@@ -1,7 +1,6 @@
 package dev.aragos.aor
 
-internal fun GameState.nextHandReference(): String =
-    "hand-${CardData.epochOne.size - deck.size + 1}"
+internal fun GameState.nextHandReference(): String = "hand-${deckHistory.nextDraw}"
 
 internal fun GameState.requireActor(actor: PlayerId, expected: Stage) {
     checkRule(stage == expected && flow.decisions.isEmpty(), ViolationCode.WRONG_PHASE)
@@ -20,11 +19,13 @@ internal fun GameState.popDecision(): GameState {
 /**
  * Queue an earned draw in request order, preserving any outer decision below consecutive draws.
  * Keep every beneficiary until resolution: an earlier beneficiary may enter Chaos before drawing.
- * Consuming the last card removes any remaining draw requests and triggers the ending.
+ * Only final-epoch exhaustion removes undeliverable requests and triggers the ending.
  */
 internal fun GameState.queueDraw(player: PlayerId): GameState {
     if (playerState(player).misery == MiseryStep.CHAOS) return this
-    if (deck.isEmpty()) return copy(endingTriggered = true)
+    if (deck.isEmpty() && currentEpoch == Epoch.THREE) {
+        return copy(endingTriggered = true)
+    }
     val insertion = flow.decisions.indexOfLast { decision -> decision !is DrawDecision } + 1
     val decisions =
         flow.decisions.take(insertion) + DrawDecision(player) + flow.decisions.drop(insertion)
@@ -46,7 +47,8 @@ internal fun GameState.replacePlayer(player: PlayerState): GameState {
         } else {
             player
         }
-    return copy(
+    val physical = if (chaos) discardCards(player.hand) else this
+    return physical.copy(
         activeWar =
             if (chaos && (activeWar?.initiator == id || activeWar?.opponent == id)) {
                 null

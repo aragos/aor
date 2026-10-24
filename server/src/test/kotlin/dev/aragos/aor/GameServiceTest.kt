@@ -39,7 +39,7 @@ class GameServiceTest {
     private fun token(game: CreatedGame, player: Int) =
         game.links[player].path.substringAfter("token=")
 
-    private fun create(service: GameService) = service.create(listOf("Alice", "Bob", "Carol"), 1)
+    private fun create(service: GameService) = service.create(listOf("Alice", "Bob", "Carol"))
 
     @AfterTest
     fun clean() {
@@ -144,7 +144,7 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, NoRandom)
         // A fresh authority is needed only for start's shuffle, never for distinct bids.
-        val game = service.create((1..6).map { "Player $it" }, 1)
+        val game = service.create((1..6).map { "Player $it" })
         createGameService(directory, FixedRandom()).submit(game.gameId, token(game, 0), 1, "start")
         val pool = Executors.newFixedThreadPool(6)
         try {
@@ -179,7 +179,7 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "set-option epochs 1")
+        service.submit(game.gameId, token(game, 0), 1, "set-option rebuilt-marker-bonus exclude")
         service.submit(game.gameId, token(game, 0), 2, "start")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
@@ -191,7 +191,7 @@ class GameServiceTest {
             )
             .isEqualTo("STALE_REVISION")
         assertThat(Files.readString(path)).isEqualTo(before)
-        assertThat(service.get(game.gameId, token(game, 0)).game.epochs).isEqualTo(1)
+        assertThat(service.get(game.gameId, token(game, 0)).game.currentEpoch).isEqualTo(1)
     }
 
     @Test
@@ -238,20 +238,22 @@ class GameServiceTest {
                     stored.revisions.map { revision ->
                         revision.copy(
                             author = PlayerId("p2"),
-                            entries =
-                                listOf(
-                                    "p2: set-option epochs 1",
-                                    "p2: set-option rebuilt-marker-bonus exclude",
-                                ),
+                            entries = defaultConfigurationText(PlayerId("p2")),
                         )
                     },
             )
         }
 
-        val configured = service.submit(game.gameId, token(game, 1), 1, "set-option epochs 1")
+        val configured =
+            service.submit(
+                game.gameId,
+                token(game, 1),
+                1,
+                "set-option rebuilt-marker-bonus exclude",
+            )
 
         assertThat(configured.creatorId).isEqualTo(PlayerId("p2"))
-        assertThat(configured.game.epochs).isEqualTo(1)
+        assertThat(configured.game.currentEpoch).isEqualTo(1)
     }
 
     @Test
@@ -266,11 +268,7 @@ class GameServiceTest {
                     stored.revisions.map { revision ->
                         revision.copy(
                             author = PlayerId("p2"),
-                            entries =
-                                listOf(
-                                    "p2: set-option epochs 1",
-                                    "p2: set-option rebuilt-marker-bonus exclude",
-                                ),
+                            entries = defaultConfigurationText(PlayerId("p2")),
                         )
                     },
             )
@@ -331,9 +329,9 @@ class GameServiceTest {
         for (contents in
             listOf(
                 "not json",
-                original.replace("\"fileVersion\":2", "\"fileVersion\":99"),
+                original.replace("\"fileVersion\":3", "\"fileVersion\":99"),
                 original.replace(RULES_VERSION, "future-rules"),
-                original.replace("set-option epochs 1", "invented-command"),
+                original.replace("set-option rebuilt-marker-bonus exclude", "invented-command"),
             )) {
             Files.writeString(path, contents)
             assertThat(

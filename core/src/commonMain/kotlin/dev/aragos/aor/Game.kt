@@ -1,7 +1,7 @@
 package dev.aragos.aor
 
-const val RULES_VERSION = "ah1996-epoch-one-2"
-const val DATA_VERSION = "ah1996-catalog-1"
+const val RULES_VERSION = "ah1996-three-epoch-1"
+const val DATA_VERSION = "ah1996-catalog-2"
 
 /**
  * A registered participant, independent of their capital or creator role.
@@ -74,7 +74,9 @@ data class PlayerState(
  */
 data class GameState(
     val header: GameHeader,
-    val epochs: Int = 1,
+    val currentEpoch: Epoch = Epoch.ONE,
+    val rules: RuleOptions = RuleOptions(),
+    val deckHistory: DeckHistory = DeckHistory(),
     val rebuiltMarkerBonus: RebuiltMarkerBonus = RebuiltMarkerBonus.EXCLUDE,
     val stage: Stage = Stage.CONFIGURATION,
     val deck: List<String> = emptyList(),
@@ -115,7 +117,10 @@ data class GameState(
 
     fun prompts(): List<Prompt> {
         val need =
-            pendingDraw()
+            pendingShuffle()?.let { request ->
+                SystemNeed.Shuffle(request.cards, request.purpose)
+            }
+                ?: pendingDraw()
                 ?: pendingRoll()?.let { decision ->
                     SystemNeed.GameRoll(decision.kind, decision.diceCount, decision.players)
                 }
@@ -126,13 +131,16 @@ data class GameState(
 
     /** Draw requests share card references and validation across setup and repeatable turns. */
     internal fun pendingDraw(): SystemNeed.Draw? {
+        if (pendingShuffle() != null) return null
         val owner =
             if (stage == Stage.INITIAL_DRAW) {
-                playerIds.first { player -> playerState(player).hand.isEmpty() }
+                playerIds.firstOrNull { player ->
+                    playerState(player).hand.size < SetupDeal.cardsPerPlayer(this)
+                } ?: return null
             } else {
                 (flow.decisions.lastOrNull() as? DrawDecision)?.owner ?: return null
             }
-        return SystemNeed.Draw(owner, nextHandReference())
+        return SystemNeed.Draw(owner, nextHandReference(), SetupDeal.nextCard(this) ?: return null)
     }
 
     /** Capital tie dice and interrupted turn dice use one request and recorded-outcome contract. */

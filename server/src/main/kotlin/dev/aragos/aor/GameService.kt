@@ -24,6 +24,8 @@ data class GameSnapshot(
     val submitted: List<PlayerId>,
     /** The viewer's unrevealed capital bid or signed token-purchase amount, when submitted. */
     val pendingBid: Int?,
+    /** Only this viewer's unrevealed setup return; other seats see submission status only. */
+    val pendingReturn: String?,
     val history: List<String>,
 )
 
@@ -34,9 +36,9 @@ class GameService(
 ) {
     private val credentialsRandom = SecureRandom()
 
-    fun create(names: List<String>, epochs: Int): CreatedGame {
+    fun create(names: List<String>): CreatedGame {
         val normalized = names.map(String::trim)
-        if (normalized.map(String::lowercase).distinct().size != normalized.size || epochs != 1) {
+        if (normalized.map(String::lowercase).distinct().size != normalized.size) {
             throw ServiceFailure(400, "INVALID_GAME")
         }
         val header =
@@ -64,7 +66,6 @@ class GameService(
                 id = id,
                 header = header,
                 credentials = tokens.mapValues { (_, token) -> digest(token) },
-                epochs = epochs,
             )
         )
         return CreatedGame(
@@ -122,7 +123,11 @@ class GameService(
                 is Prompt.MultiPlayer ->
                     PromptView(
                         messageId = "prompt.${current.choice}",
-                        players = current.players.filterNot(stored.pendingBids::containsKey),
+                        players =
+                            current.players.filterNot { participant ->
+                                participant in stored.pendingBids ||
+                                    participant in stored.pendingReturns
+                            },
                     )
                 else -> null
             }
@@ -134,8 +139,12 @@ class GameService(
             game = state.viewForPlayer(player),
             prompt = prompt,
             legalChoices = state.legalChoices(player),
-            submitted = state.playerIds.filter(stored.pendingBids::containsKey),
+            submitted =
+                state.playerIds.filter { participant ->
+                    participant in stored.pendingBids || participant in stored.pendingReturns
+                },
             pendingBid = stored.pendingBids[player],
+            pendingReturn = stored.pendingReturns[player],
             history = history.lines,
         )
     }

@@ -9,7 +9,7 @@ class QueuedDrawTest {
     private val p3 = PlayerId("p3")
 
     @Test
-    fun twoShortageBonusesWithOneRemainingCardDoNotRequestADrawFromAnEmptyDeck() {
+    fun twoShortageBonusesWithOneRemainingFinalEpochCardDoNotRequestAnEmptyDraw() {
         val state = income(cards = 1).pushDecision(ShortageDecision)
 
         val drawn = state.step(TextCodec.parse("!roll shortage 1 2 1")).acceptDraw()
@@ -31,7 +31,7 @@ class QueuedDrawTest {
         assertThat(first.playerState(p1).hand).hasSize(1)
         assertThat(first.playerState(p2).hand).isEmpty()
         assertThat((first.prompts().single() as Prompt.System).need)
-            .isEqualTo(SystemNeed.Draw(p2, first.nextHandReference()))
+            .isEqualTo(SystemNeed.Draw(p2, first.nextHandReference(), first.deck.first()))
     }
 
     @Test
@@ -160,6 +160,7 @@ class QueuedDrawTest {
         val players = ids.map { id -> Player(id, id.value) }
         return GameState(
             header = GameHeader(players, p1),
+            currentEpoch = Epoch.THREE,
             stage = Stage.INCOME,
             turnNumber = 1,
             deck = CardData.epochOne.take(cards).map(CardDefinition::id),
@@ -189,6 +190,6 @@ class QueuedDrawTest {
 
     private fun GameState.acceptDraw(): GameState {
         val need = (prompts().single() as Prompt.System).need as SystemNeed.Draw
-        return step(GameOutcome.Draw(need.player, need.reference, deck.first()))
+        return step(GameOutcome.Draw(need.player, need.reference, need.card))
     }
 }

@@ -6,9 +6,11 @@ import kotlin.test.Test
 /** Command-level acceptance: no board/cash/hand edits in the complete deck-exhaustion scenario. */
 class GameCompletionTest {
     @Test
-    fun ordinaryCommandsCompleteAnEpochAfterTheLastDraw() {
+    fun ordinaryCommandsCompleteAllThreeEpochsAfterTheLastDraw() {
         val completed = completedGame()
         assertThat(completed.state.stage).isEqualTo(Stage.FINISHED)
+        assertThat(completed.state.currentEpoch).isEqualTo(Epoch.THREE)
+        assertThat(completed.lines.count { line -> line.startsWith("!shuffle ") }).isEqualTo(3)
         assertThat(completed.state.deck).isEmpty()
         assertThat(completed.state.viewForPlayer(PlayerId("p1")).scores.any(ScoreView::winner))
             .isTrue()
@@ -30,6 +32,20 @@ class GameCompletionTest {
         assertThat(completed.lines.any { line -> line.contains(": play ") }).isTrue()
         assertThat(completed.lines.any { line -> line.startsWith("!roll war ") }).isTrue()
         assertThat(completed.lines.any { line -> line.contains(": civil-war-loss ") }).isTrue()
+    }
+
+    @Test
+    fun completeGameConservesEveryPhysicalCard() {
+        val completed = completedGame().state
+        val locations =
+            completed.players.values.flatMap(PlayerState::hand).map { card -> card.definition.id } +
+                completed.deck +
+                completed.deckHistory.discarded +
+                completed.deckHistory.removed +
+                completed.deckHistory.setupReserves +
+                completed.deckHistory.setupReturns.values.map { card -> card.definition.id }
+
+        assertThat(locations).containsExactlyElementsIn(CardData.all.map(CardDefinition::id))
     }
 
     private fun completedGame(): Scenario {

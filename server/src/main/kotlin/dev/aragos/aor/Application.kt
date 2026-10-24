@@ -36,13 +36,10 @@ fun Application.module(service: GameService = createGameService()) {
         post("/api/games") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("players", "epochs")
+                body.fieldsOnly("players")
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.create(
-                            names = body.field("players").array().map(JsonNode::string),
-                            epochs = body.get("epochs")?.integer() ?: 1,
-                        )
+                        service.create(names = body.field("players").array().map(JsonNode::string))
                     }
                 call.respondJson(result, HttpStatusCode.Created)
             }

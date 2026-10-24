@@ -23,14 +23,10 @@ class GameDriverTest {
                     id = "test-game",
                     header = header,
                     credentials = emptyMap(),
-                    epochs = 1,
                 )
 
         assertThat(stored.revisions.single().entries)
-            .containsExactly(
-                "p2: set-option epochs 1",
-                "p2: set-option rebuilt-marker-bonus exclude",
-            )
+            .containsExactlyElementsIn(defaultConfigurationText(PlayerId("p2")))
             .inOrder()
     }
 }

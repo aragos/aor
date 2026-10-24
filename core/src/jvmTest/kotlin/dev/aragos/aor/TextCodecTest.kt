@@ -9,7 +9,9 @@ class TextCodecTest {
     fun playerCommandsHaveCanonicalText() {
         for (text in
             listOf(
-                "set-option epochs 1",
+                "set-option setup standard",
+                "set-option initial-card commodity-only",
+                "return-card hand-3",
                 "set-option rebuilt-marker-bonus exclude",
                 "set-option rebuilt-marker-bonus include",
                 "start",
@@ -85,7 +87,7 @@ class TextCodecTest {
     fun unsupportedOptionsHaveASpecificDiagnostic() {
         val failure =
             assertFailsWith<RuleViolation> {
-                TextCodec.parseCommand("set-option setup improved")
+                TextCodec.parseCommand("set-option epochs 3")
             }
 
         assertThat(failure.code).isEqualTo(ViolationCode.UNSUPPORTED_OPTION)
@@ -115,7 +117,7 @@ class TextCodecTest {
 
     private fun entries() =
         listOf(
-            "p1: set-option epochs 1",
+            "p1: set-option setup standard",
             "p1: set-option rebuilt-marker-bonus include",
             "p1: start",
             "!shuffle ${CardData.epochOne.joinToString(" ", transform = CardDefinition::id)}",

@@ -39,13 +39,22 @@ class EntryTest {
     }
 
     @Test
-    fun shuffleRequiresTheShuffleStage() {
+    fun shuffleRequiresAnOutstandingShuffleRequest() {
         val failure =
             assertFailsWith<RuleViolation> {
                 Entry.Shuffle(CardData.epochOne.map(CardDefinition::id)).applyTo(GameState(header))
             }
 
         assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PHASE)
+    }
+
+    @Test
+    fun shuffleSyntaxSupportsEveryRecordedDeckLength() {
+        val texts = listOf("!shuffle stone-1", "!shuffle stone-1 stone-2")
+
+        assertThat(texts.map { text -> TextCodec.parse(text).toText() })
+            .containsExactlyElementsIn(texts)
+            .inOrder()
     }
 
     @Test
@@ -84,7 +93,7 @@ class EntryTest {
         for (text in
             listOf(
                 "!draw p1 hand-1",
-                "!shuffle stone-1",
+                "!shuffle",
                 "!roll other p1=1 p2=2",
                 "!draw p0 hand-1 stone-1",
                 "!roll capital-tie p1=one p2=2",

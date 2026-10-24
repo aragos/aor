@@ -232,19 +232,22 @@ class SetupTest {
     }
 
     @Test
-    fun epochsMustBeBetweenOneAndThree() {
-        for (epochs in listOf(0, 4)) {
-            violation(ViolationCode.INVALID_EPOCHS) {
+    fun removedEpochOptionIsUnsupportedForEveryValue() {
+        for (epochs in listOf(0, 1, 2, 3, 4)) {
+            violation(ViolationCode.UNSUPPORTED_OPTION) {
                 GameState(header()).play("p1: set-option epochs $epochs")
             }
         }
     }
 
     @Test
-    fun creatorCanConfigureTheNumberOfEpochs() {
-        val state = GameState(header()).play("p1: set-option epochs 1")
+    fun gamesAlwaysBeginInTheFirstOfThreeEpochs() {
+        val state = GameState(header()).play("p1: start")
 
-        assertThat(state.epochs).isEqualTo(1)
+        assertThat(state.currentEpoch).isEqualTo(Epoch.ONE)
+        assertThat(Epoch.entries.map(Epoch::number)).containsExactly(1, 2, 3).inOrder()
+        assertThat(state.legalChoices(PlayerId("p1")).commands)
+            .doesNotContain("set-option epochs 1")
     }
 
     @Test
@@ -260,7 +263,9 @@ class SetupTest {
 
     @Test
     fun configurationIsFrozenAfterStarting() {
-        violation(ViolationCode.WRONG_PHASE) { dealt().play("p1: set-option epochs 2") }
+        violation(ViolationCode.WRONG_PHASE) {
+            dealt().play("p1: set-option rebuilt-marker-bonus include")
+        }
     }
 
     @Test

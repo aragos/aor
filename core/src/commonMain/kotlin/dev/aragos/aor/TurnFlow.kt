@@ -63,6 +63,8 @@ data class TurnFlow(
     val boughtCards: Set<PlayerId> = emptySet(),
     val discardedCards: Set<PlayerId> = emptySet(),
     val cancelComplete: Boolean = false,
+    val marketAdjustmentComplete: Boolean = false,
+    val writtenRecordUsed: Set<PlayerId> = emptySet(),
     val renaissanceUsed: Set<PlayerId> = emptySet(),
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
     val expansionCards: Set<PlayerId> = emptySet(),

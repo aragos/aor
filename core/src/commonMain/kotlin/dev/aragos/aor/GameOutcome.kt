@@ -13,27 +13,27 @@ sealed interface GameOutcome : Entry {
                 need != null &&
                     player == need.player &&
                     reference == need.reference &&
-                    card == state.deck.firstOrNull(),
+                    card == SetupDeal.nextCard(state),
                 ViolationCode.INVALID_OUTCOME,
             )
             val definition =
-                CardData.epochOne.singleOrNull { definition -> definition.id == card }
+                CardData.all.singleOrNull { definition -> definition.id == card }
                     ?: throw RuleViolation(ViolationCode.INVALID_OUTCOME)
             val delivered =
                 state
                     .updatePlayer(player) { owner ->
                         owner.copy(hand = owner.hand + HandCard(reference, definition))
                     }
-                    .copy(deck = state.deck.drop(1))
+                    .copy(
+                        deck = state.deck.filterNot { id -> id == card },
+                        deckHistory =
+                            state.deckHistory.copy(nextDraw = state.deckHistory.nextDraw + 1),
+                    )
             if (state.stage == Stage.INITIAL_DRAW) {
-                val allStartingCardsDrawn =
-                    delivered.players.values.all { owner -> owner.hand.isNotEmpty() }
-                return delivered.copy(
-                    stage = if (allStartingCardsDrawn) Stage.BIDDING else Stage.INITIAL_DRAW
-                )
+                return SetupDeal.afterInitialDraw(delivered)
             }
             val drawn = delivered.popDecision()
-            val exhausted = delivered.deck.isEmpty()
+            val exhausted = delivered.deck.isEmpty() && delivered.currentEpoch == Epoch.THREE
             val decisions =
                 if (exhausted) {
                     drawn.flow.decisions.filterNot { frame -> frame is DrawDecision }

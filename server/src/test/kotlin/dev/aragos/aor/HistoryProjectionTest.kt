@@ -35,14 +35,15 @@ class HistoryProjectionTest {
         val projected = HistoryProjection.forPlayer(stored, owner)
 
         assertThat(projected.lines)
-            .containsExactly(
-                "p1: set-option epochs 1",
-                "p1: set-option rebuilt-marker-bonus exclude",
-                "p1: start",
-                "!shuffle <hidden>",
-                "!draw p1 hand-1 stone-1",
-                "!draw p2 hand-2 <hidden>",
-                "!draw p3 hand-3 <hidden>",
+            .containsExactlyElementsIn(
+                defaultConfigurationText() +
+                    listOf(
+                        "p1: start",
+                        "!shuffle <hidden>",
+                        "!draw p1 hand-1 stone-1",
+                        "!draw p2 hand-2 <hidden>",
+                        "!draw p3 hand-3 <hidden>",
+                    )
             )
             .inOrder()
     }
@@ -127,7 +128,7 @@ class HistoryProjectionTest {
 
     private fun startedGame(): StoredGame {
         val driver = GameDriver(FixedRandom())
-        val created = driver.create("history-test", header, emptyMap(), epochs = 1)
+        val created = driver.create("history-test", header, emptyMap())
         return driver.submit(created, owner, Command.Start)
     }
 }

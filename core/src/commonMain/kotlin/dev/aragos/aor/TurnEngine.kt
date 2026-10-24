@@ -84,7 +84,7 @@ internal object TurnEngine {
         player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
             player.player.id !in state.flow.boughtCards &&
             player.cash >= EconomyTables.cardPurchaseCost &&
-            state.deck.isNotEmpty()
+            state.canDrawCards()
 
     private fun canDiscardCard(state: GameState, player: PlayerState): Boolean =
         player.advances.owns(AdvanceId.MASTER_ART) &&
@@ -132,15 +132,15 @@ internal object TurnEngine {
             }
         return listOf("pass") +
             state.patronageChoices(actor) +
-            affordable.map { advance -> "buy-advance ${advance.letter}" }
+            affordable.map { advance -> "buy-advance ${state.rules.letter(advance)}" }
     }
 
     private fun reliefChoices(state: GameState, player: PlayerState): List<String> {
         val affordable =
             (1..player.advances.tierCount).filter { spaces ->
                 try {
-                    PlayerEconomy.reliefQuote(player, spaces, state.currentTurn()).cashCost <=
-                        player.cash
+                    PlayerEconomy.reliefQuote(player, spaces, state.currentTurn(), state.rules)
+                        .cashCost <= player.cash
                 } catch (_: RuleViolation) {
                     false
                 }
@@ -168,6 +168,7 @@ internal object TurnEngine {
             state = beginPhase(state)
         }
         repeat(1000) {
+            if (state.pendingShuffle() != null) return state
             if (
                 !state.stage.isTurnPhase ||
                     state.stage == Stage.FINISHED ||
@@ -194,7 +195,11 @@ internal object TurnEngine {
             }
             if (state.playerState(actor).misery == MiseryStep.CHAOS) {
                 if (state.stage == Stage.DRAW_CARD && state.flow.cursor == 0) {
-                    state = state.copy(flow = state.flow.copy(cancelComplete = true))
+                    state =
+                        VariantInteractions.openMarketAdjustment(
+                            state.copy(flow = state.flow.copy(cancelComplete = true))
+                        )
+                    if (state.flow.decisions.isNotEmpty()) return state
                 }
                 state = finishActor(state)
                 return@repeat
@@ -207,6 +212,8 @@ internal object TurnEngine {
                         }
                         state = state.copy(flow = state.flow.copy(cancelComplete = true))
                     }
+                    state = VariantInteractions.openMarketAdjustment(state)
+                    if (state.flow.decisions.isNotEmpty()) return state
                     if (actor !in state.flow.drawn) {
                         state =
                             state
@@ -290,6 +297,7 @@ internal object TurnEngine {
                                 player,
                                 state.playerIds.size,
                                 state.board.markerCount(id),
+                                rules = state.rules,
                             )
                             .player
                     }
@@ -312,7 +320,7 @@ internal object TurnEngine {
 
     private fun nextPhase(state: GameState): GameState =
         when (state.stage) {
-            Stage.DRAW_CARD -> open(state, Stage.BUY_CARD)
+            Stage.DRAW_CARD -> SetupDeal.afterRegularDraw(state, open(state, Stage.BUY_CARD))
             Stage.BUY_CARD -> open(state, Stage.PLAY_CARDS)
             Stage.PLAY_CARDS -> open(state, Stage.PURCHASE)
             Stage.PURCHASE -> open(state, Stage.EXPANSION)

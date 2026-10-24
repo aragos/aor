@@ -15,6 +15,11 @@ enum class EventId(val cardId: String) {
     REVOLUTIONARY_UPRISINGS("revolutionary-uprisings"),
     THE_CRUSADES("the-crusades"),
     WAR("war"),
+    BLACK_DEATH("black-death"),
+    GUNPOWDER("gunpowder"),
+    LONG_BOW("long-bow"),
+    MONGOL_ARMIES("mongol-armies"),
+    RELIGIOUS_STRIFE("religious-strife"),
 }
 
 enum class LeaderId(val cardId: String) {
@@ -23,23 +28,58 @@ enum class LeaderId(val cardId: String) {
     RASHID_AD_DIN("rashid-ad-din"),
     ST_BENEDICT("st-benedict"),
     WALTER_THE_PENNILESS("walter-the-penniless"),
+    CHRISTOPHER_COLUMBUS("christopher-columbus"),
+    DESIDERIUS_ERASMUS("desiderius-erasmus"),
+    IBN_MAJID("ibn-majid"),
+    JOHANN_GUTENBERG("johann-gutenberg"),
+    MARCO_POLO("marco-polo"),
+    NICOLAUS_COPERNICUS("nicolaus-copernicus"),
+    PRINCE_HENRY("prince-henry"),
+    WILLIAM_CAXTON("william-caxton"),
+    ANDREAS_VESALIUS("andreas-vesalius"),
+    BARTOLOME_DE_LAS_CASAS("bartolome-de-las-casas"),
+    GALILEO_GALILEI("galileo-galilei"),
+    HENRY_OLDENBURG("henry-oldenburg"),
+    LEONARDO_DA_VINCI("leonardo-da-vinci"),
+    SIR_ISAAC_NEWTON("sir-isaac-newton"),
 }
 
-/** Dollar discount; Walter's [crusadesAmount] replaces [amount] after Crusades this turn. */
+/** The event timing that enables a leader's printed increased credit. */
+enum class LeaderDiscountCondition {
+    CRUSADES_THIS_TURN,
+    MONGOL_ARMIES_BEFORE_PLAY,
+}
+
+/** Dollar credits; [increasedAmount] replaces [amount] when the printed [condition] applies. */
 data class LeaderDiscount(
     val advance: AdvanceId,
     val amount: Int,
-    val crusadesAmount: Int? = null,
+    val condition: LeaderDiscountCondition? = null,
+    val increasedAmount: Int? = null,
 ) {
     init {
         require(amount > 0) { "A leader discount must be positive." }
-        require(crusadesAmount == null || crusadesAmount > amount) {
-            "The Crusades must increase a conditional leader discount."
+        require((condition == null) == (increasedAmount == null)) {
+            "An increased leader discount requires both an amount and a condition."
+        }
+        require(increasedAmount == null || increasedAmount > amount) {
+            "A conditional leader discount must exceed its ordinary amount."
         }
     }
 
-    fun amountFor(crusadesPlayed: Boolean): Int =
-        if (crusadesPlayed) crusadesAmount ?: amount else amount
+    fun amountFor(crusadesPlayed: Boolean, mongolArmiesPlayed: Boolean = false): Int {
+        val applies =
+            when (condition) {
+                LeaderDiscountCondition.CRUSADES_THIS_TURN -> crusadesPlayed
+                LeaderDiscountCondition.MONGOL_ARMIES_BEFORE_PLAY -> mongolArmiesPlayed
+                null -> false
+            }
+        return if (applies)
+            requireNotNull(increasedAmount) {
+                "A conditional leader discount has an increased amount."
+            }
+        else amount
+    }
 }
 
 data class LeaderDefinition(val id: LeaderId, val discounts: List<LeaderDiscount>) {
@@ -47,14 +87,6 @@ data class LeaderDefinition(val id: LeaderId, val discounts: List<LeaderDiscount
         require(discounts.isNotEmpty()) { "A leader must discount at least one advance: $id." }
         require(discounts.map(LeaderDiscount::advance).distinct().size == discounts.size) {
             "A leader must not repeat a discounted advance: $id."
-        }
-        require(
-            id == LeaderId.WALTER_THE_PENNILESS ||
-                discounts.all { discount ->
-                    discount.crusadesAmount == null
-                }
-        ) {
-            "Only Walter the Penniless has a Crusades discount."
         }
     }
 }
@@ -72,13 +104,13 @@ class LeaderCatalogBuilder {
 
     internal fun build(): List<LeaderDefinition> {
         require(definitions.map(LeaderDefinition::id).toSet() == LeaderId.entries.toSet()) {
-            "The epoch-one leader catalog requires all five leaders."
+            "The leader catalog requires all nineteen leaders."
         }
         return definitions.toList()
     }
 }
 
-/** Printed epoch-one leader discounts; AH1996 card text and rules reference section 11.3. */
+/** Printed leader discounts; AH1996 card text and rules reference section 11.3. */
 object LeaderData {
     val definitions: List<LeaderDefinition> =
         LeaderCatalogBuilder()
@@ -100,7 +132,86 @@ object LeaderData {
                 )
                 leader(
                     LeaderId.WALTER_THE_PENNILESS,
-                    LeaderDiscount(AdvanceId.OVERLAND_EAST, amount = 20, crusadesAmount = 30),
+                    LeaderDiscount(
+                        AdvanceId.OVERLAND_EAST,
+                        amount = 20,
+                        condition = LeaderDiscountCondition.CRUSADES_THIS_TURN,
+                        increasedAmount = 30,
+                    ),
+                )
+                leader(
+                    LeaderId.CHRISTOPHER_COLUMBUS,
+                    LeaderDiscount(AdvanceId.NEW_WORLD, amount = 30),
+                    LeaderDiscount(AdvanceId.OCEAN_NAVIGATION, amount = 30),
+                )
+                leader(
+                    LeaderId.DESIDERIUS_ERASMUS,
+                    LeaderDiscount(AdvanceId.PRINTED_WORD, amount = 20),
+                    LeaderDiscount(AdvanceId.RENAISSANCE, amount = 20),
+                )
+                leader(
+                    LeaderId.IBN_MAJID,
+                    LeaderDiscount(AdvanceId.OCEAN_NAVIGATION, amount = 20),
+                    LeaderDiscount(AdvanceId.COSMOPOLITAN, amount = 20),
+                )
+                leader(
+                    LeaderId.JOHANN_GUTENBERG,
+                    LeaderDiscount(AdvanceId.PRINTED_WORD, amount = 30),
+                )
+                leader(
+                    LeaderId.MARCO_POLO,
+                    LeaderDiscount(
+                        AdvanceId.COSMOPOLITAN,
+                        amount = 20,
+                        condition = LeaderDiscountCondition.MONGOL_ARMIES_BEFORE_PLAY,
+                        increasedAmount = 40,
+                    ),
+                    LeaderDiscount(
+                        AdvanceId.OVERLAND_EAST,
+                        amount = 20,
+                        condition = LeaderDiscountCondition.MONGOL_ARMIES_BEFORE_PLAY,
+                        increasedAmount = 40,
+                    ),
+                )
+                leader(
+                    LeaderId.NICOLAUS_COPERNICUS,
+                    LeaderDiscount(AdvanceId.THE_HEAVENS, amount = 20),
+                    LeaderDiscount(AdvanceId.INSTITUTIONAL_RESEARCH, amount = 20),
+                )
+                leader(
+                    LeaderId.PRINCE_HENRY,
+                    LeaderDiscount(AdvanceId.OCEAN_NAVIGATION, amount = 20),
+                    LeaderDiscount(AdvanceId.INSTITUTIONAL_RESEARCH, amount = 20),
+                )
+                leader(LeaderId.WILLIAM_CAXTON, LeaderDiscount(AdvanceId.PRINTED_WORD, amount = 20))
+                leader(
+                    LeaderId.ANDREAS_VESALIUS,
+                    LeaderDiscount(AdvanceId.HUMAN_BODY, amount = 20),
+                    LeaderDiscount(AdvanceId.ENLIGHTENMENT, amount = 20),
+                )
+                leader(
+                    LeaderId.BARTOLOME_DE_LAS_CASAS,
+                    LeaderDiscount(AdvanceId.COSMOPOLITAN, amount = 30),
+                )
+                leader(
+                    LeaderId.GALILEO_GALILEI,
+                    LeaderDiscount(AdvanceId.THE_HEAVENS, amount = 20),
+                    LeaderDiscount(AdvanceId.RENAISSANCE, amount = 20),
+                )
+                leader(
+                    LeaderId.HENRY_OLDENBURG,
+                    LeaderDiscount(AdvanceId.ENLIGHTENMENT, amount = 30),
+                )
+                leader(
+                    LeaderId.LEONARDO_DA_VINCI,
+                    LeaderDiscount(AdvanceId.MASTER_ART, amount = 20),
+                    LeaderDiscount(AdvanceId.HUMAN_BODY, amount = 20),
+                    LeaderDiscount(AdvanceId.RENAISSANCE, amount = 20),
+                )
+                leader(
+                    LeaderId.SIR_ISAAC_NEWTON,
+                    LeaderDiscount(AdvanceId.LAWS_OF_MATTER, amount = 20),
+                    LeaderDiscount(AdvanceId.ENLIGHTENMENT, amount = 20),
                 )
             }
             .build()
@@ -143,7 +254,7 @@ class CardEffectCatalogBuilder {
 
     internal fun build(cards: List<CardDefinition>): Map<String, CardEffectSpec> {
         require(definitions.keys == cards.map(CardDefinition::id).toSet()) {
-            "Every physical epoch-one card requires exactly one effect definition."
+            "Every physical card requires exactly one effect definition."
         }
         for (card in cards) {
             val expectedKind =
@@ -165,7 +276,7 @@ class CardEffectCatalogBuilder {
 }
 
 object CardEffectData {
-    val epochOne: Map<String, CardEffectSpec> =
+    val all: Map<String, CardEffectSpec> =
         CardEffectCatalogBuilder()
             .apply {
                 commodity("stone-1", Commodity.STONE)
@@ -179,13 +290,33 @@ object CardEffectData {
                 commodity("fur", Commodity.FUR)
                 commodity("silk", Commodity.SILK)
                 commodity("spice", Commodity.SPICE)
+                commodity("timber-2-1", Commodity.TIMBER)
+                commodity("timber-2-2", Commodity.TIMBER)
+                commodity("grain-2-1", Commodity.GRAIN)
+                commodity("grain-2-2", Commodity.GRAIN)
+                commodity("cloth-2", Commodity.CLOTH)
+                commodity("wine-2", Commodity.WINE)
+                commodity("metal-2", Commodity.METAL)
+                commodity("silk-2", Commodity.SILK)
+                commodity("spice-2", Commodity.SPICE)
+                commodity("cloth-3", Commodity.CLOTH)
+                commodity("wine-3", Commodity.WINE)
+                commodity("metal-3", Commodity.METAL)
+                commodity("fur-3", Commodity.FUR)
+                commodity("silk-3", Commodity.SILK)
+                commodity("spice-3", Commodity.SPICE)
+                commodity("gold-3", Commodity.GOLD)
                 EventId.entries.forEach(::event)
                 LeaderId.entries.forEach(::leader)
             }
-            .build(CardData.epochOne)
+            .build(CardData.all)
+
+    val epochOne: Map<String, CardEffectSpec> = all.filterKeys { id ->
+        CardData.definition(id).epoch == Epoch.ONE
+    }
 
     fun forCard(cardId: String): CardEffectSpec =
-        requireNotNull(epochOne[cardId]) {
-            "Unknown epoch-one card: $cardId."
+        requireNotNull(all[cardId]) {
+            "Unknown physical card: $cardId."
         }
 }

@@ -455,7 +455,8 @@ class BoardGameTest {
         assertThat(bought.playerState(p1).poolTokens).isEqualTo(17)
         assertThat(bought.playerState(p1).stockTokens).isEqualTo(19)
         assertThat(bought.flow.expansionCardCount).isEqualTo(1)
-        assertThat(bought.prompts()).containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4")))
+        assertThat(bought.prompts())
+            .containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4", state.deck.first())))
     }
 
     @Test
@@ -566,7 +567,8 @@ class BoardGameTest {
 
         val ended = state.act("pass", p3)
 
-        assertThat(ended.prompts()).containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4")))
+        assertThat(ended.prompts())
+            .containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4", state.deck.first())))
     }
 
     @Test
@@ -604,7 +606,8 @@ class BoardGameTest {
 
         val ended = state.act("pass", p3)
 
-        assertThat(ended.prompts()).containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4")))
+        assertThat(ended.prompts())
+            .containsExactly(Prompt.System(SystemNeed.Draw(p1, "hand-4", state.deck.first())))
     }
 
     @Test
@@ -729,6 +732,7 @@ class BoardGameTest {
             turnOrderSelection = TurnOrderSelection(listOf(p1, p2, p3)),
             board = board,
             deck = CardData.epochOne.drop(3).map(CardDefinition::id),
+            deckHistory = DeckHistory(nextDraw = 4),
             players =
                 players
                     .mapIndexed { index, player ->

@@ -8,10 +8,9 @@ object TextCodec {
         return when (parts.first()) {
             "set-option" ->
                 when (arguments.firstOrNull()) {
-                    "epochs" -> Command.SetEpochs.parse(arguments)
                     "rebuilt-marker-bonus" -> Command.SetRebuiltMarkerBonus.parse(arguments)
                     null -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
-                    else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION)
+                    else -> RuleOptionCommand.parse(arguments)
                 }
             "start" -> Command.Start.parse(arguments)
             "bid-capital" -> Command.BidCapital.parse(arguments)
@@ -19,7 +18,8 @@ object TextCodec {
             "buy-tokens" -> Command.BuyTokens.parse(arguments)
             "choose-turn-position" -> Command.ChooseTurnPosition.parse(arguments)
             else ->
-                BoardCommand.parse(parts.first(), arguments)
+                SetupCommand.parse(parts.first(), arguments)
+                    ?: BoardCommand.parse(parts.first(), arguments)
                     ?: CardCommand.parse(parts.first(), arguments)
                     ?: TurnCommand.parse(parts.first(), arguments)
         }

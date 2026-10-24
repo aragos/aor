@@ -1,7 +1,7 @@
 package dev.aragos.aor
 
 sealed interface SystemNeed {
-    data class Draw(val player: PlayerId, val reference: String) : SystemNeed
+    data class Draw(val player: PlayerId, val reference: String, val card: String) : SystemNeed
 
     /** [players] attributes one die per participant, in the requested order, when nonempty. */
     data class GameRoll(
@@ -12,7 +12,7 @@ sealed interface SystemNeed {
 
     data class Trade(val owner: PlayerId, val recipient: PlayerId) : SystemNeed
 
-    data object Shuffle : SystemNeed
+    data class Shuffle(val cards: List<String>, val purpose: ShufflePurpose) : SystemNeed
 }
 
 sealed interface Prompt {
