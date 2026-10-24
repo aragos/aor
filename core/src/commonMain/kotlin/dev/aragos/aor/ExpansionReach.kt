@@ -23,8 +23,9 @@ sealed interface ShippingSpace {
 
 object ExpansionReach {
     /**
-     * Finds valid routes; token costs, exact attack commitments and remaining capacity are
-     * separate.
+     * Finds routes in automatic preference order: avoid shipping, then prefer fewer steps. Province
+     * identifiers break equivalent-route ties independently of board insertion order. Token
+     * commitments and remaining capacity are checked when choosing a placement plan.
      */
     fun routesTo(
         context: BoardRulesContext,
@@ -52,15 +53,37 @@ object ExpansionReach {
                     shippingRoutes(context, profile, base, destination)
             }
             .distinct()
-            .sortedBy { route ->
-                when (route) {
-                    is ExpansionRoute.Local -> 0
-                    is ExpansionRoute.Land -> 1
-                    is ExpansionRoute.Caravan -> 2
-                    is ExpansionRoute.Shipping -> 3
-                }
-            }
+            .sortedWith(
+                compareBy<ExpansionRoute>(
+                    { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
+                    ::routeLength,
+                    { route -> route.base.value },
+                    ::routeKey,
+                )
+            )
     }
+
+    private fun routeLength(route: ExpansionRoute): Int =
+        when (route) {
+            is ExpansionRoute.Local -> 0
+            is ExpansionRoute.Land -> 1
+            is ExpansionRoute.Caravan -> 2
+            is ExpansionRoute.Shipping -> route.path.size - 1
+        }
+
+    private fun routeKey(route: ExpansionRoute): String =
+        when (route) {
+            is ExpansionRoute.Local,
+            is ExpansionRoute.Land -> route.base.value
+            is ExpansionRoute.Caravan -> route.via.value
+            is ExpansionRoute.Shipping ->
+                route.path.joinToString("/") { space ->
+                    when (space) {
+                        is ShippingSpace.Coast -> "coast:${space.province.value}"
+                        is ShippingSpace.Sea -> "sea:${space.sea.name}"
+                    }
+                }
+        }
 
     /** Validates the supplied route itself, so a longer but legal galley route remains usable. */
     fun validate(
