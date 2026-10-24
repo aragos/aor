@@ -76,6 +76,25 @@ skips another player's response. Purchase steps retain their order even when no 
 the engine prefer land, then Caravan, then shipping. Reach, overseas access, physical capacity and
 per-destination shipping limits still apply. `pass` completes Expansion and returns the unused pool.
 
+## Card plays and interrupted decisions
+
+| Command | Who and when; effect |
+| --- | --- |
+| `play-card <reference>` | Card-round actor, or eligible military responder; plays a card requiring no explicit choice. A playable event with no eligible effect may be played without a target. |
+| `play-card <reference> commodity <commodity>` | Selects one of the commodity card's offered commodities. |
+| `play-card <reference> player <player>` | Selects an eligible target player, for example for War. |
+| `play-card <reference> province <province>` | Selects an eligible target province, for example for Crusades. |
+| `play-card <reference> category <category>` | Papal Decree; category is `science`, `religion`, `exploration`, or `none` to decline a ban. |
+| `play-card <reference> protect <amount>` | Leader play; nonnegative dollars of protection on an exposed leader. |
+| `civil-war-loss cash` / `civil-war-loss tokens` | Civil War victim; chooses the loss type. |
+| `replace-event-token pool` / `replace-event-token none` | Counter's owner; spend one pool token on replacement or leave the province empty. |
+| `resolve-war` | Player answering the military window; proceeds to the War roll. `pass` has the same effect after any military plays. |
+| `cede-war <province> ...` | War loser; names the required distinct eligible provinces, respecting support and overseas limits. Canonical text sorts province ids. |
+| `patronize-leader <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
+
+The outer phase actor resumes after another player's required answer. Passing the Advances step forgoes further leader claims; `pass` cannot skip Civil War losses, required replacements, War cessions or trade offers.
+In Final Card Play, every non-burden card must be played before passing; Master Art cannot discard.
+
 ## Authority outcomes and replay
 
 | Entry | Request and value ordering |
