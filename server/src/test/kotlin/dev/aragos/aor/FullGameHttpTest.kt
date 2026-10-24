@@ -107,7 +107,6 @@ class FullGameHttpTest {
                                 "stabilize misery"
                             }
                         }
-                        "done" in commands -> "done"
                         "end-expansion" in commands -> "end-expansion"
                         "pass" in commands -> "pass"
                         else -> commands.first()
@@ -124,14 +123,12 @@ class FullGameHttpTest {
 private object OrderedRandom : SetupRandom {
     override fun shuffle(cards: List<String>): List<String> = cards
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> =
-        players.mapIndexed { index, player -> player to DieRoll(index + 1) }.toMap()
+    override fun roll(count: Int): List<DieRoll> = (1..count).map { value -> DieRoll(value) }
 }
 
 private object ReplayOnlyRandom : SetupRandom {
     override fun shuffle(cards: List<String>): List<String> =
         error("Recovery must replay the recorded shuffle.")
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> =
-        error("Recovery must replay recorded dice.")
+    override fun roll(count: Int): List<DieRoll> = error("Recovery must replay recorded dice.")
 }
