@@ -45,8 +45,7 @@ internal object TurnEngine {
             Stage.PLAY_CARDS,
             Stage.FINAL_CARD_PLAY -> listOf("pass", "play-card")
             Stage.PURCHASE -> purchaseCommands(state, state.playerState(actor))
-            Stage.EXPANSION ->
-                listOf("pass", "place", "attack", "rebuild-marker", "buy-expansion-card")
+            Stage.EXPANSION -> BoardGame.choices(state, actor)
             else -> emptyList()
         }
 
