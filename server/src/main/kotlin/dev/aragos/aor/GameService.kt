@@ -138,15 +138,16 @@ class GameService(
                         is GameOutcome.Trade ->
                             if (player == entry.owner || player == entry.recipient) line
                             else "!trade ${entry.owner} ${entry.recipient} <hidden>"
-                        is Entry.Action ->
+                        is Entry.Action -> {
+                            val command = entry.command
                             when {
-                                entry.actor != player && entry.command is TurnCommand.DiscardCard ->
+                                entry.actor != player && command is TurnCommand.DiscardCard ->
                                     "${entry.actor}: discard-card <hidden>"
-                                entry.command is BoardCommand.OfferCard &&
+                                command is BoardCommand.OfferCard &&
                                     player !in BoardGame.tradeParticipants(before) ->
                                     "${entry.actor}: offer-card <hidden>"
-                                entry.command.toText().startsWith("play-card ") -> {
-                                    val reference = entry.command.toText().split(' ')[1]
+                                command is CardCommand.PlayCard -> {
+                                    val reference = command.reference
                                     val card =
                                         before.playerState(entry.actor).hand.singleOrNull { card ->
                                             card.reference == reference
@@ -155,6 +156,7 @@ class GameService(
                                 }
                                 else -> line
                             }
+                        }
                         else -> line
                     }
                 )
