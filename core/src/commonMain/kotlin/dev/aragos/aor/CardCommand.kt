@@ -71,13 +71,6 @@ sealed interface CardCommand : Command {
             CardGame.replaceEventToken(state, actor, usePool)
     }
 
-    data object ResolveWar : CardCommand {
-        override fun toText(): String = "resolve-war"
-
-        override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            CardGame.resolveWar(state, actor)
-    }
-
     data class CedeWar(val provinces: Set<ProvinceId>) : CardCommand {
         init {
             require(provinces.isNotEmpty()) {
@@ -124,10 +117,6 @@ sealed interface CardCommand : Command {
                                 else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
                             }
                         )
-                    }
-                    "resolve-war" -> {
-                        size(arguments, 0)
-                        ResolveWar
                     }
                     "cede-war" -> {
                         checkRule(
