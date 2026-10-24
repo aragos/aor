@@ -21,8 +21,8 @@ submitted through a private player link omit the actor prefix; replay logs inclu
 | Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `pass`. Unused pool tokens return to stock. |
 | Income | Automatic piece flips, income and two recorded shortage/surplus rolls. Eligible majority draws resolve automatically. |
 
-A placement may specify `land`, `ship`, or `caravan <intermediate-province>` after the destination.
-Without a route, the engine prefers land. Attacks calculate the exact additional commitment;
+The engine chooses a legal route automatically, preferring routes that do not use galley capacity.
+Commands name only the destination. Attacks calculate the exact additional commitment;
 `place` also validates commitments before spending tokens. Excess attacking tokens are rejected.
 Shipping usage includes failed attacks and is tracked separately for each destination this turn.
 
@@ -56,7 +56,7 @@ the interruption:
 | Renaissance at phase opening | `swap-order p2` or `pass`. Once per turn; the adjacent target must be active and not own Renaissance. |
 | Civil War victim | `civil-war-loss cash` or `civil-war-loss tokens`. |
 | Event replacement with no stock tokens | `replace-event-token pool` or `replace-event-token none`. |
-| Cathedral opportunity | `cathedral` or `pass`. Uses are tracked separately against each opponent. |
+| Cathedral opportunity | The eligible attacker or defender may use `cathedral` or `pass`. Uses are tracked separately against each opponent. |
 | Military cards before a War reroll | Play eligible military cards, then `pass`. |
 | War loser cessions | `cede-war milan florence`. Choose the required supportable markets. |
 | Patronage during advance purchases | `patronize-leader rashid-ad-din`; pay the exposed leader's protection once. |
