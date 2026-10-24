@@ -1,6 +1,34 @@
 export interface PlayerView {
     id: string; name: string; cash: number; capital: string | null; handCount: number;
-    stockTokens: number; poolTokens: number; boardMarkers: number; stockMarkers: number; misery: number | null; ships: number;
+    stockTokens: number; poolTokens: number; boardMarkers: number; stockMarkers: number; misery: number | null;
+    ships: {fleet: 'NONE' | 'GALLEY' | 'SEAWORTHY' | 'OCEAN'; level: number}; advances: string[];
+}
+export interface ProvinceDefinition {
+    id: string; area: string | null; overseas: string | null; marketNumber: number;
+    commodities: string[]; capital: string | null; coastal: boolean; access: string[]; satellite: boolean;
+}
+export interface AdvanceDefinition {
+    id: string; category: string; cost: number; credit: number; miseryRelief: number;
+    prerequisites: string[]; messageId: string; purchaseMisery: number;
+}
+export interface PublicCatalog {
+    provinces: ProvinceDefinition[]; advances: AdvanceDefinition[];
+    commodities: {id: string; baseValue: number; diceTotal: number; ownershipTrackBoxes: number; printedPayouts: number[]}[];
+    landBorders: {first: string; second: string}[]; coastalConnections: {first: string; second: string}[];
+    satelliteSupports: {satellite: string; market: string}[];
+}
+export interface ProvinceView {
+    id: string; marker: {owner: string; side: 'COLOURED' | 'WHITE'} | null;
+    tokens: {owner: string; coloured: number; white: number}[];
+}
+export interface ScoreView {
+    player: string; advancePoints: number; cash: number; misery: number | null;
+    total: number | null; winner: boolean;
+}
+export interface CardTurnEffects {
+    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; protectionCash: number; patronageClaimants: string[]}[];
+    enlightenedRulers: string[]; military: {player: string; event: string}[];
+    papalCategory: string | null; crusadesPlayed: boolean;
 }
 export interface CardDefinition {
     id: string; kind: 'commodity' | 'event' | 'leader'; messageId: string; shape: 'CIRCLE' | 'SQUARE';
@@ -12,7 +40,17 @@ export interface Snapshot {
         hand: {reference: string; definition: CardDefinition}[];
         capitalOrder: string[]; revealedBids: Record<string, number>;
         turnNumber: number | null; turnOrder: string[]; orderBoxes: Record<string, number>;
-        revealedTokenPurchases: Record<string, number>; provisionalTieOrder: string[]};
+        revealedTokenPurchases: Record<string, number>; provisionalTieOrder: string[];
+        board: ProvinceView[]; catalog: PublicCatalog | null; deckRemaining: number; endingTriggered: boolean;
+        scores: ScoreView[]; adjustments: Record<string, ('SHORTAGE' | 'SURPLUS')[]>;
+        effects: CardTurnEffects; activeWar: {initiator: string; opponent: string; startedTurn: number; ties: number} | null;
+        markerPlacement: {player: string; destination: string} | null;
+        warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
+        activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number} | null;
+        voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
+        advanceOffers: {advance: string; price: number | null; unavailableReason: string | null}[];
+        reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
+        stabilizationCost: number | null; burdenReferences: string[]};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; history: string[];

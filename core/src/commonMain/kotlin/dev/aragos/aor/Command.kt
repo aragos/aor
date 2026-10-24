@@ -51,6 +51,7 @@ sealed interface Command {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
             checkRule(state.epochs == 1, ViolationCode.INVALID_EPOCHS)
+            GameCatalog.requireResolvedFor(state.playerIds.size)
             return state.copy(stage = Stage.SHUFFLE)
         }
 

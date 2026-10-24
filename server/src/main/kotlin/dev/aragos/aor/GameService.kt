@@ -125,44 +125,7 @@ class GameService(
                     )
                 else -> null
             }
-        val history = buildList {
-            var before = GameState(stored.header)
-            for (line in stored.revisions.flatMap(Revision::entries)) {
-                val entry = TextCodec.parse(line)
-                add(
-                    when (entry) {
-                        is Entry.Shuffle -> "!shuffle <hidden>"
-                        is GameOutcome.Draw ->
-                            if (entry.player == player) line
-                            else "!draw ${entry.player} ${entry.reference} <hidden>"
-                        is GameOutcome.Trade ->
-                            if (player == entry.owner || player == entry.recipient) line
-                            else "!trade ${entry.owner} ${entry.recipient} <hidden>"
-                        is Entry.Action -> {
-                            val command = entry.command
-                            when {
-                                entry.actor != player && command is TurnCommand.DiscardCard ->
-                                    "${entry.actor}: discard-card <hidden>"
-                                command is BoardCommand.OfferCard &&
-                                    player !in BoardGame.tradeParticipants(before) ->
-                                    "${entry.actor}: offer-card <hidden>"
-                                command is CardCommand.PlayCard -> {
-                                    val reference = command.reference
-                                    val card =
-                                        before.playerState(entry.actor).hand.singleOrNull { card ->
-                                            card.reference == reference
-                                        }
-                                    if (card == null) line else "$line [${card.definition.id}]"
-                                }
-                                else -> line
-                            }
-                        }
-                        else -> line
-                    }
-                )
-                before = before.step(entry)
-            }
-        }
+        val history = HistoryProjection.forPlayer(stored, player)
         return GameSnapshot(
             gameId = stored.id,
             revision = stored.revision,

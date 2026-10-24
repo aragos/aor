@@ -92,6 +92,8 @@ unused pool.
 | `replace-event-token pool` / `replace-event-token none` | Counter's owner; spend one pool token on replacement or leave the province empty. |
 | `cede-war <province> ...` | War loser; names the required distinct eligible provinces, respecting support and overseas limits. Canonical text sorts province ids. |
 | `patronize <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
+| `forgo-marker` | Recipient of a War/Crusades award with no spare marker; leaves that destination empty. |
+| `move-marker <province>` | Same recipient; moves an owned coloured marker from another controlled province to the award, leaving the source empty. |
 
 Only the current card-round actor may play cards, including military cards during their own
 War preparation window. Other War participants cannot play cards during someone else's round.

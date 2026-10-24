@@ -202,9 +202,8 @@ Recorded cash at the end of each turn is public.
 ### 5.2 Draw Card
 
 1. **Cancel shortage/surplus.**
-    - The player first in turn order may pay a commodity's base value ([§9.1](#91-commodity-values)) to remove one
-      shortage and/or one surplus marker.
-    - Each marker is removed separately. Gold and Ivory share the roll "12", so removing that marker costs $10 once.
+    - The player first in turn order may pay a commodity's base value ([§9.1](#91-commodity-values)) to remove shortage/surplus markers.
+    - Each marker is removed separately. Gold and Ivory share the roll "12", so removing that joint marker costs $10 once. Double markers may each be bought off separately (Boone FAQ §3.2g).
 2. **Draw.**
     - Each player in turn order draws one card.
     - When the draw pile is empty, the next epoch begins ([§11.1](#111-epochs-and-recycling)).
@@ -588,7 +587,9 @@ When a commodity card is played, each player dominating **n ≥ 1** provinces of
 - **Surplus.** Read one box lower (n − 1). A single province on surplus pays $0.
 - **Industry.** The owner reads one box higher than it otherwise would.
 - **Overseas boxes.** An overseas box counts as one province for each commodity it produces.
-- Commodity cards print ten payment boxes (AH1996 §7.11). Board ownership-track lengths count markets; they do not cap payments. The box-11 Wool/Industry/shortage edge case awaits a project ruling.
+- Commodity cards print ten payment boxes (AH1996 §7.11). Board ownership-track lengths count
+  markets; they do not cap payments. The quadratic formula continues beyond the printed boxes;
+  nine Wool markets plus Industry and a shortage pay `2 × 11² = $242` (user ruling, 2026-10-23).
 
 ---
 
@@ -788,6 +789,15 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
     - The player gains +1 misery.
     - Boosts Walter the Penniless.
     - It becomes a burden once Mongol Armies has been played.
+**Physical marker exhaustion (project ruling, 2026-10-23).** After Crusades or War removes the
+destination's old pieces, place a coloured marker from stock if available. With all 25 deployed,
+the receiving player chooses separately for each award: forgo the new marker, or move a coloured
+marker from another controlled province. A moved marker leaves its source empty and spends no
+square tokens. A forgone destination stays empty. The card's other effects still resolve; a War
+loser gains no additional misery for a marker its winner forgoes. Existing access and overseas
+support limits still govern which provinces may be ceded. Voluntarily vacated sources do not earn
+expansion-bonus credit if rebuilt later in the turn.
+
 - **War!** (on target player)
     1. Both players roll one die. Nationalism and military advantage each add +1.
     2. The higher roller gains +1 misery and the lower +2.
@@ -909,10 +919,19 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | ID | Question | Current reading |
 | --- | --- | --- |
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
-| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | After the draw of turn 1 (3–4 players) or turn 2 (5–6 players). |
+| Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
 
 **Resolved implementation decisions (2026-10-23):**
 
+- **Q15 / card-marker exhaustion:** the user allows the receiving player to forgo a new marker
+  or move one from another controlled province. The vacated source becomes empty; the destination's
+  prior pieces are removed even when placement is forgone. A War award declined by its winner
+  adds no extra misery to its loser.
+- **Q16 / commodity overflow:** the user selected the quadratic progression beyond printed box 10.
+  All nine Wool markets plus Industry and a shortage pay $242.
+
+- **Q16 / commodity payout overflow:** the user chose to continue the quadratic formula beyond
+  the ten printed payment boxes. Nine Wool markets with Industry and a shortage pay $242.
 - **Q10 / attack commitment:** the user disallowed attacks with excess tokens. Commit exactly the
   calculated requirement, including attacker tokens already present; reject extra committed tokens.
 - **Expansion bonus (§5.6):** the user requested both interpretations of event-rebuilt markers as

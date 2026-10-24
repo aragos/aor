@@ -98,6 +98,22 @@ class CardGameTest {
     }
 
     @Test
+    fun civilWarEnteringChaosUsesReturnedStockWithoutRequestingAnEliminatedPlayersChoice() {
+        val initial =
+            running("civil-war").withMarker("genoa", p2).withPlayer(p2) { player ->
+                player.copy(stockTokens = 0, poolTokens = 5, misery = MiseryStep.THOUSAND)
+            }
+
+        val played = initial.play("p1: play hand-1 player p2")
+
+        assertThat(played.playerState(p2).misery).isEqualTo(MiseryStep.CHAOS)
+        assertThat(played.flow.decisions).isEmpty()
+        assertThat(played.board.pieces[ProvinceId("genoa")])
+            .isEqualTo(ProvincePieces.Tokens(persistentMapOf(p2 to TokenHolding(coloured = 1))))
+        assertThat(played.playerState(p2).stockTokens).isEqualTo(4)
+    }
+
+    @Test
     fun anEventVictimMayDeclineSpendingAPoolToken() {
         val initial =
             running("pirates-vikings").withMarker("tunis", p2).withPlayer(p2) { player ->
@@ -438,6 +454,240 @@ class CardGameTest {
         assertThat(rolled.flow.decisions).isEmpty()
         assertThat(rolled.playerState(p1).misery).isEqualTo(MiseryStep.TEN)
         assertThat(rolled.playerState(p2).misery).isEqualTo(MiseryStep.TWENTY)
+    }
+
+    @Test
+    fun finalCardPlayStartsANewWarRoundEvenForTheSameTurnAndActor() {
+        val initial =
+            running("stone-1")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar =
+                        WarState(
+                            p1,
+                            p2,
+                            startedTurn = 1,
+                            lastRound = WarRound(1, finalCardPlay = false, actor = p1),
+                        ),
+                )
+
+        val prepared = initial.normalise()
+
+        assertThat(prepared.flow.decisions.single()).isInstanceOf(CardDecision.WarRoll::class.java)
+    }
+
+    @Test
+    fun emptyFinalHandsHostExactlyOneWarRerollEachBeforeFinishing() {
+        val initial =
+            running("stone-1")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar = WarState(p1, p2, startedTurn = 1),
+                )
+                .let { state ->
+                    state.copy(
+                        players =
+                            state.players.mapValues { (_, player) ->
+                                player.copy(hand = emptyList())
+                            }
+                    )
+                }
+                .normalise()
+
+        val finished = initial.play("!roll war 3 3", "!roll war 3 3", "!roll war 3 3")
+
+        assertThat(finished.stage).isEqualTo(Stage.FINISHED)
+        assertThat(finished.activeWar).isNull()
+        assertThat(finished.flow.decisions).isEmpty()
+        assertThat(finished.playerState(p1).misery).isEqualTo(MiseryStep.THIRTY)
+        assertThat(finished.playerState(p2).misery).isEqualTo(MiseryStep.THIRTY)
+    }
+
+    @Test
+    fun aWarWinnerEnteringChaosKeepsTheTransferredNeutralMarker() {
+        val initial =
+            running("war").withMarker("tunis", p2).withPlayer(p1) { player ->
+                player.copy(misery = MiseryStep.THOUSAND)
+            }
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
+
+        val ceded = awaiting.play("p2: cede-war tunis")
+
+        assertThat(ceded.board.pieces[ProvinceId("tunis")])
+            .isEqualTo(ProvincePieces.Marker(p1, PieceSide.COLOURED))
+        assertThat(ceded.playerState(p1).misery).isEqualTo(MiseryStep.CHAOS)
+        assertThat(ceded.playerState(p1).hand).isEmpty()
+        assertThat(ceded.playerState(p1).poolTokens).isEqualTo(0)
+        assertThat(ceded.playerState(p1).stockTokens).isEqualTo(36)
+        assertThat(ceded.flow.actor).isEqualTo(p2)
+    }
+
+    @Test
+    fun aWarLoserEnteringChaosTransfersBeforeItsOtherMarkersBecomeNeutral() {
+        val initial =
+            running("war").withMarker("tunis", p2).withMarker("suez", p2).withPlayer(p2) { player ->
+                player.copy(misery = MiseryStep.NINE_HUNDRED)
+            }
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
+
+        val ceded = awaiting.play("p2: cede-war tunis")
+
+        assertThat(ceded.board.pieces[ProvinceId("tunis")])
+            .isEqualTo(ProvincePieces.Marker(p1, PieceSide.COLOURED))
+        assertThat(ceded.board.pieces[ProvinceId("suez")])
+            .isEqualTo(ProvincePieces.Marker(p2, PieceSide.COLOURED))
+        assertThat(ceded.playerState(p2).misery).isEqualTo(MiseryStep.CHAOS)
+        assertThat(ceded.playerState(p2).hand).isEmpty()
+        assertThat(ceded.playerState(p2).poolTokens).isEqualTo(0)
+        assertThat(ceded.activeWar).isNull()
+    }
+
+    @Test
+    fun counterExhaustionAsksTheWinnerBeforeCompletingWarMisery() {
+        val initial =
+            running("war")
+                .let { state ->
+                    state
+                        .cardContext()
+                        .provinces
+                        .values
+                        .filter { province ->
+                            province.marketNumber > 1 && province.id.value != "tunis"
+                        }
+                        .take(25)
+                        .fold(state) { current, province ->
+                            current.withMarker(province.id.value, p1)
+                        }
+                }
+                .withMarker("tunis", p2)
+                .withPlayer(p1) { player -> player.copy(misery = MiseryStep.THOUSAND) }
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
+
+        val pending = awaiting.play("p2: cede-war tunis")
+
+        assertThat(pending.flow.decisions.single())
+            .isInstanceOf(CardDecision.MarkerPlacement::class.java)
+        assertThat(pending.playerState(p1).misery).isEqualTo(MiseryStep.THOUSAND)
+        assertThat(pending.board.pieces).doesNotContainKey(ProvinceId("tunis"))
+    }
+
+    @Test
+    fun aWarSurrenderChoiceRespectsRemainingOverseasMaintenanceCapacity() {
+        val initial =
+            running("war").withMarker("east-indies", p2).withMarker("china", p2).withPlayer(p1) {
+                player ->
+                player.copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.OCEAN_NAVIGATION, 1))),
+                    ships = ShippingCapability.OCEAN_1,
+                )
+            }
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 5 3")
+        val offered = awaiting.legalChoices(p2).commands.single()
+
+        val ceded = awaiting.play("p2: $offered")
+
+        assertThat(
+                ceded.board.pieces.values.filterIsInstance<ProvincePieces.Marker>().count { marker
+                    ->
+                    marker.owner == p1
+                }
+            )
+            .isEqualTo(1)
+        assertThat(ceded.playerState(p2).misery).isEqualTo(MiseryStep.THIRTY)
+        assertThat(ceded.flow.decisions).isEmpty()
+    }
+
+    @Test
+    fun enlightenedRulerAllowsNoEffectCivilWarInTheFinalRound() {
+        val initial =
+            running("civil-war")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    effects = CardTurnEffects(enlightenedRulers = setOf(p1, p2, p3)),
+                )
+
+        val played = initial.play("p1: play hand-1")
+
+        assertThat(played.players.values.map(PlayerState::misery))
+            .containsExactly(MiseryStep.ZERO, MiseryStep.ZERO, MiseryStep.ZERO)
+        assertThat(played.effects.civilWarVictims).isEmpty()
+        assertThat(played.flow.decisions).isEmpty()
+        assertThat(played.playerState(p1).hand.map { card -> card.definition.id })
+            .doesNotContain("civil-war")
+    }
+
+    @Test
+    fun finalIncomePreservesLeaderClaimsProtectionAndTemporaryCardEffects() {
+        val effects =
+            CardTurnEffects(
+                leaders =
+                    listOf(
+                        CardLeaderInPlay(LeaderId.CHARLEMAGNE, p3, CardLeaderRole.DISPLAY),
+                        CardLeaderInPlay(
+                            LeaderId.RASHID_AD_DIN,
+                            p2,
+                            CardLeaderRole.EXPOSED,
+                            protectionCash = 7,
+                            patronageClaimants = setOf(p1),
+                        ),
+                    ),
+                enlightenedRulers = setOf(p2),
+                military = listOf(CardMilitaryPlay(p1, EventId.ARMOR)),
+                crusadesPlayed = true,
+            )
+        val initial =
+            running("stone-1")
+                .copy(
+                    stage = Stage.INCOME,
+                    endingTriggered = true,
+                    effects = effects,
+                    flow = TurnFlow(),
+                )
+                .normalise()
+
+        val finalRound = initial.play("!roll shortage 1 1 6", "!roll shortage 1 2 6")
+
+        assertThat(finalRound.stage).isEqualTo(Stage.FINAL_CARD_PLAY)
+        assertThat(finalRound.effects).isEqualTo(effects)
+        assertThat(finalRound.purchaseContext(p1).leaderDiscounts).hasSize(2)
+    }
+
+    @Test
+    fun aFinalLeaderStillPaysItsRebateWithExistingDisplayHistory() {
+        val initial =
+            running("rashid-ad-din")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.CHARLEMAGNE,
+                                        p2,
+                                        CardLeaderRole.DISPLAY,
+                                    )
+                                )
+                        ),
+                )
+                .withPlayer(p1) { player ->
+                    player.copy(
+                        advances =
+                            PlayerAdvances(
+                                listOf(
+                                    AdvanceAcquisition(AdvanceId.WRITTEN_RECORD, 1),
+                                    AdvanceAcquisition(AdvanceId.PRINTED_WORD, 1),
+                                )
+                            )
+                    )
+                }
+
+        val played = initial.play("p1: play hand-1 protect 7")
+
+        assertThat(played.playerState(p1).cash).isEqualTo(43)
+        assertThat(played.effects.leaders.last().role).isEqualTo(CardLeaderRole.EXPOSED)
+        assertThat(played.effects.leaders.last().protectionCash).isEqualTo(7)
     }
 
     private fun running(card: String): GameState {

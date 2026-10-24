@@ -53,9 +53,10 @@ their respective seats; share only the intended player's link.
 5. Restart while Carol's decision is pending. The provisional sequence and required chooser must be identical.
    Carol, the last capital chooser, can insert before, between or after the two players. Choose the middle button.
    Its effect must match `choose-turn-position 2`; earlier players cannot act again.
-6. Every tab now shows **Turn 1 — Draw Card** and the finalized order with boxes **2, 4, 6**. Resources are unchanged
-   by tie choices. Each private hand still has only its original card. This walkthrough ends at that checkpoint; the repeatable engine continues when the first player
-   uses `pass` to complete shortage/surplus cancellation and request the recorded draws.
+6. Every tab now shows **Turn 1 — Play Cards** and the finalized order with boxes **2, 4, 6**.
+   Draw Card resolves automatically in this opening turn and no player yet owns an optional Buy Card advance.
+   Each private hand contains its original card plus one new private draw. Cash and tokens are unchanged by the
+   tie choices. Continue with [the full-game guide](manual-full-game.md).
 7. Restart again. Purchases, resources, finalized order, boxes, cards and history must remain identical.
 
 Repeat with 4–6 players. Paris, London and Hamburg become available in that order. Order boxes are **1,3,5,6** for
@@ -82,7 +83,7 @@ apply to this turn. No tie prompt is needed for distinct amounts.
 The command input accepts one command without an actor prefix. Forms generate the same commands:
 
 ```text
-set-option epochs 2
+set-option epochs 1
 start
 bid-capital 12
 choose-capital venice
@@ -98,7 +99,7 @@ submitted by clients. Unsupported options, actor prefixes and multiple commands 
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/games` | `{"players":["Alice","Bob","Carol"],"epochs":3}` | Game id and private relative seat links; 201 |
+| `POST /api/games` | `{"players":["Alice","Bob","Carol"],"epochs":1}` | Game id and private relative seat links; 201 |
 | `GET /api/games/{id}` | `Authorization: Bearer <token>` | Caller-specific state, prompts, legal choices, history and active revision |
 | `POST /api/games/{id}/commands` | Same authorization; `{"expectedRevision":6,"command":"buy-tokens 5"}` | Updated caller-specific state |
 | `GET /api/health` | None | `{"status":"ok"}` |

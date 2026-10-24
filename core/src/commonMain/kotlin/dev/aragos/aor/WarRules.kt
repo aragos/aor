@@ -120,15 +120,11 @@ object WarRules {
     }
 
     /**
-     * The loser chooses all required supportable markers, or all available ones if short. AH1996
-     * section 11.5 adds one misery space for every marker that cannot be ceded. Physical counter
-     * exhaustion is validated separately once the game's counter-capacity policy is established.
+     * Number of provinces the loser must cede after access advances and overseas maintenance limits
+     * are applied. Shipping range and the winner's remaining physical markers do not reduce this
+     * count; the winner separately chooses whether to forgo or reuse each marker.
      */
-    fun surrender(
-        context: CardContext,
-        result: WarResult.Victory,
-        provinces: Set<ProvinceId>,
-    ): WarSettlement {
+    fun requiredCessions(context: CardContext, result: WarResult.Victory): Int {
         cardRule(
             result.requiredTransfers >= 0,
             CardRuleCode.INVALID_SURRENDER,
@@ -138,7 +134,22 @@ object WarRules {
         val overseas = eligible.count { province -> context.province(province).overseas != null }
         val supportable =
             eligible.size - overseas + minOf(overseas, overseasCapacity(context, result.winner))
-        val required = minOf(result.requiredTransfers, supportable)
+        return minOf(result.requiredTransfers, supportable)
+    }
+
+    /**
+     * The loser chooses all required supportable markers, or all available ones if short. AH1996
+     * section 11.5 adds one misery space for every marker that cannot be ceded. Physical counter
+     * exhaustion is resolved by the winner after these markers are removed: forgo a placement or
+     * reuse a marker from another controlled province, without extra misery for the loser.
+     */
+    fun surrender(
+        context: CardContext,
+        result: WarResult.Victory,
+        provinces: Set<ProvinceId>,
+    ): WarSettlement {
+        val required = requiredCessions(context, result)
+        val eligible = eligibleProvinces(context, result.winner, result.loser)
         cardRule(
             provinces.size == required &&
                 eligible.containsAll(provinces) &&
@@ -146,13 +157,6 @@ object WarRules {
                     overseasCapacity(context, result.winner),
             CardRuleCode.INVALID_SURRENDER,
             "The loser must cede exactly the required available supportable provinces.",
-        )
-        val availableMarkers =
-            25 - context.markers.values.count { marker -> marker.owner == result.winner }
-        cardRule(
-            required <= availableMarkers,
-            CardRuleCode.MARKER_RULING_REQUIRED,
-            "War gains exceeding available domination markers require the counter-capacity ruling.",
         )
         return WarSettlement(
             result.winner,

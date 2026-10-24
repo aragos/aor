@@ -1,6 +1,6 @@
 # Core Game Engine
 
-Status: **design draft**. The engine implements [rules.md](rules.md); application architecture and policies live in
+Status: the one-epoch engine is implemented; later epochs, planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
 [design.md](design.md). Rules section references below refer to rules.md.
 
 ## 1. Contract

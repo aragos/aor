@@ -66,7 +66,13 @@ data class GameView(
     val adjustments: Map<Commodity, List<CommodityAdjustment>> = emptyMap(),
     val effects: CardTurnEffects = CardTurnEffects(),
     val activeWar: WarState? = null,
+    val warCession: WarCessionView? = null,
+    val markerPlacement: MarkerPlacementView? = null,
     val voids: CardVoids = CardVoids(),
+    val advanceOffers: List<AdvanceOfferView> = emptyList(),
+    val reliefOffers: List<ReliefOfferView> = emptyList(),
+    val stabilizationCost: Long? = null,
+    val burdenReferences: Set<String> = emptySet(),
 ) {
     companion object {
         internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
@@ -104,10 +110,111 @@ data class GameView(
                 adjustments = state.adjustments,
                 effects = state.effects,
                 activeWar = state.activeWar,
+                warCession = WarCessionView.from(state),
+                markerPlacement =
+                    (state.flow.decisions.lastOrNull() as? CardDecision.MarkerPlacement)?.let {
+                        decision ->
+                        MarkerPlacementView(decision.player, decision.destination)
+                    },
                 voids = state.voids,
+                advanceOffers = advanceOffers(state, viewer),
+                reliefOffers = reliefOffers(state, viewer),
+                stabilizationCost =
+                    if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
+                burdenReferences = burdenReferences(state, viewer),
             )
+
+        private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
+            if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()
+            val context = state.cardContext()
+            return viewer.hand
+                .filter { card -> CardRules.isBurden(context, card.definition.id) }
+                .map(HandCard::reference)
+                .toSet()
+        }
+
+        private fun advanceOffers(state: GameState, viewer: PlayerState): List<AdvanceOfferView> {
+            if (state.turnNumber == null || viewer.misery == MiseryStep.CHAOS) return emptyList()
+            val context = state.purchaseContext(viewer.player.id)
+            return AdvanceId.entries.filterNot(viewer.advances::owns).map { advance ->
+                try {
+                    val quote =
+                        AdvancePurchases.quote(
+                            viewer,
+                            advance,
+                            context,
+                        )
+                    AdvanceOfferView(
+                        advance,
+                        quote.price,
+                        if (viewer.cash >= quote.price) {
+                            null
+                        } else {
+                            ViolationCode.INSUFFICIENT_CASH.name
+                        },
+                    )
+                } catch (failure: RuleViolation) {
+                    AdvanceOfferView(advance, null, failure.code.name)
+                }
+            }
+        }
+
+        private fun reliefOffers(state: GameState, viewer: PlayerState): List<ReliefOfferView> {
+            val turn = state.turnNumber ?: return emptyList()
+            if (viewer.misery == MiseryStep.CHAOS) return emptyList()
+            return (1..viewer.advances.tierCount).mapNotNull { spaces ->
+                try {
+                    val quote = PlayerEconomy.reliefQuote(viewer, spaces, turn)
+                    ReliefOfferView(
+                        spaces,
+                        quote.cashCost,
+                        quote.ratingSpent,
+                        viewer.cash >= quote.cashCost,
+                    )
+                } catch (_: RuleViolation) {
+                    null
+                }
+            }
+        }
     }
 }
+
+/** Public recipient and destination of the next physical marker choice after a card effect. */
+data class MarkerPlacementView(val player: PlayerId, val destination: ProvinceId)
+
+/** Public support limits for a resolved War while its loser chooses provinces to cede. */
+data class WarCessionView(
+    val winner: PlayerId,
+    val requiredCount: Int,
+    val eligibleProvinces: Set<ProvinceId>,
+    val overseasCapacity: Int,
+) {
+    companion object {
+        internal fun from(state: GameState): WarCessionView? {
+            val decision =
+                state.flow.decisions.lastOrNull() as? CardDecision.WarSurrender ?: return null
+            val context = state.cardContext()
+            val victory = decision.victory
+            val eligible = WarRules.eligibleProvinces(context, victory.winner, victory.loser)
+            val capacity = WarRules.overseasCapacity(context, victory.winner)
+            return WarCessionView(
+                victory.winner,
+                WarRules.requiredCessions(context, victory),
+                eligible,
+                capacity,
+            )
+        }
+    }
+}
+
+data class AdvanceOfferView(val advance: AdvanceId, val price: Int?, val unavailableReason: String?)
+
+data class ReliefOfferView(
+    val spaces: Int,
+    val cashCost: Int,
+    val ratingSpent: Int,
+    val affordable: Boolean,
+)
 
 /** Public board occupancy; the static catalog supplies labels and empty provinces. */
 data class ProvinceView(

@@ -15,8 +15,6 @@ enum class CardRuleCode {
     INVALID_LEADER_CLAIM,
     INVALID_WAR,
     INVALID_SURRENDER,
-    MARKER_RULING_REQUIRED,
-    PAYOUT_RULING_REQUIRED,
 }
 
 class CardRuleViolation(val code: CardRuleCode, val explanation: String) : Exception(explanation)
@@ -188,7 +186,8 @@ sealed interface CardResolution {
     ) : CardResolution
 
     /**
-     * Remove every existing piece in [province] and place the player's coloured marker; +1 misery.
+     * Remove every existing piece in [province], then offer the player a coloured marker; +1
+     * misery. The runtime resolves physical marker exhaustion before completing the misery effect.
      */
     data class CrusadesPlacement(
         val province: ProvinceId,
@@ -490,12 +489,6 @@ object CardRules {
                     CardRuleCode.ILLEGAL_TARGET,
                     "The Crusades requires a market in Area VI.",
                 )
-                val owned = context.markers.values.count { marker -> marker.owner == actor }
-                cardRule(
-                    owned < 25 || context.markers[province]?.owner == actor,
-                    CardRuleCode.MARKER_RULING_REQUIRED,
-                    "Crusades with no available domination marker requires the counter-capacity ruling.",
-                )
                 CardResolution.CrusadesPlacement(
                     province,
                     actor,
@@ -581,7 +574,7 @@ object CardRules {
         return CardResolution.MarkerReduction(event, province, marker.owner, replacement)
     }
 
-    /** Payout progression is quadratic; the board's ownership-track length is not a payout cap. */
+    /** Payouts continue quadratically beyond the ten printed card boxes. */
     fun commodityPayment(
         context: CardContext,
         commodity: Commodity,
@@ -599,11 +592,6 @@ object CardRules {
                                 (adjustment?.payoutOffset ?: 0) +
                                 if (AdvanceId.INDUSTRY in player.advances) 1 else 0)
                             .coerceAtLeast(0)
-                    cardRule(
-                        box <= 10,
-                        CardRuleCode.PAYOUT_RULING_REQUIRED,
-                        "A payout beyond the ten printed card boxes requires the overflow ruling.",
-                    )
                     definition.baseValue * box * box
                 }
             }

@@ -17,32 +17,50 @@ internal fun GameState.popDecision(): GameState {
     return copy(flow = flow.copy(decisions = flow.decisions.dropLast(1)))
 }
 
-internal fun GameState.queueDraw(player: PlayerId): GameState =
-    if (deck.isEmpty()) copy(endingTriggered = true)
-    else if (playerState(player).misery == MiseryStep.CHAOS) this
-    else pushDecision(DrawDecision(player))
+/**
+ * Queue an earned draw in request order, preserving any outer decision below consecutive draws.
+ * Keep every beneficiary until resolution: an earlier beneficiary may enter Chaos before drawing.
+ * Consuming the last card removes any remaining draw requests and triggers the ending.
+ */
+internal fun GameState.queueDraw(player: PlayerId): GameState {
+    if (playerState(player).misery == MiseryStep.CHAOS) return this
+    if (deck.isEmpty()) return copy(endingTriggered = true)
+    val insertion = flow.decisions.indexOfLast { decision -> decision !is DrawDecision } + 1
+    val decisions =
+        flow.decisions.take(insertion) + DrawDecision(player) + flow.decisions.drop(insertion)
+    return copy(flow = flow.copy(decisions = decisions))
+}
 
 /** Player-local economy results enter Chaos exactly once here; board pieces remain neutral. */
 internal fun GameState.replacePlayer(player: PlayerState): GameState {
     val id = player.player.id
     val chaos = player.misery == MiseryStep.CHAOS
     val cleaned =
-        if (chaos)
+        if (chaos) {
             player.copy(
                 hand = emptyList(),
                 stockTokens = player.stockTokens + player.poolTokens,
                 poolTokens = 0,
                 tokenPurchase = player.tokenPurchase ?: 0,
             )
-        else player
+        } else {
+            player
+        }
     return copy(
         activeWar =
-            if (chaos && (activeWar?.initiator == id || activeWar?.opponent == id)) null
-            else activeWar,
+            if (chaos && (activeWar?.initiator == id || activeWar?.opponent == id)) {
+                null
+            } else {
+                activeWar
+            },
         players = players + (id to cleaned),
         flow =
             flow.copy(
-                decisions = flow.decisions.filterNot { frame -> chaos && frame.player == id }
+                decisions =
+                    flow.decisions.filterNot { frame ->
+                        chaos &&
+                            (frame.player == id || (frame is DrawDecision && frame.owner == id))
+                    }
             ),
     )
 }

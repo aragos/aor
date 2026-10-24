@@ -46,6 +46,35 @@ sealed interface CardDecision : TurnDecision {
             CardGame.roll(state, values)
     }
 
+    /** Physical marker shortage suspends the outer card round for the receiving player. */
+    data class MarkerPlacement(
+        val destinations: List<ProvinceId>,
+        val aftermath: MarkerPlacementAftermath,
+    ) : CardDecision {
+        init {
+            require(
+                destinations.isNotEmpty() && destinations.distinct().size == destinations.size
+            ) {
+                "A marker placement requires distinct pending destinations."
+            }
+        }
+
+        override val player: PlayerId
+            get() = aftermath.player
+
+        val destination: ProvinceId
+            get() = destinations.first()
+
+        override val choice: String
+            get() = "place-event-marker"
+
+        override fun choices(state: GameState): List<String> =
+            listOf(CardCommand.ForgoMarker.toText()) +
+                CardMarkerPlacements.sources(state, player, destination).map { province ->
+                    CardCommand.MoveMarker(province).toText()
+                }
+    }
+
     data class WarSurrender(override val player: PlayerId, val victory: WarResult.Victory) :
         CardDecision {
         override val choice: String
@@ -62,7 +91,7 @@ sealed interface CardDecision : TurnDecision {
                     .filter { province -> context.province(province).overseas != null }
                     .take(WarRules.overseasCapacity(context, victory.winner))
             val candidates = mainland + overseas
-            val count = minOf(victory.requiredTransfers, candidates.size)
+            val count = WarRules.requiredCessions(context, victory)
             return listOf(CardCommand.CedeWar(candidates.take(count).toSet()).toText())
         }
     }
@@ -248,14 +277,23 @@ object CardGame {
         provinces: Set<ProvinceId>,
     ): GameState {
         val settlement = WarRules.surrender(state.cardContext(), victory, provinces)
-        val transferred =
-            settlement.provinces.fold(state) { current, province ->
-                current.withBoardChange(current.board.transferMarker(province, settlement.winner))
-            }
-        return transferred
-            .gainMisery(settlement.winner, 1)
-            .gainMisery(settlement.loser, 2 + settlement.additionalLoserMisery)
+        return CardMarkerPlacements.war(state, settlement)
     }
+
+    internal fun completeMarkerPlacement(
+        state: GameState,
+        aftermath: MarkerPlacementAftermath,
+    ): GameState =
+        when (aftermath) {
+            is MarkerPlacementAftermath.Crusades -> state.gainMisery(aftermath.player, 1)
+            is MarkerPlacementAftermath.War ->
+                state
+                    .gainMisery(aftermath.settlement.winner, 1)
+                    .gainMisery(
+                        aftermath.settlement.loser,
+                        2 + aftermath.settlement.additionalLoserMisery,
+                    )
+        }
 
     fun patronize(state: GameState, actor: PlayerId, leader: LeaderId): GameState {
         state.requirePurchaseStep(actor, PurchaseStep.ADVANCES)
@@ -305,13 +343,7 @@ object CardGame {
                 }
             is CardResolution.CivilWar -> civilWar(state, resolution)
             is CardResolution.MarkerReduction -> reduceMarker(state, resolution)
-            is CardResolution.CrusadesPlacement ->
-                state
-                    .copy(effects = resolution.effects)
-                    .withBoardChange(
-                        state.board.placeMarker(resolution.province, resolution.player)
-                    )
-                    .gainMisery(resolution.player, 1)
+            is CardResolution.CrusadesPlacement -> CardMarkerPlacements.crusades(state, resolution)
             is CardResolution.WarBattle ->
                 state
                     .copy(activeWar = resolution.war)
@@ -364,7 +396,16 @@ object CardGame {
             state.copy(
                 flow = state.flow.copy(eventReduced = state.flow.eventReduced + reduction.province)
             )
-        return when (reduction.replacement) {
+        val owner = marked.playerState(reduction.owner)
+        // Civil War may eliminate the owner before reducing its capital. Chaos returns its pool
+        // to stock, and an eliminated player cannot answer an optional pool replacement frame.
+        val replacement =
+            when {
+                owner.misery != MiseryStep.CHAOS -> reduction.replacement
+                owner.stockTokens > 0 -> EventTokenReplacement.STOCK
+                else -> EventTokenReplacement.EMPTY
+            }
+        return when (replacement) {
             EventTokenReplacement.STOCK ->
                 marked.withBoardChange(
                     marked.board.replaceWithToken(reduction.province, reduction.owner)

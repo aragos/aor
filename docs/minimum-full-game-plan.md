@@ -1,22 +1,38 @@
 # Minimum full game plan
 
-Agreed on 2026-10-23. Status: the user has reviewed the first data milestone;
-see [the catalog inventory](data-inventory.md) for validation and recorded source rulings.
-The user confirmed that Gallipoli and Angora do not touch, resolving the final data question.
-The repeatable turn-flow milestone is next. Expansion policy primitives and the rebuilt-marker setup
-option are implemented; board placement, competitions and expansion rewards remain later milestones.
+Agreed on 2026-10-23. The reviewed catalogs, repeatable engine, every advance and epoch-one card,
+board play, both ending triggers, durable service and playable browser are implemented and verified.
+The two remaining source-policy decisions have been resolved by the user and implemented,
+including card-marker placement choices and quadratic payouts beyond the printed boxes.
+The agreed minimum full-game plan is complete.
 
 ## Target and current checkpoint
 
-Deliver a complete **one-epoch game for 3–6 human players using standard rules**, from creation through final scoring.
-Use the AH1996 baseline and the corrections and rulings recorded in [rules.md](rules.md).
+Deliver a complete **one-epoch game for 3–6 human players using standard rules**, from creation
+through final scoring. Use AH1996 and the corrections recorded in [rules.md](rules.md).
 
-The current implementation completes setup and turn 1's Order of Play, stopping at **Turn 1 — Draw Card**.
-The reviewed implementation is commit `ef7992e` on `feature/turn-order`, pushed to its upstream branch.
-Player access, private hands, sealed submissions, durable storage, recorded randomness, replay, optimistic
-concurrency and the browser command interface are already available. The last full check passed 145 tests,
-Kotlin/JS compilation, Kotlin formatting checks and the web build. Three-seat browser checks covered signed
-purchases, tie choices, responsive layout and restart recovery.
+The engine now progresses from setup through repeatable turns, Income and Final Card Play to scores.
+A complete three-player command scenario covers expansion, competition, purchases and card effects;
+its recorded history replays to the identical state. Separate acceptance coverage verifies the 26th
+advance ending, final-turn completion, misery-value scoring and shared victories.
+
+Final verification after the approved rulings: **539 core JVM tests and 75 server tests pass**,
+including ordinary-command completion for each supported count (3, 4, 5 and 6 players). Kotlin/JS
+compilation, Kotlin formatting checks and the production web build pass. Marker-choice browser
+checks cover forgo, source selection, War support limits and the mobile layout.
+
+The HTTP acceptance scenario completes a game through ordinary commands, then recovers the same
+completed snapshot using a random provider that fails if called. Three real authenticated browser
+seats also completed a game in turn 8. Pending and completed state survived separate server restarts,
+stale revisions returned 409, and the 390-pixel mobile layout had no page overflow.
+
+The original setup/turn-order checkpoint was `ef7992e`; subsequent features are submitted as stacked
+PRs below. Do not merge the stack without the user's instruction.
+
+| Resolved ruling | Implemented behavior |
+| --- | --- |
+| All 25 domination markers deployed when War/Crusades needs more | The recipient may forgo each new marker or move one from another controlled province. The source and forgone destination become empty; other card effects still resolve. |
+| All nine Wool markets plus Industry and a shortage requests box 11 | Continue the quadratic formula ($242). The ten printed card boxes do not cap payments. |
 
 Setup ends after capital selection. Every turn, including turn 1, begins with regular Order of Play.
 That phase establishes the order and expansion pool for the same turn. Use explicit phase boundaries in timing
@@ -76,24 +92,21 @@ configuration complete. Required data is verified rather than replaced with gues
 Validate the new catalog with focused tests and the core JVM/JS checks. Format Kotlin edits and run the formatting
 check according to [AGENTS.md](../AGENTS.md). Make no gameplay or public HTTP API changes in this data milestone.
 
-## Subsequent milestones
+## Implementation status
 
-| Milestone                           | Required result                                                                                                                     |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Repeatable turn flow and economy    | Draw/discard handling, phase progression, income, stabilization, misery, shortages/surpluses and turn bookkeeping.                  |
-| Purchases and advances              | Shipping upgrades, prerequisites, prices, credits, leader discounts, misery relief and immediate advance abilities.                 |
-| Board play and competition          | Ownership, legal expansion, shipping, domination, combat, losses, token returns and expansion rewards.                              |
-| Cards and interruptions             | Commodity payouts, supported leaders and events, targets, victim decisions, repeated War rolls and resuming interrupted activities. |
-| Ending and scoring                  | Detect ending conditions, finish the turn, perform Final Card Play, calculate scores and declare winners.                           |
-| Playable interface and verification | Expose board state and every required decision, preserve privacy and complete representative games through the browser.             |
+| Milestone | Verified result |
+| --- | --- |
+| Board/economic data | Reviewed typed catalogs, every supported player count and the Gallipoli/Angora ruling. Ownership-track versus payment-box correction documented. |
+| Repeatable turn flow/economy | Draws/discards, ordered phases, income, stabilization, misery, shortages/surpluses, phase-opening decisions and turn resets. |
+| Purchases/advances | All 26 advances, prerequisites, old credits, immediate effects, leaders, Patronage, shipping and relief. |
+| Board/competition | Pieces, reach, shipping quotas, domination, exact attacks, dice, Cathedral, Windmill, returns, shared card prices and both expansion-reward options. |
+| Cards/interruptions | All 29 epoch-one cards, victim decisions, temporary immunity, no-effect plays, persistent tied War and physical replacements. Marker exhaustion offers the recipient forgo/reuse choices; box-11 Wool pays $242. |
+| Ending/scoring | Both triggers, completing the current turn, forced Final Card Play, preserved effects and scores. Empty-deck queued draws and post-Chaos choices covered by regressions. |
+| Interface/service | Guided phase controls, readable searchable board, catalog/ownership/effects, private offers/history, scores, full-game HTTP/browser completion and restart recovery. |
 
-Grow replayable phase and activity flow alongside the first mechanics that require nested decisions or recorded
-outcomes. Keep each milestone testable through readable command scenarios and, where interactive, the browser.
-
-The full-game acceptance target is a game completed through ordinary player commands, exercising expansion,
-competition, purchases and card effects, with correct final scoring, identical replay and successful restart recovery.
-Cover both supported ending triggers: exhaustion of the final deck and acquisition of all 26 advances. Finish the
-current turn and Final Card Play before scoring, preserving the final turn's effects.
+Additional epochs, epoch transitions, other variants, bots, accounts, private plans, general undo and
+a detailed graphical board remain deferred. Only `epochs 1` is accepted; unsupported lengths are
+rejected before starting. Games use current rules/data versions only.
 
 ## Resume in a new session
 
@@ -112,16 +125,41 @@ Submitted checkpoints:
 | Board catalog and map ruling | `feature/board-catalog` | [#2](https://github.com/aragos/aor/pull/2) |
 | Exact attack commitment | `feature/exact-attack-commitment` | [#3](https://github.com/aragos/aor/pull/3) |
 | Rebuilt-marker option | `feature/rebuilt-marker-option` | [#4](https://github.com/aragos/aor/pull/4) |
+| Delivery workflow | `feature/full-game-roadmap` | [#5](https://github.com/aragos/aor/pull/5) |
+| Board pieces | `feature/board-state-model` | [#6](https://github.com/aragos/aor/pull/6) |
+| Card data | `feature/epoch-one-card-data` | [#7](https://github.com/aragos/aor/pull/7) |
+| Advance ownership | `feature/player-advance-model` | [#8](https://github.com/aragos/aor/pull/8) |
+| Advance and shipping purchases | `feature/advance-purchases` | [#9](https://github.com/aragos/aor/pull/9) |
+| Player economy | `feature/player-economy` | [#10](https://github.com/aragos/aor/pull/10) |
+| Expansion reach | `feature/expansion-reach` | [#11](https://github.com/aragos/aor/pull/11) |
+| Pure card rules | `feature/epoch-one-card-rules` | [#12](https://github.com/aragos/aor/pull/12) |
+| Competition rules | `feature/board-competition` | [#13](https://github.com/aragos/aor/pull/13) |
+| Repeatable turns and service | `feature/repeatable-turn-service` | [#14](https://github.com/aragos/aor/pull/14) |
+| Turn opening rules | `feature/turn-opening-rules` | [#15](https://github.com/aragos/aor/pull/15) |
+| Commodity payment contract | `feature/commodity-payment-data` | [#16](https://github.com/aragos/aor/pull/16) |
+| Expansion actions | `feature/board-actions` | [#17](https://github.com/aragos/aor/pull/17) |
+| Phase window ordering | `feature/phase-window-order` | [#18](https://github.com/aragos/aor/pull/18) |
+| Card actions and interruptions | `feature/card-actions` | [#19](https://github.com/aragos/aor/pull/19) |
+| Legal action projection | `feature/legal-action-projection` | [#20](https://github.com/aragos/aor/pull/20) |
+| Complete games and endings | `feature/game-ending-acceptance` | [#21](https://github.com/aragos/aor/pull/21) |
+| Interruption regressions | `feature/interruption-regressions` | [#22](https://github.com/aragos/aor/pull/22) |
+| Private history | `feature/private-game-history` | [#23](https://github.com/aragos/aor/pull/23) |
+| Outcome and Chaos cleanup | `feature/outcome-cleanup` | [#24](https://github.com/aragos/aor/pull/24) |
+| Private economy quotes | `feature/private-economy-quotes` | [#25](https://github.com/aragos/aor/pull/25) |
+| Complete browser interface | `feature/full-game-interface` | [#26](https://github.com/aragos/aor/pull/26) |
+| Versioned contract and playing guide | `feature/epoch-one-delivery` | [#27](https://github.com/aragos/aor/pull/27) |
+| Quadratic payout ruling | `feature/approved-quadratic-payout` | [#28](https://github.com/aragos/aor/pull/28) |
+| Marker forgo/reuse ruling | `feature/card-marker-reuse` | [#29](https://github.com/aragos/aor/pull/29) |
+| Ruling controls and public projections | `feature/card-ruling-interface` | [#30](https://github.com/aragos/aor/pull/30) |
+| Completed rulings and all-count acceptance | `feature/completed-game-rulings` | [#31](https://github.com/aragos/aor/pull/31) |
 
 ### Continuing implementation
 
-1. Read this plan, the applicable coding instructions, [design.md](design.md), [engine.md](engine.md) and the relevant
-   rules sections. Inspect Git state before editing; the setup and turn-order changes may still be on feature branches.
-2. The reviewed board and economic data and the rule-option changes are submitted as the focused branches above.
-   Keep unrelated changes intact.
-3. Read [the catalog inventory](data-inventory.md) and recorded rulings, including the attack-commitment and
-   rebuilt-marker policies. Start the repeatable turn-flow and economy milestone.
-4. Connect the implemented expansion policies to the later board-play milestone; exercise both bonus settings.
+1. Read applicable instructions, inspect Git state and preserve unrelated work. Continue on a feature branch.
+2. The minimum full-game scope is complete. Keep future features and decisions on focused branches;
+   preserve recorded outcomes, privacy and optimistic concurrency. The deferred features above remain out of scope.
+3. Review the stacked PRs; do not merge automatically. Existing original development game files
+   are unsupported under the current-format-only policy.
 
 For integrated code checks, use the existing commands:
 

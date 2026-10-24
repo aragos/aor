@@ -213,7 +213,7 @@ class ApplicationTest {
         val before = json.readTree(view(0).bodyAsText())
         val recovered = createGameService(directory, NoApiRandom).get(id, tokens[0])
 
-        assertThat(json.valueToTree<JsonNode>(recovered)).isEqualTo(before)
+        assertThat(json.readTree(json.writeValueAsString(recovered))).isEqualTo(before)
         assertThat(recovered.game.board.map(ProvinceView::id))
             .containsExactly(ProvinceId("venice"), ProvinceId("genoa"), ProvinceId("barcelona"))
     }
