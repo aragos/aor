@@ -65,12 +65,12 @@ class GameCompletionTest {
                     "p3: pass",
                     "p1: place 4 florence",
                     "p1: buy-expansion-card",
-                    "p1: end-expansion",
+                    "p1: pass",
                     "p2: attack florence",
-                    "p2: end-expansion",
+                    "p2: pass",
                     "p3: place 2 valencia",
                     "p3: place 2 montpellier",
-                    "p3: end-expansion",
+                    "p3: pass",
                 )
         return opening.complete()
     }
@@ -197,7 +197,7 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
                                 "stabilize ${if (player.cash.toLong() >= PlayerEconomy.stabilizationCost(player)) "cash" else "misery"}"
                             PurchaseStep.RELIEF -> "pass"
                         }
-                    Stage.EXPANSION -> "end-expansion"
+                    Stage.EXPANSION -> "pass"
                     else -> error("Unhandled player phase ${state.stage}.")
                 }
         return play("$actor: $command")
