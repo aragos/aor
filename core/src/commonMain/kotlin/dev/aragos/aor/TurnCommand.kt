@@ -17,6 +17,7 @@ sealed interface TurnCommand : Command {
                 Stage.DRAW_CARD -> state.copy(flow = state.flow.copy(cancelComplete = true))
                 Stage.BUY_CARD,
                 Stage.PLAY_CARDS -> state.finishActor()
+                Stage.PURCHASE -> passPurchase(state)
                 Stage.FINAL_CARD_PLAY -> {
                     checkRule(
                         state.playerState(actor).hand.all { card ->
@@ -29,14 +30,9 @@ sealed interface TurnCommand : Command {
                 else -> throw RuleViolation(ViolationCode.WRONG_PHASE)
             }
         }
-    }
 
-    data object Done : TurnCommand {
-        override fun toText(): String = "done"
-
-        override fun applyTo(state: GameState, actor: PlayerId): GameState {
-            state.requireActor(actor, Stage.PURCHASE)
-            return when (state.flow.purchaseStep) {
+        private fun passPurchase(state: GameState): GameState =
+            when (state.flow.purchaseStep) {
                 PurchaseStep.SHIPPING ->
                     state.copy(flow = state.flow.copy(purchaseStep = PurchaseStep.ADVANCES))
                 PurchaseStep.ADVANCES ->
@@ -45,7 +41,6 @@ sealed interface TurnCommand : Command {
                     throw RuleViolation(ViolationCode.STABILIZATION_REQUIRED)
                 PurchaseStep.RELIEF -> state.finishActor()
             }
-        }
     }
 
     data class SwapOrder(val target: PlayerId) : TurnCommand {
@@ -221,10 +216,6 @@ sealed interface TurnCommand : Command {
                     "pass" -> {
                         arguments.sizeIs(0)
                         Pass
-                    }
-                    "done" -> {
-                        arguments.sizeIs(0)
-                        Done
                     }
                     "buy-card" -> {
                         arguments.sizeIs(0)

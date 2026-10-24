@@ -69,14 +69,14 @@ internal object TurnEngine {
                 Stage.FINAL_CARD_PLAY -> listOf("pass", "play-card")
                 Stage.PURCHASE ->
                     when (state.flow.purchaseStep) {
-                        PurchaseStep.SHIPPING -> listOf("done", "upgrade-ships")
+                        PurchaseStep.SHIPPING -> listOf("pass", "upgrade-ships")
                         PurchaseStep.ADVANCES ->
-                            listOf("done") +
+                            listOf("pass") +
                                 AdvanceId.entries
                                     .filter { advance -> !player.advances.owns(advance) }
                                     .map { advance -> "buy-advance ${advance.letter}" }
                         PurchaseStep.STABILIZATION -> listOf("stabilize cash", "stabilize misery")
-                        PurchaseStep.RELIEF -> listOf("done", "relieve-misery")
+                        PurchaseStep.RELIEF -> listOf("pass", "relieve-misery")
                     }
                 Stage.EXPANSION ->
                     listOf(

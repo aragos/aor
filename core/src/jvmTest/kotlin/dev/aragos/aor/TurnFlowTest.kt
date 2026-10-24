@@ -34,8 +34,8 @@ class TurnFlowTest {
 
     @Test
     fun stabilizationCannotBeSkipped() {
-        val state = allDrawn().play("p1: pass", "p2: pass", "p3: pass", "p1: done", "p1: done")
-        val failure = assertFailsWith<RuleViolation> { state.play("p1: done") }
+        val state = allDrawn().play("p1: pass", "p2: pass", "p3: pass", "p1: pass", "p1: pass")
+        val failure = assertFailsWith<RuleViolation> { state.play("p1: pass") }
         assertThat(failure.code).isEqualTo(ViolationCode.STABILIZATION_REQUIRED)
     }
 
@@ -47,13 +47,43 @@ class TurnFlowTest {
                     "p1: pass",
                     "p2: pass",
                     "p3: pass",
-                    "p1: done",
-                    "p1: done",
+                    "p1: pass",
+                    "p1: pass",
                     "p1: stabilize cash",
-                    "p1: done",
+                    "p1: pass",
                 )
         assertThat(state.flow.actor).isEqualTo(p2)
         assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
+    }
+
+    @Test
+    fun passAdvancesFromShippingToAdvances() {
+        val state = purchase().play("p1: pass")
+
+        assertThat(state.flow.actor).isEqualTo(p1)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.ADVANCES)
+    }
+
+    @Test
+    fun passAdvancesFromAdvancesToStabilization() {
+        val state = purchase().play("p1: pass", "p1: pass")
+
+        assertThat(state.flow.actor).isEqualTo(p1)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.STABILIZATION)
+    }
+
+    @Test
+    fun purchaseChoicesUsePassForOptionalSteps() {
+        val state = purchase()
+
+        assertThat(state.legalChoices(p1).commands).contains("pass")
+    }
+
+    @Test
+    fun doneIsNotACommandAlias() {
+        val failure = assertFailsWith<RuleViolation> { TextCodec.parseCommand("done") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
     }
 
     @Test
@@ -96,6 +126,8 @@ class TurnFlowTest {
         assertThat(assertFailsWith<RuleViolation> { state.play("p1: set-option epochs 3") }.code)
             .isEqualTo(ViolationCode.INVALID_EPOCHS)
     }
+
+    private fun purchase(): GameState = allDrawn().play("p1: pass", "p2: pass", "p3: pass")
 
     private fun header() =
         GameHeader(listOf(Player(p1, "One"), Player(p2, "Two"), Player(p3, "Three")), p1)
