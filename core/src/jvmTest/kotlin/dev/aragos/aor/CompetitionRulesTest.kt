@@ -516,8 +516,10 @@ class CompetitionRulesTest {
     private fun attack(context: BoardRulesContext, destination: String): PlacementPlan.Competition {
         val target = id(destination)
         val existing =
-            (context.board.pieces[target] as? ProvincePieces.Tokens)?.holdings?.get(venice)?.total
-                ?: 0
+            (context.board.pieces[target] as? ProvincePieces.Tokens)
+                ?.holdings
+                .orEmpty()[venice]
+                ?.total ?: 0
         val added =
             CompetitionRules.requirement(context, venice, target).requirement.tokens - existing
         return BoardPlacementRules.evaluate(
