@@ -49,7 +49,7 @@ object AtomicGameWriter : GameWriter {
     }
 }
 
-/** Version-one local storage. Revisions remain immutable deltas in one append-only chain. */
+/** Version-two local storage. Revisions remain immutable deltas in one append-only chain. */
 class FileGameStore(
     private val directory: Path,
     private val writer: GameWriter = AtomicGameWriter,
@@ -160,7 +160,7 @@ class FileGameStore(
     }
 
     private fun validate(game: StoredGame) {
-        require(game.fileVersion == 1) { "Only game file version 1 is supported." }
+        require(game.fileVersion == 2) { "Only game file version 2 is supported." }
         require(game.credentials.keys == game.header.players.map(Player::id).toSet()) {
             "Every registered player must have exactly one credential."
         }
@@ -257,14 +257,23 @@ class FileGameStore(
                 require(revision.command == command.toText()) {
                     "Revision commands must use canonical text."
                 }
-                require(
-                    actions == listOf(Entry.Action(actor = revision.author, command = command))
-                ) {
-                    "A command revision must contain exactly the author's command."
-                }
                 if (index == 0) {
-                    require(command is Command.SetEpochs && entries.size == 1) {
-                        "The initial revision must contain only the epoch configuration command."
+                    val configuration =
+                        listOf(
+                            Entry.Action(actor = revision.author, command = command),
+                            Entry.Action(
+                                actor = revision.author,
+                                command = Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE),
+                            ),
+                        )
+                    require(command is Command.SetEpochs && entries == configuration) {
+                        "The initial revision must configure epochs and the default rebuilt-marker bonus."
+                    }
+                } else {
+                    require(
+                        actions == listOf(Entry.Action(actor = revision.author, command = command))
+                    ) {
+                        "A command revision must contain exactly the author's command."
                     }
                 }
             }

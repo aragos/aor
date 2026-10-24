@@ -18,6 +18,26 @@ import kotlin.test.Test
 
 class ApplicationTest {
     @Test
+    fun rebuiltMarkerBonusIsPubliclyConfigurableBeforeStart() = withGame {
+        val configured = command(0, 1, "set-option rebuilt-marker-bonus include")
+        val own = json.readTree(configured.bodyAsText())
+        val other = json.readTree(view(1).bodyAsText())
+
+        assertThat(configured.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(own["game"]["rebuiltMarkerBonus"].asText()).isEqualTo("INCLUDE")
+        assertThat(other["game"]["rebuiltMarkerBonus"].asText()).isEqualTo("INCLUDE")
+        assertThat(other["history"].map { entry -> entry.asText() })
+            .contains("p1: set-option rebuilt-marker-bonus include")
+    }
+
+    @Test
+    fun rebuiltMarkerBonusDefaultsToExcludedThroughTheHttpApi() = withGame {
+        val snapshot = json.readTree(view(0).bodyAsText())
+
+        assertThat(snapshot["game"]["rebuiltMarkerBonus"].asText()).isEqualTo("EXCLUDE")
+    }
+
+    @Test
     fun requestsRequireAValidPlayerCredential() = withGame {
         val missing = client.get(url)
         val invalid = client.get(url) { bearerAuth("x".repeat(43)) }

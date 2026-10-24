@@ -6,6 +6,7 @@ enum class ViolationCode(val description: String) {
     WRONG_PLAYER("The action belongs to another player."),
     WRONG_PHASE("The action is not allowed in the current phase."),
     INVALID_EPOCHS("Game length must be 1, 2, or 3 epochs."),
+    INVALID_REBUILT_MARKER_BONUS("Choose include or exclude for rebuilt-marker bonus credit."),
     INVALID_ATTACK_TOKEN_COUNT(
         "Commit exactly the required attacker tokens, including those already present."
     ),

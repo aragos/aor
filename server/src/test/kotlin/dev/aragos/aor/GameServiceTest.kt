@@ -241,7 +241,11 @@ class GameServiceTest {
                     stored.revisions.map { revision ->
                         revision.copy(
                             author = PlayerId("p2"),
-                            entries = listOf("p2: set-option epochs 3"),
+                            entries =
+                                listOf(
+                                    "p2: set-option epochs 3",
+                                    "p2: set-option rebuilt-marker-bonus exclude",
+                                ),
                         )
                     },
             )
@@ -265,7 +269,11 @@ class GameServiceTest {
                     stored.revisions.map { revision ->
                         revision.copy(
                             author = PlayerId("p2"),
-                            entries = listOf("p2: set-option epochs 3"),
+                            entries =
+                                listOf(
+                                    "p2: set-option epochs 3",
+                                    "p2: set-option rebuilt-marker-bonus exclude",
+                                ),
                         )
                     },
             )
@@ -326,7 +334,7 @@ class GameServiceTest {
         for (contents in
             listOf(
                 "not json",
-                original.replace("\"fileVersion\":1", "\"fileVersion\":99"),
+                original.replace("\"fileVersion\":2", "\"fileVersion\":99"),
                 original.replace(RULES_VERSION, "future-rules"),
                 original.replace("set-option epochs 3", "invented-command"),
             )) {

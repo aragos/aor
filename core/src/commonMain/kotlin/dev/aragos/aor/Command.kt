@@ -25,6 +25,24 @@ sealed interface Command {
         }
     }
 
+    data class SetRebuiltMarkerBonus(val policy: RebuiltMarkerBonus) : Command {
+        override fun toText(): String = "set-option rebuilt-marker-bonus ${policy.commandValue}"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState {
+            checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
+            checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
+            return state.copy(rebuiltMarkerBonus = policy)
+        }
+
+        companion object {
+            fun parse(arguments: List<String>): SetRebuiltMarkerBonus {
+                arguments.requireSize(2)
+                checkRule(arguments[0] == "rebuilt-marker-bonus", ViolationCode.UNSUPPORTED_OPTION)
+                return SetRebuiltMarkerBonus(policy = RebuiltMarkerBonus.parse(arguments[1]))
+            }
+        }
+    }
+
     data object Start : Command {
         override fun toText(): String = "start"
 

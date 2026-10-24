@@ -70,6 +70,7 @@ data class PlayerState(
 data class GameState(
     val header: GameHeader,
     val epochs: Int = 3,
+    val rebuiltMarkerBonus: RebuiltMarkerBonus = RebuiltMarkerBonus.EXCLUDE,
     val stage: Stage = Stage.CONFIGURATION,
     val deck: List<String> = emptyList(),
     val players: Map<PlayerId, PlayerState> =

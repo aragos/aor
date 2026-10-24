@@ -1,5 +1,36 @@
 package dev.aragos.aor
 
+/** Why a white domination marker was placed during the current turn's Expansion phase. */
+enum class MarkerPlacementOrigin {
+    EXPANSION,
+    EVENT_REBUILD,
+    VOLUNTARY_REBUILD,
+}
+
+/**
+ * Whether replacing a domination marker lost to an event earns expansion-bonus credit.
+ *
+ * [commandValue] is the locale-independent setup value recorded in the replay log. Both policies
+ * count ordinary expansion and exclude rebuilding a marker voluntarily exchanged for a token.
+ */
+enum class RebuiltMarkerBonus(val commandValue: String) {
+    EXCLUDE("exclude"),
+    INCLUDE("include");
+
+    fun counts(origin: MarkerPlacementOrigin): Boolean =
+        when (origin) {
+            MarkerPlacementOrigin.EXPANSION -> true
+            MarkerPlacementOrigin.EVENT_REBUILD -> this == INCLUDE
+            MarkerPlacementOrigin.VOLUNTARY_REBUILD -> false
+        }
+
+    companion object {
+        fun parse(value: String): RebuiltMarkerBonus =
+            entries.singleOrNull { policy -> policy.commandValue == value }
+                ?: throw RuleViolation(ViolationCode.INVALID_REBUILT_MARKER_BONUS)
+    }
+}
+
 /**
  * The calculated number of physical attacker tokens required to initiate a competition.
  *

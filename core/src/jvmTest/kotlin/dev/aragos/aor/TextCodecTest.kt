@@ -10,6 +10,8 @@ class TextCodecTest {
         for (text in
             listOf(
                 "set-option epochs 1",
+                "set-option rebuilt-marker-bonus exclude",
+                "set-option rebuilt-marker-bonus include",
                 "start",
                 "bid-capital 12",
                 "choose-capital venice",
@@ -67,6 +69,8 @@ class TextCodecTest {
                 "buy-tokens -2147483649",
                 "choose-turn-position",
                 "choose-turn-position 999999999999999",
+                "set-option rebuilt-marker-bonus",
+                "set-option rebuilt-marker-bonus include extra",
                 "",
             )
 
@@ -88,6 +92,18 @@ class TextCodecTest {
     }
 
     @Test
+    fun invalidRebuildingPoliciesHaveASpecificDiagnostic() {
+        for (value in listOf("yes", "no", "true", "false", "INCLUDE", "EXCLUDE", "1")) {
+            val failure =
+                assertFailsWith<RuleViolation> {
+                    TextCodec.parseCommand("set-option rebuilt-marker-bonus $value")
+                }
+
+            assertThat(failure.code).isEqualTo(ViolationCode.INVALID_REBUILT_MARKER_BONUS)
+        }
+    }
+
+    @Test
     fun duplicatePlayerRollsAreRejected() {
         val failure =
             assertFailsWith<RuleViolation> {
@@ -100,6 +116,7 @@ class TextCodecTest {
     private fun entries() =
         listOf(
             "p1: set-option epochs 1",
+            "p1: set-option rebuilt-marker-bonus include",
             "p1: start",
             "!shuffle ${CardData.epochOne.joinToString(" ", transform = CardDefinition::id)}",
             "!deal p1 hand-1 stone-1",

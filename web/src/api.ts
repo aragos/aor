@@ -5,9 +5,10 @@ export interface PlayerView {
 export interface CardDefinition {
     id: string; kind: 'commodity' | 'event' | 'leader'; messageId: string; shape: 'CIRCLE' | 'SQUARE';
 }
+export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
 export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
-    game: {stage: string; epochs: number; players: PlayerView[];
+    game: {stage: string; epochs: number; rebuiltMarkerBonus: RebuiltMarkerBonus; players: PlayerView[];
         hand: {reference: string; definition: CardDefinition}[];
         capitalOrder: string[]; revealedBids: Record<string, number>;
         turnNumber: number | null; turnOrder: string[]; orderBoxes: Record<string, number>;

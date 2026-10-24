@@ -29,6 +29,7 @@ data class PlayerView(
 data class GameView(
     val stage: Stage,
     val epochs: Int,
+    val rebuiltMarkerBonus: RebuiltMarkerBonus,
     val players: List<PlayerView>,
     val hand: List<HandCard>,
     val capitalOrder: List<PlayerId>,
@@ -44,6 +45,7 @@ data class GameView(
             GameView(
                 stage = state.stage,
                 epochs = state.epochs,
+                rebuiltMarkerBonus = state.rebuiltMarkerBonus,
                 players =
                     state.playerIds.map { playerId ->
                         val player = state.playerState(playerId)

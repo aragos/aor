@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
 import {errorCode, request} from './api';
-import type {CreatedGame, Snapshot} from './api';
+import type {CreatedGame, RebuiltMarkerBonus, Snapshot} from './api';
 import {t} from './messages';
 import './app.css';
 
@@ -43,8 +43,10 @@ function CreateGame() {
 function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}) {
     const [bid, setBid] = useState(String(snapshot.pendingBid ?? 0));
     const [epochs, setEpochs] = useState(String(snapshot.game.epochs));
+    const [rebuiltMarkerBonus, setRebuiltMarkerBonus] = useState(snapshot.game.rebuiltMarkerBonus);
     const [command, setCommand] = useState('');
     const previousEpochs = useRef(snapshot.game.epochs);
+    const previousRebuiltMarkerBonus = useRef(snapshot.game.rebuiltMarkerBonus);
     const previousBid = useRef(snapshot.pendingBid);
     const previousStage = useRef(snapshot.game.stage);
     useEffect(() => {
@@ -52,6 +54,11 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
         setEpochs(current => current === previous ? String(snapshot.game.epochs) : current);
         previousEpochs.current = snapshot.game.epochs;
     }, [snapshot.game.epochs]);
+    useEffect(() => {
+        const previous = previousRebuiltMarkerBonus.current;
+        setRebuiltMarkerBonus(current => current === previous ? snapshot.game.rebuiltMarkerBonus : current);
+        previousRebuiltMarkerBonus.current = snapshot.game.rebuiltMarkerBonus;
+    }, [snapshot.game.rebuiltMarkerBonus]);
     useEffect(() => {
         if (previousStage.current !== snapshot.game.stage) {
             setBid(String(snapshot.pendingBid ?? 0));
@@ -86,7 +93,17 @@ function Controls({snapshot, busy, submit}: {snapshot: Snapshot; busy: boolean; 
                 <select id="setup-epochs" value={epochs} onChange={event => setEpochs(event.target.value)}>{[1, 2, 3].map(n => <option key={n}>{n}</option>)}</select>
                 <button className="secondary" disabled={busy}>{t('controls.saveEpochs')}</button>
             </form>
-            <button disabled={busy || Number(epochs) !== snapshot.game.epochs} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
+            <form onSubmit={event => { event.preventDefault(); void submit(`set-option rebuilt-marker-bonus ${rebuiltMarkerBonus.toLowerCase()}`); }}>
+                <label htmlFor="setup-rebuilt-marker-bonus">{t('controls.rebuiltMarkerBonus')}</label>
+                <p id="rebuilt-marker-bonus-hint" className="muted small">{t('controls.rebuiltMarkerBonusHint')}</p>
+                <div className="inline-form">
+                    <select id="setup-rebuilt-marker-bonus" value={rebuiltMarkerBonus} onChange={event => setRebuiltMarkerBonus(event.target.value as RebuiltMarkerBonus)} aria-describedby="rebuilt-marker-bonus-hint">
+                        {(['EXCLUDE', 'INCLUDE'] as const).map(rule => <option key={rule} value={rule}>{t(`rebuiltMarkerBonus.option.${rule}`)}</option>)}
+                    </select>
+                    <button className="secondary" disabled={busy}>{t('controls.saveRebuiltMarkerBonus')}</button>
+                </div>
+            </form>
+            <button disabled={busy || Number(epochs) !== snapshot.game.epochs || rebuiltMarkerBonus !== snapshot.game.rebuiltMarkerBonus} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
         </>}
         {(stage === 'BIDDING' || isTokenPurchase) && <form onSubmit={event => { event.preventDefault(); void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
@@ -175,6 +192,7 @@ function Game({id, token}: {id: string; token: string}) {
                 <p className="eyebrow">{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</p>
                 <h2>{ready ? t('game.drawReady') : snapshot.prompt ? t(snapshot.prompt.messageId) : ''}</h2>
                 {ready ? <p>{t('game.drawReadyDetail')}</p> : snapshot.prompt && <p className="muted">{t('prompt.waitingFor')}: {snapshot.prompt.players.map(nameFor).join(', ')}</p>}
+                <p className="muted small">{t(`rebuiltMarkerBonus.${snapshot.game.rebuiltMarkerBonus}`)}</p>
                 <Controls snapshot={snapshot} busy={busy} submit={submit}/>
                 {actionError && <ErrorMessage code={actionError}/>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
