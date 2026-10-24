@@ -57,7 +57,7 @@ the interruption:
 | Civil War victim | `civil-war-loss cash` or `civil-war-loss tokens`. |
 | Event replacement with no stock tokens | `replace-event-token pool` or `replace-event-token none`. |
 | Cathedral opportunity | `cathedral` or `pass`. Uses are tracked separately against each opponent. |
-| Military cards before a War reroll | Play eligible military cards, then `resolve-war` or `pass`. |
+| Military cards before a War reroll | Play eligible military cards, then `pass`. |
 | War loser cessions | `cede-war milan florence`. Choose the required supportable markets. |
 | Patronage during advance purchases | `patronize-leader rashid-ad-din`; pay the exposed leader's protection once. |
 | Wind/Watermill opportunity | `windmill` or `pass`; after a successful recorded roll, `offer-card hand-8`. The other card is chosen randomly and recorded privately. |
