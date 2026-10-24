@@ -152,8 +152,11 @@ class ProvinceCatalogBuilder {
     fun overseas(group: OverseasGroup, id: String, vararg commodities: Commodity) {
         val access =
             setOf(AccessRequirement.OCEAN_NAVIGATION) +
-                if (group == OverseasGroup.NEW_WORLD) setOf(AccessRequirement.NEW_WORLD)
-                else emptySet()
+                if (group == OverseasGroup.NEW_WORLD) {
+                    setOf(AccessRequirement.NEW_WORLD)
+                } else {
+                    emptySet()
+                }
         definitions +=
             ProvinceDefinition(
                 id = ProvinceId(id),
