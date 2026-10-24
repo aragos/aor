@@ -11,11 +11,19 @@ data class WarState(
     val opponent: PlayerId,
     val startedTurn: Int,
     val ties: Int = 0,
+    val lastRound: WarRound? = null,
 ) {
     init {
         require(initiator != opponent) { "A War requires two different players." }
         require(startedTurn > 0) { "A War must start in a positive turn." }
         require(ties >= 0) { "The number of tied War rolls cannot be negative." }
+    }
+}
+
+/** Distinguishes ordinary and final card rounds in the same turn for reroll scheduling. */
+data class WarRound(val turn: Int, val finalCardPlay: Boolean, val actor: PlayerId) {
+    init {
+        require(turn > 0) { "A War round requires a positive turn." }
     }
 }
 
@@ -95,6 +103,7 @@ object WarRules {
         )
         val advances = context.player(winner).advances
         context.player(loser)
+        val overseasCapacity = overseasCapacity(context, winner)
         return context.markers
             .filter { (province, marker) ->
                 val definition = context.province(province)
@@ -103,6 +112,7 @@ object WarRules {
                     (definition.area != GeographicalArea.V ||
                         AdvanceId.OVERLAND_EAST in advances) &&
                     (definition.overseas == null || AdvanceId.OCEAN_NAVIGATION in advances) &&
+                    (definition.overseas == null || overseasCapacity > 0) &&
                     (definition.overseas != OverseasGroup.NEW_WORLD ||
                         AdvanceId.NEW_WORLD in advances)
             }
@@ -125,11 +135,24 @@ object WarRules {
             "A War cannot require a negative number of transfers.",
         )
         val eligible = eligibleProvinces(context, result.winner, result.loser)
-        val required = minOf(result.requiredTransfers, eligible.size)
+        val overseas = eligible.count { province -> context.province(province).overseas != null }
+        val supportable =
+            eligible.size - overseas + minOf(overseas, overseasCapacity(context, result.winner))
+        val required = minOf(result.requiredTransfers, supportable)
         cardRule(
-            provinces.size == required && eligible.containsAll(provinces),
+            provinces.size == required &&
+                eligible.containsAll(provinces) &&
+                provinces.count { province -> context.province(province).overseas != null } <=
+                    overseasCapacity(context, result.winner),
             CardRuleCode.INVALID_SURRENDER,
             "The loser must cede exactly the required available supportable provinces.",
+        )
+        val availableMarkers =
+            25 - context.markers.values.count { marker -> marker.owner == result.winner }
+        cardRule(
+            required <= availableMarkers,
+            CardRuleCode.MARKER_RULING_REQUIRED,
+            "War gains exceeding available domination markers require the counter-capacity ruling.",
         )
         return WarSettlement(
             result.winner,
@@ -137,5 +160,19 @@ object WarRules {
             provinces,
             additionalLoserMisery = result.requiredTransfers - required,
         )
+    }
+
+    /** Overseas maintenance limits survive the explicit exemption from shipping range. */
+    fun overseasCapacity(context: CardContext, winner: PlayerId): Int {
+        val player = context.player(winner)
+        if (player.ships.fleet != ShippingFleet.OCEAN) return 0
+        val occupied =
+            player.overseasPresence +
+                context.markers
+                    .filter { (province, marker) ->
+                        marker.owner == winner && context.province(province).overseas != null
+                    }
+                    .keys
+        return (player.ships.level - occupied.size).coerceAtLeast(0)
     }
 }

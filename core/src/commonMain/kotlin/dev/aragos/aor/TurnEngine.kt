@@ -43,7 +43,7 @@ internal object TurnEngine {
             Stage.DRAW_CARD -> adjustmentCommands(state)
             Stage.BUY_CARD -> buyCardCommands(state, state.playerState(actor))
             Stage.PLAY_CARDS,
-            Stage.FINAL_CARD_PLAY -> listOf("pass", "play-card")
+            Stage.FINAL_CARD_PLAY -> listOf("pass") + CardGame.playChoices(state, actor)
             Stage.PURCHASE -> purchaseCommands(state, state.playerState(actor))
             Stage.EXPANSION -> BoardGame.choices(state, actor)
             else -> emptyList()
@@ -81,6 +81,7 @@ internal object TurnEngine {
             PurchaseStep.SHIPPING -> listOf("pass", "upgrade-ships")
             PurchaseStep.ADVANCES ->
                 listOf("pass") +
+                    state.patronageChoices(player.player.id) +
                     AdvanceId.entries
                         .filter { advance -> !player.advances.owns(advance) }
                         .map { advance -> "buy-advance ${advance.letter}" }
@@ -132,6 +133,9 @@ internal object TurnEngine {
                 return@repeat
             }
             if (state.playerState(actor).misery == MiseryStep.CHAOS) {
+                if (state.stage == Stage.DRAW_CARD && state.flow.cursor == 0) {
+                    state = state.copy(flow = state.flow.copy(cancelComplete = true))
+                }
                 state = finishActor(state)
                 return@repeat
             }
@@ -157,6 +161,8 @@ internal object TurnEngine {
                 }
                 Stage.PLAY_CARDS,
                 Stage.FINAL_CARD_PLAY -> {
+                    state = CardGame.prepareRound(state)
+                    if (state.flow.decisions.isNotEmpty()) return state
                     if (state.playerState(actor).hand.isEmpty()) state = finishActor(state)
                     else return state
                 }
@@ -167,13 +173,21 @@ internal object TurnEngine {
     }
 
     private fun beginPhase(initial: GameState): GameState {
+        val order =
+            if (initial.stage == Stage.EXPANSION) {
+                initial.effects.civilWarVictims.fold(initial.turnOrder) { current, victim ->
+                    current.filterNot { player -> player == victim } + victim
+                }
+            } else initial.turnOrder
+        val ordered =
+            initial.copy(turnOrderSelection = initial.turnOrderSelection.copy(order = order))
         val state =
-            initial.copy(
+            ordered.copy(
                 flow =
-                    initial.flow.copy(
+                    ordered.flow.copy(
                         phaseStarted = true,
                         phaseBookkeepingApplied = false,
-                        actor = initial.turnOrder.firstOrNull(),
+                        actor = order.firstOrNull(),
                         cursor = 0,
                         purchaseStep = PurchaseStep.SHIPPING,
                     )
@@ -231,7 +245,7 @@ internal object TurnEngine {
             Stage.DRAW_CARD -> open(state, Stage.BUY_CARD)
             Stage.BUY_CARD -> open(state, Stage.PLAY_CARDS)
             Stage.PLAY_CARDS -> open(state, Stage.PURCHASE)
-            Stage.PURCHASE -> open(state, Stage.EXPANSION)
+            Stage.PURCHASE -> open(CardGame.endPurchase(state), Stage.EXPANSION)
             Stage.EXPANSION -> {
                 val winner =
                     state.turnOrder

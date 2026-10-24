@@ -240,6 +240,10 @@ or pass. War ties extend the phase ([§11.4](#114-event-cards)).
 - History-card counter symbols refer to coloured counters (AH1996 §11.5). Event replacement tokens,
   Crusades markers and markets ceded in War are coloured; in particular a Crusades marker can be an
   expansion base during the same turn. This differs from white pieces newly placed during Expansion.
+- **Implementation inference for an otherwise unplayable target:** a non-burden event with no eligible target may be
+  played without naming a target, consuming it with no effect. If any eligible target exists, one must be selected.
+  Temporary protection still excludes protected targets; it does not create a permanent burden. This keeps mandatory
+  Final Card Play possible when every potential target is temporarily protected or no eligible marker remains.
 
 **Leader cards** ([§11.3](#113-leader-cards)):
 

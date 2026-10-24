@@ -9,6 +9,9 @@ sealed interface TurnCommand : Command {
             BoardGame.passDecision(state, actor)?.let { resumed ->
                 return resumed
             }
+            CardGame.passDecision(state, actor)?.let { resumed ->
+                return resumed
+            }
             val decision = state.flow.decisions.lastOrNull()
             if (decision is RenaissanceDecision) {
                 checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)

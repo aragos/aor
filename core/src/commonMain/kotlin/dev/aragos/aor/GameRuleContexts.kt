@@ -16,6 +16,19 @@ internal fun GameState.cardContext(): CardContext =
                             .id,
                     misery = owner.misery,
                     handCardIds = owner.hand.map { card -> card.definition.id }.toSet(),
+                    ships = owner.ships,
+                    overseasPresence =
+                        board.pieces
+                            .filter { (province, occupants) ->
+                                ProvinceData.definition(province).overseas != null &&
+                                    when (occupants) {
+                                        is ProvincePieces.Marker ->
+                                            occupants.owner == owner.player.id
+                                        is ProvincePieces.Tokens ->
+                                            owner.player.id in occupants.holdings
+                                    }
+                            }
+                            .keys,
                 )
             },
         markers =
@@ -51,3 +64,16 @@ internal fun GameState.purchaseContext(actor: PlayerId): PurchaseContext =
                 }
             },
     )
+
+internal fun GameState.patronageChoices(actor: PlayerId): List<String> {
+    val player = playerState(actor)
+    if (!player.advances.owns(AdvanceId.PATRONAGE)) return emptyList()
+    return effects.leaders
+        .filter { played ->
+            played.role == CardLeaderRole.EXPOSED &&
+                played.owner != actor &&
+                actor !in played.patronageClaimants &&
+                player.cash >= played.protectionCash
+        }
+        .map { played -> "patronize ${played.leader.cardId}" }
+}
