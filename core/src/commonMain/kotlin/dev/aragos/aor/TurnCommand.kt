@@ -88,6 +88,7 @@ sealed interface TurnCommand : Command {
                     state.deck.isNotEmpty(),
                 ViolationCode.INVALID_CARD_PURCHASE,
             )
+            // TODO: Extract raw rule values, including this card cost, into named constants.
             checkRule(player.cash >= 10, ViolationCode.INSUFFICIENT_CASH)
             return state
                 .replacePlayer(player.copy(cash = player.cash - 10))
