@@ -493,7 +493,7 @@ class CardGameTest {
             running("war").withMarker("tunis", p2).withPlayer(p1) { player ->
                 player.copy(misery = MiseryStep.THOUSAND)
             }
-        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 4 3")
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
 
         val ceded = awaiting.play("p2: cede-war tunis")
 
@@ -512,7 +512,7 @@ class CardGameTest {
             running("war").withMarker("tunis", p2).withMarker("suez", p2).withPlayer(p2) { player ->
                 player.copy(misery = MiseryStep.NINE_HUNDRED)
             }
-        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 4 3")
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
 
         val ceded = awaiting.play("p2: cede-war tunis")
 
@@ -564,7 +564,7 @@ class CardGameTest {
                     effects = CardTurnEffects(enlightenedRulers = setOf(p1, p2, p3)),
                 )
 
-        val played = initial.play("p1: play-card hand-1")
+        val played = initial.play("p1: play hand-1")
 
         assertThat(played.players.values.map(PlayerState::misery))
             .containsExactly(MiseryStep.ZERO, MiseryStep.ZERO, MiseryStep.ZERO)
@@ -640,7 +640,7 @@ class CardGameTest {
                     )
                 }
 
-        val played = initial.play("p1: play-card hand-1 protect 7")
+        val played = initial.play("p1: play hand-1 protect 7")
 
         assertThat(played.playerState(p1).cash).isEqualTo(43)
         assertThat(played.effects.leaders.last().role).isEqualTo(CardLeaderRole.EXPOSED)
