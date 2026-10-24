@@ -28,7 +28,9 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
         get() = AdvanceCategory.entries.minOf(::categoryCount)
 
     val score: Int
-        get() = acquisitions.sumOf { acquisition -> definition(acquisition.advance).cost }
+        get() = acquisitions.sumOf { acquisition ->
+            AdvanceData.definition(acquisition.advance).cost
+        }
 
     fun owns(advance: AdvanceId): Boolean = acquisitions.any { acquisition ->
         acquisition.advance == advance
@@ -44,7 +46,7 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
     }
 
     fun categoryCount(category: AdvanceCategory): Int = acquisitions.count { acquisition ->
-        definition(acquisition.advance).category == category
+        AdvanceData.definition(acquisition.advance).category == category
     }
 
     /**
@@ -55,16 +57,16 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
         return acquisitions
             .filter { acquisition ->
                 acquisition.turnNumber < currentTurn &&
-                    definition(acquisition.advance).category == category
+                    AdvanceData.definition(acquisition.advance).category == category
             }
-            .sumOf { acquisition -> definition(acquisition.advance).credit }
+            .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).credit }
     }
 
     fun miseryReliefFor(currentTurn: Int): Int {
         requireValidTurn(currentTurn)
         return acquisitions
             .filter { acquisition -> acquisition.turnNumber == currentTurn }
-            .sumOf { acquisition -> definition(acquisition.advance).miseryRelief }
+            .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).miseryRelief }
     }
 
     internal fun requireValidTurn(currentTurn: Int) {
@@ -74,9 +76,6 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
         }
     }
 }
-
-internal fun definition(advance: AdvanceId): AdvanceDefinition =
-    AdvanceData.definitions.single { candidate -> candidate.id == advance }
 
 /** Relief already used during [turnNumber]; [ratingSpent] records MR dollars, not misery spaces. */
 data class MiseryReliefUsage(val turnNumber: Int, val spaces: Int = 0, val ratingSpent: Int = 0) {
