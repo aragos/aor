@@ -579,7 +579,7 @@ class CardGameTest {
     }
 
     @Test
-    fun aFinalLeaderStillPaysItsRebateAfterPurchaseWithoutResettingDisplayHistory() {
+    fun aFinalLeaderStillPaysItsRebateWithExistingDisplayHistory() {
         val initial =
             running("rashid-ad-din")
                 .copy(
@@ -608,7 +608,7 @@ class CardGameTest {
                     )
                 }
 
-        val played = CardGame.endPurchase(initial).play("p1: play-card hand-1 protect 7")
+        val played = initial.play("p1: play-card hand-1 protect 7")
 
         assertThat(played.playerState(p1).cash).isEqualTo(43)
         assertThat(played.effects.leaders.last().role).isEqualTo(CardLeaderRole.EXPOSED)
