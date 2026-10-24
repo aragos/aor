@@ -390,8 +390,9 @@ object CardRules {
                     marker.coloured &&
                         (!context.player(marker.owner).isActive ||
                             !immune(context, marker.owner, event)) &&
-                        if (event == EventId.PIRATES_VIKINGS) definition.coastal
-                        else {
+                        if (event == EventId.PIRATES_VIKINGS) {
+                            definition.coastal
+                        } else {
                             definition.overseas != OverseasGroup.NEW_WORLD &&
                                 (definition.capital == null ||
                                     province == context.player(actor).capital)
