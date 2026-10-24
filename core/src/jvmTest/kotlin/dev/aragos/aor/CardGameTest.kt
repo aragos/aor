@@ -187,7 +187,7 @@ class CardGameTest {
     }
 
     @Test
-    fun aWarParticipantMayPlayMilitaryCardsBeforeTheReroll() {
+    fun theCurrentCardRoundActorMayPlayMilitaryCardsBeforeTheReroll() {
         val tied = running("war").play("p1: play hand-1 player p2", "!roll war 3 3")
         val nextRound =
             tied.copy(flow = tied.flow.copy(actor = p2, cursor = 1)).withPlayer(p2) { player ->
@@ -199,6 +199,39 @@ class CardGameTest {
 
         assertThat(armed.effects.military).containsExactly(CardMilitaryPlay(p2, EventId.ARMOR))
         assertThat(armed.flow.decisions.last()).isInstanceOf(CardDecision.WarRoll::class.java)
+    }
+
+    @Test
+    fun anotherWarParticipantCannotPlayArmorDuringTheCurrentActorsMilitaryPreparation() {
+        val state =
+            running("stirrups").copy(activeWar = WarState(p1, p2, startedTurn = 1)).withPlayer(
+                p2
+            ) { player ->
+                player.copy(hand = listOf(hand("hand-2", "armor")))
+            }
+        val preparing = CardGame.prepareRound(state)
+
+        val failure = assertFailsWith<RuleViolation> { preparing.play("p2: play hand-2") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
+    }
+
+    @Test
+    fun anotherWarParticipantCannotPlayStirrupsDuringTheFinalCardRoundActorsPreparation() {
+        val state =
+            running("armor")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar = WarState(p1, p2, startedTurn = 1),
+                )
+                .withPlayer(p2) { player ->
+                    player.copy(hand = listOf(hand("hand-2", "stirrups")))
+                }
+        val preparing = CardGame.prepareRound(state)
+
+        val failure = assertFailsWith<RuleViolation> { preparing.play("p2: play hand-2") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
     }
 
     @Test
