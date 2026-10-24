@@ -196,16 +196,10 @@ data class WarCessionView(
             val context = state.cardContext()
             val victory = decision.victory
             val eligible = WarRules.eligibleProvinces(context, victory.winner, victory.loser)
-            val overseas = eligible.count { province ->
-                context.province(province).overseas != null
-            }
             val capacity = WarRules.overseasCapacity(context, victory.winner)
             return WarCessionView(
                 victory.winner,
-                minOf(
-                    victory.requiredTransfers,
-                    eligible.size - overseas + minOf(overseas, capacity),
-                ),
+                WarRules.requiredCessions(context, victory),
                 eligible,
                 capacity,
             )
