@@ -121,7 +121,11 @@ object CompetitionRules {
         }
         val nationalistDefence =
             if (!attackingNationalism && defendingNationalism.isNotEmpty()) {
-                defendingNationalism.maxOf(factors::getValue)
+                defendingNationalism.maxOf { defender ->
+                    requireNotNull(factors[defender]) {
+                        "Every defending player requires a strength factor."
+                    }
+                }
             } else {
                 0
             }
@@ -149,7 +153,10 @@ object CompetitionRules {
             marketNumber = definition.marketNumber,
             defenderStrength =
                 strengthByDefender.entries.sumOf { defender ->
-                    defender.value * factors.getValue(defender.key)
+                    defender.value *
+                        requireNotNull(factors[defender.key]) {
+                            "Every defender must have a strength factor: ${defender.key}."
+                        }
                 },
             defenderCapitalFactors = factors,
             defensiveSatellites =
@@ -308,7 +315,10 @@ object CompetitionRules {
         context: BoardRulesContext,
         plan: PlacementPlan.Competition,
     ): BoardChange {
-        val previous = context.board.pieces.getValue(plan.destination)
+        val previous =
+            requireNotNull(context.board.pieces[plan.destination]) {
+                "A competition requires an occupied province: ${plan.destination}."
+            }
         val replacement =
             when (previous) {
                 is ProvincePieces.Marker -> previous
@@ -337,7 +347,7 @@ object CompetitionRules {
             support.market == province &&
                 ((context.board.pieces[support.satellite] as? ProvincePieces.Tokens)
                     ?.holdings
-                    ?.get(player)
+                    .orEmpty()[player]
                     ?.coloured ?: 0) > 0
         }
 

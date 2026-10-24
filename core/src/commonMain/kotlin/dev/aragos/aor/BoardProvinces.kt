@@ -334,6 +334,9 @@ object ProvinceData {
 
     val byId: Map<ProvinceId, ProvinceDefinition> = definitions.associateBy(ProvinceDefinition::id)
 
+    fun definition(id: ProvinceId): ProvinceDefinition =
+        requireNotNull(byId[id]) { "Unknown province in the reviewed catalog: $id." }
+
     /** Includes all overseas boxes; access conditions remain separate from setup availability. */
     fun availableFor(playerCount: Int): List<ProvinceDefinition> {
         require(playerCount in 3..6) { "Province availability requires three through six players." }

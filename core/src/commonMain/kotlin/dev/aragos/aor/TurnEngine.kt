@@ -306,7 +306,10 @@ internal object TurnEngine {
                     else
                         paying.replacePlayer(
                             paying.playerState(majority).let { player ->
-                                val cost = counts.getValue(majority)
+                                val cost =
+                                    requireNotNull(counts[majority]) {
+                                        "A commodity majority must have an ownership count: $majority."
+                                    }
                                 if (player.cash >= cost) player.copy(cash = player.cash - cost)
                                 else
                                     player.copy(
