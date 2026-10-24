@@ -311,15 +311,16 @@ class CardMarkerPlacementTest {
                                 player,
                                 capital = capitals[index],
                                 hand =
-                                    if (player.id == p1)
+                                    if (player.id == p1) {
                                         listOf(hand("hand-1", card), hand("hand-4", "fur"))
-                                    else
+                                    } else {
                                         listOf(
                                             hand(
                                                 "hand-${index + 1}",
                                                 if (index == 1) "stone-2" else "wool-2",
                                             )
-                                        ),
+                                        )
+                                    },
                             )
                     }
                     .toMap(),
