@@ -75,5 +75,5 @@ internal fun GameState.patronageChoices(actor: PlayerId): List<String> {
                 actor !in played.patronageClaimants &&
                 player.cash >= played.protectionCash
         }
-        .map { played -> "patronize-leader ${played.leader.cardId}" }
+        .map { played -> "patronize ${played.leader.cardId}" }
 }
