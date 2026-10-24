@@ -36,6 +36,9 @@ sealed interface CardCommand : Command {
                 return PlayCard(arguments[0], parseChoice(arguments[1], arguments[2]))
             }
 
+            // TODO: Explore omitting commodity/player/province/category/protect qualifiers after
+            // defining unambiguous card and choice resolution, for example `play wine/cloth cloth`
+            // and `play crusades alexandria`.
             private fun parseChoice(kind: String, value: String): CardChoice =
                 when (kind) {
                     "commodity" -> CardChoice.CommodityChoice(Commodity.valueOf(value.uppercase()))
