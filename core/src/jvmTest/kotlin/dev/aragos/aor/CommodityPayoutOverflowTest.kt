@@ -34,18 +34,22 @@ class CommodityPayoutOverflowTest {
                     player = player,
                     capital = capital.id,
                     advances =
-                        if (player.id == owner)
+                        if (player.id == owner) {
                             PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.INDUSTRY, 1)))
-                        else PlayerAdvances(),
+                        } else {
+                            PlayerAdvances()
+                        },
                     hand =
-                        if (player.id == owner)
+                        if (player.id == owner) {
                             listOf(
                                 HandCard(
                                     "hand-1",
                                     CardData.epochOne.single { card -> card.id == "wool-1" },
                                 )
                             )
-                        else emptyList(),
+                        } else {
+                            emptyList()
+                        },
                 )
             }
         val initial =
