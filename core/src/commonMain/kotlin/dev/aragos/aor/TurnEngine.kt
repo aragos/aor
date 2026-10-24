@@ -330,7 +330,7 @@ internal object TurnEngine {
             Stage.DRAW_CARD -> open(state, Stage.BUY_CARD)
             Stage.BUY_CARD -> open(state, Stage.PLAY_CARDS)
             Stage.PLAY_CARDS -> open(state, Stage.PURCHASE)
-            Stage.PURCHASE -> open(CardGame.endPurchase(state), Stage.EXPANSION)
+            Stage.PURCHASE -> open(state, Stage.EXPANSION)
             Stage.EXPANSION -> {
                 val winner = expansionBonusWinner(state)
                 val next = open(state, Stage.INCOME)
