@@ -255,7 +255,7 @@ object BoardGame {
         val decision = state.flow.decisions.lastOrNull() as? BoardDecision.WindmillOpportunity
         checkRule(decision?.player == actor, ViolationCode.WRONG_PLAYER)
         val frame = requireNotNull(decision) { "A validated Wind/Watermill use requires a frame." }
-        val number = ProvinceData.byId.getValue(frame.province).marketNumber
+        val number = ProvinceData.definition(frame.province).marketNumber
         val paid = spendPool(state.popDecision(), actor, number, returnToStock = true)
         return paid
             .copy(flow = paid.flow.copy(windmillUsed = paid.flow.windmillUsed + actor))
@@ -325,7 +325,9 @@ object BoardGame {
                 context(state),
                 decision.plan,
                 CompetitionRoll(white = values[0], black = values[1], green = values[2]),
-                state.orderBoxes.getValue(decision.plan.player),
+                requireNotNull(state.orderBoxes[decision.plan.player]) {
+                    "A competing attacker must have an order box: ${decision.plan.player}."
+                },
             )
         return completeCompetition(state.popDecision(), decision.plan, resolution)
     }
@@ -385,7 +387,7 @@ object BoardGame {
         if (
             winner.advances.owns(AdvanceId.WIND_WATERMILL) &&
                 plan.player !in conquered.flow.windmillUsed &&
-                winner.poolTokens >= ProvinceData.byId.getValue(plan.destination).marketNumber &&
+                winner.poolTokens >= ProvinceData.definition(plan.destination).marketNumber &&
                 winner.hand.isNotEmpty() &&
                 defeated.hand.isNotEmpty() &&
                 defeated.misery != MiseryStep.CHAOS
@@ -505,8 +507,10 @@ object BoardGame {
         province: ProvinceId,
     ): Int {
         val existing =
-            (context.board.pieces[province] as? ProvincePieces.Tokens)?.holdings?.get(actor)?.total
-                ?: 0
+            (context.board.pieces[province] as? ProvincePieces.Tokens)
+                ?.holdings
+                .orEmpty()[actor]
+                ?.total ?: 0
         return CompetitionRules.requirement(context, actor, province).requirement.tokens - existing
     }
 

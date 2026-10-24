@@ -67,7 +67,11 @@ class GameEndingTest {
                 .toMap()
         val board =
             players.fold(BoardState()) { board, player ->
-                val capital = states.getValue(player.id).capital
+                val capital =
+                    requireNotNull(states[player.id]) {
+                            "Every registered player must have a state: ${player.id}."
+                        }
+                        .capital
                 board
                     .placeMarker(
                         ProvinceData.definitions

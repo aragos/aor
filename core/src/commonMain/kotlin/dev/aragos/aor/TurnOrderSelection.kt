@@ -89,12 +89,12 @@ data class TurnOrderSelection(
             require(purchases.keys == capitalOrder.toSet()) {
                 "Every capital chooser must have exactly one token purchase."
             }
-            val ranked = capitalOrder.sortedBy(purchases::getValue)
+            val ranked = capitalOrder.sortedBy { player -> purchases[player] }
             return TurnOrderSelection(
                 order = ranked,
                 ties =
                     ranked
-                        .groupBy(purchases::getValue)
+                        .groupBy { player -> purchases[player] }
                         .values
                         .filter { players -> players.size > 1 }
                         .map(::TurnOrderTie),
