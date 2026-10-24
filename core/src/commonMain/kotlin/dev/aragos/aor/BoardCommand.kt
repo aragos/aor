@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-/** Expansion commands and the optional interruptions produced by a successful competition. */
+/** Expansion actions and optional competition or trade decisions. */
 sealed interface BoardCommand : Command {
     data class Place(
         val tokens: Int,

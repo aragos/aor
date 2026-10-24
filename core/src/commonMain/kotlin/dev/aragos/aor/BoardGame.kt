@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-/** Board interruptions retain the phase's outer actor while another defender or the system acts. */
+/** Competition and trade decisions preserve the current expansion activity. */
 sealed interface BoardDecision : TurnDecision {
     data class CathedralChoice(
         override val player: PlayerId,

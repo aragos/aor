@@ -63,18 +63,20 @@ skips another player's response. Purchase steps retain their order even when no 
 
 | Command | Who and when; effect |
 | --- | --- |
-| `place <amount> <province> [route]` | Expansion actor; commits a positive number of pool tokens. An attack must commit exactly the calculated requirement, including existing attacker tokens; excess is rejected. |
-| `attack <province> [route]` | Expansion actor; calculates and commits the exact additional attack tokens. |
+| `place <amount> <province>` | Expansion actor; commits a positive number of pool tokens. An attack must commit exactly the calculated requirement, including existing attacker tokens; excess is rejected. |
+| `attack <province>` | Expansion actor; calculates and commits the exact additional attack tokens. |
 | `reduce-marker <province>` | Expansion actor; replaces an owned coloured marker with one coloured token. A voluntary rebuild never earns expansion-bonus credit. |
 | `buy-expansion-card` | Expansion actor; trades pool tokens for one card, at most once per player. Shared price starts at 3 tokens and rises by 3 per purchase this phase. |
 | `cathedral` | Eligible attacker or defender before competition dice; declares an automatic win against non-owners. Once per turn against each opponent; cannot defeat a Cathedral-owning defender or apply to War. `pass` declines. |
 | `windmill` | Player answering a Wind/Watermill opportunity; requests its selection die. `pass` declines. |
 | `offer-card <reference>` | Wind/Watermill trader; selects the owned card to exchange. The other card is chosen by a recorded random transfer. |
 
-`<province>` is a configured province id such as `florence`, not its display name. An optional
-`[route]` is `land`, `ship`, or `caravan <province>` (the intermediate province). Omitting it lets
-the engine prefer land, then Caravan, then shipping. Reach, overseas access, physical capacity and
-per-destination shipping limits still apply. `pass` completes Expansion and returns the unused pool.
+`<province>` is a configured province id such as `florence`, not its display name. The engine
+chooses a feasible route automatically for the requested token count, preferring non-galley
+movement and avoiding shipping when local, land or Caravan movement is usable. Equivalent routes
+use deterministic distance and identifier ordering. Reach, overseas access, physical capacity and
+remaining per-destination shipping limits still apply. `pass` completes Expansion and returns the
+unused pool.
 
 ## Authority outcomes and replay
 
