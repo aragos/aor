@@ -88,7 +88,13 @@ enum class Stage {
                         commands =
                             RebuiltMarkerBonus.entries.map { policy ->
                                 Command.SetRebuiltMarkerBonus(policy).toText()
-                            } + "start"
+                            } +
+                                RuleOptionView.from(state.rules).flatMap { option ->
+                                    option.choices.map { value ->
+                                        RuleOptionCommand(option.key, value).toText()
+                                    }
+                                } +
+                                "start"
                     )
                 } else {
                     LegalChoices()

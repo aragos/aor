@@ -77,26 +77,53 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
 
     fun submit(stored: StoredGame, player: PlayerId, command: Command): StoredGame {
         val state = stored.state()
+        return submit(stored, state, player, command)
+    }
+
+    /** Resolve live shorthand after authentication, then record only canonical commands. */
+    fun submit(stored: StoredGame, player: PlayerId, text: String): StoredGame {
+        val state = stored.state()
+        val action = TextCodec.parseAction(text, state, actor = player)
+        return submit(stored, state, player, action.command)
+    }
+
+    private fun submit(
+        stored: StoredGame,
+        state: GameState,
+        player: PlayerId,
+        command: Command,
+    ): StoredGame {
         return when (command) {
             is Command.BidCapital ->
                 submitSealedDecision(
-                    stored = stored,
                     state = state,
                     player = player,
-                    amount = command.amount,
+                    value = command.amount,
+                    pendingValues = stored.pendingBids,
                     revealCommand = "reveal-capital-bids",
                     createCommand = Command::BidCapital,
+                    withPending = { pending -> stored.copy(pendingBids = pending) },
                 )
             is Command.BuyTokens ->
                 submitSealedDecision(
-                    stored = stored,
                     state = state,
                     player = player,
-                    amount = command.amount,
+                    value = command.amount,
+                    pendingValues = stored.pendingBids,
                     revealCommand = "reveal-token-purchases",
                     createCommand = Command::BuyTokens,
+                    withPending = { pending -> stored.copy(pendingBids = pending) },
                 )
-            is SetupCommand.ReturnCard -> submitSetupReturn(stored, state, player, command)
+            is SetupCommand.ReturnCard ->
+                submitSealedDecision(
+                    state = state,
+                    player = player,
+                    value = command.reference,
+                    pendingValues = stored.pendingReturns,
+                    revealCommand = "reveal-setup-returns",
+                    createCommand = SetupCommand::ReturnCard,
+                    withPending = { pending -> stored.copy(pendingReturns = pending) },
+                )
             else ->
                 commit(
                     stored = stored,
@@ -115,57 +142,25 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         }
     }
 
-    private fun submitSetupReturn(
-        stored: StoredGame,
+    private fun <T> submitSealedDecision(
         state: GameState,
         player: PlayerId,
-        command: SetupCommand.ReturnCard,
-    ): StoredGame {
-        state.step(Entry.Action(player, command))
-        val pending = stored.pendingReturns + (player to command.reference)
-        val required =
-            (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players
-                ?: error("Setup returns require a simultaneous player prompt.")
-        if (required.any { participant -> participant !in pending }) {
-            return stored.copy(pendingReturns = pending)
-        }
-        return commit(
-            stored = stored.copy(pendingReturns = emptyMap()),
-            state = state,
-            player = player,
-            command = "reveal-setup-returns",
-            actions =
-                state.playerIds.filter(required::contains).map { participant ->
-                    Entry.Action(
-                        participant,
-                        SetupCommand.ReturnCard(
-                            requireNotNull(pending[participant]) {
-                                "Every setup participant requires a selected return."
-                            }
-                        ),
-                    )
-                },
-        )
-    }
-
-    private fun submitSealedDecision(
-        stored: StoredGame,
-        state: GameState,
-        player: PlayerId,
-        amount: Int,
+        value: T,
+        pendingValues: Map<PlayerId, T>,
         revealCommand: String,
-        createCommand: (Int) -> Command,
+        createCommand: (T) -> Command,
+        withPending: (Map<PlayerId, T>) -> StoredGame,
     ): StoredGame {
-        state.step(Entry.Action(actor = player, command = createCommand(amount)))
-        val pending = stored.pendingBids + (player to amount)
+        state.step(Entry.Action(actor = player, command = createCommand(value)))
+        val pending = pendingValues + (player to value)
         val required =
             (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players
                 ?: error("Sealed submissions require a simultaneous player prompt.")
         if (required.any { participant -> participant !in pending }) {
-            return stored.copy(pendingBids = pending)
+            return withPending(pending)
         }
         return commit(
-            stored = stored.copy(pendingBids = emptyMap()),
+            stored = withPending(emptyMap()),
             state = state,
             player = player,
             command = revealCommand,

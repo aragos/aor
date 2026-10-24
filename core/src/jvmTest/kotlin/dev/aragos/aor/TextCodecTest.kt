@@ -115,6 +115,25 @@ class TextCodecTest {
         assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
     }
 
+    @Test
+    fun authorityOutcomesAcceptTheSameWhitespaceAsCommands() {
+        val entry = TextCodec.parse("!draw\tp1  hand-1\tstone-1  ")
+
+        assertThat(entry.toText()).isEqualTo("!draw p1 hand-1 stone-1")
+    }
+
+    @Test
+    fun entriesCannotSpanMultipleLines() {
+        val entries = listOf("p1: start\n", "!shuffle stone-1\nstone-2")
+
+        val codes = entries.map { entry ->
+            assertFailsWith<RuleViolation> { TextCodec.parse(entry) }.code
+        }
+
+        assertThat(codes)
+            .containsExactly(ViolationCode.INVALID_COMMAND, ViolationCode.INVALID_COMMAND)
+    }
+
     private fun entries() =
         listOf(
             "p1: set-option setup standard",

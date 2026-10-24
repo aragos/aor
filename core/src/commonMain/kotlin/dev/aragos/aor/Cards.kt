@@ -32,6 +32,22 @@ data class CardDefinition(
         }
         require(messageId.isNotBlank()) { "A card requires a presentation message id." }
     }
+
+    /**
+     * Locale-independent input names; physical copies may share a name and require a hand
+     * reference.
+     */
+    internal fun matchesInput(name: String): Boolean {
+        if (
+            name == id || name == messageId.removePrefix("card.") || name == id.removePrefix("the-")
+        ) {
+            return true
+        }
+        val commodities =
+            CardEffectData.forCard(id) as? CardEffectSpec.CommodityChoices ?: return false
+        return name.split('/').sorted() ==
+            commodities.choices.map { commodity -> commodity.name.lowercase() }.sorted()
+    }
 }
 
 @GameDataDsl
