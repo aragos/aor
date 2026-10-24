@@ -15,13 +15,7 @@ class BoardGameTest {
         val commands =
             listOf(
                 "place 4 florence",
-                "place 2 rome ship",
-                "place 2 milan land",
-                "place 3 rome caravan florence",
                 "attack rome",
-                "attack florence land",
-                "attack sicily ship",
-                "attack rome caravan florence",
                 "reduce-marker venice",
                 "pass",
                 "buy-expansion-card",
@@ -147,7 +141,7 @@ class BoardGameTest {
                 .act("attack florence")
                 .win()
 
-        val placed = state.act("place 4 rome caravan florence")
+        val placed = state.act("place 4 rome")
 
         assertThat(placed.board.pieces[id("rome")])
             .isEqualTo(ProvincePieces.Marker(p1, PieceSide.WHITE))
@@ -158,24 +152,28 @@ class BoardGameTest {
     fun caravanCannotPassThroughAFullEnemyProvinceBeforeWinningIt() {
         val state =
             expansion(
-                BoardState().placeMarker(id("florence"), p2).board,
+                BoardState()
+                    .placeMarker(id("florence"), p2)
+                    .board
+                    .placeMarker(id("genoa"), p2)
+                    .board,
                 advances = mapOf(p1 to setOf(AdvanceId.CARAVAN)),
             )
 
-        val failure = assertFailsWith<RuleViolation> { state.act("place 1 rome caravan florence") }
+        val failure = assertFailsWith<RuleViolation> { state.act("place 1 rome") }
 
-        assertThat(failure.code).isEqualTo(ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED)
+        assertThat(failure.code).isEqualTo(ViolationCode.UNREACHABLE_PROVINCE)
     }
 
     @Test
     fun failedShippingAttacksRemainChargedAgainstTheDestinationQuota() {
         val state =
             expansion(
-                    BoardState().placeMarker(id("florence"), p2).board,
+                    BoardState().placeMarker(id("rome"), p2).board,
                     advances = mapOf(p1 to setOf(AdvanceId.SEAWORTHY_VESSELS)),
                     ships = mapOf(p1 to ShippingCapability.SEAWORTHY_10),
                 )
-                .act("attack florence ship")
+                .act("attack rome")
                 .step(
                     GameOutcome.Roll(
                         GameRollKind.COMPETITION,
@@ -183,10 +181,10 @@ class BoardGameTest {
                     )
                 )
 
-        val failure = assertFailsWith<RuleViolation> { state.act("attack florence ship") }
+        val failure = assertFailsWith<RuleViolation> { state.act("attack rome") }
 
         assertThat(failure.code).isEqualTo(ViolationCode.SHIPPING_CAPACITY_EXCEEDED)
-        assertThat(state.flow.shipped[p1]).containsExactly(id("florence"), 8)
+        assertThat(state.flow.shipped[p1]).containsExactly(id("rome"), 8)
         assertThat(state.playerState(p1).poolTokens).isEqualTo(12)
     }
 
@@ -205,6 +203,60 @@ class BoardGameTest {
     }
 
     @Test
+    fun advertisedGalleyPlacementUsesTheSameAutomaticRouteDuringExecution() {
+        val state = expansion(ships = mapOf(p1 to ShippingCapability.GALLEY_4))
+        val choices = state.legalChoices(p1).commands
+
+        val placed = state.act("place 1 rome")
+
+        assertThat(choices).contains("place 1 rome")
+        assertThat(placed.flow.shipped[p1]).containsExactly(id("rome"), 1)
+        assertThat(placed.playerState(p1).poolTokens).isEqualTo(19)
+    }
+
+    @Test
+    fun exhaustedShippingDoesNotHideOrRejectALegalLandPlacement() {
+        val state =
+            expansion(ships = mapOf(p1 to ShippingCapability.GALLEY_4))
+                .copy(
+                    flow =
+                        TurnFlow(
+                            actor = p1,
+                            phaseStarted = true,
+                            shipped = mapOf(p1 to mapOf(id("florence") to 4)),
+                        )
+                )
+        val choices = state.legalChoices(p1).commands
+
+        val placed = state.act("place 1 florence")
+
+        assertThat(choices).contains("place 1 florence")
+        assertThat(placed.flow.shipped).isEqualTo(state.flow.shipped)
+        assertThat(placed.playerState(p1).poolTokens).isEqualTo(19)
+    }
+
+    @Test
+    fun exhaustedGalleyOnlyPlacementIsNeitherAdvertisedNorAccepted() {
+        val state =
+            expansion(ships = mapOf(p1 to ShippingCapability.GALLEY_4))
+                .copy(
+                    flow =
+                        TurnFlow(
+                            actor = p1,
+                            phaseStarted = true,
+                            shipped = mapOf(p1 to mapOf(id("rome") to 4)),
+                        )
+                )
+        val choices = state.legalChoices(p1).commands
+
+        val failure = assertFailsWith<RuleViolation> { state.act("place 1 rome") }
+
+        assertThat(choices).doesNotContain("place 1 rome")
+        assertThat(failure.code).isEqualTo(ViolationCode.SHIPPING_CAPACITY_EXCEEDED)
+        assertThat(state.playerState(p1).poolTokens).isEqualTo(20)
+    }
+
+    @Test
     fun whitePresenceConsumesAnOverseasOccupancySlot() {
         val state =
             expansion(
@@ -218,11 +270,131 @@ class BoardGameTest {
                         ),
                     ships = mapOf(p1 to ShippingCapability.OCEAN_1),
                 )
-                .act("place 1 china ship")
+                .act("place 1 china")
 
-        val failure = assertFailsWith<RuleViolation> { state.act("place 1 india ship") }
+        val failure = assertFailsWith<RuleViolation> { state.act("place 1 india") }
 
         assertThat(failure.code).isEqualTo(ViolationCode.OVERSEAS_LIMIT_EXCEEDED)
+    }
+
+    @Test
+    fun anAttackerWithCathedralCanDeclareOrPassBeforeCompetitionDice() {
+        val state =
+            expansion(
+                BoardState().placeMarker(id("florence"), p2).board,
+                advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+            )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts()).containsExactly(Prompt.SinglePlayer(p1, "cathedral"))
+        assertThat(pending.legalChoices(p1).commands).containsExactly("cathedral", "pass")
+        assertThat(pending.flow.actor).isEqualTo(p1)
+    }
+
+    @Test
+    fun attackingCathedralWinsWithoutDiceAndRecordsEveryDefendingOpponent() {
+        val board =
+            BoardState(
+                persistentMapOf(
+                    id("florence") to
+                        ProvincePieces.Tokens(
+                            persistentMapOf(
+                                p2 to TokenHolding(coloured = 1),
+                                p3 to TokenHolding(coloured = 1),
+                            )
+                        )
+                )
+            )
+        val pending =
+            expansion(board, advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)))
+                .act("attack florence")
+
+        val conquered = pending.act("cathedral")
+
+        assertThat(conquered.board.pieces[id("florence")])
+            .isEqualTo(ProvincePieces.Marker(p1, PieceSide.WHITE))
+        assertThat(conquered.flow.cathedralUses).containsExactly(p1 to p2, p1 to p3)
+        assertThat(conquered.flow.decisions).isEmpty()
+        assertThat(conquered.flow.actor).isEqualTo(p1)
+    }
+
+    @Test
+    fun passingAttackingCathedralRequestsDiceWithoutSpendingItsUseOrChangingTheActor() {
+        val pending =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        val passed = pending.act("pass")
+
+        assertThat(passed.prompts())
+            .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.COMPETITION, 3)))
+        assertThat(passed.flow.cathedralUses).isEmpty()
+        assertThat(passed.flow.actor).isEqualTo(p1)
+    }
+
+    @Test
+    fun attackingCathedralCannotBeOfferedAgainAgainstTheSameOpponent() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .copy(
+                    flow =
+                        TurnFlow(
+                            actor = p1,
+                            phaseStarted = true,
+                            cathedralUses = setOf(p1 to p2),
+                        )
+                )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts())
+            .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.COMPETITION, 3)))
+    }
+
+    @Test
+    fun attackingCathedralRemainsAvailableAgainstADifferentOpponent() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p3).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .copy(
+                    flow =
+                        TurnFlow(
+                            actor = p1,
+                            phaseStarted = true,
+                            cathedralUses = setOf(p1 to p2),
+                        )
+                )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts()).containsExactly(Prompt.SinglePlayer(p1, "cathedral"))
+    }
+
+    @Test
+    fun neitherSideCanDeclareCathedralWhenTheAttackerAndDefenderBothOwnIt() {
+        val state =
+            expansion(
+                BoardState().placeMarker(id("florence"), p2).board,
+                advances =
+                    mapOf(
+                        p1 to setOf(AdvanceId.CATHEDRAL),
+                        p2 to setOf(AdvanceId.CATHEDRAL),
+                    ),
+            )
+
+        val pending = state.act("attack florence")
+
+        assertThat(pending.prompts())
+            .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.COMPETITION, 3)))
     }
 
     @Test
