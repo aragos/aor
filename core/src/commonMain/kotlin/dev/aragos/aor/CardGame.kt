@@ -109,8 +109,9 @@ object CardGame {
             ViolationCode.WRONG_PHASE,
         )
         val preparing = state.flow.decisions.lastOrNull() as? CardDecision.WarPreparation
-        if (preparing == null) state.requireActor(actor, state.stage)
-        else {
+        if (preparing == null) {
+            state.requireActor(actor, state.stage)
+        } else {
             checkRule(
                 preparing.player == actor && state.flow.actor == actor,
                 ViolationCode.WRONG_PLAYER,
@@ -127,8 +128,7 @@ object CardGame {
         if (preparing != null) {
             val spec = CardEffectData.forCard(card.definition.id)
             cardRule(
-                spec is CardEffectSpec.Event &&
-                    spec.event in setOf(EventId.ARMOR, EventId.STIRRUPS),
+                spec.isMilitary(),
                 CardRuleCode.INVALID_CHOICE,
                 "A pending War reroll must resolve before any non-military card is played.",
             )
@@ -221,8 +221,11 @@ object CardGame {
                         .copy(activeWar = result.war.copy(lastRound = currentRound(state)))
                         .gainMisery(result.war.initiator, 1)
                         .gainMisery(result.war.opponent, 1)
-                if (WarRules.canContinue(tied.cardContext(), result.war)) tied
-                else tied.copy(activeWar = null)
+                if (WarRules.canContinue(tied.cardContext(), result.war)) {
+                    tied
+                } else {
+                    tied.copy(activeWar = null)
+                }
             }
             is WarResult.Victory -> {
                 val won = next.copy(activeWar = null)
@@ -230,7 +233,9 @@ object CardGame {
                     WarRules.eligibleProvinces(won.cardContext(), result.winner, result.loser)
                 if (result.requiredTransfers == 0 || eligible.isEmpty()) {
                     settleWar(won, result, emptySet())
-                } else won.pushDecision(CardDecision.WarSurrender(result.loser, result))
+                } else {
+                    won.pushDecision(CardDecision.WarSurrender(result.loser, result))
+                }
             }
         }
     }
@@ -269,11 +274,6 @@ object CardGame {
             .replacePlayer(recipient.copy(cash = recipient.cash + claim.cash))
     }
 
-    /**
-     * Escrow left cash at play time; retain turn leader history but make no refund or second debit.
-     */
-    fun endPurchase(state: GameState): GameState = state
-
     private fun apply(state: GameState, resolution: CardResolution): GameState =
         when (resolution) {
             is CardResolution.NoEffect -> state
@@ -289,8 +289,11 @@ object CardGame {
                 val remaining = paid.adjustments[resolution.commodity].orEmpty().drop(1)
                 paid.copy(
                     adjustments =
-                        if (remaining.isEmpty()) paid.adjustments - resolution.commodity
-                        else paid.adjustments + (resolution.commodity to remaining)
+                        if (remaining.isEmpty()) {
+                            paid.adjustments - resolution.commodity
+                        } else {
+                            paid.adjustments + (resolution.commodity to remaining)
+                        }
                 )
             }
             is CardResolution.AlchemistLoss ->
@@ -306,28 +309,7 @@ object CardGame {
                 resolution.spaces.entries.fold(state) { current, (player, spaces) ->
                     current.gainMisery(player, spaces)
                 }
-            is CardResolution.CivilWar -> {
-                val hurt = state.gainMisery(resolution.victim, 1)
-                val ordered =
-                    if (resolution.moveLastAtExpansion)
-                        hurt.copy(
-                            effects =
-                                hurt.effects.copy(
-                                    civilWarVictims =
-                                        hurt.effects.civilWarVictims + resolution.victim
-                                )
-                        )
-                    else hurt
-                val awaitingLoss =
-                    if (
-                        !state.cardContext().finalCardPlay &&
-                            ordered.playerState(resolution.victim).misery != MiseryStep.CHAOS
-                    )
-                        ordered.pushDecision(CardDecision.CivilWarLoss(resolution.victim))
-                    else ordered
-                if (resolution.capitalReduction == null) awaitingLoss
-                else reduceMarker(awaitingLoss, resolution.capitalReduction)
-            }
+            is CardResolution.CivilWar -> civilWar(state, resolution)
             is CardResolution.MarkerReduction -> reduceMarker(state, resolution)
             is CardResolution.CrusadesPlacement ->
                 state
@@ -353,6 +335,32 @@ object CardGame {
                         }
                     )
         }
+
+    private fun civilWar(state: GameState, resolution: CardResolution.CivilWar): GameState {
+        val hurt = state.gainMisery(resolution.victim, 1)
+        val ordered =
+            if (resolution.moveLastAtExpansion) {
+                hurt.copy(
+                    effects =
+                        hurt.effects.copy(
+                            civilWarVictims = hurt.effects.civilWarVictims + resolution.victim
+                        )
+                )
+            } else {
+                hurt
+            }
+        val awaitingLoss =
+            if (
+                !state.cardContext().finalCardPlay &&
+                    ordered.playerState(resolution.victim).misery != MiseryStep.CHAOS
+            ) {
+                ordered.pushDecision(CardDecision.CivilWarLoss(resolution.victim))
+            } else {
+                ordered
+            }
+        val reduction = resolution.capitalReduction ?: return awaitingLoss
+        return reduceMarker(awaitingLoss, reduction)
+    }
 
     private fun reduceMarker(
         state: GameState,
@@ -387,23 +395,20 @@ object CardGame {
         val context = state.cardContext()
         return state.playerState(actor).hand.flatMap { card ->
             val spec = CardEffectData.forCard(card.definition.id)
-            if (
-                militaryOnly &&
-                    (spec !is CardEffectSpec.Event ||
-                        spec.event !in setOf(EventId.ARMOR, EventId.STIRRUPS))
-            )
-                emptyList()
-            else
-                choices(context, spec).mapNotNull { choice ->
-                    try {
-                        CardRules.resolve(context, actor, CardPlay(card.definition.id, choice))
-                        CardCommand.PlayCard(card.reference, choice).toText()
-                    } catch (_: CardRuleViolation) {
-                        null
-                    }
+            if (militaryOnly && !spec.isMilitary()) return@flatMap emptyList()
+            choices(context, spec).mapNotNull { choice ->
+                try {
+                    CardRules.resolve(context, actor, CardPlay(card.definition.id, choice))
+                    CardCommand.PlayCard(card.reference, choice).toText()
+                } catch (_: CardRuleViolation) {
+                    null
                 }
+            }
         }
     }
+
+    private fun CardEffectSpec.isMilitary(): Boolean =
+        this is CardEffectSpec.Event && event in setOf(EventId.ARMOR, EventId.STIRRUPS)
 
     private fun choices(context: CardContext, spec: CardEffectSpec): List<CardChoice> =
         when (spec) {
