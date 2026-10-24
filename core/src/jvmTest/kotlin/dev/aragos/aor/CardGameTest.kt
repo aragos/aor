@@ -26,7 +26,7 @@ class CardGameTest {
                 )
                 .withMarker("salonika", p2)
 
-        val played = initial.play("p1: play-card hand-1")
+        val played = initial.play("p1: play hand-1")
 
         assertThat(played.playerState(p2).cash).isEqualTo(72)
         assertThat(played.adjustments[Commodity.SILK]).containsExactly(CommodityAdjustment.SHORTAGE)
@@ -38,7 +38,7 @@ class CardGameTest {
     fun anotherPlayerCannotPlayTheActivePlayersCard() {
         val initial = running("silk")
 
-        val failure = assertFailsWith<RuleViolation> { initial.play("p2: play-card hand-1") }
+        val failure = assertFailsWith<RuleViolation> { initial.play("p2: play hand-1") }
 
         assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
     }
@@ -47,7 +47,7 @@ class CardGameTest {
     fun civilWarSuspendsTheOuterActorForTheVictimsChoice() {
         val initial = running("civil-war")
 
-        val played = initial.play("p1: play-card hand-1 player p2")
+        val played = initial.play("p1: play hand-1 player p2")
 
         assertThat(played.flow.actor).isEqualTo(p1)
         assertThat(played.flow.decisions.last()).isEqualTo(CardDecision.CivilWarLoss(p2))
@@ -56,7 +56,7 @@ class CardGameTest {
 
     @Test
     fun aCivilWarReplyReturnsToTheSameCardRound() {
-        val awaiting = running("civil-war").play("p1: play-card hand-1 player p2")
+        val awaiting = running("civil-war").play("p1: play hand-1 player p2")
 
         val replied = awaiting.play("p2: civil-war-loss tokens")
 
@@ -67,7 +67,7 @@ class CardGameTest {
 
     @Test
     fun onlyTheVictimCanAnswerCivilWar() {
-        val awaiting = running("civil-war").play("p1: play-card hand-1 player p2")
+        val awaiting = running("civil-war").play("p1: play hand-1 player p2")
 
         val failure = assertFailsWith<RuleViolation> { awaiting.play("p3: civil-war-loss cash") }
 
@@ -76,7 +76,7 @@ class CardGameTest {
 
     @Test
     fun civilWarRecordsTheDelayedExpansionPenalty() {
-        val played = running("civil-war").play("p1: play-card hand-1 player p2")
+        val played = running("civil-war").play("p1: play hand-1 player p2")
 
         assertThat(played.effects.civilWarVictims).containsExactly(p2)
     }
@@ -87,8 +87,7 @@ class CardGameTest {
             running("civil-war").withMarker("genoa", p2).withPlayer(p2) { player ->
                 player.copy(stockTokens = 0, poolTokens = 5)
             }
-        val awaiting =
-            initial.play("p1: play-card hand-1 player p2", "p2: replace-event-token pool")
+        val awaiting = initial.play("p1: play hand-1 player p2", "p2: replace-event-token pool")
 
         val replied = awaiting.play("p2: civil-war-loss tokens")
 
@@ -104,7 +103,7 @@ class CardGameTest {
             running("pirates-vikings").withMarker("tunis", p2).withPlayer(p2) { player ->
                 player.copy(stockTokens = 0)
             }
-        val awaiting = initial.play("p1: play-card hand-1 province tunis")
+        val awaiting = initial.play("p1: play hand-1 province tunis")
 
         val replied = awaiting.play("p2: replace-event-token none")
 
@@ -114,7 +113,7 @@ class CardGameTest {
 
     @Test
     fun crusadesCreatesAColouredExpansionBase() {
-        val played = running("the-crusades").play("p1: play-card hand-1 province acre")
+        val played = running("the-crusades").play("p1: play hand-1 province acre")
 
         assertThat(played.board.pieces[ProvinceId("acre")])
             .isEqualTo(ProvincePieces.Marker(p1, PieceSide.COLOURED))
@@ -123,7 +122,7 @@ class CardGameTest {
 
     @Test
     fun warRequestsAnExplicitRecordedPairOfDice() {
-        val played = running("war").play("p1: play-card hand-1 player p2")
+        val played = running("war").play("p1: play hand-1 player p2")
 
         assertThat(played.prompts().single())
             .isEqualTo(Prompt.System(SystemNeed.GameRoll(GameRollKind.WAR, 2)))
@@ -133,7 +132,7 @@ class CardGameTest {
     fun aWarVictorySuspendsForTheLosersProvinceChoice() {
         val initial = running("war").withMarker("tunis", p2).withMarker("suez", p2)
 
-        val rolled = initial.play("p1: play-card hand-1 player p2", "!roll war 4 3")
+        val rolled = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
 
         val decision = rolled.flow.decisions.last() as CardDecision.WarSurrender
         assertThat(decision.player).isEqualTo(p2)
@@ -143,7 +142,7 @@ class CardGameTest {
     @Test
     fun aWarSurrenderTransfersTheChosenColouredMarkerAndAppliesMisery() {
         val initial = running("war").withMarker("tunis", p2).withMarker("suez", p2)
-        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 4 3")
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 4 3")
 
         val ceded = awaiting.play("p2: cede-war tunis")
 
@@ -157,7 +156,7 @@ class CardGameTest {
     @Test
     fun warWithoutEnoughProvincesAddsTheShortfallToMisery() {
         val initial = running("war").withMarker("tunis", p2)
-        val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 6 1")
+        val awaiting = initial.play("p1: play hand-1 player p2", "!roll war 6 1")
 
         val ceded = awaiting.play("p2: cede-war tunis")
 
@@ -166,7 +165,7 @@ class CardGameTest {
 
     @Test
     fun aTiedWarIsNotRolledTwiceInTheSamePlayersRound() {
-        val tied = running("war").play("p1: play-card hand-1 player p2", "!roll war 3 3")
+        val tied = running("war").play("p1: play hand-1 player p2", "!roll war 3 3")
 
         val prepared = CardGame.prepareRound(tied)
 
@@ -176,7 +175,7 @@ class CardGameTest {
 
     @Test
     fun anEmptyHandStillHostsTheNextWarReroll() {
-        val tied = running("war").play("p1: play-card hand-1 player p2", "!roll war 3 3")
+        val tied = running("war").play("p1: play hand-1 player p2", "!roll war 3 3")
         val nextRound =
             tied.copy(flow = tied.flow.copy(actor = p2, cursor = 1)).withPlayer(p2) { player ->
                 player.copy(hand = emptyList())
@@ -188,18 +187,51 @@ class CardGameTest {
     }
 
     @Test
-    fun aWarParticipantMayPlayMilitaryCardsBeforeTheReroll() {
-        val tied = running("war").play("p1: play-card hand-1 player p2", "!roll war 3 3")
+    fun theCurrentCardRoundActorMayPlayMilitaryCardsBeforeTheReroll() {
+        val tied = running("war").play("p1: play hand-1 player p2", "!roll war 3 3")
         val nextRound =
             tied.copy(flow = tied.flow.copy(actor = p2, cursor = 1)).withPlayer(p2) { player ->
                 player.copy(hand = listOf(hand("hand-2", "armor"), hand("hand-5", "stone-2")))
             }
         val preparing = CardGame.prepareRound(nextRound)
 
-        val armed = preparing.play("p2: play-card hand-2", "p2: pass")
+        val armed = preparing.play("p2: play hand-2", "p2: pass")
 
         assertThat(armed.effects.military).containsExactly(CardMilitaryPlay(p2, EventId.ARMOR))
         assertThat(armed.flow.decisions.last()).isInstanceOf(CardDecision.WarRoll::class.java)
+    }
+
+    @Test
+    fun anotherWarParticipantCannotPlayArmorDuringTheCurrentActorsMilitaryPreparation() {
+        val state =
+            running("stirrups").copy(activeWar = WarState(p1, p2, startedTurn = 1)).withPlayer(
+                p2
+            ) { player ->
+                player.copy(hand = listOf(hand("hand-2", "armor")))
+            }
+        val preparing = CardGame.prepareRound(state)
+
+        val failure = assertFailsWith<RuleViolation> { preparing.play("p2: play hand-2") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
+    }
+
+    @Test
+    fun anotherWarParticipantCannotPlayStirrupsDuringTheFinalCardRoundActorsPreparation() {
+        val state =
+            running("armor")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar = WarState(p1, p2, startedTurn = 1),
+                )
+                .withPlayer(p2) { player ->
+                    player.copy(hand = listOf(hand("hand-2", "stirrups")))
+                }
+        val preparing = CardGame.prepareRound(state)
+
+        val failure = assertFailsWith<RuleViolation> { preparing.play("p2: play hand-2") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
     }
 
     @Test
@@ -207,7 +239,7 @@ class CardGameTest {
         val state = running("armor").copy(activeWar = WarState(p2, p1, startedTurn = 1))
         val preparing = CardGame.prepareRound(state)
 
-        val failure = assertFailsWith<CardRuleViolation> { preparing.play("p1: play-card hand-4") }
+        val failure = assertFailsWith<CardRuleViolation> { preparing.play("p1: play hand-4") }
 
         assertThat(failure.code).isEqualTo(CardRuleCode.INVALID_CHOICE)
     }
@@ -231,7 +263,7 @@ class CardGameTest {
     fun finalCivilWarDoesNotAskForAZeroLossChoice() {
         val initial = running("civil-war").copy(stage = Stage.FINAL_CARD_PLAY)
 
-        val played = initial.play("p1: play-card hand-1 player p2")
+        val played = initial.play("p1: play hand-1 player p2")
 
         assertThat(played.flow.decisions).isEmpty()
         assertThat(played.playerState(p2).cash).isEqualTo(40)
@@ -267,7 +299,7 @@ class CardGameTest {
                     )
                 }
 
-        val played = initial.play("p1: play-card hand-1 protect 7")
+        val played = initial.play("p1: play hand-1 protect 7")
 
         assertThat(played.playerState(p1).cash).isEqualTo(43)
         assertThat(played.effects.leaders.last().protectionCash).isEqualTo(7)
@@ -310,7 +342,7 @@ class CardGameTest {
                     )
                 }
 
-        val claimed = initial.play("p1: patronize-leader rashid-ad-din")
+        val claimed = initial.play("p1: patronize rashid-ad-din")
 
         assertThat(claimed.playerState(p1).cash).isEqualTo(33)
         assertThat(claimed.playerState(p2).cash).isEqualTo(47)
@@ -320,7 +352,7 @@ class CardGameTest {
     @Test
     fun recordedCardActionsReplayToIdenticalDecisionsAndResources() {
         val initial = running("war").withMarker("tunis", p2)
-        val lines = arrayOf("p1: play-card hand-1 player p2", "!roll war 4 3", "p2: cede-war tunis")
+        val lines = arrayOf("p1: play hand-1 player p2", "!roll war 4 3", "p2: cede-war tunis")
 
         val first = initial.play(*lines)
         val replayed = initial.play(*lines)
@@ -349,7 +381,7 @@ class CardGameTest {
                     )
                 }
 
-        val played = initial.play("p1: play-card hand-1")
+        val played = initial.play("p1: play hand-1")
 
         assertThat(played.playerState(p1).hand.map { card -> card.definition.id })
             .doesNotContain("alchemists-gold")
@@ -360,7 +392,7 @@ class CardGameTest {
     fun finalPiratesWithNoMarkersCanBePlayedWithoutEffect() {
         val initial = running("pirates-vikings").copy(stage = Stage.FINAL_CARD_PLAY)
 
-        val played = initial.play("p1: play-card hand-1")
+        val played = initial.play("p1: play hand-1")
 
         assertThat(played.playerState(p1).hand.map { card -> card.definition.id })
             .doesNotContain("pirates-vikings")
@@ -375,7 +407,7 @@ class CardGameTest {
                 .withMarker("genoa", p2)
                 .withMarker("barcelona", p3)
 
-        val played = initial.play("p1: play-card hand-1")
+        val played = initial.play("p1: play hand-1")
 
         assertThat(played.playerState(p1).hand.map { card -> card.definition.id })
             .doesNotContain("rebellion")
@@ -386,7 +418,7 @@ class CardGameTest {
     fun noEffectPlayIsRejectedWhenALegalTargetExists() {
         val initial = running("pirates-vikings").withMarker("tunis", p2)
 
-        val failure = assertFailsWith<CardRuleViolation> { initial.play("p1: play-card hand-1") }
+        val failure = assertFailsWith<CardRuleViolation> { initial.play("p1: play hand-1") }
 
         assertThat(failure.code).isEqualTo(CardRuleCode.INVALID_CHOICE)
     }
@@ -400,7 +432,7 @@ class CardGameTest {
                         CardTurnEffects(military = listOf(CardMilitaryPlay(p1, EventId.ARMOR)))
                 )
 
-        val rolled = initial.play("p1: play-card hand-1 player p2", "!roll war 2 3")
+        val rolled = initial.play("p1: play hand-1 player p2", "!roll war 2 3")
 
         assertThat(rolled.activeWar).isNull()
         assertThat(rolled.flow.decisions).isEmpty()
