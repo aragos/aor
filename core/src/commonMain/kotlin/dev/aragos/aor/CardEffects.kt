@@ -15,7 +15,6 @@ enum class CardRuleCode {
     INVALID_LEADER_CLAIM,
     INVALID_WAR,
     INVALID_SURRENDER,
-    MARKER_RULING_REQUIRED,
 }
 
 class CardRuleViolation(val code: CardRuleCode, val explanation: String) : Exception(explanation)
@@ -229,7 +228,8 @@ sealed interface CardResolution {
     ) : CardResolution
 
     /**
-     * Remove every existing piece in [province] and place the player's coloured marker; +1 misery.
+     * Remove every existing piece in [province], then offer the player a coloured marker; +1
+     * misery. The runtime resolves physical marker exhaustion before completing the misery effect.
      */
     data class CrusadesPlacement(
         val province: ProvinceId,
@@ -545,12 +545,6 @@ object CardRules {
                     definition.area == GeographicalArea.VI && !definition.isSatellite,
                     CardRuleCode.ILLEGAL_TARGET,
                     "The Crusades requires a market in Area VI.",
-                )
-                val owned = context.markers.values.count { marker -> marker.owner == actor }
-                cardRule(
-                    owned < 25 || context.markers[province]?.owner == actor,
-                    CardRuleCode.MARKER_RULING_REQUIRED,
-                    "Crusades with no available domination marker requires the counter-capacity ruling.",
                 )
                 CardResolution.CrusadesPlacement(
                     province,

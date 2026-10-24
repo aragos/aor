@@ -511,7 +511,7 @@ class CardGameTest {
     }
 
     @Test
-    fun counterExhaustionRejectsAWarTransferBeforeEitherPlayerEntersChaos() {
+    fun counterExhaustionAsksTheWinnerBeforeCompletingWarMisery() {
         val initial =
             running("war")
                 .let { state ->
@@ -531,12 +531,12 @@ class CardGameTest {
                 .withPlayer(p1) { player -> player.copy(misery = MiseryStep.THOUSAND) }
         val awaiting = initial.play("p1: play-card hand-1 player p2", "!roll war 4 3")
 
-        val failure = assertFailsWith<CardRuleViolation> { awaiting.play("p2: cede-war tunis") }
+        val pending = awaiting.play("p2: cede-war tunis")
 
-        assertThat(failure.code).isEqualTo(CardRuleCode.MARKER_RULING_REQUIRED)
-        assertThat(awaiting.playerState(p1).misery).isEqualTo(MiseryStep.THOUSAND)
-        assertThat(awaiting.board.pieces[ProvinceId("tunis")])
-            .isEqualTo(ProvincePieces.Marker(p2, PieceSide.COLOURED))
+        assertThat(pending.flow.decisions.single())
+            .isInstanceOf(CardDecision.MarkerPlacement::class.java)
+        assertThat(pending.playerState(p1).misery).isEqualTo(MiseryStep.THOUSAND)
+        assertThat(pending.board.pieces).doesNotContainKey(ProvinceId("tunis"))
     }
 
     @Test

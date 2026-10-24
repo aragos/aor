@@ -124,7 +124,8 @@ object WarRules {
     /**
      * The loser chooses all required supportable markers, or all available ones if short. AH1996
      * section 11.5 adds one misery space for every marker that cannot be ceded. Physical counter
-     * exhaustion is validated separately once the game's counter-capacity policy is established.
+     * exhaustion is resolved by the winner after these markers are removed: forgo a placement or
+     * reuse a marker from another controlled province, without extra misery for the loser.
      */
     fun surrender(
         context: CardContext,
@@ -148,13 +149,6 @@ object WarRules {
                     overseasCapacity(context, result.winner),
             CardRuleCode.INVALID_SURRENDER,
             "The loser must cede exactly the required available supportable provinces.",
-        )
-        val availableMarkers =
-            25 - context.markers.values.count { marker -> marker.owner == result.winner }
-        cardRule(
-            required <= availableMarkers,
-            CardRuleCode.MARKER_RULING_REQUIRED,
-            "War gains exceeding available domination markers require the counter-capacity ruling.",
         )
         return WarSettlement(
             result.winner,

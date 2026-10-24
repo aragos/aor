@@ -789,6 +789,15 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
     - The player gains +1 misery.
     - Boosts Walter the Penniless.
     - It becomes a burden once Mongol Armies has been played.
+**Physical marker exhaustion (project ruling, 2026-10-23).** After Crusades or War removes the
+destination's old pieces, place a coloured marker from stock if available. With all 25 deployed,
+the receiving player chooses separately for each award: forgo the new marker, or move a coloured
+marker from another controlled province. A moved marker leaves its source empty and spends no
+square tokens. A forgone destination stays empty. The card's other effects still resolve; a War
+loser gains no additional misery for a marker its winner forgoes. Existing access and overseas
+support limits still govern which provinces may be ceded. Voluntarily vacated sources do not earn
+expansion-bonus credit if rebuilt later in the turn.
+
 - **War!** (on target player)
     1. Both players roll one die. Nationalism and military advantage each add +1.
     2. The higher roller gains +1 misery and the lower +2.
@@ -911,7 +920,7 @@ Each needs to be settled from the physical game (board, player mat, rulebook sca
 | --- | --- | --- |
 | Q7 | Which cards are circle (recycled) vs square (removed). | Leaders, Armor, Stirrups, Long Bow, Gunpowder, Mongol Armies removed; all others recycled. |
 | Q14 | Improved setup: when exactly are the 5 removed cards shuffled back? | Deferred improved setup. |
-| Q15 | No domination marker available for Crusades or War transfers. | Awaiting project ruling; typed rejection. Proposed: block new Crusades placement and cap War transfers by winner stock without penalizing loser for that stock shortage. |
+| Q15 | No domination marker available for Crusades or War transfers. | Resolved by the user: forgo each new marker or move one from another controlled province; its source becomes empty. |
 
 **Resolved implementation decisions (2026-10-23):**
 
