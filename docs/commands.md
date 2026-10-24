@@ -14,7 +14,7 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 
 | Placeholder | Meaning |
 | --- | --- |
-| `<player>` | Registered player id, such as `p1`; independent of the chosen capital or display name. |
+| `<player>` | Registered player id, `p1` through `p6`; independent of the chosen capital or display name. |
 | `<capital>` | Available catalog id: `venice`, `genoa`, `barcelona`, `paris`, `london`, or `hamburg`. Starting player count restricts availability. |
 | `<reference>` | Opaque reference to a physical card in the acting player's hand, such as `hand-4`; it does not encode the card's identity. |
 | `<card-id>` | Catalog identity of a history card, such as `stone-1`; only authority outcomes or revealed plays expose it. |
@@ -45,7 +45,7 @@ deferred. Unsupported lengths are rejected rather than offered as playable confi
 
 | Command | Who and when; effect |
 | --- | --- |
-| `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization, ends Relief, or completes Expansion and returns unused pool tokens to stock. It cannot skip mandatory stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
+| `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization or ends Relief. In Expansion it returns unused pool tokens and ends the activity. It cannot skip mandatory stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
 | `cancel-adjustment <commodity> <adjustment>` | First player before the ordinary draws; removes an existing marker for its commodity's base dollar cost. |
 | `buy-card` | Urban Ascendancy owner in Buy Card; once per turn, costs $10 and requests a draw. |
 | `discard-card <reference>` | Master Art owner in Buy Card; discards one owned card without effect, once per turn. Independent of buying a card; either order is accepted. |
