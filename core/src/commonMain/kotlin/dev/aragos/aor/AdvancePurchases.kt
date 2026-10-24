@@ -20,7 +20,8 @@ data class AuthorizedLeaderDiscount(
 }
 
 /**
- * Ephemeral turn facts, excluding ownership and acquisition history, which belong to the player.
+ * Ephemeral facts from the authoritative running turn. The game owns turn validity and history
+ * consistency; ownership and acquisition history belong to the player.
  */
 data class PurchaseContext(
     val currentTurn: Int,
@@ -28,7 +29,6 @@ data class PurchaseContext(
     val leaderDiscounts: List<AuthorizedLeaderDiscount> = emptyList(),
 ) {
     init {
-        require(currentTurn > 0) { "A purchase requires a positive current turn." }
         require(
             leaderDiscounts
                 .map { discount -> discount.leaderCardId to discount.advance }
@@ -73,7 +73,6 @@ object AdvancePurchases {
      */
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
         player.requireActive()
-        player.advances.requireValidTurn(context.currentTurn)
         val definition = AdvanceData.definition(advance)
         val entity = listOf(advance.letter.toString())
         checkRule(!player.advances.owns(advance), ViolationCode.ADVANCE_ALREADY_OWNED, entity)
@@ -161,12 +160,9 @@ object ShippingPurchases {
             ShippingCapability.OCEAN_4 -> null
         }
 
+    /** Apply at most one paid upgrade in the authoritative game's [currentTurn]. */
     fun upgrade(player: PlayerState, currentTurn: Int): EconomyResult {
         player.requireActive()
-        require(currentTurn > 0) { "A ship upgrade requires a positive current turn." }
-        require(player.lastShipUpgradeTurn == null || player.lastShipUpgradeTurn <= currentTurn) {
-            "A player's last ship upgrade cannot be in a future turn."
-        }
         checkRule(
             player.lastShipUpgradeTurn != currentTurn,
             ViolationCode.SHIP_UPGRADE_ALREADY_BOUGHT,
