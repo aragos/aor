@@ -127,7 +127,7 @@ data class GameState(
     /** Draw requests share card references and validation across setup and repeatable turns. */
     internal fun pendingDraw(): SystemNeed.Draw? {
         val owner =
-            if (stage == Stage.DEAL) {
+            if (stage == Stage.INITIAL_DRAW) {
                 playerIds.first { player -> playerState(player).hand.isEmpty() }
             } else {
                 (flow.decisions.lastOrNull() as? DrawDecision)?.owner ?: return null
