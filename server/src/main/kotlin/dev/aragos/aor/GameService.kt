@@ -101,7 +101,7 @@ class GameService(
                     driver.submit(
                         stored = current,
                         player = player,
-                        command = TextCodec.parseCommand(text),
+                        text = text,
                     )
                 } catch (failure: CardRuleViolation) {
                     throw ServiceFailure(422, "CARD_${failure.code.name}")

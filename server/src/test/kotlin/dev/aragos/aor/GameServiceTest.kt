@@ -109,6 +109,62 @@ class GameServiceTest {
     }
 
     @Test
+    fun shorthandCardPlaysAreStoredCanonicallyAndSurviveRestart() {
+        val directory = directory()
+        val service = createGameService(directory, FixedRandom())
+        val game = playingGame(service)
+        val before = service.get(game.gameId, token(game, 0))
+
+        val played =
+            service.submit(game.gameId, token(game, 0), before.revision, "venice: play stone")
+        val stored = FileGameStore(directory).read(game.gameId)
+        val restarted = createGameService(directory, NoRandom).get(game.gameId, token(game, 0))
+
+        assertThat(stored.revisions.last().command).isEqualTo("play hand-1")
+        assertThat(stored.revisions.last().entries.first()).isEqualTo("p1: play hand-1")
+        assertThat(played.game.hand.map(HandCard::reference)).doesNotContain("hand-1")
+        assertThat(restarted).isEqualTo(played)
+    }
+
+    @Test
+    fun actorPrefixesCannotSubmitOnBehalfOfAnotherAuthenticatedSeat() {
+        val directory = directory()
+        val service = createGameService(directory, FixedRandom())
+        val game = create(service)
+        val before = FileGameStore(directory).read(game.gameId)
+
+        val failure =
+            assertFailsWith<RuleViolation> {
+                service.submit(game.gameId, token(game, 0), before.revision, "p2: start")
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
+        assertThat(FileGameStore(directory).read(game.gameId)).isEqualTo(before)
+    }
+
+    private fun playingGame(service: GameService): CreatedGame {
+        val game = create(service)
+        val commands =
+            listOf(
+                0 to "start",
+                0 to "bid-capital 3",
+                1 to "bid-capital 2",
+                2 to "bid-capital 1",
+                0 to "choose-capital venice",
+                1 to "choose-capital genoa",
+                2 to "choose-capital barcelona",
+                0 to "buy-tokens 0",
+                1 to "buy-tokens 1",
+                2 to "buy-tokens 2",
+            )
+        commands.forEach { (seat, command) ->
+            val before = service.get(game.gameId, token(game, seat))
+            service.submit(game.gameId, token(game, seat), before.revision, command)
+        }
+        return game
+    }
+
+    @Test
     fun failedRevealDoesNotPublishPartialBatchOrOutcomes() {
         val directory = directory()
         var fail = false

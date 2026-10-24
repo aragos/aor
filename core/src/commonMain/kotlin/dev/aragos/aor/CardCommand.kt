@@ -45,9 +45,61 @@ sealed interface CardCommand : Command {
                 return PlayCard(arguments[0], parseChoice(arguments[1], arguments[2]))
             }
 
-            // TODO: Explore omitting commodity/player/province/category/protect qualifiers after
-            // defining unambiguous card and choice resolution, for example `play wine/cloth cloth`
-            // and `play crusades alexandria`.
+            /**
+             * Live aliases resolve against the acting player's hand, never other players' cards.
+             */
+            internal fun parseInput(arguments: List<String>, hand: List<HandCard>): PlayCard {
+                try {
+                    checkRule(arguments.isNotEmpty(), ViolationCode.INVALID_COMMAND)
+                    val name = arguments.first()
+                    val matches =
+                        hand
+                            .filter { card -> card.reference == name }
+                            .ifEmpty {
+                                hand.filter { card -> card.definition.matchesInput(name) }
+                            }
+                    checkRule(matches.size <= 1, ViolationCode.INVALID_COMMAND)
+                    // Unknown references retain ordinary card ownership validation.
+                    val card = matches.singleOrNull() ?: return parse(arguments)
+                    val choices = arguments.drop(1)
+                    val explicitKinds =
+                        setOf(
+                            "commodity",
+                            "player",
+                            "province",
+                            "provinces",
+                            "area",
+                            "category",
+                            "protect",
+                        )
+                    if (choices.isEmpty() || choices.first() in explicitKinds) {
+                        return parse(listOf(card.reference) + choices)
+                    }
+                    val kind = CardEffectData.forCard(card.definition.id).choiceKind(choices.size)
+                    return parse(listOf(card.reference, kind) + choices)
+                } catch (_: IllegalArgumentException) {
+                    throw RuleViolation(ViolationCode.INVALID_COMMAND)
+                }
+            }
+
+            private fun CardEffectSpec.choiceKind(count: Int): String =
+                when (this) {
+                    is CardEffectSpec.CommodityChoices -> "commodity"
+                    is CardEffectSpec.Leader -> "protect"
+                    is CardEffectSpec.Event ->
+                        when (event) {
+                            EventId.ALCHEMISTS_GOLD,
+                            EventId.CIVIL_WAR,
+                            EventId.WAR -> "player"
+                            EventId.REBELLION,
+                            EventId.THE_CRUSADES -> "province"
+                            EventId.PIRATES_VIKINGS -> if (count == 1) "province" else "provinces"
+                            EventId.BLACK_DEATH -> "area"
+                            EventId.PAPAL_DECREE -> "category"
+                            else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
+                        }
+                }
+
             private fun parseChoice(kind: String, value: String): CardChoice =
                 when (kind) {
                     "commodity" -> CardChoice.CommodityChoice(Commodity.valueOf(value.uppercase()))

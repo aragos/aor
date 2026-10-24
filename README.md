@@ -36,6 +36,9 @@ Run the server with `./gradlew :server:run`, and the web client in another termi
 port 8080 and the web client uses port 5173. The IDE's **web** run configuration starts the same npm command.
 Open <http://localhost:5173>, create a table and save the private player links. Forms and the single-command input
 use the same engine validation. Player tabs refresh automatically.
+Text input accepts assigned capital prefixes and unambiguous card shorthand, for example
+`venice: play wine/cloth cloth`. Saved commands retain canonical player ids and hand references;
+see the [command language](docs/commands.md) for all input forms.
 
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
 Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_HTTP_PORT` to change the server port. Use one server process per data directory.

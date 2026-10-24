@@ -7,6 +7,36 @@ class LegalActionProjectionTest {
     private val p1 = PlayerId("p1")
 
     @Test
+    fun configurationChoicesIncludeAllFunctionalOptions() {
+        val state = Scenario.create().state
+
+        val choices = state.legalChoices(p1).commands
+
+        assertThat(choices)
+            .containsAtLeast(
+                "set-option setup improved",
+                "set-option commerce second-edition",
+                "set-option st-gall-support enabled",
+            )
+    }
+
+    @Test
+    fun everySuggestedConfigurationCommandIsAccepted() {
+        val state = Scenario.create().state
+
+        state.legalChoices(p1).commands.forEach { command ->
+            state.step(TextCodec.parse("p1: $command"))
+        }
+    }
+
+    @Test
+    fun configurationChoicesBelongOnlyToTheCreator() {
+        val state = Scenario.create().state
+
+        assertThat(state.legalChoices(PlayerId("p2")).commands).isEmpty()
+    }
+
+    @Test
     fun shippingChoicesOmitAnUnaffordableUpgrade() {
         val state = purchasing(PurchaseStep.SHIPPING, cash = 9)
         assertThat(state.legalChoices(p1).commands).containsExactly("pass")
