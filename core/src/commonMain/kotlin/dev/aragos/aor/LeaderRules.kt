@@ -119,8 +119,11 @@ object LeaderRules {
             "This physical leader was already played this turn.",
         )
         val role =
-            if (context.effects.leaders.isEmpty()) CardLeaderRole.DISPLAY
-            else CardLeaderRole.EXPOSED
+            if (context.effects.leaders.isEmpty()) {
+                CardLeaderRole.DISPLAY
+            } else {
+                CardLeaderRole.EXPOSED
+            }
         cardRule(
             role == CardLeaderRole.EXPOSED || protectionCash == 0,
             CardRuleCode.INVALID_CHOICE,
@@ -134,7 +137,9 @@ object LeaderRules {
                         discount.advance in player.advances
                     }
                     .sumOf { discount -> discount.amountFor(context.effects.crusadesPlayed) }
-            } else 0
+            } else {
+                0
+            }
         cardRule(
             protectionCash.toLong() <= player.cash.toLong() + rebate,
             CardRuleCode.INSUFFICIENT_CASH,
@@ -187,7 +192,8 @@ object LeaderRules {
 
     /** Credits stack across owned and claimed leaders; Written Record adds ten per used credit. */
     fun discount(context: CardContext, buyer: PlayerId, advance: AdvanceId): Int {
-        val writtenRecord = AdvanceId.WRITTEN_RECORD in context.player(buyer).advances
+        val writtenRecordBonus =
+            if (AdvanceId.WRITTEN_RECORD in context.player(buyer).advances) 10 else 0
         return context.effects.leaders
             .filter { leader ->
                 leader.owner == buyer || buyer in leader.patronageClaimants
@@ -197,8 +203,8 @@ object LeaderRules {
                     LeaderData.definition(leader.leader).discounts.singleOrNull { discount ->
                         discount.advance == advance
                     }
-                if (credit == null) 0
-                else credit.amountFor(context.effects.crusadesPlayed) + if (writtenRecord) 10 else 0
+                if (credit == null) return@sumOf 0
+                credit.amountFor(context.effects.crusadesPlayed) + writtenRecordBonus
             }
     }
 
