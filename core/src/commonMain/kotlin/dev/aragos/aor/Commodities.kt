@@ -54,9 +54,9 @@ class CommodityCatalogBuilder {
         require(byRoll.keys == (2..12).toSet()) {
             "Commodity rolls must cover every two-dice total."
         }
+        val sharedRollCommodities = byRoll[12].orEmpty().map(CommodityDefinition::id).toSet()
         require(
-            byRoll.getValue(12).map(CommodityDefinition::id).toSet() ==
-                setOf(Commodity.GOLD, Commodity.IVORY) &&
+            sharedRollCommodities == setOf(Commodity.GOLD, Commodity.IVORY) &&
                 byRoll.filterKeys { roll -> roll != 12 }.values.all { row -> row.size == 1 }
         ) {
             "Only Gold and Ivory share a commodity roll, at twelve."

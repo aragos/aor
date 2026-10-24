@@ -131,7 +131,12 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 stored.header.players.map { registered ->
                     Entry.Action(
                         actor = registered.id,
-                        command = createCommand(pending.getValue(registered.id)),
+                        command =
+                            createCommand(
+                                requireNotNull(pending[registered.id]) {
+                                    "Every participant must have submitted a sealed decision: ${registered.id}."
+                                }
+                            ),
                     )
                 },
         )
