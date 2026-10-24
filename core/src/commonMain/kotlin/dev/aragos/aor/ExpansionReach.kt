@@ -111,7 +111,7 @@ object ExpansionReach {
         newlyShipped: Int,
     ) {
         val profile = context.player(player)
-        val previous = context.shipped[player]?.get(destination) ?: 0
+        val previous = context.shipped[player].orEmpty()[destination] ?: 0
         checkRule(
             newlyShipped >= 0 &&
                 profile.ships.fleet != ShippingFleet.NONE &&
@@ -252,7 +252,10 @@ object ExpansionReach {
         val queue = ArrayDeque<Visit>().apply { addLast(start) }
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
-            val path = paths.getValue(current)
+            val path =
+                requireNotNull(paths[current]) {
+                    "Every queued shipping visit must have a recorded path: ${current}."
+                }
             if (path.size - 1 >= profile.ships.level) continue
             for (neighbor in waterNeighbors(context, current.space)) {
                 val seaCount = current.seas + if (neighbor is ShippingSpace.Sea) 1 else 0
