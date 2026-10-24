@@ -30,7 +30,7 @@ internal fun cardRule(valid: Boolean, code: CardRuleCode, explanation: String) {
 /**
  * Read-only adapter for resolving a card; this is not a second persisted player model.
  * [writtenCash] is cash remaining after this turn's token purchase, and [handCardIds] contains
- * physical card ids.
+ * physical card ids. Resource bounds and player identity come from authoritative game state.
  */
 data class CardPlayerContext(
     val cash: Int,
@@ -47,13 +47,6 @@ data class CardPlayerContext(
 ) {
     val isActive: Boolean
         get() = misery != MiseryStep.CHAOS
-
-    init {
-        require(cash >= 0 && writtenCash >= 0) { "Current and written cash cannot be negative." }
-        require(poolTokens in 0..36 && stockTokens in 0..36 && poolTokens + stockTokens <= 36) {
-            "Stock and expansion pool must fit within the player's thirty-six tokens."
-        }
-    }
 }
 
 /** Domination-marker facts needed by card rules. History cards refer to coloured counters only. */
@@ -67,7 +60,9 @@ enum class CommodityAdjustment(val payoutOffset: Int) {
 /**
  * Ephemeral inputs assembled by the driver from authoritative state. Adjustment lists are ordered;
  * one marker is consumed per commodity play, so a double shortage shifts two payouts by one box.
- * [provinces] contains only spaces in this game. Card rules never mutate the supplied collections.
+ * [provinces] contains only spaces in this game. Setup and state transitions establish player,
+ * turn, marker and effect invariants; this adapter trusts those inputs. Each card validates its own
+ * action and targets. Card rules never mutate the supplied collections.
  */
 data class CardContext(
     val players: Map<PlayerId, CardPlayerContext>,
@@ -84,46 +79,6 @@ data class CardContext(
             }
             .associateBy(ProvinceDefinition::id),
 ) {
-    init {
-        require(players.size in 3..6) {
-            "Card resolution requires three through six registered players."
-        }
-        require(turn > 0) { "A card play requires a positive turn number." }
-        require(
-            markers.all { (province, marker) ->
-                province in provinces &&
-                    !requireNotNull(provinces[province]) {
-                            "Every card marker must reference a configured province: $province."
-                        }
-                        .isSatellite &&
-                    marker.owner in players
-            }
-        ) {
-            "Card markers must reference a known province and player."
-        }
-        require(
-            markers.values.groupingBy(CardMarker::owner).eachCount().values.all { count ->
-                count <= 25
-            }
-        ) {
-            "A player's board cannot contain more than twenty-five domination markers."
-        }
-        require(
-            effects.enlightenedRulers.all(players::containsKey) &&
-                effects.military.all { play -> play.player in players } &&
-                effects.leaders.all { leader ->
-                    leader.owner in players && leader.patronageClaimants.all(players::containsKey)
-                }
-        ) {
-            "Turn card effects must refer to registered players."
-        }
-        require(
-            adjustments.values.all { markers -> markers.size <= 2 && markers.distinct().size <= 1 }
-        ) {
-            "Each commodity may have at most two equal, uncancelled adjustment markers."
-        }
-    }
-
     fun player(id: PlayerId): CardPlayerContext =
         players[id]
             ?: throw CardRuleViolation(

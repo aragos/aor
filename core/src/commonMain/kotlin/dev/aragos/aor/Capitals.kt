@@ -37,8 +37,8 @@ object CapitalData {
         capital("hamburg")
     }
 
+    /** [playerCount] is the starting registration count validated during setup. */
     fun availableFor(playerCount: Int): List<String> {
-        require(playerCount in 3..6) { "Capital availability requires 3 through 6 players." }
         return definitions.take(playerCount).map(CapitalDefinition::id)
     }
 }
