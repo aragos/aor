@@ -21,7 +21,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     const finite = commands.filter(command => !simpleActions.includes(command) &&
         (command.startsWith('swap-order ') || command.startsWith('cancel-adjustment ') ||
             command.startsWith('discard-card ') || command.startsWith('civil-war-loss ') ||
-            command.startsWith('replace-event-token ') || command.startsWith('cathedral ') || command.startsWith('patronize-leader ') || command.startsWith('offer-card ') || command.startsWith('reduce-marker ')));
+            command.startsWith('replace-event-token ') || command.startsWith('cathedral ') || command.startsWith('patronize ') || command.startsWith('offer-card ') || command.startsWith('reduce-marker ')));
     const finiteLabel = (command: string) => {
         const [action, first, second] = command.split(' ');
         if (action === 'swap-order') return `${t('action.swapOrder')} ${playerName(snapshot, first)}`;
@@ -31,7 +31,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             const actionKey = action === 'discard-card' ? 'action.discard' : 'action.offerCard';
             return `${t(actionKey)} ${card ? t(card.definition.messageId) : first}`;
         }
-        if (action === 'patronize-leader') return `${t('action.patronize')} ${label(first, 'leader')}`;
+        if (action === 'patronize') return `${t('action.patronize')} ${label(first, 'leader')}`;
         if (action === 'reduce-marker') return `${t('action.reduceMarker')} ${provinceName(first)}`;
         return `${label(action, 'action')} ${label(first)}`;
     };
@@ -54,7 +54,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             </select><button disabled={busy || !snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)}>{t('action.relieveMisery')}</button></div>
             {snapshot.game.reliefOffers.length === 0 && <p className="small muted">{t('controls.noRelief')}</p>}
         </form>}
-        {commands.some(command => command === 'play-card' || command.startsWith('play-card ')) && <PlayCard snapshot={snapshot} busy={busy} submit={submit}/>}
+        {commands.some(command => command === 'play' || command.startsWith('play ')) && <PlayCard snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.some(command => command === 'place' || command === 'attack' || command.startsWith('place ') || command.startsWith('attack ')) && <ExpansionActions snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.includes('forgo-marker') && <EventMarkerPlacement snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.some(command => command.startsWith('cede-war')) && <WarSurrender snapshot={snapshot} busy={busy} submit={submit}/>}
@@ -120,9 +120,9 @@ function isCardProvince(snapshot: Snapshot, card: string, province: ProvinceDefi
 
 function playableCards(snapshot: Snapshot) {
     const commands = snapshot.legalChoices.commands;
-    if (commands.includes('play-card')) return snapshot.game.hand;
+    if (commands.includes('play')) return snapshot.game.hand;
     const references = new Set(commands
-        .filter(command => command.startsWith('play-card '))
+        .filter(command => command.startsWith('play '))
         .map(command => command.split(' ')[1]));
     return snapshot.game.hand.filter(card => references.has(card.reference));
 }
@@ -135,12 +135,12 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
     const id = card?.definition.id ?? '';
     const target = cardTarget(snapshot, id);
     const protectedLeader = card?.definition.kind === 'leader' && snapshot.game.effects.leaders.length > 0;
-    const noArgumentAllowed = snapshot.legalChoices.commands.includes(`play-card ${reference}`);
+    const noArgumentAllowed = snapshot.legalChoices.commands.includes(`play ${reference}`);
     const needsChoice = !noArgumentAllowed && target !== null;
     const cash = Number(protection);
     const validProtection = !protectedLeader || (protection.trim() !== '' && Number.isInteger(cash) && cash >= 0 && cash <= 2147483647);
     const playable = playableCards(snapshot);
-    const concreteChoices = snapshot.legalChoices.commands.filter(command => command.startsWith(`play-card ${reference} `));
+    const concreteChoices = snapshot.legalChoices.commands.filter(command => command.startsWith(`play ${reference} `));
     const targetOptions = target?.options ?? [];
     const options = concreteChoices.length > 0 && needsChoice
         ? targetOptions.filter(option => concreteChoices.some(command => command.endsWith(` ${target.prefix} ${option.value}`)))
@@ -150,7 +150,7 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
         let argument = '';
         if (needsChoice) argument = ` ${target.prefix} ${choice}`;
         else if (protectedLeader) argument = ` protect ${cash}`;
-        if (!await submit(`play-card ${reference}${argument}`)) return;
+        if (!await submit(`play ${reference}${argument}`)) return;
         setReference('');
         setChoice('');
         setProtection('0');

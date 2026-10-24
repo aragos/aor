@@ -13,7 +13,7 @@ class CardMarkerPlacementTest {
 
     @Test
     fun crusadesAtCapacityOpensAChoiceForItsPlayer() {
-        val played = crusades().play("p1: play-card hand-1 province acre")
+        val played = crusades().play("p1: play hand-1 province acre")
         val decision = played.flow.decisions.single() as CardDecision.MarkerPlacement
         assertThat(decision.player).isEqualTo(p1)
         assertThat(decision.destination).isEqualTo(acre)
@@ -24,7 +24,7 @@ class CardMarkerPlacementTest {
 
     @Test
     fun decliningCrusadesStillRemovesTheVictimAndResolvesTheEvent() {
-        val played = crusades().play("p1: play-card hand-1 province acre", "p1: forgo-marker")
+        val played = crusades().play("p1: play hand-1 province acre", "p1: forgo-marker")
         assertThat(played.board.pieces).doesNotContainKey(acre)
         assertThat(played.board.markerCount(p1)).isEqualTo(25)
         assertThat(played.playerState(p1).misery).isEqualTo(MiseryStep.TEN)
@@ -36,7 +36,7 @@ class CardMarkerPlacementTest {
     fun reusingACrusadesMarkerEmptiesItsSourceWithoutSpendingTokens() {
         val initial = crusades()
         val source = source(initial, p1)
-        val played = initial.play("p1: play-card hand-1 province acre", "p1: move-marker $source")
+        val played = initial.play("p1: play hand-1 province acre", "p1: move-marker $source")
         assertThat(played.board.pieces).doesNotContainKey(source)
         assertThat(played.board.pieces[acre])
             .isEqualTo(ProvincePieces.Marker(p1, PieceSide.COLOURED))
@@ -53,7 +53,7 @@ class CardMarkerPlacementTest {
             crusades().copy(board = crusades().board.remove(acre).board).let { state ->
                 state.withBoardChange(state.board.replaceWithToken(acre, p2))
             }
-        val played = initial.play("p1: play-card hand-1 province acre", "p1: forgo-marker")
+        val played = initial.play("p1: play hand-1 province acre", "p1: forgo-marker")
         assertThat(played.playerState(p2).stockTokens).isEqualTo(36)
         assertThat(played.board.tokenCount(p2)).isEqualTo(0)
     }
@@ -62,7 +62,7 @@ class CardMarkerPlacementTest {
     fun aCrusadesMarkerFromStockNeedsNoExtraChoice() {
         val original = crusades()
         val initial = original.withBoardChange(original.board.remove(source(original, p1)))
-        val played = initial.play("p1: play-card hand-1 province acre")
+        val played = initial.play("p1: play hand-1 province acre")
         assertThat(played.board.markerCount(p1)).isEqualTo(25)
         assertThat(played.board.pieces[acre])
             .isEqualTo(ProvincePieces.Marker(p1, PieceSide.COLOURED))
@@ -74,14 +74,14 @@ class CardMarkerPlacementTest {
         val original = crusades()
         val freed = original.withBoardChange(original.board.remove(source(original, p1)))
         val initial = freed.withBoardChange(freed.board.placeMarker(acre, p1))
-        val played = initial.play("p1: play-card hand-1 province acre")
+        val played = initial.play("p1: play hand-1 province acre")
         assertThat(played.board.markerCount(p1)).isEqualTo(25)
         assertThat(played.flow.decisions).isEmpty()
     }
 
     @Test
     fun anotherPlayerCannotChooseTheMarkerSource() {
-        val awaiting = crusades().play("p1: play-card hand-1 province acre")
+        val awaiting = crusades().play("p1: play hand-1 province acre")
         val failure = assertFailsWith<RuleViolation> { awaiting.play("p2: forgo-marker") }
         assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PLAYER)
     }
@@ -90,14 +90,14 @@ class CardMarkerPlacementTest {
     fun aForeignMarkerCannotBeReused() {
         val original = crusades()
         val initial = original.withBoardChange(original.board.placeMarker(tunis, p2))
-        val awaiting = initial.play("p1: play-card hand-1 province acre")
+        val awaiting = initial.play("p1: play hand-1 province acre")
         val failure = assertFailsWith<CardRuleViolation> { awaiting.play("p1: move-marker tunis") }
         assertThat(failure.code).isEqualTo(CardRuleCode.ILLEGAL_TARGET)
     }
 
     @Test
     fun anEmptyDestinationCannotBeUsedAsItsOwnSource() {
-        val awaiting = crusades().play("p1: play-card hand-1 province acre")
+        val awaiting = crusades().play("p1: play hand-1 province acre")
         val failure = assertFailsWith<CardRuleViolation> { awaiting.play("p1: move-marker acre") }
         assertThat(failure.code).isEqualTo(CardRuleCode.ILLEGAL_TARGET)
     }
@@ -108,7 +108,7 @@ class CardMarkerPlacementTest {
         val source = source(original, p1)
         val initial =
             original.copy(board = original.board.placeMarker(source, p1, PieceSide.WHITE).board)
-        val awaiting = initial.play("p1: play-card hand-1 province acre")
+        val awaiting = initial.play("p1: play hand-1 province acre")
         assertThat(awaiting.legalChoices(p1).commands).doesNotContain("move-marker $source")
         assertThat(
                 assertFailsWith<CardRuleViolation> { awaiting.play("p1: move-marker $source") }.code
@@ -119,7 +119,7 @@ class CardMarkerPlacementTest {
     @Test
     fun warWinnerChoosesSeparatelyForEveryAwardWithoutExtraLoserMisery() {
         val awaiting =
-            war().play("p1: play-card hand-1 player p2", "!roll war 5 3", "p2: cede-war suez tunis")
+            war().play("p1: play hand-1 player p2", "!roll war 5 3", "p2: cede-war suez tunis")
         val settled = awaiting.play("p1: forgo-marker", "p1: forgo-marker")
         assertThat(settled.board.pieces).doesNotContainKey(tunis)
         assertThat(settled.board.pieces).doesNotContainKey(suez)
@@ -135,7 +135,7 @@ class CardMarkerPlacementTest {
         val initial = original.withBoardChange(original.board.remove(source(original, p1)))
         val awaiting =
             initial.play(
-                "p1: play-card hand-1 player p2",
+                "p1: play hand-1 player p2",
                 "!roll war 5 3",
                 "p2: cede-war suez tunis",
             )
@@ -152,7 +152,7 @@ class CardMarkerPlacementTest {
         val initial = original.withBoardChange(original.board.remove(source(original, p1)))
         val settled =
             initial.play(
-                "p1: play-card hand-1 player p2",
+                "p1: play hand-1 player p2",
                 "!roll war 5 3",
                 "p2: cede-war suez tunis",
                 "p1: move-marker suez",
@@ -170,7 +170,7 @@ class CardMarkerPlacementTest {
             game("war", owner = p2)
                 .withBoardChange(game("war", owner = p2).board.placeMarker(tunis, p1))
         val awaiting =
-            initial.play("p1: play-card hand-1 player p2", "!roll war 3 4", "p1: cede-war tunis")
+            initial.play("p1: play hand-1 player p2", "!roll war 3 4", "p1: cede-war tunis")
         val decision = awaiting.flow.decisions.single() as CardDecision.MarkerPlacement
         assertThat(decision.player).isEqualTo(p2)
         assertThat(awaiting.flow.actor).isEqualTo(p1)
@@ -190,7 +190,7 @@ class CardMarkerPlacementTest {
                         player.copy(hand = if (id == p1) player.hand.take(1) else emptyList())
                     },
             )
-        val finished = initial.play("p1: play-card hand-1 province acre", "p1: forgo-marker")
+        val finished = initial.play("p1: play hand-1 province acre", "p1: forgo-marker")
         assertThat(finished.stage).isEqualTo(Stage.FINISHED)
         assertThat(finished.flow.decisions).isEmpty()
         assertThat(finished.viewForPlayer(p1).scores).hasSize(3)
@@ -202,7 +202,7 @@ class CardMarkerPlacementTest {
         val source = source(initial, p1)
         val commands =
             listOf(
-                "p1: play-card hand-1 player p2",
+                "p1: play hand-1 player p2",
                 "!roll war 5 3",
                 "p2: cede-war suez tunis",
                 "p1: forgo-marker",
@@ -220,7 +220,7 @@ class CardMarkerPlacementTest {
             original.updatePlayer(p1) { player -> player.copy(misery = MiseryStep.THOUSAND) }
         val settled =
             initial.play(
-                "p1: play-card hand-1 player p2",
+                "p1: play hand-1 player p2",
                 "!roll war 6 3",
                 "p2: cede-war suez tunis",
                 "p1: forgo-marker",
@@ -247,7 +247,7 @@ class CardMarkerPlacementTest {
             )
         val finished =
             initial.play(
-                "p1: play-card hand-1 player p2",
+                "p1: play hand-1 player p2",
                 "!roll war 3 4",
                 "p1: cede-war tunis",
                 "p2: forgo-marker",

@@ -16,7 +16,7 @@ submitted through a private player link omit the actor prefix; replay logs inclu
 | Order of Play | `buy-tokens -2`, `buy-tokens 0`, `buy-tokens 12`. Purchases stay sealed until everyone submits. Tied players use `choose-turn-position 1`. |
 | Draw Card | The first box may `cancel-adjustment wine shortage` or `cancel-adjustment stone surplus`, paying each marker separately; `pass` starts automatic draws. |
 | Buy Card | Eligible owners may use `buy-card` ($10) and, with Master Art, `discard-card hand-4` in either order. Each is optional and available once; `pass` continues. |
-| Play Cards | `play-card hand-4` with any required choice below. Play as many as desired, then `pass`. |
+| Play Cards | `play hand-4` with any required choice below. Play as many as desired, then `pass`. |
 | Purchase | `upgrade-ships` or `pass`; `buy-advance A` as often as affordable, then `pass`; mandatory `stabilize cash` or `stabilize misery`; `relieve-misery 1` as allowed, then `pass`. |
 | Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `pass`. Unused pool tokens return to stock. |
 | Income | Automatic piece flips, income and two recorded shortage/surplus rolls. Eligible majority draws resolve automatically. |
@@ -37,11 +37,11 @@ Your hand references do not encode card identities. Playing a card makes its ide
 Examples of explicit choices:
 
 ```text
-play-card hand-4 commodity wine
-play-card hand-8 player p2
-play-card hand-12 province acre
-play-card hand-16 category science
-play-card hand-20 protect 10
+play hand-4 commodity wine
+play hand-8 player p2
+play hand-12 province acre
+play hand-16 category science
+play hand-20 protect 10
 ```
 
 A non-burden event with no eligible effect can be played without a target and resolves with no
@@ -60,7 +60,7 @@ the interruption:
 | Military cards before a War reroll | Play eligible military cards, then `pass`. |
 | War loser cessions | `cede-war milan florence`. Choose the required supportable markets. |
 | No marker available for Crusades/War | The recipient chooses `forgo-marker` or `move-marker genoa`. The source must contain another coloured marker they control. |
-| Patronage during advance purchases | `patronize-leader rashid-ad-din`; pay the exposed leader's protection once. |
+| Patronage during advance purchases | `patronize rashid-ad-din`; pay the exposed leader's protection once. |
 | Wind/Watermill opportunity | `windmill` or `pass`; after a successful recorded roll, `offer-card hand-8`. The other card is chosen randomly and recorded privately. |
 
 Tied Wars continue at later players' card rounds, including later turns. An unresolved tie after the
