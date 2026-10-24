@@ -74,7 +74,7 @@ object AdvancePurchases {
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
         player.requireActive()
         player.advances.requireValidTurn(context.currentTurn)
-        val definition = definition(advance)
+        val definition = AdvanceData.definition(advance)
         val entity = listOf(advance.letter.toString())
         checkRule(!player.advances.owns(advance), ViolationCode.ADVANCE_ALREADY_OWNED, entity)
         val missing = definition.prerequisites.filterNot(player.advances::owns)
@@ -130,7 +130,11 @@ object AdvancePurchases {
                 cash = player.cash - quote.price,
                 advances = player.advances.acquire(advance, context.currentTurn),
                 ships = ships,
-                misery = MiseryRules.shift(player.misery, definition(advance).purchaseMisery),
+                misery =
+                    MiseryRules.shift(
+                        player.misery,
+                        AdvanceData.definition(advance).purchaseMisery,
+                    ),
             )
         )
     }
