@@ -391,6 +391,5 @@ class ProvinceDataTest {
         assertThat(failure).hasMessageThat().contains("must be unique")
     }
 
-    private fun province(id: String): ProvinceDefinition =
-        ProvinceData.byId.getValue(ProvinceId(id))
+    private fun province(id: String): ProvinceDefinition = ProvinceData.definition(ProvinceId(id))
 }

@@ -105,7 +105,12 @@ class CardRulesTest {
 
         assertThat(result.payments[cardPlayerOne]).isEqualTo(32)
         assertThat(result.consumedAdjustment).isEqualTo(CommodityAdjustment.SHORTAGE)
-        assertThat(context.adjustments.getValue(Commodity.SILK)).hasSize(2)
+        assertThat(
+                requireNotNull(context.adjustments[Commodity.SILK]) {
+                    "The commodity must have recorded adjustments: ${Commodity.SILK}."
+                }
+            )
+            .hasSize(2)
     }
 
     @Test

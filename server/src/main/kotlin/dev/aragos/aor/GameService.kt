@@ -71,10 +71,14 @@ class GameService(
             gameId = id,
             links =
                 players.map { player ->
+                    val token =
+                        requireNotNull(tokens[player.id]) {
+                            "Every registered player requires an access token."
+                        }
                     PlayerLink(
                         id = player.id,
                         name = player.name,
-                        path = "/games/$id#token=${tokens.getValue(player.id)}",
+                        path = "/games/$id#token=$token",
                     )
                 },
         )

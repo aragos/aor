@@ -53,10 +53,10 @@ data class CapitalSelection(
     fun resolveNextTie(rolls: Map<PlayerId, DieRoll>): CapitalSelection {
         val tie = ties.firstOrNull() ?: throw RuleViolation(ViolationCode.INVALID_OUTCOME)
         checkRule(rolls.keys == tie.players.toSet(), ViolationCode.INVALID_OUTCOME)
-        val rankedPlayers = tie.players.sortedByDescending(rolls::getValue)
+        val rankedPlayers = tie.players.sortedByDescending { player -> rolls[player] }
         val remainingTies =
             rankedPlayers
-                .groupBy(rolls::getValue)
+                .groupBy { player -> rolls[player] }
                 .values
                 .filter { players -> players.size > 1 }
                 .map(::CapitalTie)

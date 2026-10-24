@@ -104,7 +104,11 @@ class AdvanceCatalogBuilder {
         }
         fun visit(id: AdvanceId, path: Set<AdvanceId>) {
             require(id !in path) { "Advance prerequisites contain a cycle at $id." }
-            for (prerequisite in byId.getValue(id).prerequisites) {
+            for (prerequisite in
+                requireNotNull(byId[id]) {
+                        "Every advance prerequisite must exist in the catalog: ${id}."
+                    }
+                    .prerequisites) {
                 visit(prerequisite, path + id)
             }
         }
