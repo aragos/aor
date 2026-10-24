@@ -11,7 +11,7 @@ sealed interface CardCommand : Command {
         }
 
         override fun toText(): String =
-            "play-card $reference" +
+            "play $reference" +
                 when (choice) {
                     CardChoice.None -> ""
                     is CardChoice.CommodityChoice ->
@@ -86,7 +86,7 @@ sealed interface CardCommand : Command {
     }
 
     data class PatronizeLeader(val leader: LeaderId) : CardCommand {
-        override fun toText(): String = "patronize-leader ${leader.cardId}"
+        override fun toText(): String = "patronize ${leader.cardId}"
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState =
             CardGame.patronize(state, actor, leader)
@@ -97,7 +97,7 @@ sealed interface CardCommand : Command {
         fun parse(name: String, arguments: List<String>): CardCommand? =
             try {
                 when (name) {
-                    "play-card" -> PlayCard.parse(arguments)
+                    "play" -> PlayCard.parse(arguments)
                     "civil-war-loss" -> {
                         size(arguments, 1)
                         ChooseCivilWarLoss(
@@ -125,7 +125,7 @@ sealed interface CardCommand : Command {
                         )
                         CedeWar(arguments.map(::ProvinceId).toSet())
                     }
-                    "patronize-leader" -> {
+                    "patronize" -> {
                         size(arguments, 1)
                         PatronizeLeader(
                             LeaderId.entries.singleOrNull { leader ->
