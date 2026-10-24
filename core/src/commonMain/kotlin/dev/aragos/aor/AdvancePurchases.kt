@@ -92,9 +92,11 @@ object AdvancePurchases {
             if (
                 player.advances.owns(AdvanceId.INSTITUTIONAL_RESEARCH) &&
                     definition.category !in setOf(AdvanceCategory.CIVICS, AdvanceCategory.RELIGION)
-            )
+            ) {
                 10
-            else 0
+            } else {
+                0
+            }
         val writtenRecord = if (player.advances.owns(AdvanceId.WRITTEN_RECORD)) 10 else 0
         return AdvanceQuote(
             advance = advance,
@@ -131,26 +133,6 @@ object AdvancePurchases {
                 misery = MiseryRules.shift(player.misery, definition(advance).purchaseMisery),
             )
         )
-    }
-
-    /**
-     * Immediate rebate when this player plays their own leader. Pass that leader's conditional base
-     * discounts only. Patronage and Written Record never increase a Printed Word rebate.
-     */
-    fun printedWordRebate(player: PlayerState, discounts: List<AuthorizedLeaderDiscount>): Long {
-        player.requireActive()
-        require(discounts.map(AuthorizedLeaderDiscount::leaderCardId).distinct().size <= 1) {
-            "A Printed Word rebate must describe one played leader."
-        }
-        require(
-            discounts.map(AuthorizedLeaderDiscount::advance).distinct().size == discounts.size
-        ) {
-            "A played leader cannot repeat an advance discount."
-        }
-        if (!player.advances.owns(AdvanceId.PRINTED_WORD)) return 0
-        return discounts
-            .filter { discount -> player.advances.owns(discount.advance) }
-            .sumOf { discount -> discount.amount.toLong() }
     }
 }
 
