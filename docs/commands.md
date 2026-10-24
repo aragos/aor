@@ -82,18 +82,25 @@ unused pool.
 
 | Command | Who and when; effect |
 | --- | --- |
-| `play-card <reference>` | Card-round actor, or eligible military responder; plays a card requiring no explicit choice. A playable event with no eligible effect may be played without a target. |
-| `play-card <reference> commodity <commodity>` | Selects one of the commodity card's offered commodities. |
-| `play-card <reference> player <player>` | Selects an eligible target player, for example for War. |
-| `play-card <reference> province <province>` | Selects an eligible target province, for example for Crusades. |
-| `play-card <reference> category <category>` | Papal Decree; category is `science`, `religion`, `exploration`, or `none` to decline a ban. |
-| `play-card <reference> protect <amount>` | Leader play; nonnegative dollars of protection on an exposed leader. |
+| `play <reference>` | Current card-round actor; plays a card requiring no explicit choice. A playable event with no eligible effect may be played without a target. |
+| `play <reference> commodity <commodity>` | Selects one of the commodity card's offered commodities. |
+| `play <reference> player <player>` | Selects an eligible target player, for example for War. |
+| `play <reference> province <province>` | Selects an eligible target province, for example for Crusades. |
+| `play <reference> category <category>` | Papal Decree; category is `science`, `religion`, `exploration`, or `none` to decline a ban. |
+| `play <reference> protect <amount>` | Leader play; nonnegative dollars of protection on an exposed leader. |
 | `civil-war-loss cash` / `civil-war-loss tokens` | Civil War victim; chooses the loss type. |
 | `replace-event-token pool` / `replace-event-token none` | Counter's owner; spend one pool token on replacement or leave the province empty. |
 | `cede-war <province> ...` | War loser; names the required distinct eligible provinces, respecting support and overseas limits. Canonical text sorts province ids. |
-| `patronize-leader <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
+| `patronize <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
 | `forgo-marker` | Recipient of a War/Crusades award with no spare marker; leaves that destination empty. |
 | `move-marker <province>` | Same recipient; moves an owned coloured marker from another controlled province to the award, leaving the source empty. |
+
+Only the current card-round actor may play cards, including military cards during their own
+War preparation window. Other War participants cannot play cards during someone else's round.
+
+TODO: Investigate inferring choice kinds for every play option, with forms such as
+`play wine/cloth cloth` and `play crusades alexandria`. These examples are future syntax; the
+current language requires hand references and the explicit qualifiers listed above.
 
 The outer phase actor resumes after another player's required answer. In a War military window,
 `pass` proceeds to the recorded roll. Passing the Advances step forgoes further leader claims.
