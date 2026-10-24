@@ -49,6 +49,7 @@ data class GameView(
     val adjustments: Map<Commodity, List<CommodityAdjustment>> = emptyMap(),
     val effects: CardTurnEffects = CardTurnEffects(),
     val activeWar: WarState? = null,
+    val warCession: WarCessionView? = null,
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
     val reliefOffers: List<ReliefOfferView> = emptyList(),
@@ -115,6 +116,7 @@ data class GameView(
                 adjustments = state.adjustments,
                 effects = state.effects,
                 activeWar = state.activeWar,
+                warCession = WarCessionView.from(state),
                 voids = state.voids,
                 advanceOffers = advanceOffers(state, viewer),
                 reliefOffers = reliefOffers(state, viewer),
@@ -169,6 +171,37 @@ data class GameView(
                     null
                 }
             }
+        }
+    }
+}
+
+/** Public support limits for a resolved War while its loser chooses provinces to cede. */
+data class WarCessionView(
+    val winner: PlayerId,
+    val requiredCount: Int,
+    val eligibleProvinces: Set<ProvinceId>,
+    val overseasCapacity: Int,
+) {
+    companion object {
+        internal fun from(state: GameState): WarCessionView? {
+            val decision =
+                state.flow.decisions.lastOrNull() as? CardDecision.WarSurrender ?: return null
+            val context = state.cardContext()
+            val victory = decision.victory
+            val eligible = WarRules.eligibleProvinces(context, victory.winner, victory.loser)
+            val overseas = eligible.count { province ->
+                context.province(province).overseas != null
+            }
+            val capacity = WarRules.overseasCapacity(context, victory.winner)
+            return WarCessionView(
+                victory.winner,
+                minOf(
+                    victory.requiredTransfers,
+                    eligible.size - overseas + minOf(overseas, capacity),
+                ),
+                eligible,
+                capacity,
+            )
         }
     }
 }

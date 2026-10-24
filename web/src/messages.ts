@@ -59,6 +59,7 @@ export const en: Record<string, string> = {
     'controls.chooseCard': 'Choose a card', 'controls.cardChoice': 'Card choice', 'controls.chooseTarget': 'Choose a target or option',
     'controls.chooseProvince': 'Choose a province', 'controls.expansionAction': 'Expansion action', 'controls.tokenCount': 'Tokens to place',
     'controls.route': 'Route', 'controls.via': 'Intermediate province', 'controls.attackHint': 'The game commits exactly the additional tokens required for this competition.',
+    'controls.warWinner': 'War winner', 'controls.overseasCapacity': 'Available overseas capacity',
     'controls.cedeWarHint': 'Choose the required number of your supportable coloured markers. The text command also accepts a custom province list.',
     'action.pass': 'Pass', 'action.done': 'Continue', 'action.buy-card': 'Buy card · $10', 'action.upgrade-ships': 'Upgrade ships · $10',
     'action.end-expansion': 'Finish expansion', 'action.buy-expansion-card': 'Buy card with tokens', 'action.resolve-war': 'Resolve War',
