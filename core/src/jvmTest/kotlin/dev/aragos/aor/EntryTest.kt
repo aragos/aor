@@ -66,13 +66,27 @@ class EntryTest {
     }
 
     @Test
+    fun capitalTieUsesTheGenericRecordedRoll() {
+        val entry = TextCodec.parse("!roll capital-tie p2=6 p1=2")
+
+        assertThat(entry)
+            .isEqualTo(
+                GameOutcome.Roll(
+                    kind = GameRollKind.CAPITAL_TIE,
+                    values = listOf(DieRoll(6), DieRoll(2)),
+                    players = listOf(PlayerId("p2"), PlayerId("p1")),
+                )
+            )
+    }
+
+    @Test
     fun malformedOutcomeArgumentsHaveCommandDiagnostics() {
         for (text in
             listOf(
-                "!deal p1 hand-1",
+                "!draw p1 hand-1",
                 "!shuffle stone-1",
                 "!roll other p1=1 p2=2",
-                "!deal p0 hand-1 stone-1",
+                "!draw p0 hand-1 stone-1",
                 "!roll capital-tie p1=one p2=2",
             )) {
             val failure = assertFailsWith<RuleViolation> { TextCodec.parse(text) }
