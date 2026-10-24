@@ -37,7 +37,9 @@ interface SetupRandom {
         require(count in 1..6) { "An authority roll requires one through six dice." }
         val identifiers = (1..count).map { number -> PlayerId("p$number") }
         val values = dice(identifiers)
-        return identifiers.map(values::getValue)
+        return identifiers.map { player ->
+            requireNotNull(values[player]) { "Every requested player requires a die result." }
+        }
     }
 }
 
@@ -144,7 +146,12 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 state.playerIds.filter(required::contains).map { participant ->
                     Entry.Action(
                         actor = participant,
-                        command = createCommand(pending.getValue(participant)),
+                        command =
+                            createCommand(
+                                requireNotNull(pending[participant]) {
+                                    "Every participant must have submitted a sealed decision: $participant."
+                                }
+                            ),
                     )
                 },
         )

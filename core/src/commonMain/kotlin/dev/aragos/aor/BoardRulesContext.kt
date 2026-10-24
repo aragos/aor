@@ -16,7 +16,7 @@ data class BoardPlayerProfile(
 
     val homeArea: GeographicalArea
         get() =
-            requireNotNull(ProvinceData.byId.getValue(capital).area) {
+            requireNotNull(ProvinceData.definition(capital).area) {
                 "An original capital must belong to a geographical area."
             }
 }
@@ -80,14 +80,13 @@ data class BoardRulesContext(
     val provinceIds: Set<ProvinceId>
         get() = configuration.provinces.map(ProvinceDefinition::id).toSet()
 
-    fun player(player: PlayerId): BoardPlayerProfile {
-        checkRule(player in players, ViolationCode.INVALID_BOARD_PLAYER, listOf(player.value))
-        return players.getValue(player)
-    }
+    fun player(player: PlayerId): BoardPlayerProfile =
+        players[player]
+            ?: throw RuleViolation(ViolationCode.INVALID_BOARD_PLAYER, listOf(player.value))
 
     fun province(province: ProvinceId): ProvinceDefinition {
         checkRule(province in provinceIds, ViolationCode.UNKNOWN_PROVINCE, listOf(province.value))
-        return ProvinceData.byId.getValue(province)
+        return ProvinceData.definition(province)
     }
 
     fun bases(player: PlayerId): Set<ProvinceId> =
