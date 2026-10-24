@@ -146,6 +146,32 @@ class PublicGameViewTest {
         assertThat(GameState(header).viewForPlayer(PlayerId("p1")).warCession).isNull()
     }
 
+    @Test
+    fun markerPlacementPublishesTheDestinationOfTheNextChoice() {
+        val initial = turnState()
+        val decision =
+            CardDecision.MarkerPlacement(
+                listOf(ProvinceId("tunis"), ProvinceId("suez")),
+                MarkerPlacementAftermath.War(
+                    WarSettlement(
+                        winner = PlayerId("p1"),
+                        loser = PlayerId("p2"),
+                        provinces = setOf(ProvinceId("tunis"), ProvinceId("suez")),
+                        additionalLoserMisery = 0,
+                    )
+                ),
+            )
+        val state = initial.copy(flow = initial.flow.copy(decisions = listOf(decision)))
+
+        assertThat(state.viewForPlayer(PlayerId("p1")).markerPlacement)
+            .isEqualTo(MarkerPlacementView(PlayerId("p1"), ProvinceId("tunis")))
+    }
+
+    @Test
+    fun markerPlacementIsAbsentOutsideTheMarkerChoice() {
+        assertThat(GameState(header).viewForPlayer(PlayerId("p1")).markerPlacement).isNull()
+    }
+
     private fun warSurrenderState(): GameState {
         val initial = turnState()
         val winner =
