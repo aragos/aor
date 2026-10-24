@@ -36,41 +36,17 @@ object ExpansionReach {
             profile.chaos ||
                 destination !in context.provinceIds ||
                 !canEnter(profile, context.province(destination))
-        )
+        ) {
             return emptyList()
+        }
         val routes = mutableListOf<ExpansionRoute>()
         for (base in context.bases(player)) {
             if (base == destination) routes += ExpansionRoute.Local(base)
             if (connected(context.configuration.landBorders, base, destination)) {
                 routes += ExpansionRoute.Land(base)
             }
-            if (AdvanceId.CARAVAN in profile.advances) {
-                for (via in neighbors(context.configuration.landBorders, base)) {
-                    if (
-                        via != destination &&
-                            connected(context.configuration.landBorders, via, destination) &&
-                            canEnter(profile, context.province(via)) &&
-                            !opponentFills(context, player, via)
-                    ) {
-                        routes += ExpansionRoute.Caravan(base, via)
-                    }
-                }
-            }
-            if (
-                !context.province(base).coastal ||
-                    !context.province(destination).coastal ||
-                    base == destination
-            )
-                continue
-            when (profile.ships.fleet) {
-                ShippingFleet.NONE -> Unit
-                ShippingFleet.GALLEY -> routes += galleyRoutes(context, profile, base, destination)
-                ShippingFleet.SEAWORTHY ->
-                    if (context.province(destination).overseas == null) {
-                        routes += directShipping(base, destination)
-                    }
-                ShippingFleet.OCEAN -> routes += directShipping(base, destination)
-            }
+            routes += caravanRoutes(context, profile, base, destination)
+            routes += shippingRoutes(context, profile, base, destination)
         }
         return routes.distinct()
     }
@@ -166,6 +142,49 @@ object ExpansionReach {
             }
         }
 
+    private fun caravanRoutes(
+        context: BoardRulesContext,
+        profile: BoardPlayerProfile,
+        base: ProvinceId,
+        destination: ProvinceId,
+    ): List<ExpansionRoute.Caravan> {
+        if (AdvanceId.CARAVAN !in profile.advances) return emptyList()
+        return neighbors(context.configuration.landBorders, base)
+            .filter { via ->
+                via != destination &&
+                    connected(context.configuration.landBorders, via, destination) &&
+                    canEnter(profile, context.province(via)) &&
+                    !opponentFills(context, profile.player, via)
+            }
+            .map { via -> ExpansionRoute.Caravan(base, via) }
+    }
+
+    private fun shippingRoutes(
+        context: BoardRulesContext,
+        profile: BoardPlayerProfile,
+        base: ProvinceId,
+        destination: ProvinceId,
+    ): List<ExpansionRoute.Shipping> {
+        if (
+            !context.province(base).coastal ||
+                !context.province(destination).coastal ||
+                base == destination
+        ) {
+            return emptyList()
+        }
+        return when (profile.ships.fleet) {
+            ShippingFleet.NONE -> emptyList()
+            ShippingFleet.GALLEY -> galleyRoutes(context, profile, base, destination)
+            ShippingFleet.SEAWORTHY ->
+                if (context.province(destination).overseas == null) {
+                    listOf(directShipping(base, destination))
+                } else {
+                    emptyList()
+                }
+            ShippingFleet.OCEAN -> listOf(directShipping(base, destination))
+        }
+    }
+
     private fun validateShipping(
         context: BoardRulesContext,
         profile: BoardPlayerProfile,
@@ -249,13 +268,13 @@ object ExpansionReach {
                 if (
                     neighbor is ShippingSpace.Coast &&
                         !canEnter(profile, context.province(neighbor.province))
-                )
+                ) {
                     continue
-                val visit = Visit(neighbor, seaCount)
-                if (visit !in paths) {
-                    paths[visit] = path + neighbor
-                    queue.addLast(visit)
                 }
+                val visit = Visit(neighbor, seaCount)
+                if (visit in paths) continue
+                paths[visit] = path + neighbor
+                queue.addLast(visit)
             }
         }
         return routes
