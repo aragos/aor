@@ -132,12 +132,6 @@ class GameService(
                 add(
                     when (entry) {
                         is Entry.Shuffle -> "!shuffle <hidden>"
-                        is Entry.Deal ->
-                            if (entry.player == player) {
-                                line
-                            } else {
-                                "!deal ${entry.player} ${entry.reference} <hidden>"
-                            }
                         is GameOutcome.Draw ->
                             if (entry.player == player) line
                             else "!draw ${entry.player} ${entry.reference} <hidden>"

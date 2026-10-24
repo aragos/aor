@@ -30,17 +30,8 @@ data class StoredGame(
 interface SetupRandom {
     fun shuffle(cards: List<String>): List<String>
 
-    fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll>
-
     /** Independent unmodified dice, in the request's documented order. */
-    fun roll(count: Int): List<DieRoll> {
-        require(count in 1..6) { "An authority roll requires one through six dice." }
-        val identifiers = (1..count).map { number -> PlayerId("p$number") }
-        val values = dice(identifiers)
-        return identifiers.map { player ->
-            requireNotNull(values[player]) { "Every requested player requires a die result." }
-        }
-    }
+    fun roll(count: Int): List<DieRoll>
 }
 
 class AuthorityRandom : SetupRandom {
@@ -49,8 +40,9 @@ class AuthorityRandom : SetupRandom {
     override fun shuffle(cards: List<String>): List<String> =
         cards.toMutableList().also { shuffled -> shuffled.shuffle(random) }.toList()
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> = players.associateWith {
-        DieRoll(random.nextInt(6) + 1)
+    override fun roll(count: Int): List<DieRoll> {
+        require(count in 1..6) { "An authority roll requires one through six dice." }
+        return List(count) { DieRoll(random.nextInt(6) + 1) }
     }
 }
 
@@ -185,17 +177,10 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 when (need) {
                     SystemNeed.Shuffle ->
                         Entry.Shuffle(random.shuffle(CardData.epochOne.map(CardDefinition::id)))
-                    is SystemNeed.Deal ->
-                        Entry.Deal(
-                            player = need.player,
-                            reference = need.reference,
-                            card = current.deck.first(),
-                        )
-                    is SystemNeed.CapitalTie -> Entry.CapitalRoll(random.dice(need.players))
                     is SystemNeed.Draw ->
                         GameOutcome.Draw(need.player, need.reference, current.deck.first())
                     is SystemNeed.GameRoll ->
-                        GameOutcome.Roll(need.kind, random.roll(need.diceCount))
+                        GameOutcome.Roll(need.kind, random.roll(need.diceCount), need.players)
                     is SystemNeed.Trade -> {
                         val references =
                             current.playerState(need.owner).hand.map(HandCard::reference)
