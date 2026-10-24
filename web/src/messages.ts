@@ -127,7 +127,6 @@ export const en: Record<string, string> = {
     'error.CARD_IMMUNE_TARGET': 'That player is protected against this effect.', 'error.CARD_MISERY_BURDEN': 'A misery burden cannot be played.',
     'error.CARD_INSUFFICIENT_CASH': 'You cannot afford that card payment.', 'error.CARD_INVALID_LEADER_CLAIM': 'That leader is unavailable for your Patronage claim.',
     'error.CARD_INVALID_WAR': 'That War is no longer active.', 'error.CARD_INVALID_SURRENDER': 'Cede exactly the required available supportable provinces.',
-    'error.CARD_PAYOUT_RULING_REQUIRED': 'This payout requires a table ruling.', 'error.CARD_MARKER_RULING_REQUIRED': 'This marker placement requires a table ruling.',
     'error.INVALID_BID': 'Your bid must be a whole number from 0 to 40.', 'error.UNAVAILABLE_CAPITAL': 'That capital is unavailable.',
     'error.INVALID_TOKEN_PURCHASE': 'Choose a whole-number token purchase between the negative and positive amounts of your available cash.',
     'error.INVALID_TURN_POSITION': 'Choose one of the available positions in the tied group.',
