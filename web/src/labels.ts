@@ -1,4 +1,9 @@
 import {t} from './messages';
+import type {Snapshot} from './api';
+
+export function playerName(snapshot: Snapshot, id: string): string {
+    return snapshot.game.players.find(player => player.id === id)?.name ?? id;
+}
 
 /** Identifier formatting is only a fallback for catalog labels with no translation yet. */
 export function label(id: string, prefix?: string): string {
