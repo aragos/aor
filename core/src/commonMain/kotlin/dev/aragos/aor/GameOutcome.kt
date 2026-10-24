@@ -25,9 +25,12 @@ sealed interface GameOutcome : Entry {
                         owner.copy(hand = owner.hand + HandCard(reference, definition))
                     }
                     .copy(deck = state.deck.drop(1))
-            if (state.stage == Stage.DEAL) {
-                val allDealt = delivered.players.values.all { owner -> owner.hand.isNotEmpty() }
-                return delivered.copy(stage = if (allDealt) Stage.BIDDING else Stage.DEAL)
+            if (state.stage == Stage.INITIAL_DRAW) {
+                val allStartingCardsDrawn =
+                    delivered.players.values.all { owner -> owner.hand.isNotEmpty() }
+                return delivered.copy(
+                    stage = if (allStartingCardsDrawn) Stage.BIDDING else Stage.INITIAL_DRAW
+                )
             }
             val drawn = delivered.popDecision()
             val exhausted = delivered.deck.isEmpty()
