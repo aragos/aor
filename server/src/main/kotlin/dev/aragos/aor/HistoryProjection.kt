@@ -14,12 +14,6 @@ internal object HistoryProjection {
     fun line(before: GameState, entry: Entry, viewer: PlayerId): String =
         when (entry) {
             is Entry.Shuffle -> "!shuffle <hidden>"
-            is Entry.Deal ->
-                if (entry.player == viewer) {
-                    entry.toText()
-                } else {
-                    "!deal ${entry.player} ${entry.reference} <hidden>"
-                }
             is GameOutcome.Draw ->
                 if (entry.player == viewer) {
                     entry.toText()
