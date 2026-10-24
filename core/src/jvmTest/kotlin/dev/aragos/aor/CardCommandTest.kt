@@ -21,6 +21,8 @@ class CardCommandTest {
                 "replace-event-token pool",
                 "replace-event-token none",
                 "resolve-war",
+                "forgo-marker",
+                "move-marker venice",
                 "cede-war acre tunis",
                 "patronize-leader rashid-ad-din",
             )

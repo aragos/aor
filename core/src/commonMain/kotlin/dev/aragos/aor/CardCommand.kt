@@ -63,6 +63,20 @@ sealed interface CardCommand : Command {
             CardGame.surrenderWar(state, actor, provinces)
     }
 
+    data object ForgoMarker : CardCommand {
+        override fun toText(): String = "forgo-marker"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState =
+            CardMarkerPlacements.choose(state, actor, source = null)
+    }
+
+    data class MoveMarker(val source: ProvinceId) : CardCommand {
+        override fun toText(): String = "move-marker $source"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState =
+            CardMarkerPlacements.choose(state, actor, source)
+    }
+
     data class PatronizeLeader(val leader: LeaderId) : CardCommand {
         override fun toText(): String = "patronize-leader ${leader.cardId}"
 
@@ -131,6 +145,14 @@ sealed interface CardCommand : Command {
                             ViolationCode.INVALID_COMMAND,
                         )
                         CedeWar(arguments.map(::ProvinceId).toSet())
+                    }
+                    "forgo-marker" -> {
+                        size(arguments, 0)
+                        ForgoMarker
+                    }
+                    "move-marker" -> {
+                        size(arguments, 1)
+                        MoveMarker(ProvinceId(arguments.single()))
                     }
                     "patronize-leader" -> {
                         size(arguments, 1)
