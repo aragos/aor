@@ -91,7 +91,7 @@ sealed interface CardDecision : TurnDecision {
                     .filter { province -> context.province(province).overseas != null }
                     .take(WarRules.overseasCapacity(context, victory.winner))
             val candidates = mainland + overseas
-            val count = minOf(victory.requiredTransfers, candidates.size)
+            val count = WarRules.requiredCessions(context, victory)
             return listOf(CardCommand.CedeWar(candidates.take(count).toSet()).toText())
         }
     }

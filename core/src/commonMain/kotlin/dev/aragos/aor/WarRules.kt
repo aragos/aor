@@ -120,6 +120,24 @@ object WarRules {
     }
 
     /**
+     * Number of provinces the loser must cede after access advances and overseas maintenance limits
+     * are applied. Shipping range and the winner's remaining physical markers do not reduce this
+     * count; the winner separately chooses whether to forgo or reuse each marker.
+     */
+    fun requiredCessions(context: CardContext, result: WarResult.Victory): Int {
+        cardRule(
+            result.requiredTransfers >= 0,
+            CardRuleCode.INVALID_SURRENDER,
+            "A War cannot require a negative number of transfers.",
+        )
+        val eligible = eligibleProvinces(context, result.winner, result.loser)
+        val overseas = eligible.count { province -> context.province(province).overseas != null }
+        val supportable =
+            eligible.size - overseas + minOf(overseas, overseasCapacity(context, result.winner))
+        return minOf(result.requiredTransfers, supportable)
+    }
+
+    /**
      * The loser chooses all required supportable markers, or all available ones if short. AH1996
      * section 11.5 adds one misery space for every marker that cannot be ceded. Physical counter
      * exhaustion is resolved by the winner after these markers are removed: forgo a placement or
@@ -130,16 +148,8 @@ object WarRules {
         result: WarResult.Victory,
         provinces: Set<ProvinceId>,
     ): WarSettlement {
-        cardRule(
-            result.requiredTransfers >= 0,
-            CardRuleCode.INVALID_SURRENDER,
-            "A War cannot require a negative number of transfers.",
-        )
+        val required = requiredCessions(context, result)
         val eligible = eligibleProvinces(context, result.winner, result.loser)
-        val overseas = eligible.count { province -> context.province(province).overseas != null }
-        val supportable =
-            eligible.size - overseas + minOf(overseas, overseasCapacity(context, result.winner))
-        val required = minOf(result.requiredTransfers, supportable)
         cardRule(
             provinces.size == required &&
                 eligible.containsAll(provinces) &&
