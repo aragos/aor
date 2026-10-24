@@ -188,35 +188,25 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
     </form>;
 }
 
-function expansionRouteArgument(route: string, via: string): string {
-    if (route === 'auto') return '';
-    if (route === 'caravan') return ` caravan ${via}`;
-    return ` ${route}`;
-}
-
 function ExpansionActions({snapshot, busy, submit}: ActionProps) {
     const [operation, setOperation] = useState('place');
     const [province, setProvince] = useState('');
     const [tokens, setTokens] = useState('1');
-    const [route, setRoute] = useState('auto');
-    const [via, setVia] = useState('');
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
     const provinces = snapshot.game.catalog?.provinces ?? [];
     const count = Number(tokens);
     return <form className="guided-form expansion-form" onSubmit={event => {
         event.preventDefault();
-        const routeArgument = expansionRouteArgument(route, via);
-        void submit(`${operation} ${operation === 'place' ? `${count} ` : ''}${province}${routeArgument}`);
+        void submit(`${operation} ${operation === 'place' ? `${count} ` : ''}${province}`);
     }}>
         <h3>{t('action.expand')}</h3>
         <div className="action-fields"><label>{t('controls.expansionAction')}<select value={operation} onChange={event => setOperation(event.target.value)}><option value="place">{t('action.place')}</option><option value="attack">{t('action.attack')}</option></select></label>
             <label>{t('board.province')}<select value={province} onChange={event => setProvince(event.target.value)} required><option value="">{t('controls.chooseProvince')}</option>{provinces.map(province => <option key={province.id} value={province.id}>{provinceName(province.id)} · {province.marketNumber}</option>)}</select></label>
             {operation === 'place' && <label>{t('controls.tokenCount')}<input type="number" min={1} max={me.poolTokens} step={1} value={tokens} onChange={event => setTokens(event.target.value)} required/></label>}
-            <label>{t('controls.route')}<select value={route} onChange={event => setRoute(event.target.value)}>{['auto', 'land', 'ship', 'caravan'].map(route => <option key={route} value={route}>{label(route, 'route')}</option>)}</select></label>
-            {route === 'caravan' && <label>{t('controls.via')}<select value={via} onChange={event => setVia(event.target.value)} required><option value="">{t('controls.chooseProvince')}</option>{provinces.map(province => <option key={province.id} value={province.id}>{provinceName(province.id)}</option>)}</select></label>}
         </div>
+        <p className="muted small">{t('controls.routeHint')}</p>
         {operation === 'attack' && <p className="muted small">{t('controls.attackHint')}</p>}
-        <button disabled={busy || !province || (route === 'caravan' && !via) || (operation === 'place' && (!Number.isInteger(count) || count < 1 || count > me.poolTokens))}>{t(operation === 'place' ? 'action.place' : 'action.attack')}</button>
+        <button disabled={busy || !province || (operation === 'place' && (!Number.isInteger(count) || count < 1 || count > me.poolTokens))}>{t(operation === 'place' ? 'action.place' : 'action.attack')}</button>
     </form>;
 }
 
