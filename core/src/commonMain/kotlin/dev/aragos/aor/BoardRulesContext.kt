@@ -69,9 +69,6 @@ data class BoardRulesContext(
         ) {
             "Shipping usage requires registered players, available provinces and nonnegative counts."
         }
-    }
-
-    init {
         require(
             militaryPlays.all { play -> play.player in players } &&
                 militaryPlays.map(MilitaryPlay::card).distinct().size == militaryPlays.size
