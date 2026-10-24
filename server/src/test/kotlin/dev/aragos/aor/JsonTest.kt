@@ -26,13 +26,13 @@ class JsonTest {
     }
 
     @Test
-    fun startingResourcesRetainNumericRepresentations() {
+    fun shipsExposeTheirFleetAndLevel() {
         val encoded =
             json.writeValueAsString(
                 mapOf("misery" to MiseryStep.ZERO, "ships" to ShippingCapability.NONE)
             )
 
-        assertThat(encoded).isEqualTo("""{"misery":0,"ships":0}""")
+        assertThat(encoded).isEqualTo("""{"misery":0,"ships":{"fleet":"NONE","level":0}}""")
     }
 
     @Test

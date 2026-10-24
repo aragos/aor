@@ -174,8 +174,15 @@ class FileGameStore(
             "A game must have an initial configuration revision."
         }
         val state = validateRevisions(game.header, game.revisions)
-        require(game.pendingBids.size < game.header.players.size) {
-            "Pending sealed decisions must form an incomplete batch."
+        if (game.pendingBids.isNotEmpty()) {
+            val participants =
+                (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
+            require(
+                participants.containsAll(game.pendingBids.keys) &&
+                    game.pendingBids.size < participants.size
+            ) {
+                "Pending sealed decisions must form an incomplete batch of the current participants."
+            }
         }
         game.pendingBids.forEach { (player, amount) ->
             val command =
@@ -191,43 +198,49 @@ class FileGameStore(
 
     private fun validateRevisions(header: GameHeader, revisions: List<Revision>): GameState =
         revisions.withIndex().fold(GameState(header)) { state, (index, revision) ->
-            require(
-                revision.id == index + 1 && revision.parent == if (index == 0) null else index
-            ) {
-                "Revisions must form a consecutive chain starting with revision 1."
-            }
-            require(revision.author in state.playerIds) {
-                "Revision authors must be registered players."
-            }
-            val entries = revision.entries.map(TextCodec::parse)
-            val actions = entries.filterIsInstance<Entry.Action>()
-            require(entries.isNotEmpty() && entries.take(actions.size) == actions) {
-                "Each revision must contain player actions followed by system outcomes."
-            }
-            validateActions(state, revision, actions, entries, index)
-            require(revision.entries == entries.map(TextCodec::print)) {
-                "Stored entries must use canonical text."
-            }
-            entries
-                .fold(state) { current, entry -> current.step(entry) }
-                .also { next ->
-                    require(next.stage in COMMITTED_STAGES) {
-                        "A revision cannot stop before required system outcomes have completed."
-                    }
-                    require(
-                        next.stage != Stage.BIDDING ||
-                            next.players.values.all { player -> player.capitalBid == null }
-                    ) {
-                        "Sealed bids may enter history only as a complete, revealed batch."
-                    }
-                    require(
-                        next.stage != Stage.TOKEN_PURCHASE ||
-                            next.players.values.all { player -> player.tokenPurchase == null }
-                    ) {
-                        "Sealed token purchases may enter history only as a complete, revealed batch."
-                    }
-                }
+            validateRevision(state, index, revision)
         }
+
+    private fun validateRevision(state: GameState, index: Int, revision: Revision): GameState {
+        require(revision.id == index + 1 && revision.parent == if (index == 0) null else index) {
+            "Revisions must form a consecutive chain starting with revision 1."
+        }
+        require(revision.author in state.playerIds) {
+            "Revision authors must be registered players."
+        }
+        val entries = revision.entries.map(TextCodec::parse)
+        val actions = entries.filterIsInstance<Entry.Action>()
+        require(entries.isNotEmpty() && entries.take(actions.size) == actions) {
+            "Each revision must contain player actions followed by system outcomes."
+        }
+        validateActions(state, revision, actions, entries, index)
+        require(revision.entries == entries.map(TextCodec::print)) {
+            "Stored entries must use canonical text."
+        }
+        val next = entries.fold(state) { current, entry -> current.step(entry) }
+        validateCompletedRevision(next)
+        return next
+    }
+
+    private fun validateCompletedRevision(state: GameState) {
+        require(state.prompts().none { prompt -> prompt is Prompt.System }) {
+            "A revision cannot stop before required system outcomes have completed."
+        }
+        require(
+            state.stage != Stage.BIDDING ||
+                state.players.values.all { player -> player.capitalBid == null }
+        ) {
+            "Sealed bids may enter history only as a complete, revealed batch."
+        }
+        require(
+            state.stage != Stage.TOKEN_PURCHASE ||
+                state.players.values
+                    .filter { player -> player.misery != MiseryStep.CHAOS }
+                    .all { player -> player.tokenPurchase == null }
+        ) {
+            "Sealed token purchases may enter history only as a complete, revealed batch."
+        }
+    }
 
     private fun validateActions(
         state: GameState,
@@ -249,34 +262,40 @@ class FileGameStore(
                 }
                 validateSealedActions(state, actions) { command -> command is Command.BuyTokens }
             }
-            else -> {
-                val command = TextCodec.parseCommand(revision.command)
-                require(command !is Command.BidCapital && command !is Command.BuyTokens) {
-                    "Sealed decisions must be committed together under their reveal marker."
-                }
-                require(revision.command == command.toText()) {
-                    "Revision commands must use canonical text."
-                }
-                if (index == 0) {
-                    val configuration =
-                        listOf(
-                            Entry.Action(actor = revision.author, command = command),
-                            Entry.Action(
-                                actor = revision.author,
-                                command = Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE),
-                            ),
-                        )
-                    require(command is Command.SetEpochs && entries == configuration) {
-                        "The initial revision must configure epochs and the default rebuilt-marker bonus."
-                    }
-                } else {
-                    require(
-                        actions == listOf(Entry.Action(actor = revision.author, command = command))
-                    ) {
-                        "A command revision must contain exactly the author's command."
-                    }
-                }
+            else -> validateCommandActions(revision, actions, entries, index)
+        }
+    }
+
+    private fun validateCommandActions(
+        revision: Revision,
+        actions: List<Entry.Action>,
+        entries: List<Entry>,
+        index: Int,
+    ) {
+        val command = TextCodec.parseCommand(revision.command)
+        require(command !is Command.BidCapital && command !is Command.BuyTokens) {
+            "Sealed decisions must be committed together under their reveal marker."
+        }
+        require(revision.command == command.toText()) {
+            "Revision commands must use canonical text."
+        }
+        val action = Entry.Action(actor = revision.author, command = command)
+        if (index != 0) {
+            require(actions == listOf(action)) {
+                "A command revision must contain exactly the author's command."
             }
+            return
+        }
+        val configuration =
+            listOf(
+                action,
+                Entry.Action(
+                    actor = revision.author,
+                    command = Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE),
+                ),
+            )
+        require(command is Command.SetEpochs && entries == configuration) {
+            "The initial revision must configure epochs and the default rebuilt-marker bonus."
         }
     }
 
@@ -285,8 +304,10 @@ class FileGameStore(
         actions: List<Entry.Action>,
         accepts: (Command) -> Boolean,
     ) {
+        val participants =
+            (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
         require(
-            actions.map(Entry.Action::actor) == state.playerIds &&
+            actions.map(Entry.Action::actor) == state.playerIds.filter(participants::contains) &&
                 actions.all { action -> accepts(action.command) }
         ) {
             "A revealed batch must include the current sealed decision for every player in registration order."
@@ -296,14 +317,5 @@ class FileGameStore(
     private companion object {
         val GAME_ID_PATTERN = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         val CREDENTIAL_PATTERN = Regex("[0-9a-f]{64}")
-        val COMMITTED_STAGES =
-            setOf(
-                Stage.CONFIGURATION,
-                Stage.BIDDING,
-                Stage.CAPITAL_CHOICE,
-                Stage.TOKEN_PURCHASE,
-                Stage.TURN_ORDER_TIE,
-                Stage.DRAW_CARD,
-            )
     }
 }

@@ -56,7 +56,8 @@ data class PlayerState(
     val cash: Int = 40,
     val stockTokens: Int = 36,
     val poolTokens: Int = 0,
-    val boardMarkers: Int = 0,
+    /** Cash recorded after the current turn's token purchase. */
+    val writtenCash: Int = 40,
     val misery: MiseryStep = MiseryStep.ZERO,
     val ships: ShippingCapability = ShippingCapability.NONE,
     val advances: PlayerAdvances = PlayerAdvances(),
@@ -73,7 +74,7 @@ data class PlayerState(
  */
 data class GameState(
     val header: GameHeader,
-    val epochs: Int = 3,
+    val epochs: Int = 1,
     val rebuiltMarkerBonus: RebuiltMarkerBonus = RebuiltMarkerBonus.EXCLUDE,
     val stage: Stage = Stage.CONFIGURATION,
     val deck: List<String> = emptyList(),
@@ -81,6 +82,15 @@ data class GameState(
         header.players.associate { player ->
             player.id to PlayerState(player = player)
         },
+    val effects: CardTurnEffects = CardTurnEffects(),
+    val activeWar: WarState? = null,
+    val voids: CardVoids = CardVoids(),
+    val board: BoardState = BoardState(),
+    val flow: TurnFlow = TurnFlow(),
+    val endingTriggered: Boolean = false,
+    val entryCount: Int = 0,
+    val activityStart: Int = 0,
+    val adjustments: Map<Commodity, List<CommodityAdjustment>> = emptyMap(),
     val capitalSelection: CapitalSelection = CapitalSelection(),
     val turnNumber: Int? = null,
     val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
@@ -103,17 +113,54 @@ data class GameState(
             return CapitalData.availableFor(playerIds.size).filterNot(assigned::contains)
         }
 
-    fun prompts(): List<Prompt> = listOfNotNull(stage.prompt(this))
+    fun prompts(): List<Prompt> {
+        val need =
+            pendingDraw()
+                ?: pendingRoll()?.let { decision ->
+                    SystemNeed.GameRoll(decision.kind, decision.diceCount, decision.players)
+                }
+        return listOfNotNull(
+            need?.let(Prompt::System) ?: TurnEngine.prompt(this) ?: stage.prompt(this)
+        )
+    }
+
+    /** Draw requests share card references and validation across setup and repeatable turns. */
+    internal fun pendingDraw(): SystemNeed.Draw? {
+        val owner =
+            if (stage == Stage.INITIAL_DRAW) {
+                playerIds.first { player -> playerState(player).hand.isEmpty() }
+            } else {
+                (flow.decisions.lastOrNull() as? DrawDecision)?.owner ?: return null
+            }
+        return SystemNeed.Draw(owner, nextHandReference())
+    }
+
+    /** Capital tie dice and interrupted turn dice use one request and recorded-outcome contract. */
+    internal fun pendingRoll(): TurnDecision.Roll? =
+        if (stage == Stage.CAPITAL_TIE) {
+            CapitalTieDecision(capitalSelection.ties.first().players)
+        } else {
+            flow.decisions.lastOrNull() as? TurnDecision.Roll
+        }
 
     fun legalChoices(player: PlayerId): LegalChoices {
         playerState(player)
-        return stage.legalChoices(state = this, player = player)
+        return if (stage.isTurnPhase) {
+            TurnEngine.choices(this, player)
+        } else {
+            stage.legalChoices(state = this, player = player)
+        }
     }
 
     fun viewForPlayer(player: PlayerId): GameView =
         GameView.forPlayer(state = this, viewer = playerState(player))
 
-    fun step(entry: Entry): GameState = entry.applyTo(this)
+    fun step(entry: Entry): GameState {
+        val next = entry.applyTo(this).normalise().copy(entryCount = entryCount + 1)
+        val changed =
+            next.stage != stage || next.flow.actor != flow.actor || next.turnNumber != turnNumber
+        return if (changed) next.copy(activityStart = entryCount + 1) else next
+    }
 
     /** Looks up a registered [player] without exposing nullable player state to rule handlers. */
     fun playerState(player: PlayerId): PlayerState =

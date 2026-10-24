@@ -36,9 +36,7 @@ class GameService(
 
     fun create(names: List<String>, epochs: Int): CreatedGame {
         val normalized = names.map(String::trim)
-        if (
-            normalized.map(String::lowercase).distinct().size != normalized.size || epochs !in 1..3
-        ) {
+        if (normalized.map(String::lowercase).distinct().size != normalized.size || epochs != 1) {
             throw ServiceFailure(400, "INVALID_GAME")
         }
         val header =
@@ -98,11 +96,15 @@ class GameService(
                 if (current.revision != expectedRevision) {
                     throw ServiceFailure(409, "STALE_REVISION")
                 }
-                driver.submit(
-                    stored = current,
-                    player = player,
-                    command = TextCodec.parseCommand(text),
-                )
+                try {
+                    driver.submit(
+                        stored = current,
+                        player = player,
+                        command = TextCodec.parseCommand(text),
+                    )
+                } catch (failure: CardRuleViolation) {
+                    throw ServiceFailure(422, "CARD_${failure.code.name}")
+                }
             }
         return snapshot(stored = stored, player = authenticate(stored, token))
     }
@@ -123,19 +125,39 @@ class GameService(
                     )
                 else -> null
             }
-        val history =
-            stored.revisions.flatMap(Revision::entries).map { line ->
-                when (val entry = TextCodec.parse(line)) {
-                    is Entry.Shuffle -> "!shuffle <hidden>"
-                    is Entry.Deal ->
-                        if (entry.player == player) {
-                            line
-                        } else {
-                            "!deal ${entry.player} ${entry.reference} <hidden>"
-                        }
-                    else -> line
-                }
+        val history = buildList {
+            var before = GameState(stored.header)
+            for (line in stored.revisions.flatMap(Revision::entries)) {
+                val entry = TextCodec.parse(line)
+                add(
+                    when (entry) {
+                        is Entry.Shuffle -> "!shuffle <hidden>"
+                        is GameOutcome.Draw ->
+                            if (entry.player == player) line
+                            else "!draw ${entry.player} ${entry.reference} <hidden>"
+                        is GameOutcome.Trade ->
+                            if (player == entry.owner || player == entry.recipient) line
+                            else "!trade ${entry.owner} ${entry.recipient} <hidden>"
+                        is Entry.Action ->
+                            when {
+                                entry.actor != player && entry.command is TurnCommand.DiscardCard ->
+                                    "${entry.actor}: discard-card <hidden>"
+                                entry.command.toText().startsWith("play-card ") -> {
+                                    val reference = entry.command.toText().split(' ')[1]
+                                    val card =
+                                        before.playerState(entry.actor).hand.singleOrNull { card ->
+                                            card.reference == reference
+                                        }
+                                    if (card == null) line else "$line [${card.definition.id}]"
+                                }
+                                else -> line
+                            }
+                        else -> line
+                    }
+                )
+                before = before.step(entry)
             }
+        }
         return GameSnapshot(
             gameId = stored.id,
             revision = stored.revision,

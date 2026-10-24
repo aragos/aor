@@ -30,7 +30,8 @@ data class StoredGame(
 interface SetupRandom {
     fun shuffle(cards: List<String>): List<String>
 
-    fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll>
+    /** Independent unmodified dice, in the request's documented order. */
+    fun roll(count: Int): List<DieRoll>
 }
 
 class AuthorityRandom : SetupRandom {
@@ -39,8 +40,9 @@ class AuthorityRandom : SetupRandom {
     override fun shuffle(cards: List<String>): List<String> =
         cards.toMutableList().also { shuffled -> shuffled.shuffle(random) }.toList()
 
-    override fun dice(players: List<PlayerId>): Map<PlayerId, DieRoll> = players.associateWith {
-        DieRoll(random.nextInt(6) + 1)
+    override fun roll(count: Int): List<DieRoll> {
+        require(count in 1..6) { "An authority roll requires one through six dice." }
+        return List(count) { DieRoll(random.nextInt(6) + 1) }
     }
 }
 
@@ -90,7 +92,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     player = player,
                     amount = command.amount,
                     revealCommand = "reveal-capital-bids",
-                    createCommand = { amount -> Command.BidCapital(amount) },
+                    createCommand = Command::BidCapital,
                 )
             is Command.BuyTokens ->
                 submitSealedDecision(
@@ -99,7 +101,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     player = player,
                     amount = command.amount,
                     revealCommand = "reveal-token-purchases",
-                    createCommand = { amount -> Command.BuyTokens(amount) },
+                    createCommand = Command::BuyTokens,
                 )
             else ->
                 commit(
@@ -121,20 +123,25 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         createCommand: (Int) -> Command,
     ): StoredGame {
         val pending = stored.pendingBids + (player to amount)
-        if (pending.size < stored.header.players.size) return stored.copy(pendingBids = pending)
+        val required =
+            (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players
+                ?: error("Sealed submissions require a simultaneous player prompt.")
+        if (required.any { participant -> participant !in pending }) {
+            return stored.copy(pendingBids = pending)
+        }
         return commit(
             stored = stored.copy(pendingBids = emptyMap()),
             state = state,
             player = player,
             command = revealCommand,
             actions =
-                stored.header.players.map { registered ->
+                state.playerIds.filter(required::contains).map { participant ->
                     Entry.Action(
-                        actor = registered.id,
+                        actor = participant,
                         command =
                             createCommand(
-                                requireNotNull(pending[registered.id]) {
-                                    "Every participant must have submitted a sealed decision: ${registered.id}."
+                                requireNotNull(pending[participant]) {
+                                    "Every participant must have submitted a sealed decision: $participant."
                                 }
                             ),
                     )
@@ -170,13 +177,19 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 when (need) {
                     SystemNeed.Shuffle ->
                         Entry.Shuffle(random.shuffle(CardData.epochOne.map(CardDefinition::id)))
-                    is SystemNeed.Deal ->
-                        Entry.Deal(
-                            player = need.player,
-                            reference = need.reference,
-                            card = current.deck.first(),
+                    is SystemNeed.Draw ->
+                        GameOutcome.Draw(need.player, need.reference, current.deck.first())
+                    is SystemNeed.GameRoll ->
+                        GameOutcome.Roll(need.kind, random.roll(need.diceCount), need.players)
+                    is SystemNeed.Trade -> {
+                        val references =
+                            current.playerState(need.owner).hand.map(HandCard::reference)
+                        GameOutcome.Trade(
+                            need.owner,
+                            need.recipient,
+                            random.shuffle(references).first(),
                         )
-                    is SystemNeed.CapitalTie -> Entry.CapitalRoll(random.dice(need.players))
+                    }
                 }
             current = current.step(outcome)
             add(outcome)

@@ -39,7 +39,7 @@ class TurnOrderTest {
             .containsExactly(PlayerId("p3"), PlayerId("p2"), PlayerId("p1"))
             .inOrder()
         assertThat(state.stage).isEqualTo(Stage.DRAW_CARD)
-        assertThat(state.prompts()).isEmpty()
+        assertThat(state.prompts().single()).isInstanceOf(Prompt.System::class.java)
         assertThat(state.legalChoices(PlayerId("p1")).commands).isEmpty()
     }
 
@@ -304,7 +304,7 @@ class TurnOrderTest {
                 )
         val dealt =
             (1..count).fold(started) { state, index ->
-                state.play("!deal p$index hand-$index ${state.deck.first()}")
+                state.play("!draw p$index hand-$index ${state.deck.first()}")
             }
         val bids = (1..count).fold(dealt) { state, index -> state.play("p$index: bid-capital 0") }
         val ordered =
