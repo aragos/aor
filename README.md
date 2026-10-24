@@ -9,6 +9,7 @@ It stops at **Turn 1 — Draw Card**, with the order and expansion pools ready f
 
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
+- [Command language](docs/commands.md): complete syntax, parameters and recorded outcomes.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
 - [Manual walkthrough](docs/manual-setup.md): setup, Order of Play, restart and API instructions.
 - [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, next milestone and session handoff.
