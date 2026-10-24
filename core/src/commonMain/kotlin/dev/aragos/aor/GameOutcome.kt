@@ -8,48 +8,98 @@ sealed interface GameOutcome : Entry {
         override fun toText(): String = "!draw $player $reference $card"
 
         override fun applyTo(state: GameState): GameState {
-            val decision = state.flow.decisions.lastOrNull() as? DrawDecision
+            val need = state.pendingDraw()
             checkRule(
-                decision?.owner == player &&
-                    card == state.deck.firstOrNull() &&
-                    reference == state.nextHandReference(),
+                need != null &&
+                    player == need.player &&
+                    reference == need.reference &&
+                    card == state.deck.firstOrNull(),
                 ViolationCode.INVALID_OUTCOME,
             )
             val definition =
                 CardData.epochOne.singleOrNull { definition -> definition.id == card }
                     ?: throw RuleViolation(ViolationCode.INVALID_OUTCOME)
-            val drawn =
-                state.popDecision().updatePlayer(player) { owner ->
-                    owner.copy(hand = owner.hand + HandCard(reference, definition))
+            val delivered =
+                state
+                    .updatePlayer(player) { owner ->
+                        owner.copy(hand = owner.hand + HandCard(reference, definition))
+                    }
+                    .copy(deck = state.deck.drop(1))
+            if (state.stage == Stage.DEAL) {
+                val allDealt = delivered.players.values.all { owner -> owner.hand.isNotEmpty() }
+                return delivered.copy(stage = if (allDealt) Stage.BIDDING else Stage.DEAL)
+            }
+            val drawn = delivered.popDecision()
+            val exhausted = delivered.deck.isEmpty()
+            val decisions =
+                if (exhausted) {
+                    drawn.flow.decisions.filterNot { frame -> frame is DrawDecision }
+                } else {
+                    drawn.flow.decisions
                 }
-            val exhausted = state.deck.size == 1
             return drawn.copy(
-                deck = state.deck.drop(1),
                 endingTriggered = state.endingTriggered || exhausted,
-                flow =
-                    drawn.flow.copy(
-                        decisions =
-                            if (exhausted) {
-                                drawn.flow.decisions.filterNot { frame -> frame is DrawDecision }
-                            } else {
-                                drawn.flow.decisions
-                            }
-                    ),
+                flow = drawn.flow.copy(decisions = decisions),
             )
         }
     }
 
-    data class Roll(val kind: GameRollKind, val values: List<DieRoll>) : GameOutcome {
-        override fun toText(): String = "!roll ${kind.name.lowercase()} ${values.joinToString(" ")}"
+    /** [players] attributes the corresponding [values]; empty for unassigned dice. */
+    data class Roll(
+        val kind: GameRollKind,
+        val values: List<DieRoll>,
+        val players: List<PlayerId> = emptyList(),
+    ) : GameOutcome {
+        override fun toText(): String {
+            val results =
+                if (players.isEmpty()) {
+                    values.joinToString(" ")
+                } else {
+                    players
+                        .zip(values)
+                        .sortedBy { (player, _) -> player.value }
+                        .joinToString(" ") { (player, roll) -> "$player=$roll" }
+                }
+            return "!roll ${kind.name.lowercase().replace('_', '-')} $results"
+        }
 
         override fun applyTo(state: GameState): GameState {
-            val decision = state.flow.decisions.lastOrNull() as? TurnDecision.Roll
+            val decision = state.pendingRoll()
             checkRule(
-                decision != null && decision.kind == kind && values.size == decision.diceCount,
+                decision != null &&
+                    decision.kind == kind &&
+                    values.size == decision.diceCount &&
+                    players.distinct().size == players.size &&
+                    players.toSet() == decision.players.toSet(),
                 ViolationCode.INVALID_OUTCOME,
             )
-            return requireNotNull(decision) { "A validated roll requires its decision." }
-                .resolve(state, values)
+            val request = requireNotNull(decision) { "A validated roll requires its decision." }
+            val ordered =
+                if (players.isEmpty()) {
+                    values
+                } else {
+                    request.players.map { player -> values[players.indexOf(player)] }
+                }
+            return request.resolve(state, ordered)
+        }
+
+        companion object {
+            internal fun parse(arguments: List<String>): Roll {
+                checkRule(arguments.size >= 2, ViolationCode.INVALID_COMMAND)
+                val kind = GameRollKind.valueOf(arguments[0].uppercase().replace('-', '_'))
+                val results = arguments.drop(1)
+                if (results.none { result -> '=' in result }) {
+                    return Roll(kind, results.map(DieRoll::parse))
+                }
+                val attributed = results.map { result ->
+                    val pair = result.split('=')
+                    checkRule(pair.size == 2, ViolationCode.INVALID_COMMAND)
+                    PlayerId(pair[0]) to DieRoll.parse(pair[1])
+                }
+                val players = attributed.map(Pair<PlayerId, DieRoll>::first)
+                checkRule(players.distinct().size == players.size, ViolationCode.INVALID_COMMAND)
+                return Roll(kind, attributed.map(Pair<PlayerId, DieRoll>::second), players)
+            }
         }
     }
 
@@ -82,13 +132,7 @@ sealed interface GameOutcome : Entry {
                         checkRule(arguments.size == 3, ViolationCode.INVALID_COMMAND)
                         Trade(PlayerId(arguments[0]), PlayerId(arguments[1]), arguments[2])
                     }
-                    "!roll" -> {
-                        checkRule(arguments.size >= 2, ViolationCode.INVALID_COMMAND)
-                        Roll(
-                            GameRollKind.valueOf(arguments[0].uppercase()),
-                            arguments.drop(1).map(DieRoll::parse),
-                        )
-                    }
+                    "!roll" -> Roll.parse(arguments)
                     else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
                 }
             } catch (failure: IllegalArgumentException) {

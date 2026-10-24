@@ -20,7 +20,7 @@ class CardCommandTest {
                 "civil-war-loss tokens",
                 "replace-event-token pool",
                 "replace-event-token none",
-                "resolve-war",
+                "pass",
                 "forgo-marker",
                 "move-marker venice",
                 "cede-war acre tunis",
