@@ -39,8 +39,11 @@ object TextCodec {
             "!shuffle" -> Entry.Shuffle.parse(arguments)
             "!deal" -> Entry.Deal.parse(arguments)
             "!roll" ->
-                if (arguments.firstOrNull() == "capital-tie") Entry.CapitalRoll.parse(arguments)
-                else GameOutcome.parse(parts.first(), arguments)
+                if (arguments.firstOrNull() == "capital-tie") {
+                    Entry.CapitalRoll.parse(arguments)
+                } else {
+                    GameOutcome.parse(parts.first(), arguments)
+                }
             "!draw",
             "!trade" -> GameOutcome.parse(parts.first(), arguments)
             else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
