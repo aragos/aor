@@ -33,7 +33,7 @@ sealed interface Entry {
             checkRule(state.stage == Stage.SHUFFLE, ViolationCode.WRONG_PHASE)
             val expectedCards = CardData.epochOne.map(CardDefinition::id)
             checkRule(cards.sorted() == expectedCards.sorted(), ViolationCode.INVALID_OUTCOME)
-            return state.copy(stage = Stage.DEAL, deck = cards.toList())
+            return state.copy(stage = Stage.INITIAL_DRAW, deck = cards.toList())
         }
 
         companion object {

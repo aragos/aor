@@ -111,6 +111,11 @@ In Final Card Play, every non-burden card must be played before passing; Master 
 | `!roll windmill <die>` | Wind/Watermill selection die. |
 | `!trade <player> <player> <reference>` | Requested random card transfer: owner, recipient, then a reference currently in the owner's hand. |
 
+Starting-card distribution (`INITIAL_DRAW`) follows the initial shuffle and precedes capital
+bidding. The recurring `DRAW_CARD` phase includes first-player shortage/surplus cancellation and
+then draws in turn order. Both stages deliver cards through the same `!draw` outcome, also used
+for additional draws earned during play.
+
 Every outcome must match the pending request, including participant identities, dice count, card
 ownership, draw reference and deck top. Replay consumes recorded outcomes and generates no randomness.
 Shuffles and private draws/transfers are redacted for unauthorized viewers; a public history view
