@@ -13,6 +13,11 @@ interface TurnDecision {
     interface Roll : TurnDecision {
         val kind: GameRollKind
         val diceCount: Int
+
+        /** Participants receiving one die each; empty for dice without player attribution. */
+        val players: List<PlayerId>
+            get() = emptyList()
+
         override val player: PlayerId?
             get() = null
 
@@ -31,6 +36,7 @@ interface TurnDecision {
 }
 
 enum class GameRollKind {
+    CAPITAL_TIE,
     COMPETITION,
     WAR,
     SHORTAGE,
@@ -102,4 +108,19 @@ internal data object ShortageDecision : TurnDecision.Roll {
 
     override fun resolve(state: GameState, values: List<DieRoll>): GameState =
         TurnEngine.shortage(state, values)
+}
+
+/** The highest unresolved capital-choice tie uses the same recorded roll as turn decisions. */
+internal data class CapitalTieDecision(override val players: List<PlayerId>) : TurnDecision.Roll {
+    override val choice: String
+        get() = "capital-tie"
+
+    override val kind: GameRollKind
+        get() = GameRollKind.CAPITAL_TIE
+
+    override val diceCount: Int
+        get() = players.size
+
+    override fun resolve(state: GameState, values: List<DieRoll>): GameState =
+        state.resolveCapitalTie(players.zip(values).toMap())
 }
