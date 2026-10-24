@@ -42,7 +42,7 @@ internal object TurnEngine {
         when (state.stage) {
             Stage.DRAW_CARD -> adjustmentChoices(state, actor)
             Stage.BUY_CARD -> buyCardChoices(state, state.playerState(actor))
-            Stage.PLAY_CARDS -> listOf("pass") + CardGame.playChoices(state, actor)
+            Stage.PLAY_CARDS -> cardChoices(state, actor)
             Stage.FINAL_CARD_PLAY -> finalCardChoices(state, actor)
             Stage.PURCHASE -> purchaseChoices(state, actor)
             Stage.EXPANSION -> BoardGame.choices(state, actor)
@@ -90,6 +90,9 @@ internal object TurnEngine {
         player.advances.owns(AdvanceId.MASTER_ART) &&
             player.player.id !in state.flow.discardedCards &&
             player.hand.isNotEmpty()
+
+    private fun cardChoices(state: GameState, actor: PlayerId): List<String> =
+        listOf("pass") + CardGame.playChoices(state, actor)
 
     private fun finalCardChoices(state: GameState, actor: PlayerId): List<String> =
         CardGame.playChoices(state, actor) +
