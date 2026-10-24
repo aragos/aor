@@ -3,12 +3,14 @@ package dev.aragos.aor
 enum class Stage {
     CONFIGURATION,
     SHUFFLE,
-    DEAL,
+    /** Starting-card distribution before capital bidding, using [SystemNeed.Draw]. */
+    INITIAL_DRAW,
     BIDDING,
     CAPITAL_TIE,
     CAPITAL_CHOICE,
     TOKEN_PURCHASE,
     TURN_ORDER_TIE,
+    /** Recurring Draw Card phase, including first-player shortage/surplus cancellation. */
     DRAW_CARD,
     BUY_CARD,
     PLAY_CARDS,
@@ -59,7 +61,7 @@ enum class Stage {
                     player = state.turnOrderSelection.ties.first().choosingPlayer,
                     choice = "choose-turn-position",
                 )
-            DEAL,
+            INITIAL_DRAW,
             CAPITAL_TIE,
             DRAW_CARD,
             BUY_CARD,
