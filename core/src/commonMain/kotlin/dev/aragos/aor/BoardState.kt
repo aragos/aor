@@ -107,12 +107,12 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
 
     fun tokenCount(player: PlayerId): Int =
         pieces.values.sumOf { occupants ->
-            (occupants as? ProvincePieces.Tokens)?.holdings?.get(player)?.total ?: 0
+            (occupants as? ProvincePieces.Tokens)?.holdings.orEmpty()[player]?.total ?: 0
         }
 
     fun commodityCount(player: PlayerId, commodity: Commodity): Int = pieces.count { entry ->
         val marker = entry.value as? ProvincePieces.Marker
-        marker?.owner == player && commodity in ProvinceData.byId.getValue(entry.key).commodities
+        marker?.owner == player && commodity in ProvinceData.definition(entry.key).commodities
     }
 
     /** Any coloured presence is a base, even if the player's tokens do not fill the market. */
@@ -135,7 +135,7 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
             is ProvincePieces.Tokens ->
                 occupants.holdings.entries
                     .singleOrNull { holding ->
-                        holding.value.coloured >= ProvinceData.byId.getValue(province).marketNumber
+                        holding.value.coloured >= ProvinceData.definition(province).marketNumber
                     }
                     ?.key
             null -> null

@@ -89,12 +89,20 @@ class PublicGameViewTest {
                 .advanceOffers
                 .associateBy(AdvanceOfferView::advance)
 
+        val humanBody =
+            requireNotNull(offers[AdvanceId.HUMAN_BODY]) {
+                "The view must include the Human Body offer."
+            }
+        val caravan =
+            requireNotNull(offers[AdvanceId.CARAVAN]) {
+                "The view must include the Caravan offer."
+            }
+
         assertThat(offers).doesNotContainKey(AdvanceId.THE_HEAVENS)
-        assertThat(offers.getValue(AdvanceId.HUMAN_BODY).price).isEqualTo(60)
-        assertThat(offers.getValue(AdvanceId.HUMAN_BODY).unavailableReason)
-            .isEqualTo("INSUFFICIENT_CASH")
-        assertThat(offers.getValue(AdvanceId.CARAVAN).price).isEqualTo(20)
-        assertThat(offers.getValue(AdvanceId.CARAVAN).unavailableReason).isNull()
+        assertThat(humanBody.price).isEqualTo(60)
+        assertThat(humanBody.unavailableReason).isEqualTo("INSUFFICIENT_CASH")
+        assertThat(caravan.price).isEqualTo(20)
+        assertThat(caravan.unavailableReason).isNull()
     }
 
     @Test

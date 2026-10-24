@@ -12,7 +12,12 @@ class CommodityPayoutOverflowTest {
 
         val result = CardRules.commodityPayment(initial.cardContext(), Commodity.WOOL)
 
-        assertThat(result.payments.getValue(owner)).isEqualTo(242)
+        assertThat(
+                requireNotNull(result.payments[owner]) {
+                    "Every commodity owner must have a payment: $owner."
+                }
+            )
+            .isEqualTo(242)
     }
 
     @Test
