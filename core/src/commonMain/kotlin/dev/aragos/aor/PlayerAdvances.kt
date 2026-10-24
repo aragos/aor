@@ -51,9 +51,9 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
 
     /**
      * Category credits freeze for a turn; purchases during its Purchase phase cannot add to them.
+     * [currentTurn] comes from the authoritative game, which owns history consistency.
      */
     fun creditsFor(category: AdvanceCategory, currentTurn: Int): Int {
-        requireValidTurn(currentTurn)
         return acquisitions
             .filter { acquisition ->
                 acquisition.turnNumber < currentTurn &&
@@ -62,18 +62,11 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
             .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).credit }
     }
 
+    /** Rating acquired in the authoritative game's [currentTurn]. */
     fun miseryReliefFor(currentTurn: Int): Int {
-        requireValidTurn(currentTurn)
         return acquisitions
             .filter { acquisition -> acquisition.turnNumber == currentTurn }
             .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).miseryRelief }
-    }
-
-    internal fun requireValidTurn(currentTurn: Int) {
-        require(currentTurn > 0) { "Advance calculations require a positive current turn." }
-        require(acquisitions.all { acquisition -> acquisition.turnNumber <= currentTurn }) {
-            "Advance acquisition history cannot contain a future turn."
-        }
     }
 }
 
