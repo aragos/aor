@@ -147,7 +147,11 @@ class CardEffectCatalogBuilder {
         }
         for (card in cards) {
             val expectedKind =
-                when (definitions.getValue(card.id)) {
+                when (
+                    requireNotNull(definitions[card.id]) {
+                        "Every card must have an effect definition: ${card.id}."
+                    }
+                ) {
                     is CardEffectSpec.CommodityChoices -> CardKind.COMMODITY
                     is CardEffectSpec.Event -> CardKind.EVENT
                     is CardEffectSpec.Leader -> CardKind.LEADER
