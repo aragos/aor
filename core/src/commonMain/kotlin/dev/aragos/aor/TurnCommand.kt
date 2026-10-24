@@ -21,7 +21,7 @@ sealed interface TurnCommand : Command {
                 Stage.BUY_CARD,
                 Stage.PLAY_CARDS -> state.finishActor()
                 Stage.PURCHASE -> passPurchase(state)
-                Stage.EXPANSION -> passExpansion(state, actor)
+                Stage.EXPANSION -> BoardGame.endExpansion(state, actor)
                 Stage.FINAL_CARD_PLAY -> {
                     checkRule(
                         state.playerState(actor).hand.all { card ->
@@ -33,18 +33,6 @@ sealed interface TurnCommand : Command {
                 }
                 else -> throw RuleViolation(ViolationCode.WRONG_PHASE)
             }
-        }
-
-        private fun passExpansion(state: GameState, actor: PlayerId): GameState {
-            val player = state.playerState(actor)
-            return state
-                .replacePlayer(
-                    player.copy(
-                        stockTokens = player.stockTokens + player.poolTokens,
-                        poolTokens = 0,
-                    )
-                )
-                .finishActor()
         }
 
         private fun passPurchase(state: GameState): GameState =
