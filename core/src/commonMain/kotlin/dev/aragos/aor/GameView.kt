@@ -50,6 +50,7 @@ data class GameView(
     val effects: CardTurnEffects = CardTurnEffects(),
     val activeWar: WarState? = null,
     val warCession: WarCessionView? = null,
+    val markerPlacement: MarkerPlacementView? = null,
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
     val reliefOffers: List<ReliefOfferView> = emptyList(),
@@ -117,6 +118,11 @@ data class GameView(
                 effects = state.effects,
                 activeWar = state.activeWar,
                 warCession = WarCessionView.from(state),
+                markerPlacement =
+                    (state.flow.decisions.lastOrNull() as? CardDecision.MarkerPlacement)?.let {
+                        decision ->
+                        MarkerPlacementView(decision.player, decision.destination)
+                    },
                 voids = state.voids,
                 advanceOffers = advanceOffers(state, viewer),
                 reliefOffers = reliefOffers(state, viewer),
@@ -174,6 +180,9 @@ data class GameView(
         }
     }
 }
+
+/** Public recipient and destination of the next physical marker choice after a card effect. */
+data class MarkerPlacementView(val player: PlayerId, val destination: ProvinceId)
 
 /** Public support limits for a resolved War while its loser chooses provinces to cede. */
 data class WarCessionView(

@@ -59,6 +59,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         </form>}
         {commands.some(command => command === 'play-card' || command.startsWith('play-card ')) && <PlayCard snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.some(command => command === 'place' || command === 'attack' || command.startsWith('place ') || command.startsWith('attack ')) && <ExpansionActions snapshot={snapshot} busy={busy} submit={submit}/>}
+        {commands.includes('forgo-marker') && <EventMarkerPlacement snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.some(command => command.startsWith('cede-war')) && <WarSurrender snapshot={snapshot} busy={busy} submit={submit}/>}
     </div>;
 }
@@ -132,6 +133,26 @@ function ExpansionActions({snapshot, busy, submit}: ActionProps) {
         {operation === 'attack' && <p className="muted small">{t('controls.attackHint')}</p>}
         <button disabled={busy || !province || (route === 'caravan' && !via) || (operation === 'place' && (!Number.isInteger(count) || count < 1 || count > me.poolTokens))}>{t(operation === 'place' ? 'action.place' : 'action.attack')}</button>
     </form>;
+}
+
+function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {
+    const [source, setSource] = useState('');
+    const destination = snapshot.game.markerPlacement?.destination;
+    const sources = snapshot.legalChoices.commands.filter(command => command.startsWith('move-marker '));
+    return <div className="guided-form">
+        <h3>{t('controls.markerPlacement')}{destination ? ` · ${provinceName(destination)}` : ''}</h3>
+        <p className="small muted">{t('controls.markerPlacementHint')}</p>
+        <button className="secondary" disabled={busy} onClick={async () => { if (await submit('forgo-marker')) setSource(''); }}>{t('action.forgo-marker')}</button>
+        {sources.length > 0 && <form onSubmit={async event => {
+            event.preventDefault();
+            if (await submit(source)) setSource('');
+        }}>
+            <label htmlFor="marker-source">{t('controls.markerSource')}</label>
+            <div className="inline-form"><select id="marker-source" value={source} onChange={event => setSource(event.target.value)} required>
+                <option value="">{t('controls.chooseProvince')}</option>{sources.map(command => <option key={command} value={command}>{provinceName(command.split(' ')[1])}</option>)}
+            </select><button disabled={busy || !sources.includes(source)}>{t('action.move-marker')}</button></div>
+        </form>}
+    </div>;
 }
 
 function WarSurrender({snapshot, busy, submit}: ActionProps) {
