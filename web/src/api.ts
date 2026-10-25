@@ -48,6 +48,8 @@ export interface PublicCatalog {
     landBorders: {first: string; second: string}[]; coastalConnections: {first: string; second: string}[];
     satelliteSupports: {satellite: string; market: string}[];
     seaCoasts: {sea: string; province: string}[];
+    miseryTrack: (number | null)[];
+    shippingTrack: PlayerView['ships'][];
 }
 export interface ProvinceView {
     id: string; marker: {owner: string; side: 'COLOURED' | 'WHITE'} | null;

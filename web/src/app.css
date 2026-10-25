@@ -94,3 +94,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 }
 .table-effects > summary { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .table-effects .effect-badge { display: inline-block; margin: 0; padding: .25rem .5rem; border: 1px solid #cfc6a7; border-radius: 4px; color: #695629; background: #f4efdc; font-size: .78rem; }
+.reference-track {display:flex;flex-wrap:wrap;gap:.25rem;list-style:none;padding:0;margin:.5rem 0}
+.reference-track li {border:1px solid #d0d9c8;border-radius:4px;padding:.2rem .4rem;font-variant-numeric:tabular-nums}
+.reference-track li[aria-current] {background:#245c50;color:#fffef8;border-color:#245c50}
+.fleet-reference > span {display:block;margin-top:.75rem}

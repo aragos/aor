@@ -1,4 +1,4 @@
-import type {CommodityPayoutView, PlayerView, Snapshot} from './api';
+import type {CommodityPayoutView, PlayerView, PublicCatalog, Snapshot} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {TableIcon} from './TableIcon';
@@ -16,7 +16,7 @@ export function Commodity({commodity}: {commodity: string}) {
         <CommodityIcon commodity={commodity}/></svg>{label(commodity, 'commodity')}</span>;
 }
 
-function PlayerDetails({player}: {player: PlayerView}) {
+function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCatalog | null}) {
     return <div className="player-detail"><h3>{player.name}</h3>
         <dl className="detail-list">
             <div><dt>{t('table.income')}</dt><dd>{player.income ? `$${player.income.ordinary}` : t('table.unavailable')}</dd></div>
@@ -33,6 +33,17 @@ function PlayerDetails({player}: {player: PlayerView}) {
         </dl>
         <h4>{t('game.advances')}</h4>
         <ul className="plain-list">{player.advances.map(advance => <li key={advance}>{advanceName(advance)}</li>)}</ul>
+        {catalog && <details className="track-reference"><summary>{t('table.referenceTracks')}</summary>
+            <h4>{t('game.misery')}</h4>
+            <ol className="reference-track">{catalog.miseryTrack.map(value => <li key={value ?? 'chaos'}
+                aria-current={value === player.misery ? 'step' : undefined}>{value ?? t('game.chaos')}</li>)}</ol>
+            <h4>{t('game.ships')}</h4>
+            {[...new Set(catalog.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet} className="fleet-reference">
+                <span>{label(fleet, 'fleet')}</span>
+                <ol className="reference-track">{catalog.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}
+                    aria-current={fleet === player.ships.fleet && space.level === player.ships.level ? 'step' : undefined}>{space.level}</li>)}</ol>
+            </div>)}
+        </details>}
     </div>;
 }
 
@@ -57,7 +68,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> {player.misery ?? t('game.chaos')}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}</span><span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span></span>
                     <span className="player-status">{status}</span>
-                </summary><PlayerDetails player={player}/>
+                </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
             </details>;
         })}
     </section>;

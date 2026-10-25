@@ -286,6 +286,10 @@ data class PublicCatalog(
     val coastalConnections: Set<ProvinceConnection>,
     val satelliteSupports: Set<SatelliteSupport>,
     val seaCoasts: Set<SeaCoastConnection>,
+    /** Ordered printed misery boxes; Chaos is the final, nonnumeric space. */
+    val miseryTrack: List<MiseryStep>,
+    /** Legal fleet spaces, grouped by fleet in the UI rather than implying an upgrade route. */
+    val shippingTrack: List<ShippingCapability>,
 ) {
     companion object {
         fun forPlayers(playerCount: Int, rules: RuleOptions = RuleOptions()): PublicCatalog {
@@ -298,6 +302,8 @@ data class PublicCatalog(
                 configuration.coastalConnections,
                 configuration.satelliteSupports,
                 configuration.seaCoasts,
+                MiseryStep.entries,
+                ShippingCapability.entries,
             )
         }
     }

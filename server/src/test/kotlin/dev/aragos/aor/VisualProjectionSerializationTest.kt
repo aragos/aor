@@ -9,6 +9,32 @@ class VisualProjectionSerializationTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun referenceTracksRetainPrintedValuesAndFleetIdentity() {
+        val view = json.readTree(json.writeValueAsString(state().viewForPlayer(p1)))
+        val catalog = view.path("catalog")
+        val misery = catalog.path("miseryTrack").toList()
+        val shipping = catalog.path("shippingTrack").toList()
+
+        assertThat(misery.first().asInt()).isEqualTo(0)
+        assertThat(misery[misery.lastIndex - 1].asInt()).isEqualTo(1000)
+        assertThat(misery.last().isNull).isTrue()
+        assertThat(
+                shipping
+                    .filter { space -> space.path("fleet").asText() == "GALLEY" }
+                    .map { space -> space.path("level").asInt() }
+            )
+            .containsExactly(2, 4, 6, 8)
+            .inOrder()
+        assertThat(
+                shipping
+                    .filter { space -> space.path("fleet").asText() == "OCEAN" }
+                    .map { space -> space.path("level").asInt() }
+            )
+            .containsExactly(1, 2, 3, 4)
+            .inOrder()
+    }
+
+    @Test
     fun expansionProjectionSerializesTypedIdentifiersAndBlockers() {
         val view = json.readTree(json.writeValueAsString(state().viewForPlayer(p1)))
         val offers = view.path("expansionOffers").toList()

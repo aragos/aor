@@ -2,6 +2,7 @@ export const en: Record<string, string> = {
     'table.you': 'You',
     'table.decision': 'Decision',
     'table.income': 'Income',
+    'table.referenceTracks': 'Reference tracks',
     'table.unavailable': 'Unavailable',
     'table.baseIncome': 'Base income',
     'table.conditionalProfit': 'Interest & Profit · conditional',
