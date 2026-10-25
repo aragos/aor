@@ -1,6 +1,37 @@
+export interface IncomeView {
+    ordinary: number; baseIncome: number; middleClassBonus: number; interestProfit: number; reliefSpaces: number;
+}
+export interface ExpansionOfferView {
+    destination: string; primaryAction: 'PLACE' | 'ATTACK' | 'INSPECT'; requiredTokens: number;
+    availablePool: number; resultingPool: number | null; establishesMarker: boolean; uncertain: boolean;
+    blockers: string[]; partialPlacements: {tokens: number; resultingPool: number}[];
+    shipping: {used: number; capacity: number | null; required: number} | null;
+    incomeBefore: number | null; incomeAfter: number | null;
+}
+export interface CommodityPayoutView {
+    commodity: string; adjustments: ('SHORTAGE' | 'SURPLUS')[];
+    owners: {player: string; provinces: string[]; marketCount: number; effectiveBox: number; payout: number; industryBonus: number}[];
+}
+export interface CardChoiceView {
+    kind: 'NONE' | 'COMMODITY' | 'PLAYER' | 'PROVINCE' | 'PROVINCES' | 'AREA' | 'CATEGORY' | 'PROTECTION';
+    value: string | null; command: string | null;
+}
+export interface CardOfferView {
+    reference: string; playable: boolean; blockers: string[]; choices: CardChoiceView[];
+    commodities: string[];
+    leaderDiscounts: {advance: string; printedAmount: number; conditionalAmount: number; writtenRecordBonus: number; effectiveDiscount: number; condition: string | null}[];
+    provinceTargets: string[]; requiredTargetCount: number | null; protectionMax: number | null;
+}
+export interface TokenPurchaseOfferView {
+    amount: number; cost: number; tokensReceived: number; cashAfter: number; stockAfter: number; poolAfter: number;
+}
+export interface ShippingOfferView {
+    cost: number; ships: PlayerView['ships'] | null; cashAfter: number | null; blockers: string[];
+}
 export interface PlayerView {
     id: string; name: string; cash: number; capital: string | null; handCount: number;
     stockTokens: number; poolTokens: number; boardMarkers: number; stockMarkers: number; misery: number | null;
+    income: IncomeView | null;
     ships: {fleet: 'NONE' | 'GALLEY' | 'SEAWORTHY' | 'OCEAN'; level: number}; advances: string[];
 }
 export interface ProvinceDefinition {
@@ -54,7 +85,9 @@ export interface Snapshot {
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
         advanceOffers: {advance: string; price: number | null; unavailableReason: string | null}[];
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
-        stabilizationCost: number | null; burdenReferences: string[]};
+        stabilizationCost: number | null; burdenReferences: string[];
+        expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
+        tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];
