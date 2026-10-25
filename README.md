@@ -21,6 +21,10 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
   parallel agent assignments, dependencies and verification gates.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
 - [Map design](docs/map-design.md): the agreed visual language, board navigation, and map-based orders.
+- [UI guiding rules](docs/ui-design.md): visual interaction, compact summaries, action defaults,
+  and [interactive redesign proposals](docs/ui-proposals/index.html).
+- [UI implementation plan](docs/ui-implementation-plan.md): delivery order, domain projections,
+  and acceptance criteria for the visual redesign.
 - [Rule coverage](docs/rule-coverage.md), [card inventory](docs/card-inventory.md) and
   [variant inventory](docs/variant-inventory.md): implementation evidence and selected source interpretations.
 

@@ -3,6 +3,9 @@
 The first map implementation follows the approved [Iberia and northwest Africa study](map-layout-commodities.svg).
 The map follows simplified geographic coastlines while province sizes and label positions serve
 legibility. Movement and order legality always come from the game engine and the reviewed catalog.
+The [UI guiding rules](ui-design.md) extend this visual language across the application and define
+the redesign's compact summaries and default market action of establishing a marker. The
+[implementation plan](ui-implementation-plan.md) sequences that revision of the current map controls.
 
 ## Visual hierarchy
 
@@ -47,7 +50,7 @@ Selecting a province shows its market, commodities, area, access requirements, o
 coastal neighbors, sea contacts, and both directions of support. Selection highlights connections
 without changing the province's commodity fill. All map values refresh with the existing game polling.
 
-Direct orders are offered from the engine's legal-choice projection: capital selection, token
+The current implementation offers direct orders from the engine's legal-choice projection: capital selection, token
 placement, attack, marker reduction, and marker relocation. Placement counts are entered explicitly;
 the engine chooses the route and validates the whole order. Card targets, area targets, pirate targets,
 and War cessions can be selected on the map through **Choose on map** in their existing forms.
