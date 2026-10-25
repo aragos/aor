@@ -58,6 +58,8 @@ export class Page {
         fs.writeFileSync(path, Buffer.from(result.data, 'base64'));
     }
     async screenshot(path, width = 1280, height = 1000, mobile = false) {
+        // Hidden player tabs suspend animation frames; focus before waiting for layout.
+        await this.send('Page.bringToFront');
         await this.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor:1, mobile});
         await this.evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
         const result = await this.send('Page.captureScreenshot', {format:'png', captureBeyondViewport:true});
