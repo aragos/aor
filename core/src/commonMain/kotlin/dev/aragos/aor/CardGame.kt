@@ -493,11 +493,11 @@ object CardGame {
         }
     }
 
-    private fun CardEffectSpec.isMilitary(): Boolean =
+    internal fun CardEffectSpec.isMilitary(): Boolean =
         this is CardEffectSpec.Event &&
             event in setOf(EventId.ARMOR, EventId.STIRRUPS, EventId.GUNPOWDER, EventId.LONG_BOW)
 
-    private fun choices(context: CardContext, spec: CardEffectSpec): List<CardChoice> =
+    internal fun choices(context: CardContext, spec: CardEffectSpec): List<CardChoice> =
         when (spec) {
             is CardEffectSpec.CommodityChoices -> spec.choices.map(CardChoice::CommodityChoice)
             is CardEffectSpec.Leader -> listOf(CardChoice.None)

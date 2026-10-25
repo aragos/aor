@@ -15,12 +15,13 @@ data class PlayerView(
     val misery: MiseryStep = MiseryStep.ZERO,
     val ships: ShippingCapability = ShippingCapability.NONE,
     val advances: Set<AdvanceId> = emptySet(),
+    val income: IncomeView? = null,
 ) {
     val stockMarkers: Int
         get() = 25 - boardMarkers
 
     companion object {
-        internal fun from(player: PlayerState, board: BoardState): PlayerView =
+        internal fun from(player: PlayerState, state: GameState): PlayerView =
             PlayerView(
                 id = player.player.id,
                 name = player.player.name,
@@ -29,10 +30,11 @@ data class PlayerView(
                 handCount = player.hand.size,
                 stockTokens = player.stockTokens,
                 poolTokens = player.poolTokens,
-                boardMarkers = board.markerCount(player.player.id),
+                boardMarkers = state.board.markerCount(player.player.id),
                 misery = player.misery,
                 ships = player.ships,
                 advances = player.advances.owned,
+                income = IncomeView.from(state, player),
             )
     }
 }
@@ -76,6 +78,11 @@ data class GameView(
     val reliefOffers: List<ReliefOfferView> = emptyList(),
     val stabilizationCost: Long? = null,
     val burdenReferences: Set<String> = emptySet(),
+    val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    val commodityPayouts: List<CommodityPayoutView> = emptyList(),
+    val cardOffers: List<CardOfferView> = emptyList(),
+    val tokenPurchaseOffers: List<TokenPurchaseOfferView> = emptyList(),
+    val shippingOffer: ShippingOfferView? = null,
 ) {
     companion object {
         internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
@@ -87,7 +94,7 @@ data class GameView(
                 rebuiltMarkerBonus = state.rebuiltMarkerBonus,
                 players =
                     state.playerIds.map { playerId ->
-                        PlayerView.from(state.playerState(playerId), state.board)
+                        PlayerView.from(state.playerState(playerId), state)
                     },
                 hand = viewer.hand,
                 capitalOrder =
@@ -140,6 +147,11 @@ data class GameView(
                 stabilizationCost =
                     if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
                 burdenReferences = burdenReferences(state, viewer),
+                expansionOffers = ExpansionProjection.offers(state, viewer),
+                commodityPayouts = CommodityPayoutView.from(state),
+                cardOffers = CardProjection.offers(state, viewer),
+                tokenPurchaseOffers = TokenPurchaseProjection.offers(state, viewer),
+                shippingOffer = ShippingOfferView.from(state, viewer),
             )
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
