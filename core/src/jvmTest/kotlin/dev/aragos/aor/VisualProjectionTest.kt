@@ -277,6 +277,256 @@ class VisualProjectionTest {
         assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PHASE)
     }
 
+    @Test
+    fun missingMarkerStockKeepsLegalPartialPlacement() {
+        val board =
+            CatalogConfiguration(3)
+                .provinces
+                .filter { province -> !province.isSatellite && province.id != florence }
+                .take(25)
+                .fold(BoardState()) { current, province ->
+                    current.placeMarker(province.id, p1).board
+                }
+        val offer = offer(state(board))
+
+        assertThat(offer.blockers).containsExactly(ViolationCode.NO_DOMINATION_MARKERS)
+        assertThat(offer.partialPlacements.map(PartialPlacementView::tokens))
+            .containsExactly(1, 2, 3)
+    }
+
+    @Test
+    fun satelliteUsesTokenPlacementWithoutMarkerIncome() {
+        val initial = state(BoardState().replaceWithToken(ProvinceId("acre"), p1).board)
+        val offer =
+            initial.viewForPlayer(p1).expansionOffers.first { candidate ->
+                ProvinceData.definition(candidate.destination).isSatellite &&
+                    candidate.blockers.isEmpty()
+            }
+        val placed =
+            initial.step(
+                Entry.Action(
+                    p1,
+                    TextCodec.parseCommand("place ${offer.requiredTokens} ${offer.destination}"),
+                )
+            )
+
+        assertThat(offer.requiredTokens).isEqualTo(1)
+        assertThat(offer.establishesMarker).isFalse()
+        assertThat(offer.incomeAfter).isEqualTo(offer.incomeBefore)
+        assertThat(placed.board.pieces[offer.destination])
+            .isInstanceOf(ProvincePieces.Tokens::class.java)
+    }
+
+    @Test
+    fun shippingCapacityBelongsToTheSelectedDestination() {
+        val initial = state()
+        val player = initial.playerState(p1).copy(ships = ShippingCapability.GALLEY_4)
+        val state =
+            initial.copy(
+                players = initial.players + (p1 to player),
+                flow = initial.flow.copy(shipped = mapOf(p1 to mapOf(ProvinceId("rome") to 3))),
+            )
+        val offer =
+            state.viewForPlayer(p1).expansionOffers.single { it.destination == ProvinceId("rome") }
+
+        assertThat(offer.blockers).containsExactly(ViolationCode.SHIPPING_CAPACITY_EXCEEDED)
+        assertThat(offer.shipping?.used).isEqualTo(3)
+        assertThat(offer.shipping?.capacity).isEqualTo(4)
+        assertThat(offer.partialPlacements.map(PartialPlacementView::tokens)).containsExactly(1)
+    }
+
+    @Test
+    fun caravanRouteDoesNotChargeExhaustedShipping() {
+        val initial = state(advances = setOf(AdvanceId.CARAVAN))
+        val player = initial.playerState(p1).copy(ships = ShippingCapability.GALLEY_4)
+        val state =
+            initial.copy(
+                players = initial.players + (p1 to player),
+                flow = initial.flow.copy(shipped = mapOf(p1 to mapOf(ProvinceId("rome") to 4))),
+            )
+        val offer =
+            state.viewForPlayer(p1).expansionOffers.single { it.destination == ProvinceId("rome") }
+
+        assertThat(offer.blockers).isEmpty()
+        assertThat(offer.shipping).isNull()
+    }
+
+    @Test
+    fun conditionalLeaderCreditIncludesEventAndWrittenRecordBonuses() {
+        val state =
+            withHand(state(advances = setOf(AdvanceId.WRITTEN_RECORD)), "walter-the-penniless")
+                .copy(effects = CardTurnEffects(crusadesPlayed = true))
+        val discount = state.viewForPlayer(p1).cardOffers.single().leaderDiscounts.single()
+
+        assertThat(discount.printedAmount).isEqualTo(20)
+        assertThat(discount.conditionalAmount).isEqualTo(30)
+        assertThat(discount.writtenRecordBonus).isEqualTo(10)
+        assertThat(discount.effectiveDiscount).isEqualTo(40)
+    }
+
+    @Test
+    fun leaderBonusVariantDisablesWrittenRecordBonus() {
+        val state =
+            withHand(state(advances = setOf(AdvanceId.WRITTEN_RECORD)), "charlemagne")
+                .copy(rules = RuleOptions(writtenRecord = WrittenRecordRule.TAKEOVER_TRADE))
+        val discount = state.viewForPlayer(p1).cardOffers.single().leaderDiscounts.single()
+
+        assertThat(discount.writtenRecordBonus).isEqualTo(0)
+        assertThat(discount.effectiveDiscount).isEqualTo(20)
+    }
+
+    @Test
+    fun noTargetEventRetainsItsLegalNoEffectCommand() {
+        val offer =
+            withHand(state().copy(stage = Stage.PLAY_CARDS), "rebellion")
+                .viewForPlayer(p1)
+                .cardOffers
+                .single()
+
+        assertThat(offer.playable).isTrue()
+        assertThat(offer.choices.single().kind).isEqualTo(CardChoiceKind.NONE)
+        assertThat(offer.choices.single().command).isEqualTo("play hand-1")
+    }
+
+    @Test
+    fun pirateTargetsStayCompactAndRequireTheCurrentEpochCount() {
+        val initial = state()
+        val board =
+            CatalogConfiguration(3)
+                .provinces
+                .filter { province -> province.coastal && !province.isSatellite }
+                .take(6)
+                .fold(BoardState()) { current, province ->
+                    current.placeMarker(province.id, p2).board
+                }
+        val offer =
+            withHand(
+                    initial.copy(stage = Stage.PLAY_CARDS, board = board, currentEpoch = Epoch.TWO),
+                    "pirates-vikings",
+                )
+                .viewForPlayer(p1)
+                .cardOffers
+                .single()
+
+        assertThat(offer.provinceTargets).hasSize(6)
+        assertThat(offer.requiredTargetCount).isEqualTo(2)
+        assertThat(offer.choices)
+            .containsExactly(CardChoiceView(CardChoiceKind.PROVINCES, null, null))
+    }
+
+    @Test
+    fun exposedLeaderProtectionIncludesImmediatePrintedWordRebate() {
+        val state =
+            withHand(
+                    state(advances = setOf(AdvanceId.PRINTED_WORD, AdvanceId.NATIONALISM)),
+                    "charlemagne",
+                )
+                .copy(
+                    stage = Stage.PLAY_CARDS,
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.ST_BENEDICT,
+                                        p2,
+                                        CardLeaderRole.DISPLAY,
+                                    )
+                                )
+                        ),
+                )
+        val offer = state.viewForPlayer(p1).cardOffers.single()
+
+        assertThat(offer.protectionMax).isEqualTo(120)
+        assertThat(offer.choices.map(CardChoiceView::kind))
+            .containsExactly(CardChoiceKind.NONE, CardChoiceKind.PROTECTION)
+    }
+
+    @Test
+    fun shippingOfferAgreesWithPurchase() {
+        val state =
+            state()
+                .copy(
+                    stage = Stage.PURCHASE,
+                    flow = TurnFlow(actor = p1, purchaseStep = PurchaseStep.SHIPPING),
+                )
+        val offer = state.viewForPlayer(p1).shippingOffer
+        val after = ShippingPurchases.upgrade(state.playerState(p1), 1).player
+
+        assertThat(offer?.ships).isEqualTo(after.ships)
+        assertThat(offer?.cashAfter).isEqualTo(after.cash)
+        assertThat(offer?.blockers).isEmpty()
+    }
+
+    @Test
+    fun shippingOfferIsAbsentForWaitingPlayer() {
+        val state =
+            state()
+                .copy(
+                    stage = Stage.PURCHASE,
+                    flow = TurnFlow(actor = p1, purchaseStep = PurchaseStep.SHIPPING),
+                )
+
+        assertThat(state.viewForPlayer(p2).shippingOffer).isNull()
+    }
+
+    @Test
+    fun militaryPreparationOffersTheSameCardThatExecutionAccepts() {
+        val initial =
+            withHand(state(), "armor")
+                .copy(
+                    stage = Stage.PLAY_CARDS,
+                    activeWar = WarState(p1, p2, 1),
+                    flow =
+                        TurnFlow(actor = p1, decisions = listOf(CardDecision.WarPreparation(p1))),
+                )
+        val offer = initial.viewForPlayer(p1).cardOffers.single()
+        val played = CardGame.play(initial, p1, "hand-1", CardChoice.None)
+
+        assertThat(offer.playable).isTrue()
+        assertThat(offer.choices.single().command).isEqualTo("play hand-1")
+        assertThat(played.effects.military).contains(CardMilitaryPlay(p1, EventId.ARMOR))
+    }
+
+    @Test
+    fun victimInterruptionDoesNotAuthorizeOuterActorsCards() {
+        val initial =
+            withHand(state(), "armor")
+                .copy(
+                    stage = Stage.PLAY_CARDS,
+                    flow = TurnFlow(actor = p1, decisions = listOf(CardDecision.CivilWarLoss(p2))),
+                )
+        val offer = initial.viewForPlayer(p1).cardOffers.single()
+
+        assertThat(offer.playable).isFalse()
+        assertThat(offer.choices).isEmpty()
+    }
+
+    @Test
+    fun leaderAlreadyPlayedProducesBlockedOfferRatherThanFailingView() {
+        val initial =
+            withHand(state(), "charlemagne")
+                .copy(
+                    stage = Stage.PLAY_CARDS,
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.CHARLEMAGNE,
+                                        p1,
+                                        CardLeaderRole.DISPLAY,
+                                    )
+                                )
+                        ),
+                )
+        val offer = initial.viewForPlayer(p1).cardOffers.single()
+
+        assertThat(offer.playable).isFalse()
+        assertThat(offer.protectionMax).isNull()
+        assertThat(offer.blockers).containsExactly(CardOfferBlocker.INVALID_CHOICE)
+    }
+
     private fun offer(state: GameState): ExpansionOfferView =
         state.viewForPlayer(p1).expansionOffers.single { it.destination == florence }
 

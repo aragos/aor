@@ -268,9 +268,11 @@ object LeaderRules {
         if (
             rules.writtenRecord == WrittenRecordRule.LEADER_BONUS &&
                 AdvanceId.WRITTEN_RECORD in advances
-        )
+        ) {
             10
-        else 0
+        } else {
+            0
+        }
 
     /** Escrow is forfeited, rather than refunded. Claim payments are already the owner's cash. */
     fun protectionToBank(effects: CardTurnEffects): Int =

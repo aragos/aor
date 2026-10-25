@@ -58,10 +58,11 @@ internal object CardProjection {
         context: CardContext,
     ): CardOfferView {
         val spec = CardEffectData.forCard(card.definition.id)
-        val block = blocker(state, viewer, card, spec, context)
+        val block = blocker(state, viewer, card, context)
         val legal =
-            if (block != null) emptyList()
-            else
+            if (block != null) {
+                emptyList()
+            } else {
                 CardGame.choices(context, spec).filter { choice ->
                     try {
                         CardRules.resolve(
@@ -74,6 +75,7 @@ internal object CardProjection {
                         false
                     }
                 }
+            }
         val pirate = spec is CardEffectSpec.Event && spec.event == EventId.PIRATES_VIKINGS
         val targets = if (pirate && block == null) CardRules.pirateTargets(context) else emptySet()
         val required =
@@ -81,7 +83,7 @@ internal object CardProjection {
         val protection =
             if (
                 spec is CardEffectSpec.Leader &&
-                    block == null &&
+                    legal.isNotEmpty() &&
                     state.rules.patronage == PatronageRule.PROTECTION_MONEY &&
                     context.effects.leaders.isNotEmpty()
             ) {
@@ -119,25 +121,26 @@ internal object CardProjection {
         state: GameState,
         viewer: PlayerState,
         card: HandCard,
-        spec: CardEffectSpec,
         context: CardContext,
     ): CardOfferBlocker? {
         if (CardRules.isBurden(context, card.definition.id)) return CardOfferBlocker.MISERY_BURDEN
-        if (state.stage != Stage.PLAY_CARDS && state.stage != Stage.FINAL_CARD_PLAY)
-            return CardOfferBlocker.WRONG_PHASE
-        if (state.flow.actor != viewer.player.id) return CardOfferBlocker.WRONG_PLAYER
-        val decision = state.flow.decisions.lastOrNull()
-        if (
-            decision != null &&
-                (decision !is CardDecision.WarPreparation ||
-                    decision.player != viewer.player.id ||
-                    !with(CardGame) { spec.isMilitary() })
-        )
-            return CardOfferBlocker.WRONG_PHASE
-        if (state.activeWar != null && spec is CardEffectSpec.Event && spec.event == EventId.WAR)
-            return CardOfferBlocker.INVALID_WAR
-        if (viewer.misery == MiseryStep.CHAOS) return CardOfferBlocker.INVALID_CHOICE
-        return null
+        return try {
+            CardGame.requirePlayWindow(state, viewer.player.id)
+            CardGame.requirePlayableCard(state, card.definition.id)
+            null
+        } catch (failure: RuleViolation) {
+            when (failure.code) {
+                ViolationCode.WRONG_PHASE -> CardOfferBlocker.WRONG_PHASE
+                ViolationCode.WRONG_PLAYER -> CardOfferBlocker.WRONG_PLAYER
+                else -> CardOfferBlocker.INVALID_CHOICE
+            }
+        } catch (failure: CardRuleViolation) {
+            if (failure.code == CardRuleCode.INVALID_WAR) {
+                CardOfferBlocker.INVALID_WAR
+            } else {
+                CardOfferBlocker.INVALID_CHOICE
+            }
+        }
     }
 
     private fun discounts(

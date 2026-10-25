@@ -115,10 +115,12 @@ object TokenPurchaseProjection {
     internal fun offers(state: GameState, viewer: PlayerState): List<TokenPurchaseOfferView> {
         if (
             state.stage != Stage.TOKEN_PURCHASE ||
+                state.flow.decisions.isNotEmpty() ||
                 viewer.misery == MiseryStep.CHAOS ||
                 viewer.tokenPurchase != null
-        )
+        ) {
             return emptyList()
+        }
         val limit = minOf(viewer.cash, viewer.stockTokens)
         return ((-limit..limit).toList() + listOf(-viewer.cash, viewer.cash))
             .distinct()
@@ -140,8 +142,9 @@ data class ShippingOfferView(
                     state.flow.purchaseStep != PurchaseStep.SHIPPING ||
                     state.flow.actor != viewer.player.id ||
                     state.flow.decisions.isNotEmpty()
-            )
+            ) {
                 return null
+            }
             return try {
                 val after = ShippingPurchases.upgrade(viewer, state.currentTurn()).player
                 ShippingOfferView(

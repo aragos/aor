@@ -38,8 +38,9 @@ internal object ExpansionProjection {
                 state.flow.actor != viewer.player.id ||
                 state.flow.decisions.isNotEmpty() ||
                 viewer.misery == MiseryStep.CHAOS
-        )
+        ) {
             return emptyList()
+        }
         val context = BoardGame.context(state)
         return context.configuration.provinces.map { province ->
             offer(state, viewer, context, province)
@@ -84,15 +85,19 @@ internal object ExpansionProjection {
         val plan = evaluated?.plan
         val blocker = evaluated?.blocker
         val partial =
-            if (controlled) emptyList()
-            else {
+            if (controlled) {
+                emptyList()
+            } else {
                 // A province has at most six spaces. Never enumerate pool-sized commitments.
                 (1 until province.marketNumber).mapNotNull { tokens ->
                     val candidate =
                         evaluate(context, viewer, province.id, tokens, routes).plan
                             as? PlacementPlan.Peaceful
-                    if (candidate == null || tokens == required) null
-                    else PartialPlacementView(tokens, viewer.poolTokens - tokens)
+                    if (candidate == null || tokens == required) {
+                        null
+                    } else {
+                        PartialPlacementView(tokens, viewer.poolTokens - tokens)
+                    }
                 }
             }
         val route = plan?.route ?: routes.firstOrNull()
