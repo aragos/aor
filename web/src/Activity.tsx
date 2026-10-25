@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import type {HistoryEventView, Snapshot} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
@@ -30,12 +30,14 @@ function EventContent({event, snapshot}: {event: HistoryEventView; snapshot: Sna
 export function Activity({snapshot}: {snapshot: Snapshot}) {
     const [open, setOpen] = useState(false);
     const [seenCount, setSeenCount] = useState(snapshot.events.length);
+    useEffect(() => {
+        if (open) setSeenCount(snapshot.events.length);
+    }, [open, snapshot.events.length]);
     const latest = snapshot.events[snapshot.events.length - 1];
     const unread = Math.max(0, snapshot.events.length - seenCount);
     return <details className="table-activity" open={open} onToggle={event => {
         const next = event.currentTarget.open;
         setOpen(next);
-        if (next) setSeenCount(snapshot.events.length);
     }}>
         <summary><span className="recent-activity" aria-live="polite">{latest ? <EventContent event={latest} snapshot={snapshot}/> : t('table.noActivity')}</span>
             <span className="activity-toggle">{t('table.activity')}{unread > 0 && <b className="unread-badge">{unread}</b>}</span></summary>
