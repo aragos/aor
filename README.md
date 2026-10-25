@@ -67,6 +67,10 @@ New games use file format 3 with rules version `ah1996-three-epoch-1` and data v
 versions are unsupported; no migration is provided under the current-format-only policy.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
+From `web`, run `npm test` for focused checks and `npm run test:browser` for the isolated browser suite
+(Node 22 or newer and Chrome). The runner manages its own server, Vite, Chrome profile, and temporary
+game files; see [browser verification](docs/map-design.md#data-and-verification) and the
+[visual decision coverage](docs/ui-decision-coverage.md).
 Run server tests with `./gradlew :server:test` and core JVM tests with `./gradlew :core:jvmTest`. Use
 `./gradlew :core:compileKotlinJs` to check the core JS target.
 

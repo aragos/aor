@@ -50,16 +50,19 @@ Selecting a province shows its market, commodities, area, access requirements, o
 coastal neighbors, sea contacts, and both directions of support. Selection highlights connections
 without changing the province's commodity fill. All map values refresh with the existing game polling.
 
-The current implementation offers direct orders from the engine's legal-choice projection: capital selection, token
-placement, attack, marker reduction, and marker relocation. Placement counts are entered explicitly;
-the engine chooses the route and validates the whole order. Card targets, area targets, pirate targets,
-and War cessions can be selected on the map through **Choose on map** in their existing forms.
-The form's selection limits still apply.
+During expansion, selecting an uncontrolled market prepares the engine-projected commitment needed
+to establish a marker. The decision panel shows pool tokens before and after, deterministic income
+changes, and actual blockers. Contested markets use the exact attack commitment and show an uncertain
+outcome; satellites retain their token action. Legal partial placements are a secondary choice.
+The engine chooses the route and validates the whole order. Capital selection, marker reduction,
+and marker relocation remain available where applicable. Card targets, area targets, pirate targets,
+and War cessions use **Choose on map** in their contextual controls, with the same selection limits.
 
 A map click selects or edits a draft; it never submits an order. An explicit order button uses the
 same command endpoint, revision check, busy guard, and error handling as the text interface.
-Orders become unavailable as the authoritative prompt changes. No private opponent information is
-added to the map or public catalog.
+Orders become unavailable as the authoritative prompt changes. Valid drafts and the map viewport
+survive polling and workspace changes. On phones, selected-object decisions use a collapsible bottom
+sheet. No private opponent information is added to the map or public catalog.
 
 ## Data and verification
 
@@ -85,10 +88,15 @@ To edit the geographic anchors or regenerate the shapes, create a Python virtual
 101 coastal steps, 98 sea contacts, all 108 label anchors, the eight area outlines, and continental
 provinces meeting the frame without extending water beyond the playing field.
 
-Run `npm test` and `npm run build` in `web`. The browser suite at `web/tests/map.browser.mjs` uses an
-isolated game server, a Vite preview, and a Chrome debugging endpoint. With Node 22 or newer, run
-`node web/tests/map.browser.mjs`; override `MAP_API_URL`, `MAP_WEB_URL`, and `MAP_CDP_URL` as needed
-(defaults: ports 8095, 5191, and 9351). Use a temporary `AOR_DATA_DIR` for that server: the suite creates
-test games and submits real orders. Its interruption harness is a development-only page, excluded
-from the production build. It covers rejection and draft preservation, keyboard picking, search,
-zoom, narrow screens, 3–6 player boards, pirate and War selection limits, and mixed owners and ages.
+Run `npm test`, `npm run build`, and `npm run test:browser` in `web` with Node 22 or newer.
+The browser runner builds the server distribution and launches its own server, Vite, and Chrome on
+independent ports with temporary game data and a separate Chrome profile. It closes its processes
+and removes temporary data on success and failure; screenshots are retained in the printed artifact
+directory. Override `CHROME_BIN` for a different Chrome location and `AOR_BROWSER_ARTIFACTS` for a
+chosen screenshot directory.
+
+The browser checks combine live commands with development-only interruption and snapshot harnesses,
+excluded from the production build. They cover map navigation, reduced boards, mixed pieces,
+contextual decisions, draft continuity, and responsive layouts. The
+[decision coverage inventory](ui-decision-coverage.md) records exactly which flows have live-game,
+fixture, and domain evidence; fixture checks alone do not establish authorization or privacy.

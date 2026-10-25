@@ -6,8 +6,10 @@ market-selection and marker-establishment flow first, then extend the same inter
 the rest of the game. Every supported decision must remain available through visual controls and
 the command console.
 
-Status: principles and mockups accepted as the implementation baseline; the application changes
-below are planned. This revision covers presentation, interaction state, and the domain projections
+Status: the accepted principles and mockups have been implemented in the game table. The
+[decision coverage inventory](ui-decision-coverage.md) records live checks, deterministic fixtures,
+and remaining verification gaps. This plan retains the delivery rationale and acceptance criteria.
+This revision covers presentation, interaction state, and the domain projections
 needed to display reliable values. Preserve the reviewed game rules, catalogs, canonical commands,
 privacy boundaries, and revision protocol. Accounts, bots, undo, private plans, and map geometry
 redesign remain separate work.
@@ -31,22 +33,22 @@ branches and cohesive commits. The dependency column identifies what each slice 
 Slices 1 and 2 form the first playable milestone. Accessibility, localization, narrow-screen use,
 and draft continuity are acceptance criteria for every slice, not a final styling pass.
 
-## Current implementation and extension points
+## Implementation ownership
 
-| Area | Current code | Planned change |
+| Area | Code | Responsibility |
 | --- | --- | --- |
-| Page and connection state | [App.tsx](../web/src/App.tsx) | Split the large page into the game header, player overview, workspace, decision panel, hand, and command dock. Retain polling, busy guards, and stale-revision handling. |
-| Map and selections | [BoardMap.tsx](../web/src/map/BoardMap.tsx), [ProvinceInspector.tsx](../web/src/map/ProvinceInspector.tsx), [MapSelection.tsx](../web/src/map/MapSelection.tsx) | Reuse the board and picker behavior. Share the selected object and decision draft across map and panels; preserve viewport and selections. |
-| Action controls | [GameActions.tsx](../web/src/GameActions.tsx), [mapOrders.ts](../web/src/map/mapOrders.ts) | Replace command-list parsing and the one-token placement default with typed offers and contextual controls as each action is migrated. |
-| Summaries and detail | [FullGamePanels.tsx](../web/src/FullGamePanels.tsx) | Move long tables and reference information into detail views; introduce compact player, commodity, advance, and effect summaries. |
-| Visual language | [MapSymbols.tsx](../web/src/map/MapSymbols.tsx), [app.css](../web/src/app.css), [map.css](../web/src/map/map.css) | Reuse capital silhouettes and commodity symbols throughout; share typography, spacing, numbers, focus styles, and selected/blocked states. |
-| Domain and transport | [GameView.kt](../core/src/commonMain/kotlin/dev/aragos/aor/GameView.kt), [GameService.kt](../server/src/main/kotlin/dev/aragos/aor/GameService.kt), [api.ts](../web/src/api.ts) | Add typed projections beside existing advance and relief offers. Keep rule calculations in the core and authorization in the service. |
-| Labels and history | [messages.ts](../web/src/messages.ts), [labels.ts](../web/src/labels.ts), [HistoryProjection.kt](../server/src/main/kotlin/dev/aragos/aor/HistoryProjection.kt) | Localize new visible and accessible labels. Add structured activity while retaining the redacted command history in the console. |
+| Page and connection state | [App.tsx](../web/src/App.tsx), [GameTable.tsx](../web/src/GameTable.tsx) | Polling, busy guards, stale-revision handling, workspace layout, and the phone decision sheet. |
+| Map and selections | [BoardMap.tsx](../web/src/map/BoardMap.tsx), [ProvinceInspector.tsx](../web/src/map/ProvinceInspector.tsx), [MapSelection.tsx](../web/src/map/MapSelection.tsx) | Shared selected objects and target pickers, preserved viewport, authoritative marker/attack previews, and secondary partial placement. |
+| Action controls | [Controls.tsx](../web/src/Controls.tsx), [ObjectDecisions.tsx](../web/src/ObjectDecisions.tsx), [GameActions.tsx](../web/src/GameActions.tsx) | Setup, revision-bound token quotes, card and advance drafts, and finite phase/interrupt choices. |
+| Summaries and detail | [TablePanels.tsx](../web/src/TablePanels.tsx), [FullGamePanels.tsx](../web/src/FullGamePanels.tsx) | Compact players, payouts, hand values and advances; public references, board detail, effects and scores. |
+| Visual language | [MapSymbols.tsx](../web/src/map/MapSymbols.tsx), [TableIcon.tsx](../web/src/TableIcon.tsx), [app.css](../web/src/app.css), [map.css](../web/src/map/map.css) | Shared capital silhouettes, commodity symbols, resource icons, typography, focus and availability states. |
+| Domain and transport | [GameView.kt](../core/src/commonMain/kotlin/dev/aragos/aor/GameView.kt), [EconomyProjection.kt](../core/src/commonMain/kotlin/dev/aragos/aor/EconomyProjection.kt), [ExpansionProjection.kt](../core/src/commonMain/kotlin/dev/aragos/aor/ExpansionProjection.kt), [CardProjection.kt](../core/src/commonMain/kotlin/dev/aragos/aor/CardProjection.kt) | Typed domain-owned income, payout, discount, purchase and expansion projections, including reference tracks. |
+| Activity and commands | [HistoryEvents.kt](../server/src/main/kotlin/dev/aragos/aor/HistoryEvents.kt), [Activity.tsx](../web/src/Activity.tsx), [CommandDock.tsx](../web/src/CommandDock.tsx) | Stable viewer-safe visual events and the redacted command console, using the same canonical submissions. |
 
-The snapshot already supplies player balances, fleet, misery, board pieces, private hand references,
-advance prices and blockers, relief quotes, and several target constraints. It does not supply
-current income, commodity payout summaries, discounts for cards in hand, or complete expansion
-offers. A legal `place 1` command does not establish that a larger marker commitment is legal.
+The snapshot now includes current income, commodity payouts, hand-card discounts and choices,
+complete expansion offers, and token/shipping quotes beside the existing advance and relief offers.
+The server also accepts read-only, viewer- and revision-bound token quote requests for edited amounts.
+The client never treats a legal `place 1` command as evidence that a larger marker commitment is legal.
 
 ## 1 Authoritative income and expansion previews
 
