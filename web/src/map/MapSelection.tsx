@@ -10,13 +10,24 @@ interface Picker {
 }
 
 const MapSelection = createContext<{
+    selected: string;
+    setSelected: Dispatch<SetStateAction<string>>;
+    selectedCard: string;
+    setSelectedCard: Dispatch<SetStateAction<string>>;
+    selectedAdvance: string;
+    setSelectedAdvance: Dispatch<SetStateAction<string>>;
     picker: Picker | null;
     setPicker: Dispatch<SetStateAction<Picker | null>>;
-}>({picker: null, setPicker: () => undefined});
+}>({selected: '', setSelected: () => undefined, selectedCard: '', setSelectedCard: () => undefined,
+    selectedAdvance: '', setSelectedAdvance: () => undefined, picker: null, setPicker: () => undefined});
 
 export function MapSelectionProvider({children}: {children: ReactNode}) {
     const [picker, setPicker] = useState<Picker | null>(null);
-    return <MapSelection.Provider value={{picker, setPicker}}>{children}</MapSelection.Provider>;
+    const [selected, setSelected] = useState('');
+    const [selectedCard, setSelectedCard] = useState('');
+    const [selectedAdvance, setSelectedAdvance] = useState('');
+    return <MapSelection.Provider value={{picker, setPicker, selected, setSelected, selectedCard,
+        setSelectedCard, selectedAdvance, setSelectedAdvance}}>{children}</MapSelection.Provider>;
 }
 
 export const useMapSelection = () => useContext(MapSelection);

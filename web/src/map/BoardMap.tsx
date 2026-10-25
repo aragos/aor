@@ -4,7 +4,7 @@ import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, provinceName} from '../labels';
 import {areaColors, CommodityIcon, commodityColors, PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
-import {neighbors, ProvinceInspector} from './ProvinceInspector';
+import {neighbors} from './ProvinceInspector';
 import geometryData from './boardGeometry.json';
 import './map.css';
 
@@ -58,10 +58,9 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
     return pieces?.tokens.map(tokens => `${owner(tokens.owner)}, ${tokens.coloured} established and ${tokens.white} new tokens`).join('; ') || 'unoccupied';
 }
 
-export function BoardMap({snapshot, busy, submit, error = '', status = ''}: {
+export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
-    const [selected, setSelected] = useState('');
     const [search, setSearch] = useState('');
     const [area, setArea] = useState('');
     const [showSupport, setShowSupport] = useState(true);
@@ -69,13 +68,12 @@ export function BoardMap({snapshot, busy, submit, error = '', status = ''}: {
     const svg = useRef<SVGSVGElement>(null);
     const drag = useRef<{x: number; y: number; view: typeof view; moved: boolean} | null>(null);
     const suppressClick = useRef(false);
-    const {picker, setPicker} = useMapSelection();
+    const {picker, setPicker, selected, setSelected, setSelectedCard, setSelectedAdvance} = useMapSelection();
     const prefix = useId().replace(/:/g, '');
     const catalog = snapshot.game.catalog;
     const definitions = useMemo(() => new Map(catalog?.provinces.map(province => [province.id, province])), [catalog]);
     const occupancy = useMemo(() => new Map(snapshot.game.board.map(pieces => [pieces.id, pieces])), [snapshot.game.board]);
     if (!catalog) return null;
-    const province = definitions.get(selected);
     const landNeighbors = new Set(neighbors(catalog.landBorders, selected));
     const coastNeighbors = new Set(neighbors(catalog.coastalConnections, selected));
     const selectedSeas = new Set(catalog.seaCoasts.filter(coast => coast.province === selected).map(coast => coast.sea));
@@ -86,6 +84,7 @@ export function BoardMap({snapshot, busy, submit, error = '', status = ''}: {
     };
     const choose = (id: string) => {
         setSelected(id);
+        if (!picker) { setSelectedCard(''); setSelectedAdvance(''); }
         if (!busy && picker?.eligible.includes(id)) picker.pick(id);
     };
     const focusProvince = (id: string) => {
@@ -117,12 +116,7 @@ export function BoardMap({snapshot, busy, submit, error = '', status = ''}: {
             y: Math.max(initialView.y - start.view.h / 2, Math.min(initialView.y + initialView.h - start.view.h / 2, start.view.y - dy / scale))});
     };
     const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
-    return <section className="panel interactive-board" id="interactive-board" aria-labelledby="map-title">
-        <div className="map-heading"><div><p className="eyebrow">{catalog.provinces.length} provinces · {snapshot.game.players.length} players</p><h2 id="map-title">The world</h2></div>
-            <div className="map-players">{snapshot.game.players.filter(player => player.capital).map(player => <span key={player.id}>
-                <svg width="22" height="24" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={player.capital} size={44}/></svg>
-                {player.name} <small>{provinceName(player.capital!)}</small></span>)}</div>
-        </div>
+    return <section className="interactive-board" id="interactive-board" aria-label="The world">
         <div className="map-toolbar">
             <label>Find a province or commodity<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Province or commodity"/></label>
             <label>Area<select value={area} onChange={event => setArea(event.target.value)}><option value="">All areas</option>
@@ -134,7 +128,7 @@ export function BoardMap({snapshot, busy, submit, error = '', status = ''}: {
                 <button type="button" className="secondary" aria-label="Zoom out" onClick={() => zoom(1.4)}>−</button>
                 <button type="button" className="secondary" onClick={() => setView(initialView)}>Fit map</button></div>
         </div>
-        {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong><span>Choose highlighted provinces, then submit in the order form.</span>
+        {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong>
             <button type="button" className="secondary" onClick={() => {setPicker(null); document.querySelector('.decision')?.scrollIntoView({behavior: 'smooth'});}}>Return to order</button></div>}
         {(search || area) && <p className="small" role="status">{catalog.provinces.filter(province => matches(province.id)).length} matching provinces</p>}
         <div className="map-viewport">
@@ -206,20 +200,17 @@ export function BoardMap({snapshot, busy, submit, error = '', status = ''}: {
                 <path d={geometry.frame} fill="none" stroke="#84958b" strokeWidth={2} pointerEvents="none"/>
             </svg>
         </div>
-        <div className="map-legend">
+        <details className="commodity-legend"><summary>Map key</summary>        <div className="map-legend">
             <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" size={40}/></svg>Marker</span>
             <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="venice" count={2} size={40}/></svg>Tokens · count</span>
             <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" fresh size={40}/></svg>New · white face</span>
             <span>Filled · established</span><span className="satellite-key">Satellite</span><span className="coast-key">Coastal water</span>
             <label className="check-label"><input type="checkbox" checked={showSupport} onChange={event => setShowSupport(event.target.checked)}/>Support arrows</label>
         </div>
-        <details className="commodity-legend"><summary>Commodities and map key</summary><div className="map-legend">{Object.keys(commodityColors).map(commodity => <span key={commodity}>
+<div className="map-legend">{Object.keys(commodityColors).map(commodity => <span key={commodity}>
             <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><CommodityIcon commodity={commodity}/></svg>{label(commodity, 'commodity')}</span>)}</div>
-            <p className="small muted">Commodity colors stay fixed. Separate colored lines mark each area. Shared coastal edges are steps; area borders do not block them. Land at the frame continues beyond the playing field. Locks indicate access requirements. Muted areas are outside this game. Drag to pan; use zoom or Go to for detail.</p>
+
         </details>
-        {province ? <ProvinceInspector key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit} select={focusProvince}/>
-            : <p className="muted small">Select a province to inspect its values, pieces, connections, and available orders.</p>}
-        {error && <p className="error" role="alert">{error}</p>}
-        {status && <p className="save-status" aria-live="polite">{status}</p>}
+
     </section>;
 }

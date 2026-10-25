@@ -1,8 +1,10 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import type {ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
-import {CommodityIcon, PlayerPiece} from './MapSymbols';
-import {placementOrder, provinceOrders} from './mapOrders';
+import {t} from '../messages';
+import {Commodity} from '../TablePanels';
+import {PlayerPiece} from './MapSymbols';
+import {provinceOrders} from './mapOrders';
 
 export function neighbors(connections: PublicCatalog['landBorders'], province: string): string[] {
     return connections.flatMap(edge => edge.first === province ? [edge.second] : edge.second === province ? [edge.first] : []);
@@ -12,46 +14,69 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
     snapshot: Snapshot; province: ProvinceDefinition; busy: boolean;
     submit: (command: string) => Promise<boolean>; select: (province: string) => void;
 }) {
-    const [count, setCount] = useState('1');
-    const catalog = snapshot.game.catalog!;
+    const [partial, setPartial] = useState('');
+    useEffect(() => setPartial(''), [province.id]);
+    const catalog = snapshot.game.catalog;
+    if (!catalog) return null;
     const pieces = snapshot.game.board.find(pieces => pieces.id === province.id);
-    const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
-    const commands = provinceOrders(snapshot, province.id);
-    const canPlace = commands.some(command => command.startsWith('place '));
-    const order = placementOrder(province.id, count, me.poolTokens);
+    const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
+    const offer = snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
+    const primary = offer && offer.primaryAction !== 'INSPECT';
+    const available = primary && offer.blockers.length === 0 && offer.resultingPool !== null;
+    const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
+    const command = offer?.primaryAction === 'ATTACK' ? `attack ${province.id}` : `place ${offer?.requiredTokens} ${province.id}`;
+    const commands = provinceOrders(snapshot, province.id).filter(command => !command.startsWith('place ') && !command.startsWith('attack '));
     const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button" className="map-link" key={id}
         onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
-    return <div className="province-inspector" aria-label="Selected province">
+    return <div className="province-inspector" aria-label={t('table.selectedProvince')}>
         <div>
-            <h3>{provinceName(province.id)}{province.capital && ' ♛'}</h3>
-            <p className="map-facts">Market <strong>{province.marketNumber}</strong> · {province.satellite ? 'Satellite' : province.commodities.map(commodity =>
-                <span key={commodity}><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><CommodityIcon commodity={commodity}/></svg>{label(commodity, 'commodity')}</span>)}
-                {' · '}{province.area ? `Area ${province.area}` : label(province.overseas ?? '')}</p>
-            {pieces?.marker ? <p><svg width="30" height="30" viewBox="-24 -24 48 48" aria-hidden="true"><PlayerPiece size={40}
+            <p className="eyebrow">{primary ? offer.uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
+            <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
+            <p className="map-facts">{province.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
+                <span>{t('board.market')} {province.marketNumber}</span> · {province.area ? `${t('board.area')} ${province.area}` : label(province.overseas ?? '')}</p>
+            {pieces?.marker ? <p className="occupancy"><svg width="24" height="24" viewBox="-24 -24 48 48" aria-hidden="true"><PlayerPiece size={40}
                 capital={snapshot.game.players.find(player => player.id === pieces.marker?.owner)?.capital ?? null} fresh={pieces.marker.side === 'WHITE'}/></svg>
-                {' '}{playerName(snapshot, pieces.marker.owner)} · {pieces.marker.side === 'WHITE' ? 'new' : 'established'} marker</p>
+                {' '}{playerName(snapshot, pieces.marker.owner)} · {t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')} {t('board.marker')}</p>
                 : pieces?.tokens.length ? <ul className="plain-list">{pieces.tokens.map(tokens => <li key={tokens.owner}>
-                    {playerName(snapshot, tokens.owner)}: {tokens.coloured} established + {tokens.white} new tokens
-                </li>)}</ul> : <p className="muted">Unoccupied</p>}
-            {!!province.access.length && <p className="small">Access: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
-            <details><summary>Connections</summary>
-                <p>Land: {links(neighbors(catalog.landBorders, province.id))}</p>
-                <p>Coastal steps: {links(neighbors(catalog.coastalConnections, province.id))}</p>
-                <p>Seas: {catalog.seaCoasts.filter(coast => coast.province === province.id).map(coast => label(coast.sea)).join(', ') || '—'}</p>
-                <p>Supports: {links(catalog.satelliteSupports.filter(edge => edge.satellite === province.id).map(edge => edge.market))}</p>
-                <p>Supported by: {links(catalog.satelliteSupports.filter(edge => edge.market === province.id).map(edge => edge.satellite))}</p>
-            </details>
+                    {playerName(snapshot, tokens.owner)}: {tokens.coloured} {t('board.old')} + {tokens.white} {t('board.new')}
+                </li>)}</ul> : <p className="muted">{t('table.unoccupied')}</p>}
         </div>
         <div className="map-orders">
-            <h3>Orders</h3>
-            {canPlace && <form onSubmit={event => {event.preventDefault(); if (order && !busy) void submit(order);}}>
-                <label>Tokens to place<input type="number" min={1} max={me.poolTokens} step={1} required value={count} onChange={event => setCount(event.target.value)}/></label>
-                <button disabled={busy || !order}>Place tokens</button>
-                <p className="small muted">{me.poolTokens} in your pool. Routes and the full placement are checked when submitted.</p>
-            </form>}
-            <div className="action-buttons">{commands.filter(command => !command.startsWith('place ')).map(command => <button key={command}
-                disabled={busy} onClick={() => {void submit(command);}}>{label(command.split(' ')[0], 'action')}</button>)}</div>
-            {!commands.length && <p className="small muted">No direct order is available here. Card and multi-province choices can be selected using “Choose on map” in their forms.</p>}
+            {primary && <>
+                <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {offer.resultingPool ?? '—'}</strong></div>
+                <div className="commitment-preview"><span>▣ <strong>{offer.requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
+                    <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh/></svg>
+                        <small>{offer.uncertain ? t('table.uncertainMarker') : offer.establishesMarker ? t('table.newMarker') : t('action.place')}</small></span></div>
+                {offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
+                {offer.uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
+                {offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
+                <button type="button" className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>
+                    {offer.uncertain ? t('action.attack') : province.satellite ? t('action.place') : t('table.establishMarker')} · {offer.requiredTokens} {t('table.tokens')}
+                </button>
+                {offer.partialPlacements.length > 0 && <details className="partial-placement"><summary>{t('table.placeFewer')}</summary>
+                    <form onSubmit={event => { event.preventDefault(); if (partialOffer) void submit(`place ${partialOffer.tokens} ${province.id}`); }}>
+                        <label htmlFor="partial-count">{t('controls.tokenCount')}</label>
+                        <select id="partial-count" value={partial} onChange={event => setPartial(event.target.value)} required>
+                            <option value="">{t('table.chooseAmount')}</option>
+                            {offer.partialPlacements.map(choice => <option key={choice.tokens} value={choice.tokens}>{choice.tokens}</option>)}
+                        </select>
+                        {partialOffer && <p>{t('game.pool')}: {offer.availablePool} → {partialOffer.resultingPool}</p>}
+                        <button disabled={busy || !partialOffer}>{t('action.place')}</button>
+                    </form>
+                </details>}
+                <details><summary>{t('table.placementDetails')}</summary>
+                    {offer.shipping && <dl className="detail-list"><div><dt>{t('table.destinationShipping')}</dt><dd>{offer.shipping.used} / {offer.shipping.capacity ?? '∞'}</dd></div><div><dt>{t('table.shippingRequired')}</dt><dd>{offer.shipping.required}</dd></div></dl>}
+                    <p>{t('game.stockMarkers')}: {me?.stockMarkers}</p>
+                </details>
+            </>}
+            <div className="action-buttons">{commands.map(command => <button type="button" key={command} className="secondary"
+                disabled={busy} onClick={() => { void submit(command); }}>{label(command.split(' ')[0], 'action')}</button>)}</div>
+            <details className="province-details"><summary>{t('table.provinceDetails')}</summary>
+                {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
+                <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>
+                <p>{t('board.coastalNeighbors')}: {links(neighbors(catalog.coastalConnections, province.id))}</p>
+                <p>{t('board.supports')}: {links(catalog.satelliteSupports.filter(edge => edge.satellite === province.id).map(edge => edge.market))}</p>
+            </details>
         </div>
     </div>;
 }
