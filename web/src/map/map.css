@@ -1,0 +1,49 @@
+.interactive-board { margin-bottom: 1.4rem; scroll-margin-top: 1rem; }
+.map-heading, .map-toolbar, .map-players, .map-legend, .map-pick-banner, .map-zoom { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem 1rem; }
+.map-heading { justify-content: space-between; }
+.map-heading h2 { margin-bottom: .6rem; }
+.map-players { font-size: .8rem; }
+.map-players span, .map-legend span, .map-facts span { display: inline-flex; align-items: center; gap: .3rem; }
+.map-players small { color: #667268; }
+.map-toolbar { margin: .8rem 0; align-items: end; }
+.map-toolbar label { flex: 1 1 150px; margin: 0; font-size: .8rem; }
+.map-toolbar input, .map-toolbar select { margin: .35rem 0 0; width: 100%; }
+.map-zoom { gap: .35rem; }
+.map-zoom button { margin: 0; }
+.map-viewport { background: #eae8dd; border: 1px solid #92aaa6; border-radius: 8px; overflow: hidden; }
+.world-map { display: block; width: 100%; height: min(75vh, 850px); min-height: 440px; touch-action: none; cursor: grab; }
+.world-map:active { cursor: grabbing; }
+.world-map text { font-family: 'DM Sans', system-ui, sans-serif; }
+.map-province.active { cursor: pointer; outline: none; }
+.map-province:focus .province-shape { stroke: #143e4e; stroke-width: 7px; }
+.map-province:hover .province-shape { stroke: #143e4e; stroke-width: 4px; }
+.map-province.inactive { opacity: .6; }
+.map-filtered { opacity: .35; }
+.province-label { user-select: none; }
+.map-legend { font-size: .78rem; margin: .9rem 0; }
+.map-legend .check-label { margin: 0; }
+.satellite-key::before, .coast-key::before { content: ''; width: 20px; height: 18px; border: 1px solid #8d9e94; border-radius: 3px; }
+.satellite-key::before { background: radial-gradient(#879481 1px, transparent 1px) 0 0 / 6px 6px #e0e4d9; }
+.coast-key::before { background: #d2efed; border-color: #56929c; }
+.commodity-legend { font-size: .85rem; }
+.province-inspector { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; border-top: 1px solid #d3d9cc; margin-top: 1rem; padding-top: 1rem; }
+.province-inspector h3 { margin: 0 0 .4rem; font-size: 1rem; }
+.province-inspector p { margin: .5rem 0; }
+.map-facts { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; }
+.map-orders form { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
+.map-orders label { max-width: 140px; margin: 0; font-size: .8rem; }
+.map-orders input { width: 100%; margin-bottom: 0; }
+.map-orders button { margin: 0; }
+.map-orders .action-buttons { margin-top: .8rem; }
+.map-link { display: inline; background: transparent; color: #315e6b; padding: .15rem .35rem; margin: .1rem; border: 0; text-decoration: underline; font-size: inherit; }
+.map-pick-banner { padding: .7rem; background: #e4f1f4; border: 1px solid #6593a4; border-radius: 5px; font-size: .85rem; }
+.map-pick-banner button { margin: 0 0 0 auto; }
+.map-picker { margin: .5rem 0; }
+.map-picker[aria-pressed=true] { border-color: #2b6d9a; background: #e4f1f4; }
+@media (max-width: 600px) {
+    .interactive-board { padding: .8rem; }
+    .world-map { min-height: 420px; height: 65vh; }
+    .province-inspector { grid-template-columns: 1fr; }
+    .map-players small { display: none; }
+    .map-toolbar label { flex-basis: 130px; }
+}

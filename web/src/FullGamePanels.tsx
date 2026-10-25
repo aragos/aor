@@ -111,7 +111,7 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
     });
     const areas = [...new Set(catalog.provinces.map(province => province.area ?? province.overseas).filter(Boolean))];
     return <section className="panel board-panel" aria-labelledby="board-title">
-        <h2 id="board-title">{t('game.board')}</h2>
+        <details><summary id="board-title">Board table · alternative to the map</summary>
         <div className="board-filters">
             <label>
                 {t('board.search')}
@@ -143,6 +143,7 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
             </table>
         </div>
         {provinces.length === 0 && <p className="muted">{t('board.noMatches')}</p>}
+        </details>
     </section>;
 }
 

@@ -6,6 +6,8 @@ import {t} from './messages';
 import {label, playerName} from './labels';
 import {GameActions} from './GameActions';
 import {AdvancesPanel, BoardPanel, FinalScores, TurnEffects} from './FullGamePanels';
+import {BoardMap} from './map/BoardMap';
+import {MapSelectionProvider} from './map/MapSelection';
 import './app.css';
 
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
@@ -214,10 +216,11 @@ function Game({id, token}: {id: string; token: string}) {
     const finished = snapshot.game.stage === 'FINISHED';
     const sealedStatus = (playerId: string, stage: string) => snapshot.game.stage === stage
         ? t(snapshot.submitted.includes(playerId) ? 'game.submitted' : 'game.waiting') : '—';
-    return <main className="game-shell">
+    return <MapSelectionProvider><main className="game-shell">
         <header className="game-header"><div><p className="eyebrow">{t('game.seat')}: {me.name}</p><h1>{t('app.title')}</h1></div>
             <div className="header-meta"><span>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t(`stage.${snapshot.game.stage}`)}</span><small>{t('game.epoch')}: {snapshot.game.currentEpoch}/3 · {t('game.revision')}: {snapshot.revision}</small><a href="/">{t('game.new')}</a></div></header>
         {connectionError && <ErrorMessage code={connectionError}/>}
+        <BoardMap snapshot={snapshot} busy={busy} submit={submit} error={actionError ? t(`error.${actionError}`) : ''} status={saveStatus(busy, saved).trim()}/>
         <div className="game-layout"><div className="main-column">
             <FinalScores snapshot={snapshot}/>
             <section className={`panel decision ${finished ? 'complete' : ''}`}>
@@ -259,7 +262,7 @@ function Game({id, token}: {id: string; token: string}) {
             <TurnEffects snapshot={snapshot}/>
             <section className="panel history"><h2>{t('game.history')}</h2><p className="muted small">{t('game.historyHint')}</p><pre aria-label={t('game.history')}>{snapshot.history.join('\n')}</pre></section>
         </aside></div>
-    </main>;
+    </main></MapSelectionProvider>;
 }
 
 export function App() {

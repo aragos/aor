@@ -273,6 +273,7 @@ data class PublicCatalog(
     val landBorders: Set<ProvinceConnection>,
     val coastalConnections: Set<ProvinceConnection>,
     val satelliteSupports: Set<SatelliteSupport>,
+    val seaCoasts: Set<SeaCoastConnection>,
 ) {
     companion object {
         fun forPlayers(playerCount: Int, rules: RuleOptions = RuleOptions()): PublicCatalog {
@@ -284,6 +285,7 @@ data class PublicCatalog(
                 configuration.landBorders,
                 configuration.coastalConnections,
                 configuration.satelliteSupports,
+                configuration.seaCoasts,
             )
         }
     }

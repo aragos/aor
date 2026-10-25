@@ -3,6 +3,8 @@ import type {FormEvent} from 'react';
 import type {ProvinceDefinition, Snapshot} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
+import {MapPicker} from './map/MapSelection';
+import {provinceOrders} from './map/mapOrders';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
@@ -188,6 +190,12 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
                 <option value="">{t('controls.chooseTarget')}</option>
                 {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
+            {(target.prefix === 'province' || target.prefix === 'area') && <MapPicker
+                title={`Choose a target for ${card ? t(card.definition.messageId) : 'this card'}`} disabled={busy}
+                eligible={(snapshot.game.catalog?.provinces ?? []).filter(province => options.some(option =>
+                    option.value === (target.prefix === 'area' ? province.area?.toLowerCase() : province.id))).map(province => province.id)}
+                selected={target.prefix === 'province' ? [choice] : (snapshot.game.catalog?.provinces ?? []).filter(province => province.area?.toLowerCase() === choice).map(province => province.id)}
+                onPick={id => setChoice(target.prefix === 'area' ? snapshot.game.catalog?.provinces.find(province => province.id === id)?.area?.toLowerCase() ?? '' : id)}/>}
         </>}
         {multiTarget && pirates && <fieldset className="province-checks">
             <legend>{t('controls.pirateTargets').replace('{count}', String(pirates.requiredCount))}</legend>
@@ -195,6 +203,9 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
                 <input type="checkbox" checked={provinces.includes(province)} disabled={busy || (!provinces.includes(province) && provinces.length >= pirates.requiredCount)} onChange={event => setProvinces(current => event.target.checked ? [...current, province] : current.filter(selected => selected !== province))}/>
                 {provinceName(province)}
             </label>)}
+            <MapPicker title={`Choose ${pirates.requiredCount} pirate targets`} disabled={busy}
+                eligible={pirates.eligibleProvinces.filter(id => provinces.includes(id) || provinces.length < pirates.requiredCount)} selected={provinces}
+                onPick={id => setProvinces(current => current.includes(id) ? current.filter(value => value !== id) : current.length < pirates.requiredCount ? [...current, id] : current)}/>
         </fieldset>}
         {protectedLeader && <>
             <label htmlFor="leader-protection">{t('game.protection')}</label>
@@ -208,11 +219,11 @@ function PlayCard({snapshot, busy, submit}: ActionProps) {
 }
 
 function ExpansionActions({snapshot, busy, submit}: ActionProps) {
-    const [operation, setOperation] = useState('place');
+    const [operation, setOperation] = useState(snapshot.legalChoices.commands.some(command => command.startsWith('place ')) ? 'place' : 'attack');
     const [province, setProvince] = useState('');
     const [tokens, setTokens] = useState('1');
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
-    const provinces = snapshot.game.catalog?.provinces ?? [];
+    const provinces = snapshot.game.catalog?.provinces.filter(province => provinceOrders(snapshot, province.id).some(command => command.startsWith(`${operation} `))) ?? [];
     const count = Number(tokens);
     return <form className="guided-form expansion-form" onSubmit={event => {
         event.preventDefault();
@@ -223,9 +234,11 @@ function ExpansionActions({snapshot, busy, submit}: ActionProps) {
             <label>{t('board.province')}<select value={province} onChange={event => setProvince(event.target.value)} required><option value="">{t('controls.chooseProvince')}</option>{provinces.map(province => <option key={province.id} value={province.id}>{provinceName(province.id)} · {province.marketNumber}</option>)}</select></label>
             {operation === 'place' && <label>{t('controls.tokenCount')}<input type="number" min={1} max={me.poolTokens} step={1} value={tokens} onChange={event => setTokens(event.target.value)} required/></label>}
         </div>
+        <MapPicker title={operation === 'place' ? 'Choose where to place tokens' : 'Choose an attack target'}
+            eligible={provinces.map(province => province.id)} selected={[province]} onPick={setProvince} disabled={busy}/>
         <p className="muted small">{t('controls.routeHint')}</p>
         {operation === 'attack' && <p className="muted small">{t('controls.attackHint')}</p>}
-        <button disabled={busy || !province || (operation === 'place' && (!Number.isInteger(count) || count < 1 || count > me.poolTokens))}>{t(operation === 'place' ? 'action.place' : 'action.attack')}</button>
+        <button disabled={busy || !provinces.some(candidate => candidate.id === province) || (operation === 'place' && (!Number.isInteger(count) || count < 1 || count > me.poolTokens))}>{t(operation === 'place' ? 'action.place' : 'action.attack')}</button>
     </form>;
 }
 
@@ -245,6 +258,8 @@ function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {
             <div className="inline-form"><select id="marker-source" value={source} onChange={event => setSource(event.target.value)} required>
                 <option value="">{t('controls.chooseProvince')}</option>{sources.map(command => <option key={command} value={command}>{provinceName(command.split(' ')[1])}</option>)}
             </select><button disabled={busy || !sources.includes(source)}>{t('action.move-marker')}</button></div>
+            <MapPicker title="Choose the marker to move" eligible={sources.map(command => command.split(' ')[1])}
+                selected={source ? [source.split(' ')[1]] : []} onPick={id => setSource(`move-marker ${id}`)} disabled={busy}/>
         </form>}
     </div>;
 }
@@ -254,11 +269,19 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
     const cession = snapshot.game.warCession;
     const required = cession?.requiredCount ?? 0;
     const provinces = snapshot.game.catalog?.provinces.filter(province => cession?.eligibleProvinces.includes(province.id)) ?? [];
-    const overseasCount = provinces.filter(province => province.overseas && selected.includes(province.id)).length;
+    const canSelect = (province: ProvinceDefinition, choices: string[]) => choices.includes(province.id) ||
+        (choices.length < required && (!province.overseas || provinces.filter(candidate => candidate.overseas && choices.includes(candidate.id)).length < (cession?.overseasCapacity ?? 0)));
     const winner = snapshot.game.players.find(player => player.id === cession?.winner);
     return <form className="guided-form" onSubmit={event => { event.preventDefault(); void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
         <h3>{t('action.cedeWar')} · {required}</h3><p className="small muted">{t('controls.cedeWarHint')}</p><p>{t('controls.warWinner')}: {winner?.name}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
-        <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || (!selected.includes(province.id) && (selected.length >= required || (!!province.overseas && overseasCount >= (cession?.overseasCapacity ?? 0))))} onChange={event => setSelected(current => event.target.checked ? [...current, province.id] : current.filter(id => id !== province.id))}/>{provinceName(province.id)}</label>)}</div>
+        <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || !canSelect(province, selected)} onChange={event => setSelected(current => event.target.checked ? [...current, province.id] : current.filter(id => id !== province.id))}/>{provinceName(province.id)}</label>)}</div>
+        <MapPicker title={`Choose ${required} provinces to cede`} selected={selected} disabled={busy}
+            eligible={provinces.filter(province => canSelect(province, selected)).map(province => province.id)}
+            onPick={id => setSelected(current => {
+                if (current.includes(id)) return current.filter(value => value !== id);
+                const province = provinces.find(province => province.id === id);
+                return province && canSelect(province, current) ? [...current, id] : current;
+            })}/>
         <button disabled={busy || !cession || selected.length !== required}>{t('action.cedeWar')}</button>
     </form>;
 }

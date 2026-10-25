@@ -16,6 +16,7 @@ export interface PublicCatalog {
     commodities: {id: string; baseValue: number; diceTotal: number; ownershipTrackBoxes: number; printedPayouts: number[]}[];
     landBorders: {first: string; second: string}[]; coastalConnections: {first: string; second: string}[];
     satelliteSupports: {satellite: string; market: string}[];
+    seaCoasts: {sea: string; province: string}[];
 }
 export interface ProvinceView {
     id: string; marker: {owner: string; side: 'COLOURED' | 'WHITE'} | null;

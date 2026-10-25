@@ -20,6 +20,7 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
 - [Remaining rules plan](docs/remaining-rules-plan.md): fixed three-epoch delivery, remaining variants,
   parallel agent assignments, dependencies and verification gates.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
+- [Map design](docs/map-design.md): the agreed visual language, board navigation, and map-based orders.
 - [Rule coverage](docs/rule-coverage.md), [card inventory](docs/card-inventory.md) and
   [variant inventory](docs/variant-inventory.md): implementation evidence and selected source interpretations.
 

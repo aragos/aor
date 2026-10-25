@@ -316,6 +316,12 @@ class GameCatalogTest {
     }
 
     @Test
+    fun tunisAndSicilyShareCoastalWater() {
+        assertThat(BoardConnectionData.coastalConnections).contains(edge("tunis", "sicily"))
+        assertThat(BoardConnectionData.landBorders).doesNotContain(edge("tunis", "sicily"))
+    }
+
+    @Test
     fun allSupportedConfigurationsHaveResolvedReferences() {
         for (count in 3..6) {
             val configuration = GameCatalog.requireResolvedFor(count)
