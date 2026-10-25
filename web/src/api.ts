@@ -66,6 +66,18 @@ export interface CardDefinition {
     id: string; kind: 'commodity' | 'event' | 'leader'; messageId: string; shape: 'CIRCLE' | 'SQUARE';
 }
 export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
+export interface HistoryEventView {
+    id: string; kind: 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
+        'RETURN_CARD' | 'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' |
+        'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
+        'ATTACK' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' | 'WRITTEN_RECORD' |
+        'OFFER_CARD' | 'PLAY_CARD' | 'ADJUST_MARKET' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
+        'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL';
+    actor: string | null; target: string | null; turnNumber: number | null; stage: string;
+    provinces: string[]; card: string | null; commodity: string | null; advance: string | null;
+    amount: number | null; detail: string | null; dice: number[];
+}
+export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
 export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
     game: {stage: string; currentEpoch: number;
@@ -91,6 +103,7 @@ export interface Snapshot {
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];
+    events: HistoryEventView[];
 }
 export interface CreatedGame {gameId: string; links: {id: string; name: string; path: string}[]}
 export class ApiError extends Error {
