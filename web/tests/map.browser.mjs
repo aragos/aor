@@ -1,4 +1,7 @@
 import fs from 'node:fs';
+import {join} from 'node:path';
+
+const artifacts = process.env.AOR_BROWSER_ARTIFACTS ?? '/private/tmp';
 import assert from 'node:assert/strict';
 
 const web = process.env.MAP_WEB_URL ?? 'http://127.0.0.1:5191';
@@ -12,6 +15,7 @@ class Page {
             if (message.id) {
                 const pending = this.pending.get(message.id);
                 this.pending.delete(message.id);
+                if (!pending) return;
                 if (message.error) pending.reject(new Error(message.error.message)); else pending.resolve(message.result);
             }
         });
@@ -24,7 +28,12 @@ class Page {
         return page;
     }
     send(method, params = {}) {
-        return new Promise((resolve, reject) => { const id = ++this.next; this.pending.set(id, {resolve, reject}); this.ws.send(JSON.stringify({id, method, params})); });
+        return new Promise((resolve, reject) => {
+            const id = ++this.next;
+            const timeout = setTimeout(() => { this.pending.delete(id); reject(new Error(`CDP timed out: ${method}`)); }, 15000);
+            this.pending.set(id, {resolve: value => {clearTimeout(timeout); resolve(value);}, reject: error => {clearTimeout(timeout); reject(error);}});
+            this.ws.send(JSON.stringify({id, method, params}));
+        });
     }
     async evaluate(expression) {
         const result = await this.send('Runtime.evaluate', {expression, awaitPromise: true, returnByValue: true});
@@ -149,8 +158,8 @@ try {
     assert.notEqual(await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`), zoomed);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
     assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'No mobile overflow');
-    await page.screenshot('/private/tmp/aor-map-mobile.png', 390);
-    await page.screenshot('/private/tmp/aor-map-desktop.png', 1440);
+    await page.screenshot(join(artifacts, 'aor-map-mobile.png'), 390);
+    await page.screenshot(join(artifacts, 'aor-map-desktop.png'), 1440);
 
     for (const [count, expected] of [[3, 67], [4, 83], [5, 96]]) {
         const reduced = await createGame(count);
@@ -195,4 +204,7 @@ try {
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-province-label="toledo"] [data-piece-age="new"]').length`), 2);
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-province-label="toledo"] [data-piece-age="established"]').length`), 1);
     console.log('Passed: continental frame selection, live placement and rejection, draft preservation, inspection, keyboard picking, search, zoom, mobile layout, 3–6 player boards, pirate limits, War overseas limits, mixed owners and ages.');
-} finally {page.ws.close();}
+} finally {
+    page.ws.close();
+    await fetch(cdp + '/json/close/' + page.target.id);
+}
