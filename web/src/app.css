@@ -92,3 +92,5 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
     .decision-panel.has-context .province-inspector > div > .eyebrow, .decision-panel.has-context .province-inspector h2 { display: none; }
     .decision-panel.has-context .map-facts { margin-top: 0; }
 }
+.table-effects > summary { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.table-effects .effect-badge { display: inline-block; margin: 0; padding: .25rem .5rem; border: 1px solid #cfc6a7; border-radius: 4px; color: #695629; background: #f4efdc; font-size: .78rem; }

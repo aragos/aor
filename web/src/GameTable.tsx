@@ -90,7 +90,10 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
             </aside>
         </div>
         <Hand snapshot={snapshot}/>
-        <details className="table-effects"><summary>{t('game.thisTurn')} <span>{snapshot.game.deckRemaining} {t('game.cards').toLowerCase()}</span></summary><TurnEffects snapshot={snapshot}/></details>
+        <details className="table-effects"><summary>{t('game.thisTurn')} <span>{snapshot.game.deckRemaining} {t('game.cards').toLowerCase()}</span>
+            {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)}</span>}
+            {snapshot.game.effects.papalCategory && <span className="effect-badge">{t('game.forbiddenCategory')}: {label(snapshot.game.effects.papalCategory, 'category')}</span>}
+        </summary><TurnEffects snapshot={snapshot}/></details>
         {snapshot.game.endingTriggered && snapshot.game.stage !== 'FINISHED' && <p className="ending-notice">{t('game.endingNotice')}</p>}
         <details className="table-configuration"><summary>{t('table.configuration')}</summary>
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}><dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd></div>)}

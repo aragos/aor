@@ -48,6 +48,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
     const nameFor = (playerId: string) => playerName(snapshot, playerId);
     const isTokenPurchase = stage === 'TOKEN_PURCHASE';
+    const eligiblePurchase = isTokenPurchase && me.misery !== null;
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
     const amount = Number(bid);
     const validPurchase = bid.trim() !== '' && Number.isInteger(amount) && Math.abs(amount) <= me.cash;
@@ -55,7 +56,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     quoteRequest.current = quotePurchase;
     useEffect(() => {
         setPurchaseQuote(null); setQuoteError('');
-        if (!isTokenPurchase || !validPurchase) return;
+        if (!eligiblePurchase || !validPurchase) return;
         let active = true;
         const timer = setTimeout(() => {
             void quoteRequest.current(amount).then(result => {
@@ -63,7 +64,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             }).catch(failure => { if (active) setQuoteError(errorCode(failure)); });
         }, 180);
         return () => { active = false; clearTimeout(timer); };
-    }, [amount, isTokenPurchase, snapshot.revision, validPurchase]);
+    }, [amount, eligiblePurchase, snapshot.revision, validPurchase]);
     const quoted = purchaseQuote?.revision === snapshot.revision && purchaseQuote.quote.amount === amount ? purchaseQuote.quote : null;
     const positionLabel = (slot: number) => {
         const order = snapshot.game.provisionalTieOrder;
@@ -73,8 +74,8 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
         return t('controls.between').replace('{before}', nameFor(order[slot - 2])).replace('{after}', nameFor(order[slot - 1]));
     };
     return <>
-        {isTokenPurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
-        {quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
+        {eligiblePurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
+        {eligiblePurchase && quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
         {stage === 'CONFIGURATION' && snapshot.viewerId === snapshot.creatorId && <>
             <div className="rule-options">
                 <label htmlFor="rule-preset">{t('controls.preset')}</label>
