@@ -26,7 +26,7 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
     const available = primary && offer.blockers.length === 0 && offer.resultingPool !== null;
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
     const command = offer?.primaryAction === 'ATTACK' ? `attack ${province.id}` : `place ${offer?.requiredTokens} ${province.id}`;
-    const commands = provinceOrders(snapshot, province.id).filter(command => !command.startsWith('place ') && !command.startsWith('attack '));
+    const commands = provinceOrders(snapshot, province.id);
     const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button" className="map-link" key={id}
         onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
     return <div className="province-inspector" aria-label={t('table.selectedProvince')}>
