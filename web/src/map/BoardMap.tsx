@@ -86,6 +86,9 @@ export function BoardMap({snapshot, busy}: {
         setSelected(id);
         if (!picker) { setSelectedCard(''); setSelectedAdvance(''); }
         if (!busy && picker?.eligible.includes(id)) picker.pick(id);
+        if (!picker && window.matchMedia('(max-width: 700px)').matches) {
+            requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({block: 'start'}));
+        }
     };
     const focusProvince = (id: string) => {
         choose(id);

@@ -76,7 +76,7 @@ export function CardDecision({snapshot, busy, submit}: Props) {
                     onClick={() => setTargets(current => current.includes(province) ? current.filter(target => target !== province) : [...current, province])}>{provinceName(province)}</button>)}
                 <MapPicker title={t('table.targets')} disabled={busy} selected={targets}
                     eligible={offer.provinceTargets.filter(target => targets.includes(target) || targets.length < (offer.requiredTargetCount ?? 0))}
-                    onPick={id => setTargets(current => current.includes(id) ? current.filter(target => target !== id) : [...current, id])}/>
+                    onPick={id => setTargets(current => current.includes(id) ? current.filter(target => target !== id) : current.length < (offer.requiredTargetCount ?? 0) ? [...current, id] : current)}/>
             </fieldset>}
             {needsProtection && <label>{t('game.protection')}<input type="number" min={0} max={offer?.protectionMax ?? 0} value={protection}
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}

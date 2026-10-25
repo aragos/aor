@@ -46,8 +46,8 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
             {primary && <>
                 <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {offer.resultingPool ?? '—'}</strong></div>
                 <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{offer.requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
-                    <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh/></svg>
-                        <small>{offer.uncertain ? t('table.uncertainMarker') : offer.establishesMarker ? t('table.newMarker') : t('action.place')}</small></span></div>
+                    <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={offer.establishesMarker ? undefined : 1}/></svg>
+                        <small>{offer.establishesMarker ? t(offer.uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(offer.uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
                 {offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
                 {offer.uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
                 {offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}

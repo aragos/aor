@@ -1,6 +1,6 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import type {Snapshot, TokenPurchaseQuoteResponse} from './api';
-import {label, playerName} from './labels';
+import {label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
@@ -22,15 +22,19 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
     connectionError: string; actionError: string; quotePurchase: QuotePurchase;
 }) {
     const [commandsOpen, setCommandsOpen] = useState(false);
+    const [sheetCollapsed, setSheetCollapsed] = useState(false);
     const {selected, setSelected, selectedCard, selectedAdvance, picker, workspace, setWorkspace} = useMapSelection();
+    useEffect(() => setSheetCollapsed(false), [selected, selectedCard, selectedAdvance]);
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     if (!me) return null;
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
     const expansion = snapshot.game.stage === 'EXPANSION';
+    const hasContext = !!(selectedCard || selectedAdvance || province);
+    const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
     const decision = snapshot.game.stage === 'FINISHED' ? t('game.finished') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
-    return <main className="game-shell game-table">
+    return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <header className="game-header">
             <div className="game-brand"><span className="brand-seal" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
                 <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t('game.epoch')} {snapshot.game.currentEpoch}</p></div></div>
@@ -61,12 +65,15 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                 <FinalScores snapshot={snapshot}/>
                 <Activity snapshot={snapshot}/>
             </div>
-            <aside className="decision-panel decision" aria-label={t('table.currentDecision')}>
+            <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
                 <div className="decision-heading"><p className="eyebrow">{canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
                     {!canAct && snapshot.prompt && <strong>{snapshot.prompt.players.map(id => playerName(snapshot, id)).join(', ')}</strong>}
                     <h2>{decision}</h2>
+                    <span className="mobile-selected">{selectedName ? t(selectedName) : selectedAdvance ? label(selectedAdvance, 'advance') : province ? provinceName(province.id) : ''}</span>
+                    {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed} aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>{t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}</button>}
                     {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: {playerName(snapshot, snapshot.game.activity.actor)}</p>}
                 </div>
+                <div id="decision-content" className="decision-content">
                 {expansion && <div className="pool-summary"><TableIcon kind="token"/><strong>{me.poolTokens}</strong><span>{t('table.poolTokens')}</span></div>}
                 {selectedCard ? <CardDecision snapshot={snapshot} busy={busy} submit={submit}/>
                     : selectedAdvance ? <AdvanceDecision snapshot={snapshot} busy={busy} submit={submit}/>
@@ -78,6 +85,7 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                     <details className="stock-details"><summary>{t('table.stock')}</summary><dl className="detail-list">
                         <div><dt>{t('game.tokens')}</dt><dd>{me.stockTokens}</dd></div><div><dt>{t('game.stockMarkers')}</dt><dd>{me.stockMarkers}</dd></div><div><dt>{t('game.boardMarkers')}</dt><dd>{me.boardMarkers}</dd></div>
                     </dl></details>
+                </div>
                 </div>
             </aside>
         </div>
