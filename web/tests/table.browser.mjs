@@ -272,9 +272,18 @@ export async function checkDecisionFamilies(page, web, baseline) {
         cardOffers: [{reference:dualReference,playable:true,blockers:[],choices:[
             {kind:'COMMODITY',value:'cloth',command:`play ${dualReference} commodity cloth`},
             {kind:'COMMODITY',value:'wine',command:`play ${dualReference} commodity wine`}],commodities:['CLOTH','WINE'],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}],
+        commodityPayouts: [
+            {commodity:'CLOTH',adjustments:['SURPLUS'],owners:[{player:viewer,provinces:['paris'],marketCount:1,effectiveBox:0,payout:0,industryBonus:0}]},
+            {commodity:'WINE',adjustments:[],owners:[{player:other,provinces:['barcelona'],marketCount:1,effectiveBox:1,payout:5,industryBonus:0}]},
+        ],
     });
     await page.wait(`document.querySelector('[data-hand-card="${dualReference}"]')`, 'dual commodity hand');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-hand-card="${dualReference}"] .card-commodity').length`), 2, 'Both commodity choices show current values');
+    const clothOwners = await page.evaluate(`[...document.querySelector('[data-hand-card="${dualReference}"] .card-commodity').querySelectorAll('.owner-payout')].map(owner=>owner.textContent)`);
+    assert.equal(clothOwners.length, 1, 'Card omits powers without qualifying ownership');
+    assert(clothOwners[0].includes('$0'), 'A zero-paying owner remains visible on the card');
+    await page.evaluate(`document.querySelector('#tab-markets').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.market-tile .owner-payout').textContent`), clothOwners[0], 'Market and hand share the same owner payout');
     await page.evaluate(`document.querySelector('[data-hand-card="${dualReference}"]').click()`);
     await page.wait(`document.querySelectorAll('.card-decision .target-choices button').length === 2`, 'dual choice controls');
     const beforeChoice = await page.evaluate('window.uiCommands.length');
@@ -288,9 +297,10 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await show('play-cards', [`play ${reference}`], {
         hand: [{reference, definition: {id:'leonardo-da-vinci', kind:'leader',messageId:'card.leonardo-da-vinci',shape:'SQUARE'}}],
         cardOffers: [{reference,playable:true,blockers:[],choices:[{kind:'NONE',value:null,command:`play ${reference}`},{kind:'PROTECTION',value:null,command:null}],
-            commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:5}],
+            commodities:[],leaderDiscounts:[{advance:'ARCHITECTURE',printedAmount:20,conditionalAmount:0,writtenRecordBonus:0,effectiveDiscount:20,condition:null}],provinceTargets:[],requiredTargetCount:null,protectionMax:5}],
     });
     await page.wait(`document.querySelector('[data-hand-card="${reference}"]')`, 'leader hand');
+    assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="${reference}"] .leader-discount strong').textContent`), '−$20', 'Leader hand shows its projected discount, distinct from a purchase price');
     await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
     await page.wait(`document.querySelector('.card-decision input[type=number]')`, 'leader protection');
     for (const amount of ['', '-1', '6']) {
@@ -300,5 +310,17 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.fill('.card-decision input[type=number]', '3');
     await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'play ${reference} protect 3'`, 'valid protection submission');
+    for (const [stage, prompt, id, kind] of [['FINAL_CARD_PLAY','final-card-play','grain','commodity'], ['PLAY_CARDS','prepare-war','gunpowder','event']]) {
+        const cardReference = `fixture-${prompt}`;
+        const command = `play ${cardReference}`;
+        await show(prompt, [command], {
+            hand:[{reference:cardReference,definition:{id,kind,messageId:`card.${id}`,shape:'SQUARE'}}],
+            cardOffers:[{reference:cardReference,playable:true,blockers:[],choices:[{kind:'NONE',value:null,command}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}],
+        }, stage);
+        await page.evaluate(`document.querySelector('[data-hand-card="${cardReference}"]').click()`);
+        await page.wait(`document.querySelector('.card-decision form > button:last-child:not([disabled])')`, prompt+' card draft');
+        await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+        await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`, prompt+' canonical play');
+    }
     console.log('Passed: setup return, immediate discard, Civil War, replacement, Renaissance, Written Record, market variant, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');
 }
