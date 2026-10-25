@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import type {Snapshot, RebuiltMarkerBonus} from './api';
+import type {Snapshot} from './api';
 import {t} from './messages';
 import {playerName} from './labels';
 import {GameActions} from './GameActions';
@@ -73,6 +73,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
         return t('controls.between').replace('{before}', nameFor(order[slot - 2])).replace('{after}', nameFor(order[slot - 1]));
     };
     return <>
+        {isTokenPurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
         {quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
         {stage === 'CONFIGURATION' && snapshot.viewerId === snapshot.creatorId && <>
             <div className="rule-options">
@@ -94,7 +95,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                 <label htmlFor="setup-rebuilt-marker-bonus">{t('controls.rebuiltMarkerBonus')}</label>
     
                 <div className="inline-form">
-                    <select id="setup-rebuilt-marker-bonus" value={rebuiltMarkerBonus} onChange={event => setRebuiltMarkerBonus(event.target.value as RebuiltMarkerBonus)} aria-describedby="rebuilt-marker-bonus-hint">
+                    <select id="setup-rebuilt-marker-bonus" value={rebuiltMarkerBonus} onChange={event => { const value = event.target.value; if (value === 'INCLUDE' || value === 'EXCLUDE') setRebuiltMarkerBonus(value); }}>
                         {(['EXCLUDE', 'INCLUDE'] as const).map(rule => <option key={rule} value={rule}>{t(`rebuiltMarkerBonus.option.${rule}`)}</option>)}
                     </select>
                     <button className="secondary" disabled={busy}>{t('controls.saveRebuiltMarkerBonus')}</button>
@@ -102,9 +103,9 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             </form>
             <button disabled={busy || rebuiltMarkerBonus !== snapshot.game.rebuiltMarkerBonus} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
         </>}
-        {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <form onSubmit={event => { event.preventDefault(); void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
+        {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <form onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
-            <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-hint purchase-preview' : 'bid-hint'} required/>
+            <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-preview' : undefined} required/>
                 <button disabled={busy || (isTokenPurchase && (!validPurchase || !quoted))}>
                     {bidSubmitLabel(snapshot)}
                 </button>
@@ -115,8 +116,8 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                 {quoted ? <dl className="resources">
                     <div><dt>{t('controls.purchaseCost')}</dt><dd>${quoted.cost}</dd></div>
                     <div><dt>{t('controls.purchaseTokens')}</dt><dd>{quoted.tokensReceived}</dd></div>
-                    <div><dt>{t('controls.remainingCash')}</dt><dd>${quoted.cashAfter}</dd></div>
-                </dl> : <p className="small">{t('controls.purchaseRange').split('{cash}').join(String(me.cash))}</p>}
+                    <div><dt>{t('controls.remainingCash')}</dt><dd>${quoted.cashAfter}</dd></div><div><dt>{t('game.tokens')}</dt><dd>{me.stockTokens} → {quoted.stockAfter}</dd></div>
+                </dl> : <p className="small">{validPurchase ? t('table.quotePending') : t('controls.purchaseRange').split('{cash}').join(String(me.cash))}</p>}
             </div>}
         </form>}
         {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}>{t(`capital.${choice.split(' ')[1]}`)}</button>)}<button disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</button></div>}

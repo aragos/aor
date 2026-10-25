@@ -1,6 +1,6 @@
 import type {Snapshot} from '../api';
 
-/** Legal choices project a one-token placement; larger counts remain server-validated. */
+/** Canonical direct actions for secondary province controls. Expansion uses typed offers. */
 export function provinceOrders(snapshot: Snapshot, province: string) {
     if (!snapshot.prompt?.players.includes(snapshot.viewerId)) return [];
     return snapshot.legalChoices.commands.filter(command => {

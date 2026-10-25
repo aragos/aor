@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import type {ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
+import {TableIcon} from '../TableIcon';
 import {Commodity} from '../TablePanels';
 import {PlayerPiece} from './MapSymbols';
 import {provinceOrders} from './mapOrders';
@@ -44,7 +45,7 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
         <div className="map-orders">
             {primary && <>
                 <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {offer.resultingPool ?? '—'}</strong></div>
-                <div className="commitment-preview"><span>▣ <strong>{offer.requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
+                <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{offer.requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
                     <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh/></svg>
                         <small>{offer.uncertain ? t('table.uncertainMarker') : offer.establishesMarker ? t('table.newMarker') : t('action.place')}</small></span></div>
                 {offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
@@ -60,6 +61,7 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
                             <option value="">{t('table.chooseAmount')}</option>
                             {offer.partialPlacements.map(choice => <option key={choice.tokens} value={choice.tokens}>{choice.tokens}</option>)}
                         </select>
+                        {partial && !partialOffer && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
                         {partialOffer && <p>{t('game.pool')}: {offer.availablePool} → {partialOffer.resultingPool}</p>}
                         <button disabled={busy || !partialOffer}>{t('action.place')}</button>
                     </form>

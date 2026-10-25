@@ -6,7 +6,7 @@ import {MapPicker} from './map/MapSelection';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
-const simpleActions = ['pass', 'buy-card', 'upgrade-ships', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
+const simpleActions = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
     const [selectedAction, setSelectedAction] = useState('');
@@ -36,13 +36,14 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}</button>)}
             {finite.map(command => <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}
         </div>
-        {selectedAction && <div className="selected-action"><p>{finiteLabel(selectedAction)}</p><button disabled={busy || !finite.includes(selectedAction)} onClick={async () => { if (await submit(selectedAction)) setSelectedAction(''); }}>{t('table.confirm')}</button></div>}
-        {commands.includes('upgrade-ships') && snapshot.game.shippingOffer && <div className="purchase-preview">
+        {selectedAction && <div className="selected-action"><p>{finiteLabel(selectedAction)}</p>{!finite.includes(selectedAction) && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}<button disabled={busy || !finite.includes(selectedAction)} onClick={async () => { if (await submit(selectedAction)) setSelectedAction(''); }}>{t('table.confirm')}</button></div>}
+        {snapshot.game.shippingOffer && <div className="purchase-preview">
             <p>{t('game.ships')}: {snapshot.game.shippingOffer.ships ? `${label(snapshot.game.shippingOffer.ships.fleet, 'fleet')} ${snapshot.game.shippingOffer.ships.level}` : '—'}</p>
             <p>{t('controls.purchaseCost')}: ${snapshot.game.shippingOffer.cost} · {t('controls.remainingCash')}: ${snapshot.game.shippingOffer.cashAfter ?? '—'}</p>
             {snapshot.game.shippingOffer.blockers.map(blocker => <p key={blocker} className="blocker">{t(`error.${blocker}`)}</p>)}
+            <button disabled={busy || !commands.includes('upgrade-ships') || snapshot.game.shippingOffer.blockers.length > 0} onClick={() => { void submit('upgrade-ships'); }}>{t('action.upgrade-ships')}</button>
         </div>}
-        {commands.some(command => command === 'relieve-misery' || command.startsWith('relieve-misery ')) && <form className="guided-form" onSubmit={event => { event.preventDefault(); void submit(`relieve-misery ${relief}`); }}>
+        {commands.some(command => command === 'relieve-misery' || command.startsWith('relieve-misery ')) && <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
             <label htmlFor="relief-spaces">{t('action.relieveMisery')}</label><div className="inline-form"><select id="relief-spaces" value={relief} onChange={event => setRelief(event.target.value)} required>
                 <option value="">{t('controls.chooseRelief')}</option>{snapshot.game.reliefOffers.map(offer => <option key={offer.spaces} value={offer.spaces} disabled={!offer.affordable}>{offer.spaces} {t('controls.spaces')} · ${offer.cashCost} · {offer.ratingSpent} {t('controls.mrUsed')}</option>)}
             </select><button disabled={busy || !snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)}>{t('action.relieveMisery')}</button></div>
@@ -63,7 +64,7 @@ function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {
         <button className="secondary" disabled={busy} onClick={async () => { if (await submit('forgo-marker')) setSource(''); }}>{t('action.forgo-marker')}</button>
         {sources.length > 0 && <form onSubmit={async event => {
             event.preventDefault();
-            if (await submit(source)) setSource('');
+            if (!busy && sources.includes(source) && await submit(source)) setSource('');
         }}>
             <label htmlFor="marker-source">{t('controls.markerSource')}</label>
             <div className="inline-form"><select id="marker-source" value={source} onChange={event => setSource(event.target.value)} required>
@@ -83,7 +84,9 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
     const canSelect = (province: ProvinceDefinition, choices: string[]) => choices.includes(province.id) ||
         (choices.length < required && (!province.overseas || provinces.filter(candidate => candidate.overseas && choices.includes(candidate.id)).length < (cession?.overseasCapacity ?? 0)));
     const winner = snapshot.game.players.find(player => player.id === cession?.winner);
-    return <form className="guided-form" onSubmit={event => { event.preventDefault(); void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
+    const validSelection = !!cession && selected.length === required && selected.every(id => cession.eligibleProvinces.includes(id)) &&
+        provinces.filter(province => province.overseas && selected.includes(province.id)).length <= cession.overseasCapacity;
+    return <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && validSelection) void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
         <h3>{t('action.cedeWar')} · {required}</h3><p>{t('controls.warWinner')}: {winner?.name}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
         <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || !canSelect(province, selected)} onChange={event => setSelected(current => event.target.checked ? [...current, province.id] : current.filter(id => id !== province.id))}/>{provinceName(province.id)}</label>)}</div>
         <MapPicker title={`Choose ${required} provinces to cede`} selected={selected} disabled={busy}
@@ -93,6 +96,7 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
                 const province = provinces.find(province => province.id === id);
                 return province && canSelect(province, current) ? [...current, id] : current;
             })}/>
-        <button disabled={busy || !cession || selected.length !== required}>{t('action.cedeWar')}</button>
+        {selected.length > 0 && !validSelection && selected.length >= required && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
+        <button disabled={busy || !validSelection}>{t('action.cedeWar')}</button>
     </form>;
 }

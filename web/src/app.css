@@ -54,3 +54,23 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
     .table-hand { display: block; padding: 1rem; } .hand-heading { width: auto; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .4rem; } .hand-card { flex-basis: 245px; } .markets-workspace, .advances-workspace { padding: 1rem; min-height: 350px; } .table-effects, .table-configuration, .command-dock { padding-inline: 1rem; } .landing { margin: 1rem; padding: 1.5rem; } .target-choices button { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+.table-activity { border-top: 1px solid #d7dece; font-size: .8rem; padding: .5rem 1.5rem; }
+.table-activity > summary { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+.recent-activity { min-width: 0; }
+.activity-toggle { white-space: nowrap; color: #3f6658; }
+.unread-badge { border-radius: 50%; padding: .15rem .4rem; margin-left: .5rem; background: #e1ebd8; }
+.activity-content { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .45rem; }
+.activity-actor { display: inline-flex; align-items: center; gap: .3rem; }
+.activity-list { list-style: none; margin: 1rem 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.activity-list li { border-top: 1px solid #dde4d4; padding: .7rem 0; }
+.activity-list li > small { display: block; margin-bottom: .4rem; color: #64795e; }
+.event-entity, .event-card, .event-die { border: 1px solid #d8dfcd; border-radius: 4px; padding: .15rem .4rem; background: #f5f5e9; }
+.event-die { display: inline-flex; align-items: center; gap: .3rem; }
+.event-detail { color: #66775e; }
+@media (max-width: 700px) { .table-activity { padding-inline: 1rem; } .table-activity > summary { gap: .5rem; } }
+.table-icon { display: inline-block; width: 18px; height: 18px; flex-shrink: 0; vertical-align: middle; }
+.player-money > span, .player-stats > span { display: inline-flex; align-items: center; gap: .3rem; }
+.player-stats .table-icon { width: 15px; height: 15px; }
+.pool-summary > .table-icon { width: 26px; height: 26px; }
+.token-stock-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #e3edd8; border: 1px solid #bdcfae; border-radius: 7px; padding: 1rem; margin: 0 0 1rem; }
+.token-stock-summary strong { font-size: 2.5rem; color: #315b40; }

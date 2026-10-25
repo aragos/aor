@@ -1,9 +1,11 @@
 import {useState} from 'react';
-import type {Snapshot, TokenPurchaseOfferView} from './api';
+import type {Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {label, playerName} from './labels';
 import {t} from './messages';
 import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
+import {Activity} from './Activity';
+import {TableIcon} from './TableIcon';
 import {BoardPanel, FinalScores, TurnEffects} from './FullGamePanels';
 import {AdvanceTiles, Hand, PlayerOverview, Markets} from './TablePanels';
 import {AdvanceDecision, CardDecision} from './ObjectDecisions';
@@ -11,25 +13,23 @@ import {BoardMap} from './map/BoardMap';
 import {useMapSelection} from './map/MapSelection';
 import {ProvinceInspector} from './map/ProvinceInspector';
 
-export type PurchaseQuote = {revision: number; quote: TokenPurchaseOfferView};
+export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 
-type Workspace = 'map' | 'markets' | 'advances';
 
 export function GameTable({snapshot, busy, saved, submit, connectionError, actionError, quotePurchase}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: string; quotePurchase: QuotePurchase;
 }) {
-    const [workspace, setWorkspace] = useState<Workspace>('map');
     const [commandsOpen, setCommandsOpen] = useState(false);
-    const {selected, setSelected, selectedCard, selectedAdvance, picker} = useMapSelection();
+    const {selected, setSelected, selectedCard, selectedAdvance, picker, workspace, setWorkspace} = useMapSelection();
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     if (!me) return null;
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
     const expansion = snapshot.game.stage === 'EXPANSION';
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
-    const decision = snapshot.game.stage === 'FINISHED' ? t('game.finished') : prompt ? t(`table.prompt.${prompt}`) : t('game.waiting');
+    const decision = snapshot.game.stage === 'FINISHED' ? t('game.finished') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
     return <main className="game-shell game-table">
         <header className="game-header">
             <div className="game-brand"><span className="brand-seal" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
@@ -44,7 +44,7 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                 <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')}>
                     {(['map', 'markets', 'advances'] as const).map(tab => <button type="button" key={tab} role="tab" id={`tab-${tab}`} aria-selected={workspace === tab}
                         aria-controls={`workspace-${tab}`} onClick={() => setWorkspace(tab)} onKeyDown={event => {
-                            const tabs: Workspace[] = ['map', 'markets', 'advances'];
+                            const tabs: ('map' | 'markets' | 'advances')[] = ['map', 'markets', 'advances'];
                             if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
                                 event.preventDefault();
                                 const next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : 2)) % tabs.length];
@@ -59,6 +59,7 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={snapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
                 <FinalScores snapshot={snapshot}/>
+                <Activity snapshot={snapshot}/>
             </div>
             <aside className="decision-panel decision" aria-label={t('table.currentDecision')}>
                 <div className="decision-heading"><p className="eyebrow">{canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
@@ -66,7 +67,7 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                     <h2>{decision}</h2>
                     {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: {playerName(snapshot, snapshot.game.activity.actor)}</p>}
                 </div>
-                {expansion && <div className="pool-summary"><span aria-hidden="true">▣</span><strong>{me.poolTokens}</strong><span>{t('table.poolTokens')}</span></div>}
+                {expansion && <div className="pool-summary"><TableIcon kind="token"/><strong>{me.poolTokens}</strong><span>{t('table.poolTokens')}</span></div>}
                 {selectedCard ? <CardDecision snapshot={snapshot} busy={busy} submit={submit}/>
                     : selectedAdvance ? <AdvanceDecision snapshot={snapshot} busy={busy} submit={submit}/>
                     : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} busy={busy} submit={submit} select={setSelected}/>}
