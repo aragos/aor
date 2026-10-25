@@ -53,6 +53,22 @@ fun Application.module(service: GameService = createGameService()) {
                 call.respondJson(result)
             }
         }
+        post("/api/games/{id}/quote-token-purchase") {
+            call.api {
+                val body = call.body()
+                body.fieldsOnly("expectedRevision", "amount")
+                val result =
+                    withContext(Dispatchers.IO) {
+                        service.quoteTokenPurchase(
+                            call.parameters["id"]!!,
+                            call.token(),
+                            body.field("expectedRevision").integer(),
+                            body.field("amount").integer(),
+                        )
+                    }
+                call.respondJson(result)
+            }
+        }
         post("/api/games/{id}/commands") {
             call.api {
                 val body = call.body()

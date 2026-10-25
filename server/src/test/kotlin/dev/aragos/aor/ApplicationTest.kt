@@ -19,6 +19,42 @@ import kotlin.test.Test
 
 class ApplicationTest {
     @Test
+    fun tokenQuoteRequiresCredentials() = withGame {
+        val response =
+            client.post("$url/quote-token-purchase") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"expectedRevision":1,"amount":8}""")
+            }
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.Unauthorized)
+    }
+
+    @Test
+    fun tokenQuoteRejectsFractionalAmounts() = withGame {
+        val response =
+            client.post("$url/quote-token-purchase") {
+                bearerAuth(tokens[0])
+                contentType(ContentType.Application.Json)
+                setBody("""{"expectedRevision":1,"amount":8.5}""")
+            }
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+    }
+
+    @Test
+    fun tokenQuoteRejectsAnEarlierRevision() = withGame {
+        val response =
+            client.post("$url/quote-token-purchase") {
+                bearerAuth(tokens[0])
+                contentType(ContentType.Application.Json)
+                setBody("""{"expectedRevision":0,"amount":8}""")
+            }
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.Conflict)
+        assertThat(response.headers[HttpHeaders.CacheControl]).isEqualTo("no-store")
+    }
+
+    @Test
     fun rebuiltMarkerBonusIsPubliclyConfigurableBeforeStart() = withGame {
         val configured = command(0, 1, "set-option rebuilt-marker-bonus include")
         val own = json.readTree(configured.bodyAsText())

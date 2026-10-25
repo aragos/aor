@@ -13,6 +13,9 @@ data class CreatedGame(val gameId: String, val links: List<PlayerLink>)
 
 data class PromptView(val messageId: String, val players: List<PlayerId>)
 
+/** A read-only quote bound to the committed revision used for its calculation. */
+data class TokenPurchaseQuoteResponse(val revision: Int, val quote: TokenPurchaseOfferView)
+
 data class GameSnapshot(
     val gameId: String,
     val revision: Int,
@@ -27,6 +30,7 @@ data class GameSnapshot(
     /** Only this viewer's unrevealed setup return; other seats see submission status only. */
     val pendingReturn: String?,
     val history: List<String>,
+    val events: List<HistoryEventView>,
 )
 
 /** Authenticates players and projects the driver's state for the HTTP API. */
@@ -90,6 +94,23 @@ class GameService(
         return snapshot(stored = stored, player = authenticate(stored, token))
     }
 
+    fun quoteTokenPurchase(
+        id: String,
+        token: String,
+        expectedRevision: Int,
+        amount: Int,
+    ): TokenPurchaseQuoteResponse {
+        val stored = store.read(id)
+        val player = authenticate(stored, token)
+        if (stored.revision != expectedRevision) {
+            throw ServiceFailure(409, "STALE_REVISION")
+        }
+        return TokenPurchaseQuoteResponse(
+            stored.revision,
+            TokenPurchaseProjection.quote(stored.state(), player, amount),
+        )
+    }
+
     fun submit(id: String, token: String, expectedRevision: Int, text: String): GameSnapshot {
         val stored =
             store.update(id) { current ->
@@ -146,6 +167,7 @@ class GameService(
             pendingBid = stored.pendingBids[player],
             pendingReturn = stored.pendingReturns[player],
             history = history.lines,
+            events = history.events,
         )
     }
 

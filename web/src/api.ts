@@ -75,7 +75,7 @@ export interface HistoryEventView {
         'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL';
     actor: string | null; target: string | null; turnNumber: number | null; stage: string;
     provinces: string[]; card: string | null; commodity: string | null; advance: string | null;
-    amount: number | null; detail: string | null; dice: number[];
+    amount: number | null; detail: string | null; dice: {player: string | null; value: number}[];
 }
 export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
 export interface Snapshot {
