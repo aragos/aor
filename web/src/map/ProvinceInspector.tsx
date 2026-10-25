@@ -77,7 +77,9 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
                 {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
                 <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>
                 <p>{t('board.coastalNeighbors')}: {links(neighbors(catalog.coastalConnections, province.id))}</p>
+                <p>{t('board.seas')}: {catalog.seaCoasts.filter(coast => coast.province === province.id).map(coast => label(coast.sea)).join(', ') || '—'}</p>
                 <p>{t('board.supports')}: {links(catalog.satelliteSupports.filter(edge => edge.satellite === province.id).map(edge => edge.market))}</p>
+                <p>{t('board.supportedBy')}: {links(catalog.satelliteSupports.filter(edge => edge.market === province.id).map(edge => edge.satellite))}</p>
             </details>
         </div>
     </div>;

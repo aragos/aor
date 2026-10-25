@@ -84,6 +84,8 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
     const canSelect = (province: ProvinceDefinition, choices: string[]) => choices.includes(province.id) ||
         (choices.length < required && (!province.overseas || provinces.filter(candidate => candidate.overseas && choices.includes(candidate.id)).length < (cession?.overseasCapacity ?? 0)));
     const winner = snapshot.game.players.find(player => player.id === cession?.winner);
+    const invalidSelection = !!cession && (selected.some(id => !cession.eligibleProvinces.includes(id)) || selected.length > required ||
+        provinces.filter(province => province.overseas && selected.includes(province.id)).length > cession.overseasCapacity);
     const validSelection = !!cession && selected.length === required && selected.every(id => cession.eligibleProvinces.includes(id)) &&
         provinces.filter(province => province.overseas && selected.includes(province.id)).length <= cession.overseasCapacity;
     return <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && validSelection) void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
@@ -96,7 +98,7 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
                 const province = provinces.find(province => province.id === id);
                 return province && canSelect(province, current) ? [...current, id] : current;
             })}/>
-        {selected.length > 0 && !validSelection && selected.length >= required && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
+        {invalidSelection && <><p className="blocker" role="status">{t('table.invalidatedChoice')}</p><button type="button" className="secondary clear-targets" onClick={() => setSelected([])}>{t('table.clearSelection')}</button></>}
         <button disabled={busy || !validSelection}>{t('action.cedeWar')}</button>
     </form>;
 }

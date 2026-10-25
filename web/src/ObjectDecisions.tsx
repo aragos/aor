@@ -32,6 +32,7 @@ export function CardDecision({snapshot, busy, submit}: Props) {
     const validProtection = protection.trim() !== '' && Number.isInteger(amount) && amount >= 0 && offer?.protectionMax !== null && amount <= (offer?.protectionMax ?? -1);
     const selectedChoice = finiteChoices.find(candidate => candidate.command === choice);
     const noChoice = !needsProtection && finiteChoices.length === 1 && finiteChoices[0].kind === 'NONE';
+    const invalidTargets = !!offer && needsTargets && (targets.some(target => !offer.provinceTargets.includes(target)) || targets.length > (offer.requiredTargetCount ?? 0));
     const validTargets = needsTargets && targets.length === offer?.requiredTargetCount && targets.every(target => offer.provinceTargets.includes(target));
     const command = needsTargets && validTargets ? `play ${selectedCard} provinces ${[...targets].sort().join(' ')}`
         : needsProtection && validProtection ? `play ${selectedCard} protect ${amount}`
@@ -81,7 +82,8 @@ export function CardDecision({snapshot, busy, submit}: Props) {
             {needsProtection && <label>{t('game.protection')}<input type="number" min={0} max={offer?.protectionMax ?? 0} value={protection}
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
-            {((choice && !selectedChoice) || (needsTargets && targets.some(target => !offer?.provinceTargets.includes(target)))) && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
+            {((choice && !selectedChoice) || invalidTargets) && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
+            {invalidTargets && <button type="button" className="secondary clear-targets" onClick={() => setTargets([])}>{t('table.clearSelection')}</button>}
             <button disabled={busy || !actionable}>{t('action.playCard')}</button>
         </form>}
     </section>;
