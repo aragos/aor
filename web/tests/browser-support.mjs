@@ -53,6 +53,10 @@ export class Page {
     async snapshot() {
         return this.evaluate(`fetch('/api' + location.pathname, {headers:{Authorization:'Bearer ' + new URLSearchParams(location.hash.slice(1)).get('token')}}).then(r=>r.json())`);
     }
+    async viewportScreenshot(path) {
+        const result = await this.send('Page.captureScreenshot', {format:'png', captureBeyondViewport:false});
+        fs.writeFileSync(path, Buffer.from(result.data, 'base64'));
+    }
     async screenshot(path, width = 1280, height = 1000, mobile = false) {
         await this.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor:1, mobile});
         await this.evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');

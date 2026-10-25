@@ -104,11 +104,20 @@ await page.send('Page.navigate', {url: web + actor.path});
     assert.notEqual(await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`), zoomed);
     const screenshotOffer = after.game.expansionOffers.find(offer => offer.establishesMarker && !offer.blockers.length);
     assert(screenshotOffer, 'Screenshot fixture needs a legal marker draft');
-    await pick(screenshotOffer.destination);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
+    await pick(screenshotOffer.destination);
+    await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'No mobile overflow');
     await page.evaluate(`document.querySelector('.primary-expansion').scrollIntoView({block:'nearest'})`);
     assert.equal(await page.evaluate(`(() => {const button=document.querySelector('.primary-expansion');const rect=button.getBoundingClientRect();return rect.top>=0 && rect.bottom<=innerHeight && document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)===button;})()`), true, 'Phone marker submit is reachable and unobstructed');
+    assert.equal(await page.evaluate(`(() => {const map=document.querySelector('.world-map').getBoundingClientRect();const sheet=document.querySelector('.decision-panel').getBoundingClientRect();const top=Math.max(0,map.top), bottom=Math.min(sheet.top,innerHeight,map.bottom);if(bottom-top<80)return false;const element=document.elementFromPoint(Math.max(10,map.left+map.width/2),(top+bottom)/2);return !!element?.closest('.world-map');})()`), true, 'Phone board stays visible and unobstructed above decision sheet');
+    await page.viewportScreenshot(join(artifacts, 'aor-phone-viewport.png'));
+    await page.send('Emulation.setPageScaleFactor', {pageScaleFactor:2});
+    assert.equal(await page.evaluate('visualViewport.scale'), 2, 'Phone pinch zoom is 200%');
+    await page.evaluate(`document.querySelector('.primary-expansion').scrollIntoView({block:'nearest',inline:'nearest'})`);
+    assert.equal(await page.evaluate(`(() => {const button=document.querySelector('.primary-expansion');const rect=button.getBoundingClientRect();const visible=visualViewport;return !button.disabled && rect.bottom>visible.offsetTop && rect.top<visible.offsetTop+visible.height && rect.right>visible.offsetLeft && rect.left<visible.offsetLeft+visible.width;})()`), true, 'Pinch-zoomed phone submit remains reachable');
+    await page.viewportScreenshot(join(artifacts, 'aor-phone-pinch-200.png'));
+    await page.send('Emulation.setPageScaleFactor', {pageScaleFactor:1});
     await page.screenshot(join(artifacts, 'aor-map-mobile.png'), 390, 844, true);
     await page.evaluate(`document.querySelector('.sheet-toggle').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'false', 'Phone sheet minimizes');
@@ -123,6 +132,13 @@ await page.send('Page.navigate', {url: web + actor.path});
     assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'true', 'Phone sheet reopens with draft retained');
     await page.screenshot(join(artifacts, 'aor-map-phone-tall.png'), 430, 1100, true);
     assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'No tall phone overflow');
+    // Match a 1440-pixel desktop viewport at 200% browser zoom: 720 CSS pixels at 2× scale.
+    await page.send('Emulation.setDeviceMetricsOverride', {width:720,height:500,deviceScaleFactor:2,mobile:false});
+    await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    await page.evaluate(`document.querySelector('.primary-expansion').scrollIntoView({block:'center',behavior:'instant'})`);
+    assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, '200% desktop zoom reflow has no page overflow');
+    await page.viewportScreenshot(join(artifacts, 'aor-desktop-reflow-200.png'));
+    await page.wait(`(() => {const button=document.querySelector('.primary-expansion');const rect=button.getBoundingClientRect();return rect.top>=-1 && rect.bottom<=innerHeight+1 && !button.disabled;})()`, 'Submit reachable in 200% desktop zoom reflow');
     await page.screenshot(join(artifacts, 'aor-map-desktop.png'), 1440);
 
     for (const [count, expected] of [[3, 67], [4, 83], [5, 96]]) {

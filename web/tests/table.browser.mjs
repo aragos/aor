@@ -26,6 +26,16 @@ export async function checkTable(page, web, baseline) {
         assert(!income.text.includes('+') && !income.text.toLowerCase().includes('income'), 'Income overview uses icon and unsigned amount');
         assert(income.title && income.label, 'Income keeps hover and accessible labels');
     }
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .track-reference').open`), false, 'Full tracks remain collapsed inside player details');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track').checkVisibility()`), false, 'Closed reference track is not visible');
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer .track-reference > summary').click()`);
+    const reference = await page.evaluate(`({misery:document.querySelectorAll('.player-summary.is-viewer .reference-track')[0].textContent, current:[...document.querySelectorAll('.player-summary.is-viewer .reference-track [aria-current=step]')].map(step=>step.textContent)})`);
+    const me = baseline.game.players.find(player=>player.id===baseline.viewerId);
+    assert(reference.current.includes(String(me.misery)), 'Misery reference highlights current printed value');
+    assert(reference.current.includes(String(me.ships.level)), 'Shipping reference highlights current level');
+    assert(reference.misery.includes('Chaos'), 'Complete misery reference includes Chaos');
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
     const offer = fixture.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && offer.blockers.length === 0);
     assert(offer, 'Live fixture must expose a legal marker establishment');
     await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
@@ -69,6 +79,20 @@ export async function checkTable(page, web, baseline) {
     await page.wait(`window.uiCommands.length === 2 && !document.querySelector('.primary-expansion').disabled`, 'stale response refresh completed');
     assert.equal(await page.evaluate('window.uiCommands.at(-1).expectedRevision'), oldRevision, 'Stale submission uses rendered revision');
     assert.equal(await page.evaluate('window.uiCommands.length'), 2, 'Refresh never automatically retries rejected intent');
+    const nextEvent = {...baseline.events.at(-1),id:'fixture-activity-1',kind:'PASS',actor:baseline.viewerId,card:null,provinces:[],dice:[],amount:null,detail:null};
+    const events = [...baseline.events,nextEvent];
+    await show({...baseline, revision:fixture.revision+1,events});
+    await page.wait(`document.querySelector('.table-activity .unread-badge')?.textContent === '1'`, 'closed activity unread count');
+    await page.evaluate(`document.querySelector('.table-activity > summary').click()`);
+    await page.wait(`!document.querySelector('.table-activity .unread-badge')`, 'opening activity marks entries read');
+    await page.evaluate(`document.querySelector('.commands-toggle').focus()`);
+    const updatedEvents=[...events,{...nextEvent,id:'fixture-activity-2'}];
+    await show({revision:fixture.revision+1,events:updatedEvents});
+    await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    assert.equal(await page.evaluate(`document.querySelector('.table-activity .unread-badge')`), null, 'Events received while activity open remain read');
+    await show({revision:fixture.revision+1,events:updatedEvents});
+    assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.activity-list [data-event-id]')].map(entry=>entry.dataset.eventId)).size`), updatedEvents.length, 'Repeated polling keeps stable unique activity entries');
+    assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.commands-toggle')`), true, 'Activity updates preserve focus');
     console.log('Passed: compact decision table, marker commitment, blocked inspection, keyboard selection, polling/viewport continuity and changed-owner interruption.');
 }
 
@@ -166,6 +190,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
     const finite = [
         ['return-card', `return-card ${hand.reference}`, 'SETUP_RETURN'],
         ['immediate-master-art-discard', `discard-card ${hand.reference}`, 'PURCHASE'],
+        ['buy-card', `discard-card ${hand.reference}`, 'BUY_CARD'],
         ['civil-war-loss', 'civil-war-loss cash'],
         ['replace-event-token', 'replace-event-token pool'],
         ['renaissance', `swap-order ${other}`],
@@ -184,7 +209,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.wait(`window.uiCommands.length === ${count + 1}`, choice + ' confirmed');
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
-    for (const [choice, command] of [['cathedral', 'cathedral'], ['windmill', 'windmill'], ['purchase-stabilization', 'stabilize misery']]) {
+    for (const [choice, command] of [['cathedral', 'cathedral'], ['windmill', 'windmill'], ['purchase-stabilization', 'stabilize misery'], ['buy-card', 'buy-card']]) {
         await show(choice, [command]);
         const count = await page.evaluate('window.uiCommands.length');
         await page.evaluate(`document.querySelector('.game-actions .action-buttons button').click()`);
@@ -196,6 +221,35 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.evaluate(`document.querySelector('#relief-spaces').form.querySelector('button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'relieve-misery 1'`, 'quoted misery relief');
 
+    await show('choose-turn-position', ['choose-turn-position 1','choose-turn-position 2'], {provisionalTieOrder:[other]}, 'TURN_ORDER_TIE');
+    assert.equal(await page.evaluate(`document.querySelector('.turn-tie .capital-choices button:not(.secondary)').disabled`), true, 'Turn tie requires explicit slot selection');
+    await page.evaluate(`document.querySelector('.turn-tie .capital-choices button.secondary').click()`);
+    await page.evaluate(`document.querySelector('.turn-tie .capital-choices button:not(.secondary)').click()`);
+    await page.wait(`window.uiCommands.at(-1)?.command === 'choose-turn-position 1'`, 'tie slot confirmed');
+    const source = baseline.game.board.find(province => province.marker?.owner===viewer).id;
+    await show('place-event-marker', ['forgo-marker',`move-marker ${source}`], {markerPlacement:{player:viewer,destination:'rome'}});
+    await page.fill('#marker-source', `move-marker ${source}`);
+    await page.evaluate(`document.querySelector('#marker-source').form.querySelector('button').click()`);
+    await page.wait(`window.uiCommands.at(-1)?.command === 'move-marker ${source}'`, 'event marker moved');
+    await show('place-event-marker', ['forgo-marker'], {markerPlacement:{player:viewer,destination:'rome'}});
+    await page.evaluate(`document.querySelector('.game-actions .guided-form > button.secondary').click()`);
+    await page.wait(`window.uiCommands.at(-1)?.command === 'forgo-marker'`, 'event marker forgone');
+
+    for (const [id,kind,value] of [['civil-war','PLAYER',other],['black-death','AREA','i'],['the-crusades','PROVINCE','acre'],['papal-decree','CATEGORY','none']]) {
+        const reference='fixture-'+id;
+        const command=`play ${reference} ${kind.toLowerCase()} ${value}`;
+        await show('play-cards', [command], {
+            hand:[{reference,definition:{id,kind:'event',messageId:'card.'+id,shape:'SQUARE'}}],
+            cardOffers:[{reference,playable:true,blockers:[],choices:[{kind,value,command}],commodities:[],leaderDiscounts:[],provinceTargets:kind==='PROVINCE'?[value]:[],requiredTargetCount:null,protectionMax:null}],
+        });
+        await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
+        await page.wait(`document.querySelector('.card-decision .target-choices button:not(.map-picker)')`, kind+' target');
+        const before=await page.evaluate('window.uiCommands.length');
+        await page.evaluate(`document.querySelector('.card-decision .target-choices button:not(.map-picker)').click()`);
+        assert.equal(await page.evaluate('window.uiCommands.length'),before,kind+' selection cannot submit');
+        await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+        await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`,kind+' canonical play');
+    }
     const advance = baseline.game.catalog.advances[0];
     await show('purchase-advances', [`buy-advance ${advance.letter}`], {
         advanceOffers:[{advance:advance.id,price:10,unavailableReason:null}],
@@ -246,5 +300,5 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.fill('.card-decision input[type=number]', '3');
     await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'play ${reference} protect 3'`, 'valid protection submission');
-    console.log('Passed: setup return, immediate discard, Civil War, replacement, Renaissance, Written Record, market variant, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard.');
+    console.log('Passed: setup return, immediate discard, Civil War, replacement, Renaissance, Written Record, market variant, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');
 }
