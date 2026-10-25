@@ -1,9 +1,8 @@
 import {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import type {Snapshot} from '../src/api';
-import {BoardMap} from '../src/map/BoardMap';
+import {GameTable} from '../src/GameTable';
 import {MapSelectionProvider} from '../src/map/MapSelection';
-import {GameActions} from '../src/GameActions';
 import '../src/app.css';
 
 declare global {
@@ -20,9 +19,13 @@ function Harness() {
     useEffect(() => {window.setMapSnapshot = setSnapshot;}, []);
     if (!snapshot) return <p>Supply a snapshot through the browser test driver.</p>;
     const submit = async (command: string) => {window.mapCommands.push(command); return true;};
-    return <MapSelectionProvider><main className="game-shell" data-test-revision={snapshot.revision}>
-        <BoardMap snapshot={snapshot} busy={false} submit={submit}/>
-        <section className="decision panel"><GameActions key={snapshot.revision} snapshot={snapshot} busy={false} submit={submit}/></section>
-    </main></MapSelectionProvider>;
+    return <MapSelectionProvider><div data-test-revision={snapshot.revision}>
+        <GameTable snapshot={snapshot} busy={false} saved={false} submit={submit} connectionError="" actionError=""
+            quotePurchase={async amount => {
+                const quote = snapshot.game.tokenPurchaseOffers.find(offer => offer.amount === amount);
+                if (!quote) throw new Error('No authoritative quote supplied for fixture amount.');
+                return {revision: snapshot.revision, quote};
+            }}/>
+    </div></MapSelectionProvider>;
 }
 createRoot(document.getElementById('root')!).render(<Harness/>);

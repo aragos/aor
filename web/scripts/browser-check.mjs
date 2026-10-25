@@ -1,4 +1,5 @@
-import {spawn} from 'node:child_process';
+import {spawn, execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {mkdtemp, mkdir, rm} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
@@ -54,10 +55,45 @@ async function ready(url, tracked) {
     }
     throw new Error(`Timed out waiting for ${url}`);
 }
-function signalGroup(tracked, signal) {
-    if (!tracked.child.pid) return;
-    try { process.kill(-tracked.child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+async function ownedProcesses() {
+    const {stdout} = await promisify(execFile)('ps', ['-axo', 'pid=,pgid=,stat='], {timeout: 5000});
+    const groups = new Set(children.flatMap(tracked => tracked.child.pid ? [tracked.child.pid] : []));
+    return stdout.trim().split('\n').flatMap(line => {
+        const [pid, group, state] = line.trim().split(/\s+/);
+        return groups.has(Number(group)) && !state?.startsWith('Z') ? [{pid: Number(pid), group: Number(group)}] : [];
+    });
 }
+function signalOwned(pid, signal) {
+    try { process.kill(pid, signal); }
+    catch (error) { if (error.code !== 'ESRCH') console.warn(`Could not send ${signal} to owned PID ${pid}: ${error.code}`); }
+}
+async function cleanup() {
+    let leftovers;
+    try {
+        // Resolve membership before sending signals. Only groups created by launch are eligible;
+        // avoid signalling completed build groups or a process discovered by its executable name.
+        let owned = await ownedProcesses();
+        for (const process of owned.reverse()) signalOwned(process.pid, 'SIGTERM');
+        const deadline = Date.now() + 3000;
+        while (owned.length && Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            owned = await ownedProcesses();
+        }
+        for (const process of owned) signalOwned(process.pid, 'SIGKILL');
+        for (let attempt = 0; attempt < 20; attempt++) {
+            leftovers = await ownedProcesses();
+            if (!leftovers.length) break;
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (leftovers.length) throw new Error(`Owned browser-check processes remain: ${leftovers.map(process => process.pid).join(', ')}`);
+        console.log(`Verified all ${children.length} owned process groups closed.`);
+    } finally {
+        await rm(temporary, {recursive: true, force: true});
+        for (const [signal, handler] of handlers) process.off(signal, handler);
+        console.log('Removed isolated game/browser data.');
+    }
+}
+
 try {
     await mkdir(artifacts, {recursive: true});
     if (!process.env.AOR_BROWSER_SERVER) {
@@ -78,17 +114,10 @@ try {
         `--user-data-dir=${resolve(temporary, 'chrome')}`, 'about:blank',
     ]);
     await Promise.all([ready(`${api}/api/health`, server), ready(web, vite), ready(`${cdp}/json/version`, browser)]);
-    await checked(launch('browser interactions', process.execPath, [resolve(root, 'web/tests/map.browser.mjs')], {
+    await checked(launch('browser interactions', process.execPath, [resolve(root, 'web/tests', process.env.AOR_BROWSER_SUITE ?? 'map.browser.mjs')], {
         MAP_API_URL: api, MAP_WEB_URL: web, MAP_CDP_URL: cdp, AOR_BROWSER_ARTIFACTS: artifacts,
-    }), 180000);
+    }), Number(process.env.AOR_BROWSER_TIMEOUT_MS ?? 180000));
     console.log(`Browser checks passed. Screenshots: ${artifacts}`);
 } finally {
-    // Signal only process groups created above; never discover or terminate unrelated processes.
-    for (const tracked of [...children].reverse()) signalGroup(tracked, 'SIGTERM');
-    await Promise.race([Promise.all(children.map(tracked => tracked.done)), new Promise(resolve => setTimeout(resolve, 3000))]);
-    for (const tracked of [...children].reverse()) signalGroup(tracked, 'SIGKILL');
-    await Promise.all(children.map(tracked => tracked.done));
-    await rm(temporary, {recursive: true, force: true});
-    for (const [signal, handler] of handlers) process.off(signal, handler);
-    console.log(`Closed all ${children.length} tracked child processes; isolated game/browser data removed.`);
+    await cleanup();
 }

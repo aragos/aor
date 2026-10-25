@@ -1,96 +1,32 @@
-import fs from 'node:fs';
 import {join} from 'node:path';
 
 const artifacts = process.env.AOR_BROWSER_ARTIFACTS ?? '/private/tmp';
 import assert from 'node:assert/strict';
+import {open, createGame} from './browser-support.mjs';
+import {checkTable, checkLiveTokenPurchase, checkTokenContinuity, checkDecisionFamilies} from './table.browser.mjs';
 
 const web = process.env.MAP_WEB_URL ?? 'http://127.0.0.1:5191';
-const api = process.env.MAP_API_URL ?? 'http://127.0.0.1:8095';
 const cdp = process.env.MAP_CDP_URL ?? 'http://127.0.0.1:9351';
-class Page {
-    constructor(ws) {
-        this.ws = ws; this.next = 0; this.pending = new Map();
-        ws.addEventListener('message', event => {
-            const message = JSON.parse(event.data);
-            if (message.id) {
-                const pending = this.pending.get(message.id);
-                this.pending.delete(message.id);
-                if (!pending) return;
-                if (message.error) pending.reject(new Error(message.error.message)); else pending.resolve(message.result);
-            }
-        });
-    }
-    static async connect(url) {
-        const ws = new WebSocket(url);
-        await new Promise((resolve, reject) => { ws.addEventListener('open', resolve); ws.addEventListener('error', reject); });
-        const page = new Page(ws);
-        await page.send('Runtime.enable');
-        return page;
-    }
-    send(method, params = {}) {
-        return new Promise((resolve, reject) => {
-            const id = ++this.next;
-            const timeout = setTimeout(() => { this.pending.delete(id); reject(new Error(`CDP timed out: ${method}`)); }, 15000);
-            this.pending.set(id, {resolve: value => {clearTimeout(timeout); resolve(value);}, reject: error => {clearTimeout(timeout); reject(error);}});
-            this.ws.send(JSON.stringify({id, method, params}));
-        });
-    }
-    async evaluate(expression) {
-        const result = await this.send('Runtime.evaluate', {expression, awaitPromise: true, returnByValue: true});
-        if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
-        return result.result.value;
-    }
-    async wait(expression, description) {
-        for (let attempt = 0; attempt < 100; attempt++) {
-            if (await this.evaluate(`Boolean(${expression})`)) return;
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        throw new Error(`Timed out: ${description}`);
-    }
-    async click(text) {
-        const expression = `(() => {const button = [...document.querySelectorAll('button')].find(b => b.textContent === ${JSON.stringify(text)}); if (!button || button.disabled) return false; button.click(); return true;})()`;
-        assert.equal(await this.evaluate(expression), true, `Button unavailable: ${text}`);
-    }
-    async fill(selector, value) {
-        await this.evaluate(`(() => { const input = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value').set.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', {bubbles:true})); input.dispatchEvent(new Event('change', {bubbles:true})); })()`);
-    }
-    async snapshot() {
-        return this.evaluate(`fetch('/api' + location.pathname, {headers:{Authorization:'Bearer ' + new URLSearchParams(location.hash.slice(1)).get('token')}}).then(r=>r.json())`);
-    }
-    async screenshot(path, width = 1280) {
-        await this.send('Emulation.setDeviceMetricsOverride', {width, height:1000, deviceScaleFactor:1, mobile:false});
-        const result = await this.send('Page.captureScreenshot', {format:'png', captureBeyondViewport:true});
-        fs.writeFileSync(path, Buffer.from(result.data, 'base64'));
-    }
-}
-async function open(url) {
-    const target = await fetch(cdp + '/json/new?' + encodeURIComponent(url), {method:'PUT'}).then(r=>r.json());
-    const page = await Page.connect(target.webSocketDebuggerUrl);
-    page.target = target;
-    return page;
-}
 
-
-
-async function createGame(count) {
-    const created = await fetch(api + '/api/games', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({players: ['Ada', 'Bruno', 'Clara', 'Dario', 'Eva', 'Farid'].slice(0, count)})}).then(r => r.json());
-    const links = created.links.map(link => ({...link, token: new URLSearchParams(link.path.split('#')[1]).get('token')}));
-    const snapshot = link => fetch(api + '/api/games/' + created.gameId, {headers: {Authorization: 'Bearer ' + link.token}}).then(r => r.json());
-    async function send(link, command) {
-        const state = await snapshot(link);
-        const response = await fetch(api + '/api/games/' + created.gameId + '/commands', {method: 'POST',
-            headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + link.token},
-            body: JSON.stringify({expectedRevision: state.revision, command})});
-        assert(response.ok, `Engine rejected fixture command ${command}: ${await response.clone().text()}`);
-        return response.json();
-    }
-    return {created, links, snapshot, send};
-}
-
+let tokenFixture;
 const game = await createGame(6);
-await game.send(game.links[0], 'start');
-for (const link of game.links) await game.send(link, 'bid-capital 0');
+const page = await open(web + game.links[0].path);
+try {
+await page.wait(`document.querySelector('#setup-rebuilt-marker-bonus')`, 'configuration controls');
+await page.click('Start setup');
+await page.wait(`document.querySelector('#bid')`, 'capital bidding');
+await page.fill('#bid', '7');
+await page.click('Seal bid');
+await page.wait(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Replace sealed bid')`, 'sealed submission');
+const sealed = await game.snapshot(game.links[0]);
+assert.equal(sealed.pendingBid, 7);
+assert.equal((await game.snapshot(game.links[1])).pendingBid, null, 'Other seats cannot see sealed bid');
+assert.deepEqual((await game.snapshot(game.links[1])).game.revealedBids, {}, 'Sealed bids remain unrevealed');
+await page.fill('#bid', '0');
+await page.click('Replace sealed bid');
+await page.wait(`document.querySelector('.sealed')?.textContent.includes('$0')`, 'replaced bid');
+assert.equal((await game.snapshot(game.links[0])).revision, sealed.revision, 'Sealed replacement cannot advance committed revision');
+for (const link of game.links.slice(1)) await game.send(link, 'bid-capital 0');
 for (let step = 0; step < 100; step++) {
     const first = await game.snapshot(game.links[0]);
     if (first.game.stage === 'EXPANSION') break;
@@ -103,13 +39,18 @@ for (let step = 0; step < 100; step++) {
         : state.game.activity?.purchaseStep === 'SHIPPING' && commands.includes('upgrade-ships') ? 'upgrade-ships'
         : commands.find(c => c === 'pass') ?? commands.find(c => c === 'stabilize cash') ?? commands[0];
     assert(command, 'Fixture must be able to advance');
-    await game.send(actor, command);
+    if (state.game.stage === 'TOKEN_PURCHASE' && !tokenFixture) {
+        tokenFixture = await checkLiveTokenPurchase(page, game, actor, web, 8 + game.links.indexOf(actor));
+    } else {
+        await game.send(actor, command);
+    }
 }
 const first = await game.snapshot(game.links[0]);
 const actor = game.links.find(link => first.prompt?.players.includes(link.id));
-const page = await open(web + actor.path);
-try {
+await page.send('Page.navigate', {url: web + actor.path});
+    await page.wait(`location.hash === ${JSON.stringify(actor.path.slice(actor.path.indexOf('#')))}`, 'expansion actor navigation');
     await page.wait(`document.querySelectorAll('[data-map-province]').length === 108`, 'full map');
+    await page.wait(`document.querySelector('.expansion-form, .pool-summary')`, 'expansion decision ready');
     const before = await page.snapshot();
     // Hit the new continental extensions, away from labels, with real pointer input.
     for (const [province, x, y] of [
@@ -131,24 +72,29 @@ try {
     const pick = id => page.evaluate(`document.querySelector('[data-map-province="${id}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     await pick(target);
     assert.equal((await page.snapshot()).revision, before.revision, 'Inspection cannot submit');
-    await page.fill('.map-orders input', '2');
-    await page.evaluate(`document.querySelector('.map-orders form button').click()`);
-    await page.wait(`document.querySelector('.interactive-board .error')`, 'rejected placement feedback');
-    assert.equal((await page.snapshot()).revision, before.revision, 'Rejected order cannot spend pieces');
-    assert.equal(await page.evaluate(`document.querySelector('.map-orders input').value`), '2', 'Keep rejected draft');
-    await page.fill('.map-orders input', '1');
-    await page.evaluate(`document.querySelector('.map-orders form button').click()`);
+    await page.wait(`document.querySelector('.map-orders .primary-expansion')`, 'selected satellite action');
+    assert.equal(await page.evaluate(`document.querySelector('.map-orders .primary-expansion').disabled`), false);
+    await page.evaluate(`document.querySelector('.map-orders .primary-expansion').click()`);
     await page.wait(`[...document.querySelectorAll('.save-status')].some(e => e.textContent.includes('Saved'))`, 'successful placement');
-    const after = await page.snapshot();
+    let after = await page.snapshot();
     assert.equal(after.revision, before.revision + 1);
     assert(after.game.board.some(p => p.id === target && p.tokens.some(t => t.owner === after.viewerId && t.white === 1)));
-    await page.evaluate(`document.querySelector('.expansion-form .map-picker').click()`);
-    await page.wait(`document.querySelector('.map-pick-banner')`, 'target picker');
-    const next = after.legalChoices.commands.find(c => c.startsWith('place 1 ')).split(' ')[2];
-    await page.evaluate(`document.querySelector('[data-map-province="${next}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
-    await page.wait(`document.querySelector('.expansion-form .action-fields label:nth-child(2) select').value === '${next}'`, 'keyboard choice reaches form');
-    assert.equal((await page.snapshot()).revision, after.revision, 'Picking cannot submit');
-    await page.evaluate(`document.querySelector('.map-pick-banner button').click()`);
+    const market = after.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && !offer.blockers.length && offer.partialPlacements.some(choice => choice.tokens === 1));
+    assert(market, 'Fixture must support legal partial occupation');
+    await pick(market.destination);
+    await page.evaluate(`document.querySelector('.partial-placement').open = true`);
+    await page.fill('#partial-count', '1');
+    assert.equal((await page.snapshot()).revision, after.revision, 'Partial amount selection cannot submit');
+    await page.evaluate(`document.querySelector('.partial-placement form button').click()`);
+    await page.wait(`document.querySelector('.primary-expansion')?.textContent.includes('${market.requiredTokens - 1}')`, 'remaining marker commitment after partial occupation');
+    const partialState = await page.snapshot();
+    assert.equal(partialState.revision, after.revision + 1);
+    assert.equal(partialState.game.expansionOffers.find(offer => offer.destination === market.destination).requiredTokens, market.requiredTokens - 1, 'Existing friendly token reduces marker commitment');
+    await page.evaluate(`document.querySelector('.primary-expansion').click()`);
+    await page.wait(`!document.querySelector('.primary-expansion')`, 'marker established');
+    after = await page.snapshot();
+    assert.equal(after.game.board.find(province => province.id === market.destination).marker.owner, after.viewerId);
+    console.log('Passed: live satellite placement, partial-market draft and remaining marker establishment.');
     await page.fill('.map-toolbar input', 'ivory');
     assert.equal(await page.evaluate(`document.querySelectorAll('.map-province.active:not(.map-filtered)').length`), 4);
     await page.fill('.map-toolbar input', '');
@@ -156,9 +102,27 @@ try {
     const zoomed = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
     await page.click('Fit map');
     assert.notEqual(await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`), zoomed);
+    const screenshotOffer = after.game.expansionOffers.find(offer => offer.establishesMarker && !offer.blockers.length);
+    assert(screenshotOffer, 'Screenshot fixture needs a legal marker draft');
+    await pick(screenshotOffer.destination);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
     assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'No mobile overflow');
-    await page.screenshot(join(artifacts, 'aor-map-mobile.png'), 390);
+    await page.evaluate(`document.querySelector('.primary-expansion').scrollIntoView({block:'nearest'})`);
+    assert.equal(await page.evaluate(`(() => {const button=document.querySelector('.primary-expansion');const rect=button.getBoundingClientRect();return rect.top>=0 && rect.bottom<=innerHeight && document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)===button;})()`), true, 'Phone marker submit is reachable and unobstructed');
+    await page.screenshot(join(artifacts, 'aor-map-mobile.png'), 390, 844, true);
+    await page.evaluate(`document.querySelector('.sheet-toggle').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'false', 'Phone sheet minimizes');
+    await page.send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
+    assert.equal(await page.evaluate(`matchMedia('(prefers-reduced-motion: reduce)').matches`), true);
+    const touchPoint = await page.evaluate(`(() => {const control = document.querySelector('[aria-label="Zoom in"]'); control.scrollIntoView({block:'center'}); const rect=control.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+    const beforeTouch = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
+    await page.send('Input.dispatchTouchEvent', {type:'touchStart', touchPoints:[touchPoint]});
+    await page.send('Input.dispatchTouchEvent', {type:'touchEnd', touchPoints:[]});
+    await page.wait(`document.querySelector('.world-map').getAttribute('viewBox') !== ${JSON.stringify(beforeTouch)}`, 'touch zoom');
+    await page.evaluate(`document.querySelector('.sheet-toggle').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'true', 'Phone sheet reopens with draft retained');
+    await page.screenshot(join(artifacts, 'aor-map-phone-tall.png'), 430, 1100, true);
+    assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'No tall phone overflow');
     await page.screenshot(join(artifacts, 'aor-map-desktop.png'), 1440);
 
     for (const [count, expected] of [[3, 67], [4, 83], [5, 96]]) {
@@ -168,28 +132,42 @@ try {
         assert.equal(await page.evaluate(`document.querySelectorAll('.map-province.inactive[tabindex]').length`), 0);
     }
 
+    await checkTable(page, web, after);
+    await checkTokenContinuity(page, web, tokenFixture);
+    await checkDecisionFamilies(page, web, after);
+
     // Use the same components with deterministic interruptions and mixed piece ages.
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
     await page.wait(`typeof window.setMapSnapshot === 'function'`, 'component harness');
     let revision = 500;
     async function show(changes) {
-        const fixture = {...after, revision: ++revision, prompt: {messageId: 'prompt.test', players: [after.viewerId]}, ...changes,
+        const fixture = {...after, prompt: {messageId: 'prompt.test', players: [after.viewerId]}, ...changes, revision: ++revision,
             game: {...after.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'fixture render');
         return fixture;
     }
-    await show({legalChoices: {commands: ['play hand-pirates']}, game: {stage: 'PLAY_CARDS',
+    const pirateFixture = await show({legalChoices: {commands: ['play hand-pirates']}, game: {stage: 'PLAY_CARDS',
         hand: [{reference: 'hand-pirates', definition: {id: 'pirates-vikings', kind: 'event', messageId: 'card.pirates-vikings', shape: 'SQUARE'}}],
-        pirateTargets: {requiredCount: 2, eligibleProvinces: ['barcelona', 'genoa', 'rome']}}});
-    await page.fill('#play-card', 'hand-pirates');
-    await page.evaluate(`document.querySelector('.play-card-form .map-picker').click()`);
+        pirateTargets: {requiredCount: 2, eligibleProvinces: ['barcelona', 'genoa', 'rome']},
+        cardOffers: [{reference:'hand-pirates', playable:true, blockers:[], choices:[{kind:'PROVINCES',value:null,command:null}], commodities:[],leaderDiscounts:[],provinceTargets:['barcelona','genoa','rome'],requiredTargetCount:2,protectionMax:null}]}});
+    await page.evaluate(`document.querySelector('[data-hand-card="hand-pirates"]').click()`);
+    await page.evaluate(`document.querySelector('.card-decision .map-picker').click()`);
     await pick('barcelona'); await pick('genoa'); await pick('rome');
-    assert.equal(await page.evaluate(`document.querySelectorAll('.province-checks input:checked').length`), 2);
+    assert.equal(await page.evaluate(`document.querySelectorAll('.card-decision .target-choices button:not(.map-picker)[aria-pressed="true"]').length`), 2);
     assert.equal(await page.evaluate('window.mapCommands.length'), 0);
-    await page.evaluate(`document.querySelector('.play-card-form > button:last-child').click()`);
-    assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play hand-pirates provinces barcelona genoa');
+    await show({...pirateFixture, game:{...pirateFixture.game,
+        pirateTargets:{requiredCount:2,eligibleProvinces:['genoa','rome']},
+        cardOffers:pirateFixture.game.cardOffers.map(offer=>({...offer,provinceTargets:['genoa','rome']}))}});
+    await page.wait(`document.querySelector('.card-decision .clear-targets')`, 'lost pirate target explained');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), true, 'Lost target disables card submission');
+    await page.evaluate(`document.querySelector('.card-decision .clear-targets').click()`);
+    assert.equal(await page.evaluate('window.mapCommands.length'), 0, 'Clearing invalid targets never submits');
+    await pick('genoa'); await pick('rome');
+    await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+    assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play hand-pirates provinces genoa rome');
 
+    await page.evaluate(`document.querySelector('.card-decision .close-detail')?.click()`);
     await show({legalChoices: {commands: ['cede-war']}, game: {warCession: {winner: 'p2', requiredCount: 2,
         eligibleProvinces: ['genoa', 'china', 'india'], overseasCapacity: 1}}});
     await page.evaluate(`document.querySelector('.decision .map-picker').click()`);
