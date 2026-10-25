@@ -28,21 +28,23 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     if (!me) return null;
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
+    const finished = snapshot.game.stage === 'FINISHED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
     const expansion = snapshot.game.stage === 'EXPANSION';
     const hasContext = !!(selectedCard || selectedAdvance || province);
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
-    const decision = snapshot.game.stage === 'FINISHED' ? t('game.finished') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
+    const decision = finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
     return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <header className="game-header">
             <div className="game-brand"><span className="brand-seal" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
                 <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t('game.epoch')} {snapshot.game.currentEpoch}</p></div></div>
-            <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong><span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span></div>
+            <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
             <button type="button" className="secondary commands-toggle" aria-expanded={commandsOpen} onClick={() => {setCommandsOpen(current => !current); if (!commandsOpen) setTimeout(() => document.querySelector('.command-dock')?.scrollIntoView({block: 'nearest'}), 0);}}>›_ {t('table.commands')}</button>
         </header>
         <PlayerOverview snapshot={snapshot}/>
         {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
+        <FinalScores snapshot={snapshot}/>
         <div className="table-workspace">
             <div className="workspace-main">
                 <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')}>
@@ -62,11 +64,10 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                 </div>
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={snapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
-                <FinalScores snapshot={snapshot}/>
                 <Activity snapshot={snapshot}/>
             </div>
             <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
-                <div className="decision-heading"><p className="eyebrow">{canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
+                <div className="decision-heading"><p className="eyebrow">{finished ? t('game.finished') : canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
                     {!canAct && snapshot.prompt && <strong>{snapshot.prompt.players.map(id => playerName(snapshot, id)).join(', ')}</strong>}
                     <h2>{decision}</h2>
                     <span className="mobile-selected">{selectedName ? t(selectedName) : selectedAdvance ? label(selectedAdvance, 'advance') : province ? provinceName(province.id) : ''}</span>

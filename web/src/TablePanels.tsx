@@ -57,7 +57,8 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
         {players.map(player => {
             const active = snapshot.prompt?.players.includes(player.id);
             const sealed = snapshot.submitted.includes(player.id);
-            const status = sealed ? t('game.submitted') : active ? t('table.decision') : t('game.waiting');
+            const finished = snapshot.game.stage === 'FINISHED';
+            const status = finished ? t('game.finished') : sealed ? t('game.submitted') : active ? t('table.decision') : t('game.waiting');
             const fleet = player.ships.fleet === 'NONE' ? '—' : `${label(player.ships.fleet, 'fleet')} ${player.ships.level}`;
             return <details key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''}`}>
                 <summary aria-label={`${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}`}>
@@ -67,7 +68,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span></span>
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> {player.misery ?? t('game.chaos')}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}</span><span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span></span>
-                    <span className="player-status">{status}</span>
+                    {!finished && <span className="player-status">{status}</span>}
                 </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
             </details>;
         })}

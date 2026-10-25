@@ -3,7 +3,7 @@ import {join} from 'node:path';
 const artifacts = process.env.AOR_BROWSER_ARTIFACTS ?? '/private/tmp';
 import assert from 'node:assert/strict';
 import {open, createGame} from './browser-support.mjs';
-import {checkTable, checkLiveTokenPurchase, checkTokenContinuity, checkDecisionFamilies} from './table.browser.mjs';
+import {checkTable, checkLiveTokenPurchase, checkTokenContinuity, checkDecisionFamilies, checkFinished} from './table.browser.mjs';
 
 const web = process.env.MAP_WEB_URL ?? 'http://127.0.0.1:5191';
 const cdp = process.env.MAP_CDP_URL ?? 'http://127.0.0.1:9351';
@@ -149,6 +149,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     }
 
     await checkTable(page, web, after);
+    await checkFinished(page, web, after);
     await checkTokenContinuity(page, web, tokenFixture);
     await checkDecisionFamilies(page, web, after);
 

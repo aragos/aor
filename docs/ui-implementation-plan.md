@@ -14,6 +14,11 @@ needed to display reliable values. Preserve the reviewed game rules, catalogs, c
 privacy boundaries, and revision protocol. Accounts, bots, undo, private plans, and map geometry
 redesign remain separate work.
 
+The delivered revision includes all seven slices. Integrated checks passed on 2026-10-25, including
+a live three-player game through 473 canonical visual actions to final scores. The coverage inventory
+distinguishes that completed game from focused interruption/variant fixtures and records supplementary
+manual review gaps; it does not claim that one playthrough exercised every rule combination.
+
 ## Delivery order
 
 Deliver each slice with its focused checks. Keep existing controls available until their visual

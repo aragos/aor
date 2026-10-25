@@ -1,5 +1,23 @@
 import assert from 'node:assert/strict';
 
+export async function checkFinished(page, web, baseline) {
+    await page.send('Page.navigate', {url: web + '/tests/ui-harness.html'});
+    await page.wait(`typeof window.setUiSnapshot === 'function'`, 'finished application harness');
+    const finished = {...baseline, prompt:null, legalChoices:{commands:[],bidMin:null,bidMax:null}, game:{...baseline.game,
+        stage:'FINISHED',expansionOffers:[],cardOffers:[],advanceOffers:[],shippingOffer:null,
+        players:baseline.game.players.map(player=>({...player,misery:null,income:null})),
+        scores:baseline.game.players.map(player=>({player:player.id,advancePoints:0,cash:player.cash,misery:null,total:null,winner:false})),
+    }};
+    await page.evaluate(`window.setUiSnapshot(${JSON.stringify(finished)})`);
+    await page.wait(`document.querySelectorAll('.final-scores tbody tr').length === ${baseline.game.players.length}`, 'visible final scores');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.header-stage .waiting-status, .player-summary .player-status').length`), 0, 'Completed game has no waiting indicators');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-heading .eyebrow').textContent`), 'Game complete');
+    assert.equal(await page.evaluate(`!!(document.querySelector('.final-scores').compareDocumentPosition(document.querySelector('.table-workspace')) & Node.DOCUMENT_POSITION_FOLLOWING)`), true, 'Results precede the inspection workspace');
+    assert.equal(await page.evaluate(`document.querySelector('.game-actions button:not([disabled])')`), null, 'Finished game offers no further decisions');
+    assert.equal(await page.evaluate(`window.uiCommands.length`), 0);
+    console.log('Passed: completed-game results precede inspection and waiting indicators disappear.');
+}
+
 // Run through App, including its polling and canonical submission path. Snapshot fields and quote
 // values come from authoritative fixture projections, never from duplicated game calculations.
 export async function checkTable(page, web, baseline) {
