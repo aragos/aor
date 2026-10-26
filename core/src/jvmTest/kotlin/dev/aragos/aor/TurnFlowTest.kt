@@ -73,7 +73,6 @@ class TurnFlowTest {
                     "p1: pass",
                     "p1: pass",
                     "p1: stabilize cash",
-                    "p1: pass",
                 )
         assertThat(state.flow.actor).isEqualTo(p2)
         assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
@@ -94,6 +93,58 @@ class TurnFlowTest {
         assertThat(state.flow.actor).isEqualTo(p1)
         assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.STABILIZATION)
     }
+
+    @Test
+    fun emptyHandAndNoTierFinishPurchasingAfterAdvances() {
+        val initial = purchase().updatePlayer(p1) { player -> player.copy(hand = emptyList()) }
+        val owner = initial.playerState(p1)
+
+        val state = initial.play("p1: pass", "p1: pass")
+
+        assertThat(state.flow.actor).isEqualTo(p2)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
+        assertThat(state.playerState(p1)).isEqualTo(owner)
+    }
+
+    @Test
+    fun freeStabilizationStillStopsForAvailableRelief() {
+        val initial =
+            purchase().updatePlayer(p1) { player ->
+                player.copy(hand = emptyList(), advances = oneTier(), misery = MiseryStep.TEN)
+            }
+
+        val state = initial.play("p1: pass", "p1: pass")
+
+        assertThat(state.flow.actor).isEqualTo(p1)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.RELIEF)
+        assertThat(state.legalChoices(p1).commands).contains("relieve-misery 1")
+    }
+
+    @Test
+    fun tierAtZeroMiserySkipsUnavailableRelief() {
+        val initial =
+            purchase().updatePlayer(p1) { player ->
+                player.copy(hand = emptyList(), advances = oneTier(), misery = MiseryStep.ZERO)
+            }
+
+        val state = initial.play("p1: pass", "p1: pass")
+
+        assertThat(state.flow.actor).isEqualTo(p2)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
+    }
+
+    private fun oneTier(): PlayerAdvances =
+        PlayerAdvances(
+            listOf(
+                    AdvanceId.THE_HEAVENS,
+                    AdvanceId.PATRONAGE,
+                    AdvanceId.CARAVAN,
+                    AdvanceId.WRITTEN_RECORD,
+                    AdvanceId.OVERLAND_EAST,
+                    AdvanceId.URBAN_ASCENDANCY,
+                )
+                .map { advance -> AdvanceAcquisition(advance, 1) }
+        )
 
     @Test
     fun purchaseChoicesUsePassForOptionalSteps() {
@@ -186,7 +237,7 @@ class TurnFlowTest {
     }
 
     @Test
-    fun incomeIsFollowedByANewSealedPurchaseRound() {
+    fun incomeIsFollowedByANewPrivatePurchaseRound() {
         val state =
             allDrawn()
                 .copy(stage = Stage.INCOME, flow = TurnFlow())

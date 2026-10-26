@@ -14,7 +14,7 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Command language](docs/commands.md): complete syntax, parameters and recorded outcomes.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
-- [Setup walkthrough](docs/manual-setup.md): creation, sealed decisions, restart and API instructions.
+- [Setup walkthrough](docs/manual-setup.md): creation, private decisions, restart and API instructions.
 - [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
 - [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, delivery checkpoints and verification.
 - [Remaining rules plan](docs/remaining-rules-plan.md): fixed three-epoch delivery, remaining variants,

@@ -79,6 +79,30 @@ class GameCatalogTest {
     }
 
     @Test
+    fun onlyAssignedSeasBelongToGeographicalAreas() {
+        val assignments =
+            SeaArea.entries.mapNotNull { sea -> sea.area?.let { area -> sea to area } }.toMap()
+
+        assertThat(assignments)
+            .containsExactly(
+                SeaArea.BALTIC_SEA,
+                GeographicalArea.I,
+                SeaArea.GREENLAND_SEA,
+                GeographicalArea.II,
+                SeaArea.BLACK_SEA,
+                GeographicalArea.V,
+                SeaArea.EASTERN_MEDITERRANEAN,
+                GeographicalArea.VI,
+                SeaArea.ADRIATIC_SEA,
+                GeographicalArea.VII,
+                SeaArea.CENTRAL_MEDITERRANEAN,
+                GeographicalArea.VIII,
+                SeaArea.CANARY_BASIN,
+                GeographicalArea.VIII,
+            )
+    }
+
+    @Test
     fun provinceConnectionsAreSymmetricByConstruction() {
         assertThat(edge("venice", "florence")).isEqualTo(edge("florence", "venice"))
     }
@@ -209,6 +233,82 @@ class GameCatalogTest {
     }
 
     @Test
+    fun channelCoastsConnectPortsmouthAndLondonToTheirFrenchNeighbors() {
+        assertThat(BoardConnectionData.coastalConnections)
+            .containsAtLeast(
+                edge("portsmouth", "st-malo"),
+                edge("portsmouth", "paris"),
+                edge("london", "paris"),
+                edge("london", "bruges"),
+            )
+    }
+
+    @Test
+    fun bariHasExactlyItsFourPrintedCoastalNeighbors() {
+        val bari = ProvinceId("bari")
+        val neighbors =
+            BoardConnectionData.coastalConnections
+                .filter { connection -> bari in listOf(connection.first, connection.second) }
+                .map { connection ->
+                    if (connection.first == bari) connection.second else connection.first
+                }
+
+        assertThat(neighbors)
+            .containsExactly(
+                ProvinceId("naples"),
+                ProvinceId("sicily"),
+                ProvinceId("corfu"),
+                ProvinceId("durazzo"),
+            )
+    }
+
+    @Test
+    fun sicilyDoesNotTouchNaplesByCoast() {
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("sicily", "naples"))
+    }
+
+    @Test
+    fun smyrnaDoesNotTouchCreteByCoast() {
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("smyrna", "crete"))
+    }
+
+    @Test
+    fun cagliariDoesNotTouchRome() {
+        assertThat(BoardConnectionData.landBorders).doesNotContain(edge("cagliari", "rome"))
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("cagliari", "rome"))
+    }
+
+    @Test
+    fun acreDoesNotTouchCyprusByCoast() {
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("acre", "cyprus"))
+    }
+
+    @Test
+    fun granadaDoesNotTouchTheCanaryBasin() {
+        assertThat(BoardConnectionData.seaCoasts)
+            .doesNotContain(SeaCoastConnection(SeaArea.CANARY_BASIN, ProvinceId("granada")))
+    }
+
+    @Test
+    fun kamyshinTouchesOnlyTanaAndSaraiByLand() {
+        val kamyshin = ProvinceId("kamyshin")
+        val neighbors =
+            BoardConnectionData.landBorders
+                .filter { connection -> kamyshin in listOf(connection.first, connection.second) }
+                .map { connection ->
+                    if (connection.first == kamyshin) connection.second else connection.first
+                }
+
+        assertThat(neighbors).containsExactly(ProvinceId("tana"), ProvinceId("sarai"))
+    }
+
+    @Test
+    fun tanaDoesNotTouchPoti() {
+        assertThat(BoardConnectionData.landBorders).doesNotContain(edge("tana", "poti"))
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("tana", "poti"))
+    }
+
+    @Test
     fun officialBariCorfuCorrectionUsesCoastalWater() {
         assertThat(BoardConnectionData.coastalConnections).contains(edge("bari", "corfu"))
         assertThat(BoardConnectionData.landBorders).doesNotContain(edge("bari", "corfu"))
@@ -293,13 +393,25 @@ class GameCatalogTest {
     }
 
     @Test
-    fun sharperBoardPhotoConfirmsThePrintedAegeanSea() {
+    fun shetlandAndBergenShareCoastalWater() {
+        assertThat(BoardConnectionData.coastalConnections)
+            .contains(edge("shetland-islands", "bergen"))
+    }
+
+    @Test
+    fun centralMediterraneanIncludesTheAegeanAsOneSeaSpace() {
         assertThat(
                 BoardConnectionData.seaCoasts
-                    .filter { coast -> coast.sea == SeaArea.AEGEAN_SEA }
+                    .filter { coast -> coast.sea == SeaArea.CENTRAL_MEDITERRANEAN }
                     .map(SeaCoastConnection::province)
             )
             .containsExactly(
+                ProvinceId("bari"),
+                ProvinceId("sicily"),
+                ProvinceId("tunis"),
+                ProvinceId("tripoli"),
+                ProvinceId("barca"),
+                ProvinceId("corfu"),
                 ProvinceId("salonika"),
                 ProvinceId("gallipoli"),
                 ProvinceId("constantinople"),
@@ -307,6 +419,21 @@ class GameCatalogTest {
                 ProvinceId("crete"),
                 ProvinceId("athens"),
             )
+    }
+
+    @Test
+    fun creteTouchesOnlyTheCombinedCentralMediterraneanSea() {
+        val seas =
+            BoardConnectionData.seaCoasts
+                .filter { coast -> coast.province == ProvinceId("crete") }
+                .map(SeaCoastConnection::sea)
+
+        assertThat(seas).containsExactly(SeaArea.CENTRAL_MEDITERRANEAN)
+    }
+
+    @Test
+    fun angoraAndConstantinopleShareALandBorder() {
+        assertThat(BoardConnectionData.landBorders).contains(edge("angora", "constantinople"))
     }
 
     @Test
@@ -319,6 +446,17 @@ class GameCatalogTest {
     fun tunisAndSicilyShareCoastalWater() {
         assertThat(BoardConnectionData.coastalConnections).contains(edge("tunis", "sicily"))
         assertThat(BoardConnectionData.landBorders).doesNotContain(edge("tunis", "sicily"))
+    }
+
+    @Test
+    fun oranAndGranadaHaveNoDirectCoastalConnection() {
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("oran", "granada"))
+    }
+
+    @Test
+    fun salonikaAndCorfuShareOnlyTheirLandBorder() {
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(edge("salonika", "corfu"))
+        assertThat(BoardConnectionData.landBorders).contains(edge("salonika", "corfu"))
     }
 
     @Test

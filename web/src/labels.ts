@@ -2,7 +2,8 @@ import {t} from './messages';
 import type {Snapshot} from './api';
 
 export function playerName(snapshot: Snapshot, id: string): string {
-    return snapshot.game.players.find(player => player.id === id)?.name ?? id;
+    const player = snapshot.game.players.find(player => player.id === id);
+    return player?.capital ? provinceName(player.capital) : player?.name ?? id;
 }
 
 /** Identifier formatting is only a fallback for catalog labels with no translation yet. */

@@ -19,6 +19,8 @@ enum class HistoryEventKind {
     PLACE,
     ESTABLISH_MARKER,
     ATTACK,
+    COMPETITION_RESULT,
+    WAR_RESULT,
     REDUCE_MARKER,
     BUY_EXPANSION_CARD,
     CATHEDRAL,
@@ -61,7 +63,12 @@ data class HistoryEventView(
     val amount: Int? = null,
     val detail: String? = null,
     val dice: List<HistoryDieView> = emptyList(),
+    val competition: CompetitionResultView? = null,
+    val war: WarOutcomeView? = null,
 )
+
+/** Public outcome from the committed board change, including Cathedral resolutions. */
+data class CompetitionResultView(val attackerWon: Boolean, val defenders: Set<PlayerId>)
 
 /** Projects structured activity from typed entries, using the same audiences as command history. */
 internal object HistoryEvents {
@@ -81,6 +88,51 @@ internal object HistoryEvents {
             }
         fun event(kind: HistoryEventKind) =
             HistoryEventView(id, kind, actor, before.turnNumber, before.stage)
+
+        if (entry is GameOutcome.Roll && entry.kind == GameRollKind.WAR) {
+            val war = WarProjection.outcome(before, WarDice(entry.values[0], entry.values[1]))
+            if (war != null) {
+                return event(HistoryEventKind.WAR_RESULT)
+                    .copy(
+                        actor = war.initiator,
+                        target = war.opponent,
+                        war = war,
+                        dice =
+                            listOf(war.initiator, war.opponent).zip(entry.values) { player, die ->
+                                HistoryDieView(player, die.value)
+                            },
+                    )
+            }
+        }
+
+        val plan =
+            when (val decision = before.flow.decisions.lastOrNull()) {
+                is BoardDecision.CompetitionDice ->
+                    decision.plan.takeIf { entry is GameOutcome.Roll }
+                is BoardDecision.CathedralChoice ->
+                    decision.plan.takeIf {
+                        entry is Entry.Action && entry.command == BoardCommand.Cathedral
+                    }
+                else -> null
+            }
+        if (plan != null) {
+            return event(HistoryEventKind.COMPETITION_RESULT)
+                .copy(
+                    actor = plan.player,
+                    provinces = listOf(plan.destination),
+                    amount = plan.addedTokens,
+                    detail = if (entry is GameOutcome.Roll) entry.kind.name else "CATHEDRAL",
+                    dice =
+                        (entry as? GameOutcome.Roll)?.values.orEmpty().map { die ->
+                            HistoryDieView(null, die.value)
+                        },
+                    competition =
+                        CompetitionResultView(
+                            after.board.hasPresence(plan.player, plan.destination),
+                            plan.defenders,
+                        ),
+                )
+        }
 
         return when (entry) {
             is Entry.Shuffle -> null

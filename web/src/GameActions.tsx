@@ -43,7 +43,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             {snapshot.game.shippingOffer.blockers.map(blocker => <p key={blocker} className="blocker">{t(`error.${blocker}`)}</p>)}
             <button disabled={busy || !commands.includes('upgrade-ships') || snapshot.game.shippingOffer.blockers.length > 0} onClick={() => { void submit('upgrade-ships'); }}>{t('action.upgrade-ships')}</button>
         </div>}
-        {commands.some(command => command === 'relieve-misery' || command.startsWith('relieve-misery ')) && <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
+        {snapshot.game.reliefOffers.length > 0 && commands.some(command => command === 'relieve-misery' || command.startsWith('relieve-misery ')) && <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
             <label htmlFor="relief-spaces">{t('action.relieveMisery')}</label><div className="inline-form"><select id="relief-spaces" value={relief} onChange={event => setRelief(event.target.value)} required>
                 <option value="">{t('controls.chooseRelief')}</option>{snapshot.game.reliefOffers.map(offer => <option key={offer.spaces} value={offer.spaces} disabled={!offer.affordable}>{offer.spaces} {t('controls.spaces')} · ${offer.cashCost} · {offer.ratingSpent} {t('controls.mrUsed')}</option>)}
             </select><button disabled={busy || !snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)}>{t('action.relieveMisery')}</button></div>
@@ -89,9 +89,9 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
     const validSelection = !!cession && selected.length === required && selected.every(id => cession.eligibleProvinces.includes(id)) &&
         provinces.filter(province => province.overseas && selected.includes(province.id)).length <= cession.overseasCapacity;
     return <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && validSelection) void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
-        <h3>{t('action.cedeWar')} · {required}</h3><p>{t('controls.warWinner')}: {winner?.name}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
+        <h3>{t('action.cedeWar')} · {required}</h3><p>{t('controls.warWinner')}: {winner ? playerName(snapshot, winner.id) : '—'}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
         <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || !canSelect(province, selected)} onChange={event => setSelected(current => event.target.checked ? [...current, province.id] : current.filter(id => id !== province.id))}/>{provinceName(province.id)}</label>)}</div>
-        <MapPicker title={`Choose ${required} provinces to cede`} selected={selected} disabled={busy}
+        <MapPicker autoActivate title={`Choose ${required} provinces to cede`} selected={selected} disabled={busy}
             eligible={provinces.filter(province => canSelect(province, selected)).map(province => province.id)}
             onPick={id => setSelected(current => {
                 if (current.includes(id)) return current.filter(value => value !== id);

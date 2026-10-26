@@ -14,7 +14,7 @@ enum class CardChoiceKind {
 /** Command is an authorized complete choice; null denotes a bounded user-edited choice. */
 data class CardChoiceView(val kind: CardChoiceKind, val value: String?, val command: String?)
 
-/** Potential credit from playing this hand card; never an already-authorized purchase credit. */
+/** Viewer-specific credit; authorization to use a played leader is projected separately. */
 data class LeaderDiscountView(
     val advance: AdvanceId,
     val printedAmount: Int,
@@ -22,7 +22,57 @@ data class LeaderDiscountView(
     val writtenRecordBonus: Int,
     val effectiveDiscount: Int,
     val condition: LeaderDiscountCondition?,
-)
+) {
+    companion object {
+        internal fun forLeader(
+            leader: LeaderId,
+            advances: Set<AdvanceId>,
+            rules: RuleOptions,
+            crusadesPlayed: Boolean,
+            mongolEnhanced: Boolean,
+        ): List<LeaderDiscountView> {
+            val bonus = LeaderRules.writtenRecordBonus(advances, rules)
+            return LeaderData.definition(leader).discounts.map { discount ->
+                val amount = discount.amountFor(crusadesPlayed, mongolEnhanced)
+                LeaderDiscountView(
+                    discount.advance,
+                    discount.amount,
+                    amount,
+                    bonus,
+                    amount + bonus,
+                    discount.condition,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Played credits retain their play-time enhancement and the viewer's current Written Record bonus.
+ */
+data class PlayedLeaderDiscountView(
+    val leader: LeaderId,
+    val usable: Boolean,
+    val discounts: List<LeaderDiscountView>,
+) {
+    companion object {
+        internal fun from(state: GameState, viewer: PlayerState): List<PlayedLeaderDiscountView> =
+            state.effects.leaders.map { played ->
+                PlayedLeaderDiscountView(
+                    played.leader,
+                    played.owner == viewer.player.id ||
+                        viewer.player.id in played.patronageClaimants,
+                    LeaderDiscountView.forLeader(
+                        played.leader,
+                        viewer.advances.owned,
+                        state.rules,
+                        state.effects.crusadesPlayed,
+                        played.mongolEnhanced,
+                    ),
+                )
+            }
+    }
+}
 
 enum class CardOfferBlocker {
     WRONG_PHASE,
@@ -149,18 +199,13 @@ internal object CardProjection {
         spec: CardEffectSpec,
     ): List<LeaderDiscountView> {
         if (spec !is CardEffectSpec.Leader) return emptyList()
-        val bonus = LeaderRules.writtenRecordBonus(viewer.advances.owned, context.rules)
-        return LeaderData.definition(spec.leader).discounts.map { discount ->
-            val amount = discount.amountFor(context.effects.crusadesPlayed, context.voids.crusades)
-            LeaderDiscountView(
-                discount.advance,
-                discount.amount,
-                amount,
-                bonus,
-                amount + bonus,
-                discount.condition,
-            )
-        }
+        return LeaderDiscountView.forLeader(
+            spec.leader,
+            viewer.advances.owned,
+            context.rules,
+            context.effects.crusadesPlayed,
+            context.voids.crusades,
+        )
     }
 
     private fun choiceView(reference: String, choice: CardChoice): CardChoiceView {

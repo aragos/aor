@@ -1,3 +1,4 @@
+import {PlayedLeaders} from './TablePanels';
 import {useState} from 'react';
 import type {ProvinceDefinition, ProvinceView, PublicCatalog, Snapshot} from './api';
 import {label, playerName, provinceName} from './labels';
@@ -31,10 +32,7 @@ export function TurnEffects({snapshot}: {snapshot: Snapshot}) {
         {effects.military.map(play => <p key={play.event}>{playerName(snapshot, play.player)}: {label(play.event, 'event')}</p>)}
         {effects.enlightenedRulers.length > 0 && <p>{t('game.enlightenedRulers')}: {effects.enlightenedRulers.map(id => playerName(snapshot, id)).join(', ')}</p>}
         {snapshot.game.activeWar && <p>{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)} · {t('game.warTies')}: {snapshot.game.activeWar.ties}</p>}
-        {effects.leaders.length > 0 && <div className="leader-list"><h3>{t('game.leaders')}</h3>{effects.leaders.map(leader => <article key={leader.leader}>
-            <strong>{label(leader.leader, 'leader')}</strong><p className="small">{playerName(snapshot, leader.owner)} · {leader.displayBox ? `${t('game.displayBox')} ${leader.displayBox}` : label(leader.role, 'leaderRole')}{leader.role === 'EXPOSED' && snapshot.game.rules.patronage === 'PROTECTION_MONEY' && ` · ${t('game.protection')}: $${leader.protectionCash}`}</p>
-            {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: {leader.patronageClaimants.map(id => playerName(snapshot, id)).join(', ')}</p>}
-        </article>)}</div>}
+        <PlayedLeaders snapshot={snapshot}/>
         {adjustments.length === 0 && effects.leaders.length === 0 && !effects.papalCategory && effects.military.length === 0 && effects.enlightenedRulers.length === 0 && !snapshot.game.activeWar && <p className="muted small">{t('game.noEffects')}</p>}
     </section>;
 }

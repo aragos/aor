@@ -166,6 +166,141 @@ class HistoryEventsTest {
             .inOrder()
     }
 
+    @Test
+    fun winningCompetitionProjectsItsDestinationParticipantsAndDice() {
+        val pending =
+            competitionState()
+                .step(Entry.Action(owner, BoardCommand.Attack(ProvinceId("florence"))))
+        val entry =
+            GameOutcome.Roll(GameRollKind.COMPETITION, listOf(DieRoll(1), DieRoll(6), DieRoll(6)))
+        val after = pending.step(entry)
+
+        val event = HistoryEvents.project("4:1", pending, after, entry, observer)
+
+        assertThat(event?.kind).isEqualTo(HistoryEventKind.COMPETITION_RESULT)
+        assertThat(event?.actor).isEqualTo(owner)
+        assertThat(event?.provinces).containsExactly(ProvinceId("florence"))
+        assertThat(event?.competition).isEqualTo(CompetitionResultView(true, setOf(recipient)))
+        assertThat(event?.dice?.map(HistoryDieView::value)).containsExactly(1, 6, 6).inOrder()
+    }
+
+    @Test
+    fun losingCompetitionIsExplicitEvenThoughTheDefendingBoardRemains() {
+        val pending =
+            competitionState()
+                .step(Entry.Action(owner, BoardCommand.Attack(ProvinceId("florence"))))
+        val entry =
+            GameOutcome.Roll(GameRollKind.COMPETITION, listOf(DieRoll(6), DieRoll(1), DieRoll(1)))
+        val after = pending.step(entry)
+
+        val event = HistoryEvents.project("4:1", pending, after, entry, owner)
+
+        assertThat(event?.competition).isEqualTo(CompetitionResultView(false, setOf(recipient)))
+        assertThat(event?.actor).isEqualTo(owner)
+    }
+
+    @Test
+    fun cathedralDefenceProjectsACompetitionResultWithoutDice() {
+        val initial = competitionState()
+        val state =
+            initial.copy(
+                players =
+                    initial.players +
+                        (recipient to
+                            initial
+                                .playerState(recipient)
+                                .copy(
+                                    advances =
+                                        PlayerAdvances(
+                                            listOf(AdvanceAcquisition(AdvanceId.CATHEDRAL, 1))
+                                        )
+                                ))
+            )
+        val pending = state.step(Entry.Action(owner, BoardCommand.Attack(ProvinceId("florence"))))
+        val entry = Entry.Action(recipient, BoardCommand.Cathedral)
+        val after = pending.step(entry)
+
+        val event = HistoryEvents.project("4:1", pending, after, entry, owner)
+
+        assertThat(event?.competition).isEqualTo(CompetitionResultView(false, setOf(recipient)))
+        assertThat(event?.detail).isEqualTo("CATHEDRAL")
+        assertThat(event?.dice).isEmpty()
+    }
+
+    @Test
+    fun warRollProjectsAttributedDiceAndModifiedTotals() {
+        val initial = warState()
+        val military =
+            initial.copy(
+                effects = CardTurnEffects(military = listOf(CardMilitaryPlay(owner, EventId.ARMOR)))
+            )
+        val entry = GameOutcome.Roll(GameRollKind.WAR, listOf(DieRoll(3), DieRoll(3)))
+        val after = military.step(entry)
+
+        val event = HistoryEvents.project("5:1", military, after, entry, observer)
+
+        assertThat(event?.kind).isEqualTo(HistoryEventKind.WAR_RESULT)
+        assertThat(event?.war?.winner).isEqualTo(owner)
+        assertThat(event?.war?.totals).containsExactly(owner, 4, recipient, 3)
+        assertThat(event?.war?.requiredTransfers).isEqualTo(1)
+        assertThat(event?.dice)
+            .containsExactly(HistoryDieView(owner, 3), HistoryDieView(recipient, 3))
+            .inOrder()
+    }
+
+    @Test
+    fun tiedWarRollIsExplicitAndHasNoWinner() {
+        val before = warState()
+        val entry = GameOutcome.Roll(GameRollKind.WAR, listOf(DieRoll(2), DieRoll(2)))
+        val after = before.step(entry)
+
+        val event = HistoryEvents.project("5:1", before, after, entry, owner)
+
+        assertThat(event?.kind).isEqualTo(HistoryEventKind.WAR_RESULT)
+        assertThat(event?.war?.winner).isNull()
+        assertThat(event?.war?.totals).containsExactly(owner, 2, recipient, 2)
+        assertThat(after.activeWar?.ties).isEqualTo(1)
+    }
+
+    private fun warState(): GameState {
+        val war = WarState(owner, recipient, 1)
+        return competitionState()
+            .copy(
+                stage = Stage.PLAY_CARDS,
+                activeWar = war,
+                flow =
+                    TurnFlow(
+                        actor = owner,
+                        phaseStarted = true,
+                        decisions = listOf(CardDecision.WarRoll(war)),
+                    ),
+            )
+    }
+
+    private fun competitionState(): GameState {
+        val capitals = listOf("venice", "genoa", "barcelona")
+        return GameState(
+            header,
+            stage = Stage.EXPANSION,
+            turnNumber = 1,
+            flow = TurnFlow(actor = owner, phaseStarted = true),
+            turnOrderSelection = TurnOrderSelection(listOf(owner, recipient, observer)),
+            board = BoardState().placeMarker(ProvinceId("florence"), recipient).board,
+            players =
+                header.players
+                    .mapIndexed { index, player ->
+                        player.id to
+                            PlayerState(
+                                player,
+                                capital = capitals[index],
+                                poolTokens = 20,
+                                stockTokens = 16,
+                            )
+                    }
+                    .toMap(),
+        )
+    }
+
     private fun project(entry: Entry, viewer: PlayerId): HistoryEventView? =
         HistoryEvents.project("2:0", before, before, entry, viewer)
 }

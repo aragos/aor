@@ -12,6 +12,14 @@ export const areaColors: Record<string, string> = {
     VI: '#577726', VII: '#586d73', VIII: '#78436f', FAR_EAST: '#42677c', NEW_WORLD: '#77523c',
 };
 
+export function AccessLock({x = 0, y = 0, size = 24, color = '#315d70'}: {
+    x?: number; y?: number; size?: number; color?: string;
+}) {
+    return <g transform={`translate(${x} ${y}) scale(${size / 24})`} fill="none" stroke={color} strokeWidth={2.5}>
+        <rect x={4} y={10} width={16} height={12} rx={2}/><path d="M7 10V6a5 5 0 0 1 10 0v4"/>
+    </g>;
+}
+
 const identities: Record<string, {color: string; path: string}> = {
     venice: {color: '#187d7f', path: 'M0 -24L23 0L0 24L-23 0Z'},
     genoa: {color: '#365eb1', path: 'M23 0A23 23 0 1 1 -23 0A23 23 0 1 1 23 0Z'},

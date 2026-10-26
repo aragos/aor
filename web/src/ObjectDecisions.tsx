@@ -2,8 +2,9 @@ import {useEffect, useState} from 'react';
 import type {CardChoiceView, Snapshot} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
+import {CardEventText} from './CardEventText';
 import {Commodity, Emblem, Payouts} from './TablePanels';
-import {MapPicker, useMapSelection} from './map/MapSelection';
+import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 
 interface Props {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
@@ -20,8 +21,8 @@ export function CardDecision({snapshot, busy, submit}: Props) {
     const {selectedCard, setSelectedCard} = useMapSelection();
     const [choice, setChoice] = useState('');
     const [targets, setTargets] = useState<string[]>([]);
-    const [protection, setProtection] = useState('');
-    useEffect(() => { setChoice(''); setTargets([]); setProtection(''); }, [selectedCard]);
+    const [protection, setProtection] = useState('0');
+    useEffect(() => { setChoice(''); setTargets([]); setProtection('0'); }, [selectedCard]);
     const card = snapshot.game.hand.find(candidate => candidate.reference === selectedCard);
     const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === selectedCard);
     if (!card) return null;
@@ -31,11 +32,14 @@ export function CardDecision({snapshot, busy, submit}: Props) {
     const amount = Number(protection);
     const validProtection = protection.trim() !== '' && Number.isInteger(amount) && amount >= 0 && offer?.protectionMax !== null && amount <= (offer?.protectionMax ?? -1);
     const selectedChoice = finiteChoices.find(candidate => candidate.command === choice);
-    const noChoice = !needsProtection && finiteChoices.length === 1 && finiteChoices[0].kind === 'NONE';
+    const noChoice = !needsTargets && finiteChoices.length === 1 && ['NONE', 'COMMODITY'].includes(finiteChoices[0].kind);
     const invalidTargets = !!offer && needsTargets && (targets.some(target => !offer.provinceTargets.includes(target)) || targets.length > (offer.requiredTargetCount ?? 0));
     const validTargets = needsTargets && targets.length === offer?.requiredTargetCount && targets.every(target => offer.provinceTargets.includes(target));
+    const protectedPlay = validProtection
+        ? amount === 0 ? finiteChoices.find(candidate => candidate.kind === 'NONE')?.command : `play ${selectedCard} protect ${amount}`
+        : null;
     const command = needsTargets && validTargets ? `play ${selectedCard} provinces ${[...targets].sort().join(' ')}`
-        : needsProtection && validProtection ? `play ${selectedCard} protect ${amount}`
+        : needsProtection ? protectedPlay
         : noChoice ? finiteChoices[0].command : selectedChoice?.command;
     const actionable = !!offer?.playable && !!command;
     const provinceChoices = finiteChoices.filter(candidate => candidate.kind === 'PROVINCE');
@@ -43,6 +47,7 @@ export function CardDecision({snapshot, busy, submit}: Props) {
     return <section className="object-decision card-decision">
         <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setSelectedCard('')}>×</button>
         <p className="eyebrow">{t(`kind.${card.definition.kind}`)}</p><h2>{t(card.definition.messageId)}</h2>
+        <CardEventText definition={card.definition}/>
         {offer?.commodities.map(commodity => {
             const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
             return <div className="card-value" key={commodity}><Commodity commodity={commodity}/>{payout && <Payouts snapshot={snapshot} payout={payout}/>}</div>;
@@ -55,27 +60,28 @@ export function CardDecision({snapshot, busy, submit}: Props) {
             {discount.condition && <p>{label(discount.condition)}</p>}
         </details>)}
         {offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
-        {offer?.playable && <form onSubmit={async event => { event.preventDefault(); if (actionable && command && await submit(command)) setSelectedCard(''); }}>
+        {offer?.playable && <form onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
             {!noChoice && finiteChoices.length > 0 && <fieldset className="target-choices"><legend>{t('controls.cardChoice')}</legend>
                 {finiteChoices.map(candidate => <button type="button" key={candidate.command} className="secondary"
                     aria-pressed={candidate.command === choice} onClick={() => { setChoice(candidate.command ?? ''); setProtection(''); }}>
                     {candidate.kind === 'PLAYER' && snapshot.game.players.filter(player => player.id === candidate.value).map(player => <Emblem player={player} key={player.id}/>)}
                     {choiceLabel(snapshot, candidate)}</button>)}
             </fieldset>}
-            {provinceChoices.length > 0 && <MapPicker title={t('controls.cardChoice')} disabled={busy} eligible={provinceChoices.flatMap(candidate => candidate.value ? [candidate.value] : [])}
+            {finiteChoices.some(candidate => candidate.kind === 'PLAYER') && <PlayerPicker disabled={busy}
+                eligible={finiteChoices.filter(candidate => candidate.kind === 'PLAYER').flatMap(candidate => candidate.value ? [candidate.value] : [])}
+                selected={selectedChoice?.value ? [selectedChoice.value] : []}
+                onPick={id => setChoice(finiteChoices.find(candidate => candidate.kind === 'PLAYER' && candidate.value === id)?.command ?? '')}/>}
+            {provinceChoices.length > 0 && <MapPicker autoActivate title={t('controls.cardChoice')} disabled={busy} eligible={provinceChoices.flatMap(candidate => candidate.value ? [candidate.value] : [])}
                 selected={selectedChoice?.value ? [selectedChoice.value] : []} onPick={id => setChoice(provinceChoices.find(candidate => candidate.value === id)?.command ?? '')}/>}
-            {areaChoices.length > 0 && <MapPicker title={t('controls.cardChoice')} disabled={busy}
-                eligible={(snapshot.game.catalog?.provinces ?? []).filter(province => areaChoices.some(candidate => candidate.value === province.area?.toLowerCase())).map(province => province.id)}
-                selected={(snapshot.game.catalog?.provinces ?? []).filter(province => province.area?.toLowerCase() === selectedChoice?.value).map(province => province.id)}
-                onPick={id => {
-                    const area = snapshot.game.catalog?.provinces.find(province => province.id === id)?.area?.toLowerCase();
-                    setChoice(areaChoices.find(candidate => candidate.value === area)?.command ?? '');
-                }}/>}
+            {areaChoices.length > 0 && <MapPicker autoActivate kind="area" title={t('controls.cardChoice')} disabled={busy}
+                eligible={areaChoices.flatMap(candidate => candidate.value ? [candidate.value.toUpperCase()] : [])}
+                selected={selectedChoice?.kind === 'AREA' && selectedChoice.value ? [selectedChoice.value.toUpperCase()] : []}
+                onPick={area => setChoice(areaChoices.find(candidate => candidate.value?.toUpperCase() === area)?.command ?? '')}/>}
             {needsTargets && offer && <fieldset className="target-choices"><legend>{t('table.targets')} · {targets.length}/{offer.requiredTargetCount}</legend>
                 {offer.provinceTargets.map(province => <button type="button" key={province} className="secondary" aria-pressed={targets.includes(province)}
                     disabled={busy || (!targets.includes(province) && targets.length >= (offer.requiredTargetCount ?? 0))}
                     onClick={() => setTargets(current => current.includes(province) ? current.filter(target => target !== province) : [...current, province])}>{provinceName(province)}</button>)}
-                <MapPicker title={t('table.targets')} disabled={busy} selected={targets}
+                <MapPicker autoActivate title={t('table.targets')} disabled={busy} selected={targets}
                     eligible={offer.provinceTargets.filter(target => targets.includes(target) || targets.length < (offer.requiredTargetCount ?? 0))}
                     onPick={id => setTargets(current => current.includes(id) ? current.filter(target => target !== id) : current.length < (offer.requiredTargetCount ?? 0) ? [...current, id] : current)}/>
             </fieldset>}
@@ -102,10 +108,13 @@ export function AdvanceDecision({snapshot, busy, submit}: Props) {
         <p className="eyebrow">{label(advance.category, 'category')}</p><h2>{advanceName(advance.id)}</h2>
         {offer?.price !== null && offer?.price !== undefined && <div className="price-quote"><strong>${offer.price}</strong><span>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</span></div>}
         {offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
+        {offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
+            {label(discount.leaderCardId, 'leader')} <strong>−${discount.amount}</strong>
+        </p>)}
         <dl className="detail-list"><div><dt>{t('table.printedCost')}</dt><dd>${advance.cost}</dd></div><div><dt>{t('advance.prerequisites')}</dt><dd>{advance.prerequisites.map(advanceName).join(', ') || '—'}</dd></div>
             <div><dt>{t('advance.credit')}</dt><dd>${advance.credit}</dd></div><div><dt>{t('advance.mr')}</dt><dd>{advance.miseryRelief}</dd></div>
             <div><dt>{t('table.purchaseMisery')}</dt><dd>{advance.purchaseMisery}</dd></div>
-            <div><dt>{t('advance.owners')}</dt><dd>{snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.name).join(', ') || '—'}</dd></div></dl>
+            <div><dt>{t('advance.owners')}</dt><dd>{snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</dd></div></dl>
         {offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}
     </section>;
 }

@@ -93,6 +93,20 @@ All fractions are **rounded up** unless stated otherwise.
 | 6 | + Hamburg | I–VIII |
 
 - Provinces and coastal waters in unused areas do not exist for any purpose. Sea areas always exist.
+- Some seas belong to geographical areas and lie within their printed area borders. This membership
+  does not remove sea spaces when the area's provinces are excluded from a reduced board. The user
+  confirmed the following assignments on 2026-10-26; all other seas have no area assignment:
+
+| Sea | Area |
+| --- | --- |
+| Baltic Sea | I |
+| Greenland Sea | II |
+| Black Sea | V |
+| Eastern Mediterranean | VI |
+| Adriatic Sea | VII |
+| Central Mediterranean, including the Aegean | VIII |
+| Canary Basin | VIII |
+
 - **Area V** (Black Sea, Russia, Anatolia) can only be entered by a player that owns **Overland East**.
 - **Iceland** (II) and **West Africa** (VIII) can only be reached by ship, using **The Heavens** or **Seaworthy
   Vessels**.
@@ -989,11 +1003,24 @@ The user approved these implemented defaults despite the source ambiguities reco
 
 **Map transcription:** the [catalog inventory](data-inventory.md) records the component references,
 province and economic tables, connections and outstanding review questions. The photographed board has no
-Loire market, six Area I satellites (including Smolensk), Libya in Area VI and a separately printed Aegean Sea.
+Loire market, six Area I satellites (including Smolensk), Libya in Area VI and the printed Aegean label.
 The user confirmed on 2026-10-23 that Gallipoli and Angora do not touch; they have no direct coastal-water
 connection. This resolves the final recorded map question. The inventory records the source checks and ruling.
 The user confirmed on 2026-10-25 that Tunis and Sicily touch through their coastal-water spaces.
 They share a direct coastal-water connection and no land border.
+The user confirmed on 2026-10-26 that Oran and Granada have no direct coastal-water connection,
+and that Salonika and Corfu have no coastal-water connection. Salonika and Corfu retain their
+land border and printed satellite support.
+The user also confirmed on 2026-10-26 that Angora and Constantinople share a land border, in addition
+to their coastal-water connection. The Aegean and Central Mediterranean are one sea space; their
+combined coastal incidences permit a single sea crossing between the two named basins.
+Further user corrections on 2026-10-26 remove the Smyrna–Crete and Naples–Sicily coastal connections
+and add Bari–Durazzo, Portsmouth–St Malo, and London–Bruges. Bari retains its coastal connection
+with Naples. Corsica is part of Cagliari; the northern Greek island landmass is part of Athens;
+and Bari includes Italy's toe. Kamyshin connects by land to Sarai and Tana; Tana does not touch Poti.
+The [connection inventory](connection-inventory.md) records the complete reviewed graph.
+The user further confirmed that Athens and Crete share a coastal border, while Crete has no
+Eastern Mediterranean sea incidence. Crete touches only the combined Central Mediterranean/Aegean.
 
 ---
 

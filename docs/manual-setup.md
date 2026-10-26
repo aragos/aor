@@ -21,7 +21,7 @@ their respective seats; share only the intended player's link.
 
 1. In Alice's tab, click **Start setup**. Each tab should show one private card, $40, 36 tokens, 25 markers, no ships
    and zero misery. No other player's card or remaining deck order should appear in its network responses.
-2. Seal Alice's capital bid at 10. Replace it with 12 using the command input: `bid-capital 12`. Her tab shows her
+2. Submit Alice's capital bid at 10. Replace it with 12 using the command input: `bid-capital 12`. Her tab shows her
    pending bid; the others show only that she submitted. Cash remains $40 and the history has no bid entry yet.
 3. Stop the server with Ctrl+C, start it again with `./gradlew :server:run`, and refresh all tabs. Cards and Alice's
    pending bid must be unchanged. If you changed `AOR_DATA_DIR`, reuse that directory on restart.
@@ -38,7 +38,7 @@ their respective seats; share only the intended player's link.
 
 ## Buy tokens and resolve tied positions
 
-1. In Alice's tab, enter a purchase of 4. Check the preview: cost $4, four tokens and $24 remaining. Seal it, then
+1. In Alice's tab, enter a purchase of 4. Check the preview: cost $4, four tokens and $24 remaining. Submit it, then
    replace it with `buy-tokens 5` in the command input. Her saved amount is private; other tabs show only submission
    status. The public cash and token counts must remain unchanged before the final submission.
 2. Restart the server and refresh all tabs. Alice's saved purchase must still be 5. Bob and Carol must not see its
@@ -71,7 +71,7 @@ With improved setup, each seat receives three cards and privately chooses one to
 `return-card hand-1` (with its own reference). Selections can be replaced until everyone submits.
 The final selection commits the whole batch and a recorded shuffle; each player keeps two cards.
 Other seats see submission status and redacted return actions, never the returned identity.
-Pending returns survive restart just like sealed bids.
+Pending returns survive restart just like private bids.
 
 Commodity-only initial dealing is also available with standard setup. Combining it with improved
 setup is rejected under the approved rule that "get three, choose two" is incompatible with
@@ -108,7 +108,7 @@ choose-turn-position 2
 
 Only the creator can configure or start. Configuration freezes when setup starts. Capital bids must be whole numbers
 from 0 through 40. Token purchases must be whole numbers between negative available cash and positive available cash.
-Both types of sealed submission may be replaced until the final submission reveals their batch. Turn-position slots
+Both types of private submission may be replaced until the final submission reveals their batch. Turn-position slots
 are one-based insertion positions within the current tied group, not printed board boxes. System outcomes cannot be
 submitted by clients. Unsupported options, actor prefixes and multiple commands are rejected.
 
@@ -133,7 +133,7 @@ extra access to other hands.
 
 ## Storage and automated checks
 
-Games and pending sealed submissions survive server restarts. Replaying history uses recorded shuffles, deals and
+Games and pending private submissions survive server restarts. Replaying history uses recorded shuffles, deals and
 rolls without generating randomness. Failed writes retain the preceding saved state. Unreadable, corrupt or
 incompatible files return `STORAGE_UNAVAILABLE` and are never reset automatically. General history editing and undo
 are deferred.

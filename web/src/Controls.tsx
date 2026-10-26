@@ -111,7 +111,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                     {bidSubmitLabel(snapshot)}
                 </button>
             </div>
-            {snapshot.pendingBid !== null && <p className="sealed">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
+            {snapshot.pendingBid !== null && <p className="pending-submission">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
 
             {isTokenPurchase && <div id="purchase-preview" className="purchase-preview" aria-live="polite">
                 {quoted ? <dl className="resources">

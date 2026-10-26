@@ -527,6 +527,149 @@ class VisualProjectionTest {
         assertThat(offer.blockers).containsExactly(CardOfferBlocker.INVALID_CHOICE)
     }
 
+    @Test
+    fun reachableMarketRemainsHighlightedWhenThePoolCannotFillIt() {
+        val offer = offer(state(pool = 0))
+
+        assertThat(offer.reachable).isTrue()
+        assertThat(offer.blockers).containsExactly(ViolationCode.INSUFFICIENT_EXPANSION_TOKENS)
+    }
+
+    @Test
+    fun inaccessibleProvinceIsNotReachable() {
+        val offer =
+            state().viewForPlayer(p1).expansionOffers.single {
+                it.destination == ProvinceId("china")
+            }
+
+        assertThat(offer.reachable).isFalse()
+    }
+
+    @Test
+    fun playedLeaderCreditsAreIncludedInTheAdvancePrice() {
+        val state =
+            state(advances = setOf(AdvanceId.WRITTEN_RECORD))
+                .copy(
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.CHARLEMAGNE,
+                                        p1,
+                                        CardLeaderRole.DISPLAY,
+                                    )
+                                )
+                        )
+                )
+        val offer =
+            state.viewForPlayer(p1).advanceOffers.single {
+                it.advance == AdvanceId.NATIONALISM
+            }
+        val quote =
+            AdvancePurchases.quote(
+                state.playerState(p1),
+                AdvanceId.NATIONALISM,
+                state.purchaseContext(p1),
+            )
+
+        assertThat(offer.leaderDiscounts).isEqualTo(quote.leaders)
+        assertThat(offer.leaderDiscounts.single().amount).isEqualTo(30L)
+        assertThat(offer.price).isEqualTo(quote.price)
+    }
+
+    @Test
+    fun playerWithoutATierHasNoReliefPurchaseOffers() {
+        assertThat(state().viewForPlayer(p1).reliefOffers).isEmpty()
+    }
+
+    @Test
+    fun expansionPassProjectsCompletionWithoutHidingOtherPowers() {
+        val after = state().step(Entry.Action(p1, TurnCommand.Pass))
+        val players = after.viewForPlayer(p1).players
+
+        assertThat(players.single { it.id == p1 }.poolAvailable).isFalse()
+        assertThat(players.single { it.id == p2 }.poolAvailable).isTrue()
+    }
+
+    @Test
+    fun privatePurchaseDoesNotExposeAnExpansionPool() {
+        val beforeReveal = state().copy(stage = Stage.TOKEN_PURCHASE)
+
+        assertThat(beforeReveal.viewForPlayer(p1).players.map { it.poolAvailable })
+            .containsExactly(false, false, false)
+    }
+
+    @Test
+    fun revealedEmptyPoolIsAvailableBeforeExpansion() {
+        val afterReveal = state(pool = 0).copy(stage = Stage.TURN_ORDER_TIE)
+
+        assertThat(PlayerView.from(afterReveal.playerState(p1), afterReveal).poolAvailable).isTrue()
+    }
+
+    @Test
+    fun incomeDoesNotExposeAnExpansionPool() {
+        val income = state().copy(stage = Stage.INCOME)
+
+        assertThat(income.viewForPlayer(p1).players.map { it.poolAvailable })
+            .containsExactly(false, false, false)
+    }
+
+    @Test
+    fun playedLeaderDiscountKeepsItsPlayTimeEnhancement() {
+        val state =
+            state(advances = setOf(AdvanceId.WRITTEN_RECORD))
+                .copy(
+                    voids = CardVoids(crusades = true),
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.MARCO_POLO,
+                                        p1,
+                                        CardLeaderRole.DISPLAY,
+                                        mongolEnhanced = false,
+                                    )
+                                )
+                        ),
+                )
+        val credits = state.viewForPlayer(p1).playedLeaderDiscounts.single()
+
+        assertThat(credits.usable).isTrue()
+        assertThat(credits.discounts.map(LeaderDiscountView::conditionalAmount))
+            .containsExactlyElementsIn(
+                LeaderData.definition(LeaderId.MARCO_POLO).discounts.map {
+                    it.amountFor(false, false)
+                }
+            )
+        assertThat(credits.discounts.map(LeaderDiscountView::writtenRecordBonus)).contains(10)
+    }
+
+    @Test
+    fun anotherPowersUnclaimedLeaderIsNotAnAuthorizedDiscount() {
+        val state =
+            state()
+                .copy(
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.CHARLEMAGNE,
+                                        p2,
+                                        CardLeaderRole.DISPLAY,
+                                    )
+                                )
+                        )
+                )
+
+        val credits = state.viewForPlayer(p1).playedLeaderDiscounts.single()
+
+        assertThat(credits.usable).isFalse()
+        assertThat(credits.discounts.single().conditionalAmount).isEqualTo(20)
+    }
+
     private fun offer(state: GameState): ExpansionOfferView =
         state.viewForPlayer(p1).expansionOffers.single { it.destination == florence }
 

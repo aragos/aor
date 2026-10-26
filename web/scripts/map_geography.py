@@ -4,6 +4,8 @@ Coastlines are simplified Natural Earth 1:50m land. Province anchors are approxi
 regional centers, adjusted for readable labels and the game's coastal incidence.
 The reference projection uses 55 SVG units per longitude degree and 65 per latitude
 degree, then compresses longitude to 50 units and reserves an inset column.
+The exported geometry also compresses SVG eastings beyond x=2500 by 30%,
+keeping land, sea, and anchors in the same compact projection.
 It is a schematic, not a navigation map. Iceland and West Africa are insets.
 """
 
@@ -68,7 +70,7 @@ REGIONS = {
     "florence": (11.4, 43.6),
     "rome": (12.8, 41.7),
     "naples": (15.0, 40.5),
-    "bari": (17.5, 41.0),
+    "bari": (16.7, 39.6),
     "cagliari": (9.0, 40.0),
     "sicily": (14.0, 37.4),
     "dubrovnik": (16.5, 43.0),
@@ -106,14 +108,14 @@ REGIONS = {
     "salonika": (23, 40.7),
     "durazzo": (19.2, 41.5),
     "gallipoli": (26, 41.5),
-    "constantinople": (28.5, 40.7),
+    "constantinople": (29.6, 40.7),
     "smyrna": (27.4, 38.7),
     "kiev": (30.5, 50.4),
     "kaffa": (33.5, 45.7),
     "varna": (28.0, 43.5),
-    "tana": (39.2, 47.2),
+    "tana": (38.5, 46.1),
     "kamyshin": (44.8, 50.1),
-    "sarai": (47.4, 48.5),
+    "sarai": (44.8, 52.3),
     "abagia": (39.5, 44.2),
     "poti": (42, 42.7),
     "erzerum": (42, 40.2),
@@ -128,13 +130,28 @@ LABEL_OFFSETS = {
     "portsmouth": (-8, 4),
 }
 
+# Additional land components belonging to an existing province, in longitude/latitude.
+PROVINCE_ISLANDS = {
+    "cagliari": [(9.1, 42.2)],
+    "athens": [(23.8, 38.6)],
+}
+
 
 def project(lon, lat):
     return ((lon + 13) * 55, (61 - lat) * 65)
 
 
+# SVG units before final export; keep every crossing at this same longitude.
+EASTERN_COMPACTION_X = 2500
+
+
+def compact_easting(x):
+    """SVG easting: preserve the west and compress the eastern frontier by 30%."""
+    return min(x, EASTERN_COMPACTION_X) + max(0, x - EASTERN_COMPACTION_X) * 0.7
+
+
 def display_point(x, y):
-    """Reserve the western inset column and use a compact longitude scale."""
+    """Reserve the western inset column; final eastern compaction happens at export."""
     return (x * 10 / 11 + 200, y)
 
 
@@ -152,9 +169,9 @@ def geography():
             (2580, 500),
             (2520, 780),
             (2800, 750),
-            (2960, 620),
-            (3280, 600),
-            (3440, 950),
+            (2960, 480),
+            (3230, 480),
+            (3280, 780),
             (3170, 1120),
             (3160, 1400),
             (2930, 1510),
@@ -248,8 +265,6 @@ def geography():
     # Strait widths are exaggerated to keep the separate coastal spaces readable.
     neutral = unary_union(
         [
-            LineString([(2350, 1260), (2370, 1420)]).buffer(12),
-            LineString([(2290, 1300), (2300, 1360)]).buffer(12),
             LineString([(1290, 360), (1390, 430)]).buffer(10),
             LineString([(1390, 340), (1430, 415)]).buffer(10),
             Polygon(
@@ -297,7 +312,7 @@ def geography():
         ("venice", "dubrovnik"): [(14.5, 45.3), (16, 44.5)],
         ("dubrovnik", "durazzo"): [(18.8, 42.8)],
         ("kaffa", "varna"): [(30, 46.8), (29, 45.5)],
-        ("kaffa", "tana"): [(33.8, 46.7), (36.2, 47.8)],
+        ("kaffa", "tana"): [(33.8, 46.7), (36.2, 47.8), (38.9, 47.4), (39.0, 46.6)],
         ("barca", "tripoli"): [(19.5, 30.5), (16.5, 30.5)],
         ("tripoli", "tunis"): [(11.7, 32.4), (10.2, 33.7)],
     }

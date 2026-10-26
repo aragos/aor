@@ -34,7 +34,19 @@ enum class AccessRequirement {
     /** The province is reachable only by ship, with either of these advances. */
     THE_HEAVENS_OR_SEAWORTHY_VESSELS,
     OCEAN_NAVIGATION,
-    NEW_WORLD,
+    NEW_WORLD;
+
+    /**
+     * Whether the owned advances satisfy this printed access condition, independent of shipping.
+     */
+    fun isSatisfiedBy(advances: Set<AdvanceId>): Boolean =
+        when (this) {
+            OVERLAND_EAST -> AdvanceId.OVERLAND_EAST in advances
+            OCEAN_NAVIGATION -> AdvanceId.OCEAN_NAVIGATION in advances
+            NEW_WORLD -> AdvanceId.NEW_WORLD in advances
+            THE_HEAVENS_OR_SEAWORTHY_VESSELS ->
+                AdvanceId.THE_HEAVENS in advances || AdvanceId.SEAWORTHY_VESSELS in advances
+        }
 }
 
 /**

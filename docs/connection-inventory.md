@@ -93,7 +93,7 @@ Each listed neighbor is connected in both directions. Source is the Board region
 | durazzo | salonika, corfu | E |
 | salonika | gallipoli, corfu, athens | E |
 | corfu | athens | E |
-| constantinople | smyrna, angora | E |
+| constantinople | smyrna, angora | E; user correction 2026-10-26 |
 | smyrna | adalia | E |
 | adalia | taurus | E |
 | taurus | aleppo | E |
@@ -121,6 +121,7 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | --- | --- | --- |
 | bergen | kongsberg | N |
 | kongsberg | malmo, copenhagen | N |
+| shetland-islands | bergen | N; user correction 2026-10-26 |
 | malmo | stockholm, copenhagen, lubeck | N |
 | stockholm | visby | N |
 | copenhagen | hamburg, lubeck | N |
@@ -136,8 +137,8 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | chester | wales | N |
 | wales | cornwall | N |
 | cornwall | portsmouth | N |
-| portsmouth | london, paris | N + Errata |
-| london | york, paris | N + Errata |
+| portsmouth | london, paris, st-malo | N + Errata; user correction 2026-10-26 |
+| london | york, paris, bruges | N + Errata; user correction 2026-10-26 |
 | amsterdam | bruges | C |
 | bruges | paris | C |
 | paris | st-malo | C |
@@ -148,25 +149,25 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | leon | lisbon | W |
 | lisbon | seville | W |
 | seville | granada, fez | W |
-| granada | valencia, fez, oran | W |
+| granada | valencia, fez | W; user correction 2026-10-26: no Oran contact |
 | valencia | barcelona, palma | W |
 | barcelona | palma, montpellier | W |
 | montpellier | marseilles | W |
 | marseilles | genoa | W |
 | genoa | rome, cagliari | W |
 | rome | naples | W |
-| naples | bari, sicily | W |
-| bari | sicily, corfu | W + Errata |
+| naples | bari | W; user correction 2026-10-26: no Sicily contact |
+| bari | sicily, corfu, durazzo | W + Errata; user correction 2026-10-26 |
 | venice | florence, dubrovnik | W |
 | florence | rome | W |
 | dubrovnik | durazzo | W |
 | durazzo | corfu | E |
-| corfu | athens, salonika | E |
+| corfu | athens | E; user correction 2026-10-26: no Salonika coastal contact |
 | athens | salonika, crete | E |
 | salonika | gallipoli | E |
 | gallipoli | varna, constantinople | E |
 | constantinople | smyrna | E |
-| smyrna | adalia, crete | E |
+| smyrna | adalia | E; user correction 2026-10-26: no Crete contact |
 | adalia | taurus, cyprus | E |
 | taurus | cyprus, aleppo | E |
 | cyprus | aleppo, levant | E |
@@ -257,21 +258,37 @@ is the only ocean and is flagged separately; it is not a sea usable with The Hea
 | canary basin | seville, fez, west-africa | Board W, lower-left |
 | western mediterranean | granada, valencia, barcelona, palma, montpellier, marseilles, genoa, cagliari, rome, naples, bari, sicily, tunis, algiers, oran | Board W, including west of Italian peninsula |
 | adriatic sea | venice, florence, rome, naples, bari, dubrovnik, durazzo | Board W/E + Hexagonia PDF p. 12 |
-| central mediterranean | bari, sicily, tunis, tripoli, barca, corfu, athens, crete | Board W/E, south/east of Sicily |
-| eastern mediterranean | barca, libya, alexandria, cairo, suez, jerusalem, acre, levant, cyprus, adalia, crete | Board E + Errata (Barca yes; Libya to Central no) |
-| aegean sea | salonika, gallipoli, constantinople, smyrna, athens, crete | Board E, sharper photograph: diagonal printed AEGEAN SEA label |
+| central mediterranean (including aegean) | bari, sicily, tunis, tripoli, barca, corfu, athens, crete, salonika, gallipoli, constantinople, smyrna | Board W/E; user correction 2026-10-26: one sea space |
+| eastern mediterranean | barca, libya, alexandria, cairo, suez, jerusalem, acre, levant, cyprus, adalia | Board E + Errata (Barca yes; Libya to Central no); user correction 2026-10-26: no Crete incidence |
 | black sea | varna, kaffa, tana, abagia, poti, erzerum, trebizond, angora, constantinople, gallipoli | Board E, upper-right |
 | Norwegian Sea | No effective game connections | Errata: no game function |
 | Atlantic Ocean | No main-map coastal-water incidences | Board N/W; separated from coastal water by medium-blue seas |
 
 The Greenland Sea is the separately named medium-blue patch containing Iceland. It is not the
 Norwegian Sea. The Western Mediterranean extends east of Cagliari to the western Italian coast and
-northwestern Sicily; the Central Mediterranean lies to the south/east of Sicily. The sharper board
-photograph clearly prints AEGEAN SEA diagonally in the medium-blue basin between Greece and Anatolia.
-Its six coastal incidences are listed above.
+northwestern Sicily. The Central Mediterranean includes the Aegean basin between Greece and Anatolia;
+the two printed names identify one sea space, as confirmed by the user on 2026-10-26. Its twelve
+coastal incidences are listed in one row above. A crossing between those basins uses one sea space.
 
 Sea-to-sea movement is not a coastal-water step. The catalog stores the province/sea incidences needed
 for a single sea crossing with The Heavens; no additional sea-to-sea movement graph is required.
+
+### Geographical area membership
+
+The user confirmed these assignments on 2026-10-26. Area borders include the entire assigned sea;
+other water bodies have no area assignment. Outlines enclose neutral islands and small unassigned
+water pockets among member coastal spaces, without assigning an entire unassigned sea to an area.
+Sea spaces remain available on reduced boards even when their area's provinces are absent.
+
+| Sea | Area |
+| --- | --- |
+| Baltic Sea | I |
+| Greenland Sea | II |
+| Black Sea | V |
+| Eastern Mediterranean | VI |
+| Adriatic Sea | VII |
+| Central Mediterranean, including the Aegean | VIII |
+| Canary Basin | VIII |
 
 ## Connection rulings and source status
 
@@ -282,6 +299,27 @@ There are no remaining source blockers. Any future unresolved question must be e
 touch.” This resolves the contact obscured by the thick printed area boundary in both photographs.
 The absent coastal-water edge is confirmed for all player counts. Constantinople–Angora remains connected.
 
+**Constantinople–Angora: land and coastal-water connection.** The user confirmed their land border
+on 2026-10-26. Both connections apply at every supported player count.
+
+**Central Mediterranean–Aegean: one sea space.** Confirmed by the user on 2026-10-26. The catalog
+uses Central Mediterranean as the canonical identifier and combines both sets of coastal incidences.
+
+**Further coastal corrections, 2026-10-26.** Smyrna and Crete do not share coastal water; neither
+do Sicily and Naples. Bari shares coastal water with Naples, Sicily, Corfu, and Durazzo. Portsmouth
+touches both St Malo and Paris by coast; London touches both Bruges and Paris. Cagliari and Rome,
+Oran and Granada, and Tana and Poti have no direct coastal connection. Granada has no Canary Basin
+incidence. These are topology facts independent of the schematic's spacing.
+Athens and Crete retain their coastal-water border. Crete touches the combined Central
+Mediterranean/Aegean only; it does not touch the Eastern Mediterranean. The latter sea's western
+edge lies east of Crete, leaving the combined sea connected around the island.
+Shetland and Bergen also share a direct coastal-water border, confirmed on 2026-10-26.
+
+**Province geography, 2026-10-26.** Corsica belongs to Cagliari, and the northern Greek island
+landmass belongs to Athens. Bari contains the toe of Italy. Sarai's only land neighbor is Kamyshin;
+Kamyshin connects to Sarai and Tana. Clear hinterland gaps distinguish Kamyshin from Abagia and
+Poti, and Tana from Poti. Tana includes the land east of Crimea, giving it a direct Black Sea front.
+
 **Tunis–Sicily: coastal-water connection.** Confirmed by the user on 2026-10-25: Tunis and Sicily
 touch. Their coastal-water spaces share a boundary, allowing a direct galley step; they have no
 land border. This connection applies at every supported player count.
@@ -290,7 +328,7 @@ Resolved during transcription: Greenland Sea exists; no support from St. Gall to
 Cagliari supports Marseilles/Genoa; Leon supports Toledo; Barcelona and Montpellier share a short land
 and coastal-water border; Toulouse has Atlantic coastal water but does not reach the Mediterranean.
 The sharper photograph also resolves Kongsberg–Malmo and Kongsberg–Copenhagen coastal connections,
-Shetland–Bergen as a sea crossing rather than direct coastal water, Lubeck–Prague as a land border,
+Lubeck–Prague as a land border,
 Milan–Salzburg as separated by St. Gall, Cagliari–Marseilles/Genoa as coastal neighbors, and Cagliari–Rome
 as only a corner contact. Salonika and Constantinople have no direct coastal edge because Gallipoli’s
 coastal water lies between them. At Gibraltar, Seville and Fez touch Canary Basin; Granada does not.

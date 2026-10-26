@@ -1,13 +1,13 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useLayoutEffect, useState} from 'react';
 import type {Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
-import {Activity} from './Activity';
+import {Activity, CompetitionNotice, WarNotice} from './Activity';
 import {TableIcon} from './TableIcon';
 import {BoardPanel, FinalScores, TurnEffects} from './FullGamePanels';
-import {AdvanceTiles, Hand, PlayerOverview, Markets} from './TablePanels';
+import {AdvanceTiles, Emblem, Hand, PlayerOverview, Markets} from './TablePanels';
 import {AdvanceDecision, CardDecision} from './ObjectDecisions';
 import {BoardMap} from './map/BoardMap';
 import {useMapSelection} from './map/MapSelection';
@@ -17,27 +17,55 @@ export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 
 
-export function GameTable({snapshot, busy, saved, submit, connectionError, actionError, quotePurchase}: {
+export function GameTable({snapshot, busy, saved, submit: sendCommand, connectionError, actionError, quotePurchase}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: string; quotePurchase: QuotePurchase;
 }) {
     const [commandsOpen, setCommandsOpen] = useState(false);
     const [sheetCollapsed, setSheetCollapsed] = useState(false);
-    const {selected, setSelected, selectedCard, selectedAdvance, picker, workspace, setWorkspace} = useMapSelection();
-    useEffect(() => setSheetCollapsed(false), [selected, selectedCard, selectedAdvance]);
+    const {selected, setSelected, selectedArea, selectedCard, setSelectedCard, selectedAdvance,
+        picker, workspace, setWorkspace, resetSelection} = useMapSelection();
+    const purchaseStep = snapshot.game.stage === 'PURCHASE' ? snapshot.game.activity?.purchaseStep : null;
+    const decisionKey = `${snapshot.game.turnNumber}:${snapshot.game.stage}:${purchaseStep}`;
+    // Reset before new forms activate their automatic target pickers.
+    useLayoutEffect(() => {
+        resetSelection();
+        if (document.activeElement instanceof HTMLElement &&
+            document.activeElement.matches('.hand-card, .advance-tile')) document.activeElement.blur();
+    }, [snapshot.gameId, snapshot.game.turnNumber, snapshot.game.stage, purchaseStep, resetSelection]);
+    useEffect(() => setSheetCollapsed(false), [selected, selectedArea, selectedCard, selectedAdvance]);
+    const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
+    const expansion = snapshot.game.stage === 'EXPANSION';
+    const expanding = canAct && expansion && snapshot.game.activity?.actor === snapshot.viewerId;
+    useEffect(() => {
+        if (expansion) setWorkspace('map');
+    }, [expansion, expanding, setWorkspace]);
+    const buyingAdvances = canAct && snapshot.game.activity?.purchaseStep === 'ADVANCES';
+    useEffect(() => {
+        if (buyingAdvances) setWorkspace('advances');
+    }, [buyingAdvances, setWorkspace]);
+    useEffect(() => {
+        if (selectedCard && !snapshot.game.hand.some(card => card.reference === selectedCard)) setSelectedCard('');
+    }, [selectedCard, setSelectedCard, snapshot.game.hand]);
+    async function submit(command: string) {
+        const accepted = await sendCommand(command);
+        if (accepted && (command === 'pass' || command.startsWith('play '))) {
+            resetSelection();
+        }
+        return accepted;
+    }
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     if (!me) return null;
-    const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
+    const expansionPlayer = expansion ? snapshot.game.players.find(player => player.id === snapshot.game.activity?.actor) : undefined;
     const finished = snapshot.game.stage === 'FINISHED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
-    const expansion = snapshot.game.stage === 'EXPANSION';
     const hasContext = !!(selectedCard || selectedAdvance || province);
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
     const decision = finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
     return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <header className="game-header">
-            <div className="game-brand"><span className="brand-seal" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
+            <div className="game-brand"><span className="brand-emblem" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
                 <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t('game.epoch')} {snapshot.game.currentEpoch}</p></div></div>
             <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
             <button type="button" className="secondary commands-toggle" aria-expanded={commandsOpen} onClick={() => {setCommandsOpen(current => !current); if (!commandsOpen) setTimeout(() => document.querySelector('.command-dock')?.scrollIntoView({block: 'nearest'}), 0);}}>›_ {t('table.commands')}</button>
@@ -74,12 +102,18 @@ export function GameTable({snapshot, busy, saved, submit, connectionError, actio
                     {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed} aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>{t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}</button>}
                     {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: {playerName(snapshot, snapshot.game.activity.actor)}</p>}
                 </div>
+                {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status" aria-label={`${playerName(snapshot, expansionPlayer.id)} · ${t('table.remainingPoolTokens')}: ${expansionPlayer.poolTokens}`}>
+                    <Emblem player={expansionPlayer} size={30}/>
+                    <div className="expansion-player"><span>{playerName(snapshot, expansionPlayer.id)}</span><small>{t('table.remainingPoolTokens')}</small></div>
+                    <strong><TableIcon kind="token"/>{expansionPlayer.poolTokens}</strong>
+                </div>}
                 <div id="decision-content" className="decision-content">
-                {expansion && <div className="pool-summary"><TableIcon kind="token"/><strong>{me.poolTokens}</strong><span>{t('table.poolTokens')}</span></div>}
-                {selectedCard ? <CardDecision snapshot={snapshot} busy={busy} submit={submit}/>
+                <CompetitionNotice snapshot={snapshot}/>
+                <WarNotice snapshot={snapshot}/>
+                {selectedCard ? <CardDecision key={selectedCard} snapshot={snapshot} busy={busy} submit={submit}/>
                     : selectedAdvance ? <AdvanceDecision snapshot={snapshot} busy={busy} submit={submit}/>
                     : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} busy={busy} submit={submit} select={setSelected}/>}
-                <Controls snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>
+                <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>
                 {actionError && <p className="error" role="alert">{t(`error.${actionError}`)}</p>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
                 <div className="available-resources"><p className="eyebrow">{t('table.available')}</p><strong>${me.cash}</strong><small>{t('game.cash')}</small>

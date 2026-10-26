@@ -148,6 +148,17 @@ internal object TurnEngine {
         return listOf("pass") + affordable.map { spaces -> "relieve-misery $spaces" }
     }
 
+    /** Stop only for a purchase decision that can change the player's position. */
+    private fun automaticPurchaseStep(state: GameState, player: PlayerState): GameState? =
+        when {
+            state.flow.purchaseStep == PurchaseStep.STABILIZATION &&
+                PlayerEconomy.stabilizationCost(player) == 0L ->
+                state.copy(flow = state.flow.copy(purchaseStep = PurchaseStep.RELIEF))
+            state.flow.purchaseStep == PurchaseStep.RELIEF &&
+                reliefChoices(state, player) == listOf("pass") -> finishActor(state)
+            else -> null
+        }
+
     fun normalise(initial: GameState): GameState {
         var state = initial
         if (
@@ -235,6 +246,9 @@ internal object TurnEngine {
                     if (state.flow.decisions.isNotEmpty()) return state
                     if (state.playerState(actor).hand.isNotEmpty()) return state
                     state = finishActor(state)
+                }
+                Stage.PURCHASE -> {
+                    state = automaticPurchaseStep(state, state.playerState(actor)) ?: return state
                 }
                 else -> return state
             }

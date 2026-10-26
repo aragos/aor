@@ -195,7 +195,7 @@ quote without changing saved state. Conditional values remain separate from dete
 
 Visual activity is derived from typed committed entries during history replay, with stable
 `revision:entryIndex` identifiers. Its card identities follow the same viewer audiences as the
-command log; unrevealed sealed submissions and private hand references are never exposed. The client
+command log; unrevealed private submissions and private hand references are never exposed. The client
 does not parse log prose to reconstruct events or rules.
 
 The client renders server projections, prompts, legal choices and structured explanations, and builds the same

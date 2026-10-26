@@ -20,21 +20,27 @@ data class ProvinceConnection(val first: ProvinceId, val second: ProvinceId) {
     }
 }
 
-/** Printed bodies of water. The Norwegian Sea has no effective connections under the AH errata. */
-enum class SeaArea(val isOcean: Boolean = false) {
+/**
+ * Printed bodies of water. [area] is null for water outside a geographical area; membership does
+ * not remove seas on reduced boards. The Norwegian Sea has no effective connections under errata.
+ */
+enum class SeaArea(
+    val isOcean: Boolean = false,
+    val area: GeographicalArea? = null,
+) {
     ATLANTIC_OCEAN(isOcean = true),
     NORWEGIAN_SEA,
-    GREENLAND_SEA,
+    GREENLAND_SEA(area = GeographicalArea.II),
     NORTH_SEA,
-    BALTIC_SEA,
+    BALTIC_SEA(area = GeographicalArea.I),
     BAY_OF_BISCAY,
-    CANARY_BASIN,
+    CANARY_BASIN(area = GeographicalArea.VIII),
     WESTERN_MEDITERRANEAN,
-    CENTRAL_MEDITERRANEAN,
-    EASTERN_MEDITERRANEAN,
-    AEGEAN_SEA,
-    ADRIATIC_SEA,
-    BLACK_SEA,
+    /** The Aegean and Central Mediterranean are one printed sea space. */
+    CENTRAL_MEDITERRANEAN(area = GeographicalArea.VIII),
+    EASTERN_MEDITERRANEAN(area = GeographicalArea.VI),
+    ADRIATIC_SEA(area = GeographicalArea.VII),
+    BLACK_SEA(area = GeographicalArea.V),
 }
 
 /** A coastal-water space incident to a sea; this is not a land border or a galley step. */
@@ -189,7 +195,7 @@ object BoardConnectionData {
             land("durazzo", "salonika", "corfu")
             land("salonika", "gallipoli", "corfu", "athens")
             land("corfu", "athens")
-            land("constantinople", "smyrna")
+            land("constantinople", "smyrna", "angora")
             land("smyrna", "adalia")
             land("adalia", "taurus")
             land("taurus", "aleppo")
@@ -209,6 +215,7 @@ object BoardConnectionData {
 
             // Coastal-water boundaries, separate from the land graph.
             coast("bergen", "kongsberg")
+            coast("shetland-islands", "bergen")
             coast("kongsberg", "malmo", "copenhagen")
             coast("malmo", "stockholm", "copenhagen", "lubeck")
             coast("stockholm", "visby")
@@ -225,8 +232,8 @@ object BoardConnectionData {
             coast("chester", "wales")
             coast("wales", "cornwall")
             coast("cornwall", "portsmouth")
-            coast("portsmouth", "london", "paris")
-            coast("london", "york", "paris")
+            coast("portsmouth", "london", "paris", "st-malo")
+            coast("london", "york", "paris", "bruges")
             coast("amsterdam", "bruges")
             coast("bruges", "paris")
             coast("paris", "st-malo")
@@ -237,26 +244,26 @@ object BoardConnectionData {
             coast("leon", "lisbon")
             coast("lisbon", "seville")
             coast("seville", "granada", "fez")
-            coast("granada", "valencia", "fez", "oran")
+            coast("granada", "valencia", "fez")
             coast("valencia", "barcelona", "palma")
             coast("barcelona", "palma", "montpellier")
             coast("montpellier", "marseilles")
             coast("marseilles", "genoa", "cagliari")
             coast("genoa", "rome", "cagliari")
             coast("rome", "naples")
-            coast("naples", "bari", "sicily")
-            coast("bari", "sicily", "corfu")
+            coast("naples", "bari")
+            coast("bari", "sicily", "corfu", "durazzo")
             coast("venice", "florence", "dubrovnik")
             coast("florence", "rome")
             coast("dubrovnik", "durazzo")
             coast("durazzo", "corfu")
-            coast("corfu", "athens", "salonika")
+            coast("corfu", "athens")
             coast("athens", "salonika", "crete")
             coast("salonika", "gallipoli")
             // User ruling, 2026-10-23: Gallipoli and Angora do not touch.
             coast("gallipoli", "varna", "constantinople")
             coast("constantinople", "smyrna", "angora")
-            coast("smyrna", "adalia", "crete")
+            coast("smyrna", "adalia")
             coast("adalia", "taurus", "cyprus")
             coast("taurus", "cyprus", "aleppo")
             coast("cyprus", "aleppo", "levant")
@@ -404,6 +411,10 @@ object BoardConnectionData {
                 "corfu",
                 "athens",
                 "crete",
+                "salonika",
+                "gallipoli",
+                "constantinople",
+                "smyrna",
             )
             sea(
                 SeaArea.EASTERN_MEDITERRANEAN,
@@ -417,16 +428,6 @@ object BoardConnectionData {
                 "levant",
                 "cyprus",
                 "adalia",
-                "crete",
-            )
-            sea(
-                SeaArea.AEGEAN_SEA,
-                "salonika",
-                "gallipoli",
-                "constantinople",
-                "smyrna",
-                "athens",
-                "crete",
             )
             sea(
                 SeaArea.BLACK_SEA,

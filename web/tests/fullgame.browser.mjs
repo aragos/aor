@@ -37,7 +37,7 @@ async function show(link, revision) {
         page = pages.get(link.id);
         currentPlayer = link.id;
     }
-    await page.wait(`document.querySelector('.player-summary.is-viewer summary')?.getAttribute('aria-label')?.startsWith(${JSON.stringify(link.name + ',')}) && document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + revision)}`, `${link.name} at revision ${revision}`);
+    await page.wait(`document.querySelector('.player-summary.is-viewer summary')?.getAttribute('aria-label')?.includes(${JSON.stringify(link.name + ',')}) && document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + revision)}`, `${link.name} at revision ${revision}`);
 }
 
 function choose(state) {
@@ -92,7 +92,7 @@ async function playCard(state, command) {
         const choices = offer.choices.filter(choice => choice.command !== null);
         const index = choices.findIndex(choice => choice.command === command);
         assert(index >= 0, `Projection has exact finite command ${command}`);
-        const automatic = choices.length === 1 && choices[0].kind === 'NONE' && !offer.choices.some(choice => choice.kind === 'PROTECTION');
+        const automatic = choices.length === 1 && ['NONE', 'COMMODITY'].includes(choices[0].kind);
         if (!automatic) await click('.card-decision .target-choices > button:not(.map-picker)', index);
     }
     await click('.card-decision form > button:last-child');
@@ -160,20 +160,20 @@ try {
             console.log(`Full visual game: action ${step}, epoch ${state.game.currentEpoch}, turn ${state.game.turnNumber}, ${state.game.stage}`);
             lastTurn = state.game.turnNumber;
         }
-        const sealed = ['bid-capital', 'buy-tokens', 'return-card'].includes(command.split(' ')[0]);
-        const pending = sealed && state.prompt.players.length > 1;
+        const simultaneous = ['bid-capital', 'buy-tokens', 'return-card'].includes(command.split(' ')[0]);
+        const pending = simultaneous && state.prompt.players.length > 1;
         const expectedRevision = state.revision + (pending ? 0 : 1);
         await perform(state, command);
         const accepted = pending
-            ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Sealed' && document.querySelector('.save-status')?.textContent === 'Saved'`
+            ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Submitted' && document.querySelector('.save-status')?.textContent === 'Saved'`
             : `document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + expectedRevision)}`;
         await page.wait(`(${accepted}) || document.querySelector('.decision-panel .error')`, `accepted visual action ${command}`);
         const error = await page.evaluate('document.querySelector(".decision-panel .error")?.textContent ?? null');
         assert.equal(error, null, `Visual action rejected: ${command}`);
         latest = await snapshot(actor);
-        assert.equal(latest.revision, expectedRevision, 'Sealed decisions wait for reveal; ordinary controls commit exactly once');
+        assert.equal(latest.revision, expectedRevision, 'Submitted decisions wait for reveal; ordinary controls commit exactly once');
         if (pending) {
-            assert(latest.submitted.includes(actor.id), 'Private submission has a sealed readiness indicator');
+            assert(latest.submitted.includes(actor.id), 'Private submission has a submitted readiness indicator');
             if (command.startsWith('return-card ')) assert.equal(latest.pendingReturn, command.split(' ')[1]);
             else assert.equal(latest.pendingBid, Number(command.split(' ')[1]));
         } else {

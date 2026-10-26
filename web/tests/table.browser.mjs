@@ -82,7 +82,7 @@ export async function checkTable(page, web, baseline) {
         game: {expansionOffers: [], activity: {...fixture.game.activity, actor: fixture.viewerId, decisionPlayer: other, choice: 'civil-war-loss'}}});
     await page.wait(`!document.querySelector('.map-orders .primary-expansion:not([disabled])')`, 'interruption disables stale expansion');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Changed prompt cannot auto-submit');
-    assert((await page.evaluate(`document.querySelector('.decision-panel').textContent`)).includes(fixture.game.players.find(player => player.id === other).name), 'Interruption names recipient');
+    assert((await page.evaluate(`document.querySelector('.decision-panel').textContent`)).includes(fixture.game.players.find(player => player.id === other).capital.replace(/\b\w/g, letter=>letter.toUpperCase())), 'Interruption names recipient');
     await show({...baseline, revision: fixture.revision + 1});
     await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     await page.evaluate(`document.querySelector('#tab-markets').click()`);
@@ -134,16 +134,16 @@ export async function checkLiveTokenPurchase(page, game, actor, web, finalAmount
         assert.equal(result.revision, state.revision);
         await page.fill('#bid', String(amount));
         await page.wait(`document.querySelector('#purchase-preview')?.textContent.includes('$${result.quote.cashAfter}')`, `authoritative purchase preview ${amount}`);
-        const label = (await game.snapshot(actor)).pendingBid === null ? 'Seal purchase' : 'Replace sealed purchase';
+        const label = (await game.snapshot(actor)).pendingBid === null ? 'Buy tokens' : 'Update token purchase';
         await page.click(label);
-        await page.wait(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Replace sealed purchase' && !button.disabled)`, `purchase saved ${amount}`);
+        await page.wait(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Update token purchase' && !button.disabled)`, `purchase saved ${amount}`);
         assert.equal((await game.snapshot(actor)).pendingBid, amount);
         assert.equal((await game.snapshot(actor)).revision, state.revision, 'Pending replacement does not change committed revision');
     }
     assert.equal(quotes[aboveStock].quote.tokensReceived, me.stockTokens, 'Positive purchase is capped by stock');
     assert.equal(quotes[-2].quote.tokensReceived, 0, 'Negative purchase buys no tokens');
     assert.equal(quotes[-2].quote.cost, 2, 'Negative purchase pays its absolute amount');
-    console.log('Passed: live exact token quotes above stock, negative purchases, and replacement of sealed purchases.');
+    console.log('Passed: live exact token quotes above stock, negative purchases, and replacement of private purchases.');
     return {snapshot: state, quotes};
 }
 
@@ -321,6 +321,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="${reference}"] .leader-discount strong').textContent`), '−$20', 'Leader hand shows its projected discount, distinct from a purchase price');
     await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
     await page.wait(`document.querySelector('.card-decision input[type=number]')`, 'leader protection');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision input[type=number]').value`), '0', 'Protection starts at zero');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false, 'Default protection is ready to play');
     for (const amount of ['', '-1', '6']) {
         await page.fill('.card-decision input[type=number]', amount);
         assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), true, `Invalid protection ${amount} cannot become a bare play`);

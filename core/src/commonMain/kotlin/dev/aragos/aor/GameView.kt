@@ -16,13 +16,18 @@ data class PlayerView(
     val ships: ShippingCapability = ShippingCapability.NONE,
     val advances: Set<AdvanceId> = emptySet(),
     val income: IncomeView? = null,
+    /** A revealed expansion pool still usable this turn, including an empty pool. */
+    val poolAvailable: Boolean = false,
 ) {
     val stockMarkers: Int
         get() = 25 - boardMarkers
 
     companion object {
-        internal fun from(player: PlayerState, state: GameState): PlayerView =
-            PlayerView(
+        internal fun from(player: PlayerState, state: GameState): PlayerView {
+            val expansionFinished =
+                state.stage == Stage.EXPANSION &&
+                    state.turnOrder.indexOf(player.player.id) in 0 until state.flow.cursor
+            return PlayerView(
                 id = player.player.id,
                 name = player.player.name,
                 cash = player.cash,
@@ -35,7 +40,13 @@ data class PlayerView(
                 ships = player.ships,
                 advances = player.advances.owned,
                 income = IncomeView.from(state, player),
+                poolAvailable =
+                    (state.stage == Stage.TURN_ORDER_TIE ||
+                        state.stage in Stage.DRAW_CARD..Stage.EXPANSION) &&
+                        !expansionFinished &&
+                        player.misery != MiseryStep.CHAOS,
             )
+        }
     }
 }
 
@@ -79,10 +90,13 @@ data class GameView(
     val stabilizationCost: Long? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    /** Missing printed access advances for this viewer; independent of phase, routes, and ships. */
+    val lockedProvinces: Set<ProvinceId> = emptySet(),
     val commodityPayouts: List<CommodityPayoutView> = emptyList(),
     val cardOffers: List<CardOfferView> = emptyList(),
     val tokenPurchaseOffers: List<TokenPurchaseOfferView> = emptyList(),
     val shippingOffer: ShippingOfferView? = null,
+    val playedLeaderDiscounts: List<PlayedLeaderDiscountView> = emptyList(),
 ) {
     companion object {
         internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
@@ -110,6 +124,15 @@ data class GameView(
                         ProvinceView.from(province, pieces)
                     },
                 catalog = PublicCatalog.forPlayers(state.playerIds.size, state.rules),
+                lockedProvinces =
+                    ProvinceData.availableFor(state.playerIds.size)
+                        .filterNot { province ->
+                            province.access.all { requirement ->
+                                requirement.isSatisfiedBy(viewer.advances.owned)
+                            }
+                        }
+                        .map(ProvinceDefinition::id)
+                        .toSet(),
                 activity = ActivityView.from(state),
                 deckRemaining = state.deck.size,
                 endingTriggered = state.endingTriggered,
@@ -152,6 +175,7 @@ data class GameView(
                 cardOffers = CardProjection.offers(state, viewer),
                 tokenPurchaseOffers = TokenPurchaseProjection.offers(state, viewer),
                 shippingOffer = ShippingOfferView.from(state, viewer),
+                playedLeaderDiscounts = PlayedLeaderDiscountView.from(state, viewer),
             )
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
@@ -182,6 +206,7 @@ data class GameView(
                         } else {
                             ViolationCode.INSUFFICIENT_CASH.name
                         },
+                        quote.leaders,
                     )
                 } catch (failure: RuleViolation) {
                     AdvanceOfferView(advance, null, failure.code.name)
@@ -241,7 +266,13 @@ data class WarCessionView(
     }
 }
 
-data class AdvanceOfferView(val advance: AdvanceId, val price: Int?, val unavailableReason: String?)
+/** Leader credits are already authorized and included in [price], never an additional rebate. */
+data class AdvanceOfferView(
+    val advance: AdvanceId,
+    val price: Int?,
+    val unavailableReason: String?,
+    val leaderDiscounts: List<AppliedLeaderDiscount> = emptyList(),
+)
 
 data class ReliefOfferView(
     val spaces: Int,
@@ -286,6 +317,8 @@ data class PublicCatalog(
     val coastalConnections: Set<ProvinceConnection>,
     val satelliteSupports: Set<SatelliteSupport>,
     val seaCoasts: Set<SeaCoastConnection>,
+    /** Only assigned seas appear here; sea availability is independent of area availability. */
+    val seaAreas: Map<SeaArea, GeographicalArea>,
     /** Ordered printed misery boxes; Chaos is the final, nonnumeric space. */
     val miseryTrack: List<MiseryStep>,
     /** Legal fleet spaces, grouped by fleet in the UI rather than implying an upgrade route. */
@@ -302,6 +335,9 @@ data class PublicCatalog(
                 configuration.coastalConnections,
                 configuration.satelliteSupports,
                 configuration.seaCoasts,
+                configuration.seas
+                    .mapNotNull { sea -> sea.area?.let { area -> sea to area } }
+                    .toMap(),
                 MiseryStep.entries,
                 ShippingCapability.entries,
             )

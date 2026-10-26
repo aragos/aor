@@ -23,15 +23,21 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const offer = snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
     const primary = offer && offer.primaryAction !== 'INSPECT';
-    const available = primary && offer.blockers.length === 0 && offer.resultingPool !== null;
+    const remainingPlacement = primary && offer.availablePool < offer.requiredTokens
+        ? offer.partialPlacements.find(choice => choice.tokens === offer.availablePool) : undefined;
+    const requiredTokens = remainingPlacement?.tokens ?? offer?.requiredTokens;
+    const resultingPool = remainingPlacement?.resultingPool ?? offer?.resultingPool;
+    const establishesMarker = !!offer?.establishesMarker && !remainingPlacement;
+    const uncertain = !!offer?.uncertain && !remainingPlacement;
+    const available = primary && (!!remainingPlacement || (offer.blockers.length === 0 && offer.resultingPool !== null));
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
-    const command = offer?.primaryAction === 'ATTACK' ? `attack ${province.id}` : `place ${offer?.requiredTokens} ${province.id}`;
+    const command = offer?.primaryAction === 'ATTACK' && !remainingPlacement ? `attack ${province.id}` : `place ${requiredTokens} ${province.id}`;
     const commands = provinceOrders(snapshot, province.id);
     const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button" className="map-link" key={id}
         onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
     return <div className="province-inspector" aria-label={t('table.selectedProvince')}>
         <div>
-            <p className="eyebrow">{primary ? offer.uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
+            <p className="eyebrow">{remainingPlacement ? t('table.remainingTokens') : primary ? uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
             <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
             <p className="map-facts">{province.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
                 <span>{t('board.market')} {province.marketNumber}</span> · {province.area ? `${t('board.area')} ${province.area}` : label(province.overseas ?? '')}</p>
@@ -44,15 +50,16 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
         </div>
         <div className="map-orders">
             {primary && <>
-                <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {offer.resultingPool ?? '—'}</strong></div>
-                <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{offer.requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
-                    <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={offer.establishesMarker ? undefined : 1}/></svg>
-                        <small>{offer.establishesMarker ? t(offer.uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(offer.uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
-                {offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
-                {offer.uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
-                {offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
+                <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {resultingPool ?? '—'}</strong></div>
+                <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
+                    <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={establishesMarker ? undefined : requiredTokens}/></svg>
+                        <small>{establishesMarker ? t(uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
+                {!remainingPlacement && offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
+                {uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
+                {remainingPlacement && <p className="consequence">{t('table.markerNeedsTokens').replace('{count}', String(offer.requiredTokens))}</p>}
+                {!remainingPlacement && offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
                 <button type="button" className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>
-                    {offer.uncertain ? t('action.attack') : province.satellite ? t('action.place') : t('table.establishMarker')} · {offer.requiredTokens} {t('table.tokens')}
+                    {remainingPlacement ? t('table.remainingTokens') : uncertain ? t('action.attack') : province.satellite ? t('action.place') : t('table.establishMarker')} · {requiredTokens} {t('table.tokens')}
                 </button>
                 {offer.partialPlacements.length > 0 && <details className="partial-placement"><summary>{t('table.placeFewer')}</summary>
                     <form onSubmit={event => { event.preventDefault(); if (partialOffer) void submit(`place ${partialOffer.tokens} ${province.id}`); }}>
@@ -67,7 +74,7 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
                     </form>
                 </details>}
                 <details><summary>{t('table.placementDetails')}</summary>
-                    {offer.shipping && <dl className="detail-list"><div><dt>{t('table.destinationShipping')}</dt><dd>{offer.shipping.used} / {offer.shipping.capacity ?? '∞'}</dd></div><div><dt>{t('table.shippingRequired')}</dt><dd>{offer.shipping.required}</dd></div></dl>}
+                    {offer.shipping && <dl className="detail-list"><div><dt>{t('table.destinationShipping')}</dt><dd>{offer.shipping.used} / {offer.shipping.capacity ?? '∞'}</dd></div><div><dt>{t('table.shippingRequired')}</dt><dd>{remainingPlacement?.tokens ?? offer.shipping.required}</dd></div></dl>}
                     <p>{t('game.stockMarkers')}: {me?.stockMarkers}</p>
                 </details>
             </>}

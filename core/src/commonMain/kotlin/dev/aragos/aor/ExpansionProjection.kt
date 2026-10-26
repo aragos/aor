@@ -29,6 +29,8 @@ data class ExpansionOfferView(
     val shipping: ShippingUsageView?,
     val incomeBefore: Int?,
     val incomeAfter: Int?,
+    /** An accessible route exists, independently of pool, marker stock, and commitment size. */
+    val reachable: Boolean,
 )
 
 internal object ExpansionProjection {
@@ -126,6 +128,7 @@ internal object ExpansionProjection {
             shipping,
             income,
             after?.let { board -> IncomeView.from(state, viewer, board)?.ordinary },
+            routes.isNotEmpty(),
         )
     }
 

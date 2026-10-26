@@ -187,7 +187,7 @@ class FileGameStore(
                 participants.containsAll(game.pendingBids.keys) &&
                     game.pendingBids.size < participants.size
             ) {
-                "Pending sealed decisions must form an incomplete batch of the current participants."
+                "Pending private decisions must form an incomplete batch of the current participants."
             }
         }
         if (game.pendingReturns.isNotEmpty()) {
@@ -211,7 +211,9 @@ class FileGameStore(
                     Stage.BIDDING -> Command.BidCapital(amount)
                     Stage.TOKEN_PURCHASE -> Command.BuyTokens(amount)
                     else ->
-                        error("Pending sealed decisions require a bidding or token-purchase phase.")
+                        error(
+                            "Pending private decisions require a bidding or token-purchase phase."
+                        )
                 }
             state.step(Entry.Action(actor = player, command = command))
         }
@@ -251,7 +253,7 @@ class FileGameStore(
             state.stage != Stage.BIDDING ||
                 state.players.values.all { player -> player.capitalBid == null }
         ) {
-            "Sealed bids may enter history only as a complete, revealed batch."
+            "private bids may enter history only as a complete, revealed batch."
         }
         require(state.stage != Stage.SETUP_RETURN || state.deckHistory.setupReturns.isEmpty()) {
             "Setup returns may enter history only as a complete private batch."
@@ -262,7 +264,7 @@ class FileGameStore(
                     .filter { player -> player.misery != MiseryStep.CHAOS }
                     .all { player -> player.tokenPurchase == null }
         ) {
-            "Sealed token purchases may enter history only as a complete, revealed batch."
+            "private token purchases may enter history only as a complete, revealed batch."
         }
     }
 
@@ -311,7 +313,7 @@ class FileGameStore(
                 command !is Command.BuyTokens &&
                 command !is SetupCommand.ReturnCard
         ) {
-            "Sealed decisions must be committed together under their reveal marker."
+            "private decisions must be committed together under their reveal marker."
         }
         require(revision.command == command.toText()) {
             "Revision commands must use canonical text."
@@ -349,7 +351,7 @@ class FileGameStore(
             actions.map(Entry.Action::actor) == state.playerIds.filter(participants::contains) &&
                 actions.all { action -> accepts(action.command) }
         ) {
-            "A revealed batch must include the current sealed decision for every player in registration order."
+            "A revealed batch must include the current private decision for every player in registration order."
         }
     }
 

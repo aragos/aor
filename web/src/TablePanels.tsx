@@ -2,6 +2,7 @@ import type {CommodityPayoutView, PlayerView, PublicCatalog, Snapshot} from './a
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {TableIcon} from './TableIcon';
+import {CardEventText} from './CardEventText';
 import {CommodityIcon, PlayerPiece} from './map/MapSymbols';
 import {useMapSelection} from './map/MapSelection';
 
@@ -26,7 +27,7 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
                 <div><dt>{t('table.conditionalProfit')}</dt><dd>${player.income.interestProfit}</dd></div>
                 <div><dt>{t('controls.spaces')} · {t('action.relieveMisery')}</dt><dd>{player.income.reliefSpaces}</dd></div>
             </>}
-            <div><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>
+            {player.poolAvailable && <div className="player-pool-detail"><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>}
             <div><dt>{t('game.tokens')}</dt><dd>{player.stockTokens}</dd></div>
             <div><dt>{t('game.stockMarkers')}</dt><dd>{player.stockMarkers}</dd></div>
             <div><dt>{t('game.boardMarkers')}</dt><dd>{player.boardMarkers}</dd></div>
@@ -48,6 +49,7 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
 }
 
 export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
+    const {playerPicker} = useMapSelection();
     const order = snapshot.game.turnOrder.length ? snapshot.game.turnOrder : snapshot.game.capitalOrder;
     const players = [...snapshot.game.players].sort((first, second) => {
         const a = order.indexOf(first.id), b = order.indexOf(second.id);
@@ -56,18 +58,25 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
     return <section className="player-overview" aria-label={t('game.table')}>
         {players.map(player => {
             const active = snapshot.prompt?.players.includes(player.id);
-            const sealed = snapshot.submitted.includes(player.id);
+            const submitted = snapshot.submitted.includes(player.id);
             const finished = snapshot.game.stage === 'FINISHED';
-            const status = finished ? t('game.finished') : sealed ? t('game.submitted') : active ? t('table.decision') : t('game.waiting');
+            const status = finished ? t('game.finished') : submitted ? t('game.submitted') : active ? t('table.decision') : t('game.waiting');
             const fleet = player.ships.fleet === 'NONE' ? '—' : `${label(player.ships.fleet, 'fleet')} ${player.ships.level}`;
-            return <details key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''}`}>
-                <summary aria-label={`${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}`}>
+            const eligible = playerPicker?.eligible.includes(player.id);
+            const picked = playerPicker?.selected.includes(player.id);
+            return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
+                <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
+                    if (eligible) {event.preventDefault(); playerPicker?.pick(player.id);}
+                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}`}>
                     <span className="player-identity"><Emblem player={player}/><strong>{player.capital ? provinceName(player.capital) : player.name}</strong>
                         <small>{player.id === snapshot.viewerId ? t('table.you') : order.includes(player.id) ? String(order.indexOf(player.id) + 1).padStart(2, '0') : ''}</small></span>
+                    {player.capital && <span className="player-person">{player.name}</span>}
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span></span>
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> {player.misery ?? t('game.chaos')}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}</span><span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span></span>
+                    {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
+                    {eligible && <span className="target-status">{t(picked ? 'table.selectedTarget' : 'table.legalTarget')}</span>}
                     {!finished && <span className="player-status">{status}</span>}
                 </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
             </details>;
@@ -103,15 +112,16 @@ export function Markets({snapshot}: {snapshot: Snapshot}) {
 }
 
 export function Hand({snapshot}: {snapshot: Snapshot}) {
-    const {selectedCard, setSelectedCard, setSelectedAdvance, setPicker} = useMapSelection();
+    const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker} = useMapSelection();
     return <section className="table-hand" aria-label={t('game.hand')}>
         <div className="hand-heading"><p className="eyebrow">{t('game.hand')}</p><strong>{snapshot.game.hand.length} {t('game.cards').toLowerCase()}</strong></div>
         <div className="hand-cards">{snapshot.game.hand.map(card => {
             const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
             return <button type="button" key={card.reference} data-hand-card={card.reference}
                 aria-pressed={selectedCard === card.reference} className={`hand-card ${card.definition.kind}`}
-                onClick={() => { setSelectedCard(card.reference); setSelectedAdvance(''); setPicker(null); }}>
+                onClick={() => { setSelectedCard(card.reference); setSelected(''); setSelectedAdvance(''); if (selectedCard !== card.reference) setPicker(null); }}>
                 <span className="eyebrow">{t(`kind.${card.definition.kind}`)}</span><h3>{t(card.definition.messageId)}</h3>
+                <CardEventText definition={card.definition}/>
                 {snapshot.game.burdenReferences.includes(card.reference) && <span className="burden-badge">{t('game.burden')}</span>}
                 {offer?.commodities.map(commodity => {
                     const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
@@ -126,23 +136,48 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
 }
 
 export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
-    const {selectedAdvance, setSelectedAdvance, setSelectedCard, setPicker} = useMapSelection();
+    const {selectedAdvance, setSelectedAdvance, setSelected, setSelectedCard, setPicker} = useMapSelection();
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const advances = snapshot.game.catalog?.advances ?? [];
     const categories = [...new Set(advances.map(advance => advance.category))];
     return <section className="advances-workspace" aria-label={t('game.advances')}>
+        <PlayedLeaders snapshot={snapshot}/>
         {categories.map(category => <div className="advance-category" key={category}>
             <h3>{label(category, 'category')} <small>{advances.filter(advance => advance.category === category && me?.advances.includes(advance.id)).length}</small></h3>
             <div className="advance-tiles">{advances.filter(advance => advance.category === category).map(advance => {
                 const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === advance.id);
                 const owned = me?.advances.includes(advance.id);
-                return <button type="button" className={`advance-tile ${owned ? 'owned' : ''}`} key={advance.id}
-                    aria-pressed={selectedAdvance === advance.id} onClick={() => { setSelectedAdvance(advance.id); setSelectedCard(''); setPicker(null); }}>
+                const available = offer?.unavailableReason === null && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
+                return <button type="button" data-advance={advance.id} className={`advance-tile ${owned ? 'owned' : ''} ${available ? 'available' : ''} ${offer?.leaderDiscounts?.length ? 'discounted' : ''}`} key={advance.id}
+                    aria-pressed={selectedAdvance === advance.id} onClick={() => { setSelectedAdvance(advance.id); setSelected(''); setSelectedCard(''); setPicker(null); }}>
                     <span className="advance-letter">{advance.letter}</span><strong>{advanceName(advance.id)}</strong>
                     <span>{owned ? t('table.owned') : offer?.price !== null && offer?.price !== undefined ? `$${offer.price}` : '—'}</span>
+                    {available && <small className="advance-available">{t('table.available')}</small>}
+                    {offer?.leaderDiscounts?.map(discount => <small className="advance-discount" key={discount.leaderCardId}>{label(discount.leaderCardId, 'leader')} −${discount.amount}</small>)}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}
                 </button>;
             })}</div>
         </div>)}
     </section>;
+}
+
+export function PlayedLeaders({snapshot}: {snapshot: Snapshot}) {
+    const leaders = snapshot.game.effects.leaders;
+    if (!leaders.length) return null;
+    return <section className="leader-list" aria-label={t('game.leaders')}><h3>{t('game.leaders')}</h3>{leaders.map(leader => {
+        const credits = snapshot.game.playedLeaderDiscounts?.find(candidate => candidate.leader === leader.leader);
+        const inBox = leader.role === 'DISPLAY';
+        return <article key={leader.leader} className={inBox ? 'leader-in-box' : 'leader-exposed'} data-played-leader={leader.leader}>
+            <span className="leader-role">{inBox ? t('table.inTheBox') : label(leader.role, 'leaderRole')}
+                {leader.displayBox && ` · ${t('game.displayBox')} ${leader.displayBox}`}</span>
+            <strong>{label(leader.leader, 'leader')}</strong>
+            <p className="small">{playerName(snapshot, leader.owner)}</p>
+            {credits && <><p className="leader-credits-label">{t(credits.usable ? 'table.yourLeaderCredits' : 'table.leaderCredits')}</p>
+                {credits.discounts.map(discount => <div className="leader-discount" key={discount.advance}>
+                    <span>{advanceName(discount.advance)}</span><strong>−${credits.usable ? discount.effectiveDiscount : discount.conditionalAmount}</strong>
+                </div>)}</>}
+            {leader.role === 'EXPOSED' && snapshot.game.rules.patronage === 'PROTECTION_MONEY' && <p className="small">{t('game.protection')}: ${leader.protectionCash}</p>}
+            {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: {leader.patronageClaimants.map(id => playerName(snapshot, id)).join(', ')}</p>}
+        </article>;
+    })}</section>;
 }

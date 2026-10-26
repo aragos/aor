@@ -35,9 +35,9 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 | `set-option rebuilt-marker-bonus exclude` | Creator, before `start`; default policy excludes event-rebuilt markers from expansion-bonus credit. |
 | `set-option rebuilt-marker-bonus include` | Creator, before `start`; includes event-rebuilt markers. Voluntary rebuilds never qualify. |
 | `start` | Creator; freezes configuration and requests the shuffle and starting draws. |
-| `bid-capital <amount>` | Each player during sealed capital bidding; integer $0–$40. Bids reveal together. |
+| `bid-capital <amount>` | Each player during private capital bidding; integer $0–$40. Bids reveal together. |
 | `choose-capital <capital>` | Current capital chooser; the capital must remain available. |
-| `buy-tokens <amount>` | Each active player during sealed Order of Play. Pays the absolute amount, including negative bids; only positive amounts buy pool tokens, capped by stock. Must be affordable in full. |
+| `buy-tokens <amount>` | Each active player during private Order of Play. Pays the absolute amount, including negative bids; only positive amounts buy pool tokens, capped by stock. Must be affordable in full. |
 | `choose-turn-position <slot>` | Current chooser within an equal-purchase group. Insert into slots 1 through the provisional group's size plus 1. |
 
 Games always use three epochs. There is no `set-option epochs` command or `epochs` creation
@@ -80,15 +80,15 @@ locators and discrepancies.
 
 | Command | Who and when; effect |
 | --- | --- |
-| `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization or ends Relief. In Expansion it returns unused pool tokens and ends the activity. It cannot skip mandatory stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
+| `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization or ends Relief. In Expansion it returns unused pool tokens and ends the activity. Zero-cost stabilization and relief without a legal purchase advance automatically. It cannot skip positive-cost stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
 | `cancel-adjustment <commodity> <adjustment>` | First player before the ordinary draws; removes an existing marker for its commodity's base dollar cost. |
 | `buy-card` | Urban Ascendancy owner in Buy Card; once per turn, costs $10 and requests a draw. |
 | `discard-card <reference>` | Master Art owner in Buy Card; discards one owned card without effect, once per turn. Independent of buying a card; either order is accepted. |
 | `swap-order <player>` | Player answering a Renaissance decision; swap with an adjacent active player who lacks Renaissance. |
 | `upgrade-ships` | Shipping purchase step; buys the next eligible upgrade for $10 and proceeds to Advances. At most once per turn. |
 | `buy-advance <advance>` | Advances purchase step; buys an affordable unowned advance with its prerequisites and applicable discounts. Repeat as permitted, then `pass`. |
-| `stabilize cash` | Mandatory Stabilization step; pays the hand's stabilization cost in cash. |
-| `stabilize misery` | Mandatory Stabilization step; takes the corresponding misery instead. |
+| `stabilize cash` | Positive-cost Stabilization step; pays the hand's stabilization cost in cash. |
+| `stabilize misery` | Positive-cost Stabilization step; takes the corresponding misery instead. |
 | `relieve-misery <spaces>` | Relief step; buys a positive number of spaces within available current-turn relief rating, advance-tier limit and cash. |
 
 `pass` always answers the current decision or completes the current optional activity. It never

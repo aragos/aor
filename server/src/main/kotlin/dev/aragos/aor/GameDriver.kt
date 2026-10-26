@@ -48,7 +48,7 @@ class AuthorityRandom : SetupRandom {
     }
 }
 
-/** Advances the engine and batches sealed decisions independently of transport and storage. */
+/** Advances the engine and batches private decisions independently of transport and storage. */
 class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
     fun create(
         id: String,
@@ -155,7 +155,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         val pending = pendingValues + (player to value)
         val required =
             (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players
-                ?: error("Sealed submissions require a simultaneous player prompt.")
+                ?: error("private submissions require a simultaneous player prompt.")
         if (required.any { participant -> participant !in pending }) {
             return withPending(pending)
         }
@@ -171,7 +171,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                         command =
                             createCommand(
                                 requireNotNull(pending[participant]) {
-                                    "Every participant must have submitted a sealed decision: $participant."
+                                    "Every participant must have submitted a private decision: $participant."
                                 }
                             ),
                     )

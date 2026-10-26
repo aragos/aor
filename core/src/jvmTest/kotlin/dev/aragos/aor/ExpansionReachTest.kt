@@ -165,6 +165,40 @@ class ExpansionReachTest {
     }
 
     @Test
+    fun heavensCrossesFromSicilyToTheAegeanCoastAsOneSea() {
+        val context =
+            context(
+                ships = ShippingCapability.GALLEY_2,
+                advances = setOf(AdvanceId.THE_HEAVENS),
+                board = BoardState().placeMarker(id("sicily"), venice).board,
+            )
+
+        assertThat(ExpansionReach.routesTo(context, venice, id("smyrna")))
+            .contains(
+                ExpansionRoute.Shipping(
+                    id("sicily"),
+                    listOf(
+                        ShippingSpace.Coast(id("sicily")),
+                        ShippingSpace.Sea(SeaArea.CENTRAL_MEDITERRANEAN),
+                        ShippingSpace.Coast(id("smyrna")),
+                    ),
+                )
+            )
+    }
+
+    @Test
+    fun angoraReachesConstantinopleByLandWithoutShipping() {
+        val context =
+            context(
+                advances = setOf(AdvanceId.OVERLAND_EAST),
+                board = BoardState().placeMarker(id("angora"), venice).board,
+            )
+
+        assertThat(ExpansionReach.routesTo(context, venice, id("constantinople")))
+            .contains(ExpansionRoute.Land(id("angora")))
+    }
+
+    @Test
     fun aShippingRouteCannotCrossTwoSeasWithHeavens() {
         val context =
             context(

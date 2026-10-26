@@ -2,7 +2,7 @@
 
 Create a table with three through six names and keep each private player link. Games always use three epochs.
 The creator selects functional rule options and the rebuilt-marker policy before starting. See the
-[setup walkthrough](manual-setup.md) for sealed bids and access links.
+[setup walkthrough](manual-setup.md) for private bids and access links.
 
 The browser shows the current phase, the player who must act, public board pieces and advances,
 your private hand and available commands. Guided controls submit the same text commands as the
@@ -13,11 +13,11 @@ submitted through a private player link omit the actor prefix; replay logs inclu
 
 | Phase | Commands and behavior |
 | --- | --- |
-| Order of Play | `buy-tokens -2`, `buy-tokens 0`, `buy-tokens 12`. Purchases stay sealed until everyone submits. Tied players use `choose-turn-position 1`. |
+| Order of Play | `buy-tokens -2`, `buy-tokens 0`, `buy-tokens 12`. Purchases stay private until everyone submits. Tied players use `choose-turn-position 1`. |
 | Draw Card | The first box may `cancel-adjustment wine shortage` or `cancel-adjustment stone surplus`, paying each marker separately; `pass` starts automatic draws. |
 | Buy Card | Eligible owners may use `buy-card` ($10) and, with Master Art, `discard-card hand-4` in either order. Each is optional and available once; `pass` continues. |
 | Play Cards | `play hand-4` with any required choice below. Play as many as desired, then `pass`. |
-| Purchase | `upgrade-ships` or `pass`; `buy-advance A` as often as affordable, then `pass`; mandatory `stabilize cash` or `stabilize misery`; `relieve-misery 1` as allowed, then `pass`. |
+| Purchase | `upgrade-ships` or `pass`; `buy-advance A` as often as affordable, then `pass`; `stabilize cash` or `stabilize misery` when the cost is positive; `relieve-misery 1` as allowed, then `pass`. Zero-cost stabilization and relief with no legal purchase are skipped automatically. |
 | Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `pass`. Unused pool tokens return to stock. |
 | Income | Automatic piece flips, income and two recorded shortage/surplus rolls. Eligible majority draws resolve automatically. |
 

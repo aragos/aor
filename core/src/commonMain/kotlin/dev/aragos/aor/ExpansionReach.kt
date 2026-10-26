@@ -166,14 +166,7 @@ object ExpansionReach {
 
     fun canEnter(profile: BoardPlayerProfile, province: ProvinceDefinition): Boolean =
         province.access.all { requirement ->
-            when (requirement) {
-                AccessRequirement.OVERLAND_EAST -> AdvanceId.OVERLAND_EAST in profile.advances
-                AccessRequirement.OCEAN_NAVIGATION -> AdvanceId.OCEAN_NAVIGATION in profile.advances
-                AccessRequirement.NEW_WORLD -> AdvanceId.NEW_WORLD in profile.advances
-                AccessRequirement.THE_HEAVENS_OR_SEAWORTHY_VESSELS ->
-                    AdvanceId.THE_HEAVENS in profile.advances ||
-                        AdvanceId.SEAWORTHY_VESSELS in profile.advances
-            }
+            requirement.isSatisfiedBy(profile.advances)
         }
 
     private fun caravanRoutes(

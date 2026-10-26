@@ -84,6 +84,52 @@ class PublicGameViewTest {
     }
 
     @Test
+    fun publicSeaAreaMembershipSurvivesReducedBoards() {
+        val serialized = json.readTree(json.writeValueAsString(PublicCatalog.forPlayers(3)))
+
+        assertThat(serialized["seaAreas"]["BALTIC_SEA"].asText()).isEqualTo("I")
+        assertThat(serialized["seaAreas"]["GREENLAND_SEA"].asText()).isEqualTo("II")
+        assertThat(serialized["seaAreas"].has("NORTH_SEA")).isFalse()
+    }
+
+    @Test
+    fun printedAccessLocksAreAvailableOutsideExpansion() {
+        val view = GameState(header).viewForPlayer(PlayerId("p1"))
+
+        assertThat(view.lockedProvinces)
+            .containsAtLeast(
+                ProvinceId("poti"),
+                ProvinceId("east-indies"),
+                ProvinceId("north-america"),
+            )
+        assertThat(view.lockedProvinces).doesNotContain(ProvinceId("genoa"))
+    }
+
+    @Test
+    fun accessLocksUnlockOnlyGroupsWhoseAdvanceRequirementsAreMet() {
+        val initial = GameState(header)
+        val player =
+            initial
+                .playerState(PlayerId("p1"))
+                .copy(
+                    advances =
+                        PlayerAdvances(
+                            listOf(
+                                AdvanceAcquisition(AdvanceId.OVERLAND_EAST, 1),
+                                AdvanceAcquisition(AdvanceId.OCEAN_NAVIGATION, 1),
+                            )
+                        )
+                )
+        val state = initial.copy(players = initial.players + (player.player.id to player))
+
+        val view = state.viewForPlayer(player.player.id)
+
+        assertThat(view.lockedProvinces).contains(ProvinceId("north-america"))
+        assertThat(view.lockedProvinces)
+            .containsNoneOf(ProvinceId("poti"), ProvinceId("east-indies"))
+    }
+
+    @Test
     fun advanceOffersUseTheViewersCashAndCurrentPhaseCredits() {
         val initial = turnState()
         val viewer =

@@ -18,16 +18,16 @@ check passed. Test servers, Vite, and Chrome process groups were verified closed
 | Prompt / state | Canonical actions | Visual path | Browser evidence |
 | --- | --- | --- | --- |
 | Configuration | `set-option`, `start` | Rules configuration and Start | Live Start; individual options pending |
-| Setup return | `return-card` | Private hand choice, replace sealed submission | Return/confirm fixture smoke; sealed return replacement pending |
-| Capital bidding | `bid-capital` | Bidding form, sealed readiness | Live submit, replace, unchanged revision and other-seat privacy |
+| Setup return | `return-card` | Private hand choice, replace private submission | Return/confirm fixture smoke; private return replacement pending |
+| Capital bidding | `bid-capital` | Bidding form, private readiness | Live submit, replace, unchanged revision and other-seat privacy |
 | Capital choice | `choose-capital` | Capital choice buttons / board | Live full-game selection and canonical submission |
-| Token purchase | `buy-tokens` | Signed purchase amount, stock | Live stock cap, negative amount, exact quote and sealed replacement; stale quote/Chaos fixture |
+| Token purchase | `buy-tokens` | Signed purchase amount, stock | Live stock cap, negative amount, exact quote and private replacement; stale quote/Chaos fixture |
 | Turn order tie | `choose-turn-position` | Slot choices | Explicit slot/confirm fixture smoke |
 | Draw Card | `cancel-adjustment`, `pass` | Adjustment choices | Live full-game phase passage; adjustment selection also covered by finite choices |
 | Buy Card | `buy-card`, `discard-card`, `pass` | Card purchase / hand actions | Buy Card and ordinary hand discard fixture smoke |
 | Card rounds / final play / War preparation | `play`, `pass` | Hand selection and contextual target form | Dual commodity, leader protection, Pirates, Final Card Play and War preparation fixtures |
 | Commodity choice | `play … commodity` | Commodity choice and current payouts | Dual-choice fixture confirms canonical commodity play |
-| Single player / area / province / category | `play … player/area/province/category` | Target selection | PLAYER, AREA, PROVINCE and CATEGORY canonical play fixture smoke |
+| Single player / area / province / category | `play … player/area/province/category` | Target selection; area labels select Black Death drafts | PLAYER, AREA, PROVINCE and CATEGORY canonical play fixture smoke; area-label inspection, legal-area highlight, draft-only selection and explicit Play |
 | Pirates multi-target | `play … provinces` | Board picker, capped target count | Rapid picker cap, lost target, explicit clear and corrected canonical play fixture |
 | Leader | `play … protect` | Protection payment | Blank, negative, over-max blocked; valid protection submits fixture |
 | Shipping | `upgrade-ships`, `pass` | Upgrade action | Live full-game phase passage; upgrade authority covered by projection tests |
@@ -66,7 +66,7 @@ coverage; a synthetic component snapshot cannot establish authorization or priva
 | Current desktop and phone screenshots | Runner emits desktop, 390 × 844, 430 × 1100 full-page PNGs plus phone viewport/pinch zoom and desktop 200% reflow PNGs outside the repository |
 | Reference tracks | Viewer details keep full tracks collapsed; opening highlights current misery and fleet steps |
 | Structured activity | Closed unread count, open/read continuity, repeated stable IDs and focus preservation fixture |
-| Start-to-finish visual game and nested/variant interruptions | Three-player game completed through 473 checked visual actions, with sealed batches, purchases, card plays and phase changes; interruption/variant families have focused fixture smoke |
+| Start-to-finish visual game and nested/variant interruptions | Three-player game completed through 473 checked visual actions, with private batches, purchases, card plays and phase changes; interruption/variant families have focused fixture smoke |
 
 Run `node scripts/browser-check.mjs` from `web` for isolated live browser checks. It builds the server
 installation, chooses independent ports, and starts its own server, Vite and Chrome process groups.

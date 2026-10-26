@@ -121,11 +121,11 @@ completes the same flow.
 - Present misery as its current box value and shipping as fleet type and level. Show movement,
   cost, reach, and capacity only where the current decision needs them. Retain full tracks in detail.
 - Preserve secret submissions: show submitted status without revealing another player's pending
-  amount or card. A player can review and replace their own permitted sealed submission.
+  amount or card. A player can review and replace their own permitted private submission.
 
 Acceptance: three- through six-player layouts remain legible with long player names and browser zoom.
 Income refreshes after board changes; conditional profit is separate. Setup, Chaos, waiting players,
-and sealed submissions have clear states. No repeated full misery or shipping tracks, and no
+and private submissions have clear states. No repeated full misery or shipping tracks, and no
 prominent idle marker-stock count during expansion.
 
 ## 4 Commodity summaries and informative cards
@@ -180,7 +180,7 @@ as an already-applied purchase price. Command and visual flows produce equivalen
 - Apply the visual hierarchy to game creation and configuration. Extend the decision panel to
   capital bids and selection, private setup returns, token purchasing, turn-order ties, card
   buying/discarding, shipping, stabilization, misery relief, expansion card purchases, and
-  end-of-game results. Keep supported variant choices and replacements of sealed submissions
+  end-of-game results. Keep supported variant choices and replacements of private submissions
   accessible.
 - Cover nested decisions explicitly: Cathedral, event token replacement, marker relocation or
   forgoing, War cessions, market adjustments, takeover trades, Patronage, and final card play.
@@ -210,7 +210,7 @@ the shared decision panel, rather than relying on screenshots alone.
 | Area | Required evidence |
 | --- | --- |
 | Projection accuracy | Focused core tests for income, qualifying ownership, payout/discount conditions, placement commitments, blockers, and preview/execution agreement. Include current variants and marker limits. |
-| Service and privacy | Snapshot/serialization tests, wrong-player views, private hand and sealed-decision redaction, stale revisions, and equivalent visual/command submissions. Preview requests never mutate state. |
+| Service and privacy | Snapshot/serialization tests, wrong-player views, private hand and private-decision redaction, stale revisions, and equivalent visual/command submissions. Preview requests never mutate state. |
 | Continuity | Polling during edits, map/workspace switching, successful submission, rejected submission, stale refresh, and prompt interruptions. Valid intent and focus survive; invalid actions cannot submit. |
 | Legibility and access | Three to six players, large hands, crowded mixed pieces, long labels, keyboard-only operation, touch, browser zoom, reduced motion, and meaningful accessible names. Verify contrast and reading order. |
 | Responsive layout | Desktop and narrow phone layouts, including 390 × 844 and 430 × 1100 references. No unintended horizontal page overflow; action buttons remain visible and unobstructed. |

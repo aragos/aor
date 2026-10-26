@@ -1,22 +1,28 @@
 import {useEffect, useState} from 'react';
-import type {HistoryEventView, Snapshot} from './api';
+import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {Commodity, Emblem} from './TablePanels';
+
+function warHeading(snapshot: Snapshot, war: WarOutcomeView): string {
+    return war.winner ? t('table.warWinner').replace('{capital}', playerName(snapshot, war.winner)) : t('table.warTied');
+}
 
 function EventContent({event, snapshot}: {event: HistoryEventView; snapshot: Snapshot}) {
     const actor = snapshot.game.players.find(player => player.id === event.actor);
     const target = snapshot.game.players.find(player => player.id === event.target);
     const money = ['BID_CAPITAL', 'BUY_CARD', 'BUY_ADVANCE', 'UPGRADE_SHIPS', 'STABILIZE', 'PATRONIZE', 'BUY_EXPANSION_CARD'].includes(event.kind);
     return <span className="activity-content">
-        {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{actor.name}</strong></span>}
+        {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{playerName(snapshot, actor.id)}</strong></span>}
         <span>{t(`activity.${event.kind}`)}</span>
+        {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
+        {event.war && <strong>{warHeading(snapshot, event.war)}</strong>}
         {event.provinces.map(province => <span className="event-entity" key={province}>{provinceName(province)}</span>)}
         {event.card && <span className="event-card">▤ {label(event.card, 'event')}</span>}
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
         {event.amount !== null && <strong>{money ? '$' : ''}{event.amount}</strong>}
-        {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{target.name}</span>}
+        {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{playerName(snapshot, target.id)}</span>}
         {event.detail && <span className="event-detail">{label(event.detail)}</span>}
         {event.dice.map((die, index) => {
             const player = snapshot.game.players.find(candidate => candidate.id === die.player);
@@ -25,6 +31,41 @@ function EventContent({event, snapshot}: {event: HistoryEventView; snapshot: Sna
             </span>;
         })}
     </span>;
+}
+
+/** War results remain visible through subsequent card effects and cession decisions. */
+export function WarNotice({snapshot}: {snapshot: Snapshot}) {
+    const [dismissed, setDismissed] = useState('');
+    const event = [...snapshot.events].reverse().find(candidate => candidate.war);
+    if (!event?.war || event.id === dismissed) return null;
+    const war = event.war;
+    return <section className="war-notice" role="status" aria-live="polite">
+        <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setDismissed(event.id)}>×</button>
+        <strong>{warHeading(snapshot, war)}</strong>
+        <dl className="detail-list">{[war.initiator, war.opponent].map(player => <div key={player}>
+            <dt>{playerName(snapshot, player)}</dt>
+            <dd>{t('table.die')} {event.dice.find(die => die.player === player)?.value ?? '—'} → {t('table.warTotal')} <b>{war.totals[player]}</b></dd>
+        </div>)}</dl>
+        <p>{war.winner ? `${t('table.warTransfers')}: ${war.requiredTransfers}` : t('table.warContinues')}</p>
+    </section>;
+}
+
+/** A result stays beside the decision until dismissed or replaced by the next competition. */
+export function CompetitionNotice({snapshot}: {snapshot: Snapshot}) {
+    const [dismissed, setDismissed] = useState('');
+    const event = [...snapshot.events].reverse().find(candidate => candidate.competition &&
+        (candidate.actor === snapshot.viewerId || candidate.competition.defenders.includes(snapshot.viewerId)));
+    if (!event?.competition || event.id === dismissed) return null;
+    const won = event.actor === snapshot.viewerId ? event.competition.attackerWon : !event.competition.attackerWon;
+    return <section className={`competition-notice ${won ? 'won' : 'lost'}`} role="status" aria-live="polite">
+        <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setDismissed(event.id)}>×</button>
+        <strong>{t(won ? 'table.competitionWon' : 'table.competitionLost')}</strong>
+        <p>{event.provinces.map(provinceName).join(', ')} · {playerName(snapshot, event.actor ?? '')} → {event.competition.defenders.map(id => playerName(snapshot, id)).join(', ')}</p>
+        {event.dice.length > 0 && <p className="competition-dice">{event.dice.map((die, index) => <span key={index}>
+            {t(`table.die.${['white', 'black', 'green'][index]}`)}: <b>{die.value}</b>
+        </span>)}</p>}
+        {event.detail === 'CATHEDRAL' && <p>{t('action.cathedral')}</p>}
+    </section>;
 }
 
 export function Activity({snapshot}: {snapshot: Snapshot}) {
