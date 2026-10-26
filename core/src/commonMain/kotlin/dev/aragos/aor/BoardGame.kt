@@ -547,7 +547,7 @@ object BoardGame {
         }
     }
 
-    private fun attackTokens(
+    internal fun attackTokens(
         context: BoardRulesContext,
         actor: PlayerId,
         province: ProvinceId,

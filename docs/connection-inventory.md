@@ -180,7 +180,7 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | libya | barca | E |
 | barca | tripoli | E |
 | tripoli | tunis | E |
-| tunis | algiers | E |
+| tunis | algiers, sicily | E + user ruling (2026-10-25) |
 | algiers | oran | E |
 | oran | fez | E |
 | varna | kaffa | E |
@@ -281,6 +281,10 @@ There are no remaining source blockers. Any future unresolved question must be e
 **Gallipoli–Angora: no connection.** Confirmed by the user on 2026-10-23: “Angora / gallipoli do not
 touch.” This resolves the contact obscured by the thick printed area boundary in both photographs.
 The absent coastal-water edge is confirmed for all player counts. Constantinople–Angora remains connected.
+
+**Tunis–Sicily: coastal-water connection.** Confirmed by the user on 2026-10-25: Tunis and Sicily
+touch. Their coastal-water spaces share a boundary, allowing a direct galley step; they have no
+land border. This connection applies at every supported player count.
 
 Resolved during transcription: Greenland Sea exists; no support from St. Gall to Nuremberg;
 Cagliari supports Marseilles/Genoa; Leon supports Toledo; Barcelona and Montpellier share a short land

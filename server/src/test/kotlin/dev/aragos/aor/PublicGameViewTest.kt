@@ -72,6 +72,18 @@ class PublicGameViewTest {
     }
 
     @Test
+    fun publicSeaContactsFollowTheActiveBoard() {
+        val catalog = PublicCatalog.forPlayers(3)
+
+        assertThat(catalog.seaCoasts)
+            .contains(SeaCoastConnection(SeaArea.CANARY_BASIN, ProvinceId("west-africa")))
+        assertThat(catalog.seaCoasts.map(SeaCoastConnection::province))
+            .doesNotContain(ProvinceId("london"))
+        assertThat(catalog.provinces.map(ProvinceDefinition::id))
+            .containsAtLeastElementsIn(catalog.seaCoasts.map(SeaCoastConnection::province).toSet())
+    }
+
+    @Test
     fun advanceOffersUseTheViewersCashAndCurrentPhaseCredits() {
         val initial = turnState()
         val viewer =

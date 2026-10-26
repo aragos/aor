@@ -97,13 +97,7 @@ object AdvancePurchases {
             } else {
                 0
             }
-        val writtenRecord =
-            if (
-                context.rules.writtenRecord == WrittenRecordRule.LEADER_BONUS &&
-                    player.advances.owns(AdvanceId.WRITTEN_RECORD)
-            )
-                10
-            else 0
+        val writtenRecord = LeaderRules.writtenRecordBonus(player.advances.owned, context.rules)
         return AdvanceQuote(
             advance = advance,
             baseCost = definition.cost,

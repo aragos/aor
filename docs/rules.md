@@ -992,6 +992,8 @@ province and economic tables, connections and outstanding review questions. The 
 Loire market, six Area I satellites (including Smolensk), Libya in Area VI and a separately printed Aegean Sea.
 The user confirmed on 2026-10-23 that Gallipoli and Angora do not touch; they have no direct coastal-water
 connection. This resolves the final recorded map question. The inventory records the source checks and ruling.
+The user confirmed on 2026-10-25 that Tunis and Sicily touch through their coastal-water spaces.
+They share a direct coastal-water connection and no land border.
 
 ---
 

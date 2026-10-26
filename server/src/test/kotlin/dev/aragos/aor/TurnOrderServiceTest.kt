@@ -21,6 +21,67 @@ class TurnOrderServiceTest {
     }
 
     @Test
+    fun tokenQuoteUsesExactSignedAmountWithoutChangingTheGame() {
+        val fixture = ready()
+        val before = Files.readString(fixture.path)
+
+        val response =
+            fixture.service.quoteTokenPurchase(fixture.game.gameId, fixture.token(0), 6, -13)
+
+        assertThat(response.revision).isEqualTo(6)
+        assertThat(response.quote.amount).isEqualTo(-13)
+        assertThat(response.quote.cost).isEqualTo(13)
+        assertThat(response.quote.tokensReceived).isEqualTo(0)
+        assertThat(Files.readString(fixture.path)).isEqualTo(before)
+    }
+
+    @Test
+    fun tokenQuoteRemainsAvailableForReplacingASealedPurchase() {
+        val fixture = ready()
+        fixture.submit(0, "buy-tokens 9")
+
+        val response =
+            fixture.service.quoteTokenPurchase(fixture.game.gameId, fixture.token(0), 6, 11)
+
+        assertThat(response.quote.tokensReceived).isEqualTo(11)
+        assertThat(fixture.view(0).pendingBid).isEqualTo(9)
+    }
+
+    @Test
+    fun tokenQuoteRequiresTheCurrentRevision() {
+        val fixture = ready()
+
+        val failure =
+            assertFailsWith<ServiceFailure> {
+                fixture.service.quoteTokenPurchase(fixture.game.gameId, fixture.token(0), 5, 8)
+            }
+
+        assertThat(failure.code).isEqualTo("STALE_REVISION")
+    }
+
+    @Test
+    fun tokenQuoteAuthenticatesBeforeReturningRevisionInformation() {
+        val fixture = ready()
+
+        val failure =
+            assertFailsWith<ServiceFailure> {
+                fixture.service.quoteTokenPurchase(fixture.game.gameId, "invalid-token", 5, 8)
+            }
+
+        assertThat(failure.code).isEqualTo("UNAUTHORIZED")
+    }
+
+    @Test
+    fun aSealedTokenPurchaseDoesNotEnterVisualActivity() {
+        val fixture = ready()
+        val before = fixture.view(1).events
+
+        fixture.submit(0, "buy-tokens 9")
+
+        assertThat(fixture.view(1).events).isEqualTo(before)
+    }
+
+    @Test
     fun pendingTokenPurchaseIsPrivateAndDoesNotChangePublicResources() {
         val fixture = ready()
         val initial = fixture.view(1)

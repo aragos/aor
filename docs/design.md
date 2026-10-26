@@ -182,6 +182,22 @@ stop and require rebasing before accepting more entries.
 
 ## 7. UI and localization
 
+The [UI guiding rules](ui-design.md) define visual interaction, contextual action defaults, compact
+summaries, and progressive disclosure for the UI revision. The
+[UI implementation plan](ui-implementation-plan.md) sequences the application changes and their
+verification, beginning with contextual expansion.
+
+The game table provides compact player summaries, map/market/advance workspaces, an adjacent decision
+panel, selectable hand cards, visual activity, and a collapsible command dock. The core projects
+ordinary income, commodity payouts, leader discounts, expansion commitments, and purchase offers
+using the same rules as execution. Token-purchase drafts can request an authenticated, revision-bound
+quote without changing saved state. Conditional values remain separate from deterministic results.
+
+Visual activity is derived from typed committed entries during history replay, with stable
+`revision:entryIndex` identifiers. Its card identities follow the same viewer audiences as the
+command log; unrevealed sealed submissions and private hand references are never exposed. The client
+does not parse log prose to reconstruct events or rules.
+
 The client renders server projections, prompts, legal choices and structured explanations, and builds the same
 commands accepted as text. It owns translations, number formatting and optional auto-pass preferences. Auto-pass
 submits an ordinary authorized command and follows the same validation as a manual pass.

@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import type {ProvinceDefinition, ProvinceView, PublicCatalog, Snapshot} from './api';
-import {advanceName, label, playerName, provinceName} from './labels';
+import {label, playerName, provinceName} from './labels';
 import {t} from './messages';
 
 export function FinalScores({snapshot}: {snapshot: Snapshot}) {
@@ -111,7 +111,7 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
     });
     const areas = [...new Set(catalog.provinces.map(province => province.area ?? province.overseas).filter(Boolean))];
     return <section className="panel board-panel" aria-labelledby="board-title">
-        <h2 id="board-title">{t('game.board')}</h2>
+        <details><summary id="board-title">{t('table.boardDetails')}</summary>
         <div className="board-filters">
             <label>
                 {t('board.search')}
@@ -129,7 +129,7 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
                 {t('board.occupiedOnly')}
             </label>
         </div>
-        <p className="muted small">{t('board.legend')}</p>
+        
         <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="board-title">
             <table className="board-table">
                 <thead>
@@ -143,25 +143,7 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
             </table>
         </div>
         {provinces.length === 0 && <p className="muted">{t('board.noMatches')}</p>}
+        </details>
     </section>;
 }
 
-export function AdvancesPanel({snapshot}: {snapshot: Snapshot}) {
-    const [showAll, setShowAll] = useState(false);
-    const catalog = snapshot.game.catalog;
-    if (!catalog || snapshot.game.turnNumber === null) return null;
-    const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
-    const visible = showAll ? catalog.advances : catalog.advances.filter(advance => me.advances.includes(advance.id));
-    return <section className="panel advances-panel" aria-labelledby="advances-title">
-        <h2 id="advances-title">{t('game.advances')} · {me.advances.length}/26</h2>
-        <label className="check-label"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)}/>{t('advance.showAll')}</label>
-        <p className="muted small">{t('advance.priceHint')}</p>
-        <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="advances-title"><table><thead><tr>
-            {['name', 'category', 'cost', 'credit', 'mr', 'prerequisites', 'owners'].map(key => <th key={key} scope="col">{t(`advance.${key}`)}</th>)}
-        </tr></thead><tbody>{visible.map(advance => <tr key={advance.id}>
-            <td>{advance.letter} · {advanceName(advance.id)}</td><td>{label(advance.category, 'category')}</td><td>${advance.cost}</td><td>${advance.credit}</td><td>${advance.miseryRelief}</td>
-            <td>{advance.prerequisites.map(advanceName).join(', ') || '—'}</td><td>{snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.name).join(', ') || '—'}</td>
-        </tr>)}</tbody></table></div>
-        {visible.length === 0 && <p className="muted">{t('advance.noneOwned')}</p>}
-    </section>;
-}

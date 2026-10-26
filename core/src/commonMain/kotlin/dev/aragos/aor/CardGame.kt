@@ -136,6 +136,27 @@ object CardGame {
     }
 
     fun play(state: GameState, actor: PlayerId, reference: String, choice: CardChoice): GameState {
+        requirePlayWindow(state, actor)
+        val player = state.playerState(actor)
+        val handCard = player.hand.singleOrNull { card -> card.reference == reference }
+        cardRule(
+            handCard != null,
+            CardRuleCode.CARD_NOT_HELD,
+            "Choose a reference in your own hand.",
+        )
+        val card = requireNotNull(handCard) { "A validated card play has a hand reference." }
+        requirePlayableCard(state, card.definition.id)
+        val resolution =
+            CardRules.resolve(state.cardContext(), actor, CardPlay(card.definition.id, choice))
+        val committed =
+            state.replacePlayer(
+                player.copy(hand = player.hand.filterNot { held -> held.reference == reference })
+            )
+        return apply(committed.discardCards(listOf(card)), resolution)
+    }
+
+    /** Shared phase and decision ownership checks for commands and read-only card offers. */
+    internal fun requirePlayWindow(state: GameState, actor: PlayerId) {
         checkRule(
             state.stage == Stage.PLAY_CARDS || state.stage == Stage.FINAL_CARD_PLAY,
             ViolationCode.WRONG_PHASE,
@@ -149,16 +170,12 @@ object CardGame {
                 ViolationCode.WRONG_PLAYER,
             )
         }
-        val player = state.playerState(actor)
-        val handCard = player.hand.singleOrNull { card -> card.reference == reference }
-        cardRule(
-            handCard != null,
-            CardRuleCode.CARD_NOT_HELD,
-            "Choose a reference in your own hand.",
-        )
-        val card = requireNotNull(handCard) { "A validated card play has a hand reference." }
-        if (preparing != null) {
-            val spec = CardEffectData.forCard(card.definition.id)
+    }
+
+    /** Restrictions independent of the selected target or protection payment. */
+    internal fun requirePlayableCard(state: GameState, cardId: String) {
+        if (state.flow.decisions.lastOrNull() is CardDecision.WarPreparation) {
+            val spec = CardEffectData.forCard(cardId)
             cardRule(
                 spec.isMilitary(),
                 CardRuleCode.INVALID_CHOICE,
@@ -166,17 +183,10 @@ object CardGame {
             )
         }
         cardRule(
-            state.activeWar == null || card.definition.id != EventId.WAR.cardId,
+            state.activeWar == null || cardId != EventId.WAR.cardId,
             CardRuleCode.INVALID_WAR,
             "A second War cannot begin while the first is unresolved.",
         )
-        val resolution =
-            CardRules.resolve(state.cardContext(), actor, CardPlay(card.definition.id, choice))
-        val committed =
-            state.replacePlayer(
-                player.copy(hand = player.hand.filterNot { held -> held.reference == reference })
-            )
-        return apply(committed.discardCards(listOf(card)), resolution)
     }
 
     fun chooseCivilWarLoss(
@@ -497,7 +507,7 @@ object CardGame {
         this is CardEffectSpec.Event &&
             event in setOf(EventId.ARMOR, EventId.STIRRUPS, EventId.GUNPOWDER, EventId.LONG_BOW)
 
-    private fun choices(context: CardContext, spec: CardEffectSpec): List<CardChoice> =
+    internal fun choices(context: CardContext, spec: CardEffectSpec): List<CardChoice> =
         when (spec) {
             is CardEffectSpec.CommodityChoices -> spec.choices.map(CardChoice::CommodityChoice)
             is CardEffectSpec.Leader -> listOf(CardChoice.None)

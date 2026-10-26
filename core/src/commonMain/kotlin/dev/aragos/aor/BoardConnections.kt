@@ -270,7 +270,8 @@ object BoardConnectionData {
             coast("libya", "barca")
             coast("barca", "tripoli")
             coast("tripoli", "tunis")
-            coast("tunis", "algiers")
+            // User ruling, 2026-10-25: Tunis and Sicily share a coastal-water boundary.
+            coast("tunis", "algiers", "sicily")
             coast("algiers", "oran")
             coast("oran", "fez")
             coast("varna", "kaffa")

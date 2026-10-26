@@ -4,8 +4,10 @@
   "description": "Age of Renaissance web client",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "build": "tsc && vite build",
-    "start": "vite"
+    "start": "vite",
+    "test:browser": "node scripts/browser-check.mjs"
   },
   "dependencies": {
     "react": "^18.2.0",

@@ -1,6 +1,37 @@
+export interface IncomeView {
+    ordinary: number; baseIncome: number; middleClassBonus: number; interestProfit: number; reliefSpaces: number;
+}
+export interface ExpansionOfferView {
+    destination: string; primaryAction: 'PLACE' | 'ATTACK' | 'INSPECT'; requiredTokens: number;
+    availablePool: number; resultingPool: number | null; establishesMarker: boolean; uncertain: boolean;
+    blockers: string[]; partialPlacements: {tokens: number; resultingPool: number}[];
+    shipping: {used: number; capacity: number | null; required: number} | null;
+    incomeBefore: number | null; incomeAfter: number | null;
+}
+export interface CommodityPayoutView {
+    commodity: string; adjustments: ('SHORTAGE' | 'SURPLUS')[];
+    owners: {player: string; provinces: string[]; marketCount: number; effectiveBox: number; payout: number; industryBonus: number}[];
+}
+export interface CardChoiceView {
+    kind: 'NONE' | 'COMMODITY' | 'PLAYER' | 'PROVINCE' | 'PROVINCES' | 'AREA' | 'CATEGORY' | 'PROTECTION';
+    value: string | null; command: string | null;
+}
+export interface CardOfferView {
+    reference: string; playable: boolean; blockers: string[]; choices: CardChoiceView[];
+    commodities: string[];
+    leaderDiscounts: {advance: string; printedAmount: number; conditionalAmount: number; writtenRecordBonus: number; effectiveDiscount: number; condition: string | null}[];
+    provinceTargets: string[]; requiredTargetCount: number | null; protectionMax: number | null;
+}
+export interface TokenPurchaseOfferView {
+    amount: number; cost: number; tokensReceived: number; cashAfter: number; stockAfter: number; poolAfter: number;
+}
+export interface ShippingOfferView {
+    cost: number; ships: PlayerView['ships'] | null; cashAfter: number | null; blockers: string[];
+}
 export interface PlayerView {
     id: string; name: string; cash: number; capital: string | null; handCount: number;
     stockTokens: number; poolTokens: number; boardMarkers: number; stockMarkers: number; misery: number | null;
+    income: IncomeView | null;
     ships: {fleet: 'NONE' | 'GALLEY' | 'SEAWORTHY' | 'OCEAN'; level: number}; advances: string[];
 }
 export interface ProvinceDefinition {
@@ -16,6 +47,9 @@ export interface PublicCatalog {
     commodities: {id: string; baseValue: number; diceTotal: number; ownershipTrackBoxes: number; printedPayouts: number[]}[];
     landBorders: {first: string; second: string}[]; coastalConnections: {first: string; second: string}[];
     satelliteSupports: {satellite: string; market: string}[];
+    seaCoasts: {sea: string; province: string}[];
+    miseryTrack: (number | null)[];
+    shippingTrack: PlayerView['ships'][];
 }
 export interface ProvinceView {
     id: string; marker: {owner: string; side: 'COLOURED' | 'WHITE'} | null;
@@ -34,6 +68,18 @@ export interface CardDefinition {
     id: string; kind: 'commodity' | 'event' | 'leader'; messageId: string; shape: 'CIRCLE' | 'SQUARE';
 }
 export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
+export interface HistoryEventView {
+    id: string; kind: 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
+        'RETURN_CARD' | 'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' |
+        'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
+        'ATTACK' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' | 'WRITTEN_RECORD' |
+        'OFFER_CARD' | 'PLAY_CARD' | 'ADJUST_MARKET' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
+        'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL';
+    actor: string | null; target: string | null; turnNumber: number | null; stage: string;
+    provinces: string[]; card: string | null; commodity: string | null; advance: string | null;
+    amount: number | null; detail: string | null; dice: {player: string | null; value: number}[];
+}
+export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
 export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
     game: {stage: string; currentEpoch: number;
@@ -53,10 +99,13 @@ export interface Snapshot {
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
         advanceOffers: {advance: string; price: number | null; unavailableReason: string | null}[];
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
-        stabilizationCost: number | null; burdenReferences: string[]};
+        stabilizationCost: number | null; burdenReferences: string[];
+        expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
+        tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];
+    events: HistoryEventView[];
 }
 export interface CreatedGame {gameId: string; links: {id: string; name: string; path: string}[]}
 export class ApiError extends Error {

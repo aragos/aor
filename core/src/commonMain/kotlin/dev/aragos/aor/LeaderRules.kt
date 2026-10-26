@@ -247,13 +247,7 @@ object LeaderRules {
 
     /** Credits stack across owned and claimed leaders; Written Record adds ten per used credit. */
     fun discount(context: CardContext, buyer: PlayerId, advance: AdvanceId): Int {
-        val writtenRecordBonus =
-            if (
-                context.rules.writtenRecord == WrittenRecordRule.LEADER_BONUS &&
-                    AdvanceId.WRITTEN_RECORD in context.player(buyer).advances
-            )
-                10
-            else 0
+        val writtenRecordBonus = writtenRecordBonus(context.player(buyer).advances, context.rules)
         return context.effects.leaders
             .filter { leader ->
                 leader.owner == buyer || buyer in leader.patronageClaimants
@@ -268,6 +262,17 @@ object LeaderRules {
                     writtenRecordBonus
             }
     }
+
+    /** Shared bonus for both authorized purchases and potential hand-card credit. */
+    fun writtenRecordBonus(advances: Set<AdvanceId>, rules: RuleOptions): Int =
+        if (
+            rules.writtenRecord == WrittenRecordRule.LEADER_BONUS &&
+                AdvanceId.WRITTEN_RECORD in advances
+        ) {
+            10
+        } else {
+            0
+        }
 
     /** Escrow is forfeited, rather than refunded. Claim payments are already the owner's cash. */
     fun protectionToBank(effects: CardTurnEffects): Int =

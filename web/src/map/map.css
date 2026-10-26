@@ -1,0 +1,86 @@
+.interactive-board { margin-bottom: 1.4rem; scroll-margin-top: 1rem; }
+.map-heading, .map-toolbar, .map-players, .map-legend, .map-pick-banner, .map-zoom { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem 1rem; }
+.map-heading { justify-content: space-between; }
+.map-heading h2 { margin-bottom: .6rem; }
+.map-players { font-size: .8rem; }
+.map-players span, .map-legend span, .map-facts span { display: inline-flex; align-items: center; gap: .3rem; }
+.map-players small { color: #667268; }
+.map-toolbar { margin: .8rem 0; align-items: end; }
+.map-toolbar label { flex: 1 1 150px; margin: 0; font-size: .8rem; }
+.map-toolbar input, .map-toolbar select { margin: .35rem 0 0; width: 100%; }
+.map-zoom { gap: .35rem; }
+.map-zoom button { margin: 0; }
+.map-viewport { background: #eae8dd; border: 1px solid #92aaa6; border-radius: 8px; overflow: hidden; }
+.world-map { display: block; width: 100%; height: min(75vh, 850px); min-height: 440px; touch-action: none; cursor: grab; }
+.world-map:active { cursor: grabbing; }
+.world-map text { font-family: 'DM Sans', system-ui, sans-serif; }
+.map-province.active { cursor: pointer; outline: none; }
+.map-province:focus .province-shape { stroke: #143e4e; stroke-width: 7px; }
+.map-province:hover .province-shape { stroke: #143e4e; stroke-width: 4px; }
+.map-province.inactive { opacity: .6; }
+.map-filtered { opacity: .35; }
+.province-label { user-select: none; }
+.map-legend { font-size: .78rem; margin: .9rem 0; }
+.map-legend .check-label { margin: 0; }
+.satellite-key::before, .coast-key::before { content: ''; width: 20px; height: 18px; border: 1px solid #8d9e94; border-radius: 3px; }
+.satellite-key::before { background: radial-gradient(#879481 1px, transparent 1px) 0 0 / 6px 6px #e0e4d9; }
+.coast-key::before { background: #d2efed; border-color: #56929c; }
+.commodity-legend { font-size: .85rem; }
+.province-inspector { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; border-top: 1px solid #d3d9cc; margin-top: 1rem; padding-top: 1rem; }
+.province-inspector h3 { margin: 0 0 .4rem; font-size: 1rem; }
+.province-inspector p { margin: .5rem 0; }
+.map-facts { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; }
+.map-orders form { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
+.map-orders label { max-width: 140px; margin: 0; font-size: .8rem; }
+.map-orders input { width: 100%; margin-bottom: 0; }
+.map-orders button { margin: 0; }
+.map-orders .action-buttons { margin-top: .8rem; }
+.map-link { display: inline; background: transparent; color: #315e6b; padding: .15rem .35rem; margin: .1rem; border: 0; text-decoration: underline; font-size: inherit; }
+.map-pick-banner { padding: .7rem; background: #e4f1f4; border: 1px solid #6593a4; border-radius: 5px; font-size: .85rem; }
+.map-pick-banner button { margin: 0 0 0 auto; }
+.map-picker { margin: .5rem 0; }
+.map-picker[aria-pressed=true] { border-color: #2b6d9a; background: #e4f1f4; }
+@media (max-width: 600px) {
+    .interactive-board { padding: .8rem; }
+    .world-map { min-height: 420px; height: 65vh; }
+    .province-inspector { grid-template-columns: 1fr; }
+    .map-players small { display: none; }
+    .map-toolbar label { flex-basis: 130px; }
+}
+/* Selection details share the decision panel beside the board. */
+.interactive-board { margin: 0; }
+.map-toolbar { padding: .65rem 1rem; margin: 0; gap: .5rem; background: #f8faf1; }
+.map-toolbar label { font-size: .7rem; flex-basis: 120px; }
+.map-toolbar input, .map-toolbar select { padding: .5rem; }
+.map-zoom { gap: .25rem; } .map-zoom button { padding: .55rem .75rem; }
+.map-viewport { border: 0; border-radius: 0; }
+.world-map { height: min(65vh, 750px); min-height: 460px; }
+.commodity-legend { padding: .3rem 1rem; border-top: 1px solid #d7dece; font-size: .8rem; }
+.commodity-legend summary { min-height: 28px; }
+.province-inspector { display: block; padding: 0; margin: 0 0 1rem; border: 0; }
+.province-inspector h2 { margin-bottom: .8rem; font-size: 1.6rem; }
+.province-inspector p { font-size: .85rem; }
+.province-inspector .map-facts { font-size: .8rem; color: #617267; }
+.map-orders form { display: block; } .map-orders form label { max-width: none; }
+.map-orders form select { width: 100%; margin: .5rem 0; }
+.map-orders form button { margin-top: .6rem; width: 100%; }
+.pool-change { display: flex; justify-content: space-between; align-items: center; gap: .7rem; background: #e3edd8; padding: 1rem; border: 1px solid #bdcfae; border-radius: 7px; margin: 1.3rem 0 1rem; }
+.pool-change > span { font-size: .85rem; font-weight: 700; }
+.pool-change strong { font-size: 2.3rem; color: #345c3e; white-space: nowrap; }
+.pool-change strong span { font-size: 1.4rem; padding: 0 .2rem; color: #73886c; }
+.commitment-preview { display: flex; justify-content: space-between; align-items: center; border: 1px solid #d3dcc8; border-radius: 7px; padding: 1rem; margin-bottom: 1rem; background: #fffef9; }
+.commitment-preview > span { display: block; text-align: center; } .commitment-preview strong { font-size: 1.7rem; }
+.commitment-preview small { display: block; font-size: .75rem; color: #63765e; margin-top: .4rem; }
+.value-change { display: flex; justify-content: space-between; gap: .5rem; }
+.primary-expansion { width: 100%; margin-top: .7rem !important; font-weight: 700; }
+.partial-placement { margin-top: .8rem; }
+.map-orders details summary { font-size: .83rem; color: #356251; }
+.map-orders .consequence { font-size: .8rem; padding: .7rem; background: #f0ebd8; border-radius: 4px; }
+.map-pick-banner { margin: .5rem 1rem; } .map-pick-banner button { min-height: 40px; }
+@media (max-width: 700px) {
+    .interactive-board { padding: 0; } .world-map { min-height: 310px; height: 43vh; max-height: 420px; }
+    .map-toolbar { gap: .5rem; padding: .6rem .8rem; } .map-toolbar label { flex-basis: 85px; } .map-toolbar > label:first-child { display: none; } .map-zoom { margin-left: auto; }
+    .pool-change { margin-top: .8rem; padding: .6rem 1rem; } .pool-change strong { font-size: 1.8rem; }
+    .commitment-preview { padding: .65rem 1rem; margin-bottom: .7rem; }
+    .primary-expansion { position: sticky; bottom: .5rem; z-index: 2; box-shadow: 0 3px 12px #263d3330; min-height: 46px; }
+}
