@@ -1,9 +1,8 @@
 # Board and economic catalog review
 
-The first milestone in [the minimum full game plan](minimum-full-game-plan.md) now has a static
-catalog and a review inventory. This document records that original static-data milestone;
-the current [three-epoch implementation](remaining-rules-plan.md) builds on the reviewed baseline
-catalog and selects alternate definitions without changing the printed data recorded here.
+This inventory records the reviewed baseline board and economy. The current three-epoch game selects
+alternate definitions through explicit rule options; the printed data recorded here stays unchanged.
+[Rule coverage](rule-coverage.md) records implementation and verification evidence.
 
 Review the transcription using these tables:
 

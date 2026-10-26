@@ -2,6 +2,8 @@
 
 [engine.md](engine.md) defines the pure game engine; [rules.md](rules.md) is the game-rules reference.
 This document covers application architecture, storage, player interaction and development scope.
+The three-epoch human game, functional variants and visual table are implemented. General undo,
+strategy controllers and private plans remain deferred contracts, described below.
 
 ## 1. Principles
 
@@ -62,8 +64,8 @@ The following is a feature catalog, not a promise to implement every option init
 | Undo                      | Four scopes below; regular-turn undo by default. All edits preserve recorded random events and outcomes. |
 | Resolved rulings          | Q7 recycling verified against the supplied card reference; Q14 reinsertion timing is an approved project rule. |
 
-The [remaining rules plan](remaining-rules-plan.md) organizes the completed implementation and its
-verification. Three epochs are fixed; `epochs` is not a command, creation field or selector.
+[Rule coverage](rule-coverage.md) records implemented behavior and verification. Three epochs are
+fixed; `epochs` is not a command, creation field or selector.
 The functional variant rows are configurable through the [command reference](commands.md).
 Application features such as undo, controllers and private plans remain separate.
 
@@ -149,6 +151,8 @@ retain private-information restrictions, and undo cannot erase knowledge a playe
 
 ## 5. Human and strategy controllers
 
+Human seats are implemented. Strategy controllers below are a deferred contract.
+
 Each player has a stable identity and an initially fixed human or strategy controller. Both receive the same
 per-player projection, addressed prompts and legal choices, and submit through the same validation and secret-batch
 protocol. Strategies cannot inspect authoritative state, other players' secrets or the randomness provider.
@@ -169,6 +173,8 @@ assignment changes and explicit treatment of pending submissions.
 
 ## 6. Private plans
 
+Deferred contract.
+
 Plans are private saved drafts of ordinary command text, tied to a player, base revision and log position. They may
 be incomplete and reach future turns. The engine provides partial projections and per-entry diagnostics
 ([engine §5](engine.md#5-planning)). Initially there is no sharing or automatic execution: a plan becoming actionable
@@ -182,44 +188,30 @@ stop and require rebasing before accepting more entries.
 
 ## 7. UI and localization
 
-The [UI guiding rules](ui-design.md) define visual interaction, contextual action defaults, compact
-summaries, and progressive disclosure for the UI revision. The
-[UI implementation plan](ui-implementation-plan.md) sequences the application changes and their
-verification, beginning with contextual expansion.
+[UX principles](ui-design.md) own interaction requirements; [map contracts](map-design.md) own
+spatial rendering. The [UX review](ux-next-steps.md) proposes subsequent work.
 
-The game table provides compact player summaries, map/market/advance workspaces, an adjacent decision
-panel, selectable hand cards, visual activity, and a collapsible command dock. The core projects
-ordinary income, commodity payouts, leader discounts, expansion commitments, and purchase offers
-using the same rules as execution. Token-purchase drafts can request an authenticated, revision-bound
-quote without changing saved state. Conditional values remain separate from deterministic results.
+The client renders viewer-safe projections, prompts, legal choices and typed explanations, and sends
+the same canonical commands as the text interface. Calculations stay in the core and authorization
+stays in the service. Read-only quotes are authenticated and bound to the committed revision.
 
 Visual activity is derived from typed committed entries during history replay, with stable
 `revision:entryIndex` identifiers. Its card identities follow the same viewer audiences as the
 command log; unrevealed private submissions and private hand references are never exposed. The client
 does not parse log prose to reconstruct events or rules.
 
-The client renders server projections, prompts, legal choices and structured explanations, and builds the same
-commands accepted as text. It owns translations, number formatting and optional auto-pass preferences. Auto-pass
-submits an ordinary authorized command and follows the same validation as a manual pass.
-
 Use stable message identifiers, typed arguments and entity ids for engine, revision, planning and controller errors.
 Static definitions provide localization keys; translation resources belong to the presentation layer. Neither UI nor
 strategies infer legality by parsing English messages. Command text and replay results are identical across locales.
 
-## 8. Delivery and verification
+## 8. Verification
 
-Build in this order: declarative data and validation; text codec and setup loop; revisions and recorded randomness;
-economy; expansion; card effects; Final Card Play and scoring; controllers and private plans. Establish localization
-keys and typed explanation data at the interfaces. Transcribe the physical map carefully; do not copy unlicensed data.
-Keep automatic plan execution and in-game controller replacement outside the initial scope.
+[Engine verification](engine.md#8-verification), [rule coverage](rule-coverage.md) and
+[visual decision coverage](ui-decision-coverage.md) record the relevant contracts and evidence.
+Keep domain arithmetic and progression tests separate from service authorization, revision,
+secret-batch atomicity and restart checks. Browser checks verify full user interactions, including
+rejection and stale requests. UI fixture checks cannot establish secrecy or persistence.
 
-Engine checks are in [engine §8](engine.md#8-verification). Service and UI checks cover:
-
-- All four undo scopes, defaults, phase boundaries, nested interruptions, invalid suffixes, stale requests, atomic
-  secret batches and revision redaction. Reject setup edits and edits that add/remove random events, substitute
-  unrelated outcomes, invalidate recorded results or truncate away an event. Accept compatible edits within the
-  configured scope. Rejection must leave the active revision unchanged, without generating replacement outcomes.
-- Private plans, explicit submission, stopping at interruptions, retained drafts and rebasing; no automatic execution.
-- Equal information and validation for humans and strategies, deterministic commands, and pending decisions on bugs.
-- Supported initial options and rejection of unavailable keys, values and combinations; expand checks as options grow.
-- Resolution of all presentation keys and typed parameters, with locale-independent commands and replay.
+When deferred undo, controller or planning work begins, verify its contracts above before calling
+it supported. Preserve recorded outcomes and private audiences, reject invalid edits atomically,
+and never execute a private plan or substitute a strategy decision implicitly.

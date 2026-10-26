@@ -3,7 +3,6 @@
 Status: the fixed three-epoch engine and functional rule variants are implemented; planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
 [design.md](design.md). Rules section references below refer to rules.md.
 
-The [remaining rules plan](remaining-rules-plan.md) records work packets and parallel ownership.
 Epoch count is fixed at three; the 26th-advance ending remains supported.
 The [coverage inventory](rule-coverage.md) maps rules to implementations and verification.
 
@@ -119,6 +118,8 @@ validation remains authoritative; visible effects must be applicable without lea
 
 ## 5. Planning
 
+Deferred contract; a private-plan projection API is not implemented.
+
 A plan uses ordinary command objects/text plus a base revision and log position. Projection operates only on the
 viewing player's information; it never queries future live randomness or other players' hidden values.
 
@@ -220,12 +221,13 @@ and reach/combat functions from flow so they can be tested directly.
   counted once; 25 markers across mat/board; nonnegative cash; market capacity outside competitions; dominated markets
   hold only a marker; satellites hold at most one token and never a marker. Live and replayed states must match.
 - **Codec:** every command, including configuration, round-trips through print/parse.
-- **Revision validation:** accept compatible edits and reject changed setup, added/removed random requests, unrelated
-  outcome substitutions, invalid card/deck matches and truncation across recorded events. Preserve exact outcomes;
+- **Revision validation (deferred):** accept compatible edits and reject changed setup, added/removed
+  random requests, unrelated outcome substitutions, invalid card/deck matches and truncation across
+  recorded events. Preserve exact outcomes;
   rejection must not generate randomness or change state.
 - **Information:** full and projected/redacted replay agree on public and viewing-player private state. Test private
   setup returns, discards, trades and shuffles; choices, explanations and diagnostics must not leak secrets.
-- **Planning:** partial, invalid, future and blocked commands return honest diagnostics/projections without modifying
-  the live log or consuming live randomness.
+- **Planning (deferred):** partial, invalid, future and blocked commands return honest diagnostics
+  and projections without modifying the live log or consuming live randomness.
 
-Service/controller/revision and localization checks belong to [design §8](design.md#8-delivery-and-verification).
+Service/controller/revision and localization checks belong to [design §8](design.md#8-verification).

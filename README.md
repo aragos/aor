@@ -16,15 +16,10 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
 - [Rules](docs/rules.md): game mechanics, variants, sources and unresolved questions.
 - [Setup walkthrough](docs/manual-setup.md): creation, private decisions, restart and API instructions.
 - [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
-- [Minimum full game plan](docs/minimum-full-game-plan.md): agreed scope, delivery checkpoints and verification.
-- [Remaining rules plan](docs/remaining-rules-plan.md): fixed three-epoch delivery, remaining variants,
-  parallel agent assignments, dependencies and verification gates.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
 - [Map design](docs/map-design.md): the agreed visual language, board navigation, and map-based orders.
-- [UI guiding rules](docs/ui-design.md): visual interaction, compact summaries, action defaults,
-  and [interactive redesign proposals](docs/ui-proposals/index.html).
-- [UI implementation plan](docs/ui-implementation-plan.md): delivery order, domain projections,
-  and acceptance criteria for the visual redesign.
+- [UX and UI principles](docs/ui-design.md): goals and common interaction requirements.
+- [UX review and next steps](docs/ux-next-steps.md): project findings, priorities and acceptance criteria.
 - [Rule coverage](docs/rule-coverage.md), [card inventory](docs/card-inventory.md) and
   [variant inventory](docs/variant-inventory.md): implementation evidence and selected source interpretations.
 

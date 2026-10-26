@@ -134,8 +134,6 @@ All fractions are **rounded up** unless stated otherwise.
 
 1. **Game length.** Games use three epochs, with no setup option for a shorter game (project
    decision, 2026-10-24). The 26th-advance ending trigger still applies ([§8](#8-end-of-game)).
-   The fixed three-epoch implementation follows the
-   [remaining rules plan](remaining-rules-plan.md).
 2. **Pieces.**
     - Each player places one domination marker on its capital.
     - The remaining markers go on the mat circles; the "0" circle is never covered.
