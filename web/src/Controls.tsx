@@ -94,7 +94,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             </div>
             <form onSubmit={event => { event.preventDefault(); void submit(`set-option rebuilt-marker-bonus ${rebuiltMarkerBonus.toLowerCase()}`); }}>
                 <label htmlFor="setup-rebuilt-marker-bonus">{t('controls.rebuiltMarkerBonus')}</label>
-    
+
                 <div className="inline-form">
                     <select id="setup-rebuilt-marker-bonus" value={rebuiltMarkerBonus} onChange={event => { const value = event.target.value; if (value === 'INCLUDE' || value === 'EXCLUDE') setRebuiltMarkerBonus(value); }}>
                         {(['EXCLUDE', 'INCLUDE'] as const).map(rule => <option key={rule} value={rule}>{t(`rebuiltMarkerBonus.option.${rule}`)}</option>)}
@@ -130,4 +130,3 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
 
     </>;
 }
-

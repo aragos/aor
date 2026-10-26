@@ -60,7 +60,7 @@ function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {
     const sources = snapshot.legalChoices.commands.filter(command => command.startsWith('move-marker '));
     return <div className="guided-form">
         <h3>{t('controls.markerPlacement')}{destination ? ` · ${provinceName(destination)}` : ''}</h3>
-        
+
         <button className="secondary" disabled={busy} onClick={async () => { if (await submit('forgo-marker')) setSource(''); }}>{t('action.forgo-marker')}</button>
         {sources.length > 0 && <form onSubmit={async event => {
             event.preventDefault();

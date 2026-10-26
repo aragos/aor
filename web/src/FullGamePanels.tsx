@@ -129,7 +129,7 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
                 {t('board.occupiedOnly')}
             </label>
         </div>
-        
+
         <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="board-title">
             <table className="board-table">
                 <thead>
@@ -146,4 +146,3 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
         </details>
     </section>;
 }
-

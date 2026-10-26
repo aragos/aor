@@ -70,7 +70,7 @@ export function CardDecision({snapshot, busy, submit}: Props) {
                 onPick={id => {
                     const area = snapshot.game.catalog?.provinces.find(province => province.id === id)?.area?.toLowerCase();
                     setChoice(areaChoices.find(candidate => candidate.value === area)?.command ?? '');
-                }}/>} 
+                }}/>}
             {needsTargets && offer && <fieldset className="target-choices"><legend>{t('table.targets')} · {targets.length}/{offer.requiredTargetCount}</legend>
                 {offer.provinceTargets.map(province => <button type="button" key={province} className="secondary" aria-pressed={targets.includes(province)}
                     disabled={busy || (!targets.includes(province) && targets.length >= (offer.requiredTargetCount ?? 0))}
