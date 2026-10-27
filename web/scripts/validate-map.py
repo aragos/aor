@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from shapely import get_parts
-from shapely.geometry import Point, Polygon, box
+from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import transform, unary_union
 from map_geography import SCANDINAVIAN_INTERIOR, display_point
 
@@ -224,9 +224,9 @@ assert (
     water["oran"].distance(water["granada"]) >= 12
 ), "Oran must be visibly separated from Granada."
 for key, shape in geometry["provinces"].items():
-    assert land[key].covers(
+    assert polygon(shape["outline"]).covers(
         Point(shape["label"])
-    ), f"{key}: label must be inside its province."
+    ), f"{key}: label must be inside its province footprint."
     x, y = shape["label"]
     left, top, width, height = shape["labelBox"]
     label_box = box(x + left, y + top, x + left + width, y + top + height)
@@ -433,3 +433,24 @@ for first, shape in areas.items():
 print(
     f"Checked {len(expected_seas)} sea contacts, 108 combined outlines, and eight contiguous area outlines."
 )
+
+# Arrows are authored from the catalog and cannot acquire new support relationships.
+expected_supports = {
+    f"{ids[0]} {other}"
+    for arguments in re.findall(r"(?m)^\s*supports\((.*?)\)", source)
+    for ids in [re.findall(r'"([a-z-]+)"', arguments)]
+    for other in ids[1:]
+}
+assert set(geometry["supports"]) == expected_supports, "Support arrows must match the catalog."
+for edge, path in geometry["supports"].items():
+    values = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", path)]
+    points = list(zip(values[::2], values[1::2]))
+    source_id, target_id = edge.split()
+    assert footprints[source_id].buffer(0.003).covers(Point(points[0])), (
+        f"{edge}: support arrow must begin in its satellite."
+    )
+    assert footprints[target_id].buffer(0.003).covers(Point(points[-1])), (
+        f"{edge}: support arrow must end in its market."
+    )
+    assert LineString(points).length >= 24, f"{edge}: support arrow must have visible length."
+print(f"Checked {len(expected_supports)} directed support paths and their province endpoints.")

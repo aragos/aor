@@ -18,6 +18,7 @@ interface Geometry {
     areas: Record<string, {path: string; label: number[]}>;
     seas: Record<string, {path: string; label: number[]; labelAngle: number; color: string; area: string | null}>;
     terrain: string;
+    supports: Record<string, string>;
 }
 const geometry: Geometry = geometryData;
 const initialView = {x: geometry.bounds[0], y: geometry.bounds[1], w: geometry.bounds[2], h: geometry.bounds[3]};
@@ -324,12 +325,7 @@ export function BoardMap({snapshot, busy}: {
                             clipPath={`url(#${prefix}-area-${area})`}/>
                     </g>)}
                     {showSupport && catalog.satelliteSupports.map(edge => {
-                        const [x1, y1] = geometry.provinces[edge.satellite].label, [x2, y2] = geometry.provinces[edge.market].label;
-                        const distance = Math.hypot(x2 - x1, y2 - y1), dx = (x2 - x1) / distance, dy = (y2 - y1) / distance;
-                        const gap = Math.min(58, distance * .34);
-                        // Vertical arrows pass beside the name and pieces below the market value.
-                        const offset = Math.abs(dx) < .35 ? 28 : 0;
-                        const d = `M${x1 + dx * gap - dy * offset} ${y1 + dy * gap + dx * offset}L${x2 - dx * gap - dy * offset} ${y2 - dy * gap + dx * offset}`;
+                        const d = geometry.supports[`${edge.satellite} ${edge.market}`];
                         return <g key={`${edge.satellite}-${edge.market}`} data-support={`${edge.satellite} ${edge.market}`} pointerEvents="none">
                             <path d={d} fill="none" stroke="#fffdf3" strokeWidth={7}/><path d={d} fill="none" stroke="#263d4b" strokeWidth={3.5} markerEnd={`url(#${prefix}-arrow)`}/>
                         </g>;

@@ -34,6 +34,8 @@ from shapely.ops import (
 from shapely.strtree import STRtree
 from shapely.prepared import prep
 
+from support_geometry import support_paths
+
 from map_geography import (
     EASTERN_COMPACTION_X,
     LABEL_OFFSETS,
@@ -195,7 +197,7 @@ assert not expected_land - actual, f"Land borders missing: {expected_land - actu
 gaps = {
     id: unary_union(
         [
-            shapes[a].boundary.intersection(shapes[b].boundary).buffer(2, cap_style=2)
+            shapes[a].boundary.intersection(shapes[b].boundary).buffer(6, cap_style=2)
             for a, b in actual - expected_land
             if id in (a, b)
         ]
@@ -1074,6 +1076,10 @@ water, seas = simplify_water_boundaries(
 water, seas = simplify_water_boundaries(
     water, seas, focus={"armagh", "waterford", "edinburgh", "chester", "wales", "cornwall"}
 )
+water, seas = simplify_water_boundaries(
+    water, seas, focus={"toulouse", "bordeaux", "montpellier", "constantinople",
+                       "smyrna"}
+)
 
 # Keep the Canary Basin behind the Gibraltar coasts, with Granada facing only the
 # Western Mediterranean. Absorb a trapped western-sea pocket into the same coast front.
@@ -1379,6 +1385,16 @@ def province_label(id):
         [point for point in points if mainland.covers(point)], key=authored.distance
     )
     for fit, domain in [("LAND", mainland), ("PROVINCE", footprints[id])]:
+        # Coastal water belongs to the province too. Search its interior instead of
+        # requiring every label anchor to remain on the original land polygon.
+        if fit == "PROVINCE":
+            west, north, east, south = domain.bounds
+            coast_candidates = [
+                Point(x, y)
+                for x in range(math.ceil(west), math.floor(east), 8)
+                for y in range(math.ceil(north), math.floor(south), 8)
+            ]
+            candidates = sorted([*candidates, *coast_candidates], key=authored.distance)
         candidate = next(
             (point for point in candidates if domain.covers(label_box(point))), None
         )
@@ -1576,6 +1592,7 @@ result = {
     },
     "terrain": svg_path(terrain),
 }
+result["supports"] = support_paths(rel["supports"], result["provinces"], footprints, compact_easting)
 Path("web/src/map/boardGeometry.json").write_text(
     json.dumps(result, separators=(",", ":")) + "\n"
 )
