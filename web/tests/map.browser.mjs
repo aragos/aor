@@ -36,6 +36,28 @@ async function checkPieceBounds(page) {
     assert.deepEqual(failures, [], 'Rendered markers and token groups fit their own land or coastal footprint');
 }
 
+async function checkSeaTexture(page) {
+    const texture=await page.evaluate(`(() => {
+        const svg=document.querySelector('.world-map');
+        const pattern=svg.querySelector('.sea-connection-pattern');
+        const hatch=getComputedStyle(pattern.querySelector('path'));
+        return {
+            fill:getComputedStyle(svg.querySelector('[data-sea="AEGEAN_SEA"] .sea-shape')).fill,
+            pattern:pattern.id,
+            water:getComputedStyle(pattern.querySelector('rect')).fill,
+            coast:getComputedStyle(svg.querySelector('[data-coastal-space="crete"] > path')).fill,
+            stroke:hatch.stroke,
+            opacity:Number(hatch.opacity),
+            spacing:pattern.width.baseVal.value*pattern.patternTransform.baseVal.consolidate().matrix.a*svg.getScreenCTM().a,
+        };
+    })()`);
+    assert(texture.fill.includes(texture.pattern),'Connected water uses its own texture');
+    assert.notEqual(texture.water,texture.coast,'Sea water remains distinct from its surrounding coast');
+    assert.notEqual(texture.stroke,'none','Sea texture has a visible diagonal hatch');
+    assert(texture.opacity>0,'Sea hatching is visible');
+    assert(Math.abs(texture.spacing-16)<.1,'Sea hatching stays sparse at every zoom and viewport width');
+}
+
 let tokenFixture;
 const game = await createGame(6);
 const page = await open(web + game.links[0].path);
@@ -80,6 +102,10 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.wait(`document.querySelectorAll('[data-map-province]').length === 108`, 'full map');
     await page.wait(`document.querySelector('.expansion-form, .pool-summary')`, 'expansion decision ready');
     const before = await page.snapshot();
+    assert.equal(await page.evaluate(`document.querySelector('[data-support="malmo lubeck"]') !== null`), false,
+        'Malmo has no support arrow to Lubeck');
+    assert.equal(await page.evaluate(`document.querySelector('[data-support="malmo stockholm"]') !== null`), true,
+        'Malmo retains its support arrow to Stockholm');
     const expectedSeaAreas = {BALTIC_SEA:'I', GREENLAND_SEA:'II', BLACK_SEA:'V',
         EASTERN_MEDITERRANEAN:'VI', ADRIATIC_SEA:'VII', CENTRAL_MEDITERRANEAN:'VIII', AEGEAN_SEA:'VIII', CANARY_BASIN:'VIII'};
     assert.deepEqual(before.game.catalog.seaAreas, expectedSeaAreas, 'Catalog exposes only the assigned sea areas');
@@ -117,18 +143,152 @@ await page.send('Page.navigate', {url: web + actor.path});
         if (expectedSeaAreas[sea]) assert.deepEqual(enclosingAreas, [expectedSeaAreas[sea]], 'Area borders enclose assigned seas: '+sea);
         else assert.equal(await page.evaluate(`document.querySelector('[data-sea="${sea}"]').hasAttribute('data-sea-area')`), false, 'Intervening water does not assign an unassigned sea to an area');
     }
+    const restingAegeanFill = await page.evaluate(`getComputedStyle(document.querySelector('[data-sea="AEGEAN_SEA"] .sea-shape')).fill`);
     await page.evaluate(`document.querySelector('[data-map-province="crete"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
     await page.wait(`document.querySelector('.province-inspector .province-details')`, 'Crete inspection');
     await page.evaluate(`document.querySelector('.province-details').open=true`);
     const creteDetails = await page.evaluate(`document.querySelector('.province-details').textContent`);
     for (const sea of ['Aegean Sea','Central Mediterranean','Eastern Mediterranean']) assert(creteDetails.includes(sea), 'Crete inspection names '+sea);
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-connected-sea]')].map(sea=>sea.dataset.connectedSea).sort()`),
+        ['AEGEAN_SEA','CENTRAL_MEDITERRANEAN','EASTERN_MEDITERRANEAN'], 'Crete highlights all three connected sea footprints');
+    assert.notEqual(await page.evaluate(`getComputedStyle(document.querySelector('[data-sea="AEGEAN_SEA"] .sea-shape')).fill`), restingAegeanFill,
+        'Connected seas change their full water fill');
+    await checkSeaTexture(page);
+    const seaOutline = await page.evaluate(`(() => {const style=getComputedStyle(document.querySelector('.sea-connection-outline'));return {stroke:style.stroke,dashes:style.strokeDasharray,width:parseFloat(style.strokeWidth),vectorEffect:style.vectorEffect,pointerEvents:style.pointerEvents};})()`);
+    assert.notEqual(seaOutline.stroke,'none','Sea connection has a visible perimeter');
+    assert.notEqual(seaOutline.dashes,'none','Dashed sea connections differ from solid province selection');
+    assert(seaOutline.width>=1.5,'Sea connection perimeter remains visible at Fit');
+    assert.equal(seaOutline.vectorEffect,'non-scaling-stroke','Sea connection perimeter retains screen width while zooming');
+    assert.equal(seaOutline.pointerEvents,'none','Sea emphasis preserves map hit targets');
+    await page.screenshot(join(artifacts,'aor-connected-seas-fit.png'),1440);
     const fitBeforeSeaZoom = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
     const cretePoint = await page.evaluate(`(() => {document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'});const rect=document.querySelector('[data-map-province="crete"]').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
     await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...cretePoint,deltaX:0,deltaY:-400,modifiers:2});
     await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Mediterranean inspection zoom');
     await page.screenshot(join(artifacts,'aor-mediterranean-seas.png'),1440);
+    await checkSeaTexture(page);
     await page.click('Fit map');
+    await page.screenshot(join(artifacts,'aor-connected-seas-phone.png'),390,844,true);
+    await checkSeaTexture(page);
+    await page.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
     assert.equal((await page.snapshot()).revision,before.revision,'Crete sea inspection cannot submit an order');
+    for (const [province, expected, excluded] of [
+        ['copenhagen', ['Stettin', 'Hamburg'], ['Baltic Sea']],
+        ['kongsberg', ['Malmo'], []],
+        ['malmo', ['Kongsberg', 'Stettin'], ['North Sea']],
+        ['lubeck', [], ['Baltic Sea']],
+        ['visby', ['Stockholm', 'Baltic Sea'], ['Malmo', 'Mitau', 'Danzig']],
+        ['paris', ['Portsmouth', 'St Malo'], []],
+        ['edinburgh', ['Bay Of Biscay', 'Greenland Sea', 'North Sea', 'Armagh'], []],
+        ['armagh', ['Edinburgh', 'Waterford', 'Chester', 'Wales'], []],
+        ['waterford', ['Armagh', 'Wales'], []],
+        ['chester', ['Armagh', 'Wales'], []],
+        ['wales', ['Armagh'], []],
+        ['belgrade', ['Dubrovnik', 'Durazzo', 'Bari', 'Adriatic Sea'], []],
+        ['dubrovnik', ['Belgrade'], ['Durazzo']],
+        ['durazzo', ['Belgrade', 'Bari', 'Corfu'], ['Dubrovnik', 'Adriatic Sea']],
+        ['bari', ['Belgrade'], []],
+        ['smyrna', ['Aegean Sea', 'Eastern Mediterranean', 'Adalia'], []],
+    ]) {
+        await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+        await page.wait(`document.querySelector('.province-inspector .province-details')`, province+' inspection');
+        await page.evaluate(`document.querySelector('.province-details').open=true`);
+        const details=await page.evaluate(`document.querySelector('.province-details').textContent`);
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-connected-sea]')].map(sea=>sea.dataset.connectedSea).sort()`),
+            before.game.catalog.seaCoasts.filter(coast=>coast.province===province).map(coast=>coast.sea).sort(), province+' highlights only its direct sea connections');
+        for(const name of expected) assert(details.includes(name),province+' inspector includes '+name);
+        for(const name of excluded) assert(!details.includes(name),province+' inspector excludes '+name);
+        if (province === 'edinburgh') {
+            const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(490,300).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-400,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Edinburgh Biscay frontage zoom');
+            await page.screenshot(join(artifacts,'aor-edinburgh-biscay.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'belgrade') {
+            const adriaticNameFits=await page.evaluate(`(() => {const sea=document.querySelector('[data-sea="ADRIATIC_SEA"]');const path=sea.querySelector('.sea-shape');const text=sea.querySelector('.sea-name');const bounds=text.getBBox();const matrix=path.getScreenCTM().inverse().multiply(text.getScreenCTM());return [0,.5,1].every(dx=>[0,.5,1].every(dy=>path.isPointInFill(new DOMPoint(bounds.x+bounds.width*dx,bounds.y+bounds.height*dy).matrixTransform(matrix))));})()`);
+            assert.equal(adriaticNameFits,true,'The highlighted Adriatic name fits clear water beside Belgrade');
+            const coastPoint=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(1776.4,1225.5).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...coastPoint,button:'left',clickCount:1});
+            await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',...coastPoint,button:'left',clickCount:1});
+            await page.wait(`document.querySelector('[data-map-province="belgrade"][aria-pressed=true]')`, 'Belgrade coastal-water hit target');
+            const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(1750,1180).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-500,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Belgrade coastal access zoom');
+            await page.screenshot(join(artifacts,'aor-belgrade-coast.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'paris' || province === 'chester' || province === 'durazzo') {
+            const seas=await page.evaluate(`[...document.querySelectorAll('.province-details p')].find(paragraph => paragraph.textContent.startsWith('Seas:'))?.textContent`);
+            assert.equal(seas,'Seas: —',province+' has no direct sea access');
+        }
+        if (province === 'durazzo') {
+            const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(1750,1240).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-500,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Durazzo coast without sea access zoom');
+            await page.screenshot(join(artifacts,'aor-durazzo-coast.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'smyrna') {
+            const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(2210,1490).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-400,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Smyrna sea access zoom');
+            await page.screenshot(join(artifacts,'aor-smyrna-seas.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'chester') {
+            const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(580,460).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-500,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Irish Sea coast zoom');
+            await page.screenshot(join(artifacts,'aor-irish-sea-coasts.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'malmo' || province === 'lubeck') {
+            const neighbors=await page.evaluate(`[...document.querySelectorAll('.province-details p')].filter(paragraph => paragraph.textContent.startsWith('Land neighbors:') || paragraph.textContent.startsWith('Coastal-water neighbors:')).map(paragraph => paragraph.textContent).join(' ')`);
+            assert(!neighbors.includes(province === 'malmo' ? 'Lubeck' : 'Malmo'), 'Malmo and Lubeck are not physical neighbors');
+            const supportNames=await page.evaluate(`[...document.querySelectorAll('.province-details p')].find(paragraph=>paragraph.textContent.startsWith(${JSON.stringify(province === 'malmo' ? 'Supports:' : 'Supported by:')}))?.textContent`);
+            assert.equal(supportNames,province === 'malmo' ? 'Supports: Stockholm' : 'Supported by: Copenhagen',
+                province+' inspector shows its corrected support links');
+        }
+        if (province === 'copenhagen') {
+            for (const [component, x, y] of [['northern Jutland',1325,292.5],['Funen',1365,370.5],['Zealand',1435,351],
+                ['eastern Funen',1377.8,366.5],['northern Zealand strip',1456.9,341.5],['southern Zealand tip',1442.9,402.4]]) {
+                const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(${x},${y}).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+                await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+                await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',...point,button:'left',clickCount:1});
+                await page.wait(`document.querySelector('[data-map-province="copenhagen"][aria-pressed=true]')`,component+' belongs to Copenhagen');
+            }
+            const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');const point=new DOMPoint(1390,345).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-600,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Denmark ownership zoom');
+            await page.screenshot(join(artifacts,'aor-denmark-ownership.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'kongsberg') {
+            const point=await page.evaluate(`(() => {document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'});const rect=document.querySelector('[data-map-province="kongsberg"]').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-400,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Scandinavian land border zoom');
+            await page.screenshot(join(artifacts,'aor-scandinavian-land-border.png'),1440);
+            await page.click('Fit map');
+        }
+        if (province === 'visby') {
+            assert.equal(await page.evaluate(`document.querySelector('[data-province-outline="malmo"]') !== null`),false,'Visby inspection does not highlight Malmo as a neighbor');
+            const point=await page.evaluate(`(() => {document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'});const rect=document.querySelector('[data-map-province="visby"]').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-450,modifiers:2});
+            await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Baltic inspection zoom');
+            await page.screenshot(join(artifacts,'aor-baltic-connections.png'),1440);
+            await page.click('Fit map');
+            await page.screenshot(join(artifacts,'aor-baltic-phone.png'),390,844,true);
+            await page.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+        }
+    }
+    assert.equal((await page.snapshot()).revision,before.revision,'Baltic inspection cannot submit an order');
+    for (const [province,x,y] of [['kongsberg',1465,26],['malmo',1525,240.5]]) {
+        const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(${x},${y}).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
+        await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+        await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',...point,button:'left',clickCount:1});
+        await page.wait(`document.querySelector('[data-map-province="${province}"][aria-pressed=true]')`,'reclaimed interior belongs to '+province);
+    }
     assert.equal(await page.evaluate(`[...document.querySelectorAll('[data-map-area] > path')].every(path=>(path.getAttribute('d').match(/M/g)??[]).length===1)`), true, 'Every area has one continuous perimeter');
     const areaPoint = await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(${boardGeometry.areas.IV.label[0]},${boardGeometry.areas.IV.label[1]}).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
     await page.send('Input.dispatchMouseEvent', {type:'mousePressed',...areaPoint,button:'left',clickCount:1});

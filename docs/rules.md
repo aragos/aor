@@ -1023,6 +1023,23 @@ transcription: the Aegean and Central Mediterranean are separate seas, both in A
 adjoins the Aegean, Central Mediterranean and Eastern Mediterranean. This supersedes the earlier
 combined-sea interpretation and the exclusion of Crete from the Eastern Mediterranean. A crossing
 between Central Mediterranean and Aegean coasts cannot treat the two seas as one Heavens crossing.
+Further Baltic corrections on 2026-10-27 add the Copenhagen–Stettin coastal-water border and the
+Malmo–Kongsberg land border. Malmo does not adjoin the North Sea, and Lubeck does not adjoin the
+Baltic Sea. Copenhagen also does not adjoin the Baltic Sea. Visby's only coastal neighbor is
+Stockholm; the map must clearly separate it from all
+other land/coastal spaces.
+Malmo and Lubeck have neither a land nor a coastal-water border; Malmo and Stettin share a
+coastal-water border. Copenhagen includes Funen, Zealand and northern Jutland, with a land border
+to the remaining southern Hamburg province.
+Malmo's only support arrow points to Stockholm; it does not support Lubeck.
+The user also confirmed that Paris and Chester have no direct sea-space incidences, and that
+Wales and Armagh share a direct coastal-water border. Paris and Chester retain their existing
+coastal-water connections.
+The Belgrade correction adds Adriatic coastal access and direct coastal-water borders with
+Dubrovnik, Durazzo and Bari. Belgrade shares land borders with Dubrovnik and Durazzo; those two
+provinces no longer share either a land or a coastal-water border with each other.
+Durazzo has no direct sea-space incidences; its coastal-water neighbors remain available.
+Smyrna adjoins both the Aegean Sea and Eastern Mediterranean.
 
 ---
 

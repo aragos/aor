@@ -186,6 +186,38 @@ class CompetitionRulesTest {
     }
 
     @Test
+    fun malmoDoesNotDefendALubeckMarker() {
+        val board =
+            BoardState()
+                .placeMarker(id("lubeck"), genoa)
+                .board
+                .replaceWithToken(id("malmo"), genoa)
+                .board
+        val context = context(board).copy(configuration = CatalogConfiguration(6))
+
+        val breakdown = CompetitionRules.requirement(context, venice, id("lubeck"))
+
+        assertThat(breakdown.defensiveSatellites).isEqualTo(0)
+    }
+
+    @Test
+    fun malmoDoesNotSupportACosmopolitanAttackOnLubeck() {
+        val board =
+            BoardState()
+                .placeMarker(id("lubeck"), genoa)
+                .board
+                .replaceWithToken(id("malmo"), venice)
+                .board
+        val context =
+            context(board, advances = mapOf(venice to setOf(AdvanceId.COSMOPOLITAN)))
+                .copy(configuration = CatalogConfiguration(6))
+
+        val breakdown = CompetitionRules.requirement(context, venice, id("lubeck"))
+
+        assertThat(breakdown.offensiveSatellites).isEqualTo(0)
+    }
+
+    @Test
     fun whiteSatelliteTokensGiveNoDefensiveSupport() {
         val board =
             BoardState()

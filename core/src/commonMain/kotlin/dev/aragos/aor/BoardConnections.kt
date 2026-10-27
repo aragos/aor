@@ -125,7 +125,9 @@ object BoardConnectionData {
         BoardConnectionBuilder().apply {
             // Northern Europe and British Isles: board upper-left and upper-center.
             land("bergen", "kongsberg")
+            land("kongsberg", "malmo")
             land("malmo", "stockholm")
+            land("copenhagen", "hamburg")
             land("hamburg", "lubeck", "amsterdam", "cologne")
             land("lubeck", "stettin", "cologne", "nuremberg", "prague")
             land("stettin", "danzig", "breslau", "prague")
@@ -179,7 +181,7 @@ object BoardConnectionData {
             land("florence", "rome")
             land("rome", "naples")
             land("naples", "bari")
-            land("dubrovnik", "belgrade", "durazzo")
+            land("dubrovnik", "belgrade")
             land("belgrade", "durazzo")
 
             // Eastern Europe, Anatolia and the Levant: board right-hand side.
@@ -217,9 +219,9 @@ object BoardConnectionData {
             coast("bergen", "kongsberg")
             coast("shetland-islands", "bergen")
             coast("kongsberg", "malmo", "copenhagen")
-            coast("malmo", "stockholm", "copenhagen", "lubeck")
+            coast("malmo", "stockholm", "copenhagen", "stettin")
             coast("stockholm", "visby")
-            coast("copenhagen", "hamburg", "lubeck")
+            coast("copenhagen", "hamburg", "lubeck", "stettin")
             coast("hamburg", "lubeck", "amsterdam")
             coast("lubeck", "stettin")
             coast("stettin", "danzig")
@@ -227,7 +229,7 @@ object BoardConnectionData {
             coast("mitau", "riga")
             coast("riga", "novgorod")
             coast("edinburgh", "shetland-islands", "armagh", "chester", "york")
-            coast("armagh", "waterford", "chester")
+            coast("armagh", "waterford", "chester", "wales")
             coast("waterford", "wales")
             coast("chester", "wales")
             coast("wales", "cornwall")
@@ -252,10 +254,10 @@ object BoardConnectionData {
             coast("genoa", "rome", "cagliari")
             coast("rome", "naples")
             coast("naples", "bari")
-            coast("bari", "sicily", "corfu", "durazzo")
+            coast("bari", "sicily", "corfu", "durazzo", "belgrade")
             coast("venice", "florence", "dubrovnik")
             coast("florence", "rome")
-            coast("dubrovnik", "durazzo")
+            coast("belgrade", "dubrovnik", "durazzo")
             coast("durazzo", "corfu")
             coast("corfu", "athens")
             coast("athens", "salonika", "crete")
@@ -295,7 +297,7 @@ object BoardConnectionData {
             supports("armagh", "edinburgh", "chester", "waterford")
             supports("wales", "chester", "waterford")
             supports("cornwall", "chester", "portsmouth")
-            supports("malmo", "stockholm", "lubeck")
+            supports("malmo", "stockholm")
             supports("copenhagen", "hamburg", "lubeck")
             supports("visby", "stockholm")
             supports("stettin", "danzig", "prague")
@@ -346,8 +348,6 @@ object BoardConnectionData {
                 "malmo",
                 "stockholm",
                 "visby",
-                "copenhagen",
-                "lubeck",
                 "stettin",
                 "danzig",
                 "mitau",
@@ -359,11 +359,9 @@ object BoardConnectionData {
                 "edinburgh",
                 "armagh",
                 "waterford",
-                "chester",
                 "wales",
                 "cornwall",
                 "portsmouth",
-                "paris",
                 "st-malo",
                 "bordeaux",
                 "toulouse",
@@ -399,7 +397,7 @@ object BoardConnectionData {
                 "naples",
                 "bari",
                 "dubrovnik",
-                "durazzo",
+                "belgrade",
             )
             sea(
                 SeaArea.CENTRAL_MEDITERRANEAN,
@@ -433,6 +431,7 @@ object BoardConnectionData {
                 "levant",
                 "cyprus",
                 "adalia",
+                "smyrna",
                 "crete",
             )
             sea(

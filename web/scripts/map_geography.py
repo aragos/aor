@@ -25,7 +25,7 @@ REGIONS = {
     "malmo": (13.0, 55.6),
     "stockholm": (18.1, 59.3),
     "visby": (18.3, 57.4),
-    "copenhagen": (11.0, 55.8),
+    "copenhagen": (9.5, 56.5),
     "hamburg": (9.5, 53.5),
     "lubeck": (11.3, 53.9),
     "stettin": (14.6, 53.5),
@@ -74,7 +74,8 @@ REGIONS = {
     "cagliari": (9.0, 40.0),
     "sicily": (14.0, 37.4),
     "dubrovnik": (16.5, 43.0),
-    "belgrade": (20.5, 44.7),
+    # Extend the schematic province to its reviewed Adriatic shore between its neighbors.
+    "belgrade": (19.0, 43.4),
     "leon": (-6.1, 42.6),
     "basque": (-2.2, 43.0),
     "lisbon": (-8.4, 39.4),
@@ -132,9 +133,17 @@ LABEL_OFFSETS = {
 
 # Additional land components belonging to an existing province, in longitude/latitude.
 PROVINCE_ISLANDS = {
+    "copenhagen": [(10.3, 55.3), (11.7, 55.6)],
     "cagliari": [(9.1, 42.2)],
     "athens": [(23.8, 38.6)],
 }
+
+# Authored Scandinavian interior in pre-display SVG units. It is now divided between
+# Kongsberg and Malmo; its outline also supplies an independent ownership check.
+SCANDINAVIAN_INTERIOR = [
+    (1300, -60), (1500, -60), (1540, 240),
+    (1480, 300), (1420, 310), (1300, 250),
+]
 
 
 def project(lon, lat):
@@ -267,16 +276,7 @@ def geography():
         [
             LineString([(1290, 360), (1390, 430)]).buffer(10),
             LineString([(1390, 340), (1430, 415)]).buffer(10),
-            Polygon(
-                [
-                    (1300, -60),
-                    (1500, -60),
-                    (1540, 240),
-                    (1480, 300),
-                    (1420, 310),
-                    (1300, 250),
-                ]
-            ),
+            Polygon(SCANDINAVIAN_INTERIOR),
             Polygon([(1600, 340), (1740, 370), (1740, 390), (1570, 390)]),
             Polygon(
                 [
@@ -292,6 +292,14 @@ def geography():
             ),
         ]
     )
+    # Keep the western Scandinavian land corridor open for the reviewed Kongsberg–Malmo
+    # border. The northern interior still separates Kongsberg from Stockholm.
+    scandinavian_corridor = [
+        (9.5, 58.8), (10.5, 59.8), (11.4, 59.5), (12.7, 58.3), (13.0, 57.0), (13.0, 55.6)
+    ]
+    neutral = neutral.difference(
+        LineString([project(*point) for point in scandinavian_corridor]).buffer(45)
+    )
     playable = land.difference(neutral)
     for key, position in positions.items():
         component = min(
@@ -304,13 +312,13 @@ def geography():
             positions[key] = nearest_points(interior, Point(position))[0].coords[0]
     # Follow bays and peninsulas when a direct city-to-city chord crosses water.
     routes = {
+        ("kongsberg", "malmo"): scandinavian_corridor[1:-1],
         ("wales", "cornwall"): [(-3.7, 51.3)],
         ("amsterdam", "bruges"): [(4.3, 51.6)],
         ("barcelona", "valencia"): [(0.2, 40.8)],
         ("salonika", "athens"): [(22.4, 39.2)],
         ("danzig", "mitau"): [(21.5, 55.4)],
         ("venice", "dubrovnik"): [(14.5, 45.3), (16, 44.5)],
-        ("dubrovnik", "durazzo"): [(18.8, 42.8)],
         ("kaffa", "varna"): [(30, 46.8), (29, 45.5)],
         ("kaffa", "tana"): [(33.8, 46.7), (36.2, 47.8), (38.9, 47.4), (39.0, 46.6)],
         ("barca", "tripoli"): [(19.5, 30.5), (16.5, 30.5)],

@@ -29,7 +29,9 @@ Each listed neighbor is connected in both directions. Source is the Board region
 | Province | Neighbors | Board locator |
 | --- | --- | --- |
 | bergen | kongsberg | N |
+| kongsberg | malmo | N; user correction 2026-10-27 |
 | malmo | stockholm | N |
+| copenhagen | hamburg | N; user geography correction 2026-10-27: northern Jutland belongs to Copenhagen |
 | hamburg | lubeck, amsterdam, cologne | N |
 | lubeck | stettin, cologne, nuremberg, prague | N |
 | stettin | danzig, breslau, prague | N |
@@ -79,7 +81,7 @@ Each listed neighbor is connected in both directions. Source is the Board region
 | florence | rome | W |
 | rome | naples | W |
 | naples | bari | W |
-| dubrovnik | belgrade, durazzo | W |
+| dubrovnik | belgrade | W; user correction 2026-10-27: no Durazzo border |
 | belgrade | durazzo | W |
 | kiev | kaffa | E |
 | kaffa | varna, tana | E |
@@ -122,9 +124,9 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | bergen | kongsberg | N |
 | kongsberg | malmo, copenhagen | N |
 | shetland-islands | bergen | N; user correction 2026-10-26 |
-| malmo | stockholm, copenhagen, lubeck | N |
-| stockholm | visby | N |
-| copenhagen | hamburg, lubeck | N |
+| malmo | stockholm, copenhagen, stettin | N; user corrections 2026-10-27: Stettin contact, no Lubeck contact |
+| stockholm | visby | N; user confirmation 2026-10-27: Visby's only coastal neighbor |
+| copenhagen | hamburg, lubeck, stettin | N; user correction 2026-10-27: Stettin contact |
 | hamburg | lubeck, amsterdam | N |
 | lubeck | stettin | N |
 | stettin | danzig | N |
@@ -132,7 +134,7 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | mitau | riga | N |
 | riga | novgorod | N |
 | edinburgh | shetland-islands, armagh, chester, york | N |
-| armagh | waterford, chester | N |
+| armagh | waterford, chester, wales | N; user correction 2026-10-27: Wales contact |
 | waterford | wales | N |
 | chester | wales | N |
 | wales | cornwall | N |
@@ -157,10 +159,10 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | genoa | rome, cagliari | W |
 | rome | naples | W |
 | naples | bari | W; user correction 2026-10-26: no Sicily contact |
-| bari | sicily, corfu, durazzo | W + Errata; user correction 2026-10-26 |
+| bari | sicily, corfu, durazzo, belgrade | W + Errata; user corrections 2026-10-26 and 2026-10-27 |
 | venice | florence, dubrovnik | W |
 | florence | rome | W |
-| dubrovnik | durazzo | W |
+| belgrade | dubrovnik, durazzo | W; user correction 2026-10-27 |
 | durazzo | corfu | E |
 | corfu | athens | E; user correction 2026-10-26: no Salonika coastal contact |
 | athens | salonika, crete | E |
@@ -208,7 +210,7 @@ St. Gall → Nuremberg is deliberately absent under the AH errata.
 | armagh | edinburgh, chester, waterford | N |
 | wales | chester, waterford | N |
 | cornwall | chester, portsmouth | N |
-| malmo | stockholm, lubeck | N |
+| malmo | stockholm | N; user correction 2026-10-27: no Lubeck support |
 | copenhagen | hamburg, lubeck | N |
 | visby | stockholm | N |
 | stettin | danzig, prague | N |
@@ -252,15 +254,15 @@ is the only ocean and is flagged separately; it is not a sea usable with The Hea
 | Water body | Coastal-water provinces | Source locator |
 | --- | --- | --- |
 | greenland sea | iceland, edinburgh, shetland-islands | Board N (label around Iceland) |
-| north sea | bergen, kongsberg, shetland-islands, copenhagen, hamburg, amsterdam, bruges, london, york, edinburgh | Board N |
-| baltic sea | malmo, stockholm, visby, copenhagen, lubeck, stettin, danzig, mitau, riga, novgorod | Board N |
-| bay of biscay | edinburgh, armagh, waterford, chester, wales, cornwall, portsmouth, paris, st-malo, bordeaux, toulouse, basque, leon, lisbon, seville | Board N/W + Errata (Edinburgh through Seville) |
+| north sea | bergen, kongsberg, shetland-islands, copenhagen, hamburg, amsterdam, bruges, london, york, edinburgh | Board N; user confirmation 2026-10-27: no Malmo incidence |
+| baltic sea | malmo, stockholm, visby, stettin, danzig, mitau, riga, novgorod | Board N; user corrections 2026-10-27: no Copenhagen or Lubeck incidence |
+| bay of biscay | edinburgh, armagh, waterford, wales, cornwall, portsmouth, st-malo, bordeaux, toulouse, basque, leon, lisbon, seville | Board N/W + Errata; user corrections 2026-10-27: no Paris or Chester incidence |
 | canary basin | seville, fez, west-africa | Board W, lower-left |
 | western mediterranean | granada, valencia, barcelona, palma, montpellier, marseilles, genoa, cagliari, rome, naples, bari, sicily, tunis, algiers, oran | Board W, including west of Italian peninsula |
-| adriatic sea | venice, florence, rome, naples, bari, dubrovnik, durazzo | Board W/E + Hexagonia PDF p. 12 |
+| adriatic sea | venice, florence, rome, naples, bari, dubrovnik, belgrade | Board W/E + Hexagonia PDF p. 12; Belgrade/Durazzo coastal corrections 2026-10-27 |
 | central mediterranean | bari, sicily, tunis, tripoli, barca, corfu, athens, crete | Board W/E; user correction 2026-10-27: separate from the Aegean |
 | aegean sea | salonika, gallipoli, constantinople, smyrna, athens, crete | Board E; user correction 2026-10-27: separate sea in Area VIII |
-| eastern mediterranean | barca, libya, alexandria, cairo, suez, jerusalem, acre, levant, cyprus, adalia, crete | Board E + Errata (Barca yes; Libya to Central no); user correction 2026-10-27: Crete incidence |
+| eastern mediterranean | barca, libya, alexandria, cairo, suez, jerusalem, acre, levant, cyprus, adalia, smyrna, crete | Board E + Errata (Barca yes; Libya to Central no); user corrections 2026-10-27: Crete and Smyrna incidences |
 | black sea | varna, kaffa, tana, abagia, poti, erzerum, trebizond, angora, constantinople, gallipoli | Board E, upper-right |
 | Norwegian Sea | No effective game connections | Errata: no game function |
 | Atlantic Ocean | No main-map coastal-water incidences | Board N/W; separated from coastal water by medium-blue seas |
@@ -297,6 +299,32 @@ Sea spaces remain available on reduced boards even when their area's provinces a
 
 There are no remaining source blockers. Any future unresolved question must be exposed as a typed
 `ConnectionReviewBlocker` and prevent the affected configurations from being called complete.
+
+**Belgrade coast, 2026-10-27.** Belgrade has Adriatic coastal access, sharing land and coastal-water
+borders with Dubrovnik and Durazzo and a coastal-water border with Bari. Dubrovnik and Durazzo
+share neither a land nor a coastal-water border. Belgrade's existing inland borders remain.
+Durazzo has no direct sea-space incidences; its coastal-water neighbors remain available.
+
+**Smyrna sea access, 2026-10-27.** Smyrna adjoins both the Aegean Sea and Eastern Mediterranean.
+
+**British and Channel coasts, 2026-10-27.** Wales and Armagh share a direct coastal-water border.
+Paris and Chester have no direct sea-space incidences; their coastal-water neighbors remain available.
+
+**Baltic connections, 2026-10-27.** The user confirmed a Copenhagen–Stettin coastal-water border
+and a Malmo–Kongsberg land border. Malmo does not adjoin the North Sea; Lubeck does not adjoin the
+Baltic Sea. Copenhagen also has no Baltic Sea incidence. Visby's only coastal neighbor is
+Stockholm. The map retains that connection and makes
+the separation from all other land/coastal spaces visible, including Malmo.
+The user further confirmed that Malmo and Lubeck have neither a land nor a coastal-water border.
+Malmo's only support arrow points to Stockholm.
+Malmo and Stettin share a direct coastal-water border.
+Funen and northern Jutland belong to Copenhagen together with Zealand. Copenhagen and Hamburg
+share the resulting mainland border; Hamburg retains its southern land. The larger Jutland
+section carries Copenhagen's label so the three parts are easier to recognize as one province.
+The formerly neutral Scandinavian interior is split between Kongsberg and Malmo along their
+established divider. The narrow separation from Stockholm remains. Danish coastal borders are
+simplified without changing the graph; Stettin's redundant detached coastal patch belongs to the
+surrounding Copenhagen water.
 
 **Gallipoli–Angora: no connection.** Confirmed by the user on 2026-10-23: “Angora / gallipoli do not
 touch.” This resolves the contact obscured by the thick printed area boundary in both photographs.

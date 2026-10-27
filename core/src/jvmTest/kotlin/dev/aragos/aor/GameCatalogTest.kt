@@ -6,6 +6,161 @@ import kotlin.test.assertFailsWith
 
 class GameCatalogTest {
     @Test
+    fun malmoSupportsOnlyStockholm() {
+        val supports =
+            BoardConnectionData.satelliteSupports
+                .filter { support -> support.satellite == ProvinceId("malmo") }
+                .map(SatelliteSupport::market)
+
+        assertThat(supports).containsExactly(ProvinceId("stockholm"))
+    }
+
+    @Test
+    fun smyrnaTouchesTheAegeanAndEasternMediterranean() {
+        val seas =
+            BoardConnectionData.seaCoasts
+                .filter { coast -> coast.province == ProvinceId("smyrna") }
+                .map(SeaCoastConnection::sea)
+
+        assertThat(seas).containsExactly(SeaArea.AEGEAN_SEA, SeaArea.EASTERN_MEDITERRANEAN)
+    }
+
+    @Test
+    fun durazzoHasNoDirectSeaIncidences() {
+        assertThat(
+                BoardConnectionData.seaCoasts.filter { coast ->
+                    coast.province == ProvinceId("durazzo")
+                }
+            )
+            .isEmpty()
+    }
+
+    @Test
+    fun belgradeIsCoastal() {
+        assertThat(
+                ProvinceData.definitions
+                    .single { province -> province.id == ProvinceId("belgrade") }
+                    .coastal
+            )
+            .isTrue()
+    }
+
+    @Test
+    fun belgradeSharesLandWithDubrovnikAndDurazzo() {
+        assertThat(BoardConnectionData.landBorders)
+            .containsAtLeast(edge("belgrade", "dubrovnik"), edge("belgrade", "durazzo"))
+    }
+
+    @Test
+    fun belgradeHasExactlyThreeCoastalNeighbors() {
+        val belgrade = ProvinceId("belgrade")
+        val neighbors =
+            BoardConnectionData.coastalConnections.mapNotNull { connection ->
+                when (belgrade) {
+                    connection.first -> connection.second
+                    connection.second -> connection.first
+                    else -> null
+                }
+            }
+
+        assertThat(neighbors)
+            .containsExactly(ProvinceId("dubrovnik"), ProvinceId("durazzo"), ProvinceId("bari"))
+    }
+
+    @Test
+    fun dubrovnikAndDurazzoHaveNoPhysicalConnection() {
+        val connection = edge("dubrovnik", "durazzo")
+
+        assertThat(BoardConnectionData.landBorders).doesNotContain(connection)
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(connection)
+    }
+
+    @Test
+    fun chesterHasNoDirectSeaIncidences() {
+        assertThat(
+                BoardConnectionData.seaCoasts.filter { coast ->
+                    coast.province == ProvinceId("chester")
+                }
+            )
+            .isEmpty()
+    }
+
+    @Test
+    fun parisHasNoDirectSeaIncidences() {
+        assertThat(
+                BoardConnectionData.seaCoasts.filter { coast ->
+                    coast.province == ProvinceId("paris")
+                }
+            )
+            .isEmpty()
+    }
+
+    @Test
+    fun walesAndArmaghShareCoastalWater() {
+        assertThat(BoardConnectionData.coastalConnections).contains(edge("wales", "armagh"))
+    }
+
+    @Test
+    fun copenhagenDoesNotTouchTheBalticSea() {
+        assertThat(BoardConnectionData.seaCoasts)
+            .doesNotContain(SeaCoastConnection(SeaArea.BALTIC_SEA, ProvinceId("copenhagen")))
+    }
+
+    @Test
+    fun malmoAndStettinShareCoastalWater() {
+        assertThat(BoardConnectionData.coastalConnections).contains(edge("malmo", "stettin"))
+    }
+
+    @Test
+    fun malmoAndLubeckHaveNoPhysicalConnection() {
+        val connection = edge("malmo", "lubeck")
+
+        assertThat(BoardConnectionData.coastalConnections).doesNotContain(connection)
+        assertThat(BoardConnectionData.landBorders).doesNotContain(connection)
+    }
+
+    @Test
+    fun copenhagenAndHamburgShareALandBorder() {
+        assertThat(BoardConnectionData.landBorders).contains(edge("copenhagen", "hamburg"))
+    }
+
+    @Test
+    fun copenhagenAndStettinShareCoastalWater() {
+        assertThat(BoardConnectionData.coastalConnections).contains(edge("copenhagen", "stettin"))
+    }
+
+    @Test
+    fun malmoAndKongsbergShareALandBorder() {
+        assertThat(BoardConnectionData.landBorders).contains(edge("malmo", "kongsberg"))
+    }
+
+    @Test
+    fun malmoDoesNotTouchTheNorthSea() {
+        assertThat(BoardConnectionData.seaCoasts)
+            .doesNotContain(SeaCoastConnection(SeaArea.NORTH_SEA, ProvinceId("malmo")))
+    }
+
+    @Test
+    fun lubeckDoesNotTouchTheBalticSea() {
+        assertThat(BoardConnectionData.seaCoasts)
+            .doesNotContain(SeaCoastConnection(SeaArea.BALTIC_SEA, ProvinceId("lubeck")))
+    }
+
+    @Test
+    fun visbysOnlyCoastalNeighborIsStockholm() {
+        val neighbors =
+            BoardConnectionData.coastalConnections.mapNotNull { connection ->
+                when (ProvinceId("visby")) {
+                    connection.first -> connection.second
+                    connection.second -> connection.first
+                    else -> null
+                }
+            }
+
+        assertThat(neighbors).containsExactly(ProvinceId("stockholm"))
+    }
+
+    @Test
     fun allSupportedConfigurationsPassCrossCatalogValidation() {
         val counts = (3..6).associateWith { count -> GameCatalog.validateFor(count).provinces.size }
 
@@ -246,7 +401,7 @@ class GameCatalogTest {
     }
 
     @Test
-    fun bariHasExactlyItsFourPrintedCoastalNeighbors() {
+    fun bariHasExactlyItsFiveCoastalNeighbors() {
         val bari = ProvinceId("bari")
         val neighbors =
             BoardConnectionData.coastalConnections
@@ -261,6 +416,7 @@ class GameCatalogTest {
                 ProvinceId("sicily"),
                 ProvinceId("corfu"),
                 ProvinceId("durazzo"),
+                ProvinceId("belgrade"),
             )
     }
 

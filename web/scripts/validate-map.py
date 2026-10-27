@@ -6,7 +6,8 @@ from pathlib import Path
 
 from shapely import get_parts
 from shapely.geometry import Point, Polygon, box
-from shapely.ops import unary_union
+from shapely.ops import transform, unary_union
+from map_geography import SCANDINAVIAN_INTERIOR, display_point
 
 ROOT = Path(__file__).resolve().parents[2]
 geometry = json.loads((ROOT / "web/src/map/boardGeometry.json").read_text())
@@ -83,7 +84,7 @@ for kind, shapes in [("land", land), ("coast", water), ("sea", seas)]:
             shape.difference(frame.buffer(0.03)).area < 0.1
         ), f"{kind} {key} extends outside the map."
 for key, shape in land.items():
-    expected_parts = 2 if key in {"cagliari", "athens"} else 1
+    expected_parts = 3 if key == "copenhagen" else 2 if key in {"cagliari", "athens"} else 1
     assert (
         len(get_parts(shape)) == expected_parts
     ), f"{key}: land must contain exactly its authored components."
@@ -92,6 +93,41 @@ assert land["athens"].covers(
     Point(2040, 1456)
 ), "The northern Greek island must belong to Athens."
 assert land["bari"].covers(Point(1650, 1475.5)), "Bari must contain the toe of Italy."
+assert seas["BAY_OF_BISCAY"].boundary.buffer(0.03).intersection(water["edinburgh"].boundary).length >= 100, (
+    "Edinburgh must share a broad, visible frontage with the Bay of Biscay."
+)
+for neighbor in ["dubrovnik", "durazzo"]:
+    assert land["belgrade"].boundary.buffer(0.03).intersection(land[neighbor].boundary).length > 20, (
+        f"Belgrade must share a visible land border with {neighbor}."
+    )
+for neighbor in ["dubrovnik", "durazzo", "bari"]:
+    assert water["belgrade"].boundary.buffer(0.03).intersection(water[neighbor].boundary).length > 12, (
+        f"Belgrade must share a visible coastal-water border with {neighbor}."
+    )
+assert land["dubrovnik"].distance(land["durazzo"]) >= 18, (
+    "Belgrade must visibly separate Dubrovnik and Durazzo on land."
+)
+assert water["dubrovnik"].distance(water["durazzo"]) >= 18, (
+    "Belgrade must visibly separate Dubrovnik and Durazzo's coastal water."
+)
+for name, point in [
+    ("northern Jutland", (1325, 292.5)),
+    ("Funen", (1365, 370.5)),
+    ("Zealand", (1435, 351)),
+]:
+    assert land["copenhagen"].covers(Point(point)), f"{name} must belong to Copenhagen."
+assert land["hamburg"].covers(Point(1325, 487.5)), "Hamburg must retain its southern land."
+for name, point in [
+    ("eastern Funen", (1377.8, 366.5)),
+    ("northern Zealand strip", (1456.9, 341.5)),
+    ("southern Zealand tip", (1442.9, 402.4)),
+]:
+    assert land["copenhagen"].covers(Point(point)), f"{name} must belong to Copenhagen."
+assert all(
+    Polygon(ring).area < 0.1
+    for part in get_parts(polygon(geometry["provinces"]["copenhagen"]["outline"]))
+    for ring in part.interiors
+), "Copenhagen's combined outline must not contain neutral enclaves."
 assert land["tana"].covers(
     Point(2650.5, 1027)
 ), "Tana must extend onto the land east of Crimea."
@@ -122,7 +158,57 @@ assert (
 assert (
     seas["CANARY_BASIN"].distance(water["granada"]) >= 12
 ), "The Canary Basin must be visibly separated from Granada."
+assert (
+    land["kongsberg"].boundary.buffer(0.03).intersection(land["malmo"].boundary).length > 20
+), "Kongsberg and Malmo must share a visible land border."
+scandinavian_land = transform(display_point, Polygon(SCANDINAVIAN_INTERIOR)).intersection(
+    unary_union([*land.values(), polygon(geometry["terrain"])])
+)
+reclaimed = land["kongsberg"].union(land["malmo"])
+assert scandinavian_land.difference(land["stockholm"].buffer(13)).difference(reclaimed).buffer(-2.1).is_empty, (
+    "The former Scandinavian interior must belong to Kongsberg and Malmo, apart from border gaps."
+)
+assert land["kongsberg"].distance(land["stockholm"]) >= 10, (
+    "Reclaiming the interior must retain a visible separation between Kongsberg and Stockholm."
+)
+for province in ["kongsberg", "malmo"]:
+    assert land[province].intersection(scandinavian_land).area > 1000, (
+        f"{province} must receive a substantial share of the former neutral interior."
+    )
+assert all(part.distance(land["stettin"]) < 0.03 for part in get_parts(water["stettin"])), (
+    "Stettin must have no detached coastal exclave."
+)
+assert (
+    water["copenhagen"].boundary.buffer(0.03).intersection(water["stettin"].boundary).length > 12
+), "Copenhagen and Stettin must share a visible coastal-water border."
+assert (
+    water["malmo"].boundary.buffer(0.03).intersection(water["stettin"].boundary).length > 12
+), "Malmo and Stettin must share a visible coastal-water border."
+assert (
+    land["copenhagen"].boundary.buffer(0.03).intersection(land["hamburg"].boundary).length > 20
+), "Copenhagen and Hamburg must share a visible mainland border."
+assert water["malmo"].distance(water["lubeck"]) >= 18, (
+    "Malmo and Lubeck must be visibly separated by another space."
+)
+for province, sea in [("malmo", "NORTH_SEA"), ("lubeck", "BALTIC_SEA"),
+                      ("copenhagen", "BALTIC_SEA"), ("paris", "BAY_OF_BISCAY"),
+                      ("chester", "BAY_OF_BISCAY"), ("durazzo", "ADRIATIC_SEA")]:
+    assert water[province].distance(seas[sea]) >= 18, (
+        f"{province} must be visibly separated from {sea}."
+    )
+for province, coast in water.items():
+    if province not in {"visby", "stockholm"}:
+        assert water["visby"].distance(coast) >= 18, (
+            f"Visby must be visibly separated from {province}'s coastal water."
+        )
 assert len(seas) == 11, "The map must show all eleven connected seas separately."
+for sea in ["AEGEAN_SEA", "EASTERN_MEDITERRANEAN"]:
+    assert seas[sea].boundary.buffer(0.03).intersection(water["smyrna"].boundary).length > 12, (
+        f"Smyrna must visibly adjoin {sea}."
+    )
+assert seas["ADRIATIC_SEA"].boundary.buffer(0.03).intersection(water["belgrade"].boundary).length > 12, (
+    "Belgrade must have a visible Adriatic sea frontage."
+)
 for sea in ["CENTRAL_MEDITERRANEAN", "AEGEAN_SEA"]:
     assert geometry["seas"][sea]["area"] == "VIII", f"{sea} must belong to Area VIII."
     assert (

@@ -133,7 +133,7 @@ rulebook's §4.1. The capitals are the six identically named markets.
 | cagliari | VII | 1 | — | — | Yes | — |
 | sicily | VII | 2 | Grain | — | Yes | — |
 | dubrovnik | VII | 3 | Timber | — | Yes | — |
-| belgrade | VII | 2 | Grain | — | No | — |
+| belgrade | VII | 2 | Grain | — | Yes | — |
 | seville | VIII | 3 | Grain | — | Yes | — |
 | granada | VIII | 2 | Metal | — | Yes | — |
 | fez | VIII | 2 | Timber | — | Yes | — |

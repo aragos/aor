@@ -11,6 +11,12 @@
 .world-map { display: block; width: 100%; height: min(75vh, 850px); min-height: 440px; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
 .world-map:active { cursor: grabbing; }
 .world-map text { font-family: 'DM Sans', system-ui, sans-serif; }
+.sea-connection-water { fill: #365f78; }
+.sea-connection-hatch { fill: none; stroke: #c3ddeb; stroke-width: 1; opacity: .25; }
+.map-sea.is-connected .sea-name { fill: #fffdf3; font-weight: 750; stroke: #23465a; stroke-width: 5; stroke-linejoin: round; paint-order: stroke fill; }
+.sea-connections path { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.sea-connection-halo { stroke: #fffdf3; stroke-width: 4; }
+.sea-connection-outline { stroke: #143e4e; stroke-width: 1.8; stroke-dasharray: 6 4; }
 .map-area-label { cursor: pointer; outline: none; }
 .map-area-label:focus .area-label-bg { stroke: #143e4e; stroke-width: 5; }
 .map-province.active { cursor: pointer; outline: none; }

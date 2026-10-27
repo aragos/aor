@@ -46,8 +46,14 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="IV"]').getAttribute('aria-pressed')`), 'false', 'Sea clicks deselect an inspected area');
     assert.equal(await page.evaluate(`document.querySelector('[data-area-dimming]')`), null);
     await click('[data-map-province="genoa"]');
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 1, 'Genoa highlights its connected sea');
+    await click('[data-map-area-label="IV"]');
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Area inspection clears province sea emphasis');
+    await click('[data-map-province="genoa"]');
     await page.evaluate(`document.querySelector('[data-map-terrain]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     assert.equal(await page.evaluate(`document.querySelector('.province-inspector')`), null, 'Non-province land clears province inspection');
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Clearing inspection clears the sea emphasis');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.sea-shape[fill^="url("]').length`), 0, 'Clearing inspection restores the ordinary sea fill');
     for (const province of ['genoa', 'rome']) {
         await click(`[data-map-province="${province}"]`);
         assert.equal(await page.evaluate(`document.querySelector('[data-map-layer="highlights"]').lastElementChild.dataset.provinceOutline`), province, 'Inspected province is above every neighboring border');

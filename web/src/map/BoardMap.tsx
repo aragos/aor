@@ -16,7 +16,7 @@ interface Geometry {
         pieces: Record<string, {size: number; fit: string; crowded: boolean; points: number[][]}>}>;
     coasts: Record<string, string>;
     areas: Record<string, {path: string; label: number[]}>;
-    seas: Record<string, {path: string; label: number[]; color: string; area: string | null}>;
+    seas: Record<string, {path: string; label: number[]; labelAngle: number; color: string; area: string | null}>;
     terrain: string;
 }
 const geometry: Geometry = geometryData;
@@ -241,6 +241,8 @@ export function BoardMap({snapshot, busy}: {
         count + Number(tokens.coloured > 0) + Number(tokens.white > 0), 0) ?? 0;
     const inspectedLayout = geometry.provinces[selected]?.pieces[String(groupCount)];
     const denseInspection = inspectedLayout && (inspectedLayout.crowded || inspectedLayout.size * mapWidth / view.w < 14);
+    // Keep the sea texture sparse at Fit, practical zoom, and narrow screen widths.
+    const seaHatchScale = mapWidth ? view.w / mapWidth : 1;
     return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
         {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong>
             <button type="button" className="secondary" onClick={() => {setPicker(null); document.querySelector('.decision')?.scrollIntoView({behavior: 'smooth'});}}>{t('board.returnToOrder')}</button></div>}
@@ -263,6 +265,11 @@ export function BoardMap({snapshot, busy}: {
                         <path d={shape.path} clipRule="evenodd"/>
                     </clipPath>)}
                     <pattern id={`${prefix}-satellite`} width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#e0e4d9"/><circle cx="4" cy="4" r=".8" fill="#879481"/></pattern>
+                    <pattern id={`${prefix}-connected-sea`} className="sea-connection-pattern" width="16" height="16"
+                        patternUnits="userSpaceOnUse" patternTransform={`scale(${seaHatchScale})`}>
+                        <rect className="sea-connection-water" width="16" height="16"/>
+                        <path className="sea-connection-hatch" d="M0 16L16 0"/>
+                    </pattern>
                     <marker id={`${prefix}-arrow`} viewBox="0 0 24 24" refX="21" refY="12" markerWidth="22" markerHeight="22" markerUnits="userSpaceOnUse" orient="auto"><path d="M2 2L21 12L2 22Z" fill="#263d4b" stroke="#fffdf3" strokeWidth="2"/></marker>
                     {catalog.provinces.filter(province => province.commodities.length > 1).map(province => <linearGradient id={`${prefix}-${province.id}`} key={province.id}>
                         {province.commodities.flatMap((commodity, index) => [<stop key={`${commodity}-start`} offset={`${index / province.commodities.length * 100}%`} stopColor={commodityColors[commodity][0]}/>,
@@ -272,8 +279,12 @@ export function BoardMap({snapshot, busy}: {
                 <rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} fill="#eae8dd"/>
                 <g clipPath={`url(#${prefix}-frame)`}>
                     <path d={geometry.frame} fill="#90b8cb"/>
-                    {Object.entries(geometry.seas).map(([sea, shape]) => <g key={sea} data-sea={sea} data-sea-area={catalog.seaAreas[sea]}><title>{label(sea)}{catalog.seaAreas[sea] ? ` · ${t('board.area')} ${catalog.seaAreas[sea]}` : ''}</title><path d={shape.path} fill={shape.color} stroke="#739eac" strokeWidth={1}/>
-                        <text x={shape.label[0]} y={shape.label[1]} textAnchor="middle" fontSize={20} fill="#315d70" fontWeight={selectedSeas.has(sea) ? 750 : 500} aria-label={label(sea)}>
+                    {Object.entries(geometry.seas).map(([sea, shape]) => <g key={sea} data-sea={sea} data-sea-area={catalog.seaAreas[sea]}
+                        className={`map-sea${selectedSeas.has(sea) ? ' is-connected' : ''}`}>
+                        <title>{label(sea)}{catalog.seaAreas[sea] ? ` · ${t('board.area')} ${catalog.seaAreas[sea]}` : ''}</title>
+                        <path className="sea-shape" d={shape.path} fill={selectedSeas.has(sea) ? `url(#${prefix}-connected-sea)` : shape.color} stroke="#739eac" strokeWidth={1}/>
+                        <text className="sea-name" x={shape.label[0]} y={shape.label[1]} textAnchor="middle" fontSize={20} fill="#315d70" fontWeight={500} aria-label={label(sea)}
+                            transform={`rotate(${shape.labelAngle} ${shape.label[0]} ${shape.label[1]})`}>
                             {label(sea).length > 18 ? label(sea).split(' ').map((word, index) => <tspan key={index} x={shape.label[0]} y={shape.label[1] - 10 + index * 24}>{word}</tspan>) : label(sea)}
                         </text></g>)}
                     <path data-map-terrain d={geometry.terrain} fill="#e3e3d5" stroke="#b3b7a5"/>
@@ -325,6 +336,12 @@ export function BoardMap({snapshot, busy}: {
                     })}
                     {emphasizedArea && <path data-area-dimming={emphasizedArea} d={`${geometry.frame}${geometry.areas[emphasizedArea].path}`}
                         fill="#142a31" fillRule="evenodd" opacity={.48} pointerEvents="none"/>}
+                    <g className="sea-connections" pointerEvents="none" aria-hidden="true">
+                        {[...selectedSeas].map(sea => <g key={sea} data-connected-sea={sea}>
+                            <path className="sea-connection-halo" d={geometry.seas[sea].path}/>
+                            <path className="sea-connection-outline" d={geometry.seas[sea].path}/>
+                        </g>)}
+                    </g>
                     <g data-map-layer="highlights" pointerEvents="none">
                         {highlights.map(item => <g key={`${item.kind}:${item.id}`} data-highlight-priority={highlightPriority(item.state)}
                             data-province-outline={item.kind === 'province' ? item.id : undefined}

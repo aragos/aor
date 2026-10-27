@@ -18,7 +18,8 @@ import re
 from pathlib import Path
 
 from scipy.spatial import Voronoi
-from shapely import get_parts, set_precision, union_all
+from shapely import get_num_coordinates, get_parts, set_precision, union_all
+from shapely.affinity import rotate
 from shapely.geometry import LineString, MultiLineString, Point, Polygon, box
 from shapely.ops import (
     linemerge,
@@ -26,6 +27,8 @@ from shapely.ops import (
     polygonize,
     polylabel,
     substring,
+    split,
+    transform,
     unary_union,
 )
 from shapely.strtree import STRtree
@@ -35,6 +38,7 @@ from map_geography import (
     EASTERN_COMPACTION_X,
     LABEL_OFFSETS,
     PROVINCE_ISLANDS,
+    SCANDINAVIAN_INTERIOR,
     compact_easting,
     display_point,
     geography,
@@ -155,6 +159,29 @@ for cell in cells:
     )
     byid[owner].append(cell)
 shapes = {id: unary_union(cells) for id, cells in byid.items()}
+# Extend the established Kongsberg–Malmo divider through the former neutral interior.
+# Preserve Stockholm's existing boundary rather than assigning it any of the reclaimed land.
+interior = transform(display_point, Polygon(SCANDINAVIAN_INTERIOR)).intersection(physical_land)
+border = max(get_parts(shapes["kongsberg"].boundary.intersection(shapes["malmo"].boundary)),
+             key=lambda part: part.length)
+first, last = border.coords[0], border.coords[-1]
+dx, dy = last[0] - first[0], last[1] - first[1]
+length = math.hypot(dx, dy)
+assert length > 0, "Kongsberg and Malmo need a shared divider before reclaiming their interior."
+divider = LineString([
+    (first[0] - dx / length * 5000, first[1] - dy / length * 5000),
+    (last[0] + dx / length * 5000, last[1] + dy / length * 5000),
+])
+reclaimed = {key: [] for key in ["kongsberg", "malmo"]}
+for part in get_parts(split(interior, divider)):
+    owner = min(reclaimed, key=lambda key: shapes[key].distance(part.representative_point()))
+    reclaimed[owner].append(part)
+shapes = {
+    key: shape.difference(interior).union(
+        unary_union(reclaimed[key]) if key in reclaimed else Polygon()
+    ).buffer(0)
+    for key, shape in shapes.items()
+}
 actual = {
     tuple(sorted((a, b)))
     for i, a in enumerate(shapes)
@@ -188,6 +215,7 @@ for id, polygon in list(shapes.items()):
         ]
     )
 # Make the sparse eastern graph clear even where geographic cells share only a corner.
+shapes["kongsberg"] = shapes["kongsberg"].difference(shapes["stockholm"].buffer(12)).buffer(0)
 for id in ["sarai", "kamyshin", "tana"]:
     neighbors = {b if a == id else a for a, b in rel["land"] if id in (a, b)}
     non_neighbors = unary_union(
@@ -438,8 +466,18 @@ print("FINAL coast missing", expected - actual, "extra", actual - expected, flus
 
 assert actual == expected, f"Coastal adjacency differs: {actual ^ expected}."
 # Point contacts must not visually imply routes absent from the reviewed catalog.
-for first, second in [("cagliari", "rome"), ("oran", "granada")]:
-    waters[first] = waters[first].difference(waters[second].buffer(18)).buffer(0)
+for first, second, clearance in [
+    ("cagliari", "rome", 18),
+    ("oran", "granada", 18),
+    ("malmo", "lubeck", 24),
+]:
+    waters[first] = waters[first].difference(waters[second].buffer(clearance)).buffer(0)
+# Visby's only neighboring coastal water is Stockholm. A near-touching band around
+# another province must not look like a route when the complete board is fitted.
+visby_non_neighbors = unary_union(
+    [shape for province, shape in waters.items() if province not in {"visby", "stockholm"}]
+)
+waters["visby"] = waters["visby"].difference(visby_non_neighbors.buffer(24)).buffer(0)
 assert (
     pairs(waters) == expected
 ), "Separating coastal non-neighbors must preserve coastal routes."
@@ -757,7 +795,7 @@ def smooth_water_arc(arc, tolerance):
     return LineString(rounded)
 
 
-def simplify_water_boundaries(coasts, sea_regions):
+def simplify_water_boundaries(coasts, sea_regions, focus=None):
     """Simplify shared arcs once, keeping shorelines, junctions, and every adjacency intact."""
     regions = {
         **{
@@ -772,15 +810,23 @@ def simplify_water_boundaries(coasts, sea_regions):
     domain = unary_union(shapes)
     fixed = prep(domain.boundary.buffer(0.002))
     arcs = list(get_parts(linemerge(unary_union([shape.boundary for shape in shapes]))))
+    focused = None
+    if focus:
+        focus_ids = sorted(focus)
+        border = unary_union([coasts[key].boundary for key in focus_ids])
+        near_border = prep(border.buffer(0.004))
+        focused = {index for index, arc in enumerate(arcs) if near_border.covers(arc)}
     tree = STRtree(shapes)
     expected = pairs(regions)
     protected = set()
-    for tolerance in [12] * 8 + [8, 4, 1]:
+    tolerances = [40, 40, 24, 24, 12, 8, 4, 1] if focus else [12] * 8 + [8, 4, 1]
+    for tolerance in tolerances:
         lines = [
             (
                 arc
-                if index in protected or fixed.covers(arc)
-                else smooth_water_arc(arc, tolerance)
+                if index in protected or fixed.covers(arc) or
+                    (focused is not None and index not in focused)
+                else arc.simplify(tolerance) if focus else smooth_water_arc(arc, tolerance)
             )
             for index, arc in enumerate(arcs)
         ]
@@ -885,6 +931,10 @@ def simplify_water_boundaries(coasts, sea_regions):
         print(
             "Simplified shared water boundaries at", tolerance, "SVG units.", flush=True
         )
+        if focus:
+            print("Focused coastal vertices:",
+                  sum(get_num_coordinates(coasts[key]) for key in focus), "->",
+                  sum(get_num_coordinates(result[f"coast:{key}"]) for key in focus), flush=True)
         return (
             {key: result[f"coast:{key}"] for key in coasts},
             {key: result[f"sea:{key}"] for key in sea_regions},
@@ -944,9 +994,86 @@ def open_sea_frontages(coasts, sea_regions):
     return sea_regions
 
 
+def merge_detached_coast(coasts, province, recipient):
+    """Move landless fragments into the surrounding coast before checking topology."""
+    parts = list(get_parts(coasts[province]))
+    attached = [part for part in parts if part.distance(land[province]) < 0.03]
+    detached = [part for part in parts if part.distance(land[province]) >= 0.03]
+    return {
+        **coasts,
+        province: unary_union(attached),
+        recipient: union_all([coasts[recipient], *detached], grid_size=0.001),
+    }
+
+
+# Give Biscay a broad, continuous approach to Edinburgh's western coast. The former
+# sea boundary left only a tiny mouth beside northern Ireland. Keep the northern
+# Scottish coast in the Greenland Sea and stop well south of Iceland and Shetland.
+biscay_front = seas["GREENLAND_SEA"].intersection(box(0, 225, 620, world.bounds[3]))
+seas["BAY_OF_BISCAY"] = union_all([seas["BAY_OF_BISCAY"], biscay_front], grid_size=0.001)
+seas["GREENLAND_SEA"] = seas["GREENLAND_SEA"].difference(biscay_front).buffer(0)
+
 seas = open_sea_frontages(water, seas)
 water, seas = simplify_water_boundaries(water, seas)
 seas = open_sea_frontages(water, seas)
+
+# Neighboring coastal water screens provinces from seas they do not adjoin.
+# Give the separating front visible width rather than leaving a subpixel sea gap.
+for province, sea, screen in [
+    ("malmo", "NORTH_SEA", "copenhagen"),
+    ("lubeck", "BALTIC_SEA", "stettin"),
+    ("copenhagen", "BALTIC_SEA", "malmo"),
+    ("paris", "BAY_OF_BISCAY", "st-malo"),
+    ("chester", "BAY_OF_BISCAY", "armagh"),
+    ("durazzo", "ADRIATIC_SEA", "bari"),
+]:
+    front = seas[sea].intersection(water[province].buffer(24))
+    unclaimed = world.difference(
+        unary_union([*land.values(), terrain, *water.values(), *seas.values()])
+    )
+    front = front.union(front.buffer(0.2).intersection(unclaimed))
+    water[screen] = union_all([water[screen], front], grid_size=0.001)
+    seas[sea] = seas[sea].difference(front).buffer(0)
+# Join Copenhagen's new front through its existing coastal channels, retaining one
+# connected coastal space without creating a new neighboring province.
+attached = unary_union([
+    part for part in get_parts(water["copenhagen"])
+    if part.distance(land["copenhagen"]) < 0.03
+])
+detached = [part for part in get_parts(water["copenhagen"])
+            if part.distance(land["copenhagen"]) >= 0.03]
+for part in sorted(detached, key=attached.distance):
+    start, end = nearest_points(attached, part)
+    connector = LineString([start, end]).buffer(4).difference(land_union)
+    attached = union_all([attached, part, connector], grid_size=0.001)
+    water["copenhagen"] = union_all([water["copenhagen"], connector], grid_size=0.001)
+    for province in water:
+        if province != "copenhagen":
+            water[province] = water[province].difference(connector).buffer(0)
+    for sea in seas:
+        seas[sea] = seas[sea].difference(connector).buffer(0)
+# The new front can cut a tiny landless sliver off Lubeck's coastal band. It belongs
+# to the enclosing Copenhagen front, rather than forming another apparent island.
+water = merge_detached_coast(water, "lubeck", "copenhagen")
+# Stettin's short detached patch serves no unique connection. Give it to the
+# surrounding Copenhagen water and keep Stettin's coast attached to its mainland.
+water = merge_detached_coast(water, "stettin", "copenhagen")
+# Durazzo's screen can leave a tiny Bari fragment enclosed by Belgrade's coast.
+water = merge_detached_coast(water, "bari", "belgrade")
+seas = open_sea_frontages(water, seas)
+assert pairs(water) == {
+    tuple(sorted(pair)) for pair in relations["coast"]
+}, f"Coastal fronts changed the reviewed connections: {pairs(water) ^ {tuple(sorted(pair)) for pair in relations['coast']}}."
+assert sea_connections(water, seas) == set(contacts), (
+    f"Coastal fronts changed sea contacts: {sea_connections(water, seas) ^ set(contacts)}."
+)
+
+water, seas = simplify_water_boundaries(
+    water, seas, focus={"malmo", "copenhagen", "stettin", "lubeck"}
+)
+water, seas = simplify_water_boundaries(
+    water, seas, focus={"armagh", "waterford", "edinburgh", "chester", "wales", "cornwall"}
+)
 
 # Keep the Canary Basin behind the Gibraltar coasts, with Granada facing only the
 # Western Mediterranean. Absorb a trapped western-sea pocket into the same coast front.
@@ -1021,6 +1148,33 @@ assert pairs(water) == {
 assert sea_connections(water, seas) == set(
     contacts
 ), "Removing drawing remnants must preserve sea access."
+
+# Copenhagen includes the complete Danish islands, including enclosed neutral remnants.
+# Match the province-outline crack closure so only genuine enclosed pockets are absorbed.
+copenhagen_footprint = (
+    land["copenhagen"].union(water["copenhagen"])
+    .buffer(0.005, join_style=2)
+    .buffer(-0.005, join_style=2)
+)
+copenhagen_enclaves = unary_union([
+    Polygon(ring)
+    for part in get_parts(copenhagen_footprint)
+    for ring in part.interiors
+])
+other_spaces = unary_union([
+    *[shape for key, shape in land.items() if key != "copenhagen"],
+    *[shape for key, shape in water.items() if key != "copenhagen"],
+    *seas.values(),
+])
+assert copenhagen_enclaves.intersection(other_spaces).area < 0.1, (
+    "Copenhagen may absorb only enclosed neutral land or unclaimed water."
+)
+enclosed_land = terrain.intersection(copenhagen_enclaves)
+land["copenhagen"] = union_all([land["copenhagen"], enclosed_land], grid_size=0.001)
+terrain = terrain.difference(enclosed_land).buffer(0)
+water["copenhagen"] = union_all([
+    water["copenhagen"], copenhagen_enclaves.difference(land_union),
+], grid_size=0.001)
 
 # Area outlines enclose member spaces, including neutral islands and intervening unassigned water.
 # Close subpixel shoreline cracks before stroking. Reset the precision model first so the
@@ -1142,12 +1296,30 @@ for id, y in [
     positions[id] = (95, y)
 
 
+SEA_LABEL_ANGLES = {"ADRIATIC_SEA": 35}
+
+
 def sea_label(sea, shape):
     nearby = shape.intersection(Point(sea_centers[sea]).buffer(280))
     largest = max(
         (p for p in get_parts(nearby) if p.geom_type == "Polygon"), key=lambda p: p.area
     )
     x, y = polylabel(largest, tolerance=5).coords[0]
+    if sea in SEA_LABEL_ANGLES:
+        # Follow the narrow Adriatic channel. Include the 20-unit name's bold face and halo
+        # in the fitting box so province highlights cannot obscure the selected sea name.
+        min_x, min_y, max_x, max_y = largest.bounds
+        candidates = [
+            Point(px, py)
+            for px in range(math.ceil(min_x), math.floor(max_x), 4)
+            for py in range(math.ceil(min_y), math.floor(max_y), 4)
+            if largest.covers(rotate(
+                box(px - 67, py - 22, px + 67, py + 6),
+                SEA_LABEL_ANGLES[sea], origin=(px, py),
+            ))
+        ]
+        assert candidates, f"Sea {sea} needs room for its complete name."
+        x, y = min(candidates, key=Point(x, y).distance).coords[0]
     return [x, y]
 
 
@@ -1396,6 +1568,7 @@ result = {
         sea: {
             "path": svg_path(shape),
             "label": [compact_easting(sea_labels[sea][0]), sea_labels[sea][1]],
+            "labelAngle": SEA_LABEL_ANGLES[sea] if sea in SEA_LABEL_ANGLES else 0,
             "color": sea_colors[i],
             "area": sea_areas[sea] if sea in sea_areas else None,
         }

@@ -58,10 +58,15 @@ expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
 saved in the log and frozen when setup starts. Both settings apply to actual expansion rewards. Voluntary marker rebuilds never count.
 
 New games use file format 3 with rules version `ah1996-three-epoch-1` and data version
-`ah1996-catalog-3`. The initial revision records resolved setup options. Earlier development rules
+`ah1996-catalog-10`. The initial revision records resolved setup options. Earlier development rules
 and catalog versions are unsupported; no migration is provided under the current-format-only policy.
-Catalog 3 separates the Aegean and Central Mediterranean seas and connects Crete to those seas and
-the Eastern Mediterranean.
+The current catalog includes the reviewed Baltic land/coastal connections, sea exclusions and
+support arrows.
+Belgrade has Adriatic coastal access between Dubrovnik and Durazzo, which no longer border each other.
+Durazzo retains its coastal-water neighbors but has no direct sea-space contacts.
+Smyrna adjoins both the Aegean Sea and Eastern Mediterranean.
+The Aegean and Central Mediterranean are separate seas, with Crete adjoining both and the Eastern
+Mediterranean.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 From `web`, run `npm test` for focused checks and `npm run test:browser` for the isolated browser suite

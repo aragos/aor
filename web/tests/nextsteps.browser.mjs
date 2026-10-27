@@ -85,8 +85,9 @@ export async function checkSetupEvidence(page, web) {
             assert.equal(state.pendingReturn,before.game.hand[index].reference);
             assert.equal(state.revision,before.revision,'Private replacement does not commit a revision');
         }
+        await page.evaluate(`window.setupReloadMarker=true`);
         await page.send('Page.reload');
-        await page.wait(`document.querySelector('.pending-submission')?.textContent.includes('Your private return:')`,'private return survives reload');
+        await page.wait(`!window.setupReloadMarker && document.querySelector('.private-seat-link') && document.querySelector('.pending-submission')?.textContent.includes('Your private return:')`,'private return survives reload');
         const opponent = await game.snapshot(other);
         assert.equal(opponent.pendingReturn,null);
         assert.equal(opponent.game.activity.decisionEntry,before.game.activity.decisionEntry,'Readiness preserves decision identity');

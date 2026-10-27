@@ -15,6 +15,33 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
   wraparounds or stray fragments. Keep named seas and their coastal contacts clearly visible.
   The Aegean and Central Mediterranean are separate seas within Area VIII; Crete's coastal water
   visibly adjoins each of them and the Eastern Mediterranean.
+  Smyrna's coastal water visibly adjoins both the Aegean Sea and Eastern Mediterranean.
+  Copenhagen's coast reaches Stettin and visibly screens Malmo from the North Sea. Malmo and
+  Stettin share coastal water and separate Copenhagen and Lubeck from the Baltic Sea. Visby's
+  coastal band is separated from every other coast except Stockholm.
+  Copenhagen owns northern Jutland, Funen and Zealand; all three parts inspect and highlight as
+  one province, with the main label in Jutland. Copenhagen and Hamburg share a mainland border.
+  Enclosed neutral remnants on the Danish islands belong to Copenhagen; its combined outline
+  contains no internal enclaves.
+  A visible band of neighboring coastal water separates Malmo from Lubeck, which have no direct
+  physical contact.
+  Malmo's only support arrow points to Stockholm.
+- Kongsberg and Malmo share a visible land border through western Scandinavia. The neutral
+  interior between them is divided between the two provinces, extending their established
+  boundary. A narrow gap still separates Kongsberg from Stockholm.
+- Shared coastal boundaries around Malmo, Copenhagen, Stettin and Lubeck use simple lines with
+  stable junctions. Stettin has no detached coastal exclave. Preserve shorelines and every reviewed
+  land, coastal-water and sea connection while simplifying these borders.
+- Coastal-water borders between Ireland and Great Britain use the same simple shared lines,
+  retaining recognizable shorelines and readable crossings between Armagh, Waterford, Edinburgh,
+  Chester and Wales. Chester remains separated from named seas.
+  The Bay of Biscay reaches Edinburgh along a broad, continuous front west of Scotland, with
+  the Greenland Sea retained along its northern coast.
+- Belgrade reaches the Adriatic shore between Dubrovnik and Durazzo, sharing land and coastal
+  borders with both and a coastal border with Bari. A visible strip of Belgrade separates
+  Dubrovnik from Durazzo on land and water. The Adriatic name follows the narrow channel and
+  fits clear water beside Belgrade's coast.
+  Bari's coastal water separates Durazzo from the Adriatic; Durazzo touches no named seas.
 - A sea may belong to an area; membership is optional and catalogued. Area outlines enclose member
   provinces, their coasts and assigned seas in one continuous perimeter, without enclaves or
   exclaves. Adjacent area borders abut. Enclosed neutral pockets do not confer movement or ownership.
@@ -37,6 +64,11 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 Province fills retain commodity identity when control changes. Land and coastal water receive the
 same reachability, eligibility, focus and selection emphasis. Use one selected outline around their
 combined footprint. Area emphasis covers the whole area and strongly dims its surroundings.
+Inspecting a province highlights each directly connected sea with deep blue water, sparse diagonal
+hatching, a contrasting dashed perimeter and a light name with a dark halo. Sea texture remains
+distinct from the pale solid coastal bands. Hatch spacing and perimeter width stay consistent on
+screen while zooming and resizing. Sea connections come from the catalog and do not imply that a
+shipment is legal.
 
 Paint connections and ordinary borders below neighbor, eligible, hover/focus and selected highlights,
 in that order. The inspected object wins a tie with selected targets. Keep labels and pieces readable
@@ -91,5 +123,5 @@ and defers the name/market badge to inspection, rather than painting text over o
 province's accessible name retains its identity, market and complete occupancy. At small rendered
 piece sizes, selecting a province also opens a readable occupancy line beside the map; the decision
 sheet retains separate owner, established/new age and count rows. Fit is an overview; inspect or
-zoom for dense counts. Constrained label fits in Copenhagen, Toulouse and Constantinople remain
-recorded exceptions.
+zoom for dense counts. The larger Danish province removes Copenhagen's constrained label and
+dense-group sharing exceptions; constrained label fits remain in Toulouse and Constantinople.

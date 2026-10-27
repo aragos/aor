@@ -299,7 +299,7 @@ object ProvinceData {
             satellite("cagliari")
             market("sicily", number = 2, commodity = Commodity.GRAIN)
             market("dubrovnik", number = 3, commodity = Commodity.TIMBER)
-            market("belgrade", number = 2, commodity = Commodity.GRAIN, coastal = false)
+            market("belgrade", number = 2, commodity = Commodity.GRAIN)
         }
         area(GeographicalArea.VIII) {
             market("seville", number = 3, commodity = Commodity.GRAIN)
