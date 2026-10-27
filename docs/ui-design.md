@@ -90,3 +90,8 @@ limits that commitment, default to the largest partial placement offered by the 
 commitments retain their own rules. Voluntary marker reduction is a collapsed secondary action.
 All competition results from the current turn remain available until expansion ends, including
 results involving other players; the activity history retains them afterward.
+
+Command history displays capital names by default, with display-name and canonical-ID alternatives.
+The preference survives browser reloads. Aliases apply to actors, target players, attributed dice
+and revision authors, including history-editor reference labels; canonical stored commands and
+`@entry` references are unchanged. Before capital assignment, the capital view uses display names.

@@ -1,4 +1,7 @@
 export const en: Record<string, string> = {
+    'history.identifiers': 'Player identifiers', 'history.identifiers.capitals': 'Capitals',
+    'history.identifiers.names': 'Display names', 'history.identifiers.ids': 'Canonical IDs',
+
     'history.undo': 'Undo last action', 'history.policy': 'Undo policy', 'history.edit': 'Edit game history',
     'history.fromEntry': 'Replace from entry (zero-based)', 'history.loadSuffix': 'Load current actions',
     'history.replacement': 'Replacement actions', 'history.publish': 'Apply history edit',

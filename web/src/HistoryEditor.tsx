@@ -3,8 +3,9 @@ import type {Snapshot} from './api';
 import {t} from './messages';
 
 /** Retention references preserve hidden answers; new lines remain ordinary player commands. */
-export function HistoryEditor({snapshot, busy, edit}: {
+export function HistoryEditor({snapshot, busy, edit, format = (line: string) => line}: {
     snapshot: Snapshot; busy: boolean; edit: (fromEntry: number, lines: string[]) => Promise<boolean>;
+    format?: (line: string) => string;
 }) {
     const [from, setFrom] = useState('');
     const [text, setText] = useState('');
@@ -24,7 +25,7 @@ export function HistoryEditor({snapshot, busy, edit}: {
             setBase(snapshot.revision);
         }}>{t('history.loadSuffix')}</button>
         <ol className="editable-actions">{snapshot.undo.actions.filter(action => !valid || action.entry >= position).map(action =>
-            <li key={action.entry}><code>@{action.entry} · {action.text}</code></li>)}</ol>
+            <li key={action.entry}><code>@{action.entry} · {format(action.text)}</code></li>)}</ol>
         <form onSubmit={async event => {
             event.preventDefault();
             if (!busy && valid && !stale && await edit(position, text.split('\n').map(line => line.trim()).filter(Boolean))) {
