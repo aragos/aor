@@ -84,13 +84,13 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                     {['ah1996', 'second-edition', 'tournament'].map(value => <option key={value} value={value}>{t(`preset.${value}`)}</option>)}
                 </select>
                 <button className="secondary" disabled={busy || !preset} onClick={() => { void submit(`set-option preset ${preset}`); }}>{t('table.applyPreset')}</button>
-                {snapshot.game.ruleOptions.map(option => <label key={option.key}>
-                    {t(`option.${option.key}`)}
-                    <select value={options[option.key] ?? option.value} disabled={busy} onChange={event => setOptions(current => ({...current, [option.key]: event.target.value}))}>
+                {snapshot.game.ruleOptions.map(option => <div className="rule-option" key={option.key}>
+                    <label htmlFor={`rule-${option.key}`}>{t(`option.${option.key}`)}</label>
+                    <select id={`rule-${option.key}`} value={options[option.key] ?? option.value} disabled={busy} onChange={event => setOptions(current => ({...current, [option.key]: event.target.value}))}>
                         {option.choices.map(value => <option key={value} value={value}>{t(`optionValue.${value}`)}</option>)}
                     </select>
-                    <button className="secondary" disabled={busy || !options[option.key] || options[option.key] === option.value} onClick={() => { void submit(`set-option ${option.key} ${options[option.key]}`); }}>{t('table.apply')}</button>
-                </label>)}
+                    <button className="secondary" aria-label={t('controls.applyOption', {option: t(`option.${option.key}`)})} disabled={busy || !options[option.key] || options[option.key] === option.value} onClick={() => { void submit(`set-option ${option.key} ${options[option.key]}`); }}>{t('table.apply')}</button>
+                </div>)}
             </div>
             <form onSubmit={event => { event.preventDefault(); void submit(`set-option rebuilt-marker-bonus ${rebuiltMarkerBonus.toLowerCase()}`); }}>
                 <label htmlFor="setup-rebuilt-marker-bonus">{t('controls.rebuiltMarkerBonus')}</label>
@@ -126,6 +126,9 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? snapshot.game.provisionalTieOrder.map(nameFor).join(' → ') : t('controls.noPositions')}</p>
             {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button type="button" className="secondary" key={choice} disabled={busy} aria-pressed={position === choice} onClick={() => setPosition(choice)}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}<button disabled={busy || !turnChoices.includes(position)} onClick={() => { void submit(position); }}>{t('table.confirm')}</button></div>}
         </div>}
+        {stage === 'SETUP_RETURN' && snapshot.pendingReturn && <p className="pending-submission" role="status">
+            {t('controls.pendingReturn', {card: t(snapshot.game.hand.find(card => card.reference === snapshot.pendingReturn)?.definition.messageId ?? '')})}
+        </p>}
         {(canAct || stage === 'SETUP_RETURN') && <GameActions snapshot={snapshot} busy={busy} submit={submit}/>}
 
     </>;

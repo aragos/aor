@@ -109,7 +109,7 @@ export interface Snapshot {
         pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
-        activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number} | null;
+        activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
         advanceOffers: {advance: string; price: number | null; unavailableReason: string | null;
             leaderDiscounts: {leaderCardId: string; baseAmount: number; writtenRecordBonus: number; amount: number}[]}[];
@@ -125,7 +125,7 @@ export interface Snapshot {
 }
 export interface CreatedGame {gameId: string; links: {id: string; name: string; path: string}[]}
 export class ApiError extends Error {
-    constructor(public code: string) { super(code); }
+    constructor(public code: string, public entityIds: string[] = []) { super(code); }
 }
 export async function request<T>(path: string, token?: string, body?: unknown): Promise<T> {
     let response: Response;
@@ -138,7 +138,8 @@ export async function request<T>(path: string, token?: string, body?: unknown): 
     } catch { throw new ApiError('NETWORK'); }
     let result;
     try { result = await response.json(); } catch { throw new ApiError('SERVER'); }
-    if (!response.ok) throw new ApiError(typeof result.code === 'string' ? result.code : 'SERVER');
+    if (!response.ok) throw new ApiError(typeof result?.code === 'string' ? result.code : 'SERVER',
+        Array.isArray(result?.entityIds) ? result.entityIds.filter((id: unknown): id is string => typeof id === 'string') : []);
     return result as T;
 }
 export function errorCode(error: unknown): string { return error instanceof ApiError ? error.code : 'SERVER'; }

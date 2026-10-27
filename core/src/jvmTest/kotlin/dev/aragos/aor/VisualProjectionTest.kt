@@ -12,6 +12,41 @@ class VisualProjectionTest {
     private val florence = ProvinceId("florence")
 
     @Test
+    fun anotherPlacementPreservesTheDecisionIdentity() {
+        val before = state()
+        val after = before.step(Entry.Action(p1, TextCodec.parseCommand("place 1 florence")))
+
+        assertThat(after.viewForPlayer(p1).activity?.decisionEntry)
+            .isEqualTo(before.viewForPlayer(p1).activity?.decisionEntry)
+    }
+
+    @Test
+    fun successiveReplacementDecisionsForTheSamePlayerHaveDifferentIdentities() {
+        val before =
+            state()
+                .copy(
+                    flow =
+                        state()
+                            .flow
+                            .copy(
+                                decisions =
+                                    listOf(
+                                        CardDecision.ReplacementToken(p1, ProvinceId("rome")),
+                                        CardDecision.ReplacementToken(p1, florence),
+                                    )
+                            )
+                )
+        val after =
+            before.step(Entry.Action(p1, TextCodec.parseCommand("replace-event-token none")))
+
+        assertThat(after.viewForPlayer(p1).activity?.decisionEntry)
+            .isGreaterThan(before.decisionStart)
+        assertThat(after.viewForPlayer(p1).activity?.choice).isEqualTo("replace-event-token")
+        assertThat(after.viewForPlayer(p1).activity?.decisionPlayer).isEqualTo(p1)
+        assertThat(after.viewForPlayer(p1).activity?.startEntry).isEqualTo(before.activityStart)
+    }
+
+    @Test
     fun markerQuoteAgreesWithExecutionAndDoesNotChangeTheSource() {
         val state = state()
         val offer = offer(state)

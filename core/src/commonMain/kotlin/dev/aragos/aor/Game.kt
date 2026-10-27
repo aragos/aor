@@ -92,6 +92,10 @@ data class GameState(
     val endingTriggered: Boolean = false,
     val entryCount: Int = 0,
     val activityStart: Int = 0,
+    /**
+     * Entry ordinal opening the current decision; replay-derived, never a private draft revision.
+     */
+    val decisionStart: Int = 0,
     val adjustments: Map<Commodity, List<CommodityAdjustment>> = emptyMap(),
     val capitalSelection: CapitalSelection = CapitalSelection(),
     val turnNumber: Int? = null,
@@ -167,8 +171,23 @@ data class GameState(
         val next = entry.applyTo(this).normalise().copy(entryCount = entryCount + 1)
         val changed =
             next.stage != stage || next.flow.actor != flow.actor || next.turnNumber != turnNumber
-        return if (changed) next.copy(activityStart = entryCount + 1) else next
+        val decisionChanged =
+            changed ||
+                next.flow.purchaseStep != flow.purchaseStep ||
+                next.flow.decisions != flow.decisions ||
+                next.decisionPrompt() != decisionPrompt()
+        return next.copy(
+            activityStart = if (changed) entryCount + 1 else activityStart,
+            decisionStart = if (decisionChanged) entryCount + 1 else decisionStart,
+        )
     }
+
+    /** Private batch readiness changes eligibility without replacing the shared decision. */
+    private fun decisionPrompt(): Prompt? =
+        when (val prompt = prompts().singleOrNull()) {
+            is Prompt.MultiPlayer -> prompt.copy(players = emptyList())
+            else -> prompt
+        }
 
     /** Looks up a registered [player] without exposing nullable player state to rule handlers. */
     fun playerState(player: PlayerId): PlayerState =

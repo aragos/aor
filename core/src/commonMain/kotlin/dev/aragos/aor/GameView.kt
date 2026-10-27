@@ -352,6 +352,8 @@ data class ActivityView(
     val choice: String?,
     val purchaseStep: PurchaseStep?,
     val startEntry: Int,
+    /** Game-local entry ordinal identifying this decision, including nested replacements. */
+    val decisionEntry: Int,
 ) {
     companion object {
         internal fun from(state: GameState): ActivityView {
@@ -366,6 +368,7 @@ data class ActivityView(
                 },
                 if (state.stage == Stage.PURCHASE) state.flow.purchaseStep else null,
                 state.activityStart,
+                state.decisionStart,
             )
         }
     }

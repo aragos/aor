@@ -5,6 +5,8 @@ import {t} from './messages';
 import {CardEventText} from './CardEventText';
 import {Commodity, Emblem, Payouts} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
+import {InvalidChoice, useTargets} from './DecisionControls';
+import {AdvanceBenefits} from './AdvanceBenefits';
 
 interface Props {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
@@ -20,11 +22,12 @@ function choiceLabel(snapshot: Snapshot, choice: CardChoiceView): string {
 export function CardDecision({snapshot, busy, submit}: Props) {
     const {selectedCard, setSelectedCard} = useMapSelection();
     const [choice, setChoice] = useState('');
-    const [targets, setTargets] = useState<string[]>([]);
     const [protection, setProtection] = useState('0');
-    useEffect(() => { setChoice(''); setTargets([]); setProtection('0'); }, [selectedCard]);
+    useEffect(() => { setChoice(''); setProtection('0'); }, [selectedCard]);
     const card = snapshot.game.hand.find(candidate => candidate.reference === selectedCard);
     const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === selectedCard);
+    const selection = useTargets(offer?.provinceTargets ?? [], offer?.requiredTargetCount ?? 0);
+    const targets = selection.selected;
     if (!card) return null;
     const finiteChoices = offer?.choices.filter(candidate => candidate.command !== null) ?? [];
     const needsTargets = offer?.choices.some(candidate => candidate.kind === 'PROVINCES') ?? false;
@@ -33,8 +36,8 @@ export function CardDecision({snapshot, busy, submit}: Props) {
     const validProtection = protection.trim() !== '' && Number.isInteger(amount) && amount >= 0 && offer?.protectionMax !== null && amount <= (offer?.protectionMax ?? -1);
     const selectedChoice = finiteChoices.find(candidate => candidate.command === choice);
     const noChoice = !needsTargets && finiteChoices.length === 1 && ['NONE', 'COMMODITY'].includes(finiteChoices[0].kind);
-    const invalidTargets = !!offer && needsTargets && (targets.some(target => !offer.provinceTargets.includes(target)) || targets.length > (offer.requiredTargetCount ?? 0));
-    const validTargets = needsTargets && targets.length === offer?.requiredTargetCount && targets.every(target => offer.provinceTargets.includes(target));
+    const invalidTargets = needsTargets && selection.invalid;
+    const validTargets = needsTargets && selection.valid;
     const protectedPlay = validProtection
         ? amount === 0 ? finiteChoices.find(candidate => candidate.kind === 'NONE')?.command : `play ${selectedCard} protect ${amount}`
         : null;
@@ -79,17 +82,16 @@ export function CardDecision({snapshot, busy, submit}: Props) {
                 onPick={area => setChoice(areaChoices.find(candidate => candidate.value?.toUpperCase() === area)?.command ?? '')}/>}
             {needsTargets && offer && <fieldset className="target-choices"><legend>{t('table.targets')} · {targets.length}/{offer.requiredTargetCount}</legend>
                 {offer.provinceTargets.map(province => <button type="button" key={province} className="secondary" aria-pressed={targets.includes(province)}
-                    disabled={busy || (!targets.includes(province) && targets.length >= (offer.requiredTargetCount ?? 0))}
-                    onClick={() => setTargets(current => current.includes(province) ? current.filter(target => target !== province) : [...current, province])}>{provinceName(province)}</button>)}
+                    disabled={busy || !selection.canPick(province)}
+                    onClick={() => selection.pick(province)}>{provinceName(province)}</button>)}
                 <MapPicker autoActivate title={t('table.targets')} disabled={busy} selected={targets}
-                    eligible={offer.provinceTargets.filter(target => targets.includes(target) || targets.length < (offer.requiredTargetCount ?? 0))}
-                    onPick={id => setTargets(current => current.includes(id) ? current.filter(target => target !== id) : current.length < (offer.requiredTargetCount ?? 0) ? [...current, id] : current)}/>
+                    eligible={offer.provinceTargets.filter(target => selection.canPick(target))}
+                    onPick={selection.pick}/>
             </fieldset>}
             {needsProtection && <label>{t('game.protection')}<input type="number" min={0} max={offer?.protectionMax ?? 0} value={protection}
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
-            {((choice && !selectedChoice) || invalidTargets) && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
-            {invalidTargets && <button type="button" className="secondary clear-targets" onClick={() => setTargets([])}>{t('table.clearSelection')}</button>}
+            <InvalidChoice invalid={!!(choice && !selectedChoice) || invalidTargets} clear={() => {setChoice(''); selection.clear();}}/>
             <button disabled={busy || !actionable}>{t('action.playCard')}</button>
         </form>}
     </section>;
@@ -106,6 +108,7 @@ export function AdvanceDecision({snapshot, busy, submit}: Props) {
     return <section className="object-decision advance-decision">
         <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setSelectedAdvance('')}>×</button>
         <p className="eyebrow">{label(advance.category, 'category')}</p><h2>{advanceName(advance.id)}</h2>
+        <AdvanceBenefits id={advance.id} snapshot={snapshot}/>
         {offer?.price !== null && offer?.price !== undefined && <div className="price-quote"><strong>${offer.price}</strong><span>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</span></div>}
         {offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
         {offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>

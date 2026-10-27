@@ -1,4 +1,5 @@
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
+import {checkSetupEvidence, checkDecisionEvidence} from './nextsteps.browser.mjs';
 import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
 
@@ -239,6 +240,29 @@ await page.send('Page.navigate', {url: web + actor.path});
         tokens:after.game.players.map(player=>({owner:player.id,coloured:1,white:1}))}))}});
     await checkPieceBounds(page);
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-province-label="copenhagen"] [data-piece-kind]').length`), 12, 'Even the narrowest province fits every owner and token age');
+    const collisions = await page.evaluate(`(() => {
+        const overlaps=(a,b)=>a.left<b.right && a.right>b.left && a.top<b.bottom && a.bottom>b.top;
+        return [...document.querySelectorAll('[data-province-label]')].flatMap(label=>{
+            const text=[...label.querySelectorAll(':scope > .province-name, :scope > .market-label')].map(part=>part.getBoundingClientRect());
+            return [...label.querySelectorAll('[data-piece-kind]')].some(piece=>text.some(rect=>overlaps(rect,piece.getBoundingClientRect()))) ? [label.dataset.provinceLabel] : [];
+        });
+    })()`);
+    assert.deepEqual(collisions,[],'Actual rendered labels and dense pieces never overlap');
+    for (const province of ['copenhagen','acre','levant','north-america','south-america']) {
+        await pick(province);
+        await page.wait(`document.querySelector('[data-dense-province="${province}"]')`,'readable dense occupancy fallback');
+        const text = await page.evaluate(`document.querySelector('[data-dense-province="${province}"]').textContent`);
+        assert.equal((text.match(/1 established and 1 new tokens/g)??[]).length,6,'Every owner and age is retained at readable size');
+        if (province === 'copenhagen') {
+            await page.screenshot(join(artifacts,'aor-crowded-fit.png'),1440);
+            await page.screenshot(join(artifacts,'aor-crowded-phone.png'),390,844,true);
+            await page.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+            const point=await page.evaluate(`(() => {const piece=document.querySelector('[data-province-label="copenhagen"] [data-piece-kind]');const rect=piece.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+            await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-550,modifiers:2});
+            await page.screenshot(join(artifacts,'aor-crowded-zoom.png'),1440);
+            await page.click('Fit map');
+        }
+    }
     const pirateFixture = await show({legalChoices: {commands: ['play hand-pirates']}, game: {stage: 'PLAY_CARDS',
         hand: [{reference: 'hand-pirates', definition: {id: 'pirates-vikings', kind: 'event', messageId: 'card.pirates-vikings', shape: 'SQUARE'}}],
         pirateTargets: {requiredCount: 2, eligibleProvinces: ['barcelona', 'genoa', 'rome']},
@@ -274,6 +298,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-province-label="toledo"] [data-piece-age="new"]').length`), 2);
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-province-label="toledo"] [data-piece-age="established"]').length`), 1);
     console.log('Passed: continental frame selection, live placement and rejection, draft preservation, inspection, keyboard picking, zoom, mobile layout, 3–6 player boards, pirate limits, War overseas limits, mixed owners and ages.');
+    await checkDecisionEvidence(page,web,after);
+    await checkSetupEvidence(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

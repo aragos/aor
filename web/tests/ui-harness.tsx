@@ -8,6 +8,7 @@ declare global {
         uiSnapshot?: Snapshot;
         uiCommands: {command: string; expectedRevision: number}[];
         uiNextError?: string;
+        uiErrorEntities?: string[];
         uiRequests: number;
         uiQuoteRequests: {expectedRevision: number; amount: number}[];
         uiQuoteReplies: Record<number, unknown>;
@@ -53,7 +54,7 @@ window.fetch = async (input, init) => {
         if (window.uiNextError) {
             const code = window.uiNextError;
             delete window.uiNextError;
-            return new Response(JSON.stringify({code}), {status: code === 'STALE_REVISION' ? 409 : 400});
+            return new Response(JSON.stringify({code, entityIds: window.uiErrorEntities ?? []}), {status: code === 'STALE_REVISION' ? 409 : 400});
         }
     }
     return new Response(JSON.stringify(window.uiSnapshot), {headers: {'Content-Type': 'application/json'}});

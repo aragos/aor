@@ -195,6 +195,12 @@ The client renders viewer-safe projections, prompts, legal choices and typed exp
 the same canonical commands as the text interface. Calculations stay in the core and authorization
 stays in the service. Read-only quotes are authenticated and bound to the committed revision.
 
+Decision drafts and object focus follow `activity.decisionEntry`, together with game and viewer
+identity. Polling revisions and private readiness updates retain work; a new or replaced decision
+clears old form state, inspection and target pickers. Target count and combined limits come from
+authoritative offers. Rejections retain correctable selections, and stale revisions refresh without
+retrying the command. A resumed outer activity opens a fresh presentation decision.
+
 Visual activity is derived from typed committed entries during history replay, with stable
 `revision:entryIndex` identifiers. Its card identities follow the same viewer audiences as the
 command log; unrevealed private submissions and private hand references are never exposed. The client

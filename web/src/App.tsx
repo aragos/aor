@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
-import {errorCode, request} from './api';
+import {ApiError, errorCode, request} from './api';
 import type {CreatedGame, Snapshot} from './api';
 import {t} from './messages';
 import {GameTable} from './GameTable';
@@ -44,7 +44,7 @@ function CreateGame() {
 function Game({id, token}: {id: string; token: string}) {
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [connectionError, setConnectionError] = useState('');
-    const [actionError, setActionError] = useState('');
+    const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [saved, setSaved] = useState(false);
     const busyRef = useRef(false);
@@ -71,13 +71,13 @@ function Game({id, token}: {id: string; token: string}) {
     async function submit(command: string): Promise<boolean> {
         if (!snapshot || busyRef.current) return false;
         busyRef.current = true; ++sequence.current;
-        setBusy(true); setActionError(''); setSaved(false);
+        setBusy(true); setActionError(null); setSaved(false);
         try {
             setSnapshot(await request<Snapshot>(`${path}/commands`, token, {expectedRevision: snapshot.revision, command}));
             setConnectionError(''); setSaved(true); return true;
         } catch (failure) {
             const code = errorCode(failure);
-            setActionError(code);
+            setActionError(failure instanceof ApiError ? failure : new ApiError(code));
             if (code === 'STALE_REVISION') {
                 try { setSnapshot(await request<Snapshot>(path, token)); } catch (refreshFailure) { setConnectionError(errorCode(refreshFailure)); }
             }

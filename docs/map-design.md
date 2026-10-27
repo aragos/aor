@@ -81,3 +81,13 @@ land/coast/sea separation, combined province outlines, contiguous areas, shared 
 label and piece bounds. Browser checks verify actual text and piece bounds, mixed owners and ages,
 reduced boards, gestures and order submission. See [README](../README.md) for build commands and
 [decision coverage](ui-decision-coverage.md) for evidence, runner options and remaining manual checks.
+
+Dense groups use joint label/piece placement: nearby label positions are compared before accepting
+shared space. This removed the twelve-group label collisions in North and South America without
+changing province or area geometry. When sharing remains unavoidable, the map keeps every piece
+and defers the name/market badge to inspection, rather than painting text over occupants. The
+province's accessible name retains its identity, market and complete occupancy. At small rendered
+piece sizes, selecting a province also opens a readable occupancy line beside the map; the decision
+sheet retains separate owner, established/new age and count rows. Fit is an overview; inspect or
+zoom for dense counts. Constrained label fits in Copenhagen, Toulouse and Constantinople remain
+recorded exceptions.

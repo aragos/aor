@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {ResultNotice} from './DecisionControls';
 import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
@@ -39,15 +40,14 @@ export function WarNotice({snapshot}: {snapshot: Snapshot}) {
     const event = [...snapshot.events].reverse().find(candidate => candidate.war);
     if (!event?.war || event.id === dismissed) return null;
     const war = event.war;
-    return <section className="war-notice" role="status" aria-live="polite">
-        <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setDismissed(event.id)}>×</button>
+    return <ResultNotice className="war-notice" dismiss={() => setDismissed(event.id)}>
         <strong>{warHeading(snapshot, war)}</strong>
         <dl className="detail-list">{[war.initiator, war.opponent].map(player => <div key={player}>
             <dt>{playerName(snapshot, player)}</dt>
             <dd>{t('table.die')} {event.dice.find(die => die.player === player)?.value ?? '—'} → {t('table.warTotal')} <b>{war.totals[player]}</b></dd>
         </div>)}</dl>
         <p>{war.winner ? `${t('table.warTransfers')}: ${war.requiredTransfers}` : t('table.warContinues')}</p>
-    </section>;
+    </ResultNotice>;
 }
 
 /** A result stays beside the decision until dismissed or replaced by the next competition. */
@@ -57,15 +57,14 @@ export function CompetitionNotice({snapshot}: {snapshot: Snapshot}) {
         (candidate.actor === snapshot.viewerId || candidate.competition.defenders.includes(snapshot.viewerId)));
     if (!event?.competition || event.id === dismissed) return null;
     const won = event.actor === snapshot.viewerId ? event.competition.attackerWon : !event.competition.attackerWon;
-    return <section className={`competition-notice ${won ? 'won' : 'lost'}`} role="status" aria-live="polite">
-        <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setDismissed(event.id)}>×</button>
+    return <ResultNotice className={`competition-notice ${won ? 'won' : 'lost'}`} dismiss={() => setDismissed(event.id)}>
         <strong>{t(won ? 'table.competitionWon' : 'table.competitionLost')}</strong>
         <p>{event.provinces.map(provinceName).join(', ')} · {playerName(snapshot, event.actor ?? '')} → {event.competition.defenders.map(id => playerName(snapshot, id)).join(', ')}</p>
         {event.dice.length > 0 && <p className="competition-dice">{event.dice.map((die, index) => <span key={index}>
             {t(`table.die.${['white', 'black', 'green'][index]}`)}: <b>{die.value}</b>
         </span>)}</p>}
         {event.detail === 'CATHEDRAL' && <p>{t('action.cathedral')}</p>}
-    </section>;
+    </ResultNotice>;
 }
 
 export function Activity({snapshot}: {snapshot: Snapshot}) {

@@ -20,7 +20,7 @@ function Harness() {
     if (!snapshot) return <p>Supply a snapshot through the browser test driver.</p>;
     const submit = async (command: string) => {window.mapCommands.push(command); return true;};
     return <MapSelectionProvider><div data-test-revision={snapshot.revision}>
-        <GameTable snapshot={snapshot} busy={false} saved={false} submit={submit} connectionError="" actionError=""
+        <GameTable snapshot={snapshot} busy={false} saved={false} submit={submit} connectionError="" actionError={null}
             quotePurchase={async amount => {
                 const quote = snapshot.game.tokenPurchaseOffers.find(offer => offer.amount === amount);
                 if (!quote) throw new Error('No authoritative quote supplied for fixture amount.');

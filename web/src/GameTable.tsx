@@ -1,5 +1,5 @@
 import {useEffect, useLayoutEffect, useState} from 'react';
-import type {Snapshot, TokenPurchaseQuoteResponse} from './api';
+import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {Controls} from './Controls';
@@ -12,6 +12,8 @@ import {AdvanceDecision, CardDecision} from './ObjectDecisions';
 import {BoardMap} from './map/BoardMap';
 import {useMapSelection} from './map/MapSelection';
 import {ProvinceInspector} from './map/ProvinceInspector';
+import {decisionIdentity} from './decision';
+import {DiagnosticMessage} from './DiagnosticMessage';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
@@ -19,20 +21,19 @@ export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 
 export function GameTable({snapshot, busy, saved, submit: sendCommand, connectionError, actionError, quotePurchase}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
-    connectionError: string; actionError: string; quotePurchase: QuotePurchase;
+    connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
 }) {
     const [commandsOpen, setCommandsOpen] = useState(false);
     const [sheetCollapsed, setSheetCollapsed] = useState(false);
     const {selected, setSelected, selectedArea, selectedCard, setSelectedCard, selectedAdvance,
         picker, workspace, setWorkspace, resetSelection} = useMapSelection();
-    const purchaseStep = snapshot.game.stage === 'PURCHASE' ? snapshot.game.activity?.purchaseStep : null;
-    const decisionKey = `${snapshot.game.turnNumber}:${snapshot.game.stage}:${purchaseStep}`;
+    const decisionKey = decisionIdentity(snapshot);
     // Reset before new forms activate their automatic target pickers.
     useLayoutEffect(() => {
         resetSelection();
         if (document.activeElement instanceof HTMLElement &&
             document.activeElement.matches('.hand-card, .advance-tile')) document.activeElement.blur();
-    }, [snapshot.gameId, snapshot.game.turnNumber, snapshot.game.stage, purchaseStep, resetSelection]);
+    }, [decisionKey, resetSelection]);
     useEffect(() => setSheetCollapsed(false), [selected, selectedArea, selectedCard, selectedAdvance]);
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
     const expansion = snapshot.game.stage === 'EXPANSION';
@@ -68,6 +69,10 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             <div className="game-brand"><span className="brand-emblem" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
                 <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t('game.epoch')} {snapshot.game.currentEpoch}</p></div></div>
             <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
+            <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
+                <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
+                    href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
+            </details>
             <button type="button" className="secondary commands-toggle" aria-expanded={commandsOpen} onClick={() => {setCommandsOpen(current => !current); if (!commandsOpen) setTimeout(() => document.querySelector('.command-dock')?.scrollIntoView({block: 'nearest'}), 0);}}>›_ {t('table.commands')}</button>
         </header>
         <PlayerOverview snapshot={snapshot}/>
@@ -77,11 +82,17 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             <div className="workspace-main">
                 <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')}>
                     {(['map', 'markets', 'advances'] as const).map(tab => <button type="button" key={tab} role="tab" id={`tab-${tab}`} aria-selected={workspace === tab}
+                        tabIndex={workspace === tab ? 0 : -1}
                         aria-controls={`workspace-${tab}`} onClick={() => setWorkspace(tab)} onKeyDown={event => {
                             const tabs: ('map' | 'markets' | 'advances')[] = ['map', 'markets', 'advances'];
                             if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
                                 event.preventDefault();
                                 const next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : 2)) % tabs.length];
+                                setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
+                            }
+                            if (event.key === 'Home' || event.key === 'End') {
+                                event.preventDefault();
+                                const next = event.key === 'Home' ? 'map' : 'advances';
                                 setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
                             }
                         }}>{t(`table.${tab}`)}{tab === 'advances' && <small>{me.advances.length}</small>}</button>)}
@@ -97,7 +108,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
                 <div className="decision-heading"><p className="eyebrow">{finished ? t('game.finished') : canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
                     {!canAct && snapshot.prompt && <strong>{snapshot.prompt.players.map(id => playerName(snapshot, id)).join(', ')}</strong>}
-                    <h2>{decision}</h2>
+                    <h2 aria-live="polite" aria-atomic="true">{decision}</h2>
                     <span className="mobile-selected">{selectedName ? t(selectedName) : selectedAdvance ? label(selectedAdvance, 'advance') : province ? provinceName(province.id) : ''}</span>
                     {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed} aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>{t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}</button>}
                     {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: {playerName(snapshot, snapshot.game.activity.actor)}</p>}
@@ -114,7 +125,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     : selectedAdvance ? <AdvanceDecision snapshot={snapshot} busy={busy} submit={submit}/>
                     : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} busy={busy} submit={submit} select={setSelected}/>}
                 <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>
-                {actionError && <p className="error" role="alert">{t(`error.${actionError}`)}</p>}
+                {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
                 <div className="available-resources"><p className="eyebrow">{t('table.available')}</p><strong>${me.cash}</strong><small>{t('game.cash')}</small>
                     <details className="stock-details"><summary>{t('table.stock')}</summary><dl className="detail-list">

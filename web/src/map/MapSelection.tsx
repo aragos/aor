@@ -1,5 +1,6 @@
 import {createContext, useCallback, useContext, useEffect, useId, useRef, useState} from 'react';
 import type {Dispatch, ReactNode, SetStateAction} from 'react';
+import {t} from '../messages';
 
 interface Picker {
     id: string;
@@ -70,8 +71,10 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
     const initialPicker = useRef({id, kind, title, eligible, selected, pick: (province: string) => latestPick.current(province)});
     initialPicker.current = {id, kind, title, eligible, selected, pick: province => latestPick.current(province)};
     const active = picker?.id === id;
+    const activated = useRef(false);
     useEffect(() => {
-        if (autoActivate && !disabled) {
+        if (autoActivate && !disabled && !activated.current) {
+            activated.current = true;
             setPicker(initialPicker.current);
             setWorkspace('map');
         }
@@ -80,7 +83,6 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
         if (!active) return;
         setPicker(current => {
             if (current?.id !== id) return current;
-            if (disabled) return null;
             if (current.kind === kind && current.title === title && current.eligible.join('|') === eligible.join('|') &&
                 current.selected.join('|') === selected.join('|')) return current;
             return {...current, kind, title, eligible, selected};
@@ -94,7 +96,7 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
                 setWorkspace('map');
                 requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'start'}));
             }
-        }}>{active ? 'Stop choosing on map' : 'Choose on map'}</button>;
+        }}>{t(active ? 'board.stopChoosing' : 'board.chooseOnMap')}</button>;
 }
 
 /** Eligible player summaries edit the same card draft as its target buttons. */

@@ -45,6 +45,12 @@ invalid entry or unresolved input, never skip it. Expose each phase activity's i
 nested frames retain the activity id. Expose other-player actions, random outcomes and simultaneous-batch boundaries
 so the service can enforce undo policy without inferring it from display text.
 
+The current presentation decision has a separate replay-derived `activity.decisionEntry` ordinal.
+It changes with phase, actor, purchase step, nested decision frames or the requested single-player
+choice. Successive replacements with the same owner and prompt still receive distinct identities.
+Private batch readiness does not replace the decision. This identity is scoped to a game; it is
+neither a command nor a concurrency revision. Clients continue to submit the committed revision.
+
 Revision validation must also compare required random requests with the original revision. Preserve every recorded
 event and its unchanged compatible outcome, matched to the same logical request. Reject added or missing random
 events and missing, ambiguous or incompatible outcome matches, even if the total event count is unchanged. This

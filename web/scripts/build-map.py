@@ -1314,6 +1314,47 @@ def piece_layouts(id, label):
 
 label_layouts = {id: province_label(id) for id in land}
 piece_placements = {id: piece_layouts(id, label) for id, label in label_layouts.items()}
+
+
+def joint_label_layout(id, label, pieces):
+    """Try nearby label positions before accepting dense-group sharing or tiny pieces.
+
+    This only changes presentation. Province geometry and every adjacency remain fixed.
+    The renderer progressively discloses label details when sharing is still unavoidable.
+    """
+    if not any(layout["crowded"] for layout in pieces.values()):
+        return label, pieces
+    x, y = label["point"]
+    left, top, width, height = label["box"]
+
+    def bounds(px, py):
+        sx = compact_easting(px)
+        return box(expand_easting(sx + left), py + top,
+                   expand_easting(sx + left + width), py + top + height)
+
+    domain = land[id] if label["fit"] == "LAND" else footprints[id]
+    overflow = bounds(x, y).difference(domain).area + 0.001
+
+    def score(layouts, distance):
+        return (sum(layout["crowded"] for layout in layouts.values()),
+                -min(layout["size"] for layout in layouts.values()),
+                -sum(layout["size"] for layout in layouts.values()), distance)
+
+    best_label, best_pieces, best_score = label, pieces, score(pieces, 0)
+    for dx, dy in [(dx, dy) for dx in [-24, 0, 24] for dy in [-24, 0, 24] if dx or dy]:
+        point = (x + dx, y + dy)
+        if not land[id].covers(Point(point)) or bounds(*point).difference(domain).area > overflow:
+            continue
+        candidate = {**label, "point": point}
+        layouts = piece_layouts(id, candidate)
+        candidate_score = score(layouts, math.hypot(dx, dy))
+        if candidate_score < best_score:
+            best_label, best_pieces, best_score = candidate, layouts, candidate_score
+    return best_label, best_pieces
+
+
+for id, label in label_layouts.items():
+    label_layouts[id], piece_placements[id] = joint_label_layout(id, label, piece_placements[id])
 positions = {id: layout["point"] for id, layout in label_layouts.items()}
 sea_labels = {sea: sea_label(sea, shape) for sea, shape in seas.items()}
 label_clearance = unary_union(

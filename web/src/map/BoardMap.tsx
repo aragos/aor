@@ -2,6 +2,7 @@ import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'reac
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
+import {t} from '../messages';
 import {AccessLock, areaColors, CommodityIcon, commodityColors, PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
@@ -12,7 +13,7 @@ interface Geometry {
     bounds: number[];
     frame: string;
     provinces: Record<string, {path: string; outline: string; label: number[]; area: string;
-        pieces: Record<string, {size: number; fit: string; points: number[][]}>}>;
+        pieces: Record<string, {size: number; fit: string; crowded: boolean; points: number[][]}>}>;
     coasts: Record<string, string>;
     areas: Record<string, {path: string; label: number[]}>;
     seas: Record<string, {path: string; label: number[]; color: string; area: string | null}>;
@@ -68,15 +69,15 @@ function ProvinceLabel({province, pieces, snapshot, dimmed = false}: {
     const piecePosition = (index: number) => ({x: layout.points[index][0] - x, y: layout.points[index][1] - y});
     const width = 32 + province.commodities.length * 27;
     return <g transform={`translate(${x} ${y})`} className="province-label" data-province-label={province.id} pointerEvents="none" opacity={dimmed ? .45 : 1}>
-        {['iceland', 'west-africa'].includes(province.id) && <text y={-45} textAnchor="middle" fontSize={11} fill="#526b68" letterSpacing={1.2}>INSET</text>}
-        <text className="province-name" textAnchor="middle" fontSize={18} fontWeight={650} fill="#263c3c">
+        {['iceland', 'west-africa'].includes(province.id) && <text y={-45} textAnchor="middle" fontSize={11} fill="#526b68" letterSpacing={1.2}>{t('board.inset')}</text>}
+        {!layout?.crowded && <><text className="province-name" textAnchor="middle" fontSize={18} fontWeight={650} fill="#263c3c">
             {words.map((word, index) => <tspan key={index} x={0} y={-25 - (words.length - index - 1) * 20}>{word}</tspan>)}
         </text>
         <g className="market-label" data-capital-market={province.capital ? province.id : undefined}>
             <rect x={-width / 2} y={-12} width={width} height={33} rx={7} fill={province.capital ? '#263c3c' : '#fffdf5'} stroke="#b5b6a3" strokeWidth={.8}/>
             <text x={-width / 2 + 16} y={13} textAnchor="middle" fontSize={27} fontWeight={750} fill={province.capital ? '#fffdf5' : '#263c3c'}>{province.marketNumber}</text>
             {province.commodities.map((commodity, index) => <CommodityIcon key={commodity} commodity={commodity} x={-width / 2 + 31 + index * 27} y={-8} size={25}/>)}
-        </g>
+        </g></>}
         {pieces?.marker && <PlayerPiece {...piecePosition(0)} size={layout.size} fresh={pieces.marker.side === 'WHITE'}
             capital={snapshot.game.players.find(player => player.id === pieces.marker?.owner)?.capital ?? null}/>}
         {groups.map((group, index) => <PlayerPiece key={`${group.owner}-${group.fresh}`} size={Math.min(27, layout.size)}
@@ -87,8 +88,8 @@ function ProvinceLabel({province, pieces, snapshot, dimmed = false}: {
 
 function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string {
     const owner = (id: string) => playerName(snapshot, id);
-    if (pieces?.marker) return `${owner(pieces.marker.owner)}, ${pieces.marker.side === 'WHITE' ? 'new' : 'established'} marker`;
-    return pieces?.tokens.map(tokens => `${owner(tokens.owner)}, ${tokens.coloured} established and ${tokens.white} new tokens`).join('; ') || 'unoccupied';
+    if (pieces?.marker) return t('board.markerOccupancy', {owner: owner(pieces.marker.owner), age: t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')});
+    return pieces?.tokens.map(tokens => t('board.tokenOccupancy', {owner: owner(tokens.owner), old: tokens.coloured, fresh: tokens.white})).join('; ') || t('table.unoccupied');
 }
 
 export function BoardMap({snapshot, busy}: {
@@ -101,6 +102,13 @@ export function BoardMap({snapshot, busy}: {
     const [view, setView] = useState(bounds);
     useEffect(() => setView(current => clampView(current, bounds)), [bounds.w, bounds.h]);
     const svg = useRef<SVGSVGElement>(null);
+    const [mapWidth, setMapWidth] = useState(0);
+    useEffect(() => {
+        if (!svg.current) return;
+        const observer = new ResizeObserver(entries => setMapWidth(entries[0].contentRect.width));
+        observer.observe(svg.current);
+        return () => observer.disconnect();
+    }, [!!snapshot.game.catalog]);
     const pointers = useRef(new Map<number, {x: number; y: number}>());
     const gesture = useRef<{x: number; y: number; distance: number; view: MapView} | null>(null);
     const suppressClick = useRef(false);
@@ -228,16 +236,21 @@ export function BoardMap({snapshot, busy}: {
     ].filter(item => highlightPriority(item.state) > 0)
         .sort((first, second) => highlightPriority(first.state) - highlightPriority(second.state) || Number(first.inspected) - Number(second.inspected));
     const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
-    return <section className="interactive-board" id="interactive-board" aria-label="The world">
+    const inspectedPieces = occupancy.get(selected);
+    const groupCount = inspectedPieces?.marker ? 1 : inspectedPieces?.tokens.reduce((count, tokens) =>
+        count + Number(tokens.coloured > 0) + Number(tokens.white > 0), 0) ?? 0;
+    const inspectedLayout = geometry.provinces[selected]?.pieces[String(groupCount)];
+    const denseInspection = inspectedLayout && (inspectedLayout.crowded || inspectedLayout.size * mapWidth / view.w < 14);
+    return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
         {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong>
-            <button type="button" className="secondary" onClick={() => {setPicker(null); document.querySelector('.decision')?.scrollIntoView({behavior: 'smooth'});}}>Return to order</button></div>}
+            <button type="button" className="secondary" onClick={() => {setPicker(null); document.querySelector('.decision')?.scrollIntoView({behavior: 'smooth'});}}>{t('board.returnToOrder')}</button></div>}
         <div className="map-viewport">
-            <div className="map-zoom" role="group" aria-label="Map zoom">
-                <button type="button" className="secondary" aria-label="Zoom in" onClick={() => zoom(.7)}>+</button>
-                <button type="button" className="secondary" aria-label="Zoom out" onClick={() => zoom(1.4)}>−</button>
-                <button type="button" className="secondary" onClick={() => setView(bounds)}>Fit map</button>
+            <div className="map-zoom" role="group" aria-label={t('board.zoom')}>
+                <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
+                <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
+                <button type="button" className="secondary" onClick={() => setView(bounds)}>{t('board.fit')}</button>
             </div>
-            <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label="Interactive game map" fillRule="evenodd"
+            <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
                 style={{aspectRatio: `${bounds.w} / ${bounds.h}`, height: 'auto', minHeight: 0}}
                 onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd}
                 onClick={event => {
@@ -259,7 +272,7 @@ export function BoardMap({snapshot, busy}: {
                 <rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} fill="#eae8dd"/>
                 <g clipPath={`url(#${prefix}-frame)`}>
                     <path d={geometry.frame} fill="#90b8cb"/>
-                    {Object.entries(geometry.seas).map(([sea, shape]) => <g key={sea} data-sea={sea} data-sea-area={catalog.seaAreas[sea]}><title>{label(sea)}{catalog.seaAreas[sea] ? ` · Area ${catalog.seaAreas[sea]}` : ''}</title><path d={shape.path} fill={shape.color} stroke="#739eac" strokeWidth={1}/>
+                    {Object.entries(geometry.seas).map(([sea, shape]) => <g key={sea} data-sea={sea} data-sea-area={catalog.seaAreas[sea]}><title>{label(sea)}{catalog.seaAreas[sea] ? ` · ${t('board.area')} ${catalog.seaAreas[sea]}` : ''}</title><path d={shape.path} fill={shape.color} stroke="#739eac" strokeWidth={1}/>
                         <text x={shape.label[0]} y={shape.label[1]} textAnchor="middle" fontSize={20} fill="#315d70" fontWeight={selectedSeas.has(sea) ? 750 : 500} aria-label={label(sea)}>
                             {label(sea).length > 18 ? label(sea).split(' ').map((word, index) => <tspan key={index} x={shape.label[0]} y={shape.label[1] - 10 + index * 24}>{word}</tspan>) : label(sea)}
                         </text></g>)}
@@ -267,7 +280,7 @@ export function BoardMap({snapshot, busy}: {
                     {Object.entries(geometry.coasts).map(([id, path]) => definitions.has(id) && <g key={id} data-coastal-space={id}
                         onPointerEnter={() => setHovered(id)} onPointerLeave={() => setHovered('')}
                         onClick={() => {if (!suppressClick.current) choose(id);}}>
-                        <title>{provinceName(id)} coastal water</title>
+                        <title>{provinceName(id)} {t('board.coastalWater')}</title>
                         <path d={path} fill={id === selected || coastNeighbors.has(id) ? '#9adddf' : '#d2efed'} stroke="#56929c" strokeWidth={1.4}/>
                         <ProvinceHighlight path={path} {...highlight(id)} outline={false}/>
                     </g>)}
@@ -281,14 +294,14 @@ export function BoardMap({snapshot, busy}: {
                         const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : reachable.has(id);
                         return <g key={id} data-map-province={id} role={definition ? 'button' : undefined}
                             tabIndex={definition ? 0 : undefined} aria-pressed={definition ? id === selected : undefined}
-                            aria-label={definition ? `${provinceName(id)}${definition.capital ? ', capital' : ''}, market ${definition.marketNumber}, ${definition.satellite ? 'satellite' : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? ', reachable' : ''}` : undefined}
+                            aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}
                             className={`map-province ${definition ? 'active' : 'inactive'} ${expansionHighlight && definition ? reachable.has(id) ? 'expansion-reachable' : 'expansion-unreachable' : ''} ${picked ? 'picked' : ''} ${eligible ? 'eligible' : ''}`}
                             onPointerEnter={() => {if (definition) setHovered(id);}} onPointerLeave={() => setHovered('')}
                             onFocus={() => setFocused(id)} onBlur={() => setFocused('')}
                             onClick={() => {if (definition && !suppressClick.current) choose(id);}} onKeyDown={event => {
                                 if (definition && (event.key === 'Enter' || event.key === ' ')) {event.preventDefault(); suppressClick.current = false; choose(id);}
                             }}>
-                            <title>{provinceName(id)}{definition ? '' : ' · not used with this player count'}</title>
+                            <title>{provinceName(id)}{definition ? '' : ` · ${t('board.notUsed')}`}</title>
                             <path className="province-shape" d={shape.path}
                                 fill={!definition ? '#daddd1' : definition.satellite ? `url(#${prefix}-satellite)` : definition.commodities.length > 1 ? `url(#${prefix}-${id})` : commodityColors[definition.commodities[0]][0]}
                                 stroke="#777d6c" strokeWidth={1.4}/>
@@ -325,13 +338,13 @@ export function BoardMap({snapshot, busy}: {
                     {catalog.provinces.map(province => <ProvinceLabel key={province.id} province={province} pieces={occupancy.get(province.id)} snapshot={snapshot}
                         dimmed={!!emphasizedArea && province.area !== emphasizedArea}/>)}
                     {areaEntries.map(([area, shape]) => <g key={area} data-map-area-label={area} className="map-area-label" role="button" tabIndex={0}
-                        aria-label={`Area ${area}${areaAccess[area].length ? `, requires ${areaAccess[area].map(requirement => label(requirement)).join(', ')}` : ''}`} aria-pressed={highlightArea(area).selected}
+                        aria-label={`${t('board.area')} ${area}${areaAccess[area].length ? `, ${t('board.requires', {advances: areaAccess[area].map(requirement => label(requirement)).join(', ')})}` : ''}`} aria-pressed={highlightArea(area).selected}
                         opacity={activeAreas.has(area) ? 1 : .4}
                         onPointerEnter={() => setHovered(`area:${area}`)} onPointerLeave={() => setHovered('')}
                         onFocus={() => setFocused(`area:${area}`)} onBlur={() => setFocused('')}
                         onClick={() => {if (!suppressClick.current) chooseArea(area);}}
                         onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); suppressClick.current = false; chooseArea(area);}}}>
-                        <title>{`Area ${area}${areaAccess[area].length ? ` · ${areaAccess[area].map(requirement => label(requirement)).join(', ')}` : ''}`}</title>
+                        <title>{`${t('board.area')} ${area}${areaAccess[area].length ? ` · ${areaAccess[area].map(requirement => label(requirement)).join(', ')}` : ''}`}</title>
                         <rect x={shape.label[0] - 65} y={shape.label[1] - 55} width={130} height={110} fill="transparent"/>
                         <rect className="area-label-bg" x={shape.label[0] - 44} y={shape.label[1] - 28} width={88} height={56} rx={8}
                             fill={areaColors[area]} stroke={highlightArea(area).selected ? '#143e4e' : highlightArea(area).eligible ? '#2b6d9a' : '#fffdf3'} strokeWidth={highlightArea(area).selected || highlightArea(area).eligible ? 5 : 2.5}/>
@@ -341,23 +354,27 @@ export function BoardMap({snapshot, busy}: {
                         </g>}
                     </g>)}
                     <g pointerEvents="none" fill="#315d70" fontSize={18} fontWeight={700} textAnchor="middle">
-                        {[{group:'NEW_WORLD', title:'NEW WORLD', y:660}, {group:'FAR_EAST', title:'FAR EAST', y:1080}].map(({group,title,y}) => <g key={group} data-overseas-label={group}>
+                        {[{group:'NEW_WORLD', title:label('NEW_WORLD'), y:660}, {group:'FAR_EAST', title:label('FAR_EAST'), y:1080}].map(({group,title,y}) => <g key={group} data-overseas-label={group}>
                             <text x={overseasLocks[group] ? 84 : 95} y={y}>{title}</text>
-                            {overseasLocks[group] && <g data-overseas-lock={group}><title>Access advance required</title><AccessLock x={146} y={y - 17} size={20}/></g>}
+                            {overseasLocks[group] && <g data-overseas-lock={group}><title>{t('board.advanceRequired')}</title><AccessLock x={146} y={y - 17} size={20}/></g>}
                         </g>)}
                     </g>
                 </g>
                 <path d={geometry.frame} fill="none" stroke="#84958b" strokeWidth={2} pointerEvents="none"/>
             </svg>
         </div>
-        <details className="commodity-legend"><summary>Map key</summary>        <div className="map-legend">
-            <span><svg viewBox="0 0 32 33" width="24" height="24" aria-hidden="true"><rect width="32" height="33" rx="7" fill="#263c3c"/><text x="16" y="25" textAnchor="middle" fontSize="27" fontWeight="750" fill="#fffdf5">4</text></svg>Capital</span>
-            <span><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><AccessLock/></svg>Advance required</span>
-            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" size={40}/></svg>Marker</span>
-            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="venice" count={2} size={40}/></svg>Tokens · count</span>
-            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" fresh size={40}/></svg>New · white face</span>
-            <span>Filled · established</span><span className="satellite-key">Satellite</span><span className="coast-key">Coastal water</span>
-            <label className="check-label"><input type="checkbox" checked={showSupport} onChange={event => setShowSupport(event.target.checked)}/>Support arrows</label>
+        {denseInspection && <div className="dense-map-detail" data-dense-province={selected}>
+            <strong>{provinceName(selected)}</strong><p>{t('board.denseOccupancy')}</p>
+            <p>{occupancyDescription(snapshot, inspectedPieces)}</p>
+        </div>}
+        <details className="commodity-legend"><summary>{t('board.mapKey')}</summary>        <div className="map-legend">
+            <span><svg viewBox="0 0 32 33" width="24" height="24" aria-hidden="true"><rect width="32" height="33" rx="7" fill="#263c3c"/><text x="16" y="25" textAnchor="middle" fontSize="27" fontWeight="750" fill="#fffdf5">4</text></svg>{t('board.capital')}</span>
+            <span><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><AccessLock/></svg>{t('board.advanceRequired')}</span>
+            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" size={40}/></svg>{t('board.marker')}</span>
+            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="venice" count={2} size={40}/></svg>{t('board.tokensCount')}</span>
+            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" fresh size={40}/></svg>{t('board.newFace')}</span>
+            <span>{t('board.establishedFace')}</span><span className="satellite-key">{t('board.satellite')}</span><span className="coast-key">{t('board.coastalWater')}</span>
+            <label className="check-label"><input type="checkbox" checked={showSupport} onChange={event => setShowSupport(event.target.checked)}/>{t('board.supportArrows')}</label>
         </div>
 <div className="map-legend">{Object.keys(commodityColors).map(commodity => <span key={commodity}>
             <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><CommodityIcon commodity={commodity}/></svg>{label(commodity, 'commodity')}</span>)}</div>
