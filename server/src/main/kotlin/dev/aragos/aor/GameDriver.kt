@@ -9,10 +9,14 @@ data class Revision(
     val author: PlayerId,
     val command: String,
     val entries: List<String>,
+    /** Edits retain this many effective entries, then append [entries] as a replacement suffix. */
+    val replaceFrom: Int? = null,
+    /** Present on creation and explicit setup policy commands; later revisions inherit it. */
+    val undoPolicy: UndoPolicy? = null,
 )
 
 data class StoredGame(
-    val fileVersion: Int = 3,
+    val fileVersion: Int = 4,
     val id: String,
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
@@ -25,9 +29,27 @@ data class StoredGame(
     val revision: Int
         get() = revisions.last().id
 
-    /** Every revision contributes entries; replaying only the latest would lose earlier actions. */
-    fun state(): GameState = replay(header, revisions.flatMap(Revision::entries))
+    val undoPolicy: UndoPolicy
+        get() =
+            checkNotNull(revisions.lastOrNull { it.undoPolicy != null }?.undoPolicy) {
+                "Every game must record its undo policy at creation."
+            }
+
+    /** Ordinary revisions append deltas; edits replace only their declared effective suffix. */
+    fun effectiveEntries(): List<RecordedEntry> =
+        revisions.fold(emptyList()) { entries, revision ->
+            val retained = revision.replaceFrom?.let(entries::take) ?: entries
+            retained +
+                revision.entries.mapIndexed { index, text ->
+                    RecordedEntry("${revision.id}:$index", text)
+                }
+        }
+
+    fun state(): GameState = replay(header, effectiveEntries().map(RecordedEntry::text))
 }
+
+/** Stable identity `revision:index` and canonical engine text in the effective log. */
+data class RecordedEntry(val id: String, val text: String)
 
 interface SetupRandom {
     fun shuffle(cards: List<String>): List<String>
@@ -55,6 +77,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         header: GameHeader,
         credentials: Map<PlayerId, String>,
         rules: RuleOptions = RuleOptions(),
+        undoPolicy: UndoPolicy = UndoPolicy.REGULAR_TURN,
     ): StoredGame {
         val entries = initialConfiguration(header.creatorId, rules)
         val entry = entries.first()
@@ -71,6 +94,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                         author = entry.actor,
                         command = entry.command.toText(),
                         entries = entries.map(TextCodec::print),
+                        undoPolicy = undoPolicy,
                     )
                 ),
         )
@@ -227,3 +251,26 @@ internal fun initialConfiguration(
     rules: RuleOptions = RuleOptions(),
 ): List<Entry.Action> =
     rules.configurationCommands().map { command -> Entry.Action(creator, command) }
+
+internal fun requireCompletedTransaction(state: GameState) {
+    require(state.prompts().none { prompt -> prompt is Prompt.System }) {
+        "A revision cannot stop before required system outcomes have completed."
+    }
+    require(
+        state.stage != Stage.BIDDING ||
+            state.players.values.all { player -> player.capitalBid == null }
+    ) {
+        "private bids may enter history only as a complete, revealed batch."
+    }
+    require(state.stage != Stage.SETUP_RETURN || state.deckHistory.setupReturns.isEmpty()) {
+        "Setup returns may enter history only as a complete private batch."
+    }
+    require(
+        state.stage != Stage.TOKEN_PURCHASE ||
+            state.players.values
+                .filter { player -> player.misery != MiseryStep.CHAOS }
+                .all { player -> player.tokenPurchase == null }
+    ) {
+        "private token purchases may enter history only as a complete, revealed batch."
+    }
+}

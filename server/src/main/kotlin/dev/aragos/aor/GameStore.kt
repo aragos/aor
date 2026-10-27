@@ -49,7 +49,9 @@ object AtomicGameWriter : GameWriter {
     }
 }
 
-/** Version-three local storage. Revisions remain immutable deltas in one append-only chain. */
+/**
+ * Current-format local storage. Revisions are immutable deltas with explicit suffix replacements.
+ */
 class FileGameStore(
     private val directory: Path,
     private val writer: GameWriter = AtomicGameWriter,
@@ -152,6 +154,14 @@ class FileGameStore(
                         author = PlayerId(revision.field("author").string()),
                         command = revision.field("command").string(),
                         entries = revision.field("entries").array().map(JsonNode::string),
+                        replaceFrom =
+                            revision.field("replaceFrom").let {
+                                if (it.isNull) null else it.integer()
+                            },
+                        undoPolicy =
+                            revision.field("undoPolicy").let {
+                                if (it.isNull) null else UndoPolicy.valueOf(it.string())
+                            },
                     )
                 },
             pendingReturns =
@@ -166,7 +176,7 @@ class FileGameStore(
     }
 
     private fun validate(game: StoredGame) {
-        require(game.fileVersion == 3) { "Only game file version 3 is supported." }
+        require(game.fileVersion == 4) { "Only game file version 4 is supported." }
         require(game.credentials.keys == game.header.players.map(Player::id).toSet()) {
             "Every registered player must have exactly one credential."
         }
@@ -179,7 +189,7 @@ class FileGameStore(
         require(game.revisions.isNotEmpty()) {
             "A game must have an initial configuration revision."
         }
-        val state = validateRevisions(game.header, game.revisions)
+        val state = validateRevisions(game)
         if (game.pendingBids.isNotEmpty()) {
             val participants =
                 (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
@@ -219,9 +229,72 @@ class FileGameStore(
         }
     }
 
-    private fun validateRevisions(header: GameHeader, revisions: List<Revision>): GameState =
-        revisions.withIndex().fold(GameState(header)) { state, (index, revision) ->
-            validateRevision(state, index, revision)
+    private fun validateRevisions(game: StoredGame): GameState =
+        game.revisions.withIndex().fold(GameState(game.header)) { state, (index, revision) ->
+            require(
+                revision.id == index + 1 && revision.parent == if (index == 0) null else index
+            ) {
+                "Revisions must form a consecutive chain starting with revision 1."
+            }
+            require(revision.author in state.playerIds) {
+                "Revision authors must be registered players."
+            }
+            require(index != 0 || revision.undoPolicy != null) {
+                "Creation must record its undo policy."
+            }
+            val previous =
+                game.copy(
+                    revisions = game.revisions.take(index),
+                    pendingBids = emptyMap(),
+                    pendingReturns = emptyMap(),
+                )
+            when {
+                revision.replaceFrom != null -> {
+                    require(revision.undoPolicy == null) {
+                        "A history edit cannot change the undo policy."
+                    }
+                    val actions =
+                        HistoryEdits.retainedLines(
+                            previous,
+                            revision.author,
+                            revision.replaceFrom,
+                            revision.entries,
+                        )
+                    val expected =
+                        HistoryEdits.replacement(
+                            previous,
+                            revision.author,
+                            revision.replaceFrom,
+                            actions,
+                        )
+                    require(
+                        revision.entries == expected &&
+                            revision.command in
+                                listOf(
+                                    "undo ${revision.replaceFrom}",
+                                    "edit-history ${revision.replaceFrom}",
+                                )
+                    ) {
+                        "Edited history must preserve recorded outcomes and its canonical edit command."
+                    }
+                    replay(
+                        game.header,
+                        previous
+                            .effectiveEntries()
+                            .take(revision.replaceFrom)
+                            .map(RecordedEntry::text) + expected,
+                    )
+                }
+                revision.undoPolicy != null && index > 0 -> {
+                    val configured =
+                        HistoryEdits.configure(previous, revision.author, revision.undoPolicy)
+                    require(configured.revisions.last() == revision) {
+                        "Undo policy revisions must be canonical."
+                    }
+                    state
+                }
+                else -> validateRevision(state, index, revision)
+            }
         }
 
     private fun validateRevision(state: GameState, index: Int, revision: Revision): GameState {
@@ -241,31 +314,8 @@ class FileGameStore(
             "Stored entries must use canonical text."
         }
         val next = entries.fold(state) { current, entry -> current.step(entry) }
-        validateCompletedRevision(next)
+        requireCompletedTransaction(next)
         return next
-    }
-
-    private fun validateCompletedRevision(state: GameState) {
-        require(state.prompts().none { prompt -> prompt is Prompt.System }) {
-            "A revision cannot stop before required system outcomes have completed."
-        }
-        require(
-            state.stage != Stage.BIDDING ||
-                state.players.values.all { player -> player.capitalBid == null }
-        ) {
-            "private bids may enter history only as a complete, revealed batch."
-        }
-        require(state.stage != Stage.SETUP_RETURN || state.deckHistory.setupReturns.isEmpty()) {
-            "Setup returns may enter history only as a complete private batch."
-        }
-        require(
-            state.stage != Stage.TOKEN_PURCHASE ||
-                state.players.values
-                    .filter { player -> player.misery != MiseryStep.CHAOS }
-                    .all { player -> player.tokenPurchase == null }
-        ) {
-            "private token purchases may enter history only as a complete, revealed batch."
-        }
     }
 
     private fun validateActions(

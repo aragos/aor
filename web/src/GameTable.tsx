@@ -19,9 +19,10 @@ export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 
 
-export function GameTable({snapshot, busy, saved, submit: sendCommand, connectionError, actionError, quotePurchase}: {
+export function GameTable({snapshot, busy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
+    editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
 }) {
     const [commandsOpen, setCommandsOpen] = useState(false);
     const [sheetCollapsed, setSheetCollapsed] = useState(false);
@@ -124,6 +125,8 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 {selectedCard ? <CardDecision key={selectedCard} snapshot={snapshot} busy={busy} submit={submit}/>
                     : selectedAdvance ? <AdvanceDecision snapshot={snapshot} busy={busy} submit={submit}/>
                     : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} busy={busy} submit={submit} select={setSelected}/>}
+                {snapshot.undo?.available && <button type="button" className="secondary undo-action" disabled={busy}
+                    onClick={() => { void submit('undo'); }}>{t('history.undo')}</button>}
                 <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>
                 {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
@@ -146,6 +149,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
 </dl>
             <a href="/">{t('game.new')}</a>
         </details>
-        <CommandDock snapshot={snapshot} busy={busy} submit={submit} open={commandsOpen} onToggle={setCommandsOpen}/>
+        <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory} open={commandsOpen} onToggle={setCommandsOpen}/>
     </main>;
 }

@@ -1,10 +1,12 @@
 import {useState} from 'react';
 import type {Snapshot} from './api';
 import {t} from './messages';
+import {HistoryEditor} from './HistoryEditor';
 
-export function CommandDock({snapshot, busy, submit, open, onToggle}: {
+export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     open: boolean; onToggle: (open: boolean) => void;
+    editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
 }) {
     const [command, setCommand] = useState('');
     return <details className="command-dock" open={open} onToggle={event => onToggle(event.currentTarget.open)}>
@@ -19,6 +21,8 @@ export function CommandDock({snapshot, busy, submit, open, onToggle}: {
             <div className="choices"><code>{snapshot.legalChoices.commands.join(' · ')}</code></div>
         </form>}
         <div className="command-private-hand">{snapshot.game.hand.map(card => <span key={card.reference}><code>{card.reference}</code> {t(card.definition.messageId)}</span>)}</div>
+        {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${snapshot.undo.policy.toLowerCase().replace(/_/g, '-')}`)}</p>}
+        {editHistory && snapshot.undo && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory}/>}
         <h3>{t('game.history')}</h3><pre>{snapshot.history.join('\n')}</pre>
     </details>;
 }

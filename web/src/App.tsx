@@ -4,6 +4,7 @@ import {ApiError, errorCode, request} from './api';
 import type {CreatedGame, Snapshot} from './api';
 import {t} from './messages';
 import {defaultVariants, Variants} from './Variants';
+import {ChoiceButtons} from './DecisionControls';
 import {GameTable} from './GameTable';
 import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
@@ -13,13 +14,14 @@ function ErrorMessage({code}: {code: string}) { return <p className="error" role
 
 function CreateGame() {
     const [names, setNames] = useState('Alice\nBob\nCarol');
+    const [undoPolicy, setUndoPolicy] = useState('regular-turn');
     const [variants, setVariants] = useState(defaultVariants);
     const [created, setCreated] = useState<CreatedGame | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n'), options: variants})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n'), options: variants, undoPolicy})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
@@ -38,6 +40,8 @@ function CreateGame() {
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
             <p className="muted small">{t('create.threeEpochs')}</p>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
+            <p>{t('history.policy')}</p><ChoiceButtons id="undo-policy" value={undoPolicy} onChange={setUndoPolicy} disabled={busy}
+                choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {error && <ErrorMessage code={error}/>}
             <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>
         </form>}
@@ -71,12 +75,12 @@ function Game({id, token}: {id: string; token: string}) {
         return () => { active = false; clearTimeout(timer); };
     }, [path, token]);
 
-    async function submit(command: string): Promise<boolean> {
+    async function mutate(endpoint: string, operation: Record<string, unknown>): Promise<boolean> {
         if (!snapshot || busyRef.current) return false;
         busyRef.current = true; ++sequence.current;
         setBusy(true); setActionError(null); setSaved(false);
         try {
-            setSnapshot(await request<Snapshot>(`${path}/commands`, token, {expectedRevision: snapshot.revision, command}));
+            setSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...operation}));
             setConnectionError(''); setSaved(true); return true;
         } catch (failure) {
             const code = errorCode(failure);
@@ -90,7 +94,7 @@ function Game({id, token}: {id: string; token: string}) {
 
     if (!snapshot) return <main className="landing panel"><h1>{t('app.title')}</h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
     return <MapSelectionProvider><GameTable snapshot={snapshot} busy={busy} saved={saved}
-        submit={submit} connectionError={connectionError} actionError={actionError}
+        submit={command => mutate('commands', {command})} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines})} connectionError={connectionError} actionError={actionError}
         quotePurchase={amount => request<PurchaseQuote>(`${path}/quote-token-purchase`, token, {expectedRevision: snapshot.revision, amount})}/></MapSelectionProvider>;
 }
 

@@ -13,5 +13,5 @@ export function DiagnosticMessage({failure, snapshot}: {failure: ApiError; snaps
     }))];
     const key = `error.${failure.code}`;
     const message = t(key);
-    return <p className="error" role="alert">{message === key ? t('error.SERVER') : message}{names.length > 0 && ` · ${names.join(', ')}`}</p>;
+    return <p className="error" role="alert">{message === key ? t('error.SERVER') : message}{failure.entryIndex !== null && ` · ${t('history.editLine', {line: failure.entryIndex + 1})}`}{names.length > 0 && ` · ${names.join(', ')}`}</p>;
 }

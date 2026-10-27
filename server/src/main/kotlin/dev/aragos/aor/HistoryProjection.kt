@@ -13,16 +13,18 @@ internal object HistoryProjection {
         var state = GameState(stored.header)
         val events = mutableListOf<HistoryEventView>()
         val lines = buildList {
-            for (revision in stored.revisions) {
-                for ((index, text) in revision.entries.withIndex()) {
-                    val entry = TextCodec.parse(text)
-                    add(line(state, entry, viewer))
-                    val after = state.step(entry)
-                    HistoryEvents.project("${revision.id}:$index", state, after, entry, viewer)
-                        ?.let(events::add)
-                    state = after
-                }
+            for (recorded in stored.effectiveEntries()) {
+                val entry = TextCodec.parse(recorded.text)
+                add(line(state, entry, viewer))
+                val after = state.step(entry)
+                HistoryEvents.project(recorded.id, state, after, entry, viewer)?.let(events::add)
+                state = after
             }
+            stored.revisions
+                .filter { it.replaceFrom != null || (it.id > 1 && it.undoPolicy != null) }
+                .forEach { revision ->
+                    add("# revision ${revision.id} by ${revision.author}: ${revision.command}")
+                }
         }
         return PlayerHistory(state, lines, events.toList())
     }

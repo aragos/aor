@@ -57,6 +57,28 @@ Initial-deal exclusions remain in the deck for later draws. No preset, improved 
 advance table, St. Gall support toggle or rebuilt-marker-bonus option is supported. Event-rebuilt
 markers use the baseline exclusion from the expansion bonus. See [variants](variant-inventory.md).
 
+## Application history commands
+
+These are authenticated server operations; they are not engine actions and do not accept a player
+prefix. Every accepted change records its author and parent revision in immutable history.
+
+| Command | Behavior |
+| --- | --- |
+| `set-undo-policy <scope>` | Creator before `start`; `competitive`, `regular-turn` (default), `friendly-turn`, or `friendly-game` |
+| `undo` | Remove the most recent action when the current scope and recorded outcomes permit it |
+| `undo <entry-count>` | Retain this many effective engine entries and validate the removed suffix |
+
+`POST /api/games/{id}/history` accepts `expectedRevision`, zero-based `fromEntry`, and `lines`.
+Each line is an ordinary command from the editor or `@<entry-index>` retaining an original action.
+Delete/reorder references to remove/reorder actions where the scope permits. The engine must still
+accept every retained dependent action and the unchanged recorded outcomes of the same logical
+requests. The server never supplies fresh random outcomes for an edit. A rejection leaves history
+unchanged; `HISTORY_INVALID_ENTRY` includes a zero-based replacement `entryIndex`.
+
+`GET /api/games/{id}/revisions/{revision}` reads a prior committed revision with the viewer's usual
+private-information restrictions. Game file format 4 records normal deltas and explicit suffix
+replacements; displayed audit comments are not replayed as engine entries.
+
 ## Turn actions
 
 | Command | Who and when; effect |

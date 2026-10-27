@@ -122,10 +122,13 @@ export interface Snapshot {
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];
     events: HistoryEventView[];
+    undo: {policy: 'COMPETITIVE' | 'REGULAR_TURN' | 'FRIENDLY_TURN' | 'FRIENDLY_GAME'; available: boolean;
+        fromEntry: number | null; entryCount: number; editRevision: number;
+        actions: {entry: number; actor: string; text: string}[]};
 }
 export interface CreatedGame {gameId: string; links: {id: string; name: string; path: string}[]}
 export class ApiError extends Error {
-    constructor(public code: string, public entityIds: string[] = []) { super(code); }
+    constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null) { super(code); }
 }
 export async function request<T>(path: string, token?: string, body?: unknown): Promise<T> {
     let response: Response;
@@ -139,7 +142,8 @@ export async function request<T>(path: string, token?: string, body?: unknown): 
     let result;
     try { result = await response.json(); } catch { throw new ApiError('SERVER'); }
     if (!response.ok) throw new ApiError(typeof result?.code === 'string' ? result.code : 'SERVER',
-        Array.isArray(result?.entityIds) ? result.entityIds.filter((id: unknown): id is string => typeof id === 'string') : []);
+        Array.isArray(result?.entityIds) ? result.entityIds.filter((id: unknown): id is string => typeof id === 'string') : [],
+        Number.isInteger(result?.entryIndex) ? result.entryIndex : null);
     return result as T;
 }
 export function errorCode(error: unknown): string { return error instanceof ApiError ? error.code : 'SERVER'; }

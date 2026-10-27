@@ -36,7 +36,10 @@ fun Application.module(service: GameService = createGameService()) {
         post("/api/games") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("players", "options")
+                body.fieldsOnly("players", "options", "undoPolicy")
+                val undoPolicy =
+                    body["undoPolicy"]?.let { UndoPolicy.parse(it.string()) }
+                        ?: UndoPolicy.REGULAR_TURN
                 val options = body["options"]
                 val rules =
                     if (options == null) RuleOptions()
@@ -52,6 +55,7 @@ fun Application.module(service: GameService = createGameService()) {
                         service.create(
                             names = body.field("players").array().map(JsonNode::string),
                             rules = rules,
+                            undoPolicy = undoPolicy,
                         )
                     }
                 call.respondJson(result, HttpStatusCode.Created)
@@ -64,6 +68,38 @@ fun Application.module(service: GameService = createGameService()) {
                         service.get(call.parameters["id"]!!, call.token())
                     }
                 call.respondJson(result)
+            }
+        }
+        get("/api/games/{id}/revisions/{revision}") {
+            call.api {
+                val revision =
+                    call.parameters["revision"]?.toIntOrNull()
+                        ?: throw ServiceFailure(400, "INVALID_REQUEST")
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        service.getRevision(call.parameters["id"]!!, call.token(), revision)
+                    }
+                )
+            }
+        }
+        post("/api/games/{id}/history") {
+            call.api {
+                val body = call.body(524288)
+                body.fieldsOnly("expectedRevision", "fromEntry", "lines")
+                val lines = body.field("lines").array().map(JsonNode::string)
+                if (lines.size > 10000 || lines.any { it.length > 200 || '\n' in it || '\r' in it })
+                    throw ServiceFailure(400, "INVALID_HISTORY_EDIT")
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        service.editHistory(
+                            call.parameters["id"]!!,
+                            call.token(),
+                            body.field("expectedRevision").integer(),
+                            body.field("fromEntry").integer(),
+                            lines,
+                        )
+                    }
+                )
             }
         }
         post("/api/games/{id}/quote-token-purchase") {
@@ -110,9 +146,9 @@ private fun ApplicationCall.token(): String =
         ?.takeIf { it.startsWith("Bearer ") }
         ?.removePrefix("Bearer ") ?: throw ServiceFailure(401, "UNAUTHORIZED")
 
-private suspend fun ApplicationCall.body() =
+private suspend fun ApplicationCall.body(maxLength: Int = 16_384) =
     receiveText().let { text ->
-        if (text.length > 16_384) throw ServiceFailure(400, "INVALID_REQUEST")
+        if (text.length > maxLength) throw ServiceFailure(400, "INVALID_REQUEST")
         json.readTree(text) ?: throw ServiceFailure(400, "INVALID_REQUEST")
     }
 
@@ -133,7 +169,10 @@ private suspend fun ApplicationCall.api(block: suspend () -> Unit) {
             HttpStatusCode.UnprocessableEntity,
         )
     } catch (error: ServiceFailure) {
-        respondJson(mapOf("code" to error.code), HttpStatusCode.fromValue(error.status))
+        respondJson(
+            mapOf("code" to error.code, "entryIndex" to error.entryIndex),
+            HttpStatusCode.fromValue(error.status),
+        )
     } catch (_: JsonProcessingException) {
         respondJson(mapOf("code" to "INVALID_REQUEST"), HttpStatusCode.BadRequest)
     }

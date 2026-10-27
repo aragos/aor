@@ -43,7 +43,7 @@ see the [command language](docs/commands.md) for all input forms.
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
 Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_HTTP_PORT` to change the server port. Use one server process per data directory.
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
-The local server listens on `127.0.0.1`. Accounts, general undo, private plans and bots remain deferred.
+The local server listens on `127.0.0.1`. Accounts, private plans and bots remain deferred.
 
 Choose variants on the player-registration screen: swap Timber and War between decks 1 and 2,
 restrict the opening deal to no Crusades, no events or commodities only, and optionally enable an
@@ -51,7 +51,13 @@ immediate Master Art discard. Opening restrictions are mutually exclusive; exclu
 in the deck for later draws. The European map is reserved pending its province and adjacency
 specification. All other previous optional mechanics and presets are retired. Games have three epochs.
 
-New games use file format 3 with rules version `ah1996-three-epoch-2` and data version
+Undo defaults to the regular-turn policy: own actions in the current phase activity, until another
+player acts or an outcome is recorded. Competitive and friendly scopes are available at creation.
+Use **Undo last action** in the decision panel or the suffix editor under **Commands**. History edits
+are audited, preserve existing randomness, and invalidate stale drafts. See [the design](docs/design.md#4-revisions-and-undo)
+for scope limits and [commands](docs/commands.md#application-history-commands) for the API.
+
+New games use file format 4 with rules version `ah1996-three-epoch-2` and data version
 `ah1996-catalog-10`. The initial revision records resolved setup options. Earlier development rules
 and catalog versions are unsupported; no migration is provided under the current-format-only policy.
 The current catalog includes the reviewed Baltic land/coastal connections, sea exclusions and

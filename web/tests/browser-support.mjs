@@ -75,9 +75,9 @@ export async function open(url) {
 
 
 
-export async function createGame(count) {
+export async function createGame(count, options = {}) {
     const created = await fetch(api + '/api/games', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({players: ['Ada', 'Bruno', 'Clara', 'Dario', 'Eva', 'Farid'].slice(0, count)})}).then(r => r.json());
+        body: JSON.stringify({players: ['Ada', 'Bruno', 'Clara', 'Dario', 'Eva', 'Farid'].slice(0, count), ...options})}).then(r => r.json());
     const links = created.links.map(link => ({...link, token: new URLSearchParams(link.path.split('#')[1]).get('token')}));
     const snapshot = link => fetch(api + '/api/games/' + created.gameId, {headers: {Authorization: 'Bearer ' + link.token}}).then(r => r.json());
     async function send(link, command) {

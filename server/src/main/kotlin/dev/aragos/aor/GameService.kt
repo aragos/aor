@@ -5,7 +5,8 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
 
-class ServiceFailure(val status: Int, val code: String) : Exception(code)
+class ServiceFailure(val status: Int, val code: String, val entryIndex: Int? = null) :
+    Exception(code)
 
 data class PlayerLink(val id: PlayerId, val name: String, val path: String)
 
@@ -31,6 +32,7 @@ data class GameSnapshot(
     val pendingReturn: String?,
     val history: List<String>,
     val events: List<HistoryEventView>,
+    val undo: UndoView,
 )
 
 /** Authenticates players and projects the driver's state for the HTTP API. */
@@ -40,7 +42,11 @@ class GameService(
 ) {
     private val credentialsRandom = SecureRandom()
 
-    fun create(names: List<String>, rules: RuleOptions = RuleOptions()): CreatedGame {
+    fun create(
+        names: List<String>,
+        rules: RuleOptions = RuleOptions(),
+        undoPolicy: UndoPolicy = UndoPolicy.REGULAR_TURN,
+    ): CreatedGame {
         val normalized = names.map(String::trim)
         if (normalized.map(String::lowercase).distinct().size != normalized.size) {
             throw ServiceFailure(400, "INVALID_GAME")
@@ -71,6 +77,7 @@ class GameService(
                 header = header,
                 credentials = tokens.mapValues { (_, token) -> digest(token) },
                 rules = rules,
+                undoPolicy = undoPolicy,
             )
         )
         return CreatedGame(
@@ -120,16 +127,59 @@ class GameService(
                     throw ServiceFailure(409, "STALE_REVISION")
                 }
                 try {
-                    driver.submit(
-                        stored = current,
-                        player = player,
-                        text = text,
-                    )
+                    when {
+                        text.trim() == "undo" -> HistoryEdits.undo(current, player)
+                        text.trim().startsWith("undo ") ->
+                            HistoryEdits.undo(
+                                current,
+                                player,
+                                text.trim().substringAfter(' ').toIntOrNull()
+                                    ?: throw ServiceFailure(400, "INVALID_HISTORY_EDIT"),
+                            )
+                        text.trim().startsWith("set-undo-policy ") ->
+                            HistoryEdits.configure(
+                                current,
+                                player,
+                                UndoPolicy.parse(text.trim().substringAfter(' ')),
+                            )
+                        else -> driver.submit(stored = current, player = player, text = text)
+                    }
                 } catch (failure: CardRuleViolation) {
                     throw ServiceFailure(422, "CARD_${failure.code.name}")
                 }
             }
         return snapshot(stored = stored, player = authenticate(stored, token))
+    }
+
+    fun editHistory(
+        id: String,
+        token: String,
+        expectedRevision: Int,
+        fromEntry: Int,
+        lines: List<String>,
+    ): GameSnapshot {
+        val stored =
+            store.update(id) { current ->
+                val player = authenticate(current, token)
+                if (current.revision != expectedRevision)
+                    throw ServiceFailure(409, "STALE_REVISION")
+                HistoryEdits.edit(current, player, fromEntry, lines)
+            }
+        return snapshot(stored, authenticate(stored, token))
+    }
+
+    fun getRevision(id: String, token: String, revision: Int): GameSnapshot {
+        val stored = store.read(id)
+        val player = authenticate(stored, token)
+        if (revision !in 1..stored.revision) throw ServiceFailure(404, "REVISION_NOT_FOUND")
+        return snapshot(
+            stored.copy(
+                revisions = stored.revisions.take(revision),
+                pendingBids = emptyMap(),
+                pendingReturns = emptyMap(),
+            ),
+            player,
+        )
     }
 
     private fun snapshot(stored: StoredGame, player: PlayerId): GameSnapshot {
@@ -169,6 +219,7 @@ class GameService(
             pendingReturn = stored.pendingReturns[player],
             history = history.lines,
             events = history.events,
+            undo = HistoryEdits.view(stored, player),
         )
     }
 

@@ -2,8 +2,8 @@
 
 [engine.md](engine.md) defines the pure game engine; [rules.md](rules.md) is the game-rules reference.
 This document covers application architecture, storage, player interaction and development scope.
-The three-epoch human game, functional variants and visual table are implemented. General undo,
-strategy controllers and private plans remain deferred contracts, described below.
+The three-epoch human game, selected variants, visual table and scoped history editing are implemented.
+Strategy controllers and private plans remain deferred contracts.
 
 ## 1. Principles
 
@@ -68,14 +68,23 @@ replays one effective revision. Requests name the expected revision; reject stal
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
 
-The current implementation stores each revision's new log entries as a delta. Reconstructing
-the active game therefore replays the accumulated deltas; the latest revision alone is not a complete
-log. Each committed log transaction advances the concurrency revision used by `expectedRevision`;
-unrevealed pending-bid replacements leave it unchanged. This detects stale committed-state submissions
-without a separate log-position token. Keeping one revision id until a history edit would reduce
-ordinary revision records, but would require another
-monotonic version for command and pending-submission concurrency. General history editing and branch
-selection remain future work.
+Game file format 4 stores ordinary revision entries as deltas. An edit records `replaceFrom`, the
+number of effective entries to retain, and a replacement suffix containing validated actions and
+unchanged recorded outcomes. Reconstruct history by applying each delta or suffix replacement in
+revision order. Earlier revisions are immutable. The creation revision records the undo policy;
+explicit setup policy revisions carry no engine entries.
+
+Every committed transaction or edit advances `expectedRevision`; private bid replacements retain
+it. The service rejects stale edits before replay or publication. Accepted edits invalidate decision
+drafts and revalidate pending bids against the resulting phase and state. Historical revision views
+include committed state only and use the same private audience restrictions.
+
+The server accepts `undo`, `undo <entry-count>`, and setup-only `set-undo-policy <scope>` commands.
+The suffix editor uses ordinary commands for the editor's own answers and `@<entry-index>` to retain
+an original action, including another player's hidden answer without exposing its contents. It may
+remove or retain another answer where the scope allows, but cannot invent its replacement. The
+command history includes revision/author/edit audit lines. These presentation comments are separate
+from the effective engine entries.
 
 “During their turn” means the player's activity within one phase, including nested interruptions such as Cathedral.
 It does not span several phases. The engine supplies activity ownership and boundaries. Completing an activity closes
@@ -187,6 +196,6 @@ Keep domain arithmetic and progression tests separate from service authorization
 secret-batch atomicity and restart checks. Browser checks verify full user interactions, including
 rejection and stale requests. UI fixture checks cannot establish secrecy or persistence.
 
-When deferred undo, controller or planning work begins, verify its contracts above before calling
+When controller or planning work begins, verify its contracts above before calling
 it supported. Preserve recorded outcomes and private audiences, reject invalid edits atomically,
 and never execute a private plan or substitute a strategy decision implicitly.
