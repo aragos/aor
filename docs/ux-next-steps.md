@@ -1,7 +1,8 @@
 # UX review and next steps
 
-Reviewed on 2026-10-26 against the current implementation. This is a proposal, not a list of committed
-features. [UX principles](ui-design.md) and [map contracts](map-design.md) define acceptance;
+Reviewed on 2026-10-26, with execution results recorded on 2026-10-27. The priorities below retain
+their acceptance criteria; the execution record distinguishes implemented work from open review.
+[UX principles](ui-design.md) and [map contracts](map-design.md) define acceptance;
 [decision coverage](ui-decision-coverage.md) separates observed behavior from remaining evidence gaps.
 
 ## Project assessment
@@ -18,14 +19,45 @@ dock, cards, purchases, map and activity; geometry generation, styles, localizat
 The main opportunities are consistent presentation contracts and stronger evidence for difficult
 positions, rather than a new game interface or changes to the reviewed mechanics.
 
-Current limitations are concrete. Several action forms still classify command strings and manage
-selection independently. Some map prompts and labels remain English literals. Error responses keep
-a code but discard domain arguments. Three province labels have constrained fits; five provinces
-need label-space sharing for their densest token groups. Keyboard/touch automation exists, while
-manual screen-reader and contrast checks remain pending. Some setup and variant flows have fixture
-evidence without a corresponding live service/browser scenario.
+The baseline limitations were concrete: independent selection lifetimes, English map literals,
+discarded diagnostic object IDs, constrained labels and dense token groups, and setup/accessibility
+evidence gaps. The execution record below identifies the remaining limits after implementation.
 
-## Proposed work, in priority order
+## Execution record, 2026-10-27
+
+| Priority | Result | Remaining evidence or scope |
+| --- | --- | --- |
+| Decision context | Replay-derived identity includes nested replacements; shared target limits and invalidation; picker activation follows decision lifetime | Finite action forms still dispatch canonical command strings; no parallel action protocol was added |
+| Accessibility and setup | All eleven individual options changed/restored through live controls; keyboard Apply; private seats, replacement/reload and completed improved returns; viewer link saving; accessible-name and computed HTML contrast checks | Full-session screen-reader review, physical-phone use, browser-chrome zoom and SVG/state contrast review still require human testing. Restart recovery has service-test evidence, not a restarted live browser session |
+| Crowded map | Joint placement removes North/South America sharing; actual rendered label/piece collision checks; all twelve owner/age groups retained; readable zoom-aware inspection fallback; desktop/phone screenshot review | Copenhagen, Toulouse and Constantinople retain constrained label fits. Fit remains an overview; dense counts require inspection or zoom |
+| Explanations and localization | All 18 events and 26 advances have checked reference text; advance details follow functional variants; recognized diagnostic objects named; map/War picker strings centralized with quantity interpolation | Card-rule failures without object arguments retain their localized general explanation |
+| Visual primitives | Shared target invalidation and result notices; semantic target, resource, focus, blocker and outcome tokens; measured secondary-text contrast defects corrected | Token extraction is intentionally limited to migrated interaction surfaces |
+| Responsiveness | Live six-seat epoch-3 baseline recorded; no transport or caching change justified by the measurements | Representative conflict-heavy production profiling and isolated React commit timings remain unmeasured |
+
+The profile reached epoch 3, turn 8 at revision 234 through 278 authoritative actions and 363 history
+entries, with all six seats active and 9–11 cards each. Ten concurrent six-viewer batches measured
+snapshot p50 **5.0 ms**, p95 **7.2 ms**, maximum body **145,955 bytes**. Eighteen workspace
+interactions measured p50 **66.1 ms**, p95 **92.3 ms**, including driver overhead and two frames.
+Per-tab CPU deltas over polling and interactions were 0.21–0.38 seconds of tasks and 0.004–0.022
+seconds of layout. These are local Vite development measurements in a low-conflict position, not
+production latency claims or isolated React render durations. The generated bundle remains the
+largest initial payload; the existing build size advisory remains.
+
+Reproduce the measurement from `web`:
+
+```sh
+AOR_BROWSER_SUITE=performance.browser.mjs AOR_BROWSER_TIMEOUT_MS=300000 npm run test:browser
+```
+
+The runner retains `late-game-performance.json` outside the repository and removes private game
+files and browser data. The ordinary suite retains contrast JSON and crowded-map screenshots.
+Automated HTML contrast checks exclude gradients, opacity-composited states, native controls and
+SVG fills. They are a regression check, not a claim that every visual state has been reviewed.
+
+## Original priorities and acceptance
+
+The descriptions below preserve the review's baseline and acceptance criteria. The execution record
+above owns current status and remaining evidence.
 
 ### 1. Unify decision context and target controls
 
