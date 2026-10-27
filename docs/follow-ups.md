@@ -1,5 +1,17 @@
 # Decisions and checks after the task batch
 
+## Needed to publish the final step
+
+The first six steps are on remote `main` through `6502ea9`. The tested deployment implementation
+and CI workflows are committed locally on `feature/online-deployment`. GitHub rejected their push
+because the saved Personal Access Token lacks `workflow` scope; no usable SSH authentication or
+separate GitHub CLI login was available. Update the Git credential manager with workflow-capable
+authorization, then fetch/preserve any new remote changes and push this feature to `main`.
+
+Automatic approval review rejected moving the workflows out of `.github/workflows`, because that
+would disable the requested CI/security automation without explicit approval. They remain intact.
+Publishing them as inactive templates is an alternative only with the user's explicit approval.
+
 ## Needed before public launch
 
 - Create/choose the Firebase and Render projects, supply the service-account secret and initial
