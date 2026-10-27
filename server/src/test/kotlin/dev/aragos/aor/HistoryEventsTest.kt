@@ -126,7 +126,7 @@ class HistoryEventsTest {
     fun configurationAndShufflesDoNotExposeInternalActivity() {
         val entries =
             listOf(
-                Entry.Action(owner, RuleOptionCommand("preset", "ah1996")),
+                Entry.Action(owner, RuleOptionCommand("map", "standard")),
                 Entry.Shuffle(listOf("stone-1", "stone-2")),
             )
 

@@ -40,7 +40,7 @@ class GameService(
 ) {
     private val credentialsRandom = SecureRandom()
 
-    fun create(names: List<String>): CreatedGame {
+    fun create(names: List<String>, rules: RuleOptions = RuleOptions()): CreatedGame {
         val normalized = names.map(String::trim)
         if (normalized.map(String::lowercase).distinct().size != normalized.size) {
             throw ServiceFailure(400, "INVALID_GAME")
@@ -70,6 +70,7 @@ class GameService(
                 id = id,
                 header = header,
                 credentials = tokens.mapValues { (_, token) -> digest(token) },
+                rules = rules,
             )
         )
         return CreatedGame(

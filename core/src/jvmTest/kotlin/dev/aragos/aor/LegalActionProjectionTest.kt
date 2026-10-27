@@ -14,9 +14,9 @@ class LegalActionProjectionTest {
 
         assertThat(choices)
             .containsAtLeast(
-                "set-option setup improved",
-                "set-option commerce second-edition",
-                "set-option st-gall-support enabled",
+                "set-option initial-card no-events",
+                "set-option deck-modification enabled",
+                "set-option immediate-master-art-discard enabled",
             )
     }
 

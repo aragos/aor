@@ -43,85 +43,65 @@ export async function checkContrast(page, label) {
 }
 
 export async function checkSetupEvidence(page, web) {
-    const game = await createGame(3);
-    const [creator, other] = game.links;
-    await page.send('Page.navigate', {url:web+creator.path});
-    await page.wait(`document.querySelector('#rule-setup')`, 'live rule options');
-    const initial = await game.snapshot(creator);
-    for (const option of initial.game.ruleOptions) {
-        const alternate = option.choices.find(value => value !== option.value);
-        for (const value of [alternate, option.value]) {
-            await page.fill(`#rule-${option.key}`, value);
-            await page.evaluate(`document.querySelector('#rule-${option.key}').closest('.rule-option').querySelector('button').click()`);
-            await page.wait(`document.querySelector('#rule-${option.key}').closest('.rule-option').querySelector('button').disabled && document.querySelector('.save-status').textContent==='Saved'`, `saved option ${option.key}`);
-            assert.equal((await game.snapshot(creator)).game.ruleOptions.find(candidate => candidate.key===option.key).value,value);
-            assert.equal((await game.snapshot(other)).game.ruleOptions.find(candidate => candidate.key===option.key).value,value);
-        }
-    }
-    await checkAccessibleNames(page);
-    await checkContrast(page,'configuration');
-    // Native keyboard activation reaches the accurately named Apply button from its select.
-    await page.fill('#rule-setup','improved');
-    await page.evaluate(`document.querySelector('#rule-setup').focus()`);
-    await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-    await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-    assert.equal(await page.evaluate(`document.activeElement.getAttribute('aria-label')`),'Apply Initial deal');
+    await page.send('Page.navigate', {url:web+'/'});
+    await page.wait(`document.querySelector('#names') && document.querySelector('#variant-initial-card')`, 'players and variants share creation');
+    await page.fill('#names','Ada\nBruno\nClara');
+    await page.evaluate(`document.querySelector('#variant-deck-modification button:last-child').click();
+        document.querySelector('#variant-initial-card button:nth-child(3)').focus()`);
     await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
     await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-    await page.wait(`document.querySelector('#rule-setup').closest('.rule-option').querySelector('button').disabled && document.querySelector('.save-status').textContent==='Saved'`,'keyboard option saved');
+    await page.evaluate(`document.querySelector('#variant-immediate-master-art-discard button:last-child').click()`);
+    await checkAccessibleNames(page);
+    await checkContrast(page,'creation');
+    await page.click('Create game');
+    await page.wait(`document.querySelectorAll('.seat-links a').length===3`, 'registered seats');
+    const links = await page.evaluate(`[...document.querySelectorAll('.seat-links a')].map(link=>({path:link.getAttribute('href'),token:new URLSearchParams(link.hash.slice(1)).get('token')}))`);
+    const [creator, other] = links;
+    const api=process.env.MAP_API_URL;
+    const id=creator.path.split('/')[2].split('#')[0];
+    const snapshot=link=>fetch(api+'/api/games/'+id,{headers:{Authorization:'Bearer '+link.token}}).then(response=>response.json());
+    const send=async(link,command)=>{
+        const state=await snapshot(link);
+        const response=await fetch(api+'/api/games/'+id+'/commands',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+link.token},body:JSON.stringify({expectedRevision:state.revision,command})});
+        assert(response.ok,await response.clone().text()); return response.json();
+    };
+    const configured=await snapshot(creator);
+    assert.equal(configured.game.rules.deckModification,true);
+    assert.equal(configured.game.rules.initialCard,'NO_EVENTS');
+    assert.equal(configured.game.rules.immediateMasterArtDiscard,true);
+    assert.equal(configured.game.ruleOptions.length,4);
+    await page.send('Page.navigate',{url:web+creator.path});
+    await page.wait(`document.querySelector('.game-table')`,'configured game');
+    assert.equal(await page.evaluate(`document.querySelector('.rule-options')`),null,'Variants are selected with registration');
     await page.click('Start setup');
-    await page.wait(`document.querySelectorAll('.game-actions .action-buttons button.secondary').length===3`,'improved private returns');
-    const before = await game.snapshot(creator);
-    assert.equal(before.game.stage,'SETUP_RETURN');
-    const otherPage = await open(web+other.path);
+    await page.wait(`document.querySelector('#bid')`,'one-card setup proceeds to bidding');
+    const dealt=await snapshot(creator);
+    assert(dealt.game.players.every(player=>player.handCount===1));
+    assert.notEqual(dealt.game.hand[0].definition.kind,'event');
+    const otherPage=await open(web+other.path);
     try {
         await otherPage.wait(`document.querySelector('.private-seat-link')`,'separate private seat');
         assert.match(await otherPage.evaluate(`document.querySelector('.private-seat-link summary').textContent`),/Bruno/);
-        for (const index of [0,2]) {
-            await page.evaluate(`document.querySelectorAll('.game-actions .action-buttons button.secondary')[${index}].click()`);
-            await page.evaluate(`document.querySelector('.selected-action > button:last-child').click()`);
-            await page.wait(`!document.querySelector('.selected-action') && document.querySelector('.pending-submission')?.textContent.includes('Your private return:')`,'private return saved');
-            const state = await game.snapshot(creator);
-            assert.equal(state.pendingReturn,before.game.hand[index].reference);
-            assert.equal(state.revision,before.revision,'Private replacement does not commit a revision');
+        for (const amount of [7,9]) {
+            await page.fill('#bid',String(amount));
+            await page.evaluate(`document.querySelector('#bid').form.querySelector('button').click()`);
+            await page.wait(`document.querySelector('.pending-submission')?.textContent.includes('$${amount}')`,'private bid saved');
+            assert.equal((await snapshot(creator)).revision,dealt.revision,'Private replacement retains committed revision');
         }
-        await page.evaluate(`window.setupReloadMarker=true`);
         await page.send('Page.reload');
-        await page.wait(`!window.setupReloadMarker && document.querySelector('.private-seat-link') && document.querySelector('.pending-submission')?.textContent.includes('Your private return:')`,'private return survives reload');
-        const opponent = await game.snapshot(other);
-        assert.equal(opponent.pendingReturn,null);
-        assert.equal(opponent.game.activity.decisionEntry,before.game.activity.decisionEntry,'Readiness preserves decision identity');
-        assert(!opponent.history.some(line=>line.includes('return-card')),'Unrevealed choice stays out of opponent history');
-        assert(opponent.submitted.includes(creator.id));
-        assert(!JSON.stringify(opponent.game.hand).includes(before.game.hand[2].reference));
+        await page.wait(`document.querySelector('.pending-submission')?.textContent.includes('$9')`,'bid survives reload');
+        assert.equal((await snapshot(other)).pendingBid,null,'Other seats cannot see the bid');
         await page.evaluate(`document.querySelector('.private-seat-link').open=true`);
-        const savedLink = await page.evaluate(`decodeURIComponent(document.querySelector('.private-seat-link a').getAttribute('href').split(',')[1])`);
-        assert(savedLink.includes(creator.token));
-        assert(!savedLink.includes(other.token));
-        await checkAccessibleNames(page);
-        await checkContrast(page,'private-return');
-        const lastPage = await open(web+game.links[2].path);
-        try {
-            for (const seat of [otherPage,lastPage]) {
-                await seat.wait(`document.querySelector('.game-actions .action-buttons button.secondary')`,'remaining private return');
-                await seat.evaluate(`document.querySelector('.game-actions .action-buttons button.secondary').click()`);
-                await seat.evaluate(`document.querySelector('.selected-action > button:last-child').click()`);
-                await seat.wait(`!document.querySelector('.selected-action')`,'remaining return accepted');
-            }
-            await lastPage.wait(`document.querySelector('#bid')`,'improved setup completes into bidding');
-            const completed=await game.snapshot(creator);
-            assert.equal(completed.game.stage,'BIDDING');
-            assert.equal(completed.pendingReturn,null);
-            assert(completed.game.players.every(player=>player.handCount===2));
-        } finally {
-            lastPage.ws.close();
-            await fetch(`${process.env.MAP_CDP_URL}/json/close/${lastPage.target.id}`);
-        }
+        const saved=await page.evaluate(`decodeURIComponent(document.querySelector('.private-seat-link a').getAttribute('href').split(',')[1])`);
+        assert(saved.includes(creator.token)); assert(!saved.includes(other.token));
+        await checkAccessibleNames(page); await checkContrast(page,'private-bid');
+        await send(other,'bid-capital 0'); await send(links[2],'bid-capital 0');
+        assert.notEqual((await snapshot(creator)).game.stage,'BIDDING');
     } finally {
         otherPage.ws.close();
         await fetch(`${process.env.MAP_CDP_URL}/json/close/${otherPage.target.id}`);
     }
-    console.log('Passed: every individual setup option through live controls, keyboard Apply, separate private seats, replacement/reload/privacy, private link saving, accessible names and computed HTML contrast. Restart recovery is covered by service tests.');
+    console.log('Passed: variants and player registration share creation; canonical options persist; one-card deal, private bids, replacement/reload/privacy, saved links and accessible controls.');
 }
 
 export async function checkDecisionEvidence(page, web, baseline) {

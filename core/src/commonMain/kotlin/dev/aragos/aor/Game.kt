@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-const val RULES_VERSION = "ah1996-three-epoch-1"
+const val RULES_VERSION = "ah1996-three-epoch-2"
 const val DATA_VERSION = "ah1996-catalog-10"
 
 /**
@@ -139,7 +139,7 @@ data class GameState(
         val owner =
             if (stage == Stage.INITIAL_DRAW) {
                 playerIds.firstOrNull { player ->
-                    playerState(player).hand.size < SetupDeal.cardsPerPlayer(this)
+                    playerState(player).hand.size < SetupDeal.cardsPerPlayer
                 } ?: return null
             } else {
                 (flow.decisions.lastOrNull() as? DrawDecision)?.owner ?: return null

@@ -31,7 +31,7 @@ sealed interface Command {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
             GameCatalog.requireResolvedFor(state.playerIds.size, state.rules)
-            return SetupDeal.prepare(state).copy(stage = Stage.SHUFFLE)
+            return state.copy(stage = Stage.SHUFFLE)
         }
 
         fun parse(arguments: List<String>): Start {

@@ -2,42 +2,16 @@ package dev.aragos.aor
 
 /** Deterministic setup distribution and the later return of reserved physical cards. */
 internal object SetupDeal {
-    private const val additionalTimber = "timber-2-1"
-    private val reserved =
-        listOf("the-crusades", "walter-the-penniless", "rashid-ad-din", "silk", "spice")
+    fun initialCards(state: GameState): List<String> = state.rules.cardsForEpoch(Epoch.ONE)
 
-    fun prepare(state: GameState): GameState {
-        if (state.rules.setup != SetupRule.IMPROVED) return state
-        // The approved choose-two setup cannot use a reduced initial-deal deck (2026-10-24).
-        checkRule(
-            state.rules.initialCard != InitialCardRule.COMMODITY_ONLY,
-            ViolationCode.UNSUPPORTED_OPTION,
-        )
-        return state.copy(
-            deckHistory =
-                state.deckHistory.copy(
-                    setupReserves = reserved,
-                    movedToFirstDeck = setOf(additionalTimber),
-                )
-        )
-    }
+    const val cardsPerPlayer: Int = 1
 
-    fun initialCards(state: GameState): List<String> {
-        val printed = CardData.forEpoch(Epoch.ONE).map(CardDefinition::id)
-        if (state.rules.setup != SetupRule.IMPROVED) return printed
-        return printed.filterNot(reserved::contains) + additionalTimber
-    }
-
-    fun cardsPerPlayer(state: GameState): Int =
-        if (state.rules.setup == SetupRule.IMPROVED) 3 else 1
-
-    /** The first commodity in a uniform permutation is a uniform eligible initial card. */
+    /** Filtering only the first deal leaves excluded physical cards in the draw pile. */
     fun nextCard(state: GameState): String? =
-        if (
-            state.stage == Stage.INITIAL_DRAW &&
-                state.rules.initialCard == InitialCardRule.COMMODITY_ONLY
-        ) {
-            state.deck.firstOrNull { id -> CardData.definition(id).kind == CardKind.COMMODITY }
+        if (state.stage == Stage.INITIAL_DRAW) {
+            state.deck.firstOrNull { id ->
+                state.rules.initialCard.accepts(CardData.definition(id))
+            }
         } else {
             state.deck.firstOrNull()
         }
@@ -45,17 +19,10 @@ internal object SetupDeal {
     fun afterInitialDraw(state: GameState): GameState {
         val complete =
             state.players.values.all { owner ->
-                owner.hand.size == cardsPerPlayer(state)
+                owner.hand.size == cardsPerPlayer
             }
         if (!complete) return state
-        return state.copy(
-            stage =
-                if (state.rules.setup == SetupRule.IMPROVED) {
-                    Stage.SETUP_RETURN
-                } else {
-                    Stage.BIDDING
-                }
-        )
+        return state.copy(stage = Stage.BIDDING)
     }
 
     fun returnChoices(state: GameState, player: PlayerId): List<String> {

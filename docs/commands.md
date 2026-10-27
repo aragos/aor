@@ -32,8 +32,6 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 
 | Command | Who and when; parameter constraints |
 | --- | --- |
-| `set-option rebuilt-marker-bonus exclude` | Creator, before `start`; default policy excludes event-rebuilt markers from expansion-bonus credit. |
-| `set-option rebuilt-marker-bonus include` | Creator, before `start`; includes event-rebuilt markers. Voluntary rebuilds never qualify. |
 | `start` | Creator; freezes configuration and requests the shuffle and starting draws. |
 | `bid-capital <amount>` | Each player during private capital bidding; integer $0–$40. Bids reveal together. |
 | `choose-capital <capital>` | Current capital chooser; the capital must remain available. |
@@ -43,38 +41,21 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 Games always use three epochs. There is no `set-option epochs` command or `epochs` creation
 field. The existing 26th-advance ending can still finish a game before the third deck is exhausted.
 
-### Functional rule options
+### Game variants
 
-Only the creator may configure these before `start`; configuration freezes when setup begins.
-Every default is recorded explicitly in the initial revision. Presets expand into the same explicit
-functional commands in history; later options can override individual choices.
+The creator chooses variants while registering players. The creation transaction records every
+resolved value explicitly. The creator may use these commands before `start`; play freezes them.
 
 | Command key (`set-option <key> <value>`) | Values (default first) |
 | --- | --- |
-| `setup` | `standard`, `improved` |
-| `initial-card` | `any`, `commodity-only` |
-| `commerce` | `ah1996`, `second-edition` |
-| `wind-watermill` | `takeover-trade`, `market-adjustment` |
-| `written-record` | `leader-bonus`, `takeover-trade` |
-| `income-relief` | `new-world`, `enlightenment` |
-| `credits` | `ah1996`, `second-edition` |
-| `misery-relief` | `purchased`, `category-completion` |
-| `patronage` | `protection-money`, `three-box-display` |
+| `deck-modification` | `disabled`, `enabled`: exchange `war` and `timber-2-1` between decks 1 and 2 |
+| `initial-card` | `any`, `no-crusades`, `no-events`, `commodity-only`; one mutually exclusive opening-deal restriction |
 | `immediate-master-art-discard` | `disabled`, `enabled` |
-| `st-gall-support` | `disabled`, `enabled` |
-| `preset` | `ah1996`, `second-edition`, `tournament` (shorthand, not a stored edition) |
+| `map` | `standard`; `european` is reserved and rejected until its board specification is reviewed |
 
-Improved setup uses `return-card <reference>`: each player privately selects one of three starting
-cards, keeps two, and returns one to the deck. Selections remain durable private submissions until
-all players submit; replacing an unrevealed return does not advance the committed revision.
-The complete batch and shuffle are recorded atomically. The user-approved setup rule makes
-"get three, choose two" incompatible with reduced initial-deal decks for now. Combining improved
-setup with commodity-only initial dealing is therefore rejected at `start`.
-
-A printed advance letter resolves through the selected commerce table: second edition uses J for
-Improved Agriculture and K for Wind/Watermill. Domain advance identities remain stable in views,
-leader credits and acquisition history. See [the variant inventory](variant-inventory.md) for source
-locators and discrepancies.
+Initial-deal exclusions remain in the deck for later draws. No preset, improved setup, alternate
+advance table, St. Gall support toggle or rebuilt-marker-bonus option is supported. Event-rebuilt
+markers use the baseline exclusion from the expansion bonus. See [variants](variant-inventory.md).
 
 ## Turn actions
 

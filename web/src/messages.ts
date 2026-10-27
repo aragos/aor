@@ -1,4 +1,12 @@
 export const en: Record<string, string> = {
+    'create.variants': 'Game variants',
+    'create.europeanPending': 'European map: province and adjacency changes need to be specified before this option can be enabled.',
+    'option.deck-modification': 'Move Timber to deck 1 and War to deck 2',
+    'option.map': 'Map',
+    'optionValue.no-crusades': 'No Crusades in the initial deal',
+    'optionValue.no-events': 'No events in the initial deal',
+    'optionValue.european': 'European map',
+
     'table.competitionResults': 'Competition results',
     'controls.applyOption': 'Apply {option}',
     'controls.pendingReturn': 'Your private return: {card}. Choose another card to replace it before everyone submits.',

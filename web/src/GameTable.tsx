@@ -143,7 +143,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         {snapshot.game.endingTriggered && snapshot.game.stage !== 'FINISHED' && <p className="ending-notice">{t('game.endingNotice')}</p>}
         <details className="table-configuration"><summary>{t('table.configuration')}</summary>
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}><dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd></div>)}
-                <div><dt>{t('controls.rebuiltMarkerBonus')}</dt><dd>{label(snapshot.game.rebuiltMarkerBonus)}</dd></div></dl>
+</dl>
             <a href="/">{t('game.new')}</a>
         </details>
         <CommandDock snapshot={snapshot} busy={busy} submit={submit} open={commandsOpen} onToggle={setCommandsOpen}/>

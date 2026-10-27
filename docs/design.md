@@ -37,46 +37,15 @@ A game consists of player identities, metadata (e.g. when the game was created),
 versioned text log. Game option values are setup commands. `start` validates and freezes configuration. Once play
 starts, setup cannot be edited under any undo scope.
 
-Use individual functional options, starting with a small supported set. Defaults and supported keys, values and
-combinations are versioned with the rules. Record resolved choices so defaults cannot drift on replay. Reject
-unsupported or conflicting choices with structured diagnostics; resolve new interactions as options are added.
-AH1996 is the baseline. Edition names may be UI presets only when all their expanded choices are supported; logs
-record those choices rather than relying on the preset name.
+The supported variants are the deck-1 Timber/deck-2 War exchange, one mutually exclusive initial
+card restriction, and immediate Master Art discard. The European map is reserved until its board
+specification is reviewed. Baseline advance and economic rules are fixed. Presets and earlier
+optional mechanics are retired; [rules §13](rules.md#13-variants) and the [command reference](commands.md)
+define the current choices.
 
-The following is a feature catalog, not a promise to implement every option initially. Variant mechanics live in
-[rules §13](rules.md#13-variants).
-
-| Concern                   | Choices / baseline                                                                                       |
-|---------------------------|----------------------------------------------------------------------------------------------------------|
-| Players and epochs        | 3–6 registered players; fixed three-epoch sequence, with no length option.                                                          |
-| Setup                     | Deal/keep counts, deck adjustments, private returns and delayed reinsertion; standard setup by default.  |
-| Commerce advances         | Ordering, prices and prerequisites of Improved Agriculture and Wind/Watermill.                           |
-| Wind/Watermill            | Takeover card trade, or last-player shortage/surplus adjustment.                                         |
-| Written Record            | Leader-discount bonus, or takeover card trade.                                                           |
-| Income misery improvement | New World, or Enlightenment.                                                                             |
-| Advance credits           | Individual category credit schedules.                                                                    |
-| Misery relief             | Purchased tier/MR-based relief, or completion-based relief.                                              |
-| Patronage                 | Protection money, or three-box leader display.                                                           |
-| Master Art                | Buy Card phase discard; optional immediate discard on purchase.                                          |
-| Map support               | Printed arrows; optional St. Gall → Nuremberg support.                                                   |
-| Initial card restriction  | Any history card, or commodity-only first card.                                                          |
-| Event-rebuilt marker bonus | Exclude (default), or include event-rebuilt markers in the expansion bonus; both are supported.          |
-| Undo                      | Four scopes below; regular-turn undo by default. All edits preserve recorded random events and outcomes. |
-| Resolved rulings          | Q7 recycling verified against the supplied card reference; Q14 reinsertion timing is an approved project rule. |
-
-[Rule coverage](rule-coverage.md) records implemented behavior and verification. Three epochs are
-fixed; `epochs` is not a command, creation field or selector.
-The functional variant rows are configurable through the [command reference](commands.md).
-Application features such as undo, controllers and private plans remain separate.
-
-The first choice in each variant row is the baseline; declarative data and behavior handlers must both match the
-chosen options. A different advance table alone does not implement an edition.
-
-The supported `rebuilt-marker-bonus` setup command records `exclude` or `include` explicitly.
-Its default is recorded alongside every resolved functional option in the initial revision; changing the option uses an ordinary
-creator command before `start`. Both choices are public and survive replay and restart. The domain
-policy implements bonus eligibility for ordinary expansion, event rebuilds and voluntary rebuilds;
-board placements and the actual expansion reward use this policy.
+The registration screen selects players and variants together. Creation writes every resolved
+option in its initial revision, so changing defaults cannot change replay. Unknown or unavailable
+choices receive typed diagnostics. Three epochs are fixed; `epochs` is not an option.
 
 Snapshots, waiting-player lists and completion flags are derived caches, never sources of game truth. Pending secret
 submissions, private plans and operational controller settings may be stored separately. A snapshot is tied to its

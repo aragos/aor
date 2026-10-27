@@ -8,12 +8,7 @@ object TextCodec {
         val parts = tokens(text)
         val arguments = parts.drop(1)
         return when (parts.first()) {
-            "set-option" ->
-                when (arguments.firstOrNull()) {
-                    "rebuilt-marker-bonus" -> Command.SetRebuiltMarkerBonus.parse(arguments)
-                    null -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
-                    else -> RuleOptionCommand.parse(arguments)
-                }
+            "set-option" -> RuleOptionCommand.parse(arguments)
             "start" -> Command.Start.parse(arguments)
             "bid-capital" -> Command.BidCapital.parse(arguments)
             "choose-capital" -> Command.ChooseCapital.parse(arguments)

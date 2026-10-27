@@ -4,10 +4,10 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlin.test.Test
 
-/** Full preset acceptance uses only ordinary commands and recorded authority outcomes. */
+/** Full variant acceptance uses only ordinary commands and recorded authority outcomes. */
 class VariantGameCompletionTest {
     @Test
-    fun bothPresetsCompleteAtEverySupportedPlayerCount() {
+    fun supportedVariantsCompleteAtEverySupportedPlayerCount() {
         for (preset in presets) {
             for (playerCount in 3..6) {
                 val completed = completedGame(preset, playerCount)
@@ -30,7 +30,7 @@ class VariantGameCompletionTest {
     }
 
     @Test
-    fun bothPresetHistoriesReplayExactlyForEverySupportedPlayerCount() {
+    fun supportedVariantHistoriesReplayExactlyForEverySupportedPlayerCount() {
         for (preset in presets) {
             for (playerCount in 3..6) {
                 val completed = completedGame(preset, playerCount)
@@ -43,7 +43,7 @@ class VariantGameCompletionTest {
     }
 
     @Test
-    fun bothPresetsConserveAllSixtyFourPhysicalCardsAtEverySupportedPlayerCount() {
+    fun supportedVariantsConserveAllSixtyFourPhysicalCardsAtEverySupportedPlayerCount() {
         for (preset in presets) {
             for (playerCount in 3..6) {
                 val state = completedGame(preset, playerCount).state
@@ -70,7 +70,7 @@ class VariantGameCompletionTest {
     }
 
     @Test
-    fun bothPresetsPublishSelectedAdvanceValuesAndFinalScoresForEveryPlayer() {
+    fun supportedVariantsPublishSelectedAdvanceValuesAndFinalScoresForEveryPlayer() {
         for (preset in presets) {
             for (playerCount in 3..6) {
                 val state = completedGame(preset, playerCount).state
@@ -105,9 +105,16 @@ class VariantGameCompletionTest {
     }
 
     private fun completedGame(preset: String, playerCount: Int): Scenario =
-        Scenario.create(playerCount).play("p1: set-option preset $preset", "p1: start").complete()
+        Scenario.create(playerCount).play("p1: set-option $preset", "p1: start").complete()
 
     private companion object {
-        val presets = listOf("second-edition", "tournament")
+        val presets =
+            listOf(
+                "deck-modification enabled",
+                "initial-card no-events",
+                "initial-card no-crusades",
+                "initial-card commodity-only",
+                "immediate-master-art-discard enabled",
+            )
     }
 }

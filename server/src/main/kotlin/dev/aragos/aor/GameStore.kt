@@ -320,23 +320,20 @@ class FileGameStore(
         }
         val action = Entry.Action(actor = revision.author, command = command)
         if (index != 0) {
-            val expected =
-                if (command is RuleOptionCommand && command.key == "preset") {
-                    command.resolve(state.rules).configurationCommands().map { option ->
-                        Entry.Action(revision.author, option)
-                    }
-                } else listOf(action)
+            val expected = listOf(action)
             require(actions == expected) {
                 "A command revision must contain exactly the author's command."
             }
             return
         }
+        val configured = entries.fold(state) { current, entry -> current.step(entry) }
+        val expected = initialConfiguration(revision.author, configured.rules)
         require(
             revision.author == state.header.creatorId &&
-                action == initialConfiguration(revision.author).first() &&
-                entries == initialConfiguration(revision.author)
+                action == expected.first() &&
+                entries == expected
         ) {
-            "The initial revision must explicitly configure every resolved default."
+            "The initial revision must explicitly configure every resolved option."
         }
     }
 

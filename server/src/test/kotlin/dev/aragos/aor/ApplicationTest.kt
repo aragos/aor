@@ -55,16 +55,16 @@ class ApplicationTest {
     }
 
     @Test
-    fun rebuiltMarkerBonusIsPubliclyConfigurableBeforeStart() = withGame {
-        val configured = command(0, 1, "set-option rebuilt-marker-bonus include")
+    fun deckModificationIsPubliclyConfigurableBeforeStart() = withGame {
+        val configured = command(0, 1, "set-option deck-modification enabled")
         val own = json.readTree(configured.bodyAsText())
         val other = json.readTree(view(1).bodyAsText())
 
         assertThat(configured.status).isEqualTo(HttpStatusCode.OK)
-        assertThat(own["game"]["rebuiltMarkerBonus"].asText()).isEqualTo("INCLUDE")
-        assertThat(other["game"]["rebuiltMarkerBonus"].asText()).isEqualTo("INCLUDE")
+        assertThat(own["game"]["rules"]["deckModification"].asBoolean()).isTrue()
+        assertThat(other["game"]["rules"]["deckModification"].asBoolean()).isTrue()
         assertThat(other["history"].map { entry -> entry.asText() })
-            .contains("p1: set-option rebuilt-marker-bonus include")
+            .contains("p1: set-option deck-modification enabled")
     }
 
     @Test

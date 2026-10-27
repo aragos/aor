@@ -400,17 +400,6 @@ class VisualProjectionTest {
     }
 
     @Test
-    fun leaderBonusVariantDisablesWrittenRecordBonus() {
-        val state =
-            withHand(state(advances = setOf(AdvanceId.WRITTEN_RECORD)), "charlemagne")
-                .copy(rules = RuleOptions(writtenRecord = WrittenRecordRule.TAKEOVER_TRADE))
-        val discount = state.viewForPlayer(p1).cardOffers.single().leaderDiscounts.single()
-
-        assertThat(discount.writtenRecordBonus).isEqualTo(0)
-        assertThat(discount.effectiveDiscount).isEqualTo(20)
-    }
-
-    @Test
     fun noTargetEventRetainsItsLegalNoEffectCommand() {
         val offer =
             withHand(state().copy(stage = Stage.PLAY_CARDS), "rebellion")

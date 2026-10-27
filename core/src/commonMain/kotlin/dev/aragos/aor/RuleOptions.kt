@@ -1,19 +1,54 @@
 package dev.aragos.aor
 
-/** Functional rules, resolved before play. Presets are shorthand and never stored as editions. */
+/** The supported game variants, resolved and recorded before play begins. */
 data class RuleOptions(
-    val setup: SetupRule = SetupRule.STANDARD,
+    val deckModification: Boolean = false,
     val initialCard: InitialCardRule = InitialCardRule.ANY,
-    val commerce: CommerceRule = CommerceRule.AH1996,
-    val windWatermill: WindWatermillRule = WindWatermillRule.TAKEOVER_TRADE,
-    val writtenRecord: WrittenRecordRule = WrittenRecordRule.LEADER_BONUS,
-    val incomeRelief: IncomeReliefRule = IncomeReliefRule.NEW_WORLD,
-    val credits: CreditRule = CreditRule.AH1996,
-    val miseryRelief: MiseryReliefRule = MiseryReliefRule.PURCHASED,
-    val patronage: PatronageRule = PatronageRule.PROTECTION_MONEY,
     val immediateMasterArtDiscard: Boolean = false,
-    val stGallSupport: Boolean = false,
+    val map: MapRule = MapRule.STANDARD,
 ) {
+    init {
+        require(map == MapRule.STANDARD) {
+            "The European map requires its reviewed province and adjacency specification."
+        }
+    }
+
+    // Baseline mechanics are fixed; these are not configurable game variants.
+    val setup: SetupRule
+        get() = SetupRule.STANDARD
+
+    val commerce: CommerceRule
+        get() = CommerceRule.AH1996
+
+    val windWatermill: WindWatermillRule
+        get() = WindWatermillRule.TAKEOVER_TRADE
+
+    val writtenRecord: WrittenRecordRule
+        get() = WrittenRecordRule.LEADER_BONUS
+
+    val incomeRelief: IncomeReliefRule
+        get() = IncomeReliefRule.NEW_WORLD
+
+    val credits: CreditRule
+        get() = CreditRule.AH1996
+
+    val miseryRelief: MiseryReliefRule
+        get() = MiseryReliefRule.PURCHASED
+
+    val patronage: PatronageRule
+        get() = PatronageRule.PROTECTION_MONEY
+
+    val stGallSupport: Boolean
+        get() = false
+
+    /** Physical cards assigned to an epoch before recycled discards are added. */
+    fun cardsForEpoch(epoch: Epoch): List<String> {
+        val printed = CardData.forEpoch(epoch).map(CardDefinition::id)
+        if (!deckModification || epoch == Epoch.THREE) return printed
+        return if (epoch == Epoch.ONE) printed.filterNot { it == "war" } + "timber-2-1"
+        else printed.filterNot { it == "timber-2-1" } + "war"
+    }
+
     val definitions: List<AdvanceDefinition>
         get() = AdvanceData.definitions.map { definition -> resolve(definition) }
 
@@ -36,20 +71,13 @@ data class RuleOptions(
     /** An explicit canonical snapshot for durable creation histories and preset expansion. */
     fun configurationCommands(): List<RuleOptionCommand> =
         listOf(
-            RuleOptionCommand("setup", setup.commandValue),
+            RuleOptionCommand("deck-modification", deckModification.commandValue()),
             RuleOptionCommand("initial-card", initialCard.commandValue),
-            RuleOptionCommand("commerce", commerce.commandValue),
-            RuleOptionCommand("wind-watermill", windWatermill.commandValue),
-            RuleOptionCommand("written-record", writtenRecord.commandValue),
-            RuleOptionCommand("income-relief", incomeRelief.commandValue),
-            RuleOptionCommand("credits", credits.commandValue),
-            RuleOptionCommand("misery-relief", miseryRelief.commandValue),
-            RuleOptionCommand("patronage", patronage.commandValue),
             RuleOptionCommand(
                 "immediate-master-art-discard",
                 immediateMasterArtDiscard.commandValue(),
             ),
-            RuleOptionCommand("st-gall-support", stGallSupport.commandValue()),
+            RuleOptionCommand("map", map.commandValue),
         )
 
     private fun resolve(definition: AdvanceDefinition): AdvanceDefinition {
@@ -91,25 +119,13 @@ data class RuleOptions(
 
     companion object {
         val AH1996: RuleOptions = RuleOptions()
-        val SECOND_EDITION: RuleOptions =
-            RuleOptions(
-                setup = SetupRule.IMPROVED,
-                commerce = CommerceRule.SECOND_EDITION,
-                windWatermill = WindWatermillRule.MARKET_ADJUSTMENT,
-                writtenRecord = WrittenRecordRule.TAKEOVER_TRADE,
-                incomeRelief = IncomeReliefRule.ENLIGHTENMENT,
-                credits = CreditRule.SECOND_EDITION,
-                miseryRelief = MiseryReliefRule.CATEGORY_COMPLETION,
-                patronage = PatronageRule.THREE_BOX_DISPLAY,
-                immediateMasterArtDiscard = true,
-            )
-        val TOURNAMENT: RuleOptions =
-            RuleOptions(
-                initialCard = InitialCardRule.COMMODITY_ONLY,
-                immediateMasterArtDiscard = true,
-                stGallSupport = true,
-            )
     }
+}
+
+/** European geometry is reserved until its province and adjacency changes are reviewed. */
+enum class MapRule(val commandValue: String) {
+    STANDARD("standard"),
+    EUROPEAN("european"),
 }
 
 enum class SetupRule(val commandValue: String) {
@@ -119,7 +135,17 @@ enum class SetupRule(val commandValue: String) {
 
 enum class InitialCardRule(val commandValue: String) {
     ANY("any"),
-    COMMODITY_ONLY("commodity-only"),
+    NO_CRUSADES("no-crusades"),
+    NO_EVENTS("no-events"),
+    COMMODITY_ONLY("commodity-only");
+
+    fun accepts(card: CardDefinition): Boolean =
+        when (this) {
+            ANY -> true
+            NO_CRUSADES -> card.id != "the-crusades"
+            NO_EVENTS -> card.kind != CardKind.EVENT
+            COMMODITY_ONLY -> card.kind == CardKind.COMMODITY
+        }
 }
 
 enum class CommerceRule(val commandValue: String) {

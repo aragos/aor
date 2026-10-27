@@ -142,8 +142,8 @@ All fractions are **rounded up** unless stated otherwise.
     - All tokens go to stock.
     - Misery markers start at 0.
     - No player has ships.
-3. **Cards.** Shuffle epoch 1 and deal **one** card per player. Improved setup deals 3 and each player keeps 2
-   ([§13](#13-variants)).
+3. **Cards.** Shuffle epoch 1 and deal **one** card per player, applying any selected initial-deal
+   restriction ([§13](#13-variants)). Excluded cards remain available for later draws.
 4. **Capital bid.**
     - Each player secretly writes a bid of $0–$40.
     - Players choose a capital in descending bid order, from the capitals in play. Ties are broken by die roll, and the
@@ -892,61 +892,28 @@ These notes are for the engine.
 
 ## 13. Variants
 
-These are not part of the baseline. The functional options below are supported through setup
-commands; defaults preserve AH1996. See the [command reference](commands.md) and
-[variant source inventory](variant-inventory.md) for exact options and source discrepancies.
-Showing-cards and bribery enforcement remain outside the application scope.
+The baseline remains the reviewed AH1996 rules, with these independent choices recorded before play:
 
-**Supported project option: rebuilt-marker expansion bonus**
+- **Deck modification, off by default:** exchange the epoch-2 physical card `timber-2-1` and the
+  epoch-1 War card. Timber moves to deck 1; War moves to deck 2. All 64 physical cards remain present.
+- **Initial card deal, mutually exclusive:** unrestricted (default), no Crusades, no events, or only
+  commodities. Each player receives one card. No-events permits leaders; commodity-only excludes
+  both events and leaders. Excluded cards remain in the deck for later draws.
+- **Immediate Master Art discard, off by default:** buying Master Art immediately offers its
+  optional discard, in addition to the ordinary Buy Card phase ability.
+- **European map, pending specification:** this will change provinces and adjacencies. It cannot be
+  enabled until the province list, connections, capitals and drawing geometry have been reviewed.
 
-- `set-option rebuilt-marker-bonus exclude` (default): a domination marker rebuilt after an event
-  does not count toward the expansion bonus.
-- `set-option rebuilt-marker-bonus include`: it does count toward the expansion bonus.
-- The creator selects the option during configuration. The public setting is recorded in the replay
-  log and frozen at `start`.
-- Both settings count ordinary expansion markers and exclude markers rebuilt after a voluntary swap.
-
-**Improved setup** (widely used, adopted by the 2nd edition):
-
-- Add one epoch 2 Timber card to epoch 1.
-- Remove The Crusades, Walter the Penniless, Rashid ad Din, Silk and Spice from epoch 1.
-- Deal 3 cards to each player; each keeps 2 and returns 1, and the returned cards are reshuffled.
-- This "get three, choose two" deal is incompatible with reduced initial-deal decks for now,
-  including commodity-only initial dealing (user ruling, 2026-10-24). Its own required deck
-  adjustments above still apply.
-- Shuffle the 5 removed cards back in after turn 1's regular Draw Card phase (3–4 players) or
-  turn 2's regular Draw Card phase (5–6 players). The user approved this project rule on 2026-10-24
-  (Q14). Alternate timings may be added later as separate options.
-
-**EuroGames 2nd edition (1999):**
-
-- Improved Agriculture becomes J (40, needs I) and Wind/Watermill becomes K (50, needs J).
-- Wind/Watermill instead lets the last-moving active owner adjust Grain, Cloth, Wine or Metal
-  after the first player's buy-off window. Change neutral to shortage/surplus, or an existing
-  adjustment to neutral. This follows the EuroGames supplement; published rewrites differ.
-- Written Record loses its +$10 and instead forces a card trade with a defeated non-owner after a successful attack,
-  once per turn.
-- New World's −1 misery per turn moves to Enlightenment.
-- Communication credits become 30/20/10/0, Civics credits rise by 10 each, and Proselytism grants
-  30 credit. Patronage retains the reviewed 20 credit; source summaries disagree about that value.
-- Misery relief can no longer be bought. It is earned by completing 2, 3 or 4 advances in each of Science, Commerce and
-  Communication. Completion grants 1/2/3 spaces once at the corresponding threshold, on
-  acquisition; completed thresholds do not award relief again each turn.
-- Patronage uses a three-box leader display instead of protection money.
-- Master Art also allows an immediate discard when bought.
-
-**Custom rules seen in tournaments:**
-
-- Master Art discards immediately on purchase.
-- St. Gall supports Nuremberg.
-- The first card dealt is drawn from commodities only.
+Choose variants on the same screen as player registration. Every resolved option appears in the
+initial command log, and `start` freezes it. Earlier presets and all other optional mechanics are
+retired. Event-rebuilt markers do not count toward the expansion bonus; voluntary rebuilds do not
+count either. The [command reference](commands.md) owns exact keys and values.
 
 ---
 
 ## 14. Open Questions
 
-The previously open recycling and improved-setup questions are resolved below. Source disagreements
-and selected project rules remain documented separately.
+The recycling ruling below remains part of the baseline. Earlier improved-setup rulings are historical; that variant was retired on 2026-10-27.
 
 **Verified recycling classification (2026-10-24):**
 
@@ -955,7 +922,7 @@ and selected project rules remain documented separately.
   40 recyclable and 24 single-use cards. PDF page 2 marks event recycling; page 3 specifies that
   all commodities recycle and no leaders do. Every implemented status matches this reference.
 
-**Resolved reinsertion ruling (2026-10-24):**
+**Historical reinsertion ruling (retired 2026-10-27):**
 
 - **Q14 / improved setup:** the user approved shuffling the five held-out cards back in after
   turn 1's regular Draw Card phase for 3–4 players, or turn 2's for 5–6 players. Published sources

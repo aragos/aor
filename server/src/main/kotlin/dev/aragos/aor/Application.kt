@@ -36,10 +36,23 @@ fun Application.module(service: GameService = createGameService()) {
         post("/api/games") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("players")
+                body.fieldsOnly("players", "options")
+                val options = body["options"]
+                val rules =
+                    if (options == null) RuleOptions()
+                    else {
+                        if (!options.isObject || options.size() > 4)
+                            throw ServiceFailure(400, "INVALID_REQUEST")
+                        options.properties().fold(RuleOptions()) { configured, (key, value) ->
+                            RuleOptionCommand(key, value.string()).resolve(configured)
+                        }
+                    }
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.create(names = body.field("players").array().map(JsonNode::string))
+                        service.create(
+                            names = body.field("players").array().map(JsonNode::string),
+                            rules = rules,
+                        )
                     }
                 call.respondJson(result, HttpStatusCode.Created)
             }

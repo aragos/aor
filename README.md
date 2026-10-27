@@ -45,19 +45,13 @@ Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
 The local server listens on `127.0.0.1`. Accounts, general undo, private plans and bots remain deferred.
 
-During configuration, the creator can select standard or improved setup, individual functional
-rules, or a preset. The second-edition preset selects the alternate advance table, credits, relief,
-leader display and interaction rules. Tournament options include commodity-only initial cards,
-immediate Master Art discard and St. Gall support. Commands and guided controls use the same rules.
-Game length is fixed at three epochs; there is no epoch configuration field or command. The existing
-26th-advance ending can still finish a game earlier.
+Choose variants on the player-registration screen: swap Timber and War between decks 1 and 2,
+restrict the opening deal to no Crusades, no events or commodities only, and optionally enable an
+immediate Master Art discard. Opening restrictions are mutually exclusive; excluded cards remain
+in the deck for later draws. The European map is reserved pending its province and adjacency
+specification. All other previous optional mechanics and presets are retired. Games have three epochs.
 
-The creator can also choose whether markers rebuilt after events count toward the
-expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
-`set-option rebuilt-marker-bonus include`. The browser has the same selector. The choice is public,
-saved in the log and frozen when setup starts. Both settings apply to actual expansion rewards. Voluntary marker rebuilds never count.
-
-New games use file format 3 with rules version `ah1996-three-epoch-1` and data version
+New games use file format 3 with rules version `ah1996-three-epoch-2` and data version
 `ah1996-catalog-10`. The initial revision records resolved setup options. Earlier development rules
 and catalog versions are unsupported; no migration is provided under the current-format-only policy.
 The current catalog includes the reviewed Baltic land/coastal connections, sea exclusions and

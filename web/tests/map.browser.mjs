@@ -62,7 +62,7 @@ let tokenFixture;
 const game = await createGame(6);
 const page = await open(web + game.links[0].path);
 try {
-await page.wait(`document.querySelector('#setup-rebuilt-marker-bonus')`, 'configuration controls');
+await page.wait(`document.querySelector('.game-table')`, 'configuration controls');
 await page.click('Start setup');
 await page.wait(`document.querySelector('#bid')`, 'capital bidding');
 await page.fill('#bid', '7');

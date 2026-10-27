@@ -235,7 +235,7 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "set-option rebuilt-marker-bonus exclude")
+        service.submit(game.gameId, token(game, 0), 1, "set-option deck-modification disabled")
         service.submit(game.gameId, token(game, 0), 2, "start")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
@@ -305,7 +305,7 @@ class GameServiceTest {
                 game.gameId,
                 token(game, 1),
                 1,
-                "set-option rebuilt-marker-bonus exclude",
+                "set-option deck-modification disabled",
             )
 
         assertThat(configured.creatorId).isEqualTo(PlayerId("p2"))
@@ -387,7 +387,7 @@ class GameServiceTest {
                 "not json",
                 original.replace("\"fileVersion\":3", "\"fileVersion\":99"),
                 original.replace(RULES_VERSION, "future-rules"),
-                original.replace("set-option rebuilt-marker-bonus exclude", "invented-command"),
+                original.replace("set-option deck-modification disabled", "invented-command"),
             )) {
             Files.writeString(path, contents)
             assertThat(

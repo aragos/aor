@@ -14,47 +14,23 @@ data class RuleOptionCommand(val key: String, val value: String) : Command {
         return state.copy(rules = resolve(state.rules))
     }
 
-    /** Presets replace the functional snapshot; later option commands may override any value. */
+    /** Resolve one supported option without changing the other choices. */
     fun resolve(rules: RuleOptions): RuleOptions =
         when (key) {
-            "setup" -> rules.copy(setup = option(SetupRule.entries, SetupRule::commandValue))
+            "deck-modification" -> rules.copy(deckModification = enabled())
             "initial-card" ->
                 rules.copy(
                     initialCard = option(InitialCardRule.entries, InitialCardRule::commandValue)
                 )
-            "commerce" ->
-                rules.copy(commerce = option(CommerceRule.entries, CommerceRule::commandValue))
-            "wind-watermill" ->
-                rules.copy(
-                    windWatermill =
-                        option(WindWatermillRule.entries, WindWatermillRule::commandValue)
-                )
-            "written-record" ->
-                rules.copy(
-                    writtenRecord =
-                        option(WrittenRecordRule.entries, WrittenRecordRule::commandValue)
-                )
-            "income-relief" ->
-                rules.copy(
-                    incomeRelief = option(IncomeReliefRule.entries, IncomeReliefRule::commandValue)
-                )
-            "credits" -> rules.copy(credits = option(CreditRule.entries, CreditRule::commandValue))
-            "misery-relief" ->
-                rules.copy(
-                    miseryRelief = option(MiseryReliefRule.entries, MiseryReliefRule::commandValue)
-                )
-            "patronage" ->
-                rules.copy(patronage = option(PatronageRule.entries, PatronageRule::commandValue))
             "immediate-master-art-discard" -> rules.copy(immediateMasterArtDiscard = enabled())
-            "st-gall-support" -> rules.copy(stGallSupport = enabled())
-            "preset" ->
-                when (value) {
-                    "ah1996" -> RuleOptions.AH1996
-                    "second-edition" -> RuleOptions.SECOND_EDITION
-                    "tournament" -> RuleOptions.TOURNAMENT
-                    else ->
-                        throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION, listOf(key, value))
-                }
+            "map" -> {
+                checkRule(
+                    value == MapRule.STANDARD.commandValue,
+                    ViolationCode.UNSUPPORTED_OPTION,
+                    listOf(key, value),
+                )
+                rules.copy(map = MapRule.STANDARD)
+            }
             else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION, listOf(key, value))
         }
 

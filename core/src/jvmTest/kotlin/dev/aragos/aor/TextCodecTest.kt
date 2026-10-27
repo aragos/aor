@@ -9,11 +9,11 @@ class TextCodecTest {
     fun playerCommandsHaveCanonicalText() {
         for (text in
             listOf(
-                "set-option setup standard",
+                "set-option map standard",
                 "set-option initial-card commodity-only",
                 "return-card hand-3",
-                "set-option rebuilt-marker-bonus exclude",
-                "set-option rebuilt-marker-bonus include",
+                "set-option deck-modification disabled",
+                "set-option deck-modification enabled",
                 "start",
                 "bid-capital 12",
                 "choose-capital venice",
@@ -72,7 +72,7 @@ class TextCodecTest {
                 "choose-turn-position",
                 "choose-turn-position 999999999999999",
                 "set-option rebuilt-marker-bonus",
-                "set-option rebuilt-marker-bonus include extra",
+                "set-option deck-modification enabled extra",
                 "",
             )
 
@@ -101,7 +101,7 @@ class TextCodecTest {
                     TextCodec.parseCommand("set-option rebuilt-marker-bonus $value")
                 }
 
-            assertThat(failure.code).isEqualTo(ViolationCode.INVALID_REBUILT_MARKER_BONUS)
+            assertThat(failure.code).isEqualTo(ViolationCode.UNSUPPORTED_OPTION)
         }
     }
 
@@ -136,8 +136,8 @@ class TextCodecTest {
 
     private fun entries() =
         listOf(
-            "p1: set-option setup standard",
-            "p1: set-option rebuilt-marker-bonus include",
+            "p1: set-option map standard",
+            "p1: set-option deck-modification disabled",
             "p1: start",
             "!shuffle ${CardData.epochOne.joinToString(" ", transform = CardDefinition::id)}",
             "!draw p1 hand-1 stone-1",

@@ -64,10 +64,7 @@ internal fun GameState.pendingShuffle(): ShuffleRequest? {
     val awaitingDraw = flow.decisions.lastOrNull() is DrawDecision
     val next = currentEpoch.next
     if (deck.isEmpty() && awaitingDraw && next != null) {
-        val printed =
-            CardData.forEpoch(next)
-                .map(CardDefinition::id)
-                .filterNot(deckHistory.movedToFirstDeck::contains)
+        val printed = rules.cardsForEpoch(next).filterNot(deckHistory.movedToFirstDeck::contains)
         return ShuffleRequest(printed + deckHistory.discarded, ShufflePurpose.NEXT_EPOCH)
     }
     return null

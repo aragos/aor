@@ -7,21 +7,10 @@ data class RuleOptionView(val key: String, val value: String, val choices: List<
             rules.configurationCommands().map { command ->
                 val choices =
                     when (command.key) {
-                        "setup" -> SetupRule.entries.map(SetupRule::commandValue)
                         "initial-card" -> InitialCardRule.entries.map(InitialCardRule::commandValue)
-                        "commerce" -> CommerceRule.entries.map(CommerceRule::commandValue)
-                        "wind-watermill" ->
-                            WindWatermillRule.entries.map(WindWatermillRule::commandValue)
-                        "written-record" ->
-                            WrittenRecordRule.entries.map(WrittenRecordRule::commandValue)
-                        "income-relief" ->
-                            IncomeReliefRule.entries.map(IncomeReliefRule::commandValue)
-                        "credits" -> CreditRule.entries.map(CreditRule::commandValue)
-                        "misery-relief" ->
-                            MiseryReliefRule.entries.map(MiseryReliefRule::commandValue)
-                        "patronage" -> PatronageRule.entries.map(PatronageRule::commandValue)
-                        "immediate-master-art-discard",
-                        "st-gall-support" -> listOf("disabled", "enabled")
+                        "deck-modification",
+                        "immediate-master-art-discard" -> listOf("disabled", "enabled")
+                        "map" -> listOf("standard")
                         else -> error("A configured rule needs public choices: ${command.key}.")
                     }
                 RuleOptionView(command.key, command.value, choices)

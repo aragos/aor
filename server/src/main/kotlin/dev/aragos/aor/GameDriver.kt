@@ -54,8 +54,9 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         id: String,
         header: GameHeader,
         credentials: Map<PlayerId, String>,
+        rules: RuleOptions = RuleOptions(),
     ): StoredGame {
-        val entries = initialConfiguration(header.creatorId)
+        val entries = initialConfiguration(header.creatorId, rules)
         val entry = entries.first()
         entries.fold(GameState(header)) { state, action -> state.step(action) }
         return StoredGame(
@@ -130,14 +131,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     state = state,
                     player = player,
                     command = command.toText(),
-                    actions =
-                        if (command is RuleOptionCommand && command.key == "preset") {
-                            command.resolve(state.rules).configurationCommands().map { option ->
-                                Entry.Action(actor = player, command = option)
-                            }
-                        } else {
-                            listOf(Entry.Action(actor = player, command = command))
-                        },
+                    actions = listOf(Entry.Action(actor = player, command = command)),
                 )
         }
     }
@@ -228,7 +222,8 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
 /**
  * The creation transaction records every resolved default, independent of future default changes.
  */
-internal fun initialConfiguration(creator: PlayerId): List<Entry.Action> =
-    (listOf<Command>(Command.SetRebuiltMarkerBonus(RebuiltMarkerBonus.EXCLUDE)) +
-            RuleOptions().configurationCommands())
-        .map { command -> Entry.Action(creator, command) }
+internal fun initialConfiguration(
+    creator: PlayerId,
+    rules: RuleOptions = RuleOptions(),
+): List<Entry.Action> =
+    rules.configurationCommands().map { command -> Entry.Action(creator, command) }

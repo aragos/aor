@@ -21,17 +21,8 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     const [quoteError, setQuoteError] = useState('');
     const [capital, setCapital] = useState('');
     const [position, setPosition] = useState('');
-    const [preset, setPreset] = useState('');
-    const [options, setOptions] = useState<Record<string, string>>({});
-    const [rebuiltMarkerBonus, setRebuiltMarkerBonus] = useState(snapshot.game.rebuiltMarkerBonus);
-    const previousRebuiltMarkerBonus = useRef(snapshot.game.rebuiltMarkerBonus);
     const previousBid = useRef(snapshot.pendingBid);
     const previousStage = useRef(snapshot.game.stage);
-    useEffect(() => {
-        const previous = previousRebuiltMarkerBonus.current;
-        setRebuiltMarkerBonus(current => current === previous ? snapshot.game.rebuiltMarkerBonus : current);
-        previousRebuiltMarkerBonus.current = snapshot.game.rebuiltMarkerBonus;
-    }, [snapshot.game.rebuiltMarkerBonus]);
     useEffect(() => {
         if (previousStage.current !== snapshot.game.stage) {
             setBid(String(snapshot.pendingBid ?? 0));
@@ -77,34 +68,8 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     return <>
         {eligiblePurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
         {eligiblePurchase && quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
-        {stage === 'CONFIGURATION' && snapshot.viewerId === snapshot.creatorId && <>
-            <div className="rule-options">
-                <label htmlFor="rule-preset">{t('controls.preset')}</label>
-                <select id="rule-preset" value={preset} disabled={busy} onChange={event => setPreset(event.target.value)}>
-                    <option value="">{t('controls.choosePreset')}</option>
-                    {['ah1996', 'second-edition', 'tournament'].map(value => <option key={value} value={value}>{t(`preset.${value}`)}</option>)}
-                </select>
-                <button className="secondary" disabled={busy || !preset} onClick={() => { void submit(`set-option preset ${preset}`); }}>{t('table.applyPreset')}</button>
-                {snapshot.game.ruleOptions.map(option => <div className="rule-option" key={option.key}>
-                    <label htmlFor={`rule-${option.key}`}>{t(`option.${option.key}`)}</label>
-                    <select id={`rule-${option.key}`} value={options[option.key] ?? option.value} disabled={busy} onChange={event => setOptions(current => ({...current, [option.key]: event.target.value}))}>
-                        {option.choices.map(value => <option key={value} value={value}>{t(`optionValue.${value}`)}</option>)}
-                    </select>
-                    <button className="secondary" aria-label={t('controls.applyOption', {option: t(`option.${option.key}`)})} disabled={busy || !options[option.key] || options[option.key] === option.value} onClick={() => { void submit(`set-option ${option.key} ${options[option.key]}`); }}>{t('table.apply')}</button>
-                </div>)}
-            </div>
-            <form onSubmit={event => { event.preventDefault(); void submit(`set-option rebuilt-marker-bonus ${rebuiltMarkerBonus.toLowerCase()}`); }}>
-                <label htmlFor="setup-rebuilt-marker-bonus">{t('controls.rebuiltMarkerBonus')}</label>
-
-                <div className="inline-form">
-                    <select id="setup-rebuilt-marker-bonus" value={rebuiltMarkerBonus} onChange={event => { const value = event.target.value; if (value === 'INCLUDE' || value === 'EXCLUDE') setRebuiltMarkerBonus(value); }}>
-                        {(['EXCLUDE', 'INCLUDE'] as const).map(rule => <option key={rule} value={rule}>{t(`rebuiltMarkerBonus.option.${rule}`)}</option>)}
-                    </select>
-                    <button className="secondary" disabled={busy}>{t('controls.saveRebuiltMarkerBonus')}</button>
-                </div>
-            </form>
-            <button disabled={busy || rebuiltMarkerBonus !== snapshot.game.rebuiltMarkerBonus} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>
-        </>}
+        {stage === 'CONFIGURATION' && snapshot.viewerId === snapshot.creatorId &&
+            <button disabled={busy} onClick={() => { void submit('start'); }}>{t('controls.start')}</button>}
         {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <form onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
             <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-preview' : undefined} required/>

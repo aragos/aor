@@ -264,7 +264,7 @@ class SetupTest {
     @Test
     fun configurationIsFrozenAfterStarting() {
         violation(ViolationCode.WRONG_PHASE) {
-            dealt().play("p1: set-option rebuilt-marker-bonus include")
+            dealt().play("p1: set-option deck-modification enabled")
         }
     }
 

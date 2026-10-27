@@ -3,6 +3,7 @@ import type {FormEvent} from 'react';
 import {ApiError, errorCode, request} from './api';
 import type {CreatedGame, Snapshot} from './api';
 import {t} from './messages';
+import {defaultVariants, Variants} from './Variants';
 import {GameTable} from './GameTable';
 import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
@@ -12,12 +13,13 @@ function ErrorMessage({code}: {code: string}) { return <p className="error" role
 
 function CreateGame() {
     const [names, setNames] = useState('Alice\nBob\nCarol');
+    const [variants, setVariants] = useState(defaultVariants);
     const [created, setCreated] = useState<CreatedGame | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n')})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n'), options: variants})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
@@ -35,6 +37,7 @@ function CreateGame() {
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
             <p className="muted small">{t('create.threeEpochs')}</p>
+            <Variants value={variants} onChange={setVariants} disabled={busy}/>
             {error && <ErrorMessage code={error}/>}
             <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>
         </form>}
