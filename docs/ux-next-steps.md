@@ -34,7 +34,8 @@ evidence gaps. The execution record below identifies the remaining limits after 
 | Visual primitives | Shared target invalidation and result notices; semantic target, resource, focus, blocker and outcome tokens; measured secondary-text contrast defects corrected | Token extraction is intentionally limited to migrated interaction surfaces |
 | Responsiveness | Live six-seat epoch-3 baseline recorded; no transport or caching change justified by the measurements | Representative conflict-heavy production profiling and isolated React commit timings remain unmeasured |
 
-The profile reached epoch 3, turn 8 at revision 234 through 278 authoritative actions and 363 history
+The profile used catalog version `ah1996-catalog-2`, before the 2026-10-27 sea correction. It reached
+epoch 3, turn 8 at revision 234 through 278 authoritative actions and 363 history
 entries, with all six seats active and 9–11 cards each. Ten concurrent six-viewer batches measured
 snapshot p50 **5.0 ms**, p95 **7.2 ms**, maximum body **145,955 bytes**. Eighteen workspace
 interactions measured p50 **66.1 ms**, p95 **92.3 ms**, including driver overhead and two frames.

@@ -97,6 +97,8 @@ class GameCatalogTest {
                 GeographicalArea.VII,
                 SeaArea.CENTRAL_MEDITERRANEAN,
                 GeographicalArea.VIII,
+                SeaArea.AEGEAN_SEA,
+                GeographicalArea.VIII,
                 SeaArea.CANARY_BASIN,
                 GeographicalArea.VIII,
             )
@@ -399,7 +401,7 @@ class GameCatalogTest {
     }
 
     @Test
-    fun centralMediterraneanIncludesTheAegeanAsOneSeaSpace() {
+    fun centralMediterraneanHasItsOwnCoastalIncidences() {
         assertThat(
                 BoardConnectionData.seaCoasts
                     .filter { coast -> coast.sea == SeaArea.CENTRAL_MEDITERRANEAN }
@@ -412,6 +414,19 @@ class GameCatalogTest {
                 ProvinceId("tripoli"),
                 ProvinceId("barca"),
                 ProvinceId("corfu"),
+                ProvinceId("crete"),
+                ProvinceId("athens"),
+            )
+    }
+
+    @Test
+    fun aegeanHasItsOwnCoastalIncidences() {
+        assertThat(
+                BoardConnectionData.seaCoasts
+                    .filter { coast -> coast.sea == SeaArea.AEGEAN_SEA }
+                    .map(SeaCoastConnection::province)
+            )
+            .containsExactly(
                 ProvinceId("salonika"),
                 ProvinceId("gallipoli"),
                 ProvinceId("constantinople"),
@@ -422,13 +437,18 @@ class GameCatalogTest {
     }
 
     @Test
-    fun creteTouchesOnlyTheCombinedCentralMediterraneanSea() {
+    fun creteTouchesAllThreeMediterraneanSeas() {
         val seas =
             BoardConnectionData.seaCoasts
                 .filter { coast -> coast.province == ProvinceId("crete") }
                 .map(SeaCoastConnection::sea)
 
-        assertThat(seas).containsExactly(SeaArea.CENTRAL_MEDITERRANEAN)
+        assertThat(seas)
+            .containsExactly(
+                SeaArea.AEGEAN_SEA,
+                SeaArea.CENTRAL_MEDITERRANEAN,
+                SeaArea.EASTERN_MEDITERRANEAN,
+            )
     }
 
     @Test

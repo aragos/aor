@@ -258,24 +258,26 @@ is the only ocean and is flagged separately; it is not a sea usable with The Hea
 | canary basin | seville, fez, west-africa | Board W, lower-left |
 | western mediterranean | granada, valencia, barcelona, palma, montpellier, marseilles, genoa, cagliari, rome, naples, bari, sicily, tunis, algiers, oran | Board W, including west of Italian peninsula |
 | adriatic sea | venice, florence, rome, naples, bari, dubrovnik, durazzo | Board W/E + Hexagonia PDF p. 12 |
-| central mediterranean (including aegean) | bari, sicily, tunis, tripoli, barca, corfu, athens, crete, salonika, gallipoli, constantinople, smyrna | Board W/E; user correction 2026-10-26: one sea space |
-| eastern mediterranean | barca, libya, alexandria, cairo, suez, jerusalem, acre, levant, cyprus, adalia | Board E + Errata (Barca yes; Libya to Central no); user correction 2026-10-26: no Crete incidence |
+| central mediterranean | bari, sicily, tunis, tripoli, barca, corfu, athens, crete | Board W/E; user correction 2026-10-27: separate from the Aegean |
+| aegean sea | salonika, gallipoli, constantinople, smyrna, athens, crete | Board E; user correction 2026-10-27: separate sea in Area VIII |
+| eastern mediterranean | barca, libya, alexandria, cairo, suez, jerusalem, acre, levant, cyprus, adalia, crete | Board E + Errata (Barca yes; Libya to Central no); user correction 2026-10-27: Crete incidence |
 | black sea | varna, kaffa, tana, abagia, poti, erzerum, trebizond, angora, constantinople, gallipoli | Board E, upper-right |
 | Norwegian Sea | No effective game connections | Errata: no game function |
 | Atlantic Ocean | No main-map coastal-water incidences | Board N/W; separated from coastal water by medium-blue seas |
 
 The Greenland Sea is the separately named medium-blue patch containing Iceland. It is not the
 Norwegian Sea. The Western Mediterranean extends east of Cagliari to the western Italian coast and
-northwestern Sicily. The Central Mediterranean includes the Aegean basin between Greece and Anatolia;
-the two printed names identify one sea space, as confirmed by the user on 2026-10-26. Its twelve
-coastal incidences are listed in one row above. A crossing between those basins uses one sea space.
+northwestern Sicily. The Aegean is a separate sea between Greece and Anatolia. It shares Area VIII
+with the Central Mediterranean; geographical membership does not combine their shipping spaces.
+Crete's coastal water adjoins both seas and the Eastern Mediterranean.
 
 Sea-to-sea movement is not a coastal-water step. The catalog stores the province/sea incidences needed
 for a single sea crossing with The Heavens; no additional sea-to-sea movement graph is required.
 
 ### Geographical area membership
 
-The user confirmed these assignments on 2026-10-26. Area borders include the entire assigned sea;
+The user confirmed these assignments on 2026-10-26 and corrected the Aegean on 2026-10-27.
+Area borders include the entire assigned sea;
 other water bodies have no area assignment. Outlines enclose neutral islands and small unassigned
 water pockets among member coastal spaces, without assigning an entire unassigned sea to an area.
 Sea spaces remain available on reduced boards even when their area's provinces are absent.
@@ -287,7 +289,8 @@ Sea spaces remain available on reduced boards even when their area's provinces a
 | Black Sea | V |
 | Eastern Mediterranean | VI |
 | Adriatic Sea | VII |
-| Central Mediterranean, including the Aegean | VIII |
+| Central Mediterranean | VIII |
+| Aegean Sea | VIII |
 | Canary Basin | VIII |
 
 ## Connection rulings and source status
@@ -302,17 +305,16 @@ The absent coastal-water edge is confirmed for all player counts. Constantinople
 **Constantinople–Angora: land and coastal-water connection.** The user confirmed their land border
 on 2026-10-26. Both connections apply at every supported player count.
 
-**Central Mediterranean–Aegean: one sea space.** Confirmed by the user on 2026-10-26. The catalog
-uses Central Mediterranean as the canonical identifier and combines both sets of coastal incidences.
+**Central Mediterranean and Aegean: separate sea spaces.** Corrected by the user on 2026-10-27.
+Both belong to Area VIII. Crete adjoins both and the Eastern Mediterranean. This supersedes the
+earlier combined-sea interpretation and the exclusion of Crete from the Eastern Mediterranean.
 
 **Further coastal corrections, 2026-10-26.** Smyrna and Crete do not share coastal water; neither
 do Sicily and Naples. Bari shares coastal water with Naples, Sicily, Corfu, and Durazzo. Portsmouth
 touches both St Malo and Paris by coast; London touches both Bruges and Paris. Cagliari and Rome,
 Oran and Granada, and Tana and Poti have no direct coastal connection. Granada has no Canary Basin
 incidence. These are topology facts independent of the schematic's spacing.
-Athens and Crete retain their coastal-water border. Crete touches the combined Central
-Mediterranean/Aegean only; it does not touch the Eastern Mediterranean. The latter sea's western
-edge lies east of Crete, leaving the combined sea connected around the island.
+Athens and Crete retain their coastal-water border.
 Shetland and Bergen also share a direct coastal-water border, confirmed on 2026-10-26.
 
 **Province geography, 2026-10-26.** Corsica belongs to Cagliari, and the northern Greek island

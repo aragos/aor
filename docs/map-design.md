@@ -13,6 +13,8 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 - Each province owns its land, islands and coastal water. Coastal bands originate at their own
   shoreline. Simplify sea-facing edges together so neighboring cells abut without gaps, overlaps,
   wraparounds or stray fragments. Keep named seas and their coastal contacts clearly visible.
+  The Aegean and Central Mediterranean are separate seas within Area VIII; Crete's coastal water
+  visibly adjoins each of them and the Eastern Mediterranean.
 - A sea may belong to an area; membership is optional and catalogued. Area outlines enclose member
   provinces, their coasts and assigned seas in one continuous perimeter, without enclaves or
   exclaves. Adjacent area borders abut. Enclosed neutral pockets do not confer movement or ownership.

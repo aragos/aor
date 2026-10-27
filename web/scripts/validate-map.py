@@ -122,13 +122,18 @@ assert (
 assert (
     seas["CANARY_BASIN"].distance(water["granada"]) >= 12
 ), "The Canary Basin must be visibly separated from Granada."
-assert (
-    "CENTRAL_MEDITERRANEAN" in seas and "AEGEAN_SEA" not in seas
-), "The Aegean and Central Mediterranean must share one sea-space identity."
-assert (
-    len([part for part in get_parts(seas["CENTRAL_MEDITERRANEAN"]) if part.area > 1])
-    == 1
-), "The combined Mediterranean must be visibly connected around Crete."
+assert len(seas) == 11, "The map must show all eleven connected seas separately."
+for sea in ["CENTRAL_MEDITERRANEAN", "AEGEAN_SEA"]:
+    assert geometry["seas"][sea]["area"] == "VIII", f"{sea} must belong to Area VIII."
+    assert (
+        len([part for part in get_parts(seas[sea]) if part.area > 1]) == 1
+    ), f"{sea} must be visibly connected."
+assert {
+    sea for sea, shape in seas.items()
+    if water["crete"].boundary.buffer(0.03).intersection(shape.boundary).length > 3
+} == {"AEGEAN_SEA", "CENTRAL_MEDITERRANEAN", "EASTERN_MEDITERRANEAN"}, (
+    "Crete must visibly adjoin the Aegean, Central Mediterranean and Eastern Mediterranean."
+)
 assert (
     water["oran"].distance(water["granada"]) >= 12
 ), "Oran must be visibly separated from Granada."

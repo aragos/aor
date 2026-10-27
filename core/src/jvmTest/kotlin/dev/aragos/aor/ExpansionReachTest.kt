@@ -165,7 +165,7 @@ class ExpansionReachTest {
     }
 
     @Test
-    fun heavensCrossesFromSicilyToTheAegeanCoastAsOneSea() {
+    fun heavensCannotTreatCentralMediterraneanAndAegeanAsOneSea() {
         val context =
             context(
                 ships = ShippingCapability.GALLEY_2,
@@ -173,14 +173,70 @@ class ExpansionReachTest {
                 board = BoardState().placeMarker(id("sicily"), venice).board,
             )
 
+        assertThat(ExpansionReach.routesTo(context, venice, id("smyrna"))).isEmpty()
+    }
+
+    @Test
+    fun heavensCrossesTheCentralMediterraneanFromCrete() {
+        val context =
+            context(
+                ships = ShippingCapability.GALLEY_2,
+                advances = setOf(AdvanceId.THE_HEAVENS),
+                board = BoardState().placeMarker(id("crete"), venice).board,
+            )
+
+        assertThat(ExpansionReach.routesTo(context, venice, id("sicily")))
+            .contains(
+                ExpansionRoute.Shipping(
+                    id("crete"),
+                    listOf(
+                        ShippingSpace.Coast(id("crete")),
+                        ShippingSpace.Sea(SeaArea.CENTRAL_MEDITERRANEAN),
+                        ShippingSpace.Coast(id("sicily")),
+                    ),
+                )
+            )
+    }
+
+    @Test
+    fun heavensCrossesTheAegeanFromCrete() {
+        val context =
+            context(
+                ships = ShippingCapability.GALLEY_2,
+                advances = setOf(AdvanceId.THE_HEAVENS),
+                board = BoardState().placeMarker(id("crete"), venice).board,
+            )
+
         assertThat(ExpansionReach.routesTo(context, venice, id("smyrna")))
             .contains(
                 ExpansionRoute.Shipping(
-                    id("sicily"),
+                    id("crete"),
                     listOf(
-                        ShippingSpace.Coast(id("sicily")),
-                        ShippingSpace.Sea(SeaArea.CENTRAL_MEDITERRANEAN),
+                        ShippingSpace.Coast(id("crete")),
+                        ShippingSpace.Sea(SeaArea.AEGEAN_SEA),
                         ShippingSpace.Coast(id("smyrna")),
+                    ),
+                )
+            )
+    }
+
+    @Test
+    fun heavensCrossesTheEasternMediterraneanFromCrete() {
+        val context =
+            context(
+                ships = ShippingCapability.GALLEY_2,
+                advances = setOf(AdvanceId.THE_HEAVENS),
+                board = BoardState().placeMarker(id("crete"), venice).board,
+            )
+
+        assertThat(ExpansionReach.routesTo(context, venice, id("cyprus")))
+            .contains(
+                ExpansionRoute.Shipping(
+                    id("crete"),
+                    listOf(
+                        ShippingSpace.Coast(id("crete")),
+                        ShippingSpace.Sea(SeaArea.EASTERN_MEDITERRANEAN),
+                        ShippingSpace.Coast(id("cyprus")),
                     ),
                 )
             )

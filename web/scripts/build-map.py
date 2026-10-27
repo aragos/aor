@@ -497,8 +497,9 @@ sea_centers = {
         "CANARY_BASIN": (-9, 34.5),
         "WESTERN_MEDITERRANEAN": (5.6, 39),
         "ADRIATIC_SEA": (15, 42.7),
-        "CENTRAL_MEDITERRANEAN": (21, 36.5),
-        "EASTERN_MEDITERRANEAN": (31.5, 33.5),
+        "CENTRAL_MEDITERRANEAN": (18, 35.2),
+        "AEGEAN_SEA": (25.2, 38.3),
+        "EASTERN_MEDITERRANEAN": (30, 33.5),
         "BLACK_SEA": (34, 43.3),
     }.items()
 }

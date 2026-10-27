@@ -81,10 +81,13 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.wait(`document.querySelector('.expansion-form, .pool-summary')`, 'expansion decision ready');
     const before = await page.snapshot();
     const expectedSeaAreas = {BALTIC_SEA:'I', GREENLAND_SEA:'II', BLACK_SEA:'V',
-        EASTERN_MEDITERRANEAN:'VI', ADRIATIC_SEA:'VII', CENTRAL_MEDITERRANEAN:'VIII', CANARY_BASIN:'VIII'};
+        EASTERN_MEDITERRANEAN:'VI', ADRIATIC_SEA:'VII', CENTRAL_MEDITERRANEAN:'VIII', AEGEAN_SEA:'VIII', CANARY_BASIN:'VIII'};
     assert.deepEqual(before.game.catalog.seaAreas, expectedSeaAreas, 'Catalog exposes only the assigned sea areas');
-    assert.equal(await page.evaluate(`document.querySelectorAll('[data-sea]').length`), 10, 'Aegean and Central Mediterranean form one sea');
-    assert.equal(await page.evaluate(`document.querySelector('[data-sea="AEGEAN_SEA"]')`), null);
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-sea]').length`), 11, 'Aegean and Central Mediterranean are separate seas');
+    assert.equal(await page.evaluate(`document.querySelector('[data-sea="AEGEAN_SEA"]').dataset.seaArea`), 'VIII');
+    assert.equal(await page.evaluate(`document.querySelector('[data-sea="CENTRAL_MEDITERRANEAN"]').dataset.seaArea`), 'VIII');
+    assert.deepEqual(before.game.catalog.seaCoasts.filter(connection => connection.province === 'crete').map(connection => connection.sea).sort(),
+        ['AEGEAN_SEA','CENTRAL_MEDITERRANEAN','EASTERN_MEDITERRANEAN'], 'Crete adjoins all three seas');
     await page.evaluate(`document.fonts.ready.then(()=>true)`);
     const textOverflows = await page.evaluate(`(() => {
         const layouts=${JSON.stringify(Object.fromEntries(Object.entries(boardGeometry.provinces).map(([id, shape]) => [id, shape.labelFit])))};
@@ -114,6 +117,18 @@ await page.send('Page.navigate', {url: web + actor.path});
         if (expectedSeaAreas[sea]) assert.deepEqual(enclosingAreas, [expectedSeaAreas[sea]], 'Area borders enclose assigned seas: '+sea);
         else assert.equal(await page.evaluate(`document.querySelector('[data-sea="${sea}"]').hasAttribute('data-sea-area')`), false, 'Intervening water does not assign an unassigned sea to an area');
     }
+    await page.evaluate(`document.querySelector('[data-map-province="crete"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+    await page.wait(`document.querySelector('.province-inspector .province-details')`, 'Crete inspection');
+    await page.evaluate(`document.querySelector('.province-details').open=true`);
+    const creteDetails = await page.evaluate(`document.querySelector('.province-details').textContent`);
+    for (const sea of ['Aegean Sea','Central Mediterranean','Eastern Mediterranean']) assert(creteDetails.includes(sea), 'Crete inspection names '+sea);
+    const fitBeforeSeaZoom = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
+    const cretePoint = await page.evaluate(`(() => {document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'});const rect=document.querySelector('[data-map-province="crete"]').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+    await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...cretePoint,deltaX:0,deltaY:-400,modifiers:2});
+    await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Mediterranean inspection zoom');
+    await page.screenshot(join(artifacts,'aor-mediterranean-seas.png'),1440);
+    await page.click('Fit map');
+    assert.equal((await page.snapshot()).revision,before.revision,'Crete sea inspection cannot submit an order');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('[data-map-area] > path')].every(path=>(path.getAttribute('d').match(/M/g)??[]).length===1)`), true, 'Every area has one continuous perimeter');
     const areaPoint = await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(${boardGeometry.areas.IV.label[0]},${boardGeometry.areas.IV.label[1]}).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
     await page.send('Input.dispatchMouseEvent', {type:'mousePressed',...areaPoint,button:'left',clickCount:1});

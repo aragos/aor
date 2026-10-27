@@ -95,7 +95,8 @@ All fractions are **rounded up** unless stated otherwise.
 - Provinces and coastal waters in unused areas do not exist for any purpose. Sea areas always exist.
 - Some seas belong to geographical areas and lie within their printed area borders. This membership
   does not remove sea spaces when the area's provinces are excluded from a reduced board. The user
-  confirmed the following assignments on 2026-10-26; all other seas have no area assignment:
+  confirmed the following assignments on 2026-10-26 and corrected the Aegean on 2026-10-27;
+  all other seas have no area assignment:
 
 | Sea | Area |
 | --- | --- |
@@ -104,7 +105,8 @@ All fractions are **rounded up** unless stated otherwise.
 | Black Sea | V |
 | Eastern Mediterranean | VI |
 | Adriatic Sea | VII |
-| Central Mediterranean, including the Aegean | VIII |
+| Central Mediterranean | VIII |
+| Aegean Sea | VIII |
 | Canary Basin | VIII |
 
 - **Area V** (Black Sea, Russia, Anatolia) can only be entered by a player that owns **Overland East**.
@@ -1010,15 +1012,17 @@ The user confirmed on 2026-10-26 that Oran and Granada have no direct coastal-wa
 and that Salonika and Corfu have no coastal-water connection. Salonika and Corfu retain their
 land border and printed satellite support.
 The user also confirmed on 2026-10-26 that Angora and Constantinople share a land border, in addition
-to their coastal-water connection. The Aegean and Central Mediterranean are one sea space; their
-combined coastal incidences permit a single sea crossing between the two named basins.
+to their coastal-water connection.
 Further user corrections on 2026-10-26 remove the Smyrna–Crete and Naples–Sicily coastal connections
 and add Bari–Durazzo, Portsmouth–St Malo, and London–Bruges. Bari retains its coastal connection
 with Naples. Corsica is part of Cagliari; the northern Greek island landmass is part of Athens;
 and Bari includes Italy's toe. Kamyshin connects by land to Sarai and Tana; Tana does not touch Poti.
 The [connection inventory](connection-inventory.md) records the complete reviewed graph.
-The user further confirmed that Athens and Crete share a coastal border, while Crete has no
-Eastern Mediterranean sea incidence. Crete touches only the combined Central Mediterranean/Aegean.
+Athens and Crete retain their shared coastal border. On 2026-10-27 the user corrected the sea
+transcription: the Aegean and Central Mediterranean are separate seas, both in Area VIII. Crete
+adjoins the Aegean, Central Mediterranean and Eastern Mediterranean. This supersedes the earlier
+combined-sea interpretation and the exclusion of Crete from the Eastern Mediterranean. A crossing
+between Central Mediterranean and Aegean coasts cannot treat the two seas as one Heavens crossing.
 
 ---
 

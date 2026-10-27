@@ -58,8 +58,10 @@ expansion bonus: `set-option rebuilt-marker-bonus exclude` (default) or
 saved in the log and frozen when setup starts. Both settings apply to actual expansion rewards. Voluntary marker rebuilds never count.
 
 New games use file format 3 with rules version `ah1996-three-epoch-1` and data version
-`ah1996-catalog-2`. The initial revision records resolved setup options. Earlier development rules
-versions are unsupported; no migration is provided under the current-format-only policy.
+`ah1996-catalog-3`. The initial revision records resolved setup options. Earlier development rules
+and catalog versions are unsupported; no migration is provided under the current-format-only policy.
+Catalog 3 separates the Aegean and Central Mediterranean seas and connects Crete to those seas and
+the Eastern Mediterranean.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 From `web`, run `npm test` for focused checks and `npm run test:browser` for the isolated browser suite

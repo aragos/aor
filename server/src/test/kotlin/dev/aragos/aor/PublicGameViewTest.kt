@@ -89,7 +89,25 @@ class PublicGameViewTest {
 
         assertThat(serialized["seaAreas"]["BALTIC_SEA"].asText()).isEqualTo("I")
         assertThat(serialized["seaAreas"]["GREENLAND_SEA"].asText()).isEqualTo("II")
+        assertThat(serialized["seaAreas"]["AEGEAN_SEA"].asText()).isEqualTo("VIII")
+        assertThat(serialized["seaAreas"]["CENTRAL_MEDITERRANEAN"].asText()).isEqualTo("VIII")
         assertThat(serialized["seaAreas"].has("NORTH_SEA")).isFalse()
+    }
+
+    @Test
+    fun publicCreteSeaContactsIncludeAllThreeSeasOnReducedBoards() {
+        val catalog = PublicCatalog.forPlayers(3)
+
+        assertThat(
+                catalog.seaCoasts
+                    .filter { coast -> coast.province == ProvinceId("crete") }
+                    .map(SeaCoastConnection::sea)
+            )
+            .containsExactly(
+                SeaArea.AEGEAN_SEA,
+                SeaArea.CENTRAL_MEDITERRANEAN,
+                SeaArea.EASTERN_MEDITERRANEAN,
+            )
     }
 
     @Test

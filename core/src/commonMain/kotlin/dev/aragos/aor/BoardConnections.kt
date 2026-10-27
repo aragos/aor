@@ -36,8 +36,8 @@ enum class SeaArea(
     BAY_OF_BISCAY,
     CANARY_BASIN(area = GeographicalArea.VIII),
     WESTERN_MEDITERRANEAN,
-    /** The Aegean and Central Mediterranean are one printed sea space. */
     CENTRAL_MEDITERRANEAN(area = GeographicalArea.VIII),
+    AEGEAN_SEA(area = GeographicalArea.VIII),
     EASTERN_MEDITERRANEAN(area = GeographicalArea.VI),
     ADRIATIC_SEA(area = GeographicalArea.VII),
     BLACK_SEA(area = GeographicalArea.V),
@@ -411,10 +411,15 @@ object BoardConnectionData {
                 "corfu",
                 "athens",
                 "crete",
+            )
+            sea(
+                SeaArea.AEGEAN_SEA,
                 "salonika",
                 "gallipoli",
                 "constantinople",
                 "smyrna",
+                "athens",
+                "crete",
             )
             sea(
                 SeaArea.EASTERN_MEDITERRANEAN,
@@ -428,6 +433,7 @@ object BoardConnectionData {
                 "levant",
                 "cyprus",
                 "adalia",
+                "crete",
             )
             sea(
                 SeaArea.BLACK_SEA,
