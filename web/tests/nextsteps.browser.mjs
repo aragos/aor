@@ -173,7 +173,7 @@ export async function checkDecisionEvidence(page, web, baseline) {
     await page.evaluate(`window.setUiSnapshot(${JSON.stringify(cardFixture)})`);
     await page.wait(`document.querySelector('[data-hand-card="${reference}"]')`,'card rejection fixture');
     await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
-    await page.wait(`document.querySelector('.map-picker[aria-pressed=true]')`,'active area picker');
+    await page.wait(`document.querySelector('.eligible-shade') && document.querySelector('#tab-map[aria-selected=true]')`,'active area picker');
     await page.evaluate(`document.querySelector('.card-decision .target-choices button').click(); document.querySelector('#tab-markets').click()`);
     await page.evaluate(`window.uiNextError='UNREACHABLE_PROVINCE';window.uiErrorEntities=['acre',${JSON.stringify(baseline.viewerId)},'internal-fragment'];document.querySelector('.card-decision form > button:last-child').click()`);
     await page.wait(`document.querySelector('.decision-panel [role=alert]')`,'contextual rejection');

@@ -1,6 +1,5 @@
 import {createContext, useCallback, useContext, useEffect, useId, useRef, useState} from 'react';
 import type {Dispatch, ReactNode, SetStateAction} from 'react';
-import {t} from '../messages';
 
 interface Picker {
     id: string;
@@ -55,13 +54,12 @@ export function MapSelectionProvider({children}: {children: ReactNode}) {
 export const useMapSelection = () => useContext(MapSelection);
 
 /** Map clicks only edit the requesting form. Its submit button sends the order. */
-export function MapPicker({title, eligible, selected, onPick, disabled = false, autoActivate = false, kind = 'province'}: {
+export function MapPicker({title, eligible, selected, onPick, disabled = false, kind = 'province'}: {
     title: string;
     eligible: string[];
     selected: string[];
     onPick: (province: string) => void;
     disabled?: boolean;
-    autoActivate?: boolean;
     kind?: 'province' | 'area';
 }) {
     const id = useId();
@@ -73,12 +71,13 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
     const active = picker?.id === id;
     const activated = useRef(false);
     useEffect(() => {
-        if (autoActivate && !disabled && !activated.current) {
+        if (!disabled && eligible.length > 0 && !activated.current) {
             activated.current = true;
             setPicker(initialPicker.current);
             setWorkspace('map');
+            requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}));
         }
-    }, [autoActivate, disabled, kind, setPicker, setWorkspace]);
+    }, [disabled, eligible.length, kind, setPicker, setWorkspace]);
     useEffect(() => {
         if (!active) return;
         setPicker(current => {
@@ -89,14 +88,7 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
         });
     }, [active, disabled, eligible, id, kind, selected, setPicker, title]);
     useEffect(() => () => setPicker(current => current?.id === id ? null : current), [id, setPicker]);
-    return <button type="button" className="secondary map-picker" disabled={disabled || eligible.length === 0}
-        aria-pressed={active} onClick={() => {
-            setPicker(active ? null : {id, kind, title, eligible, selected, pick: province => latestPick.current(province)});
-            if (!active) {
-                setWorkspace('map');
-                requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'start'}));
-            }
-        }}>{t(active ? 'board.stopChoosing' : 'board.chooseOnMap')}</button>;
+    return null;
 }
 
 /** Eligible player summaries edit the same card draft as its target buttons. */

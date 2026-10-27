@@ -206,15 +206,21 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play area-target area viii');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'false', 'Playing an area card clears the area selection');
 
-    const event = {...baseline.events.at(-1),id:'fixture-result',kind:'COMPETITION_RESULT',actor:viewer,
+    const event = {...baseline.events.at(-1),id:'fixture-result',kind:'COMPETITION_RESULT',actor:viewer,stage:'EXPANSION',turnNumber:baseline.game.turnNumber,
         provinces:['rome'],amount:8,detail:'COMPETITION',dice:[{player:null,value:1},{player:null,value:6},{player:null,value:4}],
         competition:{attackerWon:true,defenders:[other.id]}};
-    await show({events:[...baseline.events,event]});
+    await show({game:{stage:'EXPANSION'},events:[...baseline.events,event]});
     assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /Competition won.*Rome/);
     await show({events:[...baseline.events,event,{...event,id:'later',kind:'PASS',competition:null}]});
     assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), true, 'Result survives unrelated activity');
-    await click('.competition-notice .close-detail');
-    assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null);
+    const secondResult = {...event, id:'fixture-second-result',provinces:['naples']};
+    await show({events:[...baseline.events,event,secondResult]});
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 2,
+        'All competition results remain available in the expansion phase');
+    await show({game:{stage:'PURCHASE'},events:[...baseline.events,event,secondResult]});
+    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
+        'Competition log leaves the decision panel at the end of expansion');
+    await show({game:{stage:'EXPANSION'}});
     const war = {...event,id:'fixture-war',kind:'WAR_RESULT',actor:viewer,target:other.id,competition:null,
         provinces:[],dice:[{player:viewer,value:3},{player:other.id,value:3}],
         war:{initiator:viewer,opponent:other.id,totals:{[viewer]:4,[other.id]:3},winner:viewer,requiredTransfers:1}};

@@ -1,4 +1,5 @@
 export const en: Record<string, string> = {
+    'table.competitionResults': 'Competition results',
     'controls.applyOption': 'Apply {option}',
     'controls.pendingReturn': 'Your private return: {card}. Choose another card to replace it before everyone submits.',
     'board.world': 'The world', 'board.zoom': 'Map zoom', 'board.zoomIn': 'Zoom in', 'board.zoomOut': 'Zoom out',

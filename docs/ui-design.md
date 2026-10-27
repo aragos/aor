@@ -77,3 +77,16 @@ Keep the [decision coverage inventory](ui-decision-coverage.md) aligned with obs
 
 The [interactive design studies](ui-proposals/index.html) preserve the accepted visual direction.
 They contain illustrative state; current principles, rules and production behavior govern changes.
+
+## Map decisions and expansion feedback
+
+A location decision opens the map and activates its legal targets immediately. Shade the whole
+province, including its coastal water, or the whole eligible area; retain outlines as an additional
+cue. A map click prepares the choice and the decision's action button confirms it. Finite choices
+use visible buttons. Playable hand cards also appear beside Pass in the decision panel.
+
+For peaceful expansion, default to a full market commitment when legal. If shipping or the pool
+limits that commitment, default to the largest partial placement offered by the engine. Competition
+commitments retain their own rules. Voluntary marker reduction is a collapsed secondary action.
+All competition results from the current turn remain available until expansion ends, including
+results involving other players; the activity history retains them afterward.

@@ -5,6 +5,7 @@ import {t} from '../messages';
 import {TableIcon} from '../TableIcon';
 import {Commodity} from '../TablePanels';
 import {PlayerPiece} from './MapSymbols';
+import {ChoiceButtons} from '../DecisionControls';
 import {provinceOrders} from './mapOrders';
 
 export function neighbors(connections: PublicCatalog['landBorders'], province: string): string[] {
@@ -23,8 +24,10 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const offer = snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
     const primary = offer && offer.primaryAction !== 'INSPECT';
-    const remainingPlacement = primary && offer.availablePool < offer.requiredTokens
-        ? offer.partialPlacements.find(choice => choice.tokens === offer.availablePool) : undefined;
+    const remainingPlacement = primary && offer.primaryAction === 'PLACE' && offer.resultingPool === null
+        ? offer.partialPlacements.reduce<typeof offer.partialPlacements[number] | undefined>(
+            (maximum, choice) => !maximum || choice.tokens > maximum.tokens ? choice : maximum, undefined)
+        : undefined;
     const requiredTokens = remainingPlacement?.tokens ?? offer?.requiredTokens;
     const resultingPool = remainingPlacement?.resultingPool ?? offer?.resultingPool;
     const establishesMarker = !!offer?.establishesMarker && !remainingPlacement;
@@ -64,10 +67,8 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
                 {offer.partialPlacements.length > 0 && <details className="partial-placement"><summary>{t('table.placeFewer')}</summary>
                     <form onSubmit={event => { event.preventDefault(); if (partialOffer) void submit(`place ${partialOffer.tokens} ${province.id}`); }}>
                         <label htmlFor="partial-count">{t('controls.tokenCount')}</label>
-                        <select id="partial-count" value={partial} onChange={event => setPartial(event.target.value)} required>
-                            <option value="">{t('table.chooseAmount')}</option>
-                            {offer.partialPlacements.map(choice => <option key={choice.tokens} value={choice.tokens}>{choice.tokens}</option>)}
-                        </select>
+                        <ChoiceButtons id="partial-count" value={partial} onChange={setPartial} disabled={busy}
+                            choices={offer.partialPlacements.map(choice => ({value: String(choice.tokens), label: String(choice.tokens)}))}/>
                         {partial && !partialOffer && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
                         {partialOffer && <p>{t('game.pool')}: {offer.availablePool} → {partialOffer.resultingPool}</p>}
                         <button disabled={busy || !partialOffer}>{t('action.place')}</button>
@@ -78,8 +79,13 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
                     <p>{t('game.stockMarkers')}: {me?.stockMarkers}</p>
                 </details>
             </>}
-            <div className="action-buttons">{commands.map(command => <button type="button" key={command} className="secondary"
+            <div className="action-buttons">{commands.filter(command => !command.startsWith('reduce-marker ')).map(command => <button type="button" key={command} className="secondary"
                 disabled={busy} onClick={() => { void submit(command); }}>{label(command.split(' ')[0], 'action')}</button>)}</div>
+            {commands.some(command => command.startsWith('reduce-marker ')) && <details className="marker-reduction">
+                <summary>{t('action.reduceMarker')}</summary>
+                {commands.filter(command => command.startsWith('reduce-marker ')).map(command => <button type="button" key={command}
+                    className="secondary" disabled={busy} onClick={() => { void submit(command); }}>{t('table.confirm')}</button>)}
+            </details>}
             <details className="province-details"><summary>{t('table.provinceDetails')}</summary>
                 {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
                 <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>

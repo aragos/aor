@@ -68,6 +68,16 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`), viewBox, 'Viewport survives polling');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Polling never submits a draft');
 
+    const shippingLimited = {...offer, requiredTokens:4, availablePool:8, resultingPool:null,
+        blockers:['SHIPPING_CAPACITY_EXCEEDED'], shipping:{used:0,capacity:2,required:4},
+        partialPlacements:[{tokens:1,resultingPool:7},{tokens:2,resultingPool:6}]};
+    await show({game:{expansionOffers:[shippingLimited]}});
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').disabled`),false,
+        'Legal partial shipping placement remains actionable');
+    assert.match(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), /2 tokens/,
+        'Shipping limit defaults to the maximum legal commitment');
+    await show({game:{expansionOffers:baseline.game.expansionOffers}});
+
     const blocked = fixture.game.expansionOffers.find(offer => offer.blockers.length > 0 && offer.primaryAction !== 'INSPECT');
     assert(blocked, 'Fixture must include an inspectable blocked destination');
     await page.evaluate(`document.querySelector('[data-map-province="${blocked.destination}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
@@ -235,8 +245,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
     await show('purchase-relief', ['relieve-misery'], {reliefOffers: [{spaces: 1, cashCost: 2, ratingSpent: 1, affordable: true}]}, 'PURCHASE');
-    await page.fill('#relief-spaces', '1');
-    await page.evaluate(`document.querySelector('#relief-spaces').form.querySelector('button').click()`);
+    await page.evaluate(`document.querySelector('#relief-spaces button').click()`);
+    await page.evaluate(`document.querySelector('#relief-spaces').closest('form').querySelector(':scope > button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'relieve-misery 1'`, 'quoted misery relief');
 
     await show('choose-turn-position', ['choose-turn-position 1','choose-turn-position 2'], {provisionalTieOrder:[other]}, 'TURN_ORDER_TIE');
@@ -246,8 +256,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.wait(`window.uiCommands.at(-1)?.command === 'choose-turn-position 1'`, 'tie slot confirmed');
     const source = baseline.game.board.find(province => province.marker?.owner===viewer).id;
     await show('place-event-marker', ['forgo-marker',`move-marker ${source}`], {markerPlacement:{player:viewer,destination:'rome'}});
-    await page.fill('#marker-source', `move-marker ${source}`);
-    await page.evaluate(`document.querySelector('#marker-source').form.querySelector('button').click()`);
+    await page.evaluate(`document.querySelector('#marker-source button').click()`);
+    await page.evaluate(`document.querySelector('#marker-source').closest('form').querySelector(':scope > button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'move-marker ${source}'`, 'event marker moved');
     await show('place-event-marker', ['forgo-marker'], {markerPlacement:{player:viewer,destination:'rome'}});
     await page.evaluate(`document.querySelector('.game-actions .guided-form > button.secondary').click()`);
@@ -263,7 +273,16 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
         await page.wait(`document.querySelector('.card-decision .target-choices button:not(.map-picker)')`, kind+' target');
         const before=await page.evaluate('window.uiCommands.length');
-        await page.evaluate(`document.querySelector('.card-decision .target-choices button:not(.map-picker)').click()`);
+        if (kind === 'PROVINCE' || kind === 'AREA') {
+            await page.wait(`document.querySelector('#tab-map[aria-selected=true]') && document.querySelector('.eligible-shade')`,
+                id+' automatically opens the map and shades legal targets');
+            assert.equal(await page.evaluate(`document.querySelector('button.map-picker')`), null,
+                'Map picking needs no activation button');
+            const selector = kind === 'PROVINCE' ? `[data-map-province="${value}"]` : `[data-map-area-label="${value.toUpperCase()}"]`;
+            await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+        } else {
+            await page.evaluate(`document.querySelector('.card-decision .target-choices button:not(.map-picker)').click()`);
+        }
         assert.equal(await page.evaluate('window.uiCommands.length'),before,kind+' selection cannot submit');
         await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`,kind+' canonical play');

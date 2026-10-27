@@ -1,3 +1,4 @@
+import {ChoiceButtons} from './DecisionControls';
 import {PlayedLeaders} from './TablePanels';
 import {useState} from 'react';
 import type {ProvinceDefinition, ProvinceView, PublicCatalog, Snapshot} from './api';
@@ -117,10 +118,8 @@ export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
             </label>
             <label>
                 {t('board.area')}
-                <select value={area} onChange={event => setArea(event.target.value)}>
-                    <option value="">{t('board.allAreas')}</option>
-                    {areas.map(value => <option key={value} value={value!}>{value}</option>)}
-                </select>
+                <ChoiceButtons value={area} onChange={setArea} choices={[{value: '', label: t('board.allAreas')},
+                    ...areas.map(value => ({value: value!, label: value!}))]}/>
             </label>
             <label className="check-label">
                 <input type="checkbox" checked={occupiedOnly} onChange={event => setOccupiedOnly(event.target.checked)}/>

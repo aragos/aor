@@ -46,6 +46,7 @@ function ProvinceHighlight({path, reachable, selected, eligible, neighbor, empha
     return <>
         {reachable !== undefined && <path className="reach-shade" d={path}
             fill={reachable ? '#ffffff' : '#142a31'} opacity={reachable ? .25 : .3} pointerEvents="none"/>}
+        {outline && eligible && <path className="eligible-shade" d={path} fill="#1f83a6" opacity={selected ? .32 : .23} pointerEvents="none"/>}
         {outline && (selected || eligible || neighbor || emphasized) && <path className={className} d={path} fill="none" pointerEvents="none"
             stroke={selected || emphasized ? '#143e4e' : eligible ? '#2b6d9a' : '#fffdf3'}
             strokeWidth={strokeWidth ?? (selected ? 6 : 4)}/>}
@@ -204,11 +205,15 @@ export function BoardMap({snapshot, busy}: {
     };
     if (!catalog) return null;
     const reachable = new Set(snapshot.game.expansionOffers.filter(offer => offer.reachable).map(offer => offer.destination));
+    const legalDestinations = new Set(snapshot.game.expansionOffers.filter(offer => offer.primaryAction !== 'INSPECT' &&
+        (offer.blockers.length === 0 || offer.partialPlacements.length > 0)).map(offer => offer.destination));
     const expansionHighlight = !picker && snapshot.game.expansionOffers.length > 0;
     const highlight = (id: string) => ({
-        reachable: expansionHighlight && definitions.has(id) ? reachable.has(id) : undefined,
+        reachable: picker ? (picker.kind === 'area'
+            ? picker.eligible.includes(definitions.get(id)?.area ?? '')
+            : picker.eligible.includes(id)) : expansionHighlight && definitions.has(id) ? reachable.has(id) : undefined,
         selected: id === selected || (picker?.kind !== 'area' && (picker?.selected.includes(id) ?? false)),
-        eligible: picker?.kind !== 'area' && (picker?.eligible.includes(id) ?? false),
+        eligible: picker ? (picker.kind === 'area' ? picker.eligible.includes(definitions.get(id)?.area ?? '') : picker.eligible.includes(id)) : legalDestinations.has(id),
         neighbor: landNeighbors.has(id) || coastNeighbors.has(id),
         emphasized: hovered === id || focused === id,
     });

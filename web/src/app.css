@@ -163,3 +163,9 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .pool-summary > strong > .table-icon { width: 24px; height: 24px; }
 
 .card-event-text { display: block; margin-block: .65rem; font-size: .85rem; line-height: 1.45; font-weight: 400; }
+
+.choice-buttons, .decision-cards { display: flex; flex-wrap: wrap; gap: .4rem; margin-block: .5rem; }
+.choice-buttons button[aria-pressed="true"], .eligible-card { background: var(--resource-bg, #e4eddc); border-color: #477349; }
+.marker-reduction { margin-block: .75rem; }
+.competition-log { margin-bottom: 1rem; }
+.competition-log .competition-notice { margin-block: .5rem; }

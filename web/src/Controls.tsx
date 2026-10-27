@@ -3,6 +3,7 @@ import type {Snapshot} from './api';
 import {t} from './messages';
 import {playerName} from './labels';
 import {GameActions} from './GameActions';
+import {MapPicker} from './map/MapSelection';
 import type {PurchaseQuote, QuotePurchase} from './GameTable';
 import {errorCode} from './api';
 
@@ -122,6 +123,8 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             </div>}
         </form>}
         {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}>{t(`capital.${choice.split(' ')[1]}`)}</button>)}<button disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</button></div>}
+        {capitalChoices.length > 0 && <MapPicker title={t('controls.chooseProvince')} eligible={capitalChoices.map(choice => choice.split(' ')[1])}
+            selected={capital ? [capital.split(' ')[1]] : []} disabled={busy} onPick={id => setCapital(`choose-capital ${id}`)}/>}
         {stage === 'TURN_ORDER_TIE' && <div className="turn-tie">
             <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? snapshot.game.provisionalTieOrder.map(nameFor).join(' → ') : t('controls.noPositions')}</p>
             {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button type="button" className="secondary" key={choice} disabled={busy} aria-pressed={position === choice} onClick={() => setPosition(choice)}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}<button disabled={busy || !turnChoices.includes(position)} onClick={() => { void submit(position); }}>{t('table.confirm')}</button></div>}

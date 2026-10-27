@@ -50,21 +50,17 @@ export function WarNotice({snapshot}: {snapshot: Snapshot}) {
     </ResultNotice>;
 }
 
-/** A result stays beside the decision until dismissed or replaced by the next competition. */
+/** Keep every competition result available until the current expansion phase ends. */
 export function CompetitionNotice({snapshot}: {snapshot: Snapshot}) {
-    const [dismissed, setDismissed] = useState('');
-    const event = [...snapshot.events].reverse().find(candidate => candidate.competition &&
-        (candidate.actor === snapshot.viewerId || candidate.competition.defenders.includes(snapshot.viewerId)));
-    if (!event?.competition || event.id === dismissed) return null;
-    const won = event.actor === snapshot.viewerId ? event.competition.attackerWon : !event.competition.attackerWon;
-    return <ResultNotice className={`competition-notice ${won ? 'won' : 'lost'}`} dismiss={() => setDismissed(event.id)}>
-        <strong>{t(won ? 'table.competitionWon' : 'table.competitionLost')}</strong>
-        <p>{event.provinces.map(provinceName).join(', ')} · {playerName(snapshot, event.actor ?? '')} → {event.competition.defenders.map(id => playerName(snapshot, id)).join(', ')}</p>
-        {event.dice.length > 0 && <p className="competition-dice">{event.dice.map((die, index) => <span key={index}>
-            {t(`table.die.${['white', 'black', 'green'][index]}`)}: <b>{die.value}</b>
-        </span>)}</p>}
-        {event.detail === 'CATHEDRAL' && <p>{t('action.cathedral')}</p>}
-    </ResultNotice>;
+    if (snapshot.game.stage !== 'EXPANSION') return null;
+    const events = snapshot.events.filter(event => event.competition &&
+        event.turnNumber === snapshot.game.turnNumber && event.stage === 'EXPANSION');
+    if (!events.length) return null;
+    return <details className="competition-log" open><summary>{t('table.competitionResults')} · {events.length}</summary>
+        {events.map(event => <article className="competition-notice" key={event.id} data-competition-result={event.id}>
+            <EventContent event={event} snapshot={snapshot}/>
+        </article>)}
+    </details>;
 }
 
 export function Activity({snapshot}: {snapshot: Snapshot}) {

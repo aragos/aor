@@ -74,9 +74,9 @@ export function CardDecision({snapshot, busy, submit}: Props) {
                 eligible={finiteChoices.filter(candidate => candidate.kind === 'PLAYER').flatMap(candidate => candidate.value ? [candidate.value] : [])}
                 selected={selectedChoice?.value ? [selectedChoice.value] : []}
                 onPick={id => setChoice(finiteChoices.find(candidate => candidate.kind === 'PLAYER' && candidate.value === id)?.command ?? '')}/>}
-            {provinceChoices.length > 0 && <MapPicker autoActivate title={t('controls.cardChoice')} disabled={busy} eligible={provinceChoices.flatMap(candidate => candidate.value ? [candidate.value] : [])}
+            {provinceChoices.length > 0 && <MapPicker title={t('controls.cardChoice')} disabled={busy} eligible={provinceChoices.flatMap(candidate => candidate.value ? [candidate.value] : [])}
                 selected={selectedChoice?.value ? [selectedChoice.value] : []} onPick={id => setChoice(provinceChoices.find(candidate => candidate.value === id)?.command ?? '')}/>}
-            {areaChoices.length > 0 && <MapPicker autoActivate kind="area" title={t('controls.cardChoice')} disabled={busy}
+            {areaChoices.length > 0 && <MapPicker kind="area" title={t('controls.cardChoice')} disabled={busy}
                 eligible={areaChoices.flatMap(candidate => candidate.value ? [candidate.value.toUpperCase()] : [])}
                 selected={selectedChoice?.kind === 'AREA' && selectedChoice.value ? [selectedChoice.value.toUpperCase()] : []}
                 onPick={area => setChoice(areaChoices.find(candidate => candidate.value?.toUpperCase() === area)?.command ?? '')}/>}
@@ -84,7 +84,7 @@ export function CardDecision({snapshot, busy, submit}: Props) {
                 {offer.provinceTargets.map(province => <button type="button" key={province} className="secondary" aria-pressed={targets.includes(province)}
                     disabled={busy || !selection.canPick(province)}
                     onClick={() => selection.pick(province)}>{provinceName(province)}</button>)}
-                <MapPicker autoActivate title={t('table.targets')} disabled={busy} selected={targets}
+                <MapPicker title={t('table.targets')} disabled={busy} selected={targets}
                     eligible={offer.provinceTargets.filter(target => selection.canPick(target))}
                     onPick={selection.pick}/>
             </fieldset>}

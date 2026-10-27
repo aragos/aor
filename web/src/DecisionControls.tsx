@@ -25,3 +25,13 @@ export function ResultNotice({className, dismiss, children}: {
         {children}
     </section>;
 }
+
+/** A finite choice remains visible and keyboard accessible without opening a menu. */
+export function ChoiceButtons({id, choices, value, onChange, disabled = false}: {
+    id?: string; choices: {value: string; label: ReactNode; disabled?: boolean}[];
+    value: string; onChange: (value: string) => void; disabled?: boolean;
+}) {
+    return <div id={id} className="choice-buttons" role="group">{choices.map(choice =>
+        <button type="button" key={choice.value} className="secondary" aria-pressed={choice.value === value}
+            disabled={disabled || choice.disabled} onClick={() => onChange(choice.value)}>{choice.label}</button>)}</div>;
+}
