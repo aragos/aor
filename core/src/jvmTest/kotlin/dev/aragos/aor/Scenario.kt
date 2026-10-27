@@ -132,7 +132,7 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
             PurchaseStep.SHIPPING -> "pass"
             PurchaseStep.ADVANCES -> {
                 val advance = affordableAdvance(player)
-                if (advance == null) "pass" else "buy-advance ${state.rules.letter(advance)}"
+                if (advance == null) "pass" else "buy-advance ${advance.letter}"
             }
             PurchaseStep.STABILIZATION -> stabilizationCommand(player)
             PurchaseStep.RELIEF -> "pass"

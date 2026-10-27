@@ -23,6 +23,15 @@ The baseline limitations were concrete: independent selection lifetimes, English
 discarded diagnostic object IDs, constrained labels and dense token groups, and setup/accessibility
 evidence gaps. The execution record below identifies the remaining limits after implementation.
 
+## Current follow-through
+
+The later task batch implemented automatic map picking and fill shading, finite gameplay choices,
+playable cards beside Pass, shipping-limited default placements, phase-long competition results,
+variants on registration, scoped audited undo, and descriptive history with a saved preference.
+[Requirements](requirements.md) and [visual coverage](ui-decision-coverage.md) describe current
+acceptance. The execution record below is a historical checkpoint; its retired setup/edition
+controls are not current product behavior.
+
 ## Execution record, 2026-10-27
 
 | Priority | Result | Remaining evidence or scope |

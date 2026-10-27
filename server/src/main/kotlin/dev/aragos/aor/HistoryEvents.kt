@@ -209,7 +209,7 @@ internal object HistoryEvents {
             TurnCommand.UpgradeShips -> event(HistoryEventKind.UPGRADE_SHIPS)
             is TurnCommand.BuyAdvance ->
                 event(HistoryEventKind.BUY_ADVANCE)
-                    .copy(advance = before.rules.advance(command.letter))
+                    .copy(advance = AdvanceId.fromLetter(command.letter))
             is TurnCommand.Stabilize ->
                 event(HistoryEventKind.STABILIZE).copy(detail = command.payment.name)
             is TurnCommand.RelieveMisery ->

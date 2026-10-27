@@ -64,19 +64,17 @@ four players, **1–5** for five and **1–6** for six. The tie choices must als
 separate tied groups. The next epoch begins on a draw request from an empty earlier pile; the
 authority records the shuffled next deck plus eligible discarded cards before resuming the draw.
 
-## Optional setup
+## Variants and history policy
 
-Before starting, select the individual rules or use `set-option preset second-edition`.
-With improved setup, each seat receives three cards and privately chooses one to return using
-`return-card hand-1` (with its own reference). Selections can be replaced until everyone submits.
-The final selection commits the whole batch and a recorded shuffle; each player keeps two cards.
-Other seats see submission status and redacted return actions, never the returned identity.
-Pending returns survive restart just like private bids.
+Choose variants on the same screen as player registration. Creation records every resolved option.
+The deck swap exchanges Timber and War between decks 1 and 2. The mutually exclusive opening-deal
+restrictions are no Crusades, no events or commodities only; all deal one card and leave excluded
+cards in the pile. Immediate Master Art discard is a separate toggle. The European map remains
+unavailable pending its province and adjacency specification. There are no edition presets.
 
-Commodity-only initial dealing is also available with standard setup. Combining it with improved
-setup is rejected under the approved rule that "get three, choose two" is incompatible with
-reduced initial-deal decks for now. See [the command reference](commands.md)
-for every option and [the rules](rules.md) for the reserve-card reinsertion policy.
+Undo defaults to regular turn. The other choices are competitive, friendly turn and friendly game;
+see [the design](design.md#4-revisions-and-undo) before choosing broader authority. After starting,
+these settings are frozen. **Commands** exposes readable history and the authorized suffix editor.
 
 ## Negative and over-stock purchases
 

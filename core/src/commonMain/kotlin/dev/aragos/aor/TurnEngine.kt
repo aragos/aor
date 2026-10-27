@@ -132,7 +132,7 @@ internal object TurnEngine {
             }
         return listOf("pass") +
             state.patronageChoices(actor) +
-            affordable.map { advance -> "buy-advance ${state.rules.letter(advance)}" }
+            affordable.map { advance -> "buy-advance ${advance.letter}" }
     }
 
     private fun reliefChoices(state: GameState, player: PlayerState): List<String> {

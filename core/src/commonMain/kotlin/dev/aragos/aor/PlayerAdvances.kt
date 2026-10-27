@@ -32,11 +32,6 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
             AdvanceData.definition(acquisition.advance).cost
         }
 
-    /** Scores use the selected commerce prices; ownership never changes identity with a letter. */
-    fun score(rules: RuleOptions): Int = acquisitions.sumOf { acquisition ->
-        rules.definition(acquisition.advance).cost
-    }
-
     /** Each completion threshold earns relief once, at the acquisition crossing that threshold. */
     val completionRelief: Int
         get() {
@@ -76,14 +71,13 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
     fun creditsFor(
         category: AdvanceCategory,
         currentTurn: Int,
-        rules: RuleOptions = RuleOptions(),
     ): Int {
         return acquisitions
             .filter { acquisition ->
                 acquisition.turnNumber < currentTurn &&
                     AdvanceData.definition(acquisition.advance).category == category
             }
-            .sumOf { acquisition -> rules.definition(acquisition.advance).credit }
+            .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).credit }
     }
 
     /** Rating acquired in the authoritative game's [currentTurn]. */

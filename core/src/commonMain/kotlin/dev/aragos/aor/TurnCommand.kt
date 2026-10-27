@@ -204,7 +204,7 @@ sealed interface TurnCommand : Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             state.requirePurchaseStep(actor, PurchaseStep.ADVANCES)
             val context = state.purchaseContext(actor)
-            val selected = state.rules.advance(letter)
+            val selected = AdvanceId.fromLetter(letter)
             val result = AdvancePurchases.purchase(state.playerState(actor), selected, context)
             val purchased =
                 state

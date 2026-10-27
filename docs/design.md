@@ -1,6 +1,6 @@
 # Application Design
 
-[engine.md](engine.md) defines the pure game engine; [rules.md](rules.md) is the game-rules reference.
+[Requirements](requirements.md) define product goals and acceptance. [engine.md](engine.md) defines the pure game engine; [rules.md](rules.md) is the game-rules reference.
 This document covers application architecture, storage, player interaction and development scope.
 The three-epoch human game, selected variants, visual table and scoped history editing are implemented.
 Strategy controllers and private plans remain deferred contracts.
@@ -53,9 +53,9 @@ rules/data versions, revision and log position; changing the underlying log inva
 
 ### Secret submissions
 
-Buffer simultaneous capital bids, token purchases and improved-setup card returns durably outside the committed log
-until all required players submit. Validate and append the complete batch atomically in stable player order. Bids
-reveal together; returned-card identities remain private. Pending submissions have no game effect before acceptance.
+Buffer simultaneous capital bids and token purchases durably outside the committed log until all
+required players submit. Validate and append the complete batch atomically in stable player order.
+Bids reveal together. Pending submissions have no game effect before acceptance.
 Changing an unrevealed submission is a pending-submission operation, not a history edit.
 
 The server generates and records random outcomes. Clients and strategies cannot access future shuffles, dice or

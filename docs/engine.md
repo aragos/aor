@@ -1,7 +1,8 @@
 # Core Game Engine
 
-Status: the fixed three-epoch engine and functional rule variants are implemented; planning and undo remain design work. The engine implements [rules.md](rules.md); application architecture and policies live in
-[design.md](design.md). Rules section references below refer to rules.md.
+The pure engine implements [rules](rules.md). [Requirements](requirements.md) define acceptance;
+[design](design.md) owns application authorization, storage and implemented undo. Planning remains a
+future contract. Rules section references below refer to rules.md.
 
 Epoch count is fixed at three; the 26th-advance ending remains supported.
 The [coverage inventory](rule-coverage.md) maps rules to implementations and verification.
@@ -17,7 +18,6 @@ state.step(entry)        → new state or RuleViolation
 state.prompts()          → required player decisions or system outcomes
 state.viewForPlayer(id)  → public state plus that player's private information
 state.legalChoices(id)   → choices permitted by that player's information
-projectPlan(view, plan)  → partial projected state, entry results and unresolved inputs
 ```
 
 `step` is pure. Reject an illegal entry without changing state. After acceptance, run automatic bookkeeping and
@@ -26,7 +26,7 @@ outcomes and never generates randomness.
 
 ## 2. Log and configuration
 
-Each game records its rules and data versions, registered players, creator and controller assignments.
+Each game records its rules and data versions, registered players and explicit creator.
 The creator's role is independent of registration order. The log records player actions and authority outcomes.
 Game options are setup commands. `start` validates and freezes configuration; setup cannot be edited once play starts.
 Waiting players and completion status are derived from state and prompts.
@@ -104,19 +104,18 @@ Use the detailed rules as the single source of mechanics. Frames must retain the
 | Ending        | Log the trigger, finish the current turn and Income, then Final Card Play before cleanup/scoring. Preserve same-turn effects and final shortages/surpluses; enforce forced plays and exceptions. | §8                |
 
 Preserve once-per-turn limits, general rounding up and distinctions between misery spaces and values. Do not resolve
-uncertain rules implicitly. Event-rebuilt marker eligibility follows the configured `RebuiltMarkerBonus`
-policy; voluntary rebuilds never qualify. Caravan attack-through follows the official errata recorded in
+uncertain rules implicitly. Event-rebuilt and voluntarily rebuilt markers do not earn the expansion bonus. Caravan attack-through follows the official errata recorded in
 [rules §14](rules.md#14-open-questions).
 
 ## 4. Information boundaries
 
 Use stable card references with `Known(value)` or `Hidden` identities. References must not encode secret identities.
 Player projections expose public state and only that player's private information, including their hand and draws.
-Playing a card reveals it; improved-setup returns do not. Apply the same permissions to history, plans and diagnostics.
+Playing a card reveals it. Apply the same permissions to history, plans and diagnostics.
 
 The server may inspect hidden values for authoritative validation. Redact actions as well as outcomes when serving
-logs: hands, private draws/discards/returns, trades, shuffles and unrevealed bids require appropriate treatment.
-Simultaneous batches take effect atomically; bid reveal does not make returned-card identities public.
+logs: hands, private draws/discards, trades, shuffles and unrevealed bids require appropriate treatment.
+Simultaneous batches take effect atomically; private draw identities remain private.
 
 Future client replay may consume redacted logs with placeholders such as `!draw venice <hidden>`. It must reproduce
 public state and the viewing player's private information without inspecting unknown identities. Hidden-dependent
@@ -194,25 +193,22 @@ voiding and conditional bonuses belong in history, not just the current-turn car
   Chaos discards the entire hand. Event marker reductions use stock tokens, then pool tokens, else leave an empty
   province (rules §5.4, §7.1, §11.4).
 
-## 7. Rule options
+## 7. Configuration and catalog ownership
 
-Replay builds `GameOptions` from setup commands and checks supported choices before `start`. Engine rules consume
-resolved functionality, not edition labels. Data-changing options select definitions; behavior-changing options select
-handlers. Application defaults, feature catalog and rollout scope are
-in [design §3](design.md#3-game-storage-and-configuration).
+`RuleOptions` records only the supported choices in [rules §13](rules.md#13-variants). The opening
+deal restriction filters eligible draws without removing cards; the deck swap changes physical
+epoch assignment. Master Art's optional immediate discard uses its ordinary decision frame.
+European geometry is unavailable pending specification. Configuration freezes at `start`.
 
-Use these verified classifications and recorded project rulings:
+The reviewed `AdvanceData` catalog owns printed advance values, and `AdvanceId` owns letter parsing.
+Scores and category credits use that same catalog. The standard advance/economy/leader mechanics
+are fixed, rather than selecting an edition through a second table.
 
-- **Q7 (verified 2026-10-24):** remove leaders, Armor, Stirrups, Long Bow, Gunpowder and Mongol
-  Armies; recycle other cards. All 64 statuses match the Liumas card reference.
-- **Attack commitment:** reject excess tokens; existing plus added tokens must equal the requirement.
-- **Rebuilt-marker bonus:** support `exclude` (default) and `include`, configured before `start` and
-  recorded explicitly in the replay log. `RebuiltMarkerBonus.counts` implements both eligibility policies.
-- **Q14 (approved 2026-10-24):** reinsert improved setup's five held-out cards after turn 1's
-  regular draws for 3–4 players or turn 2's for 5–6. Other timings are future separate options.
-
-Resolved baseline rules are not extra switches: turn 1 draws, Holy Indulgence shortfalls use cash, unused coastal
-waters cannot be traversed and Industry adds a box to the otherwise applicable payout.
+The Q7 recycling classification is preserved: leaders, Armor, Stirrups, Long Bow, Gunpowder and
+Mongol Armies leave play; other cards recycle. All 64 statuses match the reviewed card reference.
+Attack commitments remain exact. Baseline turn-1 draws, cash for Holy Indulgence shortfalls, coastal
+water exclusions and Industry payout boxes are rules, not configuration switches. Earlier Q14
+reinsertion and edition-specific rulings belong to retired variants.
 
 ## 8. Verification
 

@@ -49,26 +49,7 @@ data class RuleOptions(
         else printed.filterNot { it == "timber-2-1" } + "war"
     }
 
-    val definitions: List<AdvanceDefinition>
-        get() = AdvanceData.definitions.map { definition -> resolve(definition) }
-
-    fun definition(advance: AdvanceId): AdvanceDefinition = resolve(AdvanceData.definition(advance))
-
-    /** A printed letter is selected by the commerce table; domain identities remain stable. */
-    fun letter(advance: AdvanceId): Char =
-        when {
-            commerce == CommerceRule.SECOND_EDITION && advance == AdvanceId.IMPROVED_AGRICULTURE ->
-                'J'
-            commerce == CommerceRule.SECOND_EDITION && advance == AdvanceId.WIND_WATERMILL -> 'K'
-            else -> advance.letter
-        }
-
-    fun advance(letter: Char): AdvanceId =
-        AdvanceId.entries.singleOrNull { id ->
-            letter(id) == letter.uppercaseChar()
-        } ?: throw RuleViolation(ViolationCode.INVALID_COMMAND, listOf(letter.toString()))
-
-    /** An explicit canonical snapshot for durable creation histories and preset expansion. */
+    /** An explicit canonical snapshot for durable creation histories. */
     fun configurationCommands(): List<RuleOptionCommand> =
         listOf(
             RuleOptionCommand("deck-modification", deckModification.commandValue()),
@@ -79,43 +60,6 @@ data class RuleOptions(
             ),
             RuleOptionCommand("map", map.commandValue),
         )
-
-    private fun resolve(definition: AdvanceDefinition): AdvanceDefinition {
-        val commerceDefinition =
-            if (commerce == CommerceRule.SECOND_EDITION) {
-                when (definition.id) {
-                    AdvanceId.IMPROVED_AGRICULTURE ->
-                        definition.copy(
-                            cost = 40,
-                            prerequisites = setOf(AdvanceId.CARAVAN),
-                        )
-                    AdvanceId.WIND_WATERMILL ->
-                        definition.copy(
-                            cost = 50,
-                            prerequisites = setOf(AdvanceId.IMPROVED_AGRICULTURE),
-                        )
-                    AdvanceId.INTEREST_PROFIT,
-                    AdvanceId.MIDDLE_CLASS ->
-                        definition.copy(prerequisites = setOf(AdvanceId.WIND_WATERMILL))
-                    else -> definition
-                }
-            } else {
-                definition
-            }
-        val credit =
-            if (credits == CreditRule.SECOND_EDITION) {
-                when {
-                    definition.id == AdvanceId.WRITTEN_RECORD -> 30
-                    definition.id == AdvanceId.PRINTED_WORD -> 20
-                    definition.id == AdvanceId.PROSELYTISM -> 30
-                    definition.category == AdvanceCategory.CIVICS -> definition.credit + 10
-                    else -> definition.credit
-                }
-            } else {
-                definition.credit
-            }
-        return commerceDefinition.copy(credit = credit, letter = letter(definition.id))
-    }
 
     companion object {
         val AH1996: RuleOptions = RuleOptions()

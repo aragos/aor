@@ -10,6 +10,7 @@ When War or Crusades needs a marker with all 25 deployed, its recipient may forg
 a marker from another controlled province. Commodity payments continue their quadratic formula
 beyond the printed boxes. Both project rulings are implemented and replayable.
 
+- [Product requirements](docs/requirements.md): goals, acceptance contracts and open decisions.
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Command language](docs/commands.md): complete syntax, parameters and recorded outcomes.

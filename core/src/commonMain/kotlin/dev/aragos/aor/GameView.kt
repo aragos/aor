@@ -329,7 +329,7 @@ data class PublicCatalog(
             val configuration = CatalogConfiguration(playerCount, rules)
             return PublicCatalog(
                 configuration.provinces,
-                rules.definitions,
+                AdvanceData.definitions,
                 CommodityData.definitions,
                 configuration.landBorders,
                 configuration.coastalConnections,
@@ -389,7 +389,7 @@ data class ScoreView(
                 state.playerIds.map { id ->
                     val player = state.playerState(id)
                     val misery = player.misery.value
-                    val points = player.advances.score(state.rules)
+                    val points = player.advances.score
                     ScoreView(
                         id,
                         points,

@@ -81,7 +81,7 @@ class VariantGameCompletionTest {
                     val owner = state.playerState(score.player)
                     val selectedPoints =
                         owner.advances.owned.sumOf { advance ->
-                            state.rules.definition(advance).cost
+                            AdvanceData.definition(advance).cost
                         }
                     assertThat(score.advancePoints).isEqualTo(selectedPoints)
                     assertThat(score.total)

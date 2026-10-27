@@ -74,14 +74,14 @@ object AdvancePurchases {
      */
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
         player.requireActive()
-        val definition = context.rules.definition(advance)
-        val entity = listOf(context.rules.letter(advance).toString())
+        val definition = AdvanceData.definition(advance)
+        val entity = listOf(advance.letter.toString())
         checkRule(!player.advances.owns(advance), ViolationCode.ADVANCE_ALREADY_OWNED, entity)
         val missing = definition.prerequisites.filterNot(player.advances::owns)
         checkRule(
             missing.isEmpty(),
             ViolationCode.MISSING_ADVANCE_PREREQUISITE,
-            missing.map { prerequisite -> context.rules.letter(prerequisite).toString() },
+            missing.map { prerequisite -> prerequisite.letter.toString() },
         )
         checkRule(
             definition.category != context.papalDecree,
@@ -101,8 +101,7 @@ object AdvancePurchases {
         return AdvanceQuote(
             advance = advance,
             baseCost = definition.cost,
-            categoryCredit =
-                player.advances.creditsFor(definition.category, context.currentTurn, context.rules),
+            categoryCredit = player.advances.creditsFor(definition.category, context.currentTurn),
             institutionalResearchCredit = research,
             leaders =
                 context.leaderDiscounts
@@ -118,7 +117,7 @@ object AdvancePurchases {
         checkRule(
             player.cash >= quote.price,
             ViolationCode.INSUFFICIENT_CASH,
-            listOf(context.rules.letter(advance).toString()),
+            listOf(advance.letter.toString()),
         )
         val ships =
             when (advance) {
@@ -141,7 +140,7 @@ object AdvancePurchases {
                 misery =
                     MiseryRules.shift(
                         player.misery,
-                        context.rules.definition(advance).purchaseMisery - completionRelief,
+                        AdvanceData.definition(advance).purchaseMisery - completionRelief,
                     ),
             )
         )

@@ -106,8 +106,6 @@ skips another player's response. Purchase steps retain their order even when no 
 | `reduce-marker <province>` | Expansion actor; replaces an owned coloured marker with one coloured token. A voluntary rebuild never earns expansion-bonus credit. |
 | `buy-expansion-card` | Expansion actor; trades pool tokens for one card, at most once per player. Shared price starts at 3 tokens and rises by 3 per purchase this phase. |
 | `cathedral` | Eligible attacker or defender before competition dice; declares an automatic win against non-owners. Once per turn against each opponent; cannot defeat a Cathedral-owning defender or apply to War. `pass` declines. |
-| `written-record [<player>]` | Selected takeover-trade rule; accept a free once-per-turn exchange after defeating a non-owner, including a partial-token defender. Name the player when several eligible defenders were defeated. `pass` declines. |
-| `adjust-market <commodity> <status>` | Selected Wind/Watermill market rule; Grain, Cloth, Wine or Metal, status `shortage`, `surplus` or `neutral`. Change neutral to an adjustment or clear an existing adjustment. `pass` declines. |
 | `windmill` | Player answering a Wind/Watermill opportunity; requests its selection die. `pass` declines. |
 | `offer-card <reference>` | Wind/Watermill trader; selects the owned card to exchange. The other card is chosen by a recorded random transfer. |
 

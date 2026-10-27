@@ -27,7 +27,14 @@ enum class AdvanceId(val letter: Char) {
     NATIONALISM('W'),
     INSTITUTIONAL_RESEARCH('X'),
     COSMOPOLITAN('Y'),
-    MIDDLE_CLASS('Z'),
+    MIDDLE_CLASS('Z');
+
+    companion object {
+        /** Parse the current catalog's printed letter while preserving the domain identity. */
+        fun fromLetter(letter: Char): AdvanceId =
+            entries.singleOrNull { advance -> advance.letter == letter.uppercaseChar() }
+                ?: throw RuleViolation(ViolationCode.INVALID_COMMAND, listOf(letter.toString()))
+    }
 }
 
 enum class AdvanceCategory(val totalCost: Int) {
