@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/api.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2020}}).outputText;
-const {ApiError,request} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+const {ApiError,request,requestSnapshot,setAuthentication} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 
 test('rejections retain diagnostic objects and reject malformed arguments', async () => {
     const original = globalThis.fetch;
@@ -18,4 +18,17 @@ test('rejections retain diagnostic objects and reject malformed arguments', asyn
             return true;
         });
     } finally {globalThis.fetch=original;}
+});
+
+test('conditional reads retain snapshots on 304 and refresh the managed bearer token', async () => {
+    const original = globalThis.fetch;
+    try {
+        setAuthentication(async () => 'refreshed-account-token');
+        globalThis.fetch = async (path, init) => {
+            assert.equal(init.headers.Authorization, 'Bearer refreshed-account-token');
+            assert.equal(init.headers['If-None-Match'], '"private-version"');
+            return new Response(null, {status:304, headers:{ETag:'"private-version"'}});
+        };
+        assert.deepEqual(await requestSnapshot('/api/games/test', undefined, '"private-version"'), {snapshot:null, etag:'"private-version"'});
+    } finally {globalThis.fetch=original; setAuthentication();}
 });

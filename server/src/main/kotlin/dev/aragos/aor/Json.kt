@@ -127,3 +127,10 @@ internal fun JsonNode.fieldsOnly(vararg names: String) {
         throw ServiceFailure(400, "INVALID_REQUEST")
     }
 }
+
+internal fun JsonNode.longInteger(): Long =
+    if (isIntegralNumber && canConvertToLong()) longValue()
+    else throw ServiceFailure(400, "INVALID_REQUEST")
+
+internal fun JsonNode.boolean(): Boolean =
+    if (isBoolean) booleanValue() else throw ServiceFailure(400, "INVALID_REQUEST")

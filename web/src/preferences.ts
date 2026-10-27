@@ -1,5 +1,10 @@
 import {useEffect, useState} from 'react';
 
+export const isString = (value: unknown): value is string => typeof value === 'string';
+export const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+export const isUndoPolicy = (value: unknown): value is string => typeof value === 'string' && ['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].includes(value);
+export const isGameFilter = (value: unknown): value is string => typeof value === 'string' && ['ongoing', 'my-move', 'finished', 'cancelled', 'abandoned', 'unavailable', 'all'].includes(value);
+
 /** Browser preferences are optional; unavailable storage falls back to in-memory state.
  * The key stays fixed for the component's lifetime. Values are validated before use.
  */

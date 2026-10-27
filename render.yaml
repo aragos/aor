@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: aor
+    runtime: docker
+    plan: 0.5c-512mb
+    region: virginia
+    branch: main
+    numInstances: 1
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health
+    disk:
+      name: aor-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: AOR_AUTH_MODE
+        value: firebase
+      - key: AOR_HTTP_HOST
+        value: 0.0.0.0
+      - key: AOR_GAME_CREATION_POLICY
+        value: approved
+      - key: AOR_FIREBASE_PROJECT_ID
+        sync: false
+      - key: AOR_FIREBASE_WEB_API_KEY
+        sync: false
+      - key: AOR_ADMIN_UIDS
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/firebase-admin.json

@@ -173,5 +173,5 @@ separate files, then converge with the shared target controls. Change transport 
 only when the corresponding evidence identifies a need.
 
 Deliver bounded feature branches, verify affected interactions and update the coverage inventory.
-Keep accounts, bots, general undo and private plans outside this UX proposal; their deferred
-architecture remains in [application design](design.md).
+Accounts and scoped undo are now implemented separately; their contracts remain in
+[application design](design.md) and [deployment](deployment.md). Bots and private plans remain deferred.

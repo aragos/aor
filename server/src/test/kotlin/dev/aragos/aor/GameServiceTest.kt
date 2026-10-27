@@ -385,7 +385,7 @@ class GameServiceTest {
         for (contents in
             listOf(
                 "not json",
-                original.replace("\"fileVersion\":4", "\"fileVersion\":99"),
+                original.replace("\"fileVersion\":5", "\"fileVersion\":99"),
                 original.replace(RULES_VERSION, "future-rules"),
                 original.replace("set-option deck-modification disabled", "invented-command"),
             )) {

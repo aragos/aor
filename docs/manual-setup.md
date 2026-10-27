@@ -133,12 +133,13 @@ extra access to other hands.
 
 Games and pending private submissions survive server restarts. Replaying history uses recorded shuffles, deals and
 rolls without generating randomness. Failed writes retain the preceding saved state. Unreadable, corrupt or
-incompatible files return `STORAGE_UNAVAILABLE` and are never reset automatically. General history editing and undo
-are deferred.
+incompatible files return `STORAGE_UNAVAILABLE` and are never reset automatically. Scoped undo and
+audited suffix editing are available under Commands; see [the command reference](commands.md#application-history-commands).
 
 Only the current game format and rules version are supported. Every saved game must record its creator explicitly.
 Files from the setup-only implementation are incompatible; use a fresh game for this walkthrough. No migration or
-automatic deletion is performed.
+automatic deletion is performed. This walkthrough uses local private links. Public deployments use
+registered accounts and the [hosting/administrative contracts](deployment.md).
 
 Use a single server process for a data directory. Saved games contain private data; do not publish them. The default
 `.aor-data/` directory is excluded from Git. Tests and disposable manual runs should use separate temporary directories.

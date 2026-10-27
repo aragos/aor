@@ -23,7 +23,7 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
     const format = (line: string) => displayHistoryLine(line, aliases);
     return <details className="command-dock" open={open} onToggle={event => onToggle(event.currentTarget.open)}>
         <summary>{t('table.commands')} <small>{t('game.revision')} {snapshot.revision}</small></summary>
-        {snapshot.game.stage !== 'FINISHED' && <form className="console" onSubmit={async event => {
+        {snapshot.game.stage !== 'FINISHED' && (!snapshot.status || snapshot.status === 'ACTIVE') && <form className="console" onSubmit={async event => {
             event.preventDefault();
             if (await submit(command)) setCommand(current => current === command ? '' : current);
         }}><label htmlFor="command">{t('controls.command')}</label>

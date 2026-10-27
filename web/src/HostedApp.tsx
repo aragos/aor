@@ -1,0 +1,306 @@
+import {useEffect, useState} from 'react';
+import type {FormEvent, ReactNode} from 'react';
+import {initializeApp} from 'firebase/app';
+import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, onIdTokenChanged,
+    sendEmailVerification, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword,
+    signOut} from 'firebase/auth';
+import type {Auth, User} from 'firebase/auth';
+import {request, setAuthentication} from './api';
+import type {Account, ApplicationConfig, CreatedGame, GamePage, GameSummary, Session} from './api';
+import {ChoiceButtons} from './DecisionControls';
+import {defaultVariants, validVariants, Variants} from './Variants';
+import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
+import {t} from './messages';
+
+const errors: Record<string, string> = {
+    'auth/invalid-credential': t('hosted.the-email-or-password-was'),
+    'auth/email-already-in-use': t('hosted.an-account-already-uses-that'),
+    'auth/invalid-email': t('hosted.enter-a-valid-email-address'),
+    'auth/weak-password': t('hosted.choose-a-stronger-password-with'),
+    'auth/too-many-requests': t('hosted.too-many-attempts-please-try'),
+    'auth/network-request-failed': t('hosted.cannot-reach-the-signin-service'),
+    'auth/operation-not-allowed': t('hosted.email-signup-has-not-been'),
+    HANDLE_UNAVAILABLE: t('hosted.that-handle-is-already-registered'),
+    INVALID_ACCOUNT: t('hosted.use-a-324-character-handle'),
+    GAME_CREATION_FORBIDDEN: t('hosted.an-administrator-needs-to-approve'),
+    UNREGISTERED_PLAYER: t('hosted.one-of-these-players-is'),
+    STALE_REVISION: t('hosted.the-game-changed-refresh-the'),
+    HISTORY_RANDOMNESS_CHANGED: t('hosted.the-replacement-must-preserve-all'),
+    INVALID_GAME_LOG: t('hosted.the-replacement-log-does-not'),
+    UNAUTHORIZED: t('hosted.your-session-expired-sign-in'),
+    EMAIL_NOT_VERIFIED: t('hosted.verify-your-email-address-before'),
+    NETWORK: t('hosted.cannot-reach-the-game-server'),
+};
+function message(failure: unknown): string {
+    const code = typeof failure === 'object' && failure !== null && 'code' in failure ? String(failure.code) : '';
+    return errors[code] ?? t('hosted.the-operation-could-not-be');
+}
+function Problem({value}: {value: string}) {return value ? <p className="error" role="alert">{value}</p> : null;}
+
+function SignIn({auth}: {auth: Auth}) {
+    const [mode, setMode] = useState('sign-in');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    async function submit(event: FormEvent) {
+        event.preventDefault(); setBusy(true); setError(''); setNotice('');
+        try {
+            if (mode === 'sign-up') {
+                const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+                await sendEmailVerification(result.user);
+            } else await signInWithEmailAndPassword(auth, email.trim(), password);
+        } catch (failure) {setError(message(failure));}
+        finally {setBusy(false);}
+    }
+    async function reset() {
+        setBusy(true); setError('');
+        try {await sendPasswordResetEmail(auth, email.trim()); setNotice(t('hosted.if-that-address-has-an'));}
+        catch (failure) {setError(message(failure));}
+        finally {setBusy(false);}
+    }
+    return <main className="landing panel"><p className="eyebrow">{t('app.subtitle')}</p><h1>{t('app.title')}</h1>
+        <ChoiceButtons value={mode} onChange={setMode} disabled={busy} choices={[{value: 'sign-in', label: t('hosted.sign-in')}, {value: 'sign-up', label: t('hosted.create-account')}]}/>
+        <form onSubmit={submit} className="account-form">
+            <label>{t('hosted.email')}<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254}/></label>
+            <label>{t('hosted.password')}<input type="password" autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} required minLength={mode === 'sign-up' ? 12 : undefined} maxLength={128}/></label>
+            {mode === 'sign-up' && <p className="muted small">{t('hosted.use-at-least-12-characters')}</p>}
+            <Problem value={error}/><p role="status">{notice}</p>
+            <button disabled={busy}>{busy ? t('hosted.working') : mode === 'sign-up' ? t('hosted.create-account') : t('hosted.sign-in')}</button>
+            <button type="button" className="secondary" disabled={busy || !email.trim()} onClick={() => {void reset();}}>{t('hosted.reset-password')}</button>
+        </form>
+    </main>;
+}
+
+function Register({refresh}: {refresh: () => Promise<void>}) {
+    const [handle, setHandle] = useState('');
+    const [name, setName] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    async function register(event: FormEvent) {
+        event.preventDefault(); setBusy(true); setError('');
+        try {await request('/api/players/register', undefined, {handle, displayName: name}); await refresh();}
+        catch (failure) {setError(message(failure));}
+        finally {setBusy(false);}
+    }
+    return <main className="landing panel"><h1>{t('hosted.choose-your-player-identity')}</h1><form className="account-form" onSubmit={register}>
+        <label>{t('hosted.public-handle')}<input value={handle} autoComplete="username" onChange={event => setHandle(event.target.value.toLowerCase())} pattern="[a-z][a-z0-9-]{2,23}" minLength={3} maxLength={24} required/></label>
+        <p className="muted small">{t('hosted.a-unique-handle-lets-other')}</p>
+        <label>{t('hosted.display-name')}<input value={name} autoComplete="nickname" onChange={event => setName(event.target.value)} maxLength={60} required/></label>
+        <Problem value={error}/><button disabled={busy}>{busy ? t('hosted.working') : t('hosted.register-player')}</button>
+    </form></main>;
+}
+
+function VerifyEmail({user, refresh}: {user: User; refresh: () => Promise<void>}) {
+    const [notice, setNotice] = useState('');
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+    async function action(resend: boolean) {
+        setBusy(true); setError(''); setNotice('');
+        try {
+            if (resend) {await sendEmailVerification(user); setNotice(t('hosted.verification-email-sent'));}
+            else {await user.reload(); await user.getIdToken(true); await refresh(); setNotice(t('hosted.if-verification-is-complete-your'));}
+        } catch (failure) {setError(message(failure));}
+        finally {setBusy(false);}
+    }
+    return <main className="landing panel"><h1>{t('hosted.verify-your-email')}</h1><p>{t('hosted.verificationInstructions', {email: user.email ?? ''})}</p>
+        <Problem value={error}/><p role="status">{notice}</p>
+        <div className="button-row"><button disabled={busy} onClick={() => {void action(false);}}>{t('hosted.ive-verified-my-email')}</button>
+            <button className="secondary" disabled={busy} onClick={() => {void action(true);}}>{t('hosted.resend-email')}</button></div>
+    </main>;
+}
+
+function RegisteredGameForm({me}: {me: Account}) {
+    const [players, setPlayers] = useState<Account[]>([me]);
+    const [query, setQuery] = useState('');
+    const [matches, setMatches] = useState<Account[]>([]);
+    const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants);
+    const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    useEffect(() => {
+        let current = true;
+        if (query.trim().length < 2) {setMatches([]); return;}
+        const timer = setTimeout(() => {
+            void request<Account[]>(`/api/players?q=${encodeURIComponent(query)}`).then(results => {if (current) setMatches(results);})
+                .catch(failure => {if (current) setError(message(failure));});
+        }, 250);
+        return () => {current = false; clearTimeout(timer);};
+    }, [query]);
+    async function create(event: FormEvent) {
+        event.preventDefault(); setBusy(true); setError('');
+        try {
+            const result = await request<CreatedGame>('/api/games', undefined, {players: players.map(player => player.id), options: variants, undoPolicy});
+            window.location.assign(`/games/${result.gameId}`);
+        } catch (failure) {setError(message(failure)); setBusy(false);}
+    }
+    return <details className="panel create-registered"><summary>{t('hosted.create-a-game')}</summary>
+        {!me.mayCreateGames ? <p>{t('hosted.an-administrator-must-approve-your')}</p> : <form onSubmit={create}>
+            <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-36-registered-players-including')}</p>
+            <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>{player.displayName}</strong> @{player.handle}<small>{player.id}</small></span>
+                {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
+            <label>{t('hosted.find-a-player-by-handle')}<input type="search" value={query} maxLength={60} onChange={event => setQuery(event.target.value)}/></label>
+            {query.trim().length >= 2 && <ul className="player-directory" aria-label={t('hosted.matching-players')}>{matches.filter(player => !players.some(chosen => chosen.id === player.id)).map(player => <li key={player.id}>
+                <span><strong>{player.displayName}</strong> @{player.handle}<small>{player.id}</small></span>
+                <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => {setPlayers([...players, player]); setQuery('');}}>{t('hosted.add')}</button>
+            </li>)}</ul>}
+            <Variants value={variants} onChange={setVariants} disabled={busy}/>
+            <p>{t('history.policy')}</p><ChoiceButtons value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
+            <Problem value={error}/><button disabled={busy || players.length < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
+        </form>}
+    </details>;
+}
+
+function download(name: string, value: unknown) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2) + '\n'], {type: 'application/json'}));
+    const link = document.createElement('a'); link.href = url; link.download = name; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function AdminGame({game, refresh}: {game: GameSummary; refresh: () => void}) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [replacement, setReplacement] = useState<string[] | null>(null);
+    const path = `/api/admin/games/${game.id}`;
+    async function run(action: () => Promise<void>) {
+        setBusy(true); setError(''); setNotice('');
+        try {await action();} catch (failure) {setError(message(failure));}
+        finally {setBusy(false);}
+    }
+    async function replace(dryRun: boolean) {
+        if (!replacement) return;
+        await request(`${path}/log`, undefined, {expectedRevision: game.revision, entries: replacement, dryRun});
+        setNotice(dryRun ? t('hosted.this-log-replays-successfully-with') : t('hosted.log-upgraded-the-previous-file'));
+        if (!dryRun) {setReplacement(null); refresh();}
+    }
+    return <details className="admin-game"><summary>{t('hosted.manage-game')}</summary><p className="small">{game.id} · {t('game.revision')} {game.revision}</p>
+        <div className="button-row"><button className="secondary" disabled={busy} onClick={() => {void run(async () => download(`${game.id}.json`, await request(`${path}/log`)));}}>{t('hosted.download-log')}</button>
+            {['cancel', 'abandon'].map(action => <button key={action} className="secondary" disabled={busy || game.status === 'CANCELLED' || game.status === 'ABANDONED'} onClick={() => {void run(async () => {
+                await request(`${path}/status`, undefined, {expectedRevision: game.revision, action}); refresh();
+            });}}>{action === 'cancel' ? t('hosted.cancel-game') : t('hosted.abandon-game')}</button>)}
+        </div>
+        <details><summary>{t('hosted.upgrade-command-log')}</summary><p>{t('hosted.upload-an-exported-log-with')}</p>
+            <label>{t('hosted.replacement-log')}<input type="file" accept=".json,application/json" disabled={busy} onChange={event => {
+                const file = event.target.files?.[0]; setReplacement(null); setError('');
+                if (!file) return;
+                if (file.size > 8 * 1024 * 1024) {setError(t('hosted.logs-must-be-smaller-than')); return;}
+                void file.text().then(text => {
+                    const value: unknown = JSON.parse(text);
+                    const entries = typeof value === 'object' && value !== null && 'entries' in value ? value.entries : null;
+                    if (!Array.isArray(entries) || !entries.every(entry => typeof entry === 'string')) throw new Error(t('hosted.invalid-log'));
+                    setReplacement(entries);
+                }).catch(() => setError(t('hosted.choose-a-json-log-containing')));
+            }}/></label>
+            <div className="button-row"><button className="secondary" disabled={busy || !replacement} onClick={() => {void run(() => replace(true));}}>{t('hosted.validate')}</button>
+                <button disabled={busy || !replacement} onClick={() => {void run(() => replace(false));}}>{t('hosted.apply-upgrade')}</button></div>
+        </details>
+        <details><summary>{t('hosted.permanently-purge-storage')}</summary><p>{t('hosted.this-deletes-the-game-and')}</p>
+            <button className="danger" disabled={busy} onClick={() => {
+                if (window.prompt(t('hosted.type-the-full-game-id')) !== game.id) return;
+                void run(async () => {await request(`${path}/purge`, undefined, {expectedRevision: game.revision}); refresh();});
+            }}>{t('hosted.purge-game')}</button>
+        </details><Problem value={error}/><p role="status">{notice}</p>
+    </details>;
+}
+
+function AdminPlayers() {
+    const [players, setPlayers] = useState<Account[]>([]);
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState('');
+    async function load() {try {setPlayers(await request<Account[]>('/api/admin/players'));} catch (failure) {setError(message(failure));}}
+    async function approve(player: Account) {
+        setBusy(player.id); setError('');
+        try {await request(`/api/admin/players/${encodeURIComponent(player.id)}/creation`, undefined, {allowed: !player.mayCreateGames}); await load();}
+        catch (failure) {setError(message(failure));} finally {setBusy('');}
+    }
+    return <details className="panel" onToggle={event => {if (event.currentTarget.open) void load();}}><summary>{t('hosted.player-creation-permissions')}</summary>
+        <p className="small">{t('hosted.with-the-default-approvedonly-policy')}</p>
+        <Problem value={error}/><ul className="player-directory">{players.map(player => <li key={player.id}><span>{player.displayName} @{player.handle}<small>{player.id}</small></span>
+            <button className="secondary" disabled={!!busy || player.admin} onClick={() => {void approve(player);}}>{player.mayCreateGames ? t('hosted.revoke-creation') : t('hosted.allow-creation')}</button></li>)}</ul>
+    </details>;
+}
+
+export function Dashboard({me}: {me: Account}) {
+    const [scope, setScope] = useState('mine');
+    const [filter, setFilter] = useStoredSetting('game-filter', 'ongoing', isGameFilter);
+    const [page, setPage] = useState<GamePage>({games: [], nextCursor: null});
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [refresh, setRefresh] = useState(0);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const all = scope === 'all' && me.admin;
+    useEffect(() => {
+        let active = true;
+        async function load() {
+            setBusy(true); setError('');
+            try {
+                const next = await request<GamePage>(`${all ? '/api/admin/games' : '/api/games'}?status=${encodeURIComponent(filter)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`);
+                if (active) setPage(next);
+            } catch (failure) {if (active) setError(message(failure));}
+            finally {if (active) setBusy(false);}
+        }
+        void load();
+        const timer = setInterval(() => {if (!document.hidden) void load();}, 30000);
+        return () => {active = false; clearInterval(timer);};
+    }, [all, filter, cursor, refresh]);
+    async function exportAll() {
+        setBusy(true); setError('');
+        try {
+            const games: unknown[] = []; let after: string | null = null;
+            do {
+                const next: {games: unknown[]; nextCursor: string | null} = await request(`/api/admin/logs?limit=20${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+                games.push(...next.games); after = next.nextCursor;
+            } while (after);
+            download('aor-game-logs.json', {exportedAt: new Date().toISOString(), games});
+        } catch (failure) {setError(message(failure));} finally {setBusy(false);}
+    }
+    return <main className="portal"><header><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')}</h1></header>
+        <RegisteredGameForm me={me}/>
+        <section className="panel">
+            {me.admin && <ChoiceButtons value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}
+            <ChoiceButtons value={filter} onChange={value => {setFilter(value); setCursor(null);}} choices={['ongoing', 'my-move', 'finished', 'cancelled', 'abandoned', ...(all ? ['unavailable'] : []), 'all'].map(value => ({value, label: t(`gameStatus.${value.replace(/-/g, '_').toUpperCase()}`)}))}/>
+            <div className="button-row"><button className="secondary" disabled={busy} onClick={() => setRefresh(value => value + 1)}>{t('hosted.refresh')}</button>
+                {me.admin && <button className="secondary" disabled={busy} onClick={() => {void exportAll();}}>{t('hosted.export-all-command-logs')}</button>}</div>
+            <Problem value={error}/>{busy && <p role="status">{t('hosted.loading')}</p>}
+            {!busy && !page.games.length && <p>{t('hosted.no-games-match-this-filter')}</p>}
+            <ul className="game-directory">{page.games.map(game => <li key={game.id}>
+                <div className="game-list-heading"><strong className={game.myMove ? 'your-move' : ''}>{t(`gameStatus.${game.status}`)}</strong><span>{game.stage && t(`stage.${game.stage}`)}</span>
+                    {!all && <a className="button" href={`/games/${game.id}`}>{t('hosted.open-game')}</a>}</div>
+                <p>{game.players.map(player => player.name).join(' · ')}</p><p className="muted small">{t('hosted.created', {date: new Date(game.createdAt).toLocaleDateString(), id: game.id.slice(0, 8)})}</p>
+                {all && <AdminGame game={game} refresh={() => setRefresh(value => value + 1)}/>}
+            </li>)}</ul>
+            <div className="button-row">{cursor && <button className="secondary" disabled={busy} onClick={() => setCursor(null)}>{t('hosted.first-page')}</button>}
+                {page.nextCursor && <button className="secondary" disabled={busy} onClick={() => setCursor(page.nextCursor)}>{t('hosted.next-page')}</button>}</div>
+        </section>{me.admin && <AdminPlayers/>}
+    </main>;
+}
+
+export default function HostedApp({config, game}: {config: ApplicationConfig; game: ReactNode}) {
+    const [auth] = useState(() => getAuth(initializeApp(config.firebase ?? {})));
+    const [user, setUser] = useState<User | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    async function refresh() {setSession(await request<Session>('/api/me'));}
+    useEffect(() => {
+        let active = true;
+        setAuthentication(async () => auth.currentUser?.getIdToken());
+        const unsubscribe = onIdTokenChanged(auth, next => {
+            if (!active) return;
+            setUser(next); setSession(null); setError(''); setLoading(true);
+            if (!next) {setLoading(false); return;}
+            void request<Session>('/api/me').then(value => {if (active && auth.currentUser?.uid === next.uid) setSession(value);})
+                .catch(failure => {if (active) setError(message(failure));}).finally(() => {if (active) setLoading(false);});
+        });
+        void setPersistence(auth, browserLocalPersistence).catch(() => { /* Firebase retains an in-memory session when storage is unavailable. */ });
+        return () => {active = false; unsubscribe(); setAuthentication();};
+    }, [auth]);
+    return <>{user && <nav className="account-bar" aria-label={t('hosted.account')}><a href="/">{t('hosted.my-games')}</a><span>{session?.account ? `@${session.account.handle}` : user.email}</span>
+        <button className="secondary" onClick={() => {void signOut(auth).catch(failure => setError(message(failure)));}}>{t('hosted.sign-out')}</button></nav>}
+        {loading ? <main className="landing panel"><p>{t('hosted.loading-your-account')}</p></main> : !user ? <SignIn auth={auth}/>
+            : error ? <main className="landing panel"><Problem value={error}/><button onClick={() => {void refresh().then(() => setError('')).catch(failure => setError(message(failure)));}}>{t('hosted.retry')}</button></main>
+            : !session?.emailVerified ? <VerifyEmail user={user} refresh={refresh}/>
+            : !session.account ? <Register refresh={refresh}/>
+            : game ?? <Dashboard me={session.account}/>}</>;
+}

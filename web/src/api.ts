@@ -95,6 +95,7 @@ export interface HistoryEventView {
 export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
 export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
+    status?: 'ACTIVE' | 'CANCELLED' | 'ABANDONED'; accountId?: string | null;
     game: {stage: string; currentEpoch: number;
         rules: {patronage: 'PROTECTION_MONEY' | 'THREE_BOX_DISPLAY'; [key: string]: string | boolean};
         ruleOptions: {key: string; value: string; choices: string[]}[]; rebuiltMarkerBonus: RebuiltMarkerBonus; players: PlayerView[];
@@ -126,24 +127,45 @@ export interface Snapshot {
         fromEntry: number | null; entryCount: number; editRevision: number;
         actions: {entry: number; actor: string; text: string}[]};
 }
-export interface CreatedGame {gameId: string; links: {id: string; name: string; path: string}[]}
+export interface CreatedGame {gameId: string; registered?: boolean; links: {id: string; name: string; path: string}[]}
+export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Record<string, string> | null; pollIntervalMs: number}
+export interface Account {id: string; handle: string; displayName: string; mayCreateGames: boolean; admin: boolean}
+export interface Session {id: string; emailVerified: boolean; account: Account | null}
+export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABANDONED' | 'UNAVAILABLE';
+export interface GameSummary {id: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean}
+export interface GamePage {games: GameSummary[]; nextCursor: string | null}
 export class ApiError extends Error {
     constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null) { super(code); }
 }
-export async function request<T>(path: string, token?: string, body?: unknown): Promise<T> {
+let authentication: (() => Promise<string | undefined>) | undefined;
+export function setAuthentication(provider?: () => Promise<string | undefined>) { authentication = provider; }
+async function fetchResponse(path: string, token?: string, body?: unknown, etag?: string): Promise<Response> {
     let response: Response;
     try {
+        const credential = token ?? await authentication?.();
         response = await fetch(path, {
             method: body === undefined ? 'GET' : 'POST', cache: 'no-store',
-            headers: {...(token ? {Authorization: `Bearer ${token}`} : {}), ...(body === undefined ? {} : {'Content-Type': 'application/json'})},
+            headers: {...(credential ? {Authorization: `Bearer ${credential}`} : {}), ...(etag ? {'If-None-Match': etag} : {}), ...(body === undefined ? {} : {'Content-Type': 'application/json'})},
             ...(body === undefined ? {} : {body: JSON.stringify(body)}),
         });
     } catch { throw new ApiError('NETWORK'); }
+    return response;
+}
+async function responseJson<T>(response: Response): Promise<T> {
     let result;
     try { result = await response.json(); } catch { throw new ApiError('SERVER'); }
     if (!response.ok) throw new ApiError(typeof result?.code === 'string' ? result.code : 'SERVER',
         Array.isArray(result?.entityIds) ? result.entityIds.filter((id: unknown): id is string => typeof id === 'string') : [],
         Number.isInteger(result?.entryIndex) ? result.entryIndex : null);
     return result as T;
+}
+export async function request<T>(path: string, token?: string, body?: unknown): Promise<T> {
+    return responseJson<T>(await fetchResponse(path, token, body));
+}
+/** A 304 keeps the existing private snapshot without parsing an empty response. */
+export async function requestSnapshot(path: string, token?: string, etag?: string) {
+    const response = await fetchResponse(path, token, undefined, etag);
+    return {etag: response.headers.get('ETag') ?? undefined,
+        snapshot: response.status === 304 ? null : await responseJson<Snapshot>(response)};
 }
 export function errorCode(error: unknown): string { return error instanceof ApiError ? error.code : 'SERVER'; }

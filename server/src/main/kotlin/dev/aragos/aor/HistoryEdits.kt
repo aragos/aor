@@ -56,7 +56,12 @@ internal object HistoryEdits {
             available,
             lower,
             entries.size,
-            stored.revisions.lastOrNull { it.replaceFrom != null }?.id ?: 0,
+            stored.revisions
+                .lastOrNull {
+                    it.replaceFrom != null ||
+                        it.administrativeAction == AdministrativeAction.UPGRADE
+                }
+                ?.id ?: 0,
             actions,
         )
     }
@@ -76,8 +81,9 @@ internal object HistoryEdits {
 
     fun configure(stored: StoredGame, player: PlayerId, policy: UndoPolicy): StoredGame {
         if (player != stored.header.creatorId) throw ServiceFailure(403, "HISTORY_EDIT_FORBIDDEN")
-        if (stored.state().stage != Stage.CONFIGURATION)
+        if (stored.state().stage != Stage.CONFIGURATION) {
             throw ServiceFailure(422, "UNDO_POLICY_FROZEN")
+        }
         return stored.copy(
             revisions =
                 stored.revisions +
@@ -166,12 +172,14 @@ internal object HistoryEdits {
         val recorded = stored.effectiveEntries().map(RecordedEntry::text)
         val lower =
             editableFrom(stored, player) ?: throw ServiceFailure(403, "HISTORY_EDIT_FORBIDDEN")
-        if (from !in lower until recorded.size || lines.size > 10000)
+        if (from !in lower until recorded.size || lines.size > 10000) {
             throw ServiceFailure(422, "HISTORY_EDIT_BOUNDARY")
+        }
         val prefix = replay(stored.header, recorded.take(from))
         requireEditBoundary(prefix)
-        if (TextCodec.parse(recorded[from]) !is Entry.Action)
+        if (TextCodec.parse(recorded[from]) !is Entry.Action) {
             throw ServiceFailure(422, "HISTORY_EDIT_BOUNDARY")
+        }
         val originals = recorded.drop(from).map(TextCodec::parse)
         val retainedOthers =
             originals
@@ -206,16 +214,18 @@ internal object HistoryEdits {
                             val index =
                                 line.drop(1).toIntOrNull()
                                     ?: throw ServiceFailure(400, "INVALID_HISTORY_EDIT")
-                            if (index !in from until recorded.size)
+                            if (index !in from until recorded.size) {
                                 throw ServiceFailure(400, "INVALID_HISTORY_EDIT")
+                            }
                             TextCodec.parse(recorded[index]) as? Entry.Action
                                 ?: throw ServiceFailure(400, "INVALID_HISTORY_EDIT")
                         } else {
                             TextCodec.parseAction(line, state, actor = player)
                         }
                     } catch (failure: RuleViolation) {
-                        if (failure.code == ViolationCode.WRONG_PLAYER)
+                        if (failure.code == ViolationCode.WRONG_PLAYER) {
                             throw ServiceFailure(403, "HISTORY_OTHER_PLAYER_ANSWER")
+                        }
                         throw ServiceFailure(422, "HISTORY_INVALID_ENTRY", entryIndex = position)
                     }
                 if (action.actor != player) {

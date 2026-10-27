@@ -1,0 +1,131 @@
+package dev.aragos.aor
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
+/** Stable managed-authentication UID; never used as a filesystem path. */
+data class AccountId(val value: String) {
+    init {
+        require(value.isNotBlank() && value.length <= 128 && value.none(Char::isISOControl)) {
+            "An account identifier requires one through 128 printable characters."
+        }
+    }
+}
+
+/** Unique public account handle, independent of a mutable display name. */
+data class PlayerHandle(val value: String) {
+    init {
+        require(value.matches(Regex("[a-z][a-z0-9-]{2,23}"))) {
+            "Handles require 3–24 lowercase letters, digits or hyphens, starting with a letter."
+        }
+    }
+
+    companion object {
+        fun parse(value: String): PlayerHandle = PlayerHandle(value.trim().lowercase())
+    }
+}
+
+data class RegisteredAccount(
+    val id: AccountId,
+    val handle: PlayerHandle,
+    val displayName: String,
+    val mayCreateGames: Boolean = false,
+) {
+    init {
+        require(
+            displayName.isNotBlank() &&
+                displayName.length <= 60 &&
+                displayName.none(Char::isISOControl)
+        ) {
+            "Display names require one through 60 printable characters."
+        }
+    }
+}
+
+/** Account directory contains no passwords, refresh tokens or email addresses. */
+class AccountStore(private val path: Path, private val writer: GameWriter = AtomicGameWriter) {
+    private val lock = ReentrantLock()
+
+    fun all(): List<RegisteredAccount> = lock.withLock { load() }
+
+    fun find(id: AccountId): RegisteredAccount? = all().singleOrNull { it.id == id }
+
+    fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount =
+        lock.withLock {
+            val accounts = load()
+            if (accounts.any { it.id == id }) {
+                throw ServiceFailure(409, "ACCOUNT_ALREADY_REGISTERED")
+            }
+            val account =
+                try {
+                    RegisteredAccount(id, PlayerHandle.parse(handle), displayName.trim())
+                } catch (_: IllegalArgumentException) {
+                    throw ServiceFailure(400, "INVALID_ACCOUNT")
+                }
+            if (accounts.any { it.handle == account.handle }) {
+                throw ServiceFailure(409, "HANDLE_UNAVAILABLE")
+            }
+            save(accounts + account)
+            account
+        }
+
+    fun allowCreation(id: AccountId, allowed: Boolean): RegisteredAccount = lock.withLock {
+        val accounts = load()
+        val account =
+            accounts.singleOrNull { it.id == id } ?: throw ServiceFailure(404, "ACCOUNT_NOT_FOUND")
+        val updated = account.copy(mayCreateGames = allowed)
+        save(accounts.map { if (it.id == id) updated else it })
+        updated
+    }
+
+    private fun load(): List<RegisteredAccount> {
+        if (!Files.exists(path)) return emptyList()
+        try {
+            val root = json.readTree(Files.readString(path))
+            require(root.field("fileVersion").integer() == 1) {
+                "Only account file version 1 is supported."
+            }
+            val accounts =
+                root.field("accounts").array().map { node ->
+                    RegisteredAccount(
+                        AccountId(node.field("id").string()),
+                        PlayerHandle(node.field("handle").string()),
+                        node.field("displayName").string(),
+                        node.field("mayCreateGames").boolean(),
+                    )
+                }
+            require(accounts.map(RegisteredAccount::id).distinct().size == accounts.size) {
+                "Account IDs must be unique."
+            }
+            require(accounts.map(RegisteredAccount::handle).distinct().size == accounts.size) {
+                "Account handles must be unique."
+            }
+            return accounts
+        } catch (_: Exception) {
+            throw ServiceFailure(503, "STORAGE_UNAVAILABLE")
+        }
+    }
+
+    private fun save(accounts: List<RegisteredAccount>) {
+        val contents =
+            mapOf(
+                "fileVersion" to 1,
+                "accounts" to
+                    accounts.map { account ->
+                        mapOf(
+                            "id" to account.id.value,
+                            "handle" to account.handle.value,
+                            "displayName" to account.displayName,
+                            "mayCreateGames" to account.mayCreateGames,
+                        )
+                    },
+            )
+        try {
+            writer.write(path, json.writeValueAsString(contents))
+        } catch (_: Exception) {
+            throw ServiceFailure(503, "STORAGE_UNAVAILABLE")
+        }
+    }
+}

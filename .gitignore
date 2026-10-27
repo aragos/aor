@@ -16,3 +16,8 @@ web/*.tsbuildinfo
 
 # Local games, credentials and private history
 .aor-data/
+.env
+.env.*
+firebase-admin.json
+*service-account*.json
+*.admin-token.json

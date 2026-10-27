@@ -223,7 +223,7 @@ and reach/combat functions from flow so they can be tested directly.
   counted once; 25 markers across mat/board; nonnegative cash; market capacity outside competitions; dominated markets
   hold only a marker; satellites hold at most one token and never a marker. Live and replayed states must match.
 - **Codec:** every command, including configuration, round-trips through print/parse.
-- **Revision validation (deferred):** accept compatible edits and reject changed setup, added/removed
+- **Revision validation:** accept compatible edits and reject changed setup, added/removed
   random requests, unrelated outcome substitutions, invalid card/deck matches and truncation across
   recorded events. Preserve exact outcomes;
   rejection must not generate randomness or change state.

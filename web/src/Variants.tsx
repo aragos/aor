@@ -5,6 +5,13 @@ export const defaultVariants: Record<string, string> = {
     'deck-modification': 'disabled', 'initial-card': 'any',
     'immediate-master-art-discard': 'disabled', map: 'standard',
 };
+export function validVariants(value: unknown): value is Record<string, string> {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+    const options = value as Record<string, unknown>;
+    return Object.keys(options).length === 4 && options.map === 'standard' &&
+        ['any', 'no-crusades', 'no-events', 'commodity-only'].includes(String(options['initial-card'])) &&
+        ['deck-modification', 'immediate-master-art-discard'].every(key => ['enabled', 'disabled'].includes(String(options[key])));
+}
 
 /** Creation records these choices in the same transaction as player registration. */
 export function Variants({value, onChange, disabled}: {

@@ -4,7 +4,11 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 
 const messages = await readFile(new URL('../src/messages.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(messages, {compilerOptions: {module: ts.ModuleKind.ESNext}}).outputText;
+const hostedMessages = await readFile(new URL('../src/hostedMessages.ts', import.meta.url), 'utf8');
+const hostedModule = ts.transpileModule(hostedMessages, {compilerOptions: {module: ts.ModuleKind.ESNext}}).outputText;
+const hostedUrl = 'data:text/javascript;base64,' + Buffer.from(hostedModule).toString('base64');
+const compiled = ts.transpileModule(messages, {compilerOptions: {module: ts.ModuleKind.ESNext}}).outputText
+    .replace(/(['"])\.\/hostedMessages\1/, JSON.stringify(hostedUrl));
 const {en, t} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 const catalog = await readFile(new URL('../../core/src/commonMain/kotlin/dev/aragos/aor/CardEffectData.kt', import.meta.url), 'utf8');
 

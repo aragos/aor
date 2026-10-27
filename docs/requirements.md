@@ -68,6 +68,8 @@ A full-session screen-reader/physical-phone review remains a human check. Broade
 unreachable retired-rule handlers needs a separately reviewed change; current configuration rejects
 all retired choices. Hosting/authentication
 accounts, DNS access and the initial administrator identity must be supplied before public launch.
+The [deployment runbook](deployment.md) owns provider and administrative API details; the
+[follow-up list](follow-ups.md) records the remaining launch and product decisions.
 
 Bots and private plans are future designs. Retired edition presets and their earlier rulings do not
 select current gameplay. The current variant list is in [the variant inventory](variant-inventory.md).

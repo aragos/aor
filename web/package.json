@@ -10,6 +10,7 @@
     "test:browser": "node scripts/browser-check.mjs"
   },
   "dependencies": {
+    "firebase": "^13.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

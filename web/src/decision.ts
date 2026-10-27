@@ -4,7 +4,7 @@ import type {Snapshot} from './api';
 export function decisionIdentity(snapshot: Snapshot): string {
     const {game, gameId, viewerId, prompt} = snapshot;
     const activity = game.activity;
-    return JSON.stringify([gameId, viewerId, snapshot.undo?.editRevision, game.turnNumber, game.stage, activity?.actor,
+    return JSON.stringify([gameId, viewerId, snapshot.status, snapshot.undo?.editRevision, game.turnNumber, game.stage, activity?.actor,
         activity?.decisionPlayer, activity?.choice, activity?.purchaseStep, activity?.decisionEntry,
         prompt?.messageId]);
 }

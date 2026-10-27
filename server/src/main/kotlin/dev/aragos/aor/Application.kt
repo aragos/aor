@@ -7,31 +7,93 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.call
+import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.bodylimit.RequestBodyLimit
+import io.ktor.server.plugins.compression.Compression
+import io.ktor.server.plugins.compression.CompressionConfig
+import io.ktor.server.plugins.compression.condition
+import io.ktor.server.plugins.compression.gzip
+import io.ktor.server.plugins.compression.minimumSize
+import io.ktor.server.plugins.defaultheaders.DefaultHeaders
+import io.ktor.server.request.path
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.header
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondFile
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 fun main() {
     val port =
-        System.getenv("AOR_HTTP_PORT")?.let { configured ->
+        (System.getenv("AOR_HTTP_PORT") ?: System.getenv("PORT"))?.let { configured ->
             requireNotNull(configured.toIntOrNull()) {
                 "AOR_HTTP_PORT must be a whole-number port."
             }
         } ?: 8080
     require(port in 1..65535) { "AOR_HTTP_PORT must be between one and 65535." }
-    embeddedServer(Netty, port = port, host = "127.0.0.1", module = { module() }).start(wait = true)
+    val host = System.getenv("AOR_HTTP_HOST") ?: "127.0.0.1"
+    require(
+        host in setOf("127.0.0.1", "localhost", "::1") ||
+            System.getenv("AOR_AUTH_MODE") == "firebase"
+    ) {
+        "Public listening requires Firebase authentication; local mode must stay on loopback."
+    }
+    embeddedServer(Netty, port = port, host = host, module = { module() }).start(wait = true)
 }
 
-fun Application.module(service: GameService = createGameService()) {
+fun Application.module(
+    service: GameService = createGameService(),
+    hosted: HostedServices? = createHostedServices(service),
+) {
+    install(DefaultHeaders) {
+        header("Server", "aor")
+        header("X-Content-Type-Options", "nosniff")
+        header("Referrer-Policy", "same-origin")
+        header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        header(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://*.firebaseapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        )
+        if (hosted != null) header("Strict-Transport-Security", "max-age=31536000")
+    }
+    install(RequestBodyLimit) {
+        bodyLimit { call ->
+            when {
+                call.request.path().startsWith("/api/admin/games/") &&
+                    call.request.path().endsWith("/log") -> 8L * 1024 * 1024
+                call.request.path().endsWith("/history") -> 524288L
+                else -> 16384L
+            }
+        }
+    }
+    install(Compression) {
+        mode = CompressionConfig.Mode.CompressResponse
+        gzip {
+            minimumSize(1024)
+            condition {
+                !request.path().startsWith("/api/") ||
+                    request.headers["Sec-Fetch-Site"] == "same-origin"
+            }
+        }
+    }
+    monitor.subscribe(ApplicationStopped) { (hosted?.verifier as? AutoCloseable)?.close() }
+
     routing {
+        get("/api/config") {
+            call.respondJson(hosted?.publicConfig ?: PublicApplicationConfig("local", null, 1000))
+        }
+        if (hosted != null) hostedRoutes(hosted)
         get("/api/health") { call.respondText("{\"status\":\"ok\"}", ContentType.Application.Json) }
         post("/api/games") {
             call.api {
@@ -42,21 +104,24 @@ fun Application.module(service: GameService = createGameService()) {
                         ?: UndoPolicy.REGULAR_TURN
                 val options = body["options"]
                 val rules =
-                    if (options == null) RuleOptions()
-                    else {
-                        if (!options.isObject || options.size() > 4)
+                    if (options == null) {
+                        RuleOptions()
+                    } else {
+                        if (!options.isObject || options.size() > 4) {
                             throw ServiceFailure(400, "INVALID_REQUEST")
+                        }
                         options.properties().fold(RuleOptions()) { configured, (key, value) ->
                             RuleOptionCommand(key, value.string()).resolve(configured)
                         }
                     }
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.create(
-                            names = body.field("players").array().map(JsonNode::string),
-                            rules = rules,
-                            undoPolicy = undoPolicy,
-                        )
+                        val players = body.field("players").array().map(JsonNode::string)
+                        if (hosted == null) {
+                            service.create(players, rules, undoPolicy)
+                        } else {
+                            hosted.create(hosted.identity(call.token()), players, rules, undoPolicy)
+                        }
                     }
                 call.respondJson(result, HttpStatusCode.Created)
             }
@@ -65,9 +130,20 @@ fun Application.module(service: GameService = createGameService()) {
             call.api {
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.get(call.parameters["id"]!!, call.token())
+                        service.read(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            call.request.headers[HttpHeaders.IfNoneMatch],
+                        )
                     }
-                call.respondJson(result)
+                call.response.header(HttpHeaders.ETag, result.etag)
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                call.response.header(HttpHeaders.Vary, "Authorization")
+                if (result.snapshot == null) {
+                    call.respond(HttpStatusCode.NotModified)
+                } else {
+                    call.respondJson(result.snapshot)
+                }
             }
         }
         get("/api/games/{id}/revisions/{revision}") {
@@ -77,7 +153,11 @@ fun Application.module(service: GameService = createGameService()) {
                         ?: throw ServiceFailure(400, "INVALID_REQUEST")
                 call.respondJson(
                     withContext(Dispatchers.IO) {
-                        service.getRevision(call.parameters["id"]!!, call.token(), revision)
+                        service.getRevision(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            revision,
+                        )
                     }
                 )
             }
@@ -87,13 +167,16 @@ fun Application.module(service: GameService = createGameService()) {
                 val body = call.body(524288)
                 body.fieldsOnly("expectedRevision", "fromEntry", "lines")
                 val lines = body.field("lines").array().map(JsonNode::string)
-                if (lines.size > 10000 || lines.any { it.length > 200 || '\n' in it || '\r' in it })
+                if (
+                    lines.size > 10000 || lines.any { it.length > 200 || '\n' in it || '\r' in it }
+                ) {
                     throw ServiceFailure(400, "INVALID_HISTORY_EDIT")
+                }
                 call.respondJson(
                     withContext(Dispatchers.IO) {
                         service.editHistory(
                             call.parameters["id"]!!,
-                            call.token(),
+                            call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),
                             body.field("fromEntry").integer(),
                             lines,
@@ -110,7 +193,7 @@ fun Application.module(service: GameService = createGameService()) {
                     withContext(Dispatchers.IO) {
                         service.quoteTokenPurchase(
                             call.parameters["id"]!!,
-                            call.token(),
+                            call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),
                             body.field("amount").integer(),
                         )
@@ -130,7 +213,7 @@ fun Application.module(service: GameService = createGameService()) {
                     withContext(Dispatchers.IO) {
                         service.submit(
                             call.parameters["id"]!!,
-                            call.token(),
+                            call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),
                             command,
                         )
@@ -138,21 +221,43 @@ fun Application.module(service: GameService = createGameService()) {
                 call.respondJson(result)
             }
         }
+        System.getenv("AOR_WEB_DIR")?.let { directory ->
+            val web = File(directory)
+            require(File(web, "index.html").isFile) {
+                "AOR_WEB_DIR must contain the built web client."
+            }
+            staticFiles("/assets", File(web, "assets")) {
+                modify { _, call ->
+                    call.response.header(
+                        HttpHeaders.CacheControl,
+                        "public, max-age=31536000, immutable",
+                    )
+                }
+            }
+            get("/") {
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+                call.respondFile(File(web, "index.html"))
+            }
+            get("/games/{id}") {
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+                call.respondFile(File(web, "index.html"))
+            }
+        }
     }
 }
 
-private fun ApplicationCall.token(): String =
+internal fun ApplicationCall.token(): String =
     request.headers[HttpHeaders.Authorization]
         ?.takeIf { it.startsWith("Bearer ") }
         ?.removePrefix("Bearer ") ?: throw ServiceFailure(401, "UNAUTHORIZED")
 
-private suspend fun ApplicationCall.body(maxLength: Int = 16_384) =
+internal suspend fun ApplicationCall.body(maxLength: Int = 16_384) =
     receiveText().let { text ->
         if (text.length > maxLength) throw ServiceFailure(400, "INVALID_REQUEST")
         json.readTree(text) ?: throw ServiceFailure(400, "INVALID_REQUEST")
     }
 
-private suspend fun ApplicationCall.respondJson(
+internal suspend fun ApplicationCall.respondJson(
     value: Any,
     status: HttpStatusCode = HttpStatusCode.OK,
 ) {
@@ -160,7 +265,7 @@ private suspend fun ApplicationCall.respondJson(
     respondText(json.writeValueAsString(value), ContentType.Application.Json, status)
 }
 
-private suspend fun ApplicationCall.api(block: suspend () -> Unit) {
+internal suspend fun ApplicationCall.api(block: suspend () -> Unit) {
     try {
         block()
     } catch (error: RuleViolation) {
@@ -173,7 +278,11 @@ private suspend fun ApplicationCall.api(block: suspend () -> Unit) {
             mapOf("code" to error.code, "entryIndex" to error.entryIndex),
             HttpStatusCode.fromValue(error.status),
         )
+    } catch (_: IllegalArgumentException) {
+        respondJson(mapOf("code" to "INVALID_REQUEST"), HttpStatusCode.BadRequest)
     } catch (_: JsonProcessingException) {
         respondJson(mapOf("code" to "INVALID_REQUEST"), HttpStatusCode.BadRequest)
+    } catch (_: IOException) {
+        respondJson(mapOf("code" to "STORAGE_UNAVAILABLE"), HttpStatusCode.ServiceUnavailable)
     }
 }

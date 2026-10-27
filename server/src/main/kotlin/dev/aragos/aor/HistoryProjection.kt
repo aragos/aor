@@ -21,9 +21,15 @@ internal object HistoryProjection {
                 state = after
             }
             stored.revisions
-                .filter { it.replaceFrom != null || (it.id > 1 && it.undoPolicy != null) }
+                .filter {
+                    it.replaceFrom != null ||
+                        it.adminAuthor != null ||
+                        (it.id > 1 && it.undoPolicy != null)
+                }
                 .forEach { revision ->
-                    add("# revision ${revision.id} by ${revision.author}: ${revision.command}")
+                    add(
+                        "# revision ${revision.id} by ${revision.adminAuthor?.let { "admin:$it" } ?: revision.author}: ${revision.command}"
+                    )
                 }
         }
         return PlayerHistory(state, lines, events.toList())

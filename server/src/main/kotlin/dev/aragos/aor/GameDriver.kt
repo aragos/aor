@@ -13,10 +13,15 @@ data class Revision(
     val replaceFrom: Int? = null,
     /** Present on creation and explicit setup policy commands; later revisions inherit it. */
     val undoPolicy: UndoPolicy? = null,
+    /** A new engine checkpoint is authorized by this administrator and archived separately. */
+    val adminAuthor: String? = null,
+    val administrativeAction: AdministrativeAction? = null,
+    /** Administrative audit time, in Unix milliseconds; ordinary engine deltas use zero. */
+    val at: Long = 0,
 )
 
 data class StoredGame(
-    val fileVersion: Int = 4,
+    val fileVersion: Int = 5,
     val id: String,
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
@@ -25,7 +30,30 @@ data class StoredGame(
     val pendingBids: Map<PlayerId, Int> = emptyMap(),
     /** Unrevealed hand references selected during improved setup. */
     val pendingReturns: Map<PlayerId, String> = emptyMap(),
+    /** Managed account UID per seat. Registered games have no transferable seat credentials. */
+    val memberships: Map<PlayerId, String> = emptyMap(),
+    /** Creation time in milliseconds since the Unix epoch. */
+    val createdAt: Long = System.currentTimeMillis(),
+    val initialStatus: GameStatus = GameStatus.ACTIVE,
+    /** Revisions before this checkpoint are retained in [previousArchive]. */
+    val baseRevision: Int = 0,
+    val previousArchive: String? = null,
 ) {
+    val status: GameStatus
+        get() =
+            when (
+                revisions
+                    .lastOrNull {
+                        it.administrativeAction in
+                            setOf(AdministrativeAction.CANCEL, AdministrativeAction.ABANDON)
+                    }
+                    ?.administrativeAction
+            ) {
+                AdministrativeAction.CANCEL -> GameStatus.CANCELLED
+                AdministrativeAction.ABANDON -> GameStatus.ABANDONED
+                else -> initialStatus
+            }
+
     val revision: Int
         get() = revisions.last().id
 
@@ -45,7 +73,11 @@ data class StoredGame(
                 }
         }
 
-    fun state(): GameState = replay(header, effectiveEntries().map(RecordedEntry::text))
+    private val cachedState: GameState by lazy {
+        replay(header, effectiveEntries().map(RecordedEntry::text))
+    }
+
+    fun state(): GameState = cachedState
 }
 
 /** Stable identity `revision:index` and canonical engine text in the effective log. */

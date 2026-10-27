@@ -7,7 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
-import java.util.concurrent.ConcurrentHashMap
+import java.security.MessageDigest
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -19,6 +19,25 @@ interface GameStore {
 
     /** A failed transformation or write must leave the previous value available. */
     fun update(id: String, transform: (StoredGame) -> StoredGame): StoredGame
+}
+
+/** Operational storage supports validated checkpoints without interpreting game rules. */
+interface ManagedGameStore : GameStore {
+    fun ids(): List<String>
+
+    fun document(id: String): String
+
+    fun checkpoint(
+        id: String,
+        expectedRevision: Int,
+        transform: (String, String) -> StoredGame,
+    ): StoredGame
+
+    fun purge(id: String, expectedRevision: Int)
+
+    fun archives(id: String): List<String>
+
+    fun archivedDocument(id: String, name: String): String
 }
 
 fun interface GameWriter {
@@ -53,10 +72,14 @@ object AtomicGameWriter : GameWriter {
  * Current-format local storage. Revisions are immutable deltas with explicit suffix replacements.
  */
 class FileGameStore(
-    private val directory: Path,
+    internal val directory: Path,
     private val writer: GameWriter = AtomicGameWriter,
-) : GameStore {
-    private val locks = ConcurrentHashMap<String, ReentrantLock>()
+) : ManagedGameStore {
+    private val locks = Array(256) { ReentrantLock() }
+
+    private data class Cached(val contents: String, val game: StoredGame)
+
+    private val cache = LinkedHashMap<String, Cached>(32, .75f, true)
 
     override fun create(game: StoredGame): Unit =
         lock(game.id).withLock {
@@ -74,9 +97,110 @@ class FileGameStore(
             next
         }
 
+    override fun ids(): List<String> {
+        if (!Files.exists(directory)) return emptyList()
+        return Files.list(directory).use { paths ->
+            paths
+                .filter {
+                    Files.isRegularFile(it) &&
+                        it.fileName.toString().removeSuffix(".json").matches(GAME_ID_PATTERN) &&
+                        it.fileName.toString().endsWith(".json")
+                }
+                .map { it.fileName.toString().removeSuffix(".json") }
+                .sorted()
+                .toList()
+        }
+    }
+
+    override fun document(id: String): String = lock(id).withLock { raw(id) }
+
+    override fun checkpoint(
+        id: String,
+        expectedRevision: Int,
+        transform: (String, String) -> StoredGame,
+    ): StoredGame =
+        lock(id).withLock {
+            val original = raw(id)
+            checkRevision(original, expectedRevision)
+            val hash =
+                MessageDigest.getInstance("SHA-256").digest(original.toByteArray()).joinToString(
+                    ""
+                ) {
+                    "%02x".format(it)
+                }
+            val reference = "$expectedRevision-$hash.json"
+            val replacement = transform(original, reference)
+            require(replacement.id == id) { "A checkpoint cannot change the game ID." }
+            validate(replacement)
+            val archive = directory.resolve("archives").resolve(id).resolve(reference)
+            if (Files.exists(archive)) {
+                require(Files.readString(archive) == original) {
+                    "Existing archives are immutable."
+                }
+            } else {
+                writer.write(archive, original)
+            }
+            persist(replacement)
+            replacement
+        }
+
+    override fun purge(id: String, expectedRevision: Int): Unit =
+        lock(id).withLock {
+            checkRevision(raw(id), expectedRevision)
+            val archive = directory.resolve("archives").resolve(id)
+            if (Files.exists(archive)) {
+                Files.walk(archive).use { paths ->
+                    paths.sorted(Comparator.reverseOrder()).forEach(Files::delete)
+                }
+            }
+            Files.delete(path(id))
+            synchronized(cache) { cache.remove(id) }
+        }
+
+    override fun archives(id: String): List<String> =
+        lock(id).withLock {
+            val archive = directory.resolve("archives").resolve(id)
+            if (!Files.exists(archive)) {
+                emptyList()
+            } else {
+                Files.list(archive).use { paths ->
+                    paths
+                        .map { it.fileName.toString() }
+                        .filter(ARCHIVE_PATTERN::matches)
+                        .sorted()
+                        .toList()
+                }
+            }
+        }
+
+    override fun archivedDocument(id: String, name: String): String =
+        lock(id).withLock {
+            if (!name.matches(ARCHIVE_PATTERN)) throw ServiceFailure(404, "ARCHIVE_NOT_FOUND")
+            val archive = directory.resolve("archives").resolve(id).resolve(name)
+            if (!Files.isRegularFile(archive)) throw ServiceFailure(404, "ARCHIVE_NOT_FOUND")
+            Files.readString(archive)
+        }
+
+    private fun raw(id: String): String {
+        if (!Files.exists(path(id))) throw ServiceFailure(404, "GAME_NOT_FOUND")
+        return Files.readString(path(id))
+    }
+
+    private fun checkRevision(contents: String, expected: Int) {
+        if (json.readTree(contents).field("revision").integer() != expected) {
+            throw ServiceFailure(409, "STALE_REVISION")
+        }
+    }
+
+    private fun remember(id: String, contents: String, game: StoredGame) =
+        synchronized(cache) {
+            cache[id] = Cached(contents, game)
+            if (cache.size > 32) cache.remove(cache.keys.first())
+        }
+
     private fun lock(id: String): ReentrantLock {
         if (!id.matches(GAME_ID_PATTERN)) throw ServiceFailure(404, "GAME_NOT_FOUND")
-        return locks.computeIfAbsent(id) { ReentrantLock() }
+        return locks[Math.floorMod(id.hashCode(), locks.size)]
     }
 
     private fun path(id: String): Path = directory.resolve("$id.json")
@@ -84,7 +208,9 @@ class FileGameStore(
     private fun persist(game: StoredGame) {
         try {
             validate(game)
-            writer.write(path(game.id), json.writeValueAsString(game))
+            val contents = json.writeValueAsString(game)
+            writer.write(path(game.id), contents)
+            remember(game.id, contents, game)
         } catch (_: Exception) {
             throw ServiceFailure(503, "STORAGE_UNAVAILABLE")
         }
@@ -94,7 +220,15 @@ class FileGameStore(
         val path = path(id)
         if (!Files.exists(path)) throw ServiceFailure(404, "GAME_NOT_FOUND")
         try {
-            val root = json.readTree(Files.readString(path))
+            val contents = Files.readString(path)
+            synchronized(cache) {
+                cache[id]
+                    ?.takeIf { it.contents == contents }
+                    ?.let {
+                        return it.game
+                    }
+            }
+            val root = json.readTree(contents)
             require(root.field("id").string() == id) {
                 "Stored game identifier must match its file."
             }
@@ -103,6 +237,7 @@ class FileGameStore(
                 "Active revision must match the final committed revision."
             }
             validate(stored)
+            remember(id, contents, stored)
             return stored
         } catch (_: Exception) {
             throw ServiceFailure(503, "STORAGE_UNAVAILABLE")
@@ -158,12 +293,30 @@ class FileGameStore(
                             revision.field("replaceFrom").let {
                                 if (it.isNull) null else it.integer()
                             },
+                        adminAuthor =
+                            revision.field("adminAuthor").let {
+                                if (it.isNull) null else it.string()
+                            },
+                        administrativeAction =
+                            revision.field("administrativeAction").let {
+                                if (it.isNull) null else AdministrativeAction.valueOf(it.string())
+                            },
+                        at = revision.field("at").longInteger(),
                         undoPolicy =
                             revision.field("undoPolicy").let {
                                 if (it.isNull) null else UndoPolicy.valueOf(it.string())
                             },
                     )
                 },
+            memberships =
+                root.field("memberships").properties().associate { (player, uid) ->
+                    PlayerId(player) to uid.string()
+                },
+            createdAt = root.field("createdAt").longInteger(),
+            initialStatus = GameStatus.valueOf(root.field("initialStatus").string()),
+            baseRevision = root.field("baseRevision").integer(),
+            previousArchive =
+                root.field("previousArchive").let { if (it.isNull) null else it.string() },
             pendingReturns =
                 returnNode.properties().associate { (player, reference) ->
                     PlayerId(player) to reference.string()
@@ -176,9 +329,30 @@ class FileGameStore(
     }
 
     private fun validate(game: StoredGame) {
-        require(game.fileVersion == 4) { "Only game file version 4 is supported." }
-        require(game.credentials.keys == game.header.players.map(Player::id).toSet()) {
-            "Every registered player must have exactly one credential."
+        require(game.fileVersion == 5) { "Only game file version 5 is supported." }
+        require(game.createdAt > 0) { "Game creation time must be positive Unix milliseconds." }
+        require(
+            game.baseRevision >= 0 && (game.previousArchive != null) == (game.baseRevision > 0)
+        ) {
+            "Checkpoints require an explicit preceding revision archive."
+        }
+        require(game.previousArchive == null || game.previousArchive.matches(ARCHIVE_PATTERN)) {
+            "Archive references must be canonical revision and SHA-256 filenames."
+        }
+        val players = game.header.players.map(Player::id).toSet()
+        if (game.memberships.isEmpty()) {
+            require(game.credentials.keys == players) {
+                "Local games require one credential per player."
+            }
+        } else {
+            require(
+                game.credentials.isEmpty() &&
+                    game.memberships.keys == players &&
+                    game.memberships.values.distinct().size == players.size
+            ) {
+                "Registered games require unique account membership for every seat and no transferable credentials."
+            }
+            game.memberships.values.forEach(::AccountId)
         }
         require(game.credentials.values.all(CREDENTIAL_PATTERN::matches)) {
             "Credentials must be SHA-256 hashes encoded as 64 lowercase hexadecimal characters."
@@ -232,7 +406,10 @@ class FileGameStore(
     private fun validateRevisions(game: StoredGame): GameState =
         game.revisions.withIndex().fold(GameState(game.header)) { state, (index, revision) ->
             require(
-                revision.id == index + 1 && revision.parent == if (index == 0) null else index
+                revision.id == game.baseRevision + index + 1 &&
+                    revision.parent ==
+                        (if (index == 0 && game.baseRevision == 0) null
+                        else game.baseRevision + index)
             ) {
                 "Revisions must form a consecutive chain starting with revision 1."
             }
@@ -249,6 +426,47 @@ class FileGameStore(
                     pendingReturns = emptyMap(),
                 )
             when {
+                index == 0 && game.baseRevision > 0 -> {
+                    require(
+                        revision.adminAuthor != null &&
+                            revision.administrativeAction == AdministrativeAction.UPGRADE &&
+                            revision.command == "admin-replace-log" &&
+                            revision.at > 0 &&
+                            revision.replaceFrom == null
+                    ) {
+                        "A checkpoint must record its administrator, timestamp and replacement operation."
+                    }
+                    AccountId(revision.adminAuthor)
+                    val restored = replay(game.header, revision.entries)
+                    require(
+                        revision.entries ==
+                            revision.entries.map(TextCodec::parse).map(Entry::toText)
+                    ) {
+                        "Checkpoint entries must be canonical."
+                    }
+                    requireCompletedTransaction(restored)
+                    restored
+                }
+                revision.adminAuthor != null -> {
+                    AccountId(revision.adminAuthor)
+                    val action =
+                        checkNotNull(revision.administrativeAction) {
+                            "An administrative revision requires its operation."
+                        }
+                    require(
+                        index > 0 &&
+                            revision.administrativeAction in
+                                setOf(AdministrativeAction.CANCEL, AdministrativeAction.ABANDON) &&
+                            revision.at > 0 &&
+                            revision.entries.isEmpty() &&
+                            revision.replaceFrom == null &&
+                            revision.undoPolicy == null &&
+                            revision.command == "admin-${action.name.lowercase()}"
+                    ) {
+                        "Lifecycle revisions require a canonical administrator operation."
+                    }
+                    state
+                }
                 revision.replaceFrom != null -> {
                     require(revision.undoPolicy == null) {
                         "A history edit cannot change the undo policy."
@@ -298,11 +516,11 @@ class FileGameStore(
         }
 
     private fun validateRevision(state: GameState, index: Int, revision: Revision): GameState {
-        require(revision.id == index + 1 && revision.parent == if (index == 0) null else index) {
-            "Revisions must form a consecutive chain starting with revision 1."
-        }
         require(revision.author in state.playerIds) {
             "Revision authors must be registered players."
+        }
+        require(revision.adminAuthor == null && revision.administrativeAction == null) {
+            "Ordinary revisions cannot claim administrative authority."
         }
         val entries = revision.entries.map(TextCodec::parse)
         val actions = entries.filterIsInstance<Entry.Action>()
@@ -404,6 +622,7 @@ class FileGameStore(
 
     private companion object {
         val GAME_ID_PATTERN = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+        val ARCHIVE_PATTERN = Regex("[1-9][0-9]*-[0-9a-f]{64}\\.json")
         val CREDENTIAL_PATTERN = Regex("[0-9a-f]{64}")
     }
 }

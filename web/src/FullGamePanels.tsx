@@ -1,6 +1,6 @@
 import {ChoiceButtons} from './DecisionControls';
 import {PlayedLeaders} from './TablePanels';
-import {useState} from 'react';
+import {isBoolean, isString, useStoredSetting} from './preferences';
 import type {ProvinceDefinition, ProvinceView, PublicCatalog, Snapshot} from './api';
 import {label, playerName, provinceName} from './labels';
 import {t} from './messages';
@@ -98,9 +98,9 @@ function ProvinceRow({snapshot, catalog, province}: {
 }
 
 export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
-    const [filter, setFilter] = useState('');
-    const [occupiedOnly, setOccupiedOnly] = useState(false);
-    const [area, setArea] = useState('');
+    const [filter, setFilter] = useStoredSetting('board-search', '', isString);
+    const [occupiedOnly, setOccupiedOnly] = useStoredSetting('board-occupied', false, isBoolean);
+    const [area, setArea] = useStoredSetting('board-area', '', isString);
     const catalog = snapshot.game.catalog;
     if (!catalog || snapshot.game.turnNumber === null) return null;
     const provinces = catalog.provinces.filter(province => {

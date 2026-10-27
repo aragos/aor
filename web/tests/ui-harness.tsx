@@ -38,6 +38,7 @@ window.setUiSnapshot = snapshot => {
 };
 window.fetch = async (input, init) => {
     const path = String(input);
+    if (path === '/api/config') return new Response(JSON.stringify({authMode: 'local', firebase: null, pollIntervalMs: 1000}));
     if (!path.startsWith('/api/games/')) throw new Error(`Unexpected harness request: ${path}`);
     window.uiRequests++;
     if (path.endsWith('/quote-token-purchase')) {

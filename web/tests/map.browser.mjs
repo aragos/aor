@@ -1,4 +1,5 @@
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
+import {checkPortal} from './portal.browser.mjs';
 import {checkSetupEvidence, checkDecisionEvidence} from './nextsteps.browser.mjs';
 import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
@@ -272,6 +273,9 @@ await page.send('Page.navigate', {url: web + actor.path});
             await page.click('Fit map');
         }
         if (province === 'visby') {
+            // A pointer left over land after zoom also draws an outline. Isolate neighbor styling.
+            await page.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
+            await page.wait(`!document.querySelector('[data-province-outline="malmo"]')`, 'unrelated Malmo has no neighbor outline');
             assert.equal(await page.evaluate(`document.querySelector('[data-province-outline="malmo"]') !== null`),false,'Visby inspection does not highlight Malmo as a neighbor');
             const point=await page.evaluate(`(() => {document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'});const rect=document.querySelector('[data-map-province="visby"]').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
             await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-450,modifiers:2});
@@ -485,6 +489,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     console.log('Passed: continental frame selection, live placement and rejection, draft preservation, inspection, keyboard picking, zoom, mobile layout, 3–6 player boards, pirate limits, War overseas limits, mixed owners and ages.');
     await checkDecisionEvidence(page,web,after);
     await checkSetupEvidence(page,web);
+    await checkPortal(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

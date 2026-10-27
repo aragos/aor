@@ -169,3 +169,22 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .marker-reduction { margin-block: .75rem; }
 .competition-log { margin-bottom: 1rem; }
 .competition-log .competition-notice { margin-block: .5rem; }
+/* Account pages share the table's colours and remain usable on small screens. */
+.account-bar {display:flex; align-items:center; gap:1rem; padding:.6rem max(1rem, calc((100% - 1440px)/2)); background:var(--paper, #faf5e8); border-bottom:1px solid #cbbd9e; flex-wrap:wrap;}
+.account-bar span {margin-left:auto; overflow-wrap:anywhere;}
+.account-form {display:grid; gap:1rem;}
+.account-form label, .create-registered label {display:grid; gap:.4rem;}
+.portal {max-width:1100px; margin:auto; padding:1.25rem;}
+.portal > .panel {margin-bottom:1.25rem;}
+.portal summary {cursor:pointer; font-weight:600; padding:.5rem 0;}
+.portal .choice-buttons {margin:.7rem 0;}
+.player-directory, .game-directory {list-style:none; padding:0;}
+.player-directory li {display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.65rem 0; border-bottom:1px solid #d6ccb7;}
+.player-directory small {display:block; overflow-wrap:anywhere; opacity:.7;}
+.game-directory > li {padding:1.2rem 0; border-top:1px solid #d6ccb7;}
+.game-list-heading {display:flex; align-items:center; flex-wrap:wrap; gap:1rem;}
+.game-list-heading .button {margin-left:auto;}
+.button-row {display:flex; gap:.6rem; flex-wrap:wrap; margin:.7rem 0;}
+.admin-game {padding:.6rem; background:#00000006;}
+.admin-game > details {margin-top:1rem;}
+.danger {background:#8b2626; color:white;}

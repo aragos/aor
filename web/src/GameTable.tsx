@@ -60,23 +60,25 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     if (!me) return null;
     const expansionPlayer = expansion ? snapshot.game.players.find(player => player.id === snapshot.game.activity?.actor) : undefined;
     const finished = snapshot.game.stage === 'FINISHED';
+    const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
     const hasContext = !!(selectedCard || selectedAdvance || province);
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
-    const decision = finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
+    const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
     return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <header className="game-header">
             <div className="game-brand"><span className="brand-emblem" aria-hidden="true">A</span><div><h1>{t('app.title')}</h1>
                 <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t('game.epoch')} {snapshot.game.currentEpoch}</p></div></div>
             <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
-            <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
+            {!snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                 <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                     href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
-            </details>
+            </details>}
             <button type="button" className="secondary commands-toggle" aria-expanded={commandsOpen} onClick={() => {setCommandsOpen(current => !current); if (!commandsOpen) setTimeout(() => document.querySelector('.command-dock')?.scrollIntoView({block: 'nearest'}), 0);}}>›_ {t('table.commands')}</button>
         </header>
         <PlayerOverview snapshot={snapshot}/>
+        {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
         {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
         <FinalScores snapshot={snapshot}/>
         <div className="table-workspace">
@@ -127,7 +129,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} busy={busy} submit={submit} select={setSelected}/>}
                 {snapshot.undo?.available && <button type="button" className="secondary undo-action" disabled={busy}
                     onClick={() => { void submit('undo'); }}>{t('history.undo')}</button>}
-                <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>
+                {!inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
                 {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
                 <div className="available-resources"><p className="eyebrow">{t('table.available')}</p><strong>${me.cash}</strong><small>{t('game.cash')}</small>

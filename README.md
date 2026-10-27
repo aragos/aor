@@ -11,6 +11,8 @@ a marker from another controlled province. Commodity payments continue their qua
 beyond the printed boxes. Both project rulings are implemented and replayable.
 
 - [Product requirements](docs/requirements.md): goals, acceptance contracts and open decisions.
+- [Online deployment](docs/deployment.md): accounts, Render/Firebase setup, security updates and admin tools.
+- [Follow-up decisions](docs/follow-ups.md): launch prerequisites and remaining map/maintenance review.
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
 - [Command language](docs/commands.md): complete syntax, parameters and recorded outcomes.
@@ -30,7 +32,7 @@ server/   Ktor application, depending on core
 web/      React/TypeScript client, built independently with Vite
 ```
 
-Use JDK 21 and a Node version supported by Vite 7 (20.19+ or 22.12+). Install web dependencies once from the repository
+Use JDK 21 and Node 24.12 or newer. Install web dependencies once from the repository
 root with `npm install`.
 
 Run the server with `./gradlew :server:run`, and the web client in another terminal with `npm start`. The server uses
@@ -44,7 +46,9 @@ see the [command language](docs/commands.md) for all input forms.
 Games and unrevealed bids are saved in `.aor-data/` at the repository root when using `:server:run`.
 Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_HTTP_PORT` to change the server port. Use one server process per data directory.
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
-The local server listens on `127.0.0.1`. Accounts, private plans and bots remain deferred.
+The local server listens on `127.0.0.1`. Hosted mode uses verified Firebase accounts, registered
+player handles, membership-based game access and an administrative game dashboard. See
+[deployment](docs/deployment.md) for configuration. Private plans and bots remain deferred.
 
 Choose variants on the player-registration screen: swap Timber and War between decks 1 and 2,
 restrict the opening deal to no Crusades, no events or commodities only, and optionally enable an
@@ -58,9 +62,10 @@ Use **Undo last action** in the decision panel or the suffix editor under **Comm
 are audited, preserve existing randomness, and invalidate stale drafts. See [the design](docs/design.md#4-revisions-and-undo)
 for scope limits and [commands](docs/commands.md#application-history-commands) for the API.
 
-New games use file format 4 with rules version `ah1996-three-epoch-2` and data version
+New games use file format 5 with rules version `ah1996-three-epoch-2` and data version
 `ah1996-catalog-10`. The initial revision records resolved setup options. Earlier development rules
-and catalog versions are unsupported; no migration is provided under the current-format-only policy.
+and catalog versions are unsupported for ordinary play. Administrators can explicitly validate and
+publish upgraded logs with an archived preceding file; there is no automatic migration.
 The current catalog includes the reviewed Baltic land/coastal connections, sea exclusions and
 support arrows.
 Belgrade has Adriatic coastal access between Dubrovnik and Durazzo, which no longer border each other.
@@ -71,7 +76,7 @@ Mediterranean.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 From `web`, run `npm test` for focused checks and `npm run test:browser` for the isolated browser suite
-(Node 22 or newer and Chrome). The runner manages its own server, Vite, Chrome profile, and temporary
+(Node 24.12 or newer and Chrome). The runner manages its own server, Vite, Chrome profile, and temporary
 game files; see [browser verification](docs/map-design.md#data-and-verification) and the
 [visual decision coverage](docs/ui-decision-coverage.md).
 Run server tests with `./gradlew :server:test` and core JVM tests with `./gradlew :core:jvmTest`. Use

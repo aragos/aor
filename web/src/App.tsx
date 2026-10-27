@@ -1,21 +1,24 @@
-import {useEffect, useRef, useState} from 'react';
+import {lazy, Suspense, useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
-import {ApiError, errorCode, request} from './api';
-import type {CreatedGame, Snapshot} from './api';
+import {ApiError, errorCode, request, requestSnapshot} from './api';
+import type {ApplicationConfig, CreatedGame, Snapshot} from './api';
 import {t} from './messages';
-import {defaultVariants, Variants} from './Variants';
+import {defaultVariants, validVariants, Variants} from './Variants';
+import {isUndoPolicy, useStoredSetting} from './preferences';
 import {ChoiceButtons} from './DecisionControls';
 import {GameTable} from './GameTable';
 import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
 import './app.css';
 
+const HostedApp = lazy(() => import('./HostedApp'));
+
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
 
 function CreateGame() {
     const [names, setNames] = useState('Alice\nBob\nCarol');
-    const [undoPolicy, setUndoPolicy] = useState('regular-turn');
-    const [variants, setVariants] = useState(defaultVariants);
+    const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
+    const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants);
     const [created, setCreated] = useState<CreatedGame | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -48,7 +51,7 @@ function CreateGame() {
     </main>;
 }
 
-function Game({id, token}: {id: string; token: string}) {
+function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pollInterval?: number}) {
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [connectionError, setConnectionError] = useState('');
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -56,6 +59,7 @@ function Game({id, token}: {id: string; token: string}) {
     const [saved, setSaved] = useState(false);
     const busyRef = useRef(false);
     const sequence = useRef(0);
+    const etag = useRef<string>();
     const path = `/api/games/${id}`;
 
     useEffect(() => {
@@ -65,19 +69,22 @@ function Game({id, token}: {id: string; token: string}) {
             if (!busyRef.current) {
                 const current = ++sequence.current;
                 try {
-                    const next = await request<Snapshot>(path, token);
-                    if (active && current === sequence.current) { setSnapshot(next); setConnectionError(''); }
+                    const next = await requestSnapshot(path, token, etag.current);
+                    if (active && current === sequence.current) { etag.current = next.etag; if (next.snapshot) setSnapshot(next.snapshot); setConnectionError(''); }
                 } catch (failure) { if (active && current === sequence.current) setConnectionError(errorCode(failure)); }
             }
-            if (active) timer = setTimeout(() => { void poll(); }, 1000);
+            if (active) timer = setTimeout(() => { void poll(); }, document.hidden ? 60000 : pollInterval);
         }
+        const visible = () => {if (!document.hidden) {clearTimeout(timer); void poll();}};
+        document.addEventListener('visibilitychange', visible);
         void poll();
-        return () => { active = false; clearTimeout(timer); };
-    }, [path, token]);
+        return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
+    }, [path, token, pollInterval]);
 
     async function mutate(endpoint: string, operation: Record<string, unknown>): Promise<boolean> {
         if (!snapshot || busyRef.current) return false;
         busyRef.current = true; ++sequence.current;
+        etag.current = undefined;
         setBusy(true); setActionError(null); setSaved(false);
         try {
             setSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...operation}));
@@ -99,7 +106,12 @@ function Game({id, token}: {id: string; token: string}) {
 }
 
 export function App() {
+    const [config, setConfig] = useState<ApplicationConfig | null>(null);
+    const [error, setError] = useState('');
+    useEffect(() => {void request<ApplicationConfig>('/api/config').then(setConfig).catch(failure => setError(errorCode(failure)));}, []);
     const match = /^\/games\/([0-9a-f-]+)\/?$/.exec(window.location.pathname);
+    if (!config) return <main className="landing panel"><h1>{t('app.title')}</h1>{error ? <ErrorMessage code={error}/> : <p>{t('game.loading')}</p>}</main>;
+    if (config.authMode === 'firebase') return <Suspense fallback={<main className="landing panel"><p>{t('game.loading')}</p></main>}><HostedApp config={config} game={match ? <Game id={match[1]} pollInterval={config.pollIntervalMs}/> : null}/></Suspense>;
     if (!match) return <CreateGame/>;
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
     return token ? <Game id={match[1]} token={token}/> : <main className="landing panel"><h1>{t('app.title')}</h1><p role="alert">{t('game.missingToken')}</p><a href="/">{t('game.new')}</a></main>;

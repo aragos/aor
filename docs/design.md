@@ -2,7 +2,8 @@
 
 [Requirements](requirements.md) define product goals and acceptance. [engine.md](engine.md) defines the pure game engine; [rules.md](rules.md) is the game-rules reference.
 This document covers application architecture, storage, player interaction and development scope.
-The three-epoch human game, selected variants, visual table and scoped history editing are implemented.
+The three-epoch human game, selected variants, visual table, scoped history editing and registered
+account hosting are implemented. [Deployment](deployment.md) owns provider setup and operation.
 Strategy controllers and private plans remain deferred contracts.
 
 ## 1. Principles
@@ -68,11 +69,24 @@ replays one effective revision. Requests name the expected revision; reject stal
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
 
-Game file format 4 stores ordinary revision entries as deltas. An edit records `replaceFrom`, the
+Game file format 5 stores ordinary revision entries as deltas. An edit records `replaceFrom`, the
 number of effective entries to retain, and a replacement suffix containing validated actions and
 unchanged recorded outcomes. Reconstruct history by applying each delta or suffix replacement in
 revision order. Earlier revisions are immutable. The creation revision records the undo policy;
 explicit setup policy revisions carry no engine entries.
+
+An explicit administrative engine upgrade starts a new full checkpoint after archiving the preceding
+file by revision/content hash. Its revision sequence retains the previous revision offset. The
+checkpoint records the administrator and time; later writes resume delta/suffix semantics. Saved
+membership, lifecycle and undo policy remain attached. Player history edits use their usual scopes;
+administrative upgrades use a separate authenticated, validated API and never generate randomness.
+
+Managed-auth UIDs identify accounts across games; engine seat IDs remain local to a game's header.
+The server stores their membership mapping and a unique public handle/display name directory.
+Creator/admin roles are explicit. Registered games have no transferable private-seat tokens.
+Cancellation and abandonment are audited operational revisions, suppress decisions and retain
+read access; purge removes files/archives and leaves a small receipt. Deployment has one writer
+per data directory. Public APIs expose only authorized views or explicit administrative exports.
 
 Every committed transaction or edit advances `expectedRevision`; private bid replacements retain
 it. The service rejects stale edits before replay or publication. Accepted edits invalidate decision

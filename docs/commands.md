@@ -76,8 +76,11 @@ requests. The server never supplies fresh random outcomes for an edit. A rejecti
 unchanged; `HISTORY_INVALID_ENTRY` includes a zero-based replacement `entryIndex`.
 
 `GET /api/games/{id}/revisions/{revision}` reads a prior committed revision with the viewer's usual
-private-information restrictions. Game file format 4 records normal deltas and explicit suffix
+private-information restrictions. Game file format 5 records normal deltas and explicit suffix
 replacements; displayed audit comments are not replayed as engine entries.
+Administrative checkpoints retain older revision files in archives. The separate authenticated
+[operational API](deployment.md#game-operations-and-programmatic-access) owns log upgrades,
+cancellation, abandonment and purge; these are not player commands.
 
 ## Turn actions
 

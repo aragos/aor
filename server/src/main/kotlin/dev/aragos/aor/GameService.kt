@@ -10,7 +10,11 @@ class ServiceFailure(val status: Int, val code: String, val entryIndex: Int? = n
 
 data class PlayerLink(val id: PlayerId, val name: String, val path: String)
 
-data class CreatedGame(val gameId: String, val links: List<PlayerLink>)
+data class CreatedGame(
+    val gameId: String,
+    val links: List<PlayerLink>,
+    val registered: Boolean = false,
+)
 
 data class PromptView(val messageId: String, val players: List<PlayerId>)
 
@@ -33,11 +37,13 @@ data class GameSnapshot(
     val history: List<String>,
     val events: List<HistoryEventView>,
     val undo: UndoView,
+    val status: GameStatus,
+    val accountId: String?,
 )
 
 /** Authenticates players and projects the driver's state for the HTTP API. */
 class GameService(
-    private val store: GameStore,
+    internal val store: GameStore,
     private val driver: GameDriver = GameDriver(),
 ) {
     private val credentialsRandom = SecureRandom()
@@ -97,32 +103,100 @@ class GameService(
         )
     }
 
-    fun get(id: String, token: String): GameSnapshot {
-        val stored = store.read(id)
-        return snapshot(stored = stored, player = authenticate(stored, token))
+    /** Stable account membership binds each authenticated UID to an engine seat. */
+    fun createRegistered(
+        players: List<RegisteredAccount>,
+        creator: AccountId,
+        rules: RuleOptions,
+        policy: UndoPolicy,
+    ): CreatedGame {
+        if (
+            players.size !in 3..6 ||
+                players.map(RegisteredAccount::id).distinct().size != players.size ||
+                players.none { it.id == creator }
+        ) {
+            throw ServiceFailure(400, "INVALID_GAME")
+        }
+        val seats = players.mapIndexed { index, account -> PlayerId("p${index + 1}") to account }
+        val creatorId =
+            checkNotNull(seats.singleOrNull { it.second.id == creator }?.first) {
+                "The creator must have a registered seat."
+            }
+        val header =
+            GameHeader(
+                seats.map { (id, account) ->
+                    Player(id, "${account.displayName.take(32)} (@${account.handle.value})")
+                },
+                creatorId,
+            )
+        val id = UUID.randomUUID().toString()
+        store.create(
+            driver
+                .create(id, header, emptyMap(), rules, policy)
+                .copy(memberships = seats.associate { (seat, account) -> seat to account.id.value })
+        )
+        val name = header.players.single { it.id == creatorId }.name
+        return CreatedGame(id, listOf(PlayerLink(creatorId, name, "/games/$id")), registered = true)
     }
+
+    fun get(id: String, token: String): GameSnapshot = get(id, GameAccess.SeatToken(token))
+
+    fun submit(id: String, token: String, expectedRevision: Int, text: String): GameSnapshot =
+        submit(id, GameAccess.SeatToken(token), expectedRevision, text)
 
     fun quoteTokenPurchase(
         id: String,
         token: String,
         expectedRevision: Int,
         amount: Int,
+    ): TokenPurchaseQuoteResponse =
+        quoteTokenPurchase(id, GameAccess.SeatToken(token), expectedRevision, amount)
+
+    fun editHistory(
+        id: String,
+        token: String,
+        expectedRevision: Int,
+        fromEntry: Int,
+        lines: List<String>,
+    ): GameSnapshot =
+        editHistory(id, GameAccess.SeatToken(token), expectedRevision, fromEntry, lines)
+
+    fun getRevision(id: String, token: String, revision: Int): GameSnapshot =
+        getRevision(id, GameAccess.SeatToken(token), revision)
+
+    internal fun get(id: String, access: GameAccess): GameSnapshot {
+        val stored = store.read(id)
+        return snapshot(stored = stored, player = authenticate(stored, access))
+    }
+
+    internal fun quoteTokenPurchase(
+        id: String,
+        access: GameAccess,
+        expectedRevision: Int,
+        amount: Int,
     ): TokenPurchaseQuoteResponse {
         val stored = store.read(id)
-        val player = authenticate(stored, token)
+        val player = authenticate(stored, access)
         if (stored.revision != expectedRevision) {
             throw ServiceFailure(409, "STALE_REVISION")
         }
+        if (stored.status != GameStatus.ACTIVE) throw ServiceFailure(422, "GAME_INACTIVE")
         return TokenPurchaseQuoteResponse(
             stored.revision,
             TokenPurchaseProjection.quote(stored.state(), player, amount),
         )
     }
 
-    fun submit(id: String, token: String, expectedRevision: Int, text: String): GameSnapshot {
+    internal fun submit(
+        id: String,
+        access: GameAccess,
+        expectedRevision: Int,
+        text: String,
+    ): GameSnapshot {
         val stored =
             store.update(id) { current ->
-                val player = authenticate(current, token)
+                val player = authenticate(current, access)
+                if (current.status != GameStatus.ACTIVE) throw ServiceFailure(422, "GAME_INACTIVE")
                 if (current.revision != expectedRevision) {
                     throw ServiceFailure(409, "STALE_REVISION")
                 }
@@ -148,33 +222,37 @@ class GameService(
                     throw ServiceFailure(422, "CARD_${failure.code.name}")
                 }
             }
-        return snapshot(stored = stored, player = authenticate(stored, token))
+        return snapshot(stored = stored, player = authenticate(stored, access))
     }
 
-    fun editHistory(
+    internal fun editHistory(
         id: String,
-        token: String,
+        access: GameAccess,
         expectedRevision: Int,
         fromEntry: Int,
         lines: List<String>,
     ): GameSnapshot {
         val stored =
             store.update(id) { current ->
-                val player = authenticate(current, token)
-                if (current.revision != expectedRevision)
+                val player = authenticate(current, access)
+                if (current.status != GameStatus.ACTIVE) throw ServiceFailure(422, "GAME_INACTIVE")
+                if (current.revision != expectedRevision) {
                     throw ServiceFailure(409, "STALE_REVISION")
+                }
                 HistoryEdits.edit(current, player, fromEntry, lines)
             }
-        return snapshot(stored, authenticate(stored, token))
+        return snapshot(stored, authenticate(stored, access))
     }
 
-    fun getRevision(id: String, token: String, revision: Int): GameSnapshot {
+    internal fun getRevision(id: String, access: GameAccess, revision: Int): GameSnapshot {
         val stored = store.read(id)
-        val player = authenticate(stored, token)
-        if (revision !in 1..stored.revision) throw ServiceFailure(404, "REVISION_NOT_FOUND")
+        val player = authenticate(stored, access)
+        if (revision !in (stored.baseRevision + 1)..stored.revision) {
+            throw ServiceFailure(404, "REVISION_NOT_FOUND")
+        }
         return snapshot(
             stored.copy(
-                revisions = stored.revisions.take(revision),
+                revisions = stored.revisions.take(revision - stored.baseRevision),
                 pendingBids = emptyMap(),
                 pendingReturns = emptyMap(),
             ),
@@ -208,9 +286,28 @@ class GameService(
             revision = stored.revision,
             viewerId = player,
             creatorId = stored.header.creatorId,
-            game = state.viewForPlayer(player),
-            prompt = prompt,
-            legalChoices = state.legalChoices(player),
+            game =
+                state.viewForPlayer(player).let { view ->
+                    if (stored.status == GameStatus.ACTIVE) {
+                        view
+                    } else {
+                        view.copy(
+                            expansionOffers = emptyList(),
+                            cardOffers = emptyList(),
+                            advanceOffers = emptyList(),
+                            tokenPurchaseOffers = emptyList(),
+                            shippingOffer = null,
+                            reliefOffers = emptyList(),
+                        )
+                    }
+                },
+            prompt = prompt.takeIf { stored.status == GameStatus.ACTIVE },
+            legalChoices =
+                if (stored.status == GameStatus.ACTIVE) {
+                    state.legalChoices(player)
+                } else {
+                    LegalChoices()
+                },
             submitted =
                 state.playerIds.filter { participant ->
                     participant in stored.pendingBids || participant in stored.pendingReturns
@@ -219,11 +316,44 @@ class GameService(
             pendingReturn = stored.pendingReturns[player],
             history = history.lines,
             events = history.events,
-            undo = HistoryEdits.view(stored, player),
+            undo =
+                HistoryEdits.view(stored, player).let {
+                    if (stored.status == GameStatus.ACTIVE) it
+                    else it.copy(available = false, fromEntry = null, actions = emptyList())
+                },
+            status = stored.status,
+            accountId = stored.memberships[player],
         )
     }
 
-    private fun authenticate(stored: StoredGame, token: String): PlayerId {
+    internal fun read(id: String, access: GameAccess, ifNoneMatch: String?): GameRead {
+        val stored = store.read(id)
+        val player = authenticate(stored, access)
+        val visibleVersion =
+            listOf(
+                    stored.id,
+                    stored.revision,
+                    stored.status,
+                    player,
+                    stored.pendingBids[player],
+                    stored.pendingReturns[player],
+                    stored.pendingBids.keys.sortedBy(PlayerId::value),
+                    stored.pendingReturns.keys.sortedBy(PlayerId::value),
+                )
+                .joinToString("|")
+        val etag = '"' + digest(visibleVersion) + '"'
+        return GameRead(etag, if (ifNoneMatch == etag) null else snapshot(stored, player))
+    }
+
+    private fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
+        when (access) {
+            is GameAccess.Account ->
+                stored.memberships.entries.singleOrNull { it.value == access.id.value }?.key
+                    ?: throw ServiceFailure(403, "GAME_MEMBERSHIP_REQUIRED")
+            is GameAccess.SeatToken -> authenticateSeat(stored, access.token)
+        }
+
+    private fun authenticateSeat(stored: StoredGame, token: String): PlayerId {
         if (token.length !in 20..100) throw ServiceFailure(401, "UNAUTHORIZED")
         val hash = digest(token).toByteArray()
         return stored.credentials.entries

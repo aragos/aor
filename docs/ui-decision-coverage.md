@@ -85,6 +85,12 @@ game data, cleans them up on completion or failure, and prints the retained scre
 `CHROME_BIN` selects Chrome; `AOR_BROWSER_ARTIFACTS` selects the artifact directory;
 `AOR_BROWSER_SERVER` uses an existing server launcher while still starting an isolated instance.
 
+`portal.browser.mjs` also checks registered-player search with stable IDs, the combined creation
+form, persisted game status filters, the administrator's all-game view, lifecycle actions and
+creator approvals. Server integration tests establish authentication, membership privacy, archived
+log upgrades and purge behavior. Real Firebase verification/reset delivery and Render deployment
+remain launch checks in [follow-ups](follow-ups.md).
+
 The default focused suite has a three-minute budget. To run the longer live scenario:
 
 ```sh

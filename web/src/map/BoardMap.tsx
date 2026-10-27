@@ -1,4 +1,5 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {isBoolean, useStoredSetting} from '../preferences';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
@@ -97,7 +98,7 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
 export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
-    const [showSupport, setShowSupport] = useState(true);
+    const [showSupport, setShowSupport] = useStoredSetting('support-arrows', true, isBoolean);
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
     const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? []), [snapshot.game.catalog]);
