@@ -128,7 +128,6 @@ class HistoryProjectionTest {
 
     private fun startedGame(): StoredGame {
         val driver = GameDriver(FixedRandom())
-        val created = driver.create("history-test", header, emptyMap())
-        return driver.submit(created, owner, Command.Start)
+        return driver.create("history-test", header, emptyMap())
     }
 }

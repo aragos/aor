@@ -150,10 +150,241 @@ class HistoryEventsTest {
     }
 
     @Test
+    fun continuedActionsDoNotCreateActivityEntries() {
+        val entry = Entry.Action(owner, TurnCommand.Pass)
+
+        assertThat(HistoryEvents.projectAll("3:0", before, before, entry, observer)).isEmpty()
+    }
+
+    @Test
+    fun epochTransitionsHaveStablePublicEntriesWithoutRevealingTheShuffle() {
+        val after = before.copy(currentEpoch = Epoch.TWO, deck = listOf("stone-1"))
+
+        val events =
+            HistoryEvents.projectAll("4:0", before, after, Entry.Shuffle(after.deck), observer)
+
+        assertThat(events.map(HistoryEventView::kind)).containsExactly(HistoryEventKind.NEXT_EPOCH)
+        assertThat(events.single().amount).isEqualTo(2)
+        assertThat(events.single().id).isEqualTo("4:0:next_epoch")
+        assertThat(json.writeValueAsString(events)).doesNotContain("stone-1")
+    }
+
+    @Test
+    fun theFirstEndingTriggerCreatesAnExplicitEntry() {
+        val initial = before.copy(stage = Stage.DRAW_CARD, currentEpoch = Epoch.THREE)
+        val after = initial.copy(endingTriggered = true)
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val events = HistoryEvents.projectAll("4:1", initial, after, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.DRAW_CARD, HistoryEventKind.ENDING_TRIGGERED)
+            .inOrder()
+        assertThat(json.writeValueAsString(events)).doesNotContain(card.definition.id)
+    }
+
+    @Test
+    fun existingEndingTriggersAreNotAnnouncedAgain() {
+        val initial = before.copy(stage = Stage.DRAW_CARD, endingTriggered = true)
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val events = HistoryEvents.projectAll("4:2", initial, initial, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind)).containsExactly(HistoryEventKind.DRAW_CARD)
+    }
+
+    @Test
+    fun finishingFinalCardPlayAnnouncesTheGameResult() {
+        val initial = before.copy(stage = Stage.FINAL_CARD_PLAY)
+        val after = initial.copy(stage = Stage.FINISHED)
+
+        val events =
+            HistoryEvents.projectAll(
+                "5:0",
+                initial,
+                after,
+                Entry.Action(owner, TurnCommand.Pass),
+                observer,
+            )
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.GAME_FINISHED)
+    }
+
+    @Test
+    fun incomeIsPreservedWhenTheTriggeringContinuedEntryIsOmitted() {
+        val after =
+            before.copy(
+                players = before.players + (owner to before.playerState(owner).copy(cash = 58))
+            )
+
+        val events =
+            HistoryEvents.projectAll(
+                "3:0",
+                before,
+                after,
+                Entry.Action(owner, TurnCommand.Pass),
+                observer,
+            )
+
+        assertThat(events.single().kind).isEqualTo(HistoryEventKind.INCOME)
+        assertThat(events.single().actor).isNull()
+        assertThat(events.single().cashChanges).containsExactly(HistoryCashChangeView(owner, 18))
+    }
+
+    @Test
+    fun cashCostsStayWithTheirRelevantAction() {
+        val after =
+            before.copy(
+                players = before.players + (owner to before.playerState(owner).copy(cash = 30))
+            )
+
+        val event =
+            HistoryEvents.project(
+                "3:0",
+                before,
+                after,
+                Entry.Action(owner, TurnCommand.BuyCard),
+                observer,
+            )
+
+        assertThat(event?.kind).isEqualTo(HistoryEventKind.BUY_CARD)
+        assertThat(event?.cashChanges).containsExactly(HistoryCashChangeView(owner, -10))
+    }
+
+    @Test
+    fun regularDrawExplainsWhyTheCardWasAwarded() {
+        val initial = before.copy(stage = Stage.DRAW_CARD)
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val event = HistoryEvents.project("3:0", initial, initial, entry, observer)
+
+        assertThat(event?.drawReason).isEqualTo(CardDrawReason.TURN_DRAW)
+        assertThat(event?.card).isNull()
+    }
+
+    @Test
+    fun urbanAscendancyDrawExplainsThePurchase() {
+        val initial = before.copy(stage = Stage.BUY_CARD)
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val event = HistoryEvents.project("3:0", initial, initial, entry, observer)
+
+        assertThat(event?.drawReason).isEqualTo(CardDrawReason.URBAN_ASCENDANCY)
+    }
+
+    @Test
+    fun expansionPurchaseDrawNamesItsTokenPurchaseSource() {
+        val initial = before.copy(stage = Stage.EXPANSION)
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val event = HistoryEvents.project("3:0", initial, initial, entry, observer)
+
+        assertThat(event?.drawReason).isEqualTo(CardDrawReason.EXPANSION_PURCHASE)
+    }
+
+    @Test
+    fun mostWhiteMarkersDrawIsDistinctFromAnIncomeShortageReward() {
+        val initial = before.copy(stage = Stage.INCOME)
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val event = HistoryEvents.project("3:0", initial, initial, entry, observer)
+
+        assertThat(event?.drawReason).isEqualTo(CardDrawReason.EXPANSION_BONUS)
+    }
+
+    @Test
+    fun shortageRewardDrawExplainsItsCommodityMajoritySource() {
+        val initial = before.copy(stage = Stage.INCOME, flow = TurnFlow(shortageRolls = 2))
+        val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
+
+        val event = HistoryEvents.project("3:0", initial, initial, entry, observer)
+
+        assertThat(event?.drawReason).isEqualTo(CardDrawReason.SHORTAGE)
+    }
+
+    @Test
+    fun shortageRollNamesTheCommodityAdjustmentAndCancellation() {
+        val initial =
+            before.copy(adjustments = mapOf(Commodity.STONE to listOf(CommodityAdjustment.SURPLUS)))
+        val entry =
+            GameOutcome.Roll(GameRollKind.SHORTAGE, listOf(DieRoll(1), DieRoll(1), DieRoll(3)))
+
+        val event = HistoryEvents.project("3:0", initial, initial, entry, observer)
+
+        assertThat(event?.marketRoll)
+            .isEqualTo(
+                HistoryMarketRollView(
+                    2,
+                    listOf(Commodity.STONE),
+                    CommodityAdjustment.SHORTAGE,
+                    listOf(Commodity.STONE),
+                )
+            )
+        assertThat(event?.dice?.map(HistoryDieView::color))
+            .containsExactly(HistoryDieColor.WHITE, HistoryDieColor.BLACK, HistoryDieColor.GREEN)
+            .inOrder()
+    }
+
+    @Test
+    fun goldAndIvoryBothAppearForATotalOfTwelve() {
+        val entry =
+            GameOutcome.Roll(GameRollKind.SHORTAGE, listOf(DieRoll(6), DieRoll(6), DieRoll(4)))
+
+        val event = project(entry, observer)
+
+        assertThat(event?.marketRoll?.commodities).containsExactly(Commodity.GOLD, Commodity.IVORY)
+        assertThat(event?.marketRoll?.adjustment).isEqualTo(CommodityAdjustment.SURPLUS)
+    }
+
+    @Test
+    fun leaderActivitySeparatesProtectionMoneyAndPrintedWordRebate() {
+        val base = competitionState()
+        val leaderOwner =
+            base
+                .playerState(owner)
+                .copy(
+                    hand = listOf(HandCard("leader", CardData.definition("leonardo-da-vinci"))),
+                    advances =
+                        PlayerAdvances(
+                            listOf(
+                                AdvanceAcquisition(AdvanceId.PRINTED_WORD, 1),
+                                AdvanceAcquisition(AdvanceId.HUMAN_BODY, 1),
+                            )
+                        ),
+                )
+        val initial =
+            base.copy(
+                stage = Stage.PLAY_CARDS,
+                effects =
+                    CardTurnEffects(
+                        leaders =
+                            listOf(
+                                CardLeaderInPlay(
+                                    LeaderId.CHARLEMAGNE,
+                                    recipient,
+                                    CardLeaderRole.DISPLAY,
+                                    0,
+                                )
+                            )
+                    ),
+                players = base.players + (owner to leaderOwner),
+            )
+        val entry =
+            Entry.Action(owner, CardCommand.PlayCard("leader", CardChoice.LeaderProtection(5)))
+        val after = initial.step(entry)
+
+        val event = HistoryEvents.project("3:0", initial, after, entry, observer)
+
+        assertThat(event?.protectionCash).isEqualTo(5)
+        assertThat(event?.leaderRebate).isEqualTo(20)
+        assertThat(event?.cashChanges).containsExactly(HistoryCashChangeView(owner, 15))
+    }
+
+    @Test
     fun replayProjectsStableIdsInCommittedOrder() {
         val driver = GameDriver(FixedRandom())
-        val started =
-            driver.submit(driver.create("activity-test", header, emptyMap()), owner, Command.Start)
+        val started = driver.create("activity-test", header, emptyMap())
 
         val events = HistoryProjection.forPlayer(started, owner).events
 
@@ -244,7 +475,10 @@ class HistoryEventsTest {
         assertThat(event?.war?.totals).containsExactly(owner, 4, recipient, 3)
         assertThat(event?.war?.requiredTransfers).isEqualTo(1)
         assertThat(event?.dice)
-            .containsExactly(HistoryDieView(owner, 3), HistoryDieView(recipient, 3))
+            .containsExactly(
+                HistoryDieView(owner, 3, HistoryDieColor.WHITE),
+                HistoryDieView(recipient, 3, HistoryDieColor.BLACK),
+            )
             .inOrder()
     }
 
@@ -301,6 +535,9 @@ class HistoryEventsTest {
         )
     }
 
-    private fun project(entry: Entry, viewer: PlayerId): HistoryEventView? =
-        HistoryEvents.project("2:0", before, before, entry, viewer)
+    private fun project(entry: Entry, viewer: PlayerId): HistoryEventView? = before.let { initial ->
+        val state =
+            if (entry is GameOutcome.Draw) initial.copy(stage = Stage.INITIAL_DRAW) else initial
+        HistoryEvents.project("2:0", state, state, entry, viewer)
+    }
 }

@@ -107,7 +107,13 @@ export async function checkTable(page, web, baseline) {
     await page.wait(`window.uiCommands.length === 2 && !document.querySelector('.primary-expansion').disabled`, 'stale response refresh completed');
     assert.equal(await page.evaluate('window.uiCommands.at(-1).expectedRevision'), oldRevision, 'Stale submission uses rendered revision');
     assert.equal(await page.evaluate('window.uiCommands.length'), 2, 'Refresh never automatically retries rejected intent');
-    const nextEvent = {...baseline.events.at(-1),id:'fixture-activity-1',kind:'PASS',actor:baseline.viewerId,card:null,provinces:[],dice:[],amount:null,detail:null};
+    assert.equal(await page.evaluate(`document.querySelector('.table-activity').open`), true,
+        'Activity is visible by default');
+    await page.evaluate(`document.querySelector('.table-activity > summary').click()`);
+    await page.wait(`!document.querySelector('.table-activity').open`, 'activity explicitly collapsed');
+    const nextEvent = {...baseline.events.at(-1),id:'fixture-activity-1',kind:'BUY_CARD',actor:baseline.viewerId,
+        card:null,provinces:[],dice:[],amount:null,detail:null,drawReason:null,protectionCash:null,leaderRebate:null,
+        marketRoll:null,cashChanges:[{player:baseline.viewerId,amount:-10}]};
     const events = [...baseline.events,nextEvent];
     await show({...baseline, revision:fixture.revision+1,events});
     await page.wait(`document.querySelector('.table-activity .unread-badge')?.textContent === '1'`, 'closed activity unread count');
@@ -119,8 +125,13 @@ export async function checkTable(page, web, baseline) {
     await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     assert.equal(await page.evaluate(`document.querySelector('.table-activity .unread-badge')`), null, 'Events received while activity open remain read');
     await show({revision:fixture.revision+1,events:updatedEvents});
-    assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.activity-list [data-event-id]')].map(entry=>entry.dataset.eventId)).size`), updatedEvents.length, 'Repeated polling keeps stable unique activity entries');
+    assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.activity-list [data-event-id]')].map(entry=>entry.dataset.eventId)).size`), updatedEvents.filter(event=>event.kind!=='PASS').length, 'Repeated polling keeps stable unique activity entries');
     assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.commands-toggle')`), true, 'Activity updates preserve focus');
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /−\$10/,
+        'Activity includes the cash spent in its purchase entry');
+    await show({events:[...updatedEvents,{...nextEvent,id:'continued-omitted',kind:'PASS',cashChanges:[]}]});
+    assert.equal(await page.evaluate(`document.querySelector('[data-event-id="continued-omitted"]')`), null,
+        'Continued entries are omitted from activity');
     console.log('Passed: compact decision table, marker commitment, blocked inspection, keyboard selection, polling/viewport continuity and changed-owner interruption.');
 }
 

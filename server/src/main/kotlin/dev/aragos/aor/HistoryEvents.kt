@@ -38,16 +38,51 @@ enum class HistoryEventKind {
     DRAW_CARD,
     TRADE_CARD,
     ROLL,
+    NEXT_EPOCH,
+    ENDING_TRIGGERED,
+    GAME_FINISHED,
+    INCOME,
 }
 
-/** A die may be unassigned, or explicitly attributed to a player during a tie. */
-data class HistoryDieView(val player: PlayerId?, val value: Int)
+enum class HistoryDieColor {
+    WHITE,
+    BLACK,
+    GREEN,
+}
+
+/** War uses white for the initiator and black for the opponent; tie rolls use white. */
+data class HistoryDieView(
+    val player: PlayerId?,
+    val value: Int,
+    val color: HistoryDieColor = HistoryDieColor.WHITE,
+)
+
+enum class CardDrawReason {
+    INITIAL_DEAL,
+    TURN_DRAW,
+    URBAN_ASCENDANCY,
+    EXPANSION_PURCHASE,
+    EXPANSION_BONUS,
+    SHORTAGE,
+}
+
+/** Signed public cash movement caused by this entry, including automatic phase bookkeeping. */
+data class HistoryCashChangeView(val player: PlayerId, val amount: Int)
+
+/** White plus black selects the commodities; green selects the adjustment. */
+data class HistoryMarketRollView(
+    val total: Int,
+    val commodities: List<Commodity>,
+    val adjustment: CommodityAdjustment,
+    val cancelled: List<Commodity>,
+)
 
 /**
  * Viewer-safe activity derived from committed entries. [id] is `revision:entryIndex`, with a
- * zero-based index in that revision's delta. [card] contains a catalog identity only when public or
- * visible to this viewer; hand references and unrevealed submissions are never included. [detail]
- * contains an enum name for a choice or roll kind, not formatted prose.
+ * zero-based index in that revision's delta; synthetic transitions append `:kind`. [card] contains
+ * a catalog identity only when public or visible to this viewer; hand references and unrevealed
+ * submissions are never included. [detail] contains an enum name for a choice or roll kind, not
+ * formatted prose.
  */
 data class HistoryEventView(
     val id: String,
@@ -65,6 +100,11 @@ data class HistoryEventView(
     val dice: List<HistoryDieView> = emptyList(),
     val competition: CompetitionResultView? = null,
     val war: WarOutcomeView? = null,
+    val cashChanges: List<HistoryCashChangeView> = emptyList(),
+    val drawReason: CardDrawReason? = null,
+    val protectionCash: Int? = null,
+    val leaderRebate: Int? = null,
+    val marketRoll: HistoryMarketRollView? = null,
 )
 
 /** Public outcome from the committed board change, including Cathedral resolutions. */
@@ -72,7 +112,66 @@ data class CompetitionResultView(val attackerWon: Boolean, val defenders: Set<Pl
 
 /** Projects structured activity from typed entries, using the same audiences as command history. */
 internal object HistoryEvents {
+    /** One replay entry may also announce a public epoch or ending transition. */
+    fun projectAll(
+        id: String,
+        before: GameState,
+        after: GameState,
+        entry: Entry,
+        viewer: PlayerId,
+    ): List<HistoryEventView> = buildList {
+        val projected = project(id, before, after, entry, viewer)
+        if (projected != null) add(projected)
+        val changes = projected?.cashChanges ?: cashChanges(before, after)
+        if (projected == null && changes.isNotEmpty()) {
+            add(
+                HistoryEventView(
+                    id,
+                    HistoryEventKind.INCOME,
+                    null,
+                    before.turnNumber,
+                    after.stage,
+                    cashChanges = changes,
+                )
+            )
+        }
+        fun transition(kind: HistoryEventKind, amount: Int? = null) =
+            HistoryEventView(
+                "$id:${kind.name.lowercase()}",
+                kind,
+                null,
+                after.turnNumber,
+                after.stage,
+                amount = amount,
+            )
+        if (before.currentEpoch != after.currentEpoch) {
+            add(transition(HistoryEventKind.NEXT_EPOCH, after.currentEpoch.number))
+        }
+        if (!before.endingTriggered && after.endingTriggered) {
+            add(transition(HistoryEventKind.ENDING_TRIGGERED))
+        }
+        if (before.stage != Stage.FINISHED && after.stage == Stage.FINISHED) {
+            add(transition(HistoryEventKind.GAME_FINISHED))
+        }
+    }
+
     fun project(
+        id: String,
+        before: GameState,
+        after: GameState,
+        entry: Entry,
+        viewer: PlayerId,
+    ): HistoryEventView? =
+        projectEntry(id, before, after, entry, viewer)
+            ?.copy(cashChanges = cashChanges(before, after))
+
+    private fun cashChanges(before: GameState, after: GameState): List<HistoryCashChangeView> =
+        before.playerIds.mapNotNull { player ->
+            val change = after.playerState(player).cash - before.playerState(player).cash
+            HistoryCashChangeView(player, change).takeIf { change != 0 }
+        }
+
+    private fun projectEntry(
         id: String,
         before: GameState,
         after: GameState,
@@ -98,8 +197,10 @@ internal object HistoryEvents {
                         target = war.opponent,
                         war = war,
                         dice =
-                            listOf(war.initiator, war.opponent).zip(entry.values) { player, die ->
-                                HistoryDieView(player, die.value)
+                            listOf(war.initiator, war.opponent).zip(entry.values).mapIndexed {
+                                index,
+                                (player, die) ->
+                                HistoryDieView(player, die.value, HistoryDieColor.entries[index])
                             },
                     )
             }
@@ -123,8 +224,8 @@ internal object HistoryEvents {
                     amount = plan.addedTokens,
                     detail = if (entry is GameOutcome.Roll) entry.kind.name else "CATHEDRAL",
                     dice =
-                        (entry as? GameOutcome.Roll)?.values.orEmpty().map { die ->
-                            HistoryDieView(null, die.value)
+                        (entry as? GameOutcome.Roll)?.values.orEmpty().mapIndexed { index, die ->
+                            HistoryDieView(null, die.value, HistoryDieColor.entries[index])
                         },
                     competition =
                         CompetitionResultView(
@@ -138,7 +239,10 @@ internal object HistoryEvents {
             is Entry.Shuffle -> null
             is GameOutcome.Draw ->
                 event(HistoryEventKind.DRAW_CARD)
-                    .copy(card = entry.card.takeIf { entry.player == viewer })
+                    .copy(
+                        card = entry.card.takeIf { entry.player == viewer },
+                        drawReason = drawReason(before),
+                    )
             is GameOutcome.Trade ->
                 event(HistoryEventKind.TRADE_CARD)
                     .copy(
@@ -154,8 +258,15 @@ internal object HistoryEvents {
                         detail = entry.kind.name,
                         dice =
                             entry.values.mapIndexed { index, value ->
-                                HistoryDieView(entry.players.getOrNull(index), value.value)
+                                HistoryDieView(
+                                    entry.players.getOrNull(index),
+                                    value.value,
+                                    if (entry.kind == GameRollKind.SHORTAGE)
+                                        HistoryDieColor.entries[index]
+                                    else HistoryDieColor.WHITE,
+                                )
                             },
+                        marketRoll = marketRoll(before, entry),
                     )
             is Entry.Action -> action(before, after, entry, viewer, ::event)
         }
@@ -188,7 +299,7 @@ internal object HistoryEvents {
                                 cardId(before, entry.actor, command.reference)
                             else null
                     )
-            TurnCommand.Pass -> event(HistoryEventKind.PASS)
+            TurnCommand.Pass -> null
             is TurnCommand.SwapOrder ->
                 event(HistoryEventKind.SWAP_ORDER).copy(target = command.target)
             TurnCommand.BuyCard -> event(HistoryEventKind.BUY_CARD)
@@ -243,7 +354,7 @@ internal object HistoryEvents {
                             } else null
                     )
             is CardCommand.PlayCard ->
-                playedCard(event(HistoryEventKind.PLAY_CARD), before, entry.actor, command)
+                playedCard(event(HistoryEventKind.PLAY_CARD), before, after, entry.actor, command)
             is CardCommand.AdjustMarket ->
                 event(HistoryEventKind.ADJUST_MARKET)
                     .copy(
@@ -268,10 +379,23 @@ internal object HistoryEvents {
     private fun playedCard(
         event: HistoryEventView,
         before: GameState,
+        after: GameState,
         actor: PlayerId,
         command: CardCommand.PlayCard,
     ): HistoryEventView {
-        val played = event.copy(card = cardId(before, actor, command.reference))
+        val card = cardId(before, actor, command.reference)
+        val leader = after.effects.leaders.singleOrNull { play -> play.leader.cardId == card }
+        val played =
+            event.copy(
+                card = card,
+                protectionCash = leader?.protectionCash,
+                leaderRebate =
+                    leader?.let {
+                        (after.playerState(actor).cash - before.playerState(actor).cash +
+                                it.protectionCash)
+                            .takeIf { rebate -> rebate > 0 }
+                    },
+            )
         return when (val choice = command.choice) {
             CardChoice.None -> played
             is CardChoice.CommodityChoice -> played.copy(commodity = choice.commodity)
@@ -282,6 +406,35 @@ internal object HistoryEvents {
             is CardChoice.CategoryChoice -> played.copy(detail = choice.category?.name ?: "NONE")
             is CardChoice.LeaderProtection -> played.copy(amount = choice.cash)
         }
+    }
+
+    private fun drawReason(before: GameState): CardDrawReason =
+        when (before.stage) {
+            Stage.INITIAL_DRAW -> CardDrawReason.INITIAL_DEAL
+            Stage.DRAW_CARD -> CardDrawReason.TURN_DRAW
+            Stage.BUY_CARD -> CardDrawReason.URBAN_ASCENDANCY
+            Stage.EXPANSION -> CardDrawReason.EXPANSION_PURCHASE
+            Stage.INCOME ->
+                if (before.flow.shortageRolls == 0) CardDrawReason.EXPANSION_BONUS
+                else CardDrawReason.SHORTAGE
+            else -> error("A committed draw requires a phase that awards cards.")
+        }
+
+    private fun marketRoll(before: GameState, roll: GameOutcome.Roll): HistoryMarketRollView? {
+        if (roll.kind != GameRollKind.SHORTAGE) return null
+        val total = roll.values[0].value + roll.values[1].value
+        val commodities = CommodityData.definitions.filter { it.diceTotal == total }.map { it.id }
+        val adjustment =
+            if (roll.values[2].value <= 3) CommodityAdjustment.SHORTAGE
+            else CommodityAdjustment.SURPLUS
+        return HistoryMarketRollView(
+            total,
+            commodities,
+            adjustment,
+            commodities.filter { commodity ->
+                before.adjustments[commodity].orEmpty().any { marker -> marker != adjustment }
+            },
+        )
     }
 
     private fun cardId(state: GameState, owner: PlayerId, reference: String): String =
