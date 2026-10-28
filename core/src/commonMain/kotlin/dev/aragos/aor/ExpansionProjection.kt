@@ -44,9 +44,16 @@ internal object ExpansionProjection {
             return emptyList()
         }
         val context = BoardGame.context(state)
-        return context.configuration.provinces.map { province ->
-            offer(state, viewer, context, province)
-        }
+        return context.configuration.provinces
+            .map { province ->
+                offer(state, viewer, context, province)
+            }
+            .filter { offer ->
+                offer.blockers.none { blocker ->
+                    blocker == ViolationCode.INSUFFICIENT_EXPANSION_TOKENS ||
+                        blocker == ViolationCode.SHIPPING_CAPACITY_EXCEEDED
+                } || offer.partialPlacements.isNotEmpty()
+            }
     }
 
     private fun offer(

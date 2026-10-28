@@ -98,6 +98,50 @@ class LegalActionProjectionTest {
         assertThat(state.legalChoices(p1).commands).containsExactly("stabilize misery")
     }
 
+    @Test
+    fun unaffordableReliefRemainsAnExplicitPassDecision() {
+        val tier =
+            listOf(
+                    AdvanceId.THE_HEAVENS,
+                    AdvanceId.PATRONAGE,
+                    AdvanceId.CARAVAN,
+                    AdvanceId.WRITTEN_RECORD,
+                    AdvanceId.OVERLAND_EAST,
+                    AdvanceId.URBAN_ASCENDANCY,
+                )
+                .fold(PlayerAdvances()) { owned, advance -> owned.acquire(advance, 1) }
+        val initial =
+            purchasing(PurchaseStep.RELIEF, cash = 0).updatePlayer(p1) { player ->
+                player.copy(advances = tier, misery = MiseryStep.TWENTY)
+            }
+
+        val state = TurnEngine.normalise(initial)
+        val offers = state.viewForPlayer(p1).reliefOffers
+
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.RELIEF)
+        assertThat(state.flow.actor).isEqualTo(p1)
+        assertThat(state.legalChoices(p1).commands).containsExactly("pass")
+        assertThat(offers).isNotEmpty()
+        assertThat(offers.all { offer -> !offer.affordable }).isTrue()
+    }
+
+    @Test
+    fun stabilizationPreviewUsesTheDestinationPrintedBox() {
+        val state =
+            purchasing(PurchaseStep.STABILIZATION, cash = 0).updatePlayer(p1) { player ->
+                player.copy(
+                    misery = MiseryStep.HUNDRED,
+                    hand = listOf(HandCard("hand-1", CardData.epochOne.first())),
+                )
+            }
+
+        val preview = state.viewForPlayer(p1).stabilizationMisery
+        val stabilized = state.step(TextCodec.parse("p1: stabilize misery"))
+
+        assertThat(preview).isEqualTo(125)
+        assertThat(stabilized.playerState(p1).misery.value).isEqualTo(preview)
+    }
+
     private fun purchasing(step: PurchaseStep, cash: Int): GameState {
         val players = (1..3).map { number -> Player(PlayerId("p$number"), "Player $number") }
         val header = GameHeader(players, p1)

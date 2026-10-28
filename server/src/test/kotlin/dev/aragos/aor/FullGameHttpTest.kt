@@ -100,7 +100,6 @@ class FullGameHttpTest(private val postgres: Boolean, private val playerCount: I
                 }
                 return json.readTree(body)
             }
-            command(0, "start")
             for (seat in 0 until playerCount) {
                 command(seat, "bid-capital ${playerCount - seat}")
             }

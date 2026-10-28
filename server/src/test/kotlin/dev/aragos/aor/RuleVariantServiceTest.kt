@@ -25,9 +25,11 @@ class RuleVariantServiceTest {
             assertThat(after.game.rules).isEqualTo(options)
             assertThat(after).isEqualTo(before)
             assertThat(after.history)
-                .containsExactlyElementsIn(
+                .containsAtLeastElementsIn(
                     options.configurationCommands().map { "p1: ${it.toText()}" }
                 )
+            assertThat(after.game.stage).isEqualTo(Stage.BIDDING)
+            assertThat(after.history).contains("p1: start")
         } finally {
             directory.toFile().deleteRecursively()
         }

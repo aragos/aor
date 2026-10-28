@@ -148,14 +148,15 @@ internal object TurnEngine {
         return listOf("pass") + affordable.map { spaces -> "relieve-misery $spaces" }
     }
 
-    /** Stop only for a purchase decision that can change the player's position. */
+    /** Keep relief visible whenever the player has a tier, including unaffordable offers. */
     private fun automaticPurchaseStep(state: GameState, player: PlayerState): GameState? =
         when {
             state.flow.purchaseStep == PurchaseStep.STABILIZATION &&
                 PlayerEconomy.stabilizationCost(player) == 0L ->
                 state.copy(flow = state.flow.copy(purchaseStep = PurchaseStep.RELIEF))
             state.flow.purchaseStep == PurchaseStep.RELIEF &&
-                reliefChoices(state, player) == listOf("pass") -> finishActor(state)
+                (state.rules.miseryRelief != MiseryReliefRule.PURCHASED ||
+                    player.advances.tierCount == 0) -> finishActor(state)
             else -> null
         }
 

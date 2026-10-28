@@ -51,7 +51,6 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "start")
         service.submit(game.gameId, token(game, 0), 2, "bid-capital 10")
 
         val replaced = service.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
@@ -68,7 +67,6 @@ class GameServiceTest {
         val firstRandom = FixedRandom()
         val service = createGameService(directory, firstRandom)
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "start")
         service.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
         val secondRandom = FixedRandom()
         val restarted = createGameService(directory, secondRandom)
@@ -96,7 +94,6 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "start")
         service.submit(game.gameId, token(game, 0), 2, "bid-capital 3")
         service.submit(game.gameId, token(game, 1), 2, "bid-capital 2")
         service.submit(game.gameId, token(game, 2), 2, "bid-capital 1")
@@ -146,7 +143,6 @@ class GameServiceTest {
         val game = create(service)
         val commands =
             listOf(
-                0 to "start",
                 0 to "bid-capital 3",
                 1 to "bid-capital 2",
                 2 to "bid-capital 1",
@@ -173,7 +169,6 @@ class GameServiceTest {
         }
         val service = createGameService(directory, FixedRandom(), writer)
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "start")
         service.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
         service.submit(game.gameId, token(game, 1), 2, "bid-capital 12")
         val path = directory.resolve("${game.gameId}.json")
@@ -198,10 +193,8 @@ class GameServiceTest {
     @Test
     fun concurrentBidsCommitOneBatchInRegistrationOrder() {
         val directory = directory()
-        val service = createGameService(directory, NoRandom)
-        // A fresh authority is needed only for start's shuffle, never for distinct bids.
+        val service = createGameService(directory, FixedRandom())
         val game = service.create((1..6).map { "Player $it" })
-        createGameService(directory, FixedRandom()).submit(game.gameId, token(game, 0), 1, "start")
         val pool = Executors.newFixedThreadPool(6)
         try {
             val results =
@@ -235,8 +228,9 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "set-option deck-modification disabled")
-        service.submit(game.gameId, token(game, 0), 2, "start")
+        service.submit(game.gameId, token(game, 0), 2, "bid-capital 3")
+        service.submit(game.gameId, token(game, 1), 2, "bid-capital 2")
+        service.submit(game.gameId, token(game, 2), 2, "bid-capital 1")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
         assertThat(
@@ -255,7 +249,6 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "start")
         val path = directory.resolve("${game.gameId}.json")
         val before = Files.readString(path)
 
@@ -274,7 +267,7 @@ class GameServiceTest {
         val service = GameService(store = store, driver = GameDriver(FixedRandom()))
         val game = create(service)
 
-        val started = service.submit(game.gameId, token(game, 0), 1, "start")
+        val started = service.get(game.gameId, token(game, 0))
 
         assertThat(started.game.stage).isEqualTo(Stage.BIDDING)
         assertThat(store.read(game.gameId).revisions).hasSize(2)
@@ -291,7 +284,7 @@ class GameServiceTest {
             stored.copy(
                 header = stored.header.copy(creatorId = PlayerId("p2")),
                 revisions =
-                    stored.revisions.map { revision ->
+                    stored.revisions.take(1).map { revision ->
                         revision.copy(
                             author = PlayerId("p2"),
                             entries = defaultConfigurationText(PlayerId("p2")),
@@ -321,7 +314,7 @@ class GameServiceTest {
             stored.copy(
                 header = stored.header.copy(creatorId = PlayerId("p2")),
                 revisions =
-                    stored.revisions.map { revision ->
+                    stored.revisions.take(1).map { revision ->
                         revision.copy(
                             author = PlayerId("p2"),
                             entries = defaultConfigurationText(PlayerId("p2")),
@@ -341,7 +334,7 @@ class GameServiceTest {
     @Test
     fun storedFilesRequireCreatorIdentity() {
         val directory = directory()
-        val service = createGameService(directory, NoRandom)
+        val service = createGameService(directory, FixedRandom())
         val game = create(service)
         val path = directory.resolve("${game.gameId}.json")
         val incomplete = json.readTree(Files.readString(path)) as ObjectNode
@@ -361,7 +354,7 @@ class GameServiceTest {
     @Test
     fun storedCreatorIdentityMustBelongToARegisteredPlayer() {
         val directory = directory()
-        val service = createGameService(directory, NoRandom)
+        val service = createGameService(directory, FixedRandom())
         val game = create(service)
         val path = directory.resolve("${game.gameId}.json")
         val invalid = json.readTree(Files.readString(path)) as ObjectNode
@@ -404,7 +397,6 @@ class GameServiceTest {
         val directory = directory()
         val service = createGameService(directory, FixedRandom())
         val game = create(service)
-        service.submit(game.gameId, token(game, 0), 1, "start")
         service.submit(game.gameId, token(game, 0), 2, "bid-capital 3")
         service.submit(game.gameId, token(game, 1), 2, "bid-capital 2")
         service.submit(game.gameId, token(game, 2), 2, "bid-capital 1")
