@@ -6,6 +6,16 @@ import kotlin.test.assertFailsWith
 
 class GameCatalogTest {
     @Test
+    fun fezTouchesBothCanaryBasinAndWesternMediterranean() {
+        val seas =
+            BoardConnectionData.seaCoasts
+                .filter { coast -> coast.province == ProvinceId("fez") }
+                .map(SeaCoastConnection::sea)
+
+        assertThat(seas).containsExactly(SeaArea.CANARY_BASIN, SeaArea.WESTERN_MEDITERRANEAN)
+    }
+
+    @Test
     fun malmoSupportsOnlyStockholm() {
         val supports =
             BoardConnectionData.satelliteSupports

@@ -29,7 +29,7 @@ export async function checkEuropeanMap(page, web) {
     assert.equal((await snapshot(links[0])).game.rules.map, 'EUROPEAN');
     await page.send('Page.navigate', {url: web + links[0].path});
     await page.wait(`document.querySelector('.game-table')`, 'European game table');
-    await page.click('Start setup');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Start setup')`), false, 'Creation starts setup implicitly');
     await page.wait(`document.querySelector('#bid')`, 'European capital bids');
     for (const [index, link] of links.entries()) await send(link, 'bid-capital ' + (6 - index));
     const capitals = ['paris', 'london', 'hamburg', 'venice', 'genoa', 'barcelona'];

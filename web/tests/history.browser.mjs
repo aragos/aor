@@ -3,7 +3,6 @@ import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
 
 const game = await createGame(3, {undoPolicy:'friendly-turn'});
-await game.send(game.links[0], 'start');
 for (const [index, link] of game.links.entries()) await game.send(link, `bid-capital ${3-index}`);
 for (let step=0; step<100; step++) {
     const state=await game.snapshot(game.links[0]);

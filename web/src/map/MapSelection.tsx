@@ -63,21 +63,21 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
     kind?: 'province' | 'area';
 }) {
     const id = useId();
-    const {picker, setPicker, setWorkspace} = useMapSelection();
+    const {picker, setPicker, setWorkspace, focusRevision} = useMapSelection();
     const latestPick = useRef(onPick);
     latestPick.current = onPick;
     const initialPicker = useRef({id, kind, title, eligible, selected, pick: (province: string) => latestPick.current(province)});
     initialPicker.current = {id, kind, title, eligible, selected, pick: province => latestPick.current(province)};
     const active = picker?.id === id;
-    const activated = useRef(false);
+    const activated = useRef<number | null>(null);
     useEffect(() => {
-        if (!disabled && eligible.length > 0 && !activated.current) {
-            activated.current = true;
+        if (!disabled && eligible.length > 0 && activated.current !== focusRevision) {
+            activated.current = focusRevision;
             setPicker(initialPicker.current);
             setWorkspace('map');
             requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}));
         }
-    }, [disabled, eligible.length, kind, setPicker, setWorkspace]);
+    }, [disabled, eligible.length, focusRevision, kind, setPicker, setWorkspace]);
     useEffect(() => {
         if (!active) return;
         setPicker(current => {

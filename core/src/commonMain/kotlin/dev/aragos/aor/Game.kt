@@ -1,7 +1,7 @@
 package dev.aragos.aor
 
 const val RULES_VERSION = "ah1996-three-epoch-2"
-const val DATA_VERSION = "ah1996-catalog-12"
+const val DATA_VERSION = "ah1996-catalog-13"
 
 /**
  * A registered participant, independent of their capital or creator role.

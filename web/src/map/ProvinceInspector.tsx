@@ -12,15 +12,14 @@ export function neighbors(connections: PublicCatalog['landBorders'], province: s
     return connections.flatMap(edge => edge.first === province ? [edge.second] : edge.second === province ? [edge.first] : []);
 }
 
-export function ProvinceInspector({snapshot, province, busy, submit, select}: {
+export function ProvinceActions({snapshot, province, busy, submit}: {
     snapshot: Snapshot; province: ProvinceDefinition; busy: boolean;
-    submit: (command: string) => Promise<boolean>; select: (province: string) => void;
+    submit: (command: string) => Promise<boolean>;
 }) {
     const [partial, setPartial] = useState('');
     useEffect(() => setPartial(''), [province.id]);
     const catalog = snapshot.game.catalog;
     if (!catalog) return null;
-    const pieces = snapshot.game.board.find(pieces => pieces.id === province.id);
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const offer = snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
     const primary = offer && offer.primaryAction !== 'INSPECT';
@@ -36,20 +35,10 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
     const command = offer?.primaryAction === 'ATTACK' && !remainingPlacement ? `attack ${province.id}` : `place ${requiredTokens} ${province.id}`;
     const commands = provinceOrders(snapshot, province.id);
-    const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button" className="map-link" key={id}
-        onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
-    return <div className="province-inspector" aria-label={t('table.selectedProvince')}>
+    return <div className="province-actions" aria-label={t('table.selectedProvince')}>
         <div>
             <p className="eyebrow">{remainingPlacement ? t('table.remainingTokens') : primary ? uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
             <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
-            <p className="map-facts">{province.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
-                <span>{t('board.market')} {province.marketNumber}</span> · {province.area ? `${t('board.area')} ${province.area}` : label(province.overseas ?? '')}</p>
-            {pieces?.marker ? <p className="occupancy"><svg width="24" height="24" viewBox="-24 -24 48 48" aria-hidden="true"><PlayerPiece size={40}
-                capital={snapshot.game.players.find(player => player.id === pieces.marker?.owner)?.capital ?? null} fresh={pieces.marker.side === 'WHITE'}/></svg>
-                {' '}{playerName(snapshot, pieces.marker.owner)} · {t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')} {t('board.marker')}</p>
-                : pieces?.tokens.length ? <ul className="plain-list">{pieces.tokens.map(tokens => <li key={tokens.owner}>
-                    {playerName(snapshot, tokens.owner)}: {tokens.coloured} {t('board.old')} + {tokens.white} {t('board.new')}
-                </li>)}</ul> : <p className="muted">{t('table.unoccupied')}</p>}
         </div>
         <div className="map-orders">
             {primary && <>
@@ -86,14 +75,37 @@ export function ProvinceInspector({snapshot, province, busy, submit, select}: {
                 {commands.filter(command => command.startsWith('reduce-marker ')).map(command => <button type="button" key={command}
                     className="secondary" disabled={busy} onClick={() => { void submit(command); }}>{t('table.confirm')}</button>)}
             </details>}
-            <details className="province-details"><summary>{t('table.provinceDetails')}</summary>
-                {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
-                <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>
-                <p>{t('board.coastalNeighbors')}: {links(neighbors(catalog.coastalConnections, province.id))}</p>
-                <p>{t('board.seas')}: {catalog.seaCoasts.filter(coast => coast.province === province.id).map(coast => label(coast.sea)).join(', ') || '—'}</p>
-                <p>{t('board.supports')}: {links(catalog.satelliteSupports.filter(edge => edge.satellite === province.id).map(edge => edge.market))}</p>
-                <p>{t('board.supportedBy')}: {links(catalog.satelliteSupports.filter(edge => edge.market === province.id).map(edge => edge.satellite))}</p>
-            </details>
+
         </div>
     </div>;
+}
+
+/** Province reference stays outside the panel that owns the current decision. */
+export function ProvinceInspector({snapshot, province, select}: {
+    snapshot: Snapshot; province: ProvinceDefinition; select: (province: string) => void;
+}) {
+    const catalog = snapshot.game.catalog;
+    if (!catalog) return null;
+    const pieces = snapshot.game.board.find(holding => holding.id === province.id);
+    const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button"
+        className="map-link" key={id} onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
+    return <section className="province-inspector" aria-label={t('table.selectedProvince')}>
+        <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
+        <p className="map-facts">{province.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
+            <span>{t('board.market')} {province.marketNumber}</span> · {province.area ? `${t('board.area')} ${province.area}` : label(province.overseas ?? '')}</p>
+        {pieces?.marker ? <p className="occupancy"><svg width="24" height="24" viewBox="-24 -24 48 48" aria-hidden="true"><PlayerPiece size={40}
+            capital={snapshot.game.players.find(player => player.id === pieces.marker?.owner)?.capital ?? null} fresh={pieces.marker.side === 'WHITE'}/></svg>
+            {' '}{playerName(snapshot, pieces.marker.owner)} · {t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')} {t('board.marker')}</p>
+            : pieces?.tokens.length ? <ul className="plain-list">{pieces.tokens.map(tokens => <li key={tokens.owner}>
+                {playerName(snapshot, tokens.owner)}: {tokens.coloured} {t('board.old')} + {tokens.white} {t('board.new')}
+            </li>)}</ul> : <p className="muted">{t('table.unoccupied')}</p>}
+        <details className="province-details"><summary>{t('table.provinceDetails')}</summary>
+            {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
+            <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>
+            <p>{t('board.coastalNeighbors')}: {links(neighbors(catalog.coastalConnections, province.id))}</p>
+            <p>{t('board.seas')}: {catalog.seaCoasts.filter(coast => coast.province === province.id).map(coast => label(coast.sea)).join(', ') || '—'}</p>
+            <p>{t('board.supports')}: {links(catalog.satelliteSupports.filter(edge => edge.satellite === province.id).map(edge => edge.market))}</p>
+            <p>{t('board.supportedBy')}: {links(catalog.satelliteSupports.filter(edge => edge.market === province.id).map(edge => edge.satellite))}</p>
+        </details>
+    </section>;
 }
