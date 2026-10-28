@@ -94,7 +94,7 @@ export async function checkContextualUx(page, web, baseline) {
         blockers:['INSUFFICIENT_EXPANSION_TOKENS'], partialPlacements:[{tokens:1,resultingPool:1},{tokens:2,resultingPool:0}]}]}});
     await click(`[data-map-province="${partial.destination}"]`);
     assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').disabled`), false);
-    assert.match(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), /Place remaining tokens.*2/);
+    assert.match(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), /Place maximum possible tokens.*2/);
     await click('.primary-expansion');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `place 2 ${partial.destination}`);
     await click('.game-actions button');

@@ -15,8 +15,8 @@
     --blocker-border: #af603a;
     --result-success-fill: #edf5e5;
     --result-success-border: #acc09d;
-    --result-loss-fill: #f7eee4;
-    --result-loss-border: #c8aa8f;
+    --result-loss-fill: #fff0ee;
+    --result-loss-border: #cf857d;
     --result-pending-fill: #edf3f4;
     --result-pending-border: #9eb6c0;
     font-family: 'DM Sans', system-ui, sans-serif; color: var(--ink); background: #e9eae1;
@@ -205,9 +205,9 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .payout-reference summary { cursor: pointer; font-weight: 600; }
 .unplayed-leaders { display: block; font-size: .72rem; color: #526256; margin-top: .35rem; }
 .player-white-markers { display: flex; gap: .4rem; align-items: center; font-size: .75rem; }
-.event-die[data-die-color="GREEN"] { background: #e0eddc; border-color: #83a373; }
-.event-die[data-die-color="BLACK"] { background: #29342e; border-color: #29342e; color: #fffef8; }
-.event-die[data-die-color="WHITE"] { background: #fffef8; }
+.event-die.die-green { background: #e0eddc; border-color: #83a373; }
+.event-die.die-black { background: #29342e; border-color: #29342e; color: #fffef8; }
+.event-die.die-white { background: #fffef8; }
 @media (max-width: 700px) {
     .inspection-panel { padding: 1rem; }
     .game-brand > div { gap: .4rem; }

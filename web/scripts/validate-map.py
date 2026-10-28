@@ -158,6 +158,9 @@ assert (
     seas["CANARY_BASIN"].distance(water["granada"]) >= 12
 ), "The Canary Basin must be visibly separated from Granada."
 assert (
+    seas["WESTERN_MEDITERRANEAN"].boundary.buffer(0.03).intersection(water["fez"].boundary).length > 20
+), "Fez must share a visible frontage with the Western Mediterranean."
+assert (
     land["kongsberg"].boundary.buffer(0.03).intersection(land["malmo"].boundary).length > 20
 ), "Kongsberg and Malmo must share a visible land border."
 scandinavian_land = transform(display_point, Polygon(SCANDINAVIAN_INTERIOR)).intersection(

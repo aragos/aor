@@ -1,3 +1,4 @@
+import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkPortal} from './portal.browser.mjs';
@@ -420,6 +421,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkFinished(page, web, after);
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);
+    await checkGameplayImprovements(page, web, after);
     await checkTokenContinuity(page, web, tokenFixture);
     await checkDecisionFamilies(page, web, after);
 
