@@ -48,6 +48,10 @@ jobs:
       - run: npm test --workspace web
       - run: npm run build
       - run: npm audit --audit-level=low
+      - name: Production container
+        run: docker build --pull -t aor:verify .
+      - name: Production container with PostgreSQL
+        run: python3 scripts/check-container.py
       - name: Browser interactions
         run: npm run test:browser --workspace web
         env:
@@ -59,10 +63,6 @@ jobs:
           CHROME_BIN: /usr/bin/google-chrome
           AOR_BROWSER_SUITE: history.browser.mjs
           AOR_BROWSER_SERVER: ${{ github.workspace }}/web/scripts/postgres-browser-server.sh
-      - name: Production container
-        run: docker build --pull -t aor:verify .
-      - name: Production container with PostgreSQL
-        run: python3 scripts/check-container.py
   refresh-runtime:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     needs: verify

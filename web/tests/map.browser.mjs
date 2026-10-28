@@ -192,7 +192,7 @@ await page.send('Page.navigate', {url: web + actor.path});
         ['smyrna', ['Aegean Sea', 'Eastern Mediterranean', 'Adalia'], []],
     ]) {
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
-        await page.wait(`document.querySelector('.province-inspector .province-details')`, province+' inspection');
+        await page.wait(`document.querySelector('[data-map-province="${province}"][aria-pressed="true"]') && document.querySelector('.province-inspector .province-details')`, province+' inspection');
         await page.evaluate(`document.querySelector('.province-details').open=true`);
         const details=await page.evaluate(`document.querySelector('.province-details').textContent`);
         assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-connected-sea]')].map(sea=>sea.dataset.connectedSea).sort()`),
@@ -276,11 +276,12 @@ await page.send('Page.navigate', {url: web + actor.path});
             await page.click('Fit map');
         }
         if (province === 'visby') {
-            // Pointer and keyboard focus also draw outlines. Isolate neighbor styling.
+            // Expansion eligibility also draws an outline; only white means a neighbor.
             await page.evaluate(`document.activeElement?.blur()`);
+            await page.send('Page.bringToFront');
             await page.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
-            await page.wait(`!document.querySelector('[data-province-outline="malmo"]')`, 'unrelated Malmo has no neighbor outline');
-            assert.equal(await page.evaluate(`document.querySelector('[data-province-outline="malmo"]') !== null`),false,'Visby inspection does not highlight Malmo as a neighbor');
+            await page.wait(`!document.querySelector('[data-province-outline="malmo"][data-highlight-priority="3"]')`, 'pointer left Malmo');
+            assert.notEqual(await page.evaluate(`document.querySelector('[data-province-outline="malmo"] .province-highlight')?.getAttribute('stroke')`),'#fffdf3','Visby inspection does not highlight Malmo as a neighbor');
             const point=await page.evaluate(`(() => {document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'});const rect=document.querySelector('[data-map-province="visby"]').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
             await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-450,modifiers:2});
             await page.wait(`document.querySelector('.world-map').getAttribute('viewBox')!==${JSON.stringify(fitBeforeSeaZoom)}`, 'Baltic inspection zoom');
