@@ -70,7 +70,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all'}: Props) {
                 <div><dt>{t('table.conditionalDiscount')}</dt><dd>${discount.conditionalAmount}</dd></div></dl>
             {discount.condition && <p>{label(discount.condition)}</p>}
         </details>)}</>}
-        {action && offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
+        {inspection && offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
         {action && offer?.playable && <form onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
             {!noChoice && finiteChoices.length > 0 && <fieldset className="target-choices"><legend>{t('controls.cardChoice')}</legend>
                 {finiteChoices.map(candidate => <button type="button" key={candidate.command} className="secondary"
@@ -121,7 +121,7 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all'}: Props) {
         {inspection && <><AdvanceBenefits id={advance.id} snapshot={snapshot}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
         {offer?.price !== null && offer?.price !== undefined && <div className="price-quote"><strong>${offer.price}</strong><span>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</span></div>}
-        {action && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
+        {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
         {offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
             {label(discount.leaderCardId, 'leader')} <strong>−${discount.amount}</strong>
         </p>)}

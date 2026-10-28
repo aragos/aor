@@ -35,6 +35,7 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
     const command = offer?.primaryAction === 'ATTACK' && !remainingPlacement ? `attack ${province.id}` : `place ${requiredTokens} ${province.id}`;
     const commands = provinceOrders(snapshot, province.id);
+    if (!primary && commands.length === 0) return null;
     return <div className="province-actions" aria-label={t('table.selectedProvince')}>
         <div>
             <p className="eyebrow">{remainingPlacement ? t('table.remainingTokens') : primary ? uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>

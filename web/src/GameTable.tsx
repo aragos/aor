@@ -69,7 +69,11 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     const finished = snapshot.game.stage === 'FINISHED';
     const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
-    const hasContext = !!(selectedCard || selectedAdvance || province);
+    const hasInspection = !!(selectedCard || selectedAdvance || province);
+    const cardAction = selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
+    const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
+    const advanceAction = advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
+    const hasContext = !!(cardAction || advanceAction || (province && !picker && expanding));
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
     const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
@@ -112,7 +116,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 </div>
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={snapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
-                {hasContext && <section className="inspection-panel" aria-label={t('table.inspection')}>
+                {hasInspection && <section className="inspection-panel" aria-label={t('table.inspection')}>
                     {selectedCard ? <CardDecision key={selectedCard} mode="inspection" snapshot={snapshot} busy={busy} submit={submit}/>
                         : selectedAdvance ? <AdvanceDecision mode="inspection" snapshot={snapshot} busy={busy} submit={submit}/>
                         : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} select={setSelected}/>}
@@ -138,8 +142,8 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <div id="decision-content" className="decision-content">
                 <CompetitionNotice snapshot={snapshot}/>
                 <WarNotice snapshot={snapshot}/>
-                {selectedCard ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
-                    : selectedAdvance ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
+                {cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
+                    : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                     : province && !picker && <ProvinceActions snapshot={snapshot} province={province} busy={busy} submit={submit}/>}
                 {snapshot.undo?.available && <button type="button" className="secondary undo-action" disabled={busy}
                     onClick={() => { void submit('undo'); }}>{t('history.undo')}</button>}
