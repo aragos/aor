@@ -42,6 +42,7 @@ enum class HistoryEventKind {
     ENDING_TRIGGERED,
     GAME_FINISHED,
     INCOME,
+    HOLY_INDULGENCE,
 }
 
 enum class HistoryDieColor {
@@ -120,14 +121,18 @@ internal object HistoryEvents {
         entry: Entry,
         viewer: PlayerId,
     ): List<HistoryEventView> = buildList {
+        val incomeCollected = incomeCollected(before, after)
         val projected = project(id, before, after, entry, viewer)
         if (projected != null) add(projected)
-        val changes = projected?.cashChanges ?: cashChanges(before, after)
-        if (projected == null && changes.isNotEmpty()) {
+        val changes =
+            if (incomeCollected) cashChanges(before, after)
+            else projected?.cashChanges ?: cashChanges(before, after)
+        if ((projected == null || incomeCollected) && changes.isNotEmpty()) {
             add(
                 HistoryEventView(
-                    id,
-                    HistoryEventKind.INCOME,
+                    if (projected == null) id else "$id:income",
+                    if (after.stage == Stage.EXPANSION) HistoryEventKind.HOLY_INDULGENCE
+                    else HistoryEventKind.INCOME,
                     null,
                     before.turnNumber,
                     after.stage,
@@ -163,7 +168,15 @@ internal object HistoryEvents {
         viewer: PlayerId,
     ): HistoryEventView? =
         projectEntry(id, before, after, entry, viewer)
-            ?.copy(cashChanges = cashChanges(before, after))
+            ?.copy(
+                cashChanges =
+                    if (incomeCollected(before, after)) emptyList() else cashChanges(before, after)
+            )
+
+    private fun incomeCollected(before: GameState, after: GameState): Boolean =
+        after.stage == Stage.INCOME &&
+            after.flow.phaseBookkeepingApplied &&
+            (before.stage != Stage.INCOME || !before.flow.phaseBookkeepingApplied)
 
     private fun cashChanges(before: GameState, after: GameState): List<HistoryCashChangeView> =
         before.playerIds.mapNotNull { player ->
