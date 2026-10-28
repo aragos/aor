@@ -85,6 +85,8 @@ data class GameState(
             player.id to PlayerState(player = player)
         },
     val effects: CardTurnEffects = CardTurnEffects(),
+    /** Public leader plays across all turns; private discards never change this information. */
+    val playedLeaders: Set<LeaderId> = emptySet(),
     val activeWar: WarState? = null,
     val voids: CardVoids = CardVoids(),
     val board: BoardState = BoardState(definition = rules.map.definition),

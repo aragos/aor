@@ -64,6 +64,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const fleet = player.ships.fleet === 'NONE' ? '—' : `${label(player.ships.fleet, 'fleet')} ${player.ships.level}`;
             const eligible = playerPicker?.eligible.includes(player.id);
             const picked = playerPicker?.selected.includes(player.id);
+            const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
                     if (eligible) {event.preventDefault(); playerPicker?.pick(player.id);}
@@ -76,6 +77,9 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> {player.misery ?? t('game.chaos')}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}</span><span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span></span>
                     {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
+                    {snapshot.game.stage === 'EXPANSION' && <span className="player-white-markers" aria-label={`${t('table.whiteMarkers')}: ${whiteMarkers}`}>
+                        <b>{whiteMarkers}</b><small>{t('table.whiteMarkers')}</small>
+                    </span>}
                     {eligible && <span className="target-status">{t(picked ? 'table.selectedTarget' : 'table.legalTarget')}</span>}
                     {!finished && <span className="player-status">{status}</span>}
                 </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
@@ -93,20 +97,57 @@ export function Payouts({snapshot, payout}: {snapshot: Snapshot; payout: Commodi
     })}</span>;
 }
 
+export function CommodityAdjustments({payout}: {payout: CommodityPayoutView}) {
+    return <span className="adjustment-badges">{(['SHORTAGE', 'SURPLUS'] as const).map(adjustment => {
+        const count = payout.adjustments.filter(marker => marker === adjustment).length;
+        return count > 0 && <span key={adjustment} className={`adjustment-badge ${adjustment}`}>
+            {adjustment === 'SHORTAGE' ? '↑' : '↓'} {label(adjustment, 'adjustment')} ×{count}
+        </span>;
+    })}</span>;
+}
+
+export function PayoutReference({snapshot, payout}: {snapshot: Snapshot; payout: CommodityPayoutView}) {
+    const definition = snapshot.game.catalog?.commodities.find(commodity => commodity.id === payout.commodity);
+    if (!definition) return null;
+    return <details className="payout-reference" data-commodity={payout.commodity}><summary>{t('table.fullPayouts')}</summary>
+        <ol className="payout-boxes" aria-label={t('table.payoutBoxes')}>
+            {definition.printedPayouts.map((amount, index) => {
+                const owners = payout.owners.filter(owner => owner.effectiveBox === index + 1);
+                return <li key={index} className={`payout-box ${owners.length ? 'is-current' : ''}`}>
+                    <span>{index + 1}</span><strong>${amount}</strong>
+                    {owners.map(owner => {
+                        const player = snapshot.game.players.find(candidate => candidate.id === owner.player);
+                        return player && <span key={owner.player} title={playerName(snapshot, owner.player)}>
+                            <Emblem player={player} size={15}/><span className="sr-only">{playerName(snapshot, owner.player)}</span>
+                        </span>;
+                    })}
+                </li>;
+            })}
+        </ol><p className="small muted">{t('table.payoutOverflow')}</p>
+    </details>;
+}
+
+export function UnplayedLeaders({snapshot, advance}: {snapshot: Snapshot; advance: string}) {
+    const availability = snapshot.game.unplayedAdvanceLeaders?.find(candidate => candidate.advance === advance);
+    if (!availability) return null;
+    return <span className="unplayed-leaders" title={t('table.unplayedLeadersHint')}>
+        {t('table.unplayedLeaders')} · {availability.epochs.map(epoch => `${['I', 'II', 'III'][epoch.epoch - 1]}: ${epoch.count}`).join(' · ')}
+    </span>;
+}
+
 export function Markets({snapshot}: {snapshot: Snapshot}) {
     return <section className="markets-workspace" aria-label={t('table.markets')}>
-        <div className="market-grid">{snapshot.game.commodityPayouts.map(payout => <details className="market-tile" key={payout.commodity}>
+        <div className="market-grid">{snapshot.game.commodityPayouts.map(payout => <details className="market-tile" data-commodity={payout.commodity} key={payout.commodity}>
             <summary><Commodity commodity={payout.commodity}/>
-                <span className="adjustment-badges">{(['SHORTAGE', 'SURPLUS'] as const).map(adjustment => {
-                    const count = payout.adjustments.filter(marker => marker === adjustment).length;
-                    return count > 0 && <span key={adjustment} title={label(adjustment, 'adjustment')}>{adjustment === 'SHORTAGE' ? '↑' : '↓'}{count}</span>;
-                })}</span><Payouts snapshot={snapshot} payout={payout}/></summary>
+                <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/></summary>
             <div className="market-detail">{payout.owners.map(owner => <div key={owner.player}>
                 <strong>{playerName(snapshot, owner.player)} · ${owner.payout}</strong>
                 <p>{t('table.markets')}: {owner.marketCount} · {t('table.payoutBox')}: {owner.effectiveBox}</p>
                 <p>{owner.provinces.map(provinceName).join(', ')}</p>
                 {owner.industryBonus > 0 && <p>{advanceName('industry')}: +{owner.industryBonus} {t('table.payoutBox')}</p>}
-            </div>)}{payout.owners.length === 0 && <p>{t('table.noOwners')}</p>}</div>
+            </div>)}{payout.owners.length === 0 && <p>{t('table.noOwners')}</p>}
+                <PayoutReference snapshot={snapshot} payout={payout}/>
+            </div>
         </details>)}</div>
     </section>;
 }
@@ -125,7 +166,9 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
                 {snapshot.game.burdenReferences.includes(card.reference) && <span className="burden-badge">{t('game.burden')}</span>}
                 {offer?.commodities.map(commodity => {
                     const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
-                    return <span className="card-commodity" key={commodity}><Commodity commodity={commodity}/>{payout && <Payouts snapshot={snapshot} payout={payout}/>}</span>;
+                    return <span className="card-commodity" key={commodity}><Commodity commodity={commodity}/>{payout && <>
+                        <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/>
+                    </>}</span>;
                 })}
                 {offer?.leaderDiscounts.map(discount => <span className="leader-discount" key={discount.advance}>
                     <span>{advanceName(discount.advance)}</span><strong>−${discount.effectiveDiscount}</strong>
@@ -152,6 +195,7 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                     aria-pressed={selectedAdvance === advance.id} onClick={() => { setSelectedAdvance(advance.id); setSelected(''); setSelectedCard(''); setPicker(null); }}>
                     <span className="advance-letter">{advance.letter}</span><strong>{advanceName(advance.id)}</strong>
                     <span>{owned ? t('table.owned') : offer?.price !== null && offer?.price !== undefined ? `$${offer.price}` : '—'}</span>
+                    <UnplayedLeaders snapshot={snapshot} advance={advance.id}/>
                     {available && <small className="advance-available">{t('table.available')}</small>}
                     {offer?.leaderDiscounts?.map(discount => <small className="advance-discount" key={discount.leaderCardId}>{label(discount.leaderCardId, 'leader')} −${discount.amount}</small>)}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}
