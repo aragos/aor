@@ -32,7 +32,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Scheduled workflows run on main; refreshes must verify the selected release.
           ref: >-
@@ -82,7 +82,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.verify.outputs.commit }}
       - name: Rebuild the deployed service with fresh base images
