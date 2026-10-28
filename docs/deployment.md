@@ -62,8 +62,11 @@ quotas also apply; see [Firebase limits](https://firebase.google.com/docs/auth/l
    `/etc/secrets/firebase-admin.json`. The Admin SDK uses application-default credentials. See
    [Admin setup](https://firebase.google.com/docs/admin/setup) and
    [token verification](https://firebase.google.com/docs/auth/admin/verify-id-tokens).
-3. Connect the repository to Render and create a Blueprint from `render.yaml`. Confirm the plan,
-   PostgreSQL 18, 1 GB database storage and matching Virginia regions. Fill `AOR_FIREBASE_PROJECT_ID`
+3. Push the selected version to the remote `release` branch. Connect the repository to Render and
+   create a Blueprint from `render.yaml`, linking the Blueprint to `release` with Auto Sync enabled.
+   Confirm the service also tracks `release` with Auto-Deploy set to **After CI Checks Pass**.
+   Confirm the plan, PostgreSQL 18, 1 GB database storage and matching Virginia regions.
+   Fill `AOR_FIREBASE_PROJECT_ID`
    and `AOR_FIREBASE_WEB_API_KEY` from the web app configuration. The web API key is public configuration; the service-account JSON is
    a secret. Do not grant that service account general Editor/Owner access.
 4. Create and verify the initial administrator's Firebase account. Copy its **UID**, not its email,
@@ -160,10 +163,21 @@ authorized domains. See [Render custom domains](https://render.com/docs/custom-d
 `Checks / verify` runs Kotlin tests/JS compilation/formatting, web tests/build, browser interactions,
 the live undo suite against PostgreSQL, an npm advisory audit, and a fresh production container
 build/startup check against PostgreSQL. HTTP tests also exercise the file backend. Render's
-`checksPass` setting deploys `main` after CI succeeds. Require the `verify` check on `main` and enable
-the repository's dependency graph, Dependabot alerts/security updates and secret scanning where
-available. The separate JVM dependency-graph workflow submits transitive Gradle dependencies for
-advisory monitoring.
+`checksPass` setting deploys `release` after CI succeeds. CI runs for pushes to both `main` and
+`release`, as well as pull requests. Keep developing and merging into `main`; promote a chosen version
+to `release` and push that branch only when the owner explicitly requests a deployment. Advancing
+`release` is the deployment decision. Merging into `main` alone does not change the deployed version.
+
+Keep the Blueprint linked to `release` with Auto Sync enabled, so infrastructure changes also take
+effect when promoted to `release`. For an existing deployment, merge these workflow changes into
+`main` to replace the old scheduled refresh and include them in the chosen `release` version.
+Ensure the production Blueprint is linked to `release` and manages the existing application and
+database. Confirm that the service tracks `release` with **After CI Checks Pass**; the service branch
+is also declared in `render.yaml`.
+
+Require the `verify` check on `main` and `release` and enable the repository's dependency graph,
+Dependabot alerts/security updates and secret scanning where available. The separate JVM
+dependency-graph workflow submits transitive Gradle dependencies for advisory monitoring.
 
 Dependabot proposes npm/Gradle updates daily and Docker/Actions updates weekly. Major/minor updates
 need review. To automate patches, enable GitHub auto-merge and set repository variable
@@ -176,8 +190,13 @@ executes PR code with write permissions. A ruleset-only setup needs a correspond
 before automatic patch merging will activate.
 
 For weekly runtime/base-image refreshes, set Actions secret `RENDER_API_KEY` and repository variable
-`RENDER_SERVICE_ID`. Monday's successful full verification requests a cache-cleared rebuild of the
-exact tested commit via the [Render deployment API](https://api-docs.render.com/reference/create-deploy).
+`RENDER_SERVICE_ID`. Monday's scheduled workflow is defined on `main` but checks out and fully verifies
+`release`, then requests a cache-cleared rebuild of that exact tested commit via the
+[Render deployment API](https://api-docs.render.com/reference/create-deploy). Manually running
+**Checks** on `main` or `release` performs the same release verification and refresh. Push and pull
+request runs never request a runtime refresh. A new release push cancels an in-progress refresh run;
+the refresh also skips its deployment request if `release` has changed since verification. Refreshes
+do not promote newer application code from `main`.
 Use a dedicated Render account/key with access only to the deployment's workspace and rotate it.
 Without those settings, CI reports that automatic runtime refresh is disabled. Watch failed checks
 and deployment notifications; automation does not guarantee that every future security fix is
