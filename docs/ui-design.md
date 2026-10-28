@@ -1,97 +1,78 @@
 # UX and UI principles
 
-The product is a visual game table for Age of Renaissance. A player should understand the position,
-identify the next meaningful decision, and act with confidence. Every supported player decision must be
-available through both visual controls and the command interface, on desktop and narrow screens.
-
-This document owns application-wide interaction requirements. [Map design](map-design.md) adds
-spatial contracts; [application design](design.md) owns architecture; [rules](rules.md) owns mechanics.
-[Coverage](ui-decision-coverage.md) records evidence, and [next steps](ux-next-steps.md) proposes work.
+AoR is a visual game table. Players must understand the position, find the next decision, prepare a
+choice and understand its result through visual controls and commands, on desktop and narrow screens.
+[Map design](map-design.md) owns spatial contracts, [rules](rules.md) mechanics and
+[design](design.md) architecture. [Coverage](ui-decision-coverage.md) records evidence;
+[UX review](ux-next-steps.md) records remaining work.
 
 ## Interaction rules
 
-1. **Present authoritative facts.** The engine owns legality, commitments, prices, eligibility and
-   effects. Render typed, viewer-safe projections and submit canonical commands through the same
-   authorization and revision checks as text input. Geometry, English prose and log text cannot
-   supply game rules. Preserve private audiences in previews, readiness and history.
+1. **Render authoritative facts.** Use typed, viewer-safe engine projections for legality, prices,
+   targets, commitments and effects. Visual controls submit canonical commands through the same
+   authorization and revision checks as text input. Preserve private audiences in every preview.
+2. **Keep choices meaningful.** Resolve setup during creation and skip empty bookkeeping. Prepare
+   sole legal choices and useful numeric defaults without committing them. Retain blocked relief as
+   an explicit decision for players with an advance tier, with its explanation and Pass.
+3. **Organize attention around action.** Show actor, request and relevant resources together. Open
+   the relevant workspace once per decision boundary; polling must not repeatedly redirect it.
+   Interruptions name the required responder and the activity that resumes.
+4. **Separate reference from action.** Cards, advances, provinces and players remain inspectable in
+   a dedicated surface. Inspecting another object must preserve the active form, prepared targets
+   and picker. Inspection, eligibility, draft selection and commitment have distinct cues.
+5. **Define draft lifetimes.** Polling and navigation preserve valid drafts and viewport. Replaced
+   decisions and accepted history edits clear obsolete selections. Successful pass/card play closes
+   its action context; rejection retains correctable input. Mark invalid choices and prevent stale
+   submission. A preauthorized queued action submits once only when legal, never retries a failure.
+6. **Explain consequences locally.** Show costs, modifiers, remaining resources and deterministic
+   effects before commitment. Distinguish current, projected, conditional and uncertain values;
+   discounts, final prices and cash receipts are different quantities. Offer feasible alternatives.
+7. **Use consistent identity and emphasis.** Capital names identify powers; before assignment use
+   human names, retained in player overviews. Reuse symbols, owner silhouettes, quantities and terms.
+   Dice state their colors. Wins/losses have text and green/red styling; color alone conveys nothing.
+8. **Keep summaries compact.** Give each fact a predictable home, with decision-relevant state at
+   rest and full tracks/breakdowns in optional detail. Remove repeated structure before shrinking
+   text. Localize ordinary play; command syntax and internal IDs belong in technical views.
+9. **Show consequential feedback.** Distinguish accepted, rejected, waiting and private-submission
+   states. Keep results until dismissed or their scope ends; dismissing results never deletes
+   history. Activity opens by default, explains effects and excludes continuation noise. Announce
+   updates without taking focus or erasing unrelated feedback.
+10. **Verify complete accessible flows.** Keyboard, touch and pointer actions need meaningful names,
+    visible focus and readable contrast. Support six players, large hands, zoom, reduced motion and
+    narrow screens. Keep the commit action reachable while inspecting and scrolling.
 
-2. **Ask only meaningful questions.** The engine advances past bookkeeping with no effect or legal
-   decision. Prepare a sole legal option and sensible numeric defaults without an extra selection
-   step. Defaults edit a draft; an explicit, accurately named action commits it. Never hide a real
-   tradeoff or silently choose an uncertain outcome.
+## Current table contracts
 
-3. **Organize attention around the decision.** Show the actor, requested choice and relevant
-   resources beside the objects involved. Open the relevant workspace once at the decision boundary.
-   Keep the primary action reachable while inspecting or scrolling. Interruptions identify who must
-   answer and which activity resumes. Hide resources and actions outside their meaningful lifetime;
-   an available value of zero differs from an unavailable value.
+- The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
+  Remove the redundant Board details expander; province facts remain in inspection.
+- Location decisions activate map targets immediately, including Crusades, Rebellion and
+  Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
+  the action button confirms it. Playable cards also appear beside Pass.
+- Full-market placement is primary when legal. Otherwise use the largest engine-offered partial
+  placement and label it **Place maximum possible tokens**. Omit destinations with no feasible
+  pool/shipping commitment. Keep marker reduction collapsed and competition commitments exact.
+- Expansion summaries show each player's white markers and the actor's military cards with
+  matchup caveats. Competition results persist through expansion unless cleared; new results
+  still appear, and the activity history remains intact.
+- Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
+  full payout boxes, collapsed by default, while preserving current owner payouts and overflow rules.
+- Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
+  and private discards stay counted; this cannot promise remaining drawable cards.
+- Cancellation choices and confirmation show cost. Stabilization shows its resulting misery box
+  or Chaos. Relief remains visible for an advance tier even when blocked, with Pass.
+- Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
+  to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
+- Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
+  It explains draw reasons, epoch/end triggers, protection money, leader rebates, related cash
+  changes and shortage/surplus dice. All displayed dice identify their colors.
+- Command history defaults to capital aliases, with saved display-name/ID alternatives. Aliases
+  cover actors, targets, attributed dice and edit authors; stored commands and `@entry` references
+  remain canonical.
 
-4. **Act through recognizable objects.** Cards, advances, players, provinces and areas provide their
-   own inspection and target selection. Keep inspection, eligibility, a prepared selection and
-   commitment visibly distinct. A blocked object may remain inspectable; explain its actual blocker
-   when that helps planning. Put shared requirements on the group that owns them.
+## Acceptance evidence
 
-5. **Make action lifetimes predictable.** Polling and workspace navigation preserve valid drafts,
-   inspection and viewport. A phase or purchase-step change clears obsolete selections, target
-   pickers and entity focus. A successful pass or card play closes its action context; a rejection
-   retains correctable input. Revalidate changed choices, identify invalidated selections and block
-   stale submission. Automatic updates do not repeatedly redirect navigation.
-
-6. **Explain consequences where they matter.** Show costs, commitments, modifiers, remaining
-   resources and deterministic effects before commitment. Distinguish current, projected,
-   conditional and uncertain values, with their timing and units. Reference text stays readable on
-   cards and in detail. Discounts, final prices and cash gains are different quantities. Offer a
-   useful legal alternative when the usual action is blocked.
-
-7. **Use one visual language.** Capital names identify powers; before capital selection, use player
-   names. Player overviews also retain the human name. Reuse entity symbols, owner silhouettes,
-   colors, quantity formats and terminology across every surface. Color always has another cue.
-   Emphasis reflects semantic priority rather than rendering order, and covers the whole object.
-
-8. **Keep summaries small and explanations available.** Give each fact a predictable home and show
-   decision-relevant state at rest. Put breakdowns and full tracks in detail; repeat a value only for
-   a useful local comparison. Keep consequential limits and required choices visible when detail is
-   closed. Remove repeated structure and instructional filler before reducing type size. Ordinary
-   play uses localized names; command syntax and internal identifiers belong in technical views.
-
-9. **Close the feedback loop.** Make acceptance, rejection, waiting and private submission states
-   distinguishable. Present consequential outcomes and recorded rolls near the action as well as in
-   history. Preserve an outcome until dismissed or replaced by the next relevant result. Announce
-   changes without stealing focus; an unrelated update must not erase useful feedback.
-
-10. **Make complete flows accessible.** Every action works with keyboard, touch and pointer, with a
-    meaningful accessible name, visible focus and readable contrast. Information cannot depend on
-    hover or color alone. Support narrow screens, large hands, six players, browser zoom and reduced
-    motion. Compact layouts retain a reachable commit action and preserve the player's work.
-
-## Acceptance
-
-Review a complete decision: discover it, inspect options, prepare, commit, and understand the result.
-Include blocked actions, waiting, interruptions, errors and return to play. Verify these contracts at
-phase boundaries and during polling, rejection and stale revision recovery.
-
-Use domain tests for calculations, service tests for authorization, secrecy and persistence, and
-browser checks for actual interaction and rendered geometry. Fixture evidence establishes only what
-it exercises. Record manual accessibility and legibility checks separately from automated coverage.
-Keep the [decision coverage inventory](ui-decision-coverage.md) aligned with observed evidence.
-
-The [interactive design studies](ui-proposals/index.html) preserve the accepted visual direction.
-They contain illustrative state; current principles, rules and production behavior govern changes.
-
-## Map decisions and expansion feedback
-
-A location decision opens the map and activates its legal targets immediately. Shade the whole
-province, including its coastal water, or the whole eligible area; retain outlines as an additional
-cue. A map click prepares the choice and the decision's action button confirms it. Finite choices
-use visible buttons. Playable hand cards also appear beside Pass in the decision panel.
-
-For peaceful expansion, default to a full market commitment when legal. If shipping or the pool
-limits that commitment, default to the largest partial placement offered by the engine. Competition
-commitments retain their own rules. Voluntary marker reduction is a collapsed secondary action.
-All competition results from the current turn remain available until expansion ends, including
-results involving other players; the activity history retains them afterward.
-
-Command history displays capital names by default, with display-name and canonical-ID alternatives.
-The preference survives browser reloads. Aliases apply to actors, target players, attributed dice
-and revision authors, including history-editor reference labels; canonical stored commands and
-`@entry` references are unchanged. Before capital assignment, the capital view uses display names.
+Review discovery, inspection, preparation, commitment and outcome together, including waiting,
+interruptions, blockers, rejection and stale revisions. Domain tests own calculations; service tests
+own authorization, privacy and persistence; browser tests own interaction and rendered geometry.
+Fixtures prove only what they exercise. Record human accessibility/legibility findings separately.
+The [design studies](ui-proposals/index.html) illustrate visual direction; current contracts govern.
