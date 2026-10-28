@@ -94,7 +94,7 @@ sealed interface BoardDecision : TurnDecision {
 object BoardGame {
     fun context(state: GameState): BoardRulesContext =
         BoardRulesContext(
-            configuration = CatalogConfiguration(state.playerIds.size, state.rules),
+            configuration = state.catalog,
             board = state.board,
             players =
                 state.players.mapValues { entry ->
@@ -269,7 +269,7 @@ object BoardGame {
         val decision = state.flow.decisions.lastOrNull() as? BoardDecision.WindmillOpportunity
         checkRule(decision?.player == actor, ViolationCode.WRONG_PLAYER)
         val frame = requireNotNull(decision) { "A validated Wind/Watermill use requires a frame." }
-        val number = ProvinceData.definition(frame.province).marketNumber
+        val number = state.catalog.map.province(frame.province).marketNumber
         val paid = spendPool(state.popDecision(), actor, number, returnToStock = true)
         return paid
             .copy(flow = paid.flow.copy(windmillUsed = paid.flow.windmillUsed + actor))
@@ -434,7 +434,7 @@ object BoardGame {
             conquered.rules.windWatermill == WindWatermillRule.TAKEOVER_TRADE &&
                 winner.advances.owns(AdvanceId.WIND_WATERMILL) &&
                 plan.player !in conquered.flow.windmillUsed &&
-                winner.poolTokens >= ProvinceData.definition(plan.destination).marketNumber &&
+                winner.poolTokens >= state.catalog.map.province(plan.destination).marketNumber &&
                 winner.hand.isNotEmpty() &&
                 defeated.hand.isNotEmpty() &&
                 defeated.misery != MiseryStep.CHAOS

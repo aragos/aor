@@ -11,7 +11,11 @@ data class RuleOptionCommand(val key: String, val value: String) : Command {
     override fun applyTo(state: GameState, actor: PlayerId): GameState {
         checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
         checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
-        return state.copy(rules = resolve(state.rules))
+        val resolved = resolve(state.rules)
+        return state.copy(
+            rules = resolved,
+            board = state.board.copy(definition = resolved.map.definition),
+        )
     }
 
     /** Resolve one supported option without changing the other choices. */
@@ -23,14 +27,7 @@ data class RuleOptionCommand(val key: String, val value: String) : Command {
                     initialCard = option(InitialCardRule.entries, InitialCardRule::commandValue)
                 )
             "immediate-master-art-discard" -> rules.copy(immediateMasterArtDiscard = enabled())
-            "map" -> {
-                checkRule(
-                    value == MapRule.STANDARD.commandValue,
-                    ViolationCode.UNSUPPORTED_OPTION,
-                    listOf(key, value),
-                )
-                rules.copy(map = MapRule.STANDARD)
-            }
+            "map" -> rules.copy(map = option(MapRule.entries, MapRule::commandValue))
             else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION, listOf(key, value))
         }
 

@@ -95,6 +95,20 @@ class PublicGameViewTest {
     }
 
     @Test
+    fun europeanCatalogPublishesTheMergedMediterraneanWithoutAnAegeanSea() {
+        val serialized =
+            json.readTree(
+                json.writeValueAsString(
+                    PublicCatalog.forPlayers(3, RuleOptions(map = MapRule.EUROPEAN))
+                )
+            )
+
+        assertThat(serialized["seaAreas"].has("AEGEAN_SEA")).isFalse()
+        assertThat(serialized["seaAreas"]["CENTRAL_MEDITERRANEAN"].asText()).isEqualTo("VIII")
+        assertThat(serialized["seaCoasts"].filter { it["sea"].asText() == "AEGEAN_SEA" }).isEmpty()
+    }
+
+    @Test
     fun publicCreteSeaContactsIncludeAllThreeSeasOnReducedBoards() {
         val catalog = PublicCatalog.forPlayers(3)
 

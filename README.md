@@ -58,8 +58,9 @@ Private plans and bots remain deferred.
 Choose variants on the player-registration screen: swap Timber and War between decks 1 and 2,
 restrict the opening deal to no Crusades, no events or commodities only, and optionally enable an
 immediate Master Art discard. Opening restrictions are mutually exclusive; excluded cards remain
-in the deck for later draws. The European map is reserved pending its province and adjacency
-specification. All other previous optional mechanics and presets are retired. Games have three epochs.
+in the deck for later draws. Choose **European map** to play the alternate board, including Loire
+in games with four or more players. All other previous optional mechanics and presets are retired.
+Games have three epochs.
 
 Undo defaults to the regular-turn policy: own actions in the current phase activity, until another
 player acts or an outcome is recorded. Competitive and friendly scopes are available at creation.
@@ -68,7 +69,7 @@ are audited, preserve existing randomness, and invalidate stale drafts. See [the
 for scope limits and [commands](docs/commands.md#application-history-commands) for the API.
 
 New games use file format 5 with rules version `ah1996-three-epoch-2` and data version
-`ah1996-catalog-10`. The initial revision records resolved setup options. Earlier development rules
+`ah1996-catalog-12`. The initial revision records resolved setup options. Earlier development rules
 and catalog versions are unsupported for ordinary play. Administrators can explicitly validate and
 publish upgraded logs with an archived preceding file; there is no automatic engine migration.
 The current catalog includes the reviewed Baltic land/coastal connections, sea exclusions and
@@ -76,8 +77,9 @@ support arrows.
 Belgrade has Adriatic coastal access between Dubrovnik and Durazzo, which no longer border each other.
 Durazzo retains its coastal-water neighbors but has no direct sea-space contacts.
 Smyrna adjoins both the Aegean Sea and Eastern Mediterranean.
-The Aegean and Central Mediterranean are separate seas, with Crete adjoining both and the Eastern
-Mediterranean.
+On the standard board, the Aegean and Central Mediterranean are separate seas, with Crete adjoining
+both and the Eastern Mediterranean. The European map merges the Aegean into the Central
+Mediterranean; Crete adjoins only that combined sea.
 
 Build the web client with `npm run build`; output is in `web/dist/`. It does not require a Kotlin/JS distribution.
 From `web`, run `npm test` for focused checks and `npm run test:browser` for the isolated browser suite

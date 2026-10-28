@@ -11,7 +11,7 @@ internal fun GameState.cardContext(): CardContext =
                     stockTokens = owner.stockTokens,
                     advances = owner.advances.owned,
                     capital =
-                        ProvinceData.definitions
+                        catalog.provinces
                             .single { definition -> definition.capital == owner.capital }
                             .id,
                     misery = owner.misery,
@@ -20,7 +20,7 @@ internal fun GameState.cardContext(): CardContext =
                     overseasPresence =
                         board.pieces
                             .filter { (province, _) ->
-                                ProvinceData.definition(province).overseas != null &&
+                                catalog.map.province(province).overseas != null &&
                                     board.hasPresence(owner.player.id, province)
                             }
                             .keys,
@@ -43,10 +43,7 @@ internal fun GameState.cardContext(): CardContext =
         rules = rules,
         tokenProvinces =
             board.pieces.filterValues { pieces -> pieces is ProvincePieces.Tokens }.keys,
-        provinces =
-            CatalogConfiguration(playerIds.size, rules)
-                .provinces
-                .associateBy(ProvinceDefinition::id),
+        provinces = catalog.provinces.associateBy(ProvinceDefinition::id),
     )
 
 internal fun GameState.purchaseContext(actor: PlayerId): PurchaseContext =

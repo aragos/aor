@@ -69,8 +69,8 @@ authority records the shuffled next deck plus eligible discarded cards before re
 Choose variants on the same screen as player registration. Creation records every resolved option.
 The deck swap exchanges Timber and War between decks 1 and 2. The mutually exclusive opening-deal
 restrictions are no Crusades, no events or commodities only; all deal one card and leave excluded
-cards in the pile. Immediate Master Art discard is a separate toggle. The European map remains
-unavailable pending its province and adjacency specification. There are no edition presets.
+cards in the pile. Immediate Master Art discard is a separate toggle. Select European map to use
+the alternate board; Loire appears with four or more players. There are no edition presets.
 
 Undo defaults to regular turn. The other choices are competitive, friendly turn and friendly game;
 see [the design](design.md#4-revisions-and-undo) before choosing broader authority. After starting,

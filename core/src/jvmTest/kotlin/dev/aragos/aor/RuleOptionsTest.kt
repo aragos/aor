@@ -12,6 +12,7 @@ class RuleOptionsTest {
                 deckModification = true,
                 initialCard = InitialCardRule.NO_EVENTS,
                 immediateMasterArtDiscard = true,
+                map = MapRule.EUROPEAN,
             )
         val reconstructed =
             options.configurationCommands().fold(RuleOptions()) { rules, command ->
@@ -48,7 +49,7 @@ class RuleOptionsTest {
                 "preset" to "second-edition",
                 "st-gall-support" to "enabled",
                 "rebuilt-marker-bonus" to "include",
-                "map" to "european",
+                "map" to "unknown",
             )) {
             val failure = assertFailsWith<RuleViolation> { RuleOptionCommand(key, value) }
             assertThat(failure.code).isEqualTo(ViolationCode.UNSUPPORTED_OPTION)

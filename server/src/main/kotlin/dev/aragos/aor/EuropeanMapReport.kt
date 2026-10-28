@@ -7,7 +7,8 @@ fun main(args: Array<String>) {
     }
     val base = StandardMapData.definition
     val draft = EuropeanMapData.definition
-    println("European map draft is structurally valid; game selection remains disabled.")
+    GameCatalog.requireResolvedFor(6, RuleOptions(map = MapRule.EUROPEAN))
+    println("European map is structurally valid and available for play.")
     println("Edit core/src/commonMain/kotlin/dev/aragos/aor/EuropeanMapData.kt")
     for (players in 3..draft.capitalOrder.size) {
         println(

@@ -13,24 +13,43 @@ data class CatalogConfiguration(
         require(playerCount in 3..6) { "Catalog configurations require three through six players." }
     }
 
-    val provinces: List<ProvinceDefinition> by lazy { ProvinceData.availableFor(playerCount) }
+    val map: BoardMapDefinition
+        get() = rules.map.definition
+
+    val provinces: List<ProvinceDefinition> by lazy { map.availableFor(playerCount) }
 
     val provinceIds: Set<ProvinceId> by lazy { provinces.map(ProvinceDefinition::id).toSet() }
 
-    val capitals: List<String> by lazy { CapitalData.availableFor(playerCount) }
+    val capitals: List<String> by lazy {
+        map.capitalOrder.take(playerCount).map { capital ->
+            requireNotNull(map.province(capital).capital) {
+                "A capital province requires a capital id."
+            }
+        }
+    }
 
-    val seas: List<SeaArea> = SeaArea.entries.toList()
+    /** Ownership tracks reflect every market on the selected full map, before player cutoffs. */
+    val commodities: List<CommodityDefinition> by lazy {
+        CommodityData.definitions.map { commodity ->
+            commodity.copy(
+                ownershipTrackBoxes = map.provinces.count { commodity.id in it.commodities }
+            )
+        }
+    }
+
+    val seas: List<SeaArea>
+        get() = map.seaAreas.keys.toList()
 
     val landBorders: Set<ProvinceConnection> by lazy {
-        BoardConnectionData.landBorders.filterTo(mutableSetOf(), ::containsBoth)
+        map.landBorders.filter(::containsBoth).toSet()
     }
 
     val coastalConnections: Set<ProvinceConnection> by lazy {
-        BoardConnectionData.coastalConnections.filterTo(mutableSetOf(), ::containsBoth)
+        map.coastalConnections.filter(::containsBoth).toSet()
     }
 
     val satelliteSupports: Set<SatelliteSupport> by lazy {
-        (BoardConnectionData.satelliteSupports +
+        (map.satelliteSupports +
                 if (rules.stGallSupport) {
                     setOf(SatelliteSupport(ProvinceId("st-gall"), ProvinceId("nuremberg")))
                 } else {
@@ -42,7 +61,7 @@ data class CatalogConfiguration(
     }
 
     val seaCoasts: Set<SeaCoastConnection> by lazy {
-        BoardConnectionData.seaCoasts.filterTo(mutableSetOf()) { coast ->
+        map.seaCoasts.filterTo(mutableSetOf()) { coast ->
             coast.province in provinceIds
         }
     }
@@ -79,8 +98,7 @@ object GameCatalog {
         rules: RuleOptions = RuleOptions(),
     ): CatalogConfiguration {
         val configuration = CatalogConfiguration(playerCount, rules)
-        val definitions = ProvinceData.definitions
-        BoardConnectionData.validate(definitions)
+        val definitions = configuration.map.provinces
         require(definitions.map(ProvinceDefinition::id).distinct().size == definitions.size) {
             "Province identifiers must be unique across the board."
         }
@@ -103,12 +121,14 @@ object GameCatalog {
         ) {
             "Board areas and available capitals must agree for $playerCount players."
         }
-        for (commodity in CommodityData.definitions) {
-            require(
-                definitions.count { province -> commodity.id in province.commodities } ==
-                    commodity.ownershipTrackBoxes
-            ) {
-                "Commodity market assignments must match the printed ownership track for ${commodity.id}."
+        if (rules.map == MapRule.STANDARD) {
+            for (commodity in CommodityData.definitions) {
+                require(
+                    definitions.count { province -> commodity.id in province.commodities } ==
+                        commodity.ownershipTrackBoxes
+                ) {
+                    "Commodity market assignments must match the printed ownership track for ${commodity.id}."
+                }
             }
         }
         require(

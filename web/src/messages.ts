@@ -33,7 +33,6 @@ export const en: Record<string, string> = {
     'error.REVISION_NOT_FOUND': 'That history revision does not exist.',
 
     'create.variants': 'Game variants',
-    'create.europeanPending': 'European map: province and adjacency changes need to be specified before this option can be enabled.',
     'option.deck-modification': 'Move Timber to deck 1 and War to deck 2',
     'option.map': 'Map',
     'optionValue.no-crusades': 'No Crusades in the initial deal',

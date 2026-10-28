@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check the exported SVG geometry against the independently maintained board catalog."""
+import argparse
 import json
 import re
 from pathlib import Path
@@ -8,15 +9,15 @@ from shapely import get_parts
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import transform, unary_union
 from map_geography import SCANDINAVIAN_INTERIOR, display_point
+from map_catalog import load_catalog
 
 ROOT = Path(__file__).resolve().parents[2]
-geometry = json.loads((ROOT / "web/src/map/boardGeometry.json").read_text())
-source = (
-    ROOT / "core/src/commonMain/kotlin/dev/aragos/aor/BoardConnections.kt"
-).read_text()
-sea_areas = dict(
-    re.findall(r"(?m)^\s*([A-Z_]+)\(area = GeographicalArea\.([IVX]+)\)", source)
-)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--catalog", type=Path, help="Resolved JSON from :server:exportMapCatalog")
+parser.add_argument("--geometry", type=Path, default=ROOT / "web/src/map/boardGeometry.json")
+args = parser.parse_args()
+geometry = json.loads(args.geometry.read_text())
+provinces, relations, sea_contacts, sea_areas = load_catalog(args.catalog)
 
 
 def polygon(path):
@@ -32,11 +33,7 @@ def polygon(path):
 
 
 def pairs(kind):
-    result = set()
-    for arguments in re.findall(r"(?m)^\s*" + kind + r"\((.*?)\)", source):
-        ids = re.findall(r'"([a-z-]+)"', arguments)
-        result.update(tuple(sorted((ids[0], other))) for other in ids[1:])
-    return result
+    return {tuple(sorted(edge)) for edge in relations[kind]}
 
 
 def neighbors(shapes):
@@ -54,7 +51,7 @@ def neighbors(shapes):
 land = {key: polygon(shape["path"]) for key, shape in geometry["provinces"].items()}
 water = {key: polygon(path) for key, path in geometry["coasts"].items()}
 seas = {key: polygon(shape["path"]) for key, shape in geometry["seas"].items()}
-assert len(land) == 108, "The full board must contain all 108 provinces."
+assert set(land) == set(provinces), "The drawing must contain exactly the selected map's provinces."
 frame = polygon(geometry["frame"])
 # The cropped playing field follows the continental frontier instead of requiring
 # long province wedges to reach the rectangular SVG viewport.
@@ -72,6 +69,8 @@ for province in [
     "barca",
     "cairo",
 ]:
+    if province not in land:
+        continue
     assert (
         land[province].boundary.intersection(frame.boundary.buffer(0.03)).length > 20
     ), f"{province} must meet the frame as continental land, not an island."
@@ -201,8 +200,10 @@ for province, coast in water.items():
         assert water["visby"].distance(coast) >= 18, (
             f"Visby must be visibly separated from {province}'s coastal water."
         )
-assert len(seas) == 11, "The map must show all eleven connected seas separately."
-for sea in ["AEGEAN_SEA", "EASTERN_MEDITERRANEAN"]:
+assert set(seas) == {sea for sea, _ in sea_contacts}, (
+    "The drawing must show exactly the selected map's connected seas."
+)
+for sea in {sea for sea, province in sea_contacts if province == "smyrna"}:
     assert seas[sea].boundary.buffer(0.03).intersection(water["smyrna"].boundary).length > 12, (
         f"Smyrna must visibly adjoin {sea}."
     )
@@ -210,6 +211,8 @@ assert seas["ADRIATIC_SEA"].boundary.buffer(0.03).intersection(water["belgrade"]
     "Belgrade must have a visible Adriatic sea frontage."
 )
 for sea in ["CENTRAL_MEDITERRANEAN", "AEGEAN_SEA"]:
+    if sea not in seas:
+        continue
     assert geometry["seas"][sea]["area"] == "VIII", f"{sea} must belong to Area VIII."
     assert (
         len([part for part in get_parts(seas[sea]) if part.area > 1]) == 1
@@ -217,8 +220,8 @@ for sea in ["CENTRAL_MEDITERRANEAN", "AEGEAN_SEA"]:
 assert {
     sea for sea, shape in seas.items()
     if water["crete"].boundary.buffer(0.03).intersection(shape.boundary).length > 3
-} == {"AEGEAN_SEA", "CENTRAL_MEDITERRANEAN", "EASTERN_MEDITERRANEAN"}, (
-    "Crete must visibly adjoin the Aegean, Central Mediterranean and Eastern Mediterranean."
+} == {sea for sea, province in sea_contacts if province == "crete"}, (
+    "Crete's visible sea contacts must match the selected map."
 )
 assert (
     water["oran"].distance(water["granada"]) >= 12
@@ -266,11 +269,7 @@ for kind, shapes in [("land", land), ("coast", water)]:
     ), f"{kind}: missing {expected - actual}; extra {actual - expected}."
     print(f"Checked {len(expected)} {kind} adjacencies.")
 
-expected_seas = {
-    (sea, province)
-    for sea, arguments in re.findall(r"sea\(\s*SeaArea\.([A-Z_]+),([\s\S]*?)\)", source)
-    for province in re.findall(r'"([a-z-]+)"', arguments)
-}
+expected_seas = set(sea_contacts)
 actual_seas = {
     (sea, province)
     for sea, shape in seas.items()
@@ -431,16 +430,11 @@ for first, shape in areas.items():
                 < precision
             ), f"Areas {first} and {second} must abut along their shared boundary."
 print(
-    f"Checked {len(expected_seas)} sea contacts, 108 combined outlines, and eight contiguous area outlines."
+    f"Checked {len(expected_seas)} sea contacts, {len(land)} combined outlines, and eight contiguous area outlines."
 )
 
 # Arrows are authored from the catalog and cannot acquire new support relationships.
-expected_supports = {
-    f"{ids[0]} {other}"
-    for arguments in re.findall(r"(?m)^\s*supports\((.*?)\)", source)
-    for ids in [re.findall(r'"([a-z-]+)"', arguments)]
-    for other in ids[1:]
-}
+expected_supports = {f"{satellite} {market}" for satellite, market in relations["supports"]}
 assert set(geometry["supports"]) == expected_supports, "Support arrows must match the catalog."
 for edge, path in geometry["supports"].items():
     values = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", path)]

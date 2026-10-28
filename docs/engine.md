@@ -198,7 +198,10 @@ voiding and conditional bonuses belong in history, not just the current-turn car
 `RuleOptions` records only the supported choices in [rules §13](rules.md#13-variants). The opening
 deal restriction filters eligible draws without removing cards; the deck swap changes physical
 epoch assignment. Master Art's optional immediate discard uses its ordinary decision frame.
-European geometry is unavailable pending specification. Configuration freezes at `start`.
+Map selection resolves a `BoardMapDefinition` for setup, board invariants, expansion, card targets
+and public catalogs. Each board retains its definition when applying occupancy changes. Commodity
+ownership tracks derive from the selected full map; payments keep their ordinary formula.
+Configuration freezes at `start`.
 
 The reviewed `AdvanceData` catalog owns printed advance values, and `AdvanceId` owns letter parsing.
 Scores and category credits use that same catalog. The standard advance/economy/leader mechanics

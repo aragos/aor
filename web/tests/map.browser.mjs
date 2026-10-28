@@ -1,5 +1,6 @@
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkPortal} from './portal.browser.mjs';
+import {checkEuropeanMap} from './european-map.browser.mjs';
 import {checkSetupEvidence, checkDecisionEvidence} from './nextsteps.browser.mjs';
 import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
@@ -495,6 +496,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkDecisionEvidence(page,web,after);
     await checkSetupEvidence(page,web);
     await checkPortal(page,web);
+    await checkEuropeanMap(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

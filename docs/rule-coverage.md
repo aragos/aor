@@ -91,7 +91,7 @@ File names below refer to `core/src/commonMain/kotlin/dev/aragos/aor`, core test
 | Timber/War epoch exchange | `RuleOptionsTest`, `VariantGameCompletionTest`: physical-card assignment, conservation and full replay |
 | Initial deal restriction | `SetupDealTest`: each seat receives an eligible card; excluded cards remain available later |
 | Immediate Master Art discard | `VariantFlowTest`: offer, decline, burden removal, empty hand and purchase resumption |
-| European map | Explicitly unavailable until province/connection/geometry review |
+| European map | `EuropeanMapGameTest`, `VariantGameCompletionTest`, `RuleVariantServiceTest`, geometry validation and live browser placement/reload checks |
 | Shared registration and configuration | `RuleVariantServiceTest` and live browser creation/reload checks |
 
 Earlier edition, improved-setup and rebuilt-marker option rulings are historical after the user's

@@ -125,7 +125,7 @@ data class GameView(
                     },
                 catalog = PublicCatalog.forPlayers(state.playerIds.size, state.rules),
                 lockedProvinces =
-                    ProvinceData.availableFor(state.playerIds.size)
+                    state.catalog.provinces
                         .filterNot { province ->
                             province.access.all { requirement ->
                                 requirement.isSatisfiedBy(viewer.advances.owned)
@@ -330,13 +330,15 @@ data class PublicCatalog(
             return PublicCatalog(
                 configuration.provinces,
                 AdvanceData.definitions,
-                CommodityData.definitions,
+                configuration.commodities,
                 configuration.landBorders,
                 configuration.coastalConnections,
                 configuration.satelliteSupports,
                 configuration.seaCoasts,
                 configuration.seas
-                    .mapNotNull { sea -> sea.area?.let { area -> sea to area } }
+                    .mapNotNull { sea ->
+                        configuration.map.seaAreas[sea]?.let { area -> sea to area }
+                    }
                     .toMap(),
                 MiseryStep.entries,
                 ShippingCapability.entries,

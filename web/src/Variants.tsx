@@ -8,7 +8,7 @@ export const defaultVariants: Record<string, string> = {
 export function validVariants(value: unknown): value is Record<string, string> {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
     const options = value as Record<string, unknown>;
-    return Object.keys(options).length === 4 && options.map === 'standard' &&
+    return Object.keys(options).length === 4 && ['standard', 'european'].includes(String(options.map)) &&
         ['any', 'no-crusades', 'no-events', 'commodity-only'].includes(String(options['initial-card'])) &&
         ['deck-modification', 'immediate-master-art-discard'].every(key => ['enabled', 'disabled'].includes(String(options[key])));
 }
@@ -25,8 +25,11 @@ export function Variants({value, onChange, disabled}: {
                 choices={(key === 'initial-card' ? ['any', 'no-crusades', 'no-events', 'commodity-only'] : ['disabled', 'enabled'])
                     .map(choice => ({value: choice, label: t(`optionValue.${choice}`)}))}/>
         </div>)}
-        <p>{t('option.map')}: {t('optionValue.standard')}</p>
-        <button type="button" className="secondary" disabled title={t('create.europeanPending')}>{t('optionValue.european')}</button>
-        <p className="muted small">{t('create.europeanPending')}</p>
+        <div className="rule-option">
+            <p id="variant-label-map">{t('option.map')}</p>
+            <ChoiceButtons id="variant-map" value={value.map} disabled={disabled}
+                onChange={map => onChange({...value, map})}
+                choices={['standard', 'european'].map(map => ({value: map, label: t(`optionValue.${map}`)}))}/>
+        </div>
     </fieldset>;
 }

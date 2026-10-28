@@ -7,12 +7,6 @@ data class RuleOptions(
     val immediateMasterArtDiscard: Boolean = false,
     val map: MapRule = MapRule.STANDARD,
 ) {
-    init {
-        require(map == MapRule.STANDARD) {
-            "The European map requires its reviewed province and adjacency specification."
-        }
-    }
-
     // Baseline mechanics are fixed; these are not configurable game variants.
     val setup: SetupRule
         get() = SetupRule.STANDARD
@@ -66,10 +60,17 @@ data class RuleOptions(
     }
 }
 
-/** European geometry is reserved until its province and adjacency changes are reviewed. */
+/** Selects the province catalog, topology and setup metadata recorded for this game. */
 enum class MapRule(val commandValue: String) {
     STANDARD("standard"),
-    EUROPEAN("european"),
+    EUROPEAN("european");
+
+    val definition: BoardMapDefinition
+        get() =
+            when (this) {
+                STANDARD -> StandardMapData.definition
+                EUROPEAN -> EuropeanMapData.definition
+            }
 }
 
 enum class SetupRule(val commandValue: String) {

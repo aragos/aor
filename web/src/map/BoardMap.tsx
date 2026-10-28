@@ -8,6 +8,7 @@ import {AccessLock, areaColors, CommodityIcon, commodityColors, PlayerPiece} fro
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
 import geometryData from './boardGeometry.json';
+import europeanGeometryData from './europeanBoardGeometry.json';
 import './map.css';
 
 interface Geometry {
@@ -21,12 +22,11 @@ interface Geometry {
     terrain: string;
     supports: Record<string, string>;
 }
-const geometry: Geometry = geometryData;
-const initialView = {x: geometry.bounds[0], y: geometry.bounds[1], w: geometry.bounds[2], h: geometry.bounds[3]};
-type MapView = typeof initialView;
+interface MapView {x: number; y: number; w: number; h: number}
 
 /** Trim unused eastern provinces on smaller boards without changing the province geometry. */
-function mapBounds(provinces: ProvinceDefinition[]): MapView {
+function mapBounds(provinces: ProvinceDefinition[], geometry: Geometry): MapView {
+    const initialView = {x: geometry.bounds[0], y: geometry.bounds[1], w: geometry.bounds[2], h: geometry.bounds[3]};
     const right = Math.max(...provinces.flatMap(province =>
         (geometry.provinces[province.id]?.path.match(/-?\d+(?:\.\d+)?/g) ?? [])
             .filter((_, index) => index % 2 === 0).map(Number)));
@@ -58,8 +58,8 @@ function highlightPriority(state: {selected: boolean; emphasized: boolean; eligi
     return state.selected ? 4 : state.emphasized ? 3 : state.eligible ? 2 : state.neighbor ? 1 : 0;
 }
 
-function ProvinceLabel({province, pieces, snapshot, dimmed = false}: {
-    province: ProvinceDefinition; pieces?: ProvinceView; snapshot: Snapshot; dimmed?: boolean;
+function ProvinceLabel({province, pieces, snapshot, geometry, dimmed = false}: {
+    province: ProvinceDefinition; pieces?: ProvinceView; snapshot: Snapshot; geometry: Geometry; dimmed?: boolean;
 }) {
     const {label: [x, y]} = geometry.provinces[province.id];
     const name = provinceName(province.id);
@@ -100,10 +100,11 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
 export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
+    const geometry: Geometry = snapshot.game.rules.map === 'EUROPEAN' ? europeanGeometryData : geometryData;
     const [showSupport, setShowSupport] = useStoredSetting('support-arrows', true, isBoolean);
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
-    const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? []), [snapshot.game.catalog]);
+    const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? [], geometry), [snapshot.game.catalog, geometry]);
     const [view, setView] = useState(bounds);
     useEffect(() => setView(current => clampView(current, bounds)), [bounds.w, bounds.h]);
     const svg = useRef<SVGSVGElement>(null);
@@ -359,7 +360,7 @@ export function BoardMap({snapshot, busy}: {
                                 className={item.kind === 'area' ? 'area-highlight' : 'province-highlight'}/>
                         </g>)}
                     </g>
-                    {catalog.provinces.map(province => <ProvinceLabel key={province.id} province={province} pieces={occupancy.get(province.id)} snapshot={snapshot}
+                    {catalog.provinces.map(province => <ProvinceLabel key={province.id} province={province} pieces={occupancy.get(province.id)} snapshot={snapshot} geometry={geometry}
                         dimmed={!!emphasizedArea && province.area !== emphasizedArea}/>)}
                     {areaEntries.map(([area, shape]) => <g key={area} data-map-area-label={area} className="map-area-label" role="button" tabIndex={0}
                         aria-label={`${t('board.area')} ${area}${areaAccess[area].length ? `, ${t('board.requires', {advances: areaAccess[area].map(requirement => label(requirement)).join(', ')})}` : ''}`} aria-pressed={highlightArea(area).selected}

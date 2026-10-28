@@ -100,7 +100,7 @@ sealed interface Command {
                 state.updatePlayer(actor) { player ->
                     player.copy(capital = capital)
                 }
-            val home = ProvinceData.definitions.single { province -> province.capital == capital }
+            val home = state.catalog.provinces.single { province -> province.capital == capital }
             val placed = chosen.copy(board = chosen.board.placeMarker(home.id, actor).board)
             return if (chosen.players.values.all { player -> player.capital != null }) {
                 placed.copy(stage = Stage.TOKEN_PURCHASE, turnNumber = 1)

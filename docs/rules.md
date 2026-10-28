@@ -901,8 +901,16 @@ The baseline remains the reviewed AH1996 rules, with these independent choices r
   both events and leaders. Excluded cards remain in the deck for later draws.
 - **Immediate Master Art discard, off by default:** buying Master Art immediately offers its
   optional discard, in addition to the ordinary Buy Card phase ability.
-- **European map, pending specification:** this will change provinces and adjacencies. It cannot be
-  enabled until the province list, connections, capitals and drawing geometry have been reviewed.
+- **European map, off by default:** start from the standard board, remove Smolensk and its incident
+  connections, and add inland Loire in Area III (market 3, Wine). Loire borders St. Malo, Paris and
+  Bordeaux; St. Malo and Bordeaux no longer share a land border. Add London–Chester and
+  Novgorod–Kiev land borders. Remove Eastern Mediterranean contacts with Crete, Libya and Barca;
+  add Central Mediterranean contacts with Libya and Alexandria. Merge the Aegean into the Central
+  Mediterranean: all former Aegean coastal contacts belong to the combined Central Mediterranean
+  in Area VIII, and the Aegean no longer exists as a separate sea. A Heavens crossing between any
+  two of the combined sea's coasts counts as one sea. Coastal-water steps, capitals,
+  area cutoffs and other facts follow the standard board. Loire is available with four or more
+  players; the full map has seven Wine markets. Commodity payments keep the usual quadratic rule.
 
 Choose variants on the same screen as player registration. Every resolved option appears in the
 initial command log, and `start` freezes it. Earlier presets and all other optional mechanics are
@@ -985,11 +993,12 @@ and add Bari–Durazzo, Portsmouth–St Malo, and London–Bruges. Bari retains 
 with Naples. Corsica is part of Cagliari; the northern Greek island landmass is part of Athens;
 and Bari includes Italy's toe. Kamyshin connects by land to Sarai and Tana; Tana does not touch Poti.
 The [connection inventory](connection-inventory.md) records the complete reviewed graph.
-Athens and Crete retain their shared coastal border. On 2026-10-27 the user corrected the sea
+On the standard board, Athens and Crete retain their shared coastal border. On 2026-10-27 the user corrected the sea
 transcription: the Aegean and Central Mediterranean are separate seas, both in Area VIII. Crete
 adjoins the Aegean, Central Mediterranean and Eastern Mediterranean. This supersedes the earlier
 combined-sea interpretation and the exclusion of Crete from the Eastern Mediterranean. A crossing
 between Central Mediterranean and Aegean coasts cannot treat the two seas as one Heavens crossing.
+The European variant deliberately combines those seas; see [variants](#13-variants).
 Further Baltic corrections on 2026-10-27 add the Copenhagen–Stettin coastal-water border and the
 Malmo–Kongsberg land border. Malmo does not adjoin the North Sea, and Lubeck does not adjoin the
 Baltic Sea. Copenhagen also does not adjoin the Baltic Sea. Visby's only coastal neighbor is
