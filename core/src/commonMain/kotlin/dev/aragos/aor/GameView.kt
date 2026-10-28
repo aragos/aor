@@ -97,6 +97,7 @@ data class GameView(
     val tokenPurchaseOffers: List<TokenPurchaseOfferView> = emptyList(),
     val shippingOffer: ShippingOfferView? = null,
     val playedLeaderDiscounts: List<PlayedLeaderDiscountView> = emptyList(),
+    val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
 ) {
     companion object {
         internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
@@ -176,6 +177,7 @@ data class GameView(
                 tokenPurchaseOffers = TokenPurchaseProjection.offers(state, viewer),
                 shippingOffer = ShippingOfferView.from(state, viewer),
                 playedLeaderDiscounts = PlayedLeaderDiscountView.from(state, viewer),
+                unplayedAdvanceLeaders = AdvanceLeaderAvailabilityView.from(state),
             )
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
