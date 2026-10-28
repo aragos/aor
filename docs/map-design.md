@@ -13,9 +13,12 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 - Each province owns its land, islands and coastal water. Coastal bands originate at their own
   shoreline. Simplify sea-facing edges together so neighboring cells abut without gaps, overlaps,
   wraparounds or stray fragments. Keep named seas and their coastal contacts clearly visible.
-  The Aegean and Central Mediterranean are separate seas within Area VIII; Crete's coastal water
+  On the standard map, the Aegean and Central Mediterranean are separate seas within Area VIII; Crete's coastal water
   visibly adjoins each of them and the Eastern Mediterranean.
   Smyrna's coastal water visibly adjoins both the Aegean Sea and Eastern Mediterranean.
+  On the European map, the Aegean is part of the Central Mediterranean: show one continuous sea
+  and one name, with every former Aegean contact transferred to the combined sea. Crete adjoins
+  only the Central Mediterranean; Smyrna adjoins it and the Eastern Mediterranean.
   Copenhagen's coast reaches Stettin and visibly screens Malmo from the North Sea. Malmo and
   Stettin share coastal water and separate Copenhagen and Lubeck from the Baltic Sea. Visby's
   coastal band is separated from every other coast except Stockholm.
@@ -94,10 +97,11 @@ provides a structured alternative to spatial inspection; omit map search and nav
 
 ## Data and verification
 
-The [European map authoring guide](european-map.md) describes the separate declarative draft and its
-validation/report command. Its topology can be specified before variant geometry is drawn.
+The [European map authoring guide](european-map.md) describes the derived catalog, report and
+regeneration commands for the playable European variant.
 
-The browser consumes checked-in `web/src/map/boardGeometry.json`, keyed by stable province IDs.
+The browser selects checked-in `web/src/map/boardGeometry.json` or `europeanBoardGeometry.json`
+according to the game's recorded map option. Both are keyed by stable province IDs.
 The catalog owns connections, memberships and access; game state owns pieces and assigned capitals.
 Geometry does not determine eligibility or calculate game effects.
 

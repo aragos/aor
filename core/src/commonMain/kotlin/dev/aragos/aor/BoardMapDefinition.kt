@@ -4,8 +4,8 @@ package dev.aragos.aor
  * Static map facts, independent of ownership, movement rules and drawing geometry. [capitalOrder]
  * lists the first three capitals, then those added for four, five and six players.
  * [areaMinimumPlayers] determines province availability; overseas boxes remain available.
- * [seaAreas] assigns every known sea an optional geographical area, independently of availability.
- * Construction validates the complete graph; it does not certify a draft for game selection.
+ * [seaAreas] lists this map's seas with their optional geographical areas; omitted seas do not
+ * exist. Construction validates the complete graph; it does not certify a draft for game selection.
  */
 data class BoardMapDefinition(
     val provinces: List<ProvinceDefinition>,
@@ -18,6 +18,13 @@ data class BoardMapDefinition(
         GeographicalArea.entries.associateWith(GeographicalArea::minimumPlayers),
     val seaAreas: Map<SeaArea, GeographicalArea?> = SeaArea.entries.associateWith(SeaArea::area),
 ) {
+    val byId: Map<ProvinceId, ProvinceDefinition> by lazy {
+        provinces.associateBy(ProvinceDefinition::id)
+    }
+
+    fun province(id: ProvinceId): ProvinceDefinition =
+        requireNotNull(byId[id]) { "Unknown province on this map: $id." }
+
     init {
         validateConnections()
         require(areaMinimumPlayers.keys == GeographicalArea.entries.toSet()) {
@@ -26,8 +33,8 @@ data class BoardMapDefinition(
         require(areaMinimumPlayers.values.all { it in 3..6 }) {
             "Area availability requires three through six players."
         }
-        require(seaAreas.keys == SeaArea.entries.toSet()) {
-            "Declare an area or null for every known sea."
+        require(seaCoasts.all { it.sea in seaAreas }) {
+            "Every sea coast must reference a sea present on this map."
         }
         require(capitalOrder.size in 3..6 && capitalOrder.distinct() == capitalOrder) {
             "Declare three through six distinct capitals in registration-count order."

@@ -115,6 +115,7 @@ class VariantGameCompletionTest {
                 "initial-card no-crusades",
                 "initial-card commodity-only",
                 "immediate-master-art-discard enabled",
+                "map european",
             )
     }
 }

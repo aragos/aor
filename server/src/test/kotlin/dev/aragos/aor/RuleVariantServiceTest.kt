@@ -14,6 +14,7 @@ class RuleVariantServiceTest {
                     deckModification = true,
                     initialCard = InitialCardRule.NO_EVENTS,
                     immediateMasterArtDiscard = true,
+                    map = MapRule.EUROPEAN,
                 )
             val service = createGameService(directory)
             val created = service.create(listOf("Alice", "Bob", "Carol"), options)

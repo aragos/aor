@@ -71,21 +71,25 @@ data class BoardChange(
 /**
  * Immutable board occupancy; absent entries are empty provinces. Pending attack commitments are
  * stored by the driver outside this map, so its stacking invariants hold even during competition.
+ * [definition] owns the province identities and market limits used to validate every replacement.
  */
-data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = persistentMapOf()) {
+data class BoardState(
+    val pieces: PersistentMap<ProvinceId, ProvincePieces> = persistentMapOf(),
+    val definition: BoardMapDefinition = StandardMapData.definition,
+) {
     init {
         for ((province, occupants) in pieces) {
-            val definition =
-                requireNotNull(ProvinceData.byId[province]) {
+            val provinceDefinition =
+                requireNotNull(definition.byId[province]) {
                     "The board contains an unknown province: $province."
                 }
             when (occupants) {
                 is ProvincePieces.Tokens ->
-                    require(occupants.total <= definition.marketNumber) {
+                    require(occupants.total <= provinceDefinition.marketNumber) {
                         "Tokens cannot exceed the province's market number outside competition: $province."
                     }
                 is ProvincePieces.Marker ->
-                    require(!definition.isSatellite) {
+                    require(!provinceDefinition.isSatellite) {
                         "A satellite cannot contain a domination marker: $province."
                     }
             }
@@ -120,7 +124,7 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
 
     fun commodityCount(player: PlayerId, commodity: Commodity): Int = pieces.count { entry ->
         val marker = entry.value as? ProvincePieces.Marker
-        marker?.owner == player && commodity in ProvinceData.definition(entry.key).commodities
+        marker?.owner == player && commodity in definition.province(entry.key).commodities
     }
 
     /** Any coloured presence is a base, even if the player's tokens do not fill the market. */
@@ -143,7 +147,7 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
             is ProvincePieces.Tokens ->
                 occupants.holdings.entries
                     .singleOrNull { holding ->
-                        holding.value.coloured >= ProvinceData.definition(province).marketNumber
+                        holding.value.coloured >= definition.province(province).marketNumber
                     }
                     ?.key
             null -> null
@@ -179,7 +183,7 @@ data class BoardState(val pieces: PersistentMap<ProvinceId, ProvincePieces> = pe
 
     internal fun replace(province: ProvinceId, replacement: ProvincePieces?): BoardChange {
         checkRule(
-            ProvinceData.byId.containsKey(province),
+            province in definition.byId,
             ViolationCode.UNKNOWN_PROVINCE,
             listOf(province.value),
         )

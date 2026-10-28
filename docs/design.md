@@ -40,8 +40,8 @@ versioned text log. Game option values are setup commands. `start` validates and
 starts, setup cannot be edited under any undo scope.
 
 The supported variants are the deck-1 Timber/deck-2 War exchange, one mutually exclusive initial
-card restriction, and immediate Master Art discard. The European map is reserved until its board
-specification is reviewed. Baseline advance and economic rules are fixed. Presets and earlier
+card restriction, immediate Master Art discard, and the European map. Map selection determines the
+catalog and drawing throughout play and replay. Baseline advance and economic rules are fixed. Presets and earlier
 optional mechanics are retired; [rules §13](rules.md#13-variants) and the [command reference](commands.md)
 define the current choices.
 

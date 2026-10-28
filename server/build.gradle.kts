@@ -35,6 +35,17 @@ tasks.register<JavaExec>("describeEuropeanMap") {
     }
 }
 
+tasks.register<JavaExec>("exportMapCatalog") {
+    group = "verification"
+    description = "Exports a resolved map catalog for offline geometry generation and validation."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("dev.aragos.aor.MapCatalogExportKt")
+    args(
+        providers.gradleProperty("map").orElse("standard").get(),
+        providers.gradleProperty("mapOutput").orElse("").get(),
+    )
+}
+
 tasks.register<JavaExec>("importFileStorage") {
     group = "application"
     description =

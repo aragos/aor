@@ -10,13 +10,7 @@ data class BoardPlayerProfile(
     val advances: Set<AdvanceId> = emptySet(),
     val ships: ShippingCapability = ShippingCapability.NONE,
     val chaos: Boolean = false,
-) {
-    val homeArea: GeographicalArea
-        get() =
-            requireNotNull(ProvinceData.definition(capital).area) {
-                "An original capital must belong to a geographical area."
-            }
-}
+)
 
 /**
  * Immutable inputs for board operations, separate from phase progression and player resources. The
@@ -44,7 +38,7 @@ data class BoardRulesContext(
 
     fun province(province: ProvinceId): ProvinceDefinition {
         checkRule(province in provinceIds, ViolationCode.UNKNOWN_PROVINCE, listOf(province.value))
-        return ProvinceData.definition(province)
+        return configuration.map.province(province)
     }
 
     fun bases(player: PlayerId): Set<ProvinceId> =

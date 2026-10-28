@@ -10,11 +10,11 @@ channels restore required contacts around peninsulas. Sea cells are seeded from
 their catalogued coastal boundaries. Validate the exported asset after generation.
 """
 
+import argparse
 import heapq
 import json
 import math
 import os
-import re
 from pathlib import Path
 
 from scipy.spatial import Voronoi
@@ -35,6 +35,7 @@ from shapely.strtree import STRtree
 from shapely.prepared import prep
 
 from support_geometry import support_paths
+from map_catalog import load_catalog
 
 from map_geography import (
     EASTERN_COMPACTION_X,
@@ -48,35 +49,20 @@ from map_geography import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--catalog", type=Path, help="Resolved JSON from :server:exportMapCatalog")
+parser.add_argument("--output", type=Path, default=ROOT / "web/src/map/boardGeometry.json")
+args = parser.parse_args()
+catalog_path = args.catalog.resolve() if args.catalog else None
+output_path = args.output.resolve()
 os.chdir(ROOT)
 
 
-p = {}
-for line in Path("docs/province-inventory.md").read_text().splitlines():
-    c = [v.strip() for v in line.split("|")[1:-1]]
-    if len(c) == 7 and re.fullmatch("[a-z]+(?:-[a-z]+)*", c[0]):
-        p[c[0]] = dict(
-            zip(
-                ["id", "area", "market", "commodity", "capital", "coastal", "access"], c
-            )
-        )
-s = Path("core/src/commonMain/kotlin/dev/aragos/aor/BoardConnections.kt").read_text()
-sea_areas = dict(
-    re.findall(r"(?m)^\s*([A-Z_]+)\(area = GeographicalArea\.([IVX]+)\)", s)
-)
-rel = {}
-for k in ["land", "coast", "supports"]:
-    rel[k] = []
-    for args in re.findall(r"(?m)^\s*" + k + r"\((.*?)\)", s):
-        n = re.findall(r'"([a-z-]+)"', args)
-        rel[k].extend((n[0], b) for b in n[1:])
-seas = []
-for sea, args in re.findall(r"sea\(\s*SeaArea\.([A-Z_]+),([\s\S]*?)\)", s):
-    seas.extend((sea, b) for b in re.findall(r'"([a-z-]+)"', args))
+p, rel, seas, sea_areas = load_catalog(catalog_path)
 
 # Geographic coastlines are independent of the game graph. The graph partitions
 # land; narrow neutral interiors separate real neighbors absent from the catalog.
-world, physical_land, neutral, positions, routes = geography()
+world, physical_land, neutral, positions, routes = geography(p)
 province_points = {
     id: (
         [Point(position)]
@@ -542,6 +528,7 @@ sea_centers = {
         "EASTERN_MEDITERRANEAN": (30, 33.5),
         "BLACK_SEA": (34, 43.3),
     }.items()
+    if sea in {name for name, _ in contacts}
 }
 
 sea_colors = [
@@ -1593,7 +1580,7 @@ result = {
     "terrain": svg_path(terrain),
 }
 result["supports"] = support_paths(rel["supports"], result["provinces"], footprints, compact_easting)
-Path("web/src/map/boardGeometry.json").write_text(
+output_path.write_text(
     json.dumps(result, separators=(",", ":")) + "\n"
 )
 print(

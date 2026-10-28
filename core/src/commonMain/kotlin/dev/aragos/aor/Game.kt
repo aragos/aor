@@ -1,7 +1,7 @@
 package dev.aragos.aor
 
 const val RULES_VERSION = "ah1996-three-epoch-2"
-const val DATA_VERSION = "ah1996-catalog-10"
+const val DATA_VERSION = "ah1996-catalog-12"
 
 /**
  * A registered participant, independent of their capital or creator role.
@@ -87,7 +87,7 @@ data class GameState(
     val effects: CardTurnEffects = CardTurnEffects(),
     val activeWar: WarState? = null,
     val voids: CardVoids = CardVoids(),
-    val board: BoardState = BoardState(),
+    val board: BoardState = BoardState(definition = rules.map.definition),
     val flow: TurnFlow = TurnFlow(),
     val endingTriggered: Boolean = false,
     val entryCount: Int = 0,
@@ -101,6 +101,8 @@ data class GameState(
     val turnNumber: Int? = null,
     val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
 ) {
+    val catalog: CatalogConfiguration by lazy { CatalogConfiguration(playerIds.size, rules) }
+
     val playerIds: List<PlayerId>
         get() = header.players.map(Player::id)
 
@@ -116,7 +118,7 @@ data class GameState(
     val availableCapitals: List<String>
         get() {
             val assigned = players.values.mapNotNull(PlayerState::capital)
-            return CapitalData.availableFor(playerIds.size).filterNot(assigned::contains)
+            return catalog.capitals.filterNot(assigned::contains)
         }
 
     fun prompts(): List<Prompt> {

@@ -5,8 +5,9 @@ Its `boardMap(StandardMapData.definition) { ... }` block starts with a complete 
 standard board. Declare only the differences. The standard data is not mutated or duplicated;
 unchanged facts follow the standard definitions in the same build.
 
-The file contains commented examples for every operation. They are authoring examples, not
-proposed European rules. The initial draft has no changes from the standard map.
+The active differences are listed in [rules](rules.md#13-variants). The file also contains commented
+authoring examples. Choose **European map** when creating a local table, or use
+`set-option map european` before `start`. Choose at least four players to include Loire (Area III).
 
 ## Check your changes
 
@@ -92,6 +93,7 @@ capitals("venice", "genoa", "barcelona", "paris", "london", "hamburg")
 minimumPlayers(GeographicalArea.V, count = 4)
 seaArea(SeaArea.ADRIATIC_SEA, GeographicalArea.VIII)
 seaArea(SeaArea.BALTIC_SEA, null)
+mergeSea(SeaArea.AEGEAN_SEA, into = SeaArea.CENTRAL_MEDITERRANEAN)
 ```
 
 Capital order starts with the three always available capitals, followed by the additional capital
@@ -102,18 +104,30 @@ up to 6 players. Overseas boxes remain available regardless of area cutoffs.
 `seaArea` changes geographical membership, not sea connections or shipping rules. `null` leaves the
 sea outside all geographical areas. Existing `SeaArea` values can be used in draft connections;
 the standard board's Norwegian Sea erratum is enforced separately on the standard catalog.
+`mergeSea` removes its first sea and transfers all its coastal contacts to the surviving sea,
+deduplicating shared contacts and retaining the surviving sea's area. Merges apply after connection
+edits. The European map uses this operation to combine the Aegean and Central Mediterranean into
+one Central Mediterranean sea in Area VIII.
 
-## Review and activation
+## Regenerate and validate the drawing
 
-This supplies the declarative **rules/topology draft**. The European option remains unavailable in
-game creation and commands until the specification is reviewed and implemented for play. No
-speculative European changes are active and existing games keep the same catalog version.
+The selected map is used throughout setup, board validation, expansion, card targets, commodity
+ownership and public catalogs. Wine has seven ownership boxes on the full European board;
+payments use the same quadratic formula. The selected option is recorded in the initial revision
+and replayed on restart. Catalog version `ah1996-catalog-12` includes the merged European sea.
 
-When the declarations are ready, provide this file and the report output for review. Activation also
-needs the selected map threaded through engine lookups/setup/economic validation and the browser's
-catalog; any new capitals need presentation metadata. Review commodity-track implications when
-adding/removing markets. Drawing geometry must be authored/validated for changed provinces,
-connections, area outlines, labels and support paths. The current standard drawing uses
-`web/scripts/map_geography.py`, `web/scripts/build-map.py`, and `web/src/map/boardGeometry.json`;
-editing this draft alone does not redraw that asset. Record the reviewed rules in [rules](rules.md)
-and change the catalog version when the playable variant is introduced.
+Province declarations do not redraw the browser asset. After changing the map, update its anchors
+in `web/scripts/map_geography.py` as needed, then export the resolved engine catalog and regenerate
+the separate drawing. From the repository root, using the Python environment described in
+[map design](map-design.md#data-and-verification):
+
+```sh
+./gradlew :server:exportMapCatalog -Pmap=european -PmapOutput=/tmp/aor-european-catalog.json
+python web/scripts/build-map.py --catalog /tmp/aor-european-catalog.json --output web/src/map/europeanBoardGeometry.json
+python web/scripts/validate-map.py --catalog /tmp/aor-european-catalog.json --geometry web/src/map/europeanBoardGeometry.json
+```
+
+The validator checks exact land, coastal-water, sea and support connections, province identities,
+area outlines, labels and piece bounds. The standard asset and its default generation/validation
+commands remain separate. Record further rule changes in [rules](rules.md) and advance the catalog
+version when changing playable definitions. New capitals also require presentation metadata.

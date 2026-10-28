@@ -12,6 +12,7 @@ class BoardMapBuilder internal constructor(private val base: BoardMapDefinition)
     private var capitalOrder = base.capitalOrder.toList()
     private val areaMinimumPlayers = base.areaMinimumPlayers.toMutableMap()
     private val seaAreas = base.seaAreas.toMutableMap()
+    private var mergedSeas: Map<SeaArea, SeaArea> = emptyMap()
     private val additions = BoardConnectionBuilder()
     private val removals = BoardConnectionBuilder()
 
@@ -74,7 +75,22 @@ class BoardMapBuilder internal constructor(private val base: BoardMapDefinition)
 
     /** Reassigns a sea's geographical area; null leaves the sea outside geographical areas. */
     fun seaArea(sea: SeaArea, area: GeographicalArea?) {
+        require(sea in seaAreas) { "Cannot assign an area to an absent sea: $sea." }
         seaAreas[sea] = area
+    }
+
+    /**
+     * Removes [from], transferring its final coastal contacts to [into] without duplicates. The
+     * surviving sea retains its geographical area. Merges apply after connection edits.
+     */
+    fun mergeSea(from: SeaArea, into: SeaArea) {
+        require(from != into) { "A sea cannot be merged into itself: $from." }
+        require(from in seaAreas && into in seaAreas) {
+            "Both seas must be present before merging $from into $into."
+        }
+        mergedSeas =
+            mergedSeas.mapValues { (_, sea) -> if (sea == from) into else sea } + (from to into)
+        seaAreas.remove(from)
     }
 
     internal fun build(): BoardMapDefinition {
@@ -111,13 +127,15 @@ class BoardMapBuilder internal constructor(private val base: BoardMapDefinition)
                 },
             seaCoasts =
                 connections(
-                    "sea coast",
-                    base.seaCoasts,
-                    removals.seaCoasts,
-                    additions.seaCoasts,
-                ) {
-                    it.province in inheritedIds
-                },
+                        "sea coast",
+                        base.seaCoasts,
+                        removals.seaCoasts,
+                        additions.seaCoasts,
+                    ) {
+                        it.province in inheritedIds
+                    }
+                    .map { coast -> coast.copy(sea = mergedSeas[coast.sea] ?: coast.sea) }
+                    .toSet(),
             capitalOrder = capitalOrder.toList(),
             areaMinimumPlayers = areaMinimumPlayers.toMap(),
             seaAreas = seaAreas.toMap(),

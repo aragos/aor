@@ -9,23 +9,22 @@ revision and frozen at `start`.
 | `deck-modification` | `disabled` | `enabled`: swap War and the physical Timber card `timber-2-1` between epochs 1 and 2 |
 | `initial-card` | `any` | `no-crusades`, `no-events`, or `commodity-only`; mutually exclusive |
 | `immediate-master-art-discard` | `disabled` | `enabled`: offer an optional discard immediately after acquiring Master Art |
-| `map` | `standard` | European map reserved pending a reviewed province and adjacency specification |
+| `map` | `standard` | `european`: Loire replaces Smolensk, with the land and sea changes in [rules](rules.md#13-variants) |
 
 Opening restrictions filter each seat's eligible draw from the shuffled pile; they do not remove
 physical cards from play. No-events still permits leaders. Commodity-only permits commodity cards
 only. The deck modification changes epoch assignment and preserves all 64 physical cards.
 
-The European option is shown as unavailable and rejected by the engine. Required follow-up: province
-additions/removals, land/coastal/sea contacts, support arrows, region membership, capitals and map
-geometry. No speculative connections are implemented.
-The [European map authoring guide](european-map.md) provides an editable derived copy and validation
-command; authoring the draft does not activate it for play.
+The European option selects its own catalog and validated drawing throughout setup, expansion,
+card targets, commodity payments and replay. Its Wine ownership track has seven boxes. The
+[European map authoring guide](european-map.md) describes the derived definitions, report and drawing
+regeneration commands.
 
 Second-edition and tournament presets, improved setup, alternate advance/credit tables, optional
 St. Gall support, alternate economy/leader interactions and rebuilt-marker-bonus selection were
 retired at the user's request on 2026-10-27. Their earlier rulings do not select current behavior.
-Baseline catalog values and reviewed map connections remain unchanged.
+The standard board retains its reviewed catalog values and connections.
 
 Verification: `RuleOptionsTest`, `SetupDealTest`, `VariantFlowTest`, `VariantGameCompletionTest`,
-`RuleVariantServiceTest`, and the browser creation/setup checks cover configuration, opening draws,
+`EuropeanMapGameTest`, `RuleVariantServiceTest`, and the browser creation/setup checks cover configuration, opening draws,
 physical-card conservation, replay, persistence and the shared registration screen.

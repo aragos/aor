@@ -75,7 +75,7 @@ data class CardContext(
     /** Provinces containing square tokens, returned to stock before Black Death reductions. */
     val tokenProvinces: Set<ProvinceId> = emptySet(),
     val provinces: Map<ProvinceId, ProvinceDefinition> =
-        ProvinceData.definitions
+        rules.map.definition.provinces
             .filter { province ->
                 province.area == null || province.area.minimumPlayers <= players.size
             }

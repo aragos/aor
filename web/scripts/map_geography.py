@@ -164,12 +164,16 @@ def display_point(x, y):
     return (x * 10 / 11 + 200, y)
 
 
-def geography():
+def geography(province_ids=None):
     """Return the frame, physical land, neutral interiors, labels, and land-edge bends."""
     reference = json.loads(
         Path(__file__).with_name("geographic-coastlines.json").read_text()
     )
-    positions = {key: project(*point) for key, point in REGIONS.items()}
+    regions = {**REGIONS, **({"loire": (0.2, 47.3)} if province_ids and "loire" in province_ids else {})}
+    positions = {
+        key: project(*point) for key, point in regions.items()
+        if province_ids is None or key in province_ids
+    }
     frame = Polygon(
         [
             (0, -60),

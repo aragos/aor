@@ -115,9 +115,9 @@ object CompetitionRules {
         }
         val attackerFactor = if (profile.capital == province) 2 else 1
         val advancesUsable = defenders.none { defender -> context.player(defender).chaos }
-        val attackingNationalism = advancesUsable && hasNationalism(profile, definition)
+        val attackingNationalism = advancesUsable && hasNationalism(context, profile, definition)
         val defendingNationalism = defenders.filter { defender ->
-            hasNationalism(context.player(defender), definition)
+            hasNationalism(context, context.player(defender), definition)
         }
         val nationalistDefence =
             if (!attackingNationalism && defendingNationalism.isNotEmpty()) {
@@ -345,8 +345,13 @@ object CompetitionRules {
                     ?.coloured ?: 0) > 0
         }
 
-    private fun hasNationalism(profile: BoardPlayerProfile, province: ProvinceDefinition): Boolean =
-        AdvanceId.NATIONALISM in profile.advances && province.area == profile.homeArea
+    private fun hasNationalism(
+        context: BoardRulesContext,
+        profile: BoardPlayerProfile,
+        province: ProvinceDefinition,
+    ): Boolean =
+        AdvanceId.NATIONALISM in profile.advances &&
+            province.area == context.province(profile.capital).area
 
     private fun effectiveMilitary(
         context: BoardRulesContext,

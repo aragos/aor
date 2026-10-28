@@ -51,7 +51,7 @@ resolved value explicitly. The creator may use these commands before `start`; pl
 | `deck-modification` | `disabled`, `enabled`: exchange `war` and `timber-2-1` between decks 1 and 2 |
 | `initial-card` | `any`, `no-crusades`, `no-events`, `commodity-only`; one mutually exclusive opening-deal restriction |
 | `immediate-master-art-discard` | `disabled`, `enabled` |
-| `map` | `standard`; `european` is reserved and rejected until its board specification is reviewed |
+| `map` | `standard` (default), `european`; selects provinces, connections and board drawing |
 
 Initial-deal exclusions remain in the deck for later draws. No preset, improved setup, alternate
 advance table, St. Gall support toggle or rebuilt-marker-bonus option is supported. Event-rebuilt

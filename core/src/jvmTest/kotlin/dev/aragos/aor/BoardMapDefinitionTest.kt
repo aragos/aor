@@ -303,6 +303,65 @@ class BoardMapDefinitionTest {
             .contains(SeaCoastConnection(SeaArea.NORWEGIAN_SEA, ProvinceId("bergen")))
     }
 
+    @Test
+    fun mergingSeasTransfersTheirCoastsAndRemovesTheSourceSea() {
+        val draft =
+            boardMap(standard) {
+                mergeSea(SeaArea.AEGEAN_SEA, into = SeaArea.CENTRAL_MEDITERRANEAN)
+            }
+        val mediterraneanCoasts =
+            standard.seaCoasts
+                .filter {
+                    it.sea in setOf(SeaArea.AEGEAN_SEA, SeaArea.CENTRAL_MEDITERRANEAN)
+                }
+                .map(SeaCoastConnection::province)
+                .toSet()
+
+        assertThat(draft.seaAreas).doesNotContainKey(SeaArea.AEGEAN_SEA)
+        assertThat(draft.seaAreas[SeaArea.CENTRAL_MEDITERRANEAN]).isEqualTo(GeographicalArea.VIII)
+        assertThat(
+                draft.seaCoasts
+                    .filter { it.sea == SeaArea.CENTRAL_MEDITERRANEAN }
+                    .map(SeaCoastConnection::province)
+            )
+            .containsExactlyElementsIn(mediterraneanCoasts)
+        assertThat(draft.seaCoasts.map(SeaCoastConnection::sea)).doesNotContain(SeaArea.AEGEAN_SEA)
+        assertThat(standard.seaAreas).containsKey(SeaArea.AEGEAN_SEA)
+    }
+
+    @Test
+    fun aSeaCannotMergeIntoItself() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                boardMap(standard) { mergeSea(SeaArea.AEGEAN_SEA, into = SeaArea.AEGEAN_SEA) }
+            }
+
+        assertThat(failure).hasMessageThat().contains("cannot be merged into itself")
+    }
+
+    @Test
+    fun aSeaCannotMergeIntoAnAbsentSea() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                boardMap(standard) {
+                    mergeSea(SeaArea.AEGEAN_SEA, into = SeaArea.CENTRAL_MEDITERRANEAN)
+                    mergeSea(SeaArea.BLACK_SEA, into = SeaArea.AEGEAN_SEA)
+                }
+            }
+
+        assertThat(failure).hasMessageThat().contains("Both seas must be present")
+    }
+
+    @Test
+    fun seaCoastsCannotReferenceASeaMissingFromTheMap() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                standard.copy(seaAreas = standard.seaAreas - SeaArea.AEGEAN_SEA)
+            }
+
+        assertThat(failure).hasMessageThat().contains("sea present on this map")
+    }
+
     private fun province(map: BoardMapDefinition, id: String): ProvinceDefinition =
         requireNotNull(map.provinces.singleOrNull { it.id == ProvinceId(id) }) {
             "The fixture requires province $id."

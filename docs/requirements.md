@@ -65,8 +65,8 @@ in [README](../README.md), and coding conventions in [AGENTS.md](../AGENTS.md).
 
 ## Open decisions and scope
 
-The European map requires its exact province changes, memberships, connections, support arrows and
-geometry before activation. Toulouse and Constantinople retain documented constrained label fits.
+The European map is playable with the definitions in [rules §13](rules.md#13-variants) and its own
+validated drawing. Toulouse and Constantinople retain documented constrained label fits.
 A full-session screen-reader/physical-phone review remains a human check. Broader removal of
 unreachable retired-rule handlers needs a separately reviewed change; current configuration rejects
 all retired choices. Hosting/authentication
