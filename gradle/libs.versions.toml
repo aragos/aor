@@ -2,7 +2,7 @@
 kotlin = "2.4.20"
 ktor = "3.6.0"
 logback = "1.6.5"
-jackson = "2.21.1"
+jackson = "2.22.4"
 ktfmt = "0.64"
 truth = "1.4.5"
 collectionsImmutable = "0.5.2"
