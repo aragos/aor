@@ -1,7 +1,7 @@
 name: Checks
 on:
   push:
-    branches: [main]
+    branches: [main, release]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -9,12 +9,16 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: checks-${{ github.ref }}
+  group: >-
+    checks-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    && 'refs/heads/release' || github.ref }}
   cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
     services:
       postgres:
         image: postgres:18
@@ -29,9 +33,17 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Scheduled workflows run on main; refreshes must verify the selected release.
+          ref: >-
+            ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+            && 'refs/heads/release' || github.sha }}
+      - name: Record the commit under verification
+        id: revision
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Configure isolated PostgreSQL endpoint
         env:
-          POSTGRES_TEST_PORT: ${{ job.services.postgres.ports[5432] }}
+          POSTGRES_TEST_PORT: ${{ job.services.postgres.ports['5432'] }}
         run: |
           echo "AOR_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:$POSTGRES_TEST_PORT/postgres?sslmode=disable" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v5
@@ -64,22 +76,32 @@ jobs:
           AOR_BROWSER_SUITE: history.browser.mjs
           AOR_BROWSER_SERVER: ${{ github.workspace }}/web/scripts/postgres-browser-server.sh
   refresh-runtime:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    if: >-
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release') &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     needs: verify
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify.outputs.commit }}
       - name: Rebuild the deployed service with fresh base images
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
-          VERIFIED_COMMIT: ${{ github.sha }}
+          VERIFIED_COMMIT: ${{ needs.verify.outputs.commit }}
         run: |
-          if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
-            curl --fail --silent --show-error --request POST \
-              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
-              --header "Authorization: Bearer $RENDER_API_KEY" \
-              --header 'Content-Type: application/json' \
-              --data "{\"clearCache\":\"clear\",\"commitId\":\"$VERIFIED_COMMIT\"}" > /dev/null
-          else
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
             echo 'Set RENDER_API_KEY and RENDER_SERVICE_ID to enable weekly runtime refreshes.'
+            exit 0
           fi
+          release_commit=$(git ls-remote --exit-code origin refs/heads/release | cut -f1)
+          if [ "$release_commit" != "$VERIFIED_COMMIT" ]; then
+            echo 'Release changed after verification; skipping this runtime refresh.'
+            exit 0
+          fi
+          curl --fail --silent --show-error --request POST \
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            --header "Authorization: Bearer $RENDER_API_KEY" \
+            --header 'Content-Type: application/json' \
+            --data "{\"clearCache\":\"clear\",\"commitId\":\"$VERIFIED_COMMIT\"}" > /dev/null

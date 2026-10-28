@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: 0.5c-512mb
     region: virginia
-    branch: main
+    branch: release
     numInstances: 1
     autoDeployTrigger: checksPass
     healthCheckPath: /api/health
