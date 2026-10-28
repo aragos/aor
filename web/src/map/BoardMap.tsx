@@ -74,7 +74,9 @@ function ProvinceLabel({province, pieces, snapshot, dimmed = false}: {
     return <g transform={`translate(${x} ${y})`} className="province-label" data-province-label={province.id} pointerEvents="none" opacity={dimmed ? .45 : 1}>
         {['iceland', 'west-africa'].includes(province.id) && <text y={-45} textAnchor="middle" fontSize={11} fill="#526b68" letterSpacing={1.2}>{t('board.inset')}</text>}
         {!layout?.crowded && <><text className="province-name" textAnchor="middle" fontSize={18} fontWeight={650} fill="#263c3c">
-            {words.map((word, index) => <tspan key={index} x={0} y={-25 - (words.length - index - 1) * 20}>{word}</tspan>)}
+            {/* Match the geometry generator's width budget across platform font substitutions. */}
+            {words.map((word, index) => <tspan key={index} x={0} y={-25 - (words.length - index - 1) * 20}
+                textLength={word.length * 9.5} lengthAdjust="spacingAndGlyphs">{word}</tspan>)}
         </text>
         <g className="market-label" data-capital-market={province.capital ? province.id : undefined}>
             <rect x={-width / 2} y={-12} width={width} height={33} rx={7} fill={province.capital ? '#263c3c' : '#fffdf5'} stroke="#b5b6a3" strokeWidth={.8}/>
@@ -262,6 +264,7 @@ export function BoardMap({snapshot, busy}: {
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
                 style={{aspectRatio: `${bounds.w} / ${bounds.h}`, height: 'auto', minHeight: 0}}
                 onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd}
+                onPointerLeave={() => setHovered('')}
                 onClick={event => {
                     if (!suppressClick.current && event.target instanceof Element && !event.target.closest('[data-map-province].active, [data-coastal-space], [data-map-area-label]')) clearInspection();
                 }}

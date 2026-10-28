@@ -5,8 +5,9 @@ export async function checkPortal(page, web) {
     await page.wait(`document.querySelector('.portal') && document.querySelectorAll('.game-directory > li').length === 2`, 'own ongoing games');
     await page.click('My move');
     await page.wait(`document.querySelectorAll('.game-directory > li').length === 1`, 'my move game filter');
+    const previousDocument = await page.evaluate(`performance.timeOrigin`);
     await page.send('Page.reload');
-    await page.wait(`document.querySelectorAll('.game-directory > li').length === 1 && [...document.querySelectorAll('button')].some(button=>button.textContent==='My move' && button.getAttribute('aria-pressed')==='true')`, 'persisted game filter');
+    await page.wait(`performance.timeOrigin !== ${previousDocument} && document.querySelectorAll('.game-directory > li').length === 1 && [...document.querySelectorAll('button')].some(button=>button.textContent==='My move' && button.getAttribute('aria-pressed')==='true')`, 'persisted game filter');
     await page.click('Finished');
     await page.wait(`document.querySelector('.game-directory').textContent.includes('Finished')`, 'finished games');
     await page.evaluate(`document.querySelector('.create-registered > summary').click()`);

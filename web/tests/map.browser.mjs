@@ -273,7 +273,8 @@ await page.send('Page.navigate', {url: web + actor.path});
             await page.click('Fit map');
         }
         if (province === 'visby') {
-            // A pointer left over land after zoom also draws an outline. Isolate neighbor styling.
+            // Pointer and keyboard focus also draw outlines. Isolate neighbor styling.
+            await page.evaluate(`document.activeElement?.blur()`);
             await page.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
             await page.wait(`!document.querySelector('[data-province-outline="malmo"]')`, 'unrelated Malmo has no neighbor outline');
             assert.equal(await page.evaluate(`document.querySelector('[data-province-outline="malmo"]') !== null`),false,'Visby inspection does not highlight Malmo as a neighbor');
