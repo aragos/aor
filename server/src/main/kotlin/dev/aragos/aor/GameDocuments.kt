@@ -143,7 +143,8 @@ internal object GameDocuments {
                     game.memberships.keys == players &&
                     game.memberships.values.distinct().size == players.size
             ) {
-                "Registered games require unique account membership for every seat and no transferable credentials."
+                "Registered games require unique account membership for every " +
+                    "seat and no transferable credentials."
             }
             game.memberships.values.forEach(::AccountId)
         }
@@ -164,7 +165,8 @@ internal object GameDocuments {
                 participants.containsAll(game.pendingBids.keys) &&
                     game.pendingBids.size < participants.size
             ) {
-                "Pending private decisions must form an incomplete batch of the current participants."
+                "Pending private decisions must form an incomplete batch of the " +
+                    "current participants."
             }
         }
         if (game.pendingReturns.isNotEmpty()) {
@@ -227,7 +229,8 @@ internal object GameDocuments {
                             revision.at > 0 &&
                             revision.replaceFrom == null
                     ) {
-                        "A checkpoint must record its administrator, timestamp and replacement operation."
+                        "A checkpoint must record its administrator, timestamp and " +
+                            "replacement operation."
                     }
                     AccountId(revision.adminAuthor)
                     val restored = replay(game.header, revision.entries)
@@ -286,7 +289,8 @@ internal object GameDocuments {
                                     "edit-history ${revision.replaceFrom}",
                                 )
                     ) {
-                        "Edited history must preserve recorded outcomes and its canonical edit command."
+                        "Edited history must preserve recorded outcomes and its canonical " +
+                            "edit command."
                     }
                     replay(
                         game.header,
@@ -409,7 +413,8 @@ internal object GameDocuments {
             actions.map(Entry.Action::actor) == state.playerIds.filter(participants::contains) &&
                 actions.all { action -> accepts(action.command) }
         ) {
-            "A revealed batch must include the current private decision for every player in registration order."
+            "A revealed batch must include the current private decision for " +
+                "every player in registration order."
         }
     }
 

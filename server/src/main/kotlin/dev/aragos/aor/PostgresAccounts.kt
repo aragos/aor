@@ -28,7 +28,11 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
         return database.write { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO accounts (id, handle, display_name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING"
+                    """
+                    INSERT INTO accounts (id, handle, display_name) VALUES (?, ?, ?)
+                    ON CONFLICT DO NOTHING
+                    """
+                        .trimIndent()
                 )
                 .use { statement ->
                     statement.setString(1, id.value)
@@ -68,7 +72,12 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
             val normalized = query.lowercase()
             connection
                 .prepareStatement(
-                    "SELECT * FROM accounts WHERE strpos(handle, ?) > 0 OR strpos(lower(display_name), ?) > 0 OR id = ? ORDER BY handle LIMIT ?"
+                    """
+                    SELECT * FROM accounts WHERE strpos(handle, ?) > 0
+                        OR strpos(lower(display_name), ?) > 0 OR id = ?
+                    ORDER BY handle LIMIT ?
+                    """
+                        .trimIndent()
                 )
                 .use { statement ->
                     statement.setString(1, normalized)
@@ -114,7 +123,11 @@ class PostgresAdministrationAudit(
         database.write { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO administration_audit (id, at, actor, action, target, revision) VALUES (?, ?, ?, ?, ?, ?)"
+                    """
+                    INSERT INTO administration_audit (id, at, actor, action, target, revision)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """
+                        .trimIndent()
                 )
                 .use { statement ->
                     statement.setObject(1, UUID.randomUUID())

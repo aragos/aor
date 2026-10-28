@@ -27,7 +27,11 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             val listing = GameDirectory.summary(game, null)
             connection
                 .prepareStatement(
-                    "INSERT INTO games (id, document, revision, listing_status, stage) VALUES (?, ?::jsonb, ?, ?, ?)"
+                    """
+                    INSERT INTO games (id, document, revision, listing_status, stage)
+                    VALUES (?, ?::jsonb, ?, ?, ?)
+                    """
+                        .trimIndent()
                 )
                 .use { statement ->
                     statement.setObject(1, key(game.id))
@@ -199,7 +203,11 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         database.write { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO game_archives (game_id, name, contents) VALUES (?, ?, ?) ON CONFLICT DO NOTHING"
+                    """
+                    INSERT INTO game_archives (game_id, name, contents) VALUES (?, ?, ?)
+                    ON CONFLICT DO NOTHING
+                    """
+                        .trimIndent()
                 )
                 .use { statement ->
                     statement.setObject(1, key(id))
@@ -237,9 +245,11 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                 FROM games g LEFT JOIN game_players p ON p.game_id = g.id AND p.account_id = ?
                 WHERE (? OR p.account_id IS NOT NULL) AND (?::uuid IS NULL OR g.id > ?::uuid)
             )
-            SELECT *, CASE WHEN base_status = 'ONGOING' AND needs_move THEN 'MY_MOVE' ELSE base_status END AS viewer_status
+            SELECT *, CASE WHEN base_status = 'ONGOING' AND needs_move
+                THEN 'MY_MOVE' ELSE base_status END AS viewer_status
             FROM directory
-            WHERE ?::text IS NULL OR base_status = ? OR (? = 'MY_MOVE' AND base_status = 'ONGOING' AND needs_move)
+            WHERE ?::text IS NULL OR base_status = ?
+                OR (? = 'MY_MOVE' AND base_status = 'ONGOING' AND needs_move)
             ORDER BY id LIMIT ?
             """
                 .trimIndent()
@@ -331,7 +341,11 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         val credentials = root.putObject("credentials")
         connection
             .prepareStatement(
-                "SELECT seat, account_id, credential_hash FROM game_players WHERE game_id = ? ORDER BY seat"
+                """
+                SELECT seat, account_id, credential_hash FROM game_players
+                WHERE game_id = ? ORDER BY seat
+                """
+                    .trimIndent()
             )
             .use { statement ->
                 statement.setObject(1, key(row.id))
@@ -372,7 +386,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         connection
             .prepareStatement(
                 """
-                INSERT INTO game_players (game_id, seat, account_id, credential_hash, needs_move) VALUES (?, ?, ?, ?, ?)
+                INSERT INTO game_players (game_id, seat, account_id, credential_hash, needs_move)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (game_id, seat) DO UPDATE SET account_id = EXCLUDED.account_id,
                     credential_hash = EXCLUDED.credential_hash, needs_move = EXCLUDED.needs_move
                 """
@@ -404,7 +419,12 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         val listing = GameDirectory.summary(game, null)
         connection
             .prepareStatement(
-                "UPDATE games SET document = ?::jsonb, revision = ?, storage_version = storage_version + 1, listing_status = ?, stage = ? WHERE id = ? AND storage_version = ?"
+                """
+                UPDATE games SET document = ?::jsonb, revision = ?,
+                    storage_version = storage_version + 1, listing_status = ?, stage = ?
+                WHERE id = ? AND storage_version = ?
+                """
+                    .trimIndent()
             )
             .use { statement ->
                 statement.setString(1, metadata(root).toString())

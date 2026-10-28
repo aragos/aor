@@ -64,8 +64,17 @@ private object TestPostgres {
     }
 
     private val origin: String by lazy {
-        System.getenv("AOR_TEST_DATABASE_URL")
-            ?: "postgresql://postgres:postgres@127.0.0.1:${checkNotNull(embedded) { "Embedded PostgreSQL is required without a test URL." }.port}/postgres?sslmode=disable"
+        val external = System.getenv("AOR_TEST_DATABASE_URL")
+        if (external != null) {
+            external
+        } else {
+            val port =
+                checkNotNull(embedded) {
+                        "Embedded PostgreSQL is required without a test URL."
+                    }
+                    .port
+            "postgresql://postgres:postgres@127.0.0.1:$port/postgres?sslmode=disable"
+        }
     }
 
     fun environment(schema: String): Map<String, String> =

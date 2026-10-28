@@ -39,16 +39,25 @@ fun importFileStorage(directory: Path, database: PostgresDatabase): StorageImpor
     return database.write { connection ->
         connection.createStatement().use { statement ->
             statement.execute(
-                "LOCK TABLE accounts, games, game_revisions, game_players, game_archives, administration_audit IN ACCESS EXCLUSIVE MODE"
+                """
+                LOCK TABLE accounts, games, game_revisions, game_players, game_archives,
+                    administration_audit IN ACCESS EXCLUSIVE MODE
+                """
+                    .trimIndent()
             )
             statement
                 .executeQuery(
-                    "SELECT EXISTS(SELECT FROM accounts) OR EXISTS(SELECT FROM games) OR EXISTS(SELECT FROM administration_audit)"
+                    """
+                    SELECT EXISTS(SELECT FROM accounts) OR EXISTS(SELECT FROM games)
+                        OR EXISTS(SELECT FROM administration_audit)
+                    """
+                        .trimIndent()
                 )
                 .use { result ->
                     result.next()
                     require(!result.getBoolean(1)) {
-                        "Storage import requires an empty application schema; existing data is never overwritten."
+                        "Storage import requires an empty application schema; " +
+                            "existing data is never overwritten."
                     }
                 }
         }
@@ -80,7 +89,12 @@ fun importFileStorage(directory: Path, database: PostgresDatabase): StorageImpor
             }
             connection
                 .prepareStatement(
-                    "INSERT INTO administration_audit (id, at, actor, action, target, revision, outcome) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    """
+                    INSERT INTO administration_audit
+                        (id, at, actor, action, target, revision, outcome)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """
+                        .trimIndent()
                 )
                 .use { statement ->
                     statement.setObject(1, UUID.randomUUID())

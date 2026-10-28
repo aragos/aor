@@ -136,7 +136,8 @@ data directory. Configure the target database secrets and run:
 The target application schema must be empty. One transaction imports accounts, creation permissions,
 memberships, active histories, pending bids, undo policies, exact archive bytes and audit receipts.
 An error rolls back the entire import; existing SQL data is never overwritten and source files are
-unchanged. Use the same Firebase project to retain UID ownership. Verify counts, player views and
+unchanged. Use the same Firebase project to retain UID ownership. Private-link games keep their
+original credentials and require local mode; importing does not assign registered memberships. Verify counts, player views and
 archives before switching traffic. Unsupported active game formats/rules require an explicit engine
 upgrade first; this tool does not introduce legacy decoding. Keep the stopped source as a rollback
 copy, and do not resume it after accepting new SQL moves.

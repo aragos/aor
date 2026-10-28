@@ -96,9 +96,9 @@ class PostgresSettings(
                 .entries
                 .joinToString("&") { (key, parameter) -> "${encode(key)}=${encode(parameter)}" }
             val host = uri.host.let { if (':' in it && !it.startsWith('[')) "[$it]" else it }
+            val port = if (uri.port == -1) 5432 else uri.port
             return PostgresSettings(
-                jdbcUrl =
-                    "jdbc:postgresql://$host:${if (uri.port == -1) 5432 else uri.port}/$database?$parameters",
+                jdbcUrl = "jdbc:postgresql://$host:$port/$database?$parameters",
                 user = decode(credentials[0]),
                 password = decode(credentials[1]),
                 schema = environment["AOR_DATABASE_SCHEMA"] ?: "aor",
