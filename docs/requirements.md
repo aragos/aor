@@ -1,78 +1,76 @@
 # Product goals and requirements
 
-This is the acceptance contract for the application. [Rules](rules.md) own game behavior and reviewed
-rulings; [design](design.md) owns application architecture; [commands](commands.md) own wire syntax;
-[UI principles](ui-design.md) and [map contracts](map-design.md) own interaction. Build commands live
-in [README](../README.md), and coding conventions in [AGENTS.md](../AGENTS.md).
+This is the acceptance contract. [Rules](rules.md) own mechanics and reviewed rulings;
+[commands](commands.md) own syntax; [design](design.md) owns architecture; [UI principles](ui-design.md)
+and [map design](map-design.md) own interaction. [README](../README.md) owns build commands and
+[AGENTS.md](../AGENTS.md) coding conventions.
 
 ## Goals
 
-- Let 3–6 people play a complete three-epoch Age of Renaissance game online, including asynchronous
-  decisions, interruptions, private hands, simultaneous bids and final scores.
-- Make ordinary play available through the map, cards and contextual controls. Keep the command
-  interface useful for inspection, expert play, reproducible reports and authorized history edits.
-- Preserve a reviewable, deterministic record through restarts, engine changes and history edits.
-- Keep deployment and routine maintenance simple, with a target hosting budget of $25/month for
-  hundreds of games per month. A subdomain of the existing Squarespace-managed domain is available.
+- Complete online three-epoch games for 3–6 people, including asynchronous decisions, interruptions,
+  private hands, simultaneous bids and final scores.
+- Ordinary play through recognizable map, card and advance objects, with commands for expert play,
+  reproducible reports and authorized edits.
+- Deterministic, reviewable history through restarts and explicit upgrades.
+- Simple operation for hundreds of games per month, targeting $25/month hosting. An existing
+  Squarespace-managed domain can supply a subdomain.
 
-## Domain and history
+## Domain, history and privacy
 
-1. The engine owns legality, costs, eligibility, game effects and readiness. Geometry, prose,
-   persistence and authentication do not decide game rules.
-2. Replay uses canonical player commands and recorded outcomes. It performs no IO, clock reads or
-   live randomness. Logical random events retain their original outcomes through every history edit.
-3. Strong identifiers and constrained values validate their intrinsic invariants. Rejections have
-   typed diagnostics. Catalog values and reviewed connections have one logical owner.
-4. Ordinary revisions append deltas; edits retain an explicit prefix and replace a suffix. Earlier
-   revisions remain immutable. Every write checks the expected revision and publishes atomically.
-5. Simultaneous submissions remain private and have no effect before the complete batch commits.
-   Views, history, errors and earlier revisions preserve each viewer's information permissions.
-6. Undo follows the four documented scopes; setup and complete simultaneous batches are protected.
-   An editor may retain another player's answer by reference, but cannot supply its replacement.
-7. Only the current rules/data/file versions are supported. Any operational upgrade of saved games
-   must be explicit, validated and auditable; persistence never silently migrates game behavior.
+1. The engine owns legality, prices, commitments, eligibility and readiness. Use strong domain types,
+   intrinsic validation and typed rejections; geometry, transport and persistence do not decide rules.
+2. Replay uses canonical commands and recorded outcomes, with no IO, clock reads or fresh randomness.
+   History edits preserve the outcomes of the same logical random events.
+3. Ordinary revisions append deltas. Edits retain an explicit prefix and replace a suffix while
+   earlier revisions remain immutable. Writes check the expected revision and publish atomically.
+4. Private submissions take effect only when their complete batch commits. Views, errors, history
+   and earlier revisions preserve each viewer's audience. Public leader counts use public plays,
+   retaining privately discarded leaders in the counts so no hidden identity is disclosed.
+5. Undo follows its four documented scopes. Setup and complete simultaneous batches are protected;
+   another player's answer may be retained by reference, never supplied as a replacement.
+6. Support only current rules/data/file versions. Saved-game upgrades are explicit, validated and
+   auditable; schema maintenance cannot silently change game behavior.
 
 ## Player experience
 
-- A map decision activates immediately. Shade eligible land and coastal water together, retain
-  clear borders, and require confirmation to submit the prepared choice.
-- Prefer visible finite choices. Put playable cards with Pass, collapse rare marker reduction, and
-  default peaceful expansion to the largest legal commitment when a full market is unavailable.
-- Retain all competition results through expansion. Offer readable player names or capitals in
-  command history while retaining canonical IDs in saved entries.
-- Polling preserves valid work. Changed decisions and accepted history edits invalidate stale
-  drafts. Rejections retain correctable choices and never automatically resubmit them.
-- Support keyboard use, phone layouts, bounded map gestures and readable inspection of dense pieces.
-  Accessible names and contrast checks supplement human screen-reader and physical-phone review.
-- Persist user preferences and creation defaults across at least a browser session; use durable
-  browser storage where available, with a usable in-memory fallback.
+- Creation selects players, current variants and undo policy, then starts setup automatically.
+  Preserve the fixed three-epoch format and the reviewed variant catalog.
+- Keep the AoR header compact and identify the assigned capital in the page title. Show the actor,
+  decision and relevant resources; keep inspection separate from action forms and preserve drafts
+  while inspecting other objects.
+- Activate map targets immediately for location choices, including Crusades, Rebellion and
+  Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
+  commits them. Prefer visible finite choices and playable cards beside Pass.
+- Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
+  feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
+  During expansion, show each player's white markers and the acting player's military cards, with
+  matchup qualifications. Losses use red result styling; results can be cleared without deleting history.
+- Show costs at offer and confirmation, stabilization's resulting misery box, current commodity
+  adjustments and optional full payout boxes. Show matching unplayed leader counts for epochs I–III
+  beside each advance, with the public-information meaning above.
+- Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
+  explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
+  while waiting; submit once on the legal turn while that view remains open, with no failed retries.
+- Open activity by default. Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
+  protection money, leader rebates and related cash changes; label dice colors and omit continuation noise.
+- Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
+  retain correctable input; stale requests refresh without automatic resubmission.
+- Support keyboard, touch, narrow layouts, bounded map gestures, zoom and dense-piece inspection.
+  Persist preferences and creation defaults in browser storage with an in-memory fallback.
 
-## Online operation
+## Online operation and remaining scope
 
-- Players register stable accounts. Game creation selects existing registered identities, with a
-  readable handle/display name and stable identifier so names alone cannot select the wrong person.
-- An administrator can restrict game creation. Members see their own games and can filter ongoing,
-  awaiting-their-move and finished games.
-- Administrators can inspect all games, cancel or abandon them, export all authoritative command
-  logs programmatically, validate explicit log upgrades, and purge games by ID to reclaim storage.
-- Administrative operations are authenticated, separated from player actions and audited. Private
-  game data is available only to game members and authorized administrators.
-- Hosted storage uses managed PostgreSQL for all durable application state. Independent writers
-  preserve optimistic revisions and private submissions; failed writes roll back history, metadata
-  and associated administrative receipts together. Database-schema changes do not change game rules.
-- Prefer managed authentication, TLS and platform protection. Automate dependency/security checks
-  and fresh deployment images as far as the hosting platform permits.
+Use stable registered identities and readable handles when creating hosted games. Administrators
+control creation permission; members can filter their own ongoing, awaiting-move and finished games.
+Administrators may inspect games, cancel/abandon them, export logs, validate upgrades and purge by ID.
+These operations are authenticated, audited and distinct from player actions.
 
-## Open decisions and scope
+Hosted PostgreSQL stores all durable state. Independent writers preserve optimistic revisions and
+private submissions; failed transactions roll back history, metadata and audit receipts together.
+Prefer managed authentication/TLS and automated dependency checks and fresh deployment images.
 
-The European map is playable with the definitions in [rules §13](rules.md#13-variants) and its own
-validated drawing. Toulouse and Constantinople retain documented constrained label fits.
-A full-session screen-reader/physical-phone review remains a human check. Broader removal of
-unreachable retired-rule handlers needs a separately reviewed change; current configuration rejects
-all retired choices. Hosting/authentication
-accounts, DNS access and the initial administrator identity must be supplied before public launch.
-The [deployment runbook](deployment.md) owns provider and administrative API details; the
-[follow-up list](follow-ups.md) records the remaining launch and product decisions.
-
-Bots and private plans are future designs. Retired edition presets and their earlier rulings do not
-select current gameplay. The current variant list is in [the variant inventory](variant-inventory.md).
+[Follow-ups](follow-ups.md) own launch credentials, DNS and initial administrator decisions. Human
+screen-reader, physical-phone, browser-chrome zoom and composited/SVG contrast review remain separate
+from automated evidence. Toulouse and Constantinople retain constrained label fits. Broader removal
+of unreachable retired-rule handlers requires separate review. Bots and persistent private plans
+remain deferred; the in-view Urban Ascendancy draft does not provide a general planning system.

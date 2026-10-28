@@ -1,155 +1,127 @@
-# Manual setup and Order of Play walkthrough
+# Setup and Order of Play walkthrough
 
-## Run locally
+## Create a table
 
-Use the JDK and Node requirements in [README](../README.md). From the repository root:
+Use the JDK/Node requirements and run commands in [README](../README.md). Start the server with
+`./gradlew :server:run`, the client with `npm start`, then open <http://localhost:5173>. The production
+web bundle also needs the API server.
 
-```sh
-npm install
-./gradlew :server:run
-```
+Choose Alice, Bob and Carol, the variants and undo policy on the creation form. Every game has three
+epochs. Current variants are:
 
-In a second terminal, run `npm start` and open <http://localhost:5173>. Vite proxies `/api` to the local server on
-port 8080. The server is required even after `npm run build`; the production bundle does not host an API.
+- Swap Timber and War between decks 1 and 2.
+- Restrict the opening deal to no Crusades, no events or commodities only. These restrictions are
+  mutually exclusive, still deal one card each and leave excluded cards available for later draws.
+- Offer an immediate optional discard when Master Art is acquired.
+- Use the European map, including Loire in games with four or more players.
 
-Create a game with Alice, Bob and Carol. Every game has a fixed three-epoch deck sequence. Save all three private seat links and open
-each in its own tab. Links identify players independently of cookies, so the tabs may share a browser profile.
-The first player, Alice, is the creator and can configure the rebuilt-marker bonus or start setup. The links grant access to
-their respective seats; share only the intended player's link.
+Creation records every resolved option in revision 1 and automatically starts setup and records the
+opening shuffle/deal in revision 2. Options and undo policy are then frozen. There is no **Start
+setup** button. Retired edition presets, improved setup and rebuilt-marker settings are unavailable.
 
-## Complete setup
+Save all three private seat links and open each in its own tab. They identify seats independently of
+cookies and may share a browser profile; share only the intended player's link. The first player is
+the local game's creator. Hosted games select registered accounts and use membership access instead
+of transferable seat credentials; see [deployment](deployment.md).
 
-1. In Alice's tab, click **Start setup**. Each tab should show one private card, $40, 36 tokens, 25 markers, no ships
-   and zero misery. No other player's card or remaining deck order should appear in its network responses.
-2. Submit Alice's capital bid at 10. Replace it with 12 using the command input: `bid-capital 12`. Her tab shows her
-   pending bid; the others show only that she submitted. Cash remains $40 and the history has no bid entry yet.
-3. Stop the server with Ctrl+C, start it again with `./gradlew :server:run`, and refresh all tabs. Cards and Alice's
-   pending bid must be unchanged. If you changed `AOR_DATA_DIR`, reuse that directory on restart.
-4. Submit Bob's capital bid of 12 through the form and Carol's bid of 0 through the command input. All bids reveal
-   together. Cash must become $28, $28 and $40. The history must include tie rolls for Alice and Bob; higher dice
-   results choose first, with equal rolls repeated. Carol chooses last.
-5. Try selecting a capital from the wrong player's command input. Expect a validation error, no history change and
-   the command still in the input so it can be corrected. Choose capitals in the displayed order using both buttons
-   and `choose-capital <id>`. Reusing an assigned capital must fail. For three players the choices are `venice`,
-   `genoa` and `barcelona`.
-6. The last capital choice leads directly to **Turn 1 — Order of Play**. Each player has its capital, one board
-   marker, 24 stock markers, 36 stock tokens, zero pool tokens, zero misery and no ships. Capital-choice order stays
-   visible and is distinct from the turn order being determined.
+## Complete capital bidding
+
+1. Each tab immediately shows one private card, $40, 36 stock tokens, 25 stock markers, no ships and
+   zero misery. Network responses must hide other hands and future deck order.
+2. Submit Alice's bid of 10, then replace it with `bid-capital 12`. Her tab shows the pending amount;
+   the others show only readiness. Cash remains $40 and public history contains no bid yet.
+3. Stop and restart the server, then refresh the tabs. Alice's private card and pending bid must be
+   unchanged. Reuse the same `AOR_DATA_DIR` if configured.
+4. Submit Bob's bid of 12 and Carol's bid of 0. The batch reveals together: cash becomes $28, $28
+   and $40. Recorded, color-labeled tie dice decide between Alice and Bob; equal rolls repeat.
+   Carol chooses last.
+5. Choose capitals in the displayed order using buttons, the map or `choose-capital <id>`. Wrong
+   players and already assigned capitals are rejected without changing history. Three-player
+   choices are `venice`, `genoa` and `barcelona`.
+6. The last choice opens **Turn 1 — Order of Play**. Each player has a capital marker, 24 stock
+   markers, 36 stock tokens, no pool tokens, zero misery and no ships. Capital-choice order remains
+   separate from the turn order being determined. Page titles now identify the assigned capital.
 
 ## Buy tokens and resolve tied positions
 
-1. In Alice's tab, enter a purchase of 4. Check the preview: cost $4, four tokens and $24 remaining. Submit it, then
-   replace it with `buy-tokens 5` in the command input. Her saved amount is private; other tabs show only submission
-   status. The public cash and token counts must remain unchanged before the final submission.
-2. Restart the server and refresh all tabs. Alice's saved purchase must still be 5. Bob and Carol must not see its
-   amount in their responses, previews or history. Try unaffordable, fractional and malformed commands; each must be
-   rejected without replacing the saved purchase.
-3. Submit 5 for Bob and 5 for Carol. Purchases reveal together: cash becomes $23, $23 and $35. Every player now has
-   five pool tokens and 31 stock tokens. Capital bids remain separately visible. History adds all three purchases
-   together, with one revision increase and no turn-order dice.
-4. Everyone is tied. The earliest capital chooser is placed provisionally. The second chooser gets buttons to go
-   before or after that player. Choose after using `choose-turn-position 2`. A command from another player or an
-   unavailable slot must fail without changing the sequence or cash.
-5. Restart while Carol's decision is pending. The provisional sequence and required chooser must be identical.
-   Carol, the last capital chooser, can insert before, between or after the two players. Choose the middle button.
-   Its effect must match `choose-turn-position 2`; earlier players cannot act again.
-6. Every tab now shows **Turn 1 — Play Cards** and the finalized order with boxes **2, 4, 6**.
-   Draw Card resolves automatically in this opening turn and no player yet owns an optional Buy Card advance.
-   Each private hand contains its original card plus one new private draw. Cash and tokens are unchanged by the
-   tie choices. Continue with [the full-game guide](manual-full-game.md).
-7. Restart again. Purchases, resources, finalized order, boxes, cards and history must remain identical.
+1. Enter a purchase of 4 for Alice: the preview shows $4 cost, four tokens and $24 remaining. Submit,
+   then replace it with `buy-tokens 5`. Other tabs see only readiness; public cash and token totals
+   do not change before the final submission.
+2. Restart and refresh. Alice's saved amount stays 5 and remains private. Unaffordable, fractional
+   and malformed purchases must fail without replacing it.
+3. Submit 5 for Bob and Carol. The batch reveals once: cash becomes $23, $23 and $35; each player
+   has five pool tokens and 31 stock tokens. Capital bids remain separately visible. No turn-order
+   dice are used.
+4. All are tied. The earliest capital chooser is placed provisionally; the next chooser selects
+   before/after. Choose after with `choose-turn-position 2`. Wrong players and unavailable slots
+   fail without changing cash or sequence.
+5. Restart while the last chooser is pending. The sequence and chooser stay unchanged. That player
+   can insert before, between or after; the middle button submits `choose-turn-position 2`.
+6. **Turn 1 — Play Cards** opens with finalized order boxes **2, 4, 6**. Draw Card resolves
+   automatically and nobody yet owns an optional Buy Card advance. Each hand now has its opening
+   card plus one regular draw. Restart once more and check the same resources, cards and history.
 
-Repeat with 4–6 players. Paris, London and Hamburg become available in that order. Order boxes are **1,3,5,6** for
-four players, **1–5** for five and **1–6** for six. The tie choices must also work for larger groups and for multiple
-separate tied groups. The next epoch begins on a draw request from an empty earlier pile; the
-authority records the shuffled next deck plus eligible discarded cards before resuming the draw.
-
-## Variants and history policy
-
-Choose variants on the same screen as player registration. Creation records every resolved option.
-The deck swap exchanges Timber and War between decks 1 and 2. The mutually exclusive opening-deal
-restrictions are no Crusades, no events or commodities only; all deal one card and leave excluded
-cards in the pile. Immediate Master Art discard is a separate toggle. Select European map to use
-the alternate board; Loire appears with four or more players. There are no edition presets.
-
-Undo defaults to regular turn. The other choices are competitive, friendly turn and friendly game;
-see [the design](design.md#4-revisions-and-undo) before choosing broader authority. After starting,
-these settings are frozen. **Commands** exposes readable history and the authorized suffix editor.
+Repeat with 4–6 players: Paris, London and Hamburg become available in that order. Order boxes are
+**1, 3, 5, 6**, **1–5** and **1–6** respectively. Test larger and separate tied groups. Continue with
+[the full-game guide](manual-full-game.md).
 
 ## Negative and over-stock purchases
 
-Create another three-player game and submit capital bids of 0 for everyone. Complete the recorded dice and capital
-choices normally; each player retains $40. Then submit:
+In a fresh game, bid 0 for everyone and complete the recorded tie rolls and capital choices. Each
+player retains $40. Submit:
 
-| Player | Command | Cash after reveal | Pool tokens | Stock tokens | Order box |
+| Player | Command | Cash after reveal | Pool | Stock | Order box |
 | --- | --- | --- | --- | --- | --- |
 | Alice | `buy-tokens -2` | $38 | 0 | 36 | 2 |
 | Bob | `buy-tokens 0` | $40 | 0 | 36 | 4 |
 | Carol | `buy-tokens 38` | $2 | 36 | 0 | 6 |
 
-The order is Alice, Bob, Carol. A negative purchase pays its absolute amount and receives no tokens. Over-stock
-purchases pay and rank by the full submitted amount but receive only available stock. Both the order and the pool
-apply to this turn. No tie prompt is needed for distinct amounts.
+Order follows the signed submitted amounts. Negative purchases pay their absolute value and receive
+no tokens; over-stock purchases pay and rank by the full amount but receive only available stock.
+Distinct amounts require no tie prompt.
 
-## Commands and API
+## Commands, API and recovery
 
-The command input accepts one command without an actor prefix. Forms generate the same commands:
+Forms and the command input share validation. Common setup commands are:
 
 ```text
-set-option rebuilt-marker-bonus exclude
-start
 bid-capital 12
 choose-capital venice
 buy-tokens -2
 choose-turn-position 2
 ```
 
-Only the creator can configure or start. Configuration freezes when setup starts. Capital bids must be whole numbers
-from 0 through 40. Token purchases must be whole numbers between negative available cash and positive available cash.
-Both types of private submission may be replaced until the final submission reveals their batch. Turn-position slots
-are one-based insertion positions within the current tied group, not printed board boxes. System outcomes cannot be
-submitted by clients. Unsupported options, actor prefixes and multiple commands are rejected.
+Capital bids are whole numbers from 0 through 40. Token purchases range from negative available cash
+to positive available cash. Both submissions may be replaced until their complete batch reveals.
+Turn-position slots are one-based insertion positions within the tied group, distinct from printed
+order boxes. Own actor/capital prefixes are supported; impersonating another seat, authority outcomes,
+unsupported options and multiple commands are rejected. `start` remains recorded engine syntax;
+newly created tables have already executed it.
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/games` | `{"players":["Alice","Bob","Carol"]}` | Game id and private relative seat links; 201 |
-| `GET /api/games/{id}` | `Authorization: Bearer <token>` | Caller-specific state, prompts, legal choices, history and active revision |
-| `POST /api/games/{id}/commands` | Same authorization; `{"expectedRevision":6,"command":"buy-tokens 5"}` | Updated caller-specific state |
+| `POST /api/games` | `{"players":["Alice","Bob","Carol"]}`; optional `options` and `undoPolicy` | Started game ID and private relative seat links; 201 |
+| `GET /api/games/{id}` | `Authorization: Bearer <token>` | Viewer-safe state, prompt, choices, history and revision |
+| `POST /api/games/{id}/commands` | Same authorization; `{"expectedRevision":6,"command":"buy-tokens 5"}` | Updated viewer-safe snapshot |
 | `GET /api/health` | None | `{"status":"ok"}` |
 
-Extract the token from the seat link's `#token=…` fragment. It is sent in the authorization header and is not a query
-parameter. Use the active revision from the latest snapshot when submitting a command. Unknown credentials return
-401. Invalid commands return 422 with a stable `code` and entity ids; malformed
-requests return 400. A stale active revision returns 409; the browser refreshes the state while preserving drafts,
-then requires you to review and explicitly resubmit. Pending bid changes do not advance the committed revision.
-Capital-bid reveal advances it once, including required dice; token-purchase reveal advances it once, including all
-payments and allocations. Each subsequent turn-order choice advances it individually.
+The token comes from the link's `#token=…` fragment and travels in the authorization header. Use the
+latest snapshot revision. Unknown credentials return 401; malformed requests 400; rejected commands
+422 with typed diagnostics; stale revisions 409. Stale recovery refreshes and preserves correctable
+drafts, then requires explicit resubmission. Pending replacements keep the same committed revision;
+complete reveals, including their outcomes, advance it once. Each tie-position choice advances it.
 
-Each response hides other hands, unrevealed amounts and future deck order. Successful game responses and structured
-errors use `Cache-Control: no-store`. The creator receives all seat links at creation but its own game view has no
-extra access to other hands.
+Responses and structured errors use `Cache-Control: no-store`. The creator receives all local links
+at creation but gains no extra hand access through their own snapshot. Save links: the server stores
+credential hashes and cannot recover a lost URL.
 
-## Storage and automated checks
+Games and private submissions survive restart through replay of recorded outcomes. Failed writes
+preserve saved state; corrupt or incompatible files return `STORAGE_UNAVAILABLE` and are not reset.
+Only current versions are supported; administrative upgrades are explicit and audited. Use one
+server per data directory and separate temporary directories for disposable runs.
 
-Games and pending private submissions survive server restarts. Replaying history uses recorded shuffles, deals and
-rolls without generating randomness. Failed writes retain the preceding saved state. Unreadable, corrupt or
-incompatible files return `STORAGE_UNAVAILABLE` and are never reset automatically. Scoped undo and
-audited suffix editing are available under Commands; see [the command reference](commands.md#application-history-commands).
-
-Only the current game format and rules version are supported. Every saved game must record its creator explicitly.
-Files from the setup-only implementation are incompatible; use a fresh game for this walkthrough. No migration or
-automatic deletion is performed. This walkthrough uses local private links. Public deployments use
-registered accounts and the [hosting/administrative contracts](deployment.md).
-
-Use a single server process for a data directory. Saved games contain private data; do not publish them. The default
-`.aor-data/` directory is excluded from Git. Tests and disposable manual runs should use separate temporary directories.
-
-```sh
-./gradlew formatKotlin
-./gradlew :core:jvmTest :core:compileKotlinJs :server:test checkKotlinFormat
-npm run build
-```
-
-Core tests cover all player counts, signed purchase calculations, tie insertion, printed boxes, codec round trips,
-replay equality, invalid commands and token conservation. Server tests cover private projections, authorization,
-replacement, stale and concurrent requests, restart recovery, invalid saved histories and failed atomic writes.
+Undo defaults to regular turn; competitive, friendly turn and friendly game are creation choices.
+Use **Undo last action** or the suffix editor under **Commands** within the
+[documented scopes](design.md#4-revisions-and-undo). History aliases can show capitals, names or IDs
+without changing canonical entries. [README](../README.md) owns verification commands; core/service
+checks cover private batches, signed purchases, ties, authorization, replay, revisions and atomic writes.
