@@ -294,8 +294,10 @@ export function BoardMap({snapshot, busy}: {
                         <title>{label(sea)}{catalog.seaAreas[sea] ? ` · ${t('board.area')} ${catalog.seaAreas[sea]}` : ''}</title>
                         <path className="sea-shape" d={shape.path} fill={selectedSeas.has(sea) ? `url(#${prefix}-connected-sea)` : shape.color} stroke="#739eac" strokeWidth={1}/>
                         <text className="sea-name" x={shape.label[0]} y={shape.label[1]} textAnchor="middle" fontSize={20} fill="#315d70" fontWeight={500} aria-label={label(sea)}
+                            textLength={label(sea).length <= 18 ? label(sea).length * 9.5 : undefined} lengthAdjust="spacingAndGlyphs"
                             transform={`rotate(${shape.labelAngle} ${shape.label[0]} ${shape.label[1]})`}>
-                            {label(sea).length > 18 ? label(sea).split(' ').map((word, index) => <tspan key={index} x={shape.label[0]} y={shape.label[1] - 10 + index * 24}>{word}</tspan>) : label(sea)}
+                            {label(sea).length > 18 ? label(sea).split(' ').map((word, index) => <tspan key={index} x={shape.label[0]} y={shape.label[1] - 10 + index * 24}
+                                textLength={word.length * 9.5} lengthAdjust="spacingAndGlyphs">{word}</tspan>) : label(sea)}
                         </text></g>)}
                     <path data-map-terrain d={geometry.terrain} fill="#e3e3d5" stroke="#b3b7a5"/>
                     {Object.entries(geometry.coasts).map(([id, path]) => definitions.has(id) && <g key={id} data-coastal-space={id}

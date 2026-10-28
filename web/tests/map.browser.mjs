@@ -208,7 +208,10 @@ await page.send('Page.navigate', {url: web + actor.path});
         }
         if (province === 'belgrade') {
             const adriaticNameFits=await page.evaluate(`(() => {const sea=document.querySelector('[data-sea="ADRIATIC_SEA"]');const path=sea.querySelector('.sea-shape');const text=sea.querySelector('.sea-name');const bounds=text.getBBox();const matrix=path.getScreenCTM().inverse().multiply(text.getScreenCTM());return [0,.5,1].every(dx=>[0,.5,1].every(dy=>path.isPointInFill(new DOMPoint(bounds.x+bounds.width*dx,bounds.y+bounds.height*dy).matrixTransform(matrix))));})()`);
-            assert.equal(adriaticNameFits,true,'The highlighted Adriatic name fits clear water beside Belgrade');
+            if (!adriaticNameFits) {
+                const metrics=await page.evaluate(`(() => {const text=document.querySelector('[data-sea="ADRIATIC_SEA"] .sea-name');const {x,y,width,height}=text.getBBox();return {x,y,width,height,font:getComputedStyle(text).font};})()`);
+                assert.fail('The highlighted Adriatic name must fit clear water beside Belgrade: '+JSON.stringify(metrics));
+            }
             const coastPoint=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(1776.4,1225.5).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
             await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...coastPoint,button:'left',clickCount:1});
             await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',...coastPoint,button:'left',clickCount:1});

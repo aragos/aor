@@ -43,6 +43,11 @@ export class Page {
         }
         throw new Error(`Timed out: ${description}`);
     }
+    async reload() {
+        const previous = await this.evaluate('performance.timeOrigin');
+        await this.send('Page.reload');
+        await this.wait(`performance.timeOrigin !== ${previous} && document.readyState === 'complete'`, 'new document after reload');
+    }
     async click(text) {
         const expression = `(() => {const button = [...document.querySelectorAll('button')].find(b => b.textContent === ${JSON.stringify(text)}); if (!button || button.disabled) return false; button.click(); return true;})()`;
         assert.equal(await this.evaluate(expression), true, `Button unavailable: ${text}`);

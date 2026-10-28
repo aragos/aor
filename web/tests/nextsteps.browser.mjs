@@ -88,7 +88,7 @@ export async function checkSetupEvidence(page, web) {
             await page.wait(`document.querySelector('.pending-submission')?.textContent.includes('$${amount}')`,'private bid saved');
             assert.equal((await snapshot(creator)).revision,dealt.revision,'Private replacement retains committed revision');
         }
-        await page.send('Page.reload');
+        await page.reload();
         await page.wait(`document.querySelector('.pending-submission')?.textContent.includes('$9')`,'bid survives reload');
         assert.equal((await snapshot(other)).pendingBid,null,'Other seats cannot see the bid');
         await page.evaluate(`document.querySelector('.private-seat-link').open=true`);

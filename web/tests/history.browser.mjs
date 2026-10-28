@@ -33,7 +33,7 @@ try {
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(capital+': place 1 '+target));
     await page.click('Display names');
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(player.name+': place 1 '+target));
-    await page.send('Page.reload');
+    await page.reload();
     await page.wait(`document.querySelector('#history-identifiers button[aria-pressed=true]')?.textContent==='Display names'`, 'history name preference survives reload');
     await page.evaluate(`document.querySelector('.commands-toggle').click()`);
     await page.click('Canonical IDs');
