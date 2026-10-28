@@ -213,10 +213,23 @@ export async function checkContextualUx(page, web, baseline) {
     assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /Competition won.*Rome/);
     await show({events:[...baseline.events,event,{...event,id:'later',kind:'PASS',competition:null}]});
     assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), true, 'Result survives unrelated activity');
-    const secondResult = {...event, id:'fixture-second-result',provinces:['naples']};
+    const secondResult = {...event, id:'fixture-second-result',provinces:['naples'],competition:{...event.competition,attackerWon:false}};
     await show({events:[...baseline.events,event,secondResult]});
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 2,
         'All competition results remain available in the expansion phase');
+    assert.equal(await page.evaluate(`document.querySelector('[data-competition-result="fixture-second-result"]').classList.contains('lost')`), true,
+        'Losing competitions use the loss treatment');
+    assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /White die 1.*Black die 6.*Green die 4/,
+        'Every competition die identifies its color');
+    await click('.clear-competition-results');
+    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
+        'Competition results can be cleared');
+    await show({events:[...baseline.events,event,secondResult]});
+    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
+        'Polling preserves the cleared results');
+    await show({events:[...baseline.events,event,secondResult,{...event,id:'fixture-fresh-result'}]});
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 1,
+        'A new competition remains visible after clearing older results');
     await show({game:{stage:'PURCHASE'},events:[...baseline.events,event,secondResult]});
     assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
         'Competition log leaves the decision panel at the end of expansion');
@@ -226,7 +239,7 @@ export async function checkContextualUx(page, web, baseline) {
         war:{initiator:viewer,opponent:other.id,totals:{[viewer]:4,[other.id]:3},winner:viewer,requiredTransfers:1}};
     await show({events:[...baseline.events,war]});
     assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /won the War/);
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /Die 3 → total 4/);
+    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /White die 3 → total 4/);
     await show({events:[...baseline.events,war,{...event,id:'later-war',kind:'PASS',war:null,competition:null}]});
     assert.equal(await page.evaluate(`!!document.querySelector('.war-notice')`), true, 'War result survives later activity');
     const tied = {...war,id:'fixture-war-tie',war:{...war.war,winner:null,totals:{[viewer]:3,[other.id]:3},requiredTransfers:0}};
