@@ -253,6 +253,67 @@ class HistoryEventsTest {
     }
 
     @Test
+    fun resolvingTheExpansionBonusAnnouncesIncomeSeparatelyFromTheCardDraw() {
+        val initial =
+            competitionState()
+                .copy(
+                    deck = listOf("stone-1"),
+                    board =
+                        BoardState()
+                            .placeMarker(ProvinceId("venice"), owner, PieceSide.WHITE)
+                            .board,
+                    flow = TurnFlow(actor = observer, cursor = 2, phaseStarted = true),
+                )
+        val waiting = initial.step(Entry.Action(observer, TurnCommand.Pass))
+        val draw = GameOutcome.Draw(owner, "hand-1", "stone-1")
+        val after = waiting.step(draw)
+
+        val events = HistoryEvents.projectAll("3:0", waiting, after, draw, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.DRAW_CARD, HistoryEventKind.INCOME)
+            .inOrder()
+        assertThat(events.first().drawReason).isEqualTo(CardDrawReason.EXPANSION_BONUS)
+        assertThat(events.first().cashChanges).isEmpty()
+        assertThat(events.first().card).isNull()
+        assertThat(events.last().id).isEqualTo("3:0:income")
+        assertThat(events.last().cashChanges).contains(HistoryCashChangeView(owner, 18))
+    }
+
+    @Test
+    fun anOmittedPurchasePassNamesAutomaticHolyIndulgencePayments() {
+        val base = competitionState()
+        val ownerWithIndulgence =
+            base
+                .playerState(owner)
+                .copy(
+                    stockTokens = 0,
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.HOLY_INDULGENCE, 1))),
+                )
+        val initial =
+            base.copy(
+                stage = Stage.PURCHASE,
+                players = base.players + (owner to ownerWithIndulgence),
+                flow =
+                    TurnFlow(
+                        actor = observer,
+                        cursor = 2,
+                        purchaseStep = PurchaseStep.RELIEF,
+                        phaseStarted = true,
+                        phaseBookkeepingApplied = true,
+                    ),
+            )
+        val entry = Entry.Action(observer, TurnCommand.Pass)
+        val after = initial.step(entry)
+
+        val events = HistoryEvents.projectAll("3:0", initial, after, entry, observer)
+
+        assertThat(events.single().kind).isEqualTo(HistoryEventKind.HOLY_INDULGENCE)
+        assertThat(events.single().cashChanges).contains(HistoryCashChangeView(owner, 4))
+    }
+
+    @Test
     fun regularDrawExplainsWhyTheCardWasAwarded() {
         val initial = before.copy(stage = Stage.DRAW_CARD)
         val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
