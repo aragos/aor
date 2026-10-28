@@ -1,9 +1,10 @@
 # Online deployment and operation
 
-Use a Render Docker web service, managed PostgreSQL 18 and Firebase email/password authentication.
+Use a Render Docker web service, managed PostgreSQL 18 and Firebase email/password or Google
+authentication.
 The repository contains a two-resource Blueprint, SQL migrations, CI, dependency updates, an account
 dashboard and administrative APIs. Public hosting requires managed authentication; private-link
-mode is for loopback development. Infrastructure and DNS must still be provisioned by the owner.
+mode is for loopback development. Infrastructure and DNS are provisioned by the owner.
 
 ## Hosting choice and expected cost
 
@@ -44,12 +45,16 @@ quotas also apply; see [Firebase limits](https://firebase.google.com/docs/auth/l
 
 ## First launch
 
-1. Create a Firebase project and register a web application. Enable Email/Password authentication.
+1. Create a Firebase project and register a web application. Enable Email/Password and Google
+   authentication. For Google, choose the project's support email and save the provider settings.
    In Authentication settings, enable email enumeration protection and an enforced password policy
    of at least 12 characters. Set an appropriate verification/reset email template and contact
    address. The application requires verified email before registering a player or joining games.
    [Firebase password authentication](https://firebase.google.com/docs/auth/web/password-auth)
-   describes the provider settings.
+   describes the password provider settings. [Firebase Google authentication](https://firebase.google.com/docs/auth/web/google-signin)
+   describes the Google provider settings. The application uses popup sign-in with the existing
+   Firebase auth domain; Google users continue through the same verified-email and player-registration
+   checks as password users. Allow popups for the application if the browser blocks the sign-in window.
 2. Create a dedicated service account with the Firebase Authentication Viewer role
    (`roles/firebaseauth.viewer`). The server verifies ID tokens and checks disabled/revoked users;
    it does not create identities or manage passwords. Generate its credential JSON and keep it out
@@ -74,8 +79,8 @@ quotas also apply; see [Firebase limits](https://firebase.google.com/docs/auth/l
    traffic. Health checks query PostgreSQL. The Blueprint sets `sslmode=require` because Render's
    internal certificates are self-signed; other managed endpoints default to hostname-verified TLS.
    See [Render connection security](https://render.com/docs/postgresql-creating-connecting).
-7. Verify signup, verification email delivery, password reset, restart persistence, cross-account
-   isolation, database restoration and a complete game on the actual service. CI runs real
+7. Verify Google sign-in, signup, verification email delivery, password reset, restart persistence,
+   cross-account isolation, database restoration and a complete game on the actual service. CI runs real
    PostgreSQL tests and a non-root production-container smoke check. Provider credentials, email
    delivery and capacity on the smallest paid tiers require live checks.
 

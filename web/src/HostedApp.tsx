@@ -1,9 +1,9 @@
 import {useEffect, useState} from 'react';
 import type {FormEvent, ReactNode} from 'react';
 import {initializeApp} from 'firebase/app';
-import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, onIdTokenChanged,
+import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, onIdTokenChanged,
     sendEmailVerification, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword,
-    signOut} from 'firebase/auth';
+    signInWithPopup, signOut} from 'firebase/auth';
 import type {Auth, User} from 'firebase/auth';
 import {request, setAuthentication} from './api';
 import type {Account, ApplicationConfig, CreatedGame, GamePage, GameSummary, Session} from './api';
@@ -12,6 +12,9 @@ import {defaultVariants, validVariants, Variants} from './Variants';
 import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
 import {t} from './messages';
 
+// Google's pre-approved light button from https://developers.google.com/identity/branding-guidelines.
+const googleSignInButton = new URL('./assets/google-sign-in.png', import.meta.url).href;
+
 const errors: Record<string, string> = {
     'auth/invalid-credential': t('hosted.the-email-or-password-was'),
     'auth/email-already-in-use': t('hosted.an-account-already-uses-that'),
@@ -19,7 +22,12 @@ const errors: Record<string, string> = {
     'auth/weak-password': t('hosted.choose-a-stronger-password-with'),
     'auth/too-many-requests': t('hosted.too-many-attempts-please-try'),
     'auth/network-request-failed': t('hosted.cannot-reach-the-signin-service'),
-    'auth/operation-not-allowed': t('hosted.email-signup-has-not-been'),
+    'auth/operation-not-allowed': t('hosted.sign-in-method-not-enabled'),
+    'auth/popup-blocked': t('hosted.google-popup-blocked'),
+    'auth/popup-closed-by-user': '',
+    'auth/cancelled-popup-request': '',
+    'auth/unauthorized-domain': t('hosted.sign-in-domain-not-authorized'),
+    'auth/account-exists-with-different-credential': t('hosted.use-existing-sign-in-method'),
     HANDLE_UNAVAILABLE: t('hosted.that-handle-is-already-registered'),
     INVALID_ACCOUNT: t('hosted.use-a-324-character-handle'),
     GAME_CREATION_FORBIDDEN: t('hosted.an-administrator-needs-to-approve'),
@@ -60,13 +68,23 @@ function SignIn({auth}: {auth: Auth}) {
         catch (failure) {setError(message(failure));}
         finally {setBusy(false);}
     }
+    async function google() {
+        setBusy(true); setError(''); setNotice('');
+        try {await signInWithPopup(auth, new GoogleAuthProvider());}
+        catch (failure) {setError(message(failure));}
+        finally {setBusy(false);}
+    }
     return <main className="landing panel"><p className="eyebrow">{t('app.subtitle')}</p><h1>{t('app.title')}</h1>
+        <Problem value={error}/><p role="status">{notice}</p>
+        <button type="button" className="google-sign-in" disabled={busy} aria-busy={busy} onClick={() => {void google();}}>
+            <img src={googleSignInButton} alt="" width={198} height={44}/><span className="sr-only">{t('hosted.sign-in-with-google')}</span>
+        </button>
+        <p className="auth-divider muted">{t('hosted.or-use-email')}</p>
         <ChoiceButtons value={mode} onChange={setMode} disabled={busy} choices={[{value: 'sign-in', label: t('hosted.sign-in')}, {value: 'sign-up', label: t('hosted.create-account')}]}/>
         <form onSubmit={submit} className="account-form">
             <label>{t('hosted.email')}<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254}/></label>
             <label>{t('hosted.password')}<input type="password" autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} required minLength={mode === 'sign-up' ? 12 : undefined} maxLength={128}/></label>
             {mode === 'sign-up' && <p className="muted small">{t('hosted.use-at-least-12-characters')}</p>}
-            <Problem value={error}/><p role="status">{notice}</p>
             <button disabled={busy}>{busy ? t('hosted.working') : mode === 'sign-up' ? t('hosted.create-account') : t('hosted.sign-in')}</button>
             <button type="button" className="secondary" disabled={busy || !email.trim()} onClick={() => {void reset();}}>{t('hosted.reset-password')}</button>
         </form>

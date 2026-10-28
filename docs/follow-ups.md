@@ -5,8 +5,8 @@ publication credential issue was resolved using the configured SSH authenticatio
 
 ## Needed before public launch
 
-- Create/choose the Firebase and Render projects, supply the service-account secret and initial
-  admin UID, and choose the hostname under the Squarespace domain. Follow [deployment](deployment.md).
+- The deployment setup is complete and the application runs successfully on Render. Google is
+  enabled in Firebase; verify Google sign-in on the deployed application after this change ships.
 - Complete a real sign-up/verification/reset flow, three-account privacy check, restart and backup
   restore on Render. Check actual memory, traffic, database size and concurrent-player load. The
   $13.30/month app plus managed PostgreSQL base is a starting configuration, not a measured capacity

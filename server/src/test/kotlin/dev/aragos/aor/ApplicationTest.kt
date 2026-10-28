@@ -19,6 +19,20 @@ import kotlin.test.Test
 
 class ApplicationTest {
     @Test
+    fun securityPolicyAllowsFirebaseGooglePopupScripts() = withGame {
+        val response = client.get("/api/config")
+        val policy =
+            requireNotNull(response.headers["Content-Security-Policy"]) {
+                "Application responses must include a content security policy."
+            }
+        val scripts = policy.split(';').map(String::trim).single { it.startsWith("script-src ") }
+
+        assertThat(scripts.split(' '))
+            .containsExactly("script-src", "'self'", "https://apis.google.com")
+        assertThat(policy).contains("frame-src https://*.firebaseapp.com")
+    }
+
+    @Test
     fun tokenQuoteRequiresCredentials() = withGame {
         val response =
             client.post("$url/quote-token-purchase") {
