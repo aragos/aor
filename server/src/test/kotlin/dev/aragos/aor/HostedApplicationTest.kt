@@ -124,7 +124,6 @@ class HostedApplicationTest(private val postgres: Boolean) {
     @Test
     fun gameListUsesMembershipAndReadinessFilters() = withHosted {
         val game = game()
-        command(game.gameId, "alice", 1, "start")
         command(game.gameId, "alice", 2, "bid-capital 5")
 
         val alice = json.readTree(get("/api/games?status=my-move", "alice").bodyAsText())
@@ -164,7 +163,6 @@ class HostedApplicationTest(private val postgres: Boolean) {
     @Test
     fun replacingPrivateBidsDoesNotInvalidateAnotherPlayersSnapshot() = withHosted {
         val game = game()
-        command(game.gameId, "alice", 1, "start")
         command(game.gameId, "alice", 2, "bid-capital 5")
         val before = get("/api/games/${game.gameId}", "bob")
 
@@ -184,7 +182,7 @@ class HostedApplicationTest(private val postgres: Boolean) {
         post(
             "/api/admin/games/${game.gameId}/status",
             "admin",
-            mapOf("expectedRevision" to 1, "action" to "cancel"),
+            mapOf("expectedRevision" to 2, "action" to "cancel"),
         )
 
         val rejected = command(game.gameId, "alice", 2, "start")
@@ -483,10 +481,7 @@ private class HostedFixture(postgres: Boolean) : AutoCloseable {
             UndoPolicy.REGULAR_TURN,
         )
 
-    fun startedGame(): CreatedGame =
-        game().also {
-            service.submit(it.gameId, GameAccess.Account(AccountId("alice")), 1, "start")
-        }
+    fun startedGame(): CreatedGame = game()
 
     suspend fun get(path: String, token: String) = client.get(path) { bearerAuth(token) }
 

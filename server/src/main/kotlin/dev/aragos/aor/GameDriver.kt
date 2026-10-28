@@ -104,6 +104,7 @@ class AuthorityRandom : SetupRandom {
 
 /** Advances the engine and batches private decisions independently of transport and storage. */
 class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
+    /** Resolve selected variants and opening setup outcomes before publishing the new game. */
     fun create(
         id: String,
         header: GameHeader,
@@ -114,22 +115,24 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         val entries = initialConfiguration(header.creatorId, rules)
         val entry = entries.first()
         entries.fold(GameState(header)) { state, action -> state.step(action) }
-        return StoredGame(
-            id = id,
-            header = header,
-            credentials = credentials,
-            revisions =
-                listOf(
-                    Revision(
-                        id = 1,
-                        parent = null,
-                        author = entry.actor,
-                        command = entry.command.toText(),
-                        entries = entries.map(TextCodec::print),
-                        undoPolicy = undoPolicy,
-                    )
-                ),
-        )
+        val configured =
+            StoredGame(
+                id = id,
+                header = header,
+                credentials = credentials,
+                revisions =
+                    listOf(
+                        Revision(
+                            id = 1,
+                            parent = null,
+                            author = entry.actor,
+                            command = entry.command.toText(),
+                            entries = entries.map(TextCodec::print),
+                            undoPolicy = undoPolicy,
+                        )
+                    ),
+            )
+        return submit(configured, header.creatorId, Command.Start)
     }
 
     fun submit(stored: StoredGame, player: PlayerId, command: Command): StoredGame {

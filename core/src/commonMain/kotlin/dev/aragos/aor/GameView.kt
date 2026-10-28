@@ -88,6 +88,8 @@ data class GameView(
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
     val reliefOffers: List<ReliefOfferView> = emptyList(),
     val stabilizationCost: Long? = null,
+    /** Printed misery box after paying stabilization in misery; null means Chaos. */
+    val stabilizationMisery: Int? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
     /** Missing printed access advances for this viewer; independent of phase, routes, and ships. */
@@ -169,6 +171,9 @@ data class GameView(
                 reliefOffers = reliefOffers(state, viewer),
                 stabilizationCost =
                     if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
+                stabilizationMisery =
+                    MiseryRules.payDebt(viewer.misery, PlayerEconomy.stabilizationCost(viewer))
+                        .value,
                 burdenReferences = burdenReferences(state, viewer),
                 expansionOffers = ExpansionProjection.offers(state, viewer),
                 commodityPayouts = CommodityPayoutView.from(state),

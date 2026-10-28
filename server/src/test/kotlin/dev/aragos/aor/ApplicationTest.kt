@@ -69,16 +69,14 @@ class ApplicationTest {
     }
 
     @Test
-    fun deckModificationIsPubliclyConfigurableBeforeStart() = withGame {
-        val configured = command(0, 1, "set-option deck-modification enabled")
-        val own = json.readTree(configured.bodyAsText())
-        val other = json.readTree(view(1).bodyAsText())
+    fun creationStartsSetupAndFreezesTheSelectedVariants() = withGame {
+        val own = json.readTree(view(0).bodyAsText())
+        val rejected = command(0, 2, "set-option deck-modification enabled")
 
-        assertThat(configured.status).isEqualTo(HttpStatusCode.OK)
-        assertThat(own["game"]["rules"]["deckModification"].asBoolean()).isTrue()
-        assertThat(other["game"]["rules"]["deckModification"].asBoolean()).isTrue()
-        assertThat(other["history"].map { entry -> entry.asText() })
-            .contains("p1: set-option deck-modification enabled")
+        assertThat(own["game"]["stage"].asText()).isEqualTo("BIDDING")
+        assertThat(own["game"]["hand"].size()).isEqualTo(1)
+        assertThat(own["legalChoices"]["commands"].map { it.asText() }).doesNotContain("start")
+        assertThat(rejected.status).isEqualTo(HttpStatusCode.UnprocessableEntity)
     }
 
     @Test
@@ -92,7 +90,7 @@ class ApplicationTest {
     fun requestsRequireAValidPlayerCredential() = withGame {
         val missing = client.get(url)
         val invalid = client.get(url) { bearerAuth("x".repeat(43)) }
-        val wrongPlayer = command(1, 1, "start")
+        val wrongPlayer = command(1, 2, "p1: bid-capital 1")
 
         assertThat(missing.status).isEqualTo(HttpStatusCode.Unauthorized)
         assertThat(invalid.status).isEqualTo(HttpStatusCode.Unauthorized)
@@ -101,7 +99,7 @@ class ApplicationTest {
 
     @Test
     fun playerViewsExposeOnlyTheCallersCard() = withGame {
-        val started = command(0, 1, "start")
+        val started = view(0)
         val raw = started.bodyAsText()
         val other = json.readTree(view(1).bodyAsText())
 
@@ -117,8 +115,6 @@ class ApplicationTest {
 
     @Test
     fun staleCommandsReturnConflict() = withGame {
-        command(0, 1, "start")
-
         val response = command(0, 1, "bid-capital 12")
 
         assertThat(response.status).isEqualTo(HttpStatusCode.Conflict)
@@ -126,7 +122,6 @@ class ApplicationTest {
 
     @Test
     fun invalidCommandsReturnRuleDiagnostics() = withGame {
-        command(0, 1, "start")
         val commands =
             listOf(
                 "p2: bid-capital 12",
@@ -152,7 +147,6 @@ class ApplicationTest {
 
     @Test
     fun pendingBidsRemainPrivateUntilTheBatchIsComplete() = withGame {
-        command(0, 1, "start")
         command(0, 2, "bid-capital 12")
 
         val other = json.readTree(view(1).bodyAsText())
@@ -378,7 +372,6 @@ private class ApiGame(
     }
 
     suspend fun revealBids() {
-        command(0, 1, "start")
         command(0, 2, "bid-capital 12")
         command(1, 2, "bid-capital 12")
         command(2, 2, "bid-capital 0")

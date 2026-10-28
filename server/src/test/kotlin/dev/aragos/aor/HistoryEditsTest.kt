@@ -275,7 +275,6 @@ class HistoryEditsTest(private val postgres: Boolean) {
         val game = service.create(listOf("Alice", "Bob", "Carol"), undoPolicy = policy)
 
         init {
-            send(0, "start")
             for (seat in 0..2) send(seat, "bid-capital ${3 - seat}")
             for (step in 0 until 100) {
                 if (view(0).game.stage == Stage.EXPANSION) break

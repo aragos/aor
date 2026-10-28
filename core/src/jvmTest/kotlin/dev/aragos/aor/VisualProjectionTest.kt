@@ -371,6 +371,47 @@ class VisualProjectionTest {
     }
 
     @Test
+    fun competitionDestinationIsOmittedWhenThePoolCannotMeetItsMinimum() {
+        val board = BoardState().placeMarker(florence, p2).board
+        val state = state(board, pool = 1)
+
+        assertThat(state.viewForPlayer(p1).expansionOffers.map(ExpansionOfferView::destination))
+            .doesNotContain(florence)
+    }
+
+    @Test
+    fun competitionDestinationIsOmittedWhenShippingCannotMeetItsMinimum() {
+        val rome = ProvinceId("rome")
+        val initial = state(BoardState().placeMarker(rome, p2).board)
+        val state =
+            initial.copy(
+                players =
+                    initial.players +
+                        (p1 to initial.playerState(p1).copy(ships = ShippingCapability.GALLEY_4)),
+                flow = initial.flow.copy(shipped = mapOf(p1 to mapOf(rome to 3))),
+            )
+
+        assertThat(state.viewForPlayer(p1).expansionOffers.map(ExpansionOfferView::destination))
+            .doesNotContain(rome)
+    }
+
+    @Test
+    fun exhaustedDestinationShippingOmitsPeacefulPlacements() {
+        val rome = ProvinceId("rome")
+        val initial = state()
+        val state =
+            initial.copy(
+                players =
+                    initial.players +
+                        (p1 to initial.playerState(p1).copy(ships = ShippingCapability.GALLEY_4)),
+                flow = initial.flow.copy(shipped = mapOf(p1 to mapOf(rome to 4))),
+            )
+
+        assertThat(state.viewForPlayer(p1).expansionOffers.map(ExpansionOfferView::destination))
+            .doesNotContain(rome)
+    }
+
+    @Test
     fun caravanRouteDoesNotChargeExhaustedShipping() {
         val initial = state(advances = setOf(AdvanceId.CARAVAN))
         val player = initial.playerState(p1).copy(ships = ShippingCapability.GALLEY_4)
@@ -552,11 +593,10 @@ class VisualProjectionTest {
     }
 
     @Test
-    fun reachableMarketRemainsHighlightedWhenThePoolCannotFillIt() {
-        val offer = offer(state(pool = 0))
+    fun noPoolOmitsDestinationsWithoutAnyPossiblePlacement() {
+        val offers = state(pool = 0).viewForPlayer(p1).expansionOffers
 
-        assertThat(offer.reachable).isTrue()
-        assertThat(offer.blockers).containsExactly(ViolationCode.INSUFFICIENT_EXPANSION_TOKENS)
+        assertThat(offers.map(ExpansionOfferView::destination)).doesNotContain(florence)
     }
 
     @Test

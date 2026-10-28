@@ -328,7 +328,6 @@ class TurnOrderServiceTest {
         val service = createGameService(directory, FixedRandom(), writer)
         val game = service.create(listOf("Alice", "Bob", "Carol"))
         val fixture = TurnFixture(directory, service, game)
-        fixture.submit(0, "start")
         fixture.submit(0, "bid-capital 3")
         fixture.submit(1, "bid-capital 2")
         fixture.submit(2, "bid-capital 1")
