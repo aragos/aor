@@ -21,7 +21,9 @@ publication credential issue was resolved using the configured SSH authenticatio
 ## Product decisions
 
 - Specify the European map's added/removed provinces, area membership, land/coastal/sea connections
-  and satellite supports. The option is visible but disabled until those rules and geometry exist.
+  and satellite supports in [EuropeanMapData.kt](../core/src/commonMain/kotlin/dev/aragos/aor/EuropeanMapData.kt).
+  Follow the [authoring guide](european-map.md) and run `:server:describeEuropeanMap`. The option is
+  visible but disabled until the reviewed definitions are wired into play and geometry exists.
 - Review the remaining constrained label space in Toulouse and Constantinople on the map. All
   supported connections remain checked; these shapes still limit comfortable label placement.
 - Perform the human screen-reader and physical-phone review recorded in the UI requirements.

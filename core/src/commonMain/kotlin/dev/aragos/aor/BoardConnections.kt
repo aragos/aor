@@ -75,6 +75,7 @@ class BoardConnectionBuilder {
     internal val seaCoasts = linkedSetOf<SeaCoastConnection>()
 
     fun land(from: String, vararg neighbors: String) {
+        require(neighbors.isNotEmpty()) { "Declare at least one land neighbor for $from." }
         for (neighbor in neighbors) {
             require(
                 landBorders.add(ProvinceConnection.of(ProvinceId(from), ProvinceId(neighbor)))
@@ -85,6 +86,7 @@ class BoardConnectionBuilder {
     }
 
     fun coast(from: String, vararg neighbors: String) {
+        require(neighbors.isNotEmpty()) { "Declare at least one coastal-water neighbor for $from." }
         for (neighbor in neighbors) {
             require(
                 coastalConnections.add(
@@ -97,6 +99,7 @@ class BoardConnectionBuilder {
     }
 
     fun supports(satellite: String, vararg markets: String) {
+        require(markets.isNotEmpty()) { "Declare at least one supported market for $satellite." }
         for (market in markets) {
             require(
                 satelliteSupports.add(SatelliteSupport(ProvinceId(satellite), ProvinceId(market)))
@@ -107,6 +110,7 @@ class BoardConnectionBuilder {
     }
 
     fun sea(sea: SeaArea, vararg provinces: String) {
+        require(provinces.isNotEmpty()) { "Declare at least one coastal province for $sea." }
         for (province in provinces) {
             require(seaCoasts.add(SeaCoastConnection(sea, ProvinceId(province)))) {
                 "Duplicate sea coast: $sea / $province."
@@ -456,51 +460,19 @@ object BoardConnectionData {
 
     val reviewBlockers: List<ConnectionReviewBlocker> = emptyList()
 
-    /** Checks references and edge meanings; source completeness is tracked by [reviewBlockers]. */
-    fun validate(provinces: List<ProvinceDefinition>) {
-        val byId = provinces.associateBy(ProvinceDefinition::id)
-        require(byId.size == provinces.size) { "Connection validation requires unique provinces." }
-        fun province(id: ProvinceId): ProvinceDefinition =
-            requireNotNull(byId[id]) {
-                "A board connection references an unknown province: $id."
-            }
-        for (connection in landBorders) {
-            require(
-                province(connection.first).overseas == null &&
-                    province(connection.second).overseas == null
-            ) {
-                "Overseas boxes cannot have land borders: $connection."
-            }
+    /** Checks standard-map references and the AH sea erratum. */
+    fun validate(provinces: List<ProvinceDefinition>): BoardMapDefinition {
+        val definition =
+            BoardMapDefinition(
+                provinces = provinces,
+                landBorders = landBorders,
+                coastalConnections = coastalConnections,
+                satelliteSupports = satelliteSupports,
+                seaCoasts = seaCoasts,
+            )
+        require(seaCoasts.none { it.sea == SeaArea.NORWEGIAN_SEA }) {
+            "The Norwegian Sea has no effective game connections under the AH map errata."
         }
-        for (connection in coastalConnections) {
-            val first = province(connection.first)
-            val second = province(connection.second)
-            require(
-                first.coastal && second.coastal && first.overseas == null && second.overseas == null
-            ) {
-                "Coastal-water edges require two coastal main-map provinces: $connection."
-            }
-        }
-        for (support in satelliteSupports) {
-            require(province(support.satellite).isSatellite) {
-                "Only a satellite can originate a support arrow: ${support.satellite}."
-            }
-            require(
-                !province(support.market).isSatellite && province(support.market).overseas == null
-            ) {
-                "A support arrow must point to a main-map market: ${support.market}."
-            }
-        }
-        for (connection in seaCoasts) {
-            require(
-                province(connection.province).coastal &&
-                    province(connection.province).overseas == null
-            ) {
-                "A sea coast requires a coastal main-map province: ${connection.province}."
-            }
-            require(connection.sea != SeaArea.NORWEGIAN_SEA) {
-                "The Norwegian Sea has no effective game connections under the AH map errata."
-            }
-        }
+        return definition
     }
 }

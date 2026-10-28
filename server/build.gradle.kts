@@ -24,6 +24,17 @@ tasks.register<JavaExec>("verifyGameLogs") {
     args(providers.gradleProperty("gameLogs").orElse("").get())
 }
 
+tasks.register<JavaExec>("describeEuropeanMap") {
+    group = "verification"
+    description =
+        "Validates the European map draft and reports differences from the standard board."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("dev.aragos.aor.EuropeanMapReportKt")
+    if (providers.gradleProperty("fullMap").orNull == "true") {
+        args("--full")
+    }
+}
+
 tasks.register<JavaExec>("importFileStorage") {
     group = "application"
     description =

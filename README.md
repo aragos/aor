@@ -21,6 +21,7 @@ beyond the printed boxes. Both project rulings are implemented and replayable.
 - [Playing a full game](docs/manual-full-game.md): phase actions and interruption commands.
 - [Board and economic inventory](docs/data-inventory.md): catalog transcription, sources and review status.
 - [Map design](docs/map-design.md): the agreed visual language, board navigation, and map-based orders.
+- [European map authoring](docs/european-map.md): edit a declarative copy of the standard map and validate its differences.
 - [UX and UI principles](docs/ui-design.md): goals and common interaction requirements.
 - [UX review and next steps](docs/ux-next-steps.md): project findings, priorities and acceptance criteria.
 - [Rule coverage](docs/rule-coverage.md), [card inventory](docs/card-inventory.md) and

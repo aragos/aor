@@ -94,6 +94,9 @@ provides a structured alternative to spatial inspection; omit map search and nav
 
 ## Data and verification
 
+The [European map authoring guide](european-map.md) describes the separate declarative draft and its
+validation/report command. Its topology can be specified before variant geometry is drawn.
+
 The browser consumes checked-in `web/src/map/boardGeometry.json`, keyed by stable province IDs.
 The catalog owns connections, memberships and access; game state owns pieces and assigned capitals.
 Geometry does not determine eligibility or calculate game effects.

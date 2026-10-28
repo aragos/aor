@@ -18,6 +18,8 @@ only. The deck modification changes epoch assignment and preserves all 64 physic
 The European option is shown as unavailable and rejected by the engine. Required follow-up: province
 additions/removals, land/coastal/sea contacts, support arrows, region membership, capitals and map
 geometry. No speculative connections are implemented.
+The [European map authoring guide](european-map.md) provides an editable derived copy and validation
+command; authoring the draft does not activate it for play.
 
 Second-edition and tournament presets, improved setup, alternate advance/credit tables, optional
 St. Gall support, alternate economy/leader interactions and rebuilt-marker-bonus selection were
