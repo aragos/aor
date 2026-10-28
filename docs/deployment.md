@@ -1,29 +1,46 @@
 # Online deployment and operation
 
-Use one Render Docker web service with a persistent disk and Firebase email/password authentication.
-The repository contains the container, `render.yaml`, CI, dependency updates, an account dashboard,
-and administrative APIs. Public hosting requires managed authentication; private-link mode is for
-loopback development. No hosting account or domain was changed while preparing this configuration.
+Use a Render Docker web service, managed PostgreSQL 18 and Firebase email/password authentication.
+The repository contains a two-resource Blueprint, SQL migrations, CI, dependency updates, an account
+dashboard and administrative APIs. Public hosting requires managed authentication; private-link
+mode is for loopback development. Infrastructure and DNS must still be provisioned by the owner.
 
 ## Hosting choice and expected cost
 
-The initial service uses Render's `0.5c-512mb` plan ($7/month) and 1 GB SSD ($0.25/month). Start at
-about **$7.25/month plus bandwidth/build overages**, before tax. This leaves room below $25 for
-moderate usage, but game count alone cannot guarantee a bill or capacity: simultaneous players,
-history length and traffic matter. Monitor memory, disk, outbound traffic and build minutes after
-launch. Render's Hobby allowance includes 5 GB outbound traffic; additional traffic is $0.15/GB.
-These are the [published prices reviewed on October 27, 2026](https://render.com/pricing).
+**Recommend Render with managed PostgreSQL.** The starting configuration is $7/month for the
+`0.5c-512mb` application, $6/month for the `0.1c-256mb` database and $0.30/month for 1 GB of database
+storage: approximately **$13.30/month before tax and usage overages** on the free Hobby workspace.
+The [compute prices](https://render.com/articles/production-rails-hosting-guide) and
+[database storage price](https://render.com/articles/how-much-does-cloud-application-hosting-cost-for-small-businesses)
+were reviewed October 28, 2026. There is no application disk. Start small and monitor database size,
+CPU, connections, application memory, build minutes and outbound traffic. Hundreds of games per
+month alone cannot establish capacity; simultaneous players and retained history matter.
 
-Email authentication at this scale fits the free tier; Identity Platform's tier-1 authentication
-includes the first 50,000 monthly active users. Email sending quotas also apply. SMS is unused.
-See [authentication pricing](https://cloud.google.com/identity-platform/pricing) and
-[Firebase limits](https://firebase.google.com/docs/auth/limits).
+The managed PostgreSQL options compare as follows:
 
-This choice keeps one deployable application and the existing atomic file store. The paid service
-stays awake. A disk permits one server instance and introduces a short interruption during deploys;
-it cannot support horizontal scaling. Data outside `/var/data` is ephemeral. Render encrypts disks
-and takes daily snapshots retained for seven days. See [disk behavior](https://render.com/docs/disks).
-If concurrency outgrows this instance, measure it before increasing compute or replacing storage.
+| Option | Assessment for this application |
+| --- | --- |
+| Render app + Render PostgreSQL | About $13.30/month baseline, one Blueprint and private same-region networking. Managed database maintenance and recovery fit the operating budget. |
+| DigitalOcean App Platform + managed PostgreSQL | A credible alternative with more database memory: $5 app plus database compute starting at $15.15, with separately priced storage. Less budget headroom; compare the final storage quote. See [app pricing](https://www.digitalocean.com/pricing/app-platform) and [database pricing](https://www.digitalocean.com/pricing/managed-databases). |
+| Small app host + Neon | Potentially cheaper for intermittent use. Neon Free has 100 CU-hours/month and 1 GB; Launch meters compute at $0.106/CU-hour and storage at $0.35/GB-month. Continuous 0.25-CU operation is about $19.35/month in compute alone. Application polling and health checks can prevent sleep. See [Neon pricing](https://neon.com/pricing). |
+| Fly.io + Fly Managed PostgreSQL | Managed PostgreSQL starts at $38/month before the app or storage, exceeding this budget. See [Fly pricing](https://docs.fly.io/about/pricing). |
+| Railway app + PostgreSQL | A credible metered alternative: Hobby has a $5 minimum credited toward usage; RAM is $10/GB-month and CPU $20/vCPU-month. Railway patches its maintained database templates; backups/PITR must be enabled explicitly. Cost may be lower at idle or higher under load. Render offers a simpler fixed starting quote. See [pricing](https://docs.railway.com/pricing) and [database responsibilities](https://docs.railway.com/databases#what-railway-manages). |
+
+Render's advantage here is the combination of predictable entry pricing, managed PostgreSQL,
+GitHub-triggered Docker deploys and one provider for the application/database. The application uses
+standard PostgreSQL and can move elsewhere. This entry tier has no high-availability standby;
+maintenance can interrupt play. Confirm actual load on the deployed instance before claiming that
+this size is sufficient. Increasing either compute tier may require revisiting the $25 budget.
+
+Paid Render databases include continuous recovery: Hobby retains three days, Pro or higher seven.
+Recovery creates another database for inspection and cutover; it is not an in-place undo and the
+recovery instance is billed. See [recovery and backups](https://render.com/docs/postgresql-backups).
+Render applies [minor-version security updates](https://render.com/docs/postgresql-upgrading), with
+maintenance-window controls. This is independent of application dependency and container updates.
+
+Email authentication at this scale fits the first 50,000 monthly active users in the tier-1
+[Identity Platform allowance](https://cloud.google.com/identity-platform/pricing). Email sending
+quotas also apply; see [Firebase limits](https://firebase.google.com/docs/auth/limits). SMS is unused.
 
 ## First launch
 
@@ -41,8 +58,8 @@ If concurrency outgrows this instance, measure it before increasing compute or r
    [Admin setup](https://firebase.google.com/docs/admin/setup) and
    [token verification](https://firebase.google.com/docs/auth/admin/verify-id-tokens).
 3. Connect the repository to Render and create a Blueprint from `render.yaml`. Confirm the plan,
-   1 GB disk and Virginia region. Fill `AOR_FIREBASE_PROJECT_ID` and `AOR_FIREBASE_WEB_API_KEY` from
-   the web app configuration. The web API key is public configuration; the service-account JSON is
+   PostgreSQL 18, 1 GB database storage and matching Virginia regions. Fill `AOR_FIREBASE_PROJECT_ID`
+   and `AOR_FIREBASE_WEB_API_KEY` from the web app configuration. The web API key is public configuration; the service-account JSON is
    a secret. Do not grant that service account general Editor/Owner access.
 4. Create and verify the initial administrator's Firebase account. Copy its **UID**, not its email,
    to `AOR_ADMIN_UIDS`; multiple UIDs are comma-separated. An empty list grants no administration.
@@ -52,10 +69,15 @@ If concurrency outgrows this instance, measure it before increasing compute or r
    creation permissions** to approve game organizers. `registered` instead allows every verified,
    registered account to create games. Administrators always can. Games require 3–6 distinct
    registered UIDs including the creator; public handles and names help find the intended person.
-6. Verify signup, verification email delivery, password reset, restart persistence, cross-account
-   isolation and a complete game on the actual service. Check the first CI container build and
-   memory usage on the 512 MB instance. Local tests use a fake identity verifier and cannot prove
-   live provider credentials or email delivery. Docker was unavailable in the preparation workspace.
+6. Confirm that the database has no public IP allowlist entries and the application uses its
+   internal URL. Startup applies checksum-validated Flyway schema migrations before accepting
+   traffic. Health checks query PostgreSQL. The Blueprint sets `sslmode=require` because Render's
+   internal certificates are self-signed; other managed endpoints default to hostname-verified TLS.
+   See [Render connection security](https://render.com/docs/postgresql-creating-connecting).
+7. Verify signup, verification email delivery, password reset, restart persistence, cross-account
+   isolation, database restoration and a complete game on the actual service. CI runs real
+   PostgreSQL tests and a non-root production-container smoke check. Provider credentials, email
+   delivery and capacity on the smallest paid tiers require live checks.
 
 Runtime configuration:
 
@@ -66,14 +88,58 @@ Runtime configuration:
 | `GOOGLE_APPLICATION_CREDENTIALS` | `/etc/secrets/firebase-admin.json` |
 | `AOR_ADMIN_UIDS` | Exact stable administrator UIDs; empty grants nobody that role |
 | `AOR_GAME_CREATION_POLICY` | `approved` or `registered`; default `approved` |
-| `AOR_DATA_DIR` | `/var/data/aor` in the image; `.aor-data` locally |
+| `AOR_STORAGE` | `postgres` in the image; locally inferred from a database URL, otherwise `file` |
+| `AOR_DATABASE_URL` / `DATABASE_URL` | Secret `postgresql://user:password@host:port/database` URL; first takes precedence |
+| `AOR_DATABASE_TLS` | `verify-full` by default; Blueprint uses `require` on Render's private network; `disable` only on loopback |
+| `AOR_DATABASE_SCHEMA` | SQL schema, default `aor`; lowercase SQL identifier, at most 63 characters |
+| `AOR_DATABASE_POOL_SIZE` | 4 connections per server by default; allowed 1–20 |
+| `AOR_DATA_DIR` | File backend only; `.aor-data` locally |
 | `AOR_WEB_DIR` | `/app/web`, built assets served by Ktor on the same origin |
 | `AOR_HTTP_HOST` | `0.0.0.0` in the image; loopback locally |
 | `PORT` / `AOR_HTTP_PORT` | Render's supplied port; explicit application port takes precedence |
 
-The container initializes the mounted application directory, then runs Java as UID 10001 with a
-256 MB heap and bounded direct memory. One process owns the data directory. Do not run a second
-service against that disk or expose local private-link mode on a public interface.
+The container runs Java as UID 10001 with a 256 MB heap and bounded direct memory. No writable
+application volume is needed. URLs permit only `sslmode` and `sslrootcert` query parameters; unknown
+driver options are rejected. Default TLS uses the JVM trust store with hostname verification;
+`sslrootcert` can select a provider CA file. Keep credentials in secret environment configuration.
+
+### Storage, concurrency and schema updates
+
+PostgreSQL owns accounts, unique handles, memberships, permissions, game metadata, private pending
+submissions, immutable revision rows, upgrade archives and administrative receipts. Indexed directory
+projections provide status and my-move filtering without replaying every game. The engine still owns
+legality and readiness. Revisions retain their delta/suffix/checkpoint meaning; this is not a SQL
+rewrite of the game rules.
+
+Each write locks its game row and commits history, pending submissions and directory projections in
+one transaction. Private submissions advance a storage generation even when the public revision
+stays unchanged. Independent servers and restarted pools detect that generation before using cached
+state. Permission changes and purge receipts commit atomically with their operation. Failed writes
+roll back, and stale public revisions still receive 409. No write is automatically retried with fresh
+randomness. All durable application state is shared, permitting overlapping deployments and multiple
+instances running the same engine/schema versions. The Blueprint starts with one instance.
+
+Flyway applies versioned database-schema changes at startup and rejects altered migration checksums.
+Never edit an applied migration. Future migrations must remain compatible with any old instance
+serving traffic during deploys; otherwise schedule a maintenance cutover. Schema migration does not
+upgrade game rules, commands or catalog versions. That remains the explicit log-upgrade operation.
+
+### Importing existing file data
+
+For current game file format 5, stop the file-backed server and keep a private copy of its complete
+data directory. Configure the target database secrets and run:
+
+```sh
+./gradlew :server:importFileStorage -PstorageImport=/absolute/path/to/stopped-data
+```
+
+The target application schema must be empty. One transaction imports accounts, creation permissions,
+memberships, active histories, pending bids, undo policies, exact archive bytes and audit receipts.
+An error rolls back the entire import; existing SQL data is never overwritten and source files are
+unchanged. Use the same Firebase project to retain UID ownership. Verify counts, player views and
+archives before switching traffic. Unsupported active game formats/rules require an explicit engine
+upgrade first; this tool does not introduce legacy decoding. Keep the stopped source as a rollback
+copy, and do not resume it after accepting new SQL moves.
 
 ## Squarespace domain
 
@@ -86,7 +152,8 @@ authorized domains. See [Render custom domains](https://render.com/docs/custom-d
 ## Updates and automatic protection
 
 `Checks / verify` runs Kotlin tests/JS compilation/formatting, web tests/build, browser interactions,
-the live undo suite, an npm advisory audit, and a fresh production container build. Render's
+the live undo suite against PostgreSQL, an npm advisory audit, and a fresh production container
+build/startup check against PostgreSQL. HTTP tests also exercise the file backend. Render's
 `checksPass` setting deploys `main` after CI succeeds. Require the `verify` check on `main` and enable
 the repository's dependency graph, Dependabot alerts/security updates and secret scanning where
 available. The separate JVM dependency-graph workflow submits transitive Gradle dependencies for
@@ -177,22 +244,29 @@ full account-directory/disaster-recovery backup.
    under its revision/content SHA-256. Later revisions append deltas or scoped edit suffixes.
    Credentials/memberships, creation time, lifecycle and undo policy stay with the game. Pending
    unrevealed submissions are cleared and must be resubmitted. Admin identity/time/action appear
-   in history. A failed replay or active-file write leaves the old active file unchanged.
+   in history. A failed replay or database write leaves the preceding game and archive set unchanged.
 
 Only game file format **5** and the current rules/data versions are decoded for ordinary play.
 Older files remain exportable to admins; there is no silent legacy decoder. An explicit validated
 upgrade reconstructs a current header and checkpoint. Historic revisions before a checkpoint remain
 in its archive and are inspected through admin exports rather than replayed with a mismatched engine.
 
-Cancellation and abandonment retain files. To reclaim space:
+Cancellation and abandonment retain history. To reclaim database space for reuse:
 
 ```sh
 python3 scripts/game-admin.py --url https://play.example.com --token-file /tmp/aor.admin-token.json purge GAME_ID --revision 43
 ```
 
-Purge also removes previous engine archives. Permission and purge receipts record the requested
-operation before its write; a receipt alone does not prove that the operation completed. Keep separate encrypted backups according to the
-desired recovery window. For complete recovery, back up `/var/data/aor` (including `accounts.json`
-and archives) and retain control of the same Firebase project: UIDs grant membership. Restore to
-one stopped/replaced instance, not two writers. Render disk snapshots provide a seven-day fallback;
-restoring one loses later moves. Test backup restoration before relying on it.
+Purge cascades through revision, membership and archive rows while retaining its small committed
+audit receipt. PostgreSQL reuses space after vacuum; deleting rows does not shrink the provider's
+provisioned disk or bill. A stale/failed purge leaves both data and receipt unchanged. Imported
+file-backend `REQUESTED` receipts retain that outcome: they do not prove completion.
+
+For complete recovery, retain encrypted logical database backups (`pg_dump`/provider exports) in
+addition to managed point-in-time recovery. Include the entire application schema, account directory,
+archives and receipts; admin game-log exports alone are insufficient. Keep control of the same
+Firebase project and a secure copy of deployment secrets. Restore into a separate database, validate
+it, then stop writes and repoint the application. Use an appropriate trusted IP temporarily if an
+external backup tool needs access; the Blueprint blocks external database connections by default.
+Test recovery before launch, and retain backups beyond the Hobby three-day window if desired.
+A restore loses subsequent moves; a restored database and the old database must not both accept play.

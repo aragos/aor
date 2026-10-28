@@ -9,6 +9,24 @@ fun createGameService(
     writer: GameWriter = AtomicGameWriter,
 ): GameService = GameService(store = FileGameStore(directory, writer), driver = GameDriver(random))
 
+/** Runtime storage selection is separate from explicit, isolated file-backed test fixtures. */
+fun createConfiguredGameService(environment: Map<String, String> = System.getenv()): GameService {
+    val backend =
+        environment["AOR_STORAGE"]
+            ?: if (environment["AOR_DATABASE_URL"] != null || environment["DATABASE_URL"] != null)
+                "postgres"
+            else "file"
+    val store =
+        when (backend) {
+            "postgres" ->
+                PostgresGameStore(PostgresDatabase(PostgresSettings.fromEnvironment(environment)))
+            "file" ->
+                FileGameStore(Path.of(environment["AOR_DATA_DIR"] ?: ".aor-data").toAbsolutePath())
+            else -> error("AOR_STORAGE must be postgres or file.")
+        }
+    return GameService(store)
+}
+
 /** Local private-link mode is only for loopback development and deterministic engine checks. */
 fun createHostedServices(
     service: GameService,
@@ -33,7 +51,24 @@ fun createHostedServices(
         }
     require(apiKey.isNotBlank()) { "The Firebase web API key cannot be blank." }
     val store =
-        service.store as? FileGameStore ?: error("Hosted mode requires operational game storage.")
+        service.store as? ManagedGameStore
+            ?: error("Hosted mode requires operational game storage.")
+    val accounts: AccountStore
+    val audit: AdministrationAudit
+    val transactions: StorageTransactions
+    when (store) {
+        is FileGameStore -> {
+            accounts = FileAccountStore(store.directory.resolve("accounts.json"))
+            audit = FileAdministrationAudit(store.directory.resolve("admin-audit"))
+            transactions = FileTransactions
+        }
+        is PostgresGameStore -> {
+            accounts = PostgresAccountStore(store.database)
+            audit = PostgresAdministrationAudit(store.database)
+            transactions = store.database
+        }
+        else -> error("The selected game store requires account and audit repositories.")
+    }
     val administrators =
         environment["AOR_ADMIN_UIDS"]
             .orEmpty()
@@ -50,7 +85,7 @@ fun createHostedServices(
         }
     return HostedServices(
         service,
-        AccountStore(store.directory.resolve("accounts.json")),
+        accounts,
         FirebaseIdentityVerifier(project),
         administrators,
         creationPolicy,
@@ -63,6 +98,7 @@ fun createHostedServices(
             ),
             5000,
         ),
-        GameAdministration(store, AdministrationAudit(store.directory.resolve("admin-audit"))),
+        GameAdministration(store, audit, transactions = transactions),
+        transactions,
     )
 }

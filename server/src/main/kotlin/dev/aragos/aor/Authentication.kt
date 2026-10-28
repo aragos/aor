@@ -94,6 +94,7 @@ class HostedServices(
     private val creationPolicy: GameCreationPolicy,
     val publicConfig: PublicApplicationConfig,
     val administration: GameAdministration,
+    private val transactions: StorageTransactions = FileTransactions,
 ) {
     fun identity(token: String): AccountIdentity = verifier.verify(token)
 
@@ -130,6 +131,16 @@ class HostedServices(
             identity.emailVerified,
             accounts.find(identity.id)?.let(::view),
         )
+
+    /** Permission changes and their SQL audit receipt form one committed operation. */
+    fun allowCreation(identity: AccountIdentity, target: AccountId, allowed: Boolean): AccountView {
+        val admin = requireAdmin(identity)
+        return transactions.transaction {
+            if (accounts.find(target) == null) throw ServiceFailure(404, "ACCOUNT_NOT_FOUND")
+            administration.recordCreationPermission(admin.id, target, allowed)
+            view(accounts.allowCreation(target, allowed))
+        }
+    }
 
     fun create(
         identity: AccountIdentity,

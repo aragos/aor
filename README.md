@@ -11,7 +11,7 @@ a marker from another controlled province. Commodity payments continue their qua
 beyond the printed boxes. Both project rulings are implemented and replayable.
 
 - [Product requirements](docs/requirements.md): goals, acceptance contracts and open decisions.
-- [Online deployment](docs/deployment.md): accounts, Render/Firebase setup, security updates and admin tools.
+- [Online deployment](docs/deployment.md): PostgreSQL, hosting comparison, Render/Firebase setup and admin tools.
 - [Follow-up decisions](docs/follow-ups.md): launch prerequisites and remaining map/maintenance review.
 - [Application design](docs/design.md): architecture, storage, undo, controllers and plans.
 - [Engine](docs/engine.md): replay contract, state, flow, data and verification.
@@ -48,7 +48,11 @@ Set `AOR_DATA_DIR` to an absolute directory to choose another location, or `AOR_
 Keep the player links: only their credential hashes are saved, so the server cannot recover lost links.
 The local server listens on `127.0.0.1`. Hosted mode uses verified Firebase accounts, registered
 player handles, membership-based game access and an administrative game dashboard. See
-[deployment](docs/deployment.md) for configuration. Private plans and bots remain deferred.
+[deployment](docs/deployment.md) for configuration. Hosted deployment uses managed PostgreSQL for
+games, private submissions, accounts, permissions, archives and audit receipts; no application disk
+is needed. Set `AOR_STORAGE=postgres` and secret `AOR_DATABASE_URL` to use SQL locally or on another
+provider. TLS defaults to `verify-full`; loopback development may use `?sslmode=disable`.
+Private plans and bots remain deferred.
 
 Choose variants on the player-registration screen: swap Timber and War between decks 1 and 2,
 restrict the opening deal to no Crusades, no events or commodities only, and optionally enable an
@@ -65,7 +69,7 @@ for scope limits and [commands](docs/commands.md#application-history-commands) f
 New games use file format 5 with rules version `ah1996-three-epoch-2` and data version
 `ah1996-catalog-10`. The initial revision records resolved setup options. Earlier development rules
 and catalog versions are unsupported for ordinary play. Administrators can explicitly validate and
-publish upgraded logs with an archived preceding file; there is no automatic migration.
+publish upgraded logs with an archived preceding file; there is no automatic engine migration.
 The current catalog includes the reviewed Baltic land/coastal connections, sea exclusions and
 support arrows.
 Belgrade has Adriatic coastal access between Dubrovnik and Durazzo, which no longer border each other.
@@ -80,7 +84,12 @@ From `web`, run `npm test` for focused checks and `npm run test:browser` for the
 game files; see [browser verification](docs/map-design.md#data-and-verification) and the
 [visual decision coverage](docs/ui-decision-coverage.md).
 Run server tests with `./gradlew :server:test` and core JVM tests with `./gradlew :core:jvmTest`. Use
-`./gradlew :core:compileKotlinJs` to check the core JS target.
+`./gradlew :core:compileKotlinJs` to check the core JS target. SQL contract tests run against actual
+PostgreSQL 18: an isolated native test cluster by default (Linux/macOS), or the disposable database
+supplied by `AOR_TEST_DATABASE_URL`. Each fixture creates and drops its own schema. CI uses a
+PostgreSQL service container. Run the same browser interactions against SQL with
+`AOR_BROWSER_SERVER="$PWD/web/scripts/postgres-browser-server.sh" npm run test:browser --workspace web`
+from the repository root.
 
 Kotlin code follows the [Android Kotlin style guide](https://developer.android.com/kotlin/style-guide).
 Run `./gradlew formatKotlin` after edits and `./gradlew checkKotlinFormat` to verify formatting without

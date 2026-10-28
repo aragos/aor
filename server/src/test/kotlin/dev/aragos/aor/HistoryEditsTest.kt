@@ -6,12 +6,24 @@ import java.nio.file.Path
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
-class HistoryEditsTest {
+@RunWith(Parameterized::class)
+class HistoryEditsTest(private val postgres: Boolean) {
+    private val sql = mutableListOf<PostgresFixture>()
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "postgres={0}")
+        fun backends(): List<Array<Any>> = listOf(arrayOf<Any>(false), arrayOf<Any>(true))
+    }
+
     private val directories = mutableListOf<Path>()
 
     @AfterTest
     fun clean() {
+        sql.forEach(PostgresFixture::close)
         directories.forEach { it.toFile().deleteRecursively() }
     }
 
@@ -35,9 +47,7 @@ class HistoryEditsTest {
         val fixture = fixture()
         fixture.placeOne()
         val undone = fixture.send(0, "undo")
-        val recovered =
-            createGameService(fixture.directory, NoNewHistoryRandomness)
-                .get(fixture.game.gameId, fixture.token(0))
+        val recovered = fixture.reopened().get(fixture.game.gameId, fixture.token(0))
 
         assertThat(recovered).isEqualTo(undone)
     }
@@ -246,11 +256,22 @@ class HistoryEditsTest {
     private fun fixture(policy: UndoPolicy = UndoPolicy.REGULAR_TURN): Fixture {
         val directory = Files.createTempDirectory("aor-history-edit-")
         directories.add(directory)
-        return Fixture(directory, policy)
+        val database = if (postgres) PostgresFixture().also(sql::add) else null
+        return Fixture(directory, policy, database)
     }
 
-    private class Fixture(val directory: Path, policy: UndoPolicy) {
-        val service = createGameService(directory, FixedRandom())
+    private class Fixture(
+        val directory: Path,
+        policy: UndoPolicy,
+        private val database: PostgresFixture?,
+    ) {
+        val store: ManagedGameStore = database?.store ?: FileGameStore(directory)
+        val service = GameService(store, GameDriver(FixedRandom()))
+
+        fun reopened(): GameService =
+            database?.reopened(NoNewHistoryRandomness)
+                ?: createGameService(directory, NoNewHistoryRandomness)
+
         val game = service.create(listOf("Alice", "Bob", "Carol"), undoPolicy = policy)
 
         init {
@@ -281,7 +302,7 @@ class HistoryEditsTest {
 
         fun view(seat: Int): GameSnapshot = service.get(game.gameId, token(seat))
 
-        fun stored(): StoredGame = FileGameStore(directory).read(game.gameId)
+        fun stored(): StoredGame = store.read(game.gameId)
 
         fun currentActor(): Int = game.links.indexOfFirst { it.id == view(0).game.activity?.actor }
 

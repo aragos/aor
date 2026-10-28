@@ -19,8 +19,18 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import org.junit.Assume.assumeFalse
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
-class HostedApplicationTest {
+@RunWith(Parameterized::class)
+class HostedApplicationTest(private val postgres: Boolean) {
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "postgres={0}")
+        fun backends(): List<Array<Any>> = listOf(arrayOf<Any>(false), arrayOf<Any>(true))
+    }
+
     @Test
     fun signupRequiresVerifiedEmail() = withHosted {
         val response =
@@ -46,9 +56,7 @@ class HostedApplicationTest {
             )
 
         assertThat(response.status).isEqualTo(HttpStatusCode.Conflict)
-        assertThat(
-                AccountStore(directory.resolve("accounts.json")).find(AccountId("new-user"))?.handle
-            )
+        assertThat(reopenedAccounts().find(AccountId("new-user"))?.handle)
             .isEqualTo(PlayerHandle("new-player"))
     }
 
@@ -294,7 +302,7 @@ class HostedApplicationTest {
         val root = json.readTree(store.document(game.gameId)) as ObjectNode
         root.put("fileVersion", 4)
         (root["header"] as ObjectNode).put("rulesVersion", "obsolete-engine")
-        Files.writeString(directory.resolve("${game.gameId}.json"), root.toString())
+        replaceDocument(game.gameId, root)
         val old = hosted.administration.log(game.gameId)
 
         val upgraded =
@@ -325,14 +333,15 @@ class HostedApplicationTest {
 
         assertThat(store.ids()).isEmpty()
         assertThat(store.archives(game.gameId)).isEmpty()
-        val receipts = Files.list(directory.resolve("audit")).use { it.toList() }
+        val receipts = receipts()
         assertThat(receipts).hasSize(1)
-        assertThat(Files.readString(receipts.single())).contains("PURGE")
-        assertThat(Files.readString(receipts.single())).doesNotContain("!shuffle")
+        assertThat(receipts.single()).contains("PURGE")
+        assertThat(receipts.single()).doesNotContain("!shuffle")
     }
 
     @Test
     fun failedCheckpointWritePreservesTheActiveFile() = withHosted {
+        assumeFalse(postgres)
         val game = startedGame()
         val original = store.document(game.gameId)
         val failingStore =
@@ -344,7 +353,7 @@ class HostedApplicationTest {
                 },
             )
         val administration =
-            GameAdministration(failingStore, AdministrationAudit(directory.resolve("audit")))
+            GameAdministration(failingStore, FileAdministrationAudit(directory.resolve("audit")))
 
         assertFailsWith<ServiceFailure> {
             administration.replaceLog(
@@ -371,22 +380,24 @@ class HostedApplicationTest {
     }
 
     private fun withHosted(block: suspend HostedFixture.() -> Unit) = testApplication {
-        val fixture = HostedFixture()
+        val fixture = HostedFixture(postgres)
         try {
             application { module(fixture.service, fixture.hosted) }
             fixture.client = client
             fixture.block()
         } finally {
-            fixture.directory.toFile().deleteRecursively()
+            fixture.close()
         }
     }
 }
 
-private class HostedFixture {
+private class HostedFixture(postgres: Boolean) : AutoCloseable {
+    private val sql = if (postgres) PostgresFixture() else null
     val directory: Path = Files.createTempDirectory("aor-hosted-test-")
-    val store = FileGameStore(directory)
+    val store: ManagedGameStore = sql?.store ?: FileGameStore(directory)
     val service = GameService(store, GameDriver(FixedRandom()))
-    val accounts = AccountStore(directory.resolve("accounts.json"))
+    val accounts: AccountStore =
+        sql?.accounts ?: FileAccountStore(directory.resolve("accounts.json"))
     val hosted: HostedServices
     lateinit var client: HttpClient
 
@@ -406,8 +417,62 @@ private class HostedFixture {
                 setOf(AccountId("admin")),
                 GameCreationPolicy.APPROVED,
                 PublicApplicationConfig("firebase", emptyMap(), 5000),
-                GameAdministration(store, AdministrationAudit(directory.resolve("audit"))),
+                GameAdministration(
+                    store,
+                    sql?.audit ?: FileAdministrationAudit(directory.resolve("audit")),
+                    transactions = sql?.database ?: FileTransactions,
+                ),
+                sql?.database ?: FileTransactions,
             )
+    }
+
+    fun reopenedAccounts(): AccountStore =
+        sql?.let {
+            PostgresAccountStore((it.reopened().store as PostgresGameStore).database)
+        } ?: FileAccountStore(directory.resolve("accounts.json"))
+
+    fun replaceDocument(id: String, root: ObjectNode) {
+        if (sql == null) {
+            Files.writeString(directory.resolve("$id.json"), root.toString())
+        } else {
+            val metadata =
+                root.deepCopy().apply {
+                    remove(listOf("id", "revision", "revisions", "memberships", "credentials"))
+                }
+            sql.database.write { connection ->
+                connection
+                    .prepareStatement(
+                        "UPDATE games SET document = ?::jsonb, storage_version = storage_version + 1 WHERE id = ?::uuid"
+                    )
+                    .use { statement ->
+                        statement.setString(1, metadata.toString())
+                        statement.setString(2, id)
+                        statement.executeUpdate()
+                    }
+            }
+        }
+    }
+
+    fun receipts(): List<String> =
+        sql?.database?.read { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT row_to_json(a) FROM administration_audit a").use {
+                    rows ->
+                    buildList {
+                        while (rows.next()) {
+                            add(rows.getString(1))
+                        }
+                    }
+                }
+            }
+        }
+            ?: Files.list(directory.resolve("audit")).use { paths ->
+                paths.map(Files::readString).toList()
+            }
+
+    override fun close() {
+        sql?.close()
+        directory.toFile().deleteRecursively()
     }
 
     fun game() =

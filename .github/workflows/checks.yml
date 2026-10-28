@@ -15,8 +15,25 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v6
+      - name: Configure isolated PostgreSQL endpoint
+        env:
+          POSTGRES_TEST_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          echo "AOR_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:$POSTGRES_TEST_PORT/postgres?sslmode=disable" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -35,13 +52,17 @@ jobs:
         run: npm run test:browser --workspace web
         env:
           CHROME_BIN: /usr/bin/google-chrome
+          AOR_BROWSER_SERVER: ${{ github.workspace }}/web/scripts/postgres-browser-server.sh
       - name: Live undo and history
         run: npm run test:browser --workspace web
         env:
           CHROME_BIN: /usr/bin/google-chrome
           AOR_BROWSER_SUITE: history.browser.mjs
+          AOR_BROWSER_SERVER: ${{ github.workspace }}/web/scripts/postgres-browser-server.sh
       - name: Production container
         run: docker build --pull -t aor:verify .
+      - name: Production container with PostgreSQL
+        run: python3 scripts/check-container.py
   refresh-runtime:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     needs: verify

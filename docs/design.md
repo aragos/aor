@@ -30,7 +30,8 @@ JS target remains available for future client replay. Keep source packages flat 
 more structure. Build and run commands are in [README.md](../README.md).
 
 The server separates game progression and authority outcomes from authorization, private views and
-storage. Replaceable storage provides atomic updates for each game.
+storage. Replaceable storage provides atomic updates for each game. Local development can use
+files; hosted deployment uses PostgreSQL for every durable application repository.
 
 ## 3. Game storage and configuration
 
@@ -51,6 +52,25 @@ choices receive typed diagnostics. Three epochs are fixed; `epochs` is not an op
 Snapshots, waiting-player lists and completion flags are derived caches, never sources of game truth. Pending secret
 submissions, private plans and operational controller settings may be stored separately. A snapshot is tied to its
 rules/data versions, revision and log position; changing the underlying log invalidates it.
+
+### Persistence contracts
+
+Both backends share current-format encoding and replay validation. SQL stores immutable revisions
+separately from mutable metadata and private pending submissions. Accounts, unique handles, game
+membership, creator permissions, exact upgrade archives and administrative receipts share the same
+database. Engine-derived status/readiness fields are indexed listing projections, never inputs to
+legality. The file backend remains single-process development storage.
+
+SQL writers lock a game row and publish the full operation in one transaction. A storage generation
+advances on every mutation, including pending replacements that do not advance the public revision.
+Reads reconstruct a repeatable snapshot; bounded process caches check the generation first and never
+cache uncommitted state. This permits independent application pools/instances without losing private
+submissions. Purge and permission changes include their audit receipt in the same transaction.
+
+Versioned Flyway migrations change the database schema, separately from explicit engine log
+upgrades. A one-time, transactional importer copies a stopped current-format file directory into an
+empty schema, preserving archive bytes and leaving the source unchanged. Provider configuration,
+backups and cutover procedures live in [deployment](deployment.md).
 
 ### Secret submissions
 
@@ -85,8 +105,9 @@ Managed-auth UIDs identify accounts across games; engine seat IDs remain local t
 The server stores their membership mapping and a unique public handle/display name directory.
 Creator/admin roles are explicit. Registered games have no transferable private-seat tokens.
 Cancellation and abandonment are audited operational revisions, suppress decisions and retain
-read access; purge removes files/archives and leaves a small receipt. Deployment has one writer
-per data directory. Public APIs expose only authorized views or explicit administrative exports.
+read access; purge removes game history/archives and leaves a small receipt. SQL supports multiple
+writers through database locks; file storage requires one writer per directory. Public APIs expose
+only authorized views or explicit administrative exports.
 
 Every committed transaction or edit advances `expectedRevision`; private bid replacements retain
 it. The service rejects stale edits before replay or publication. Accepted edits invalidate decision

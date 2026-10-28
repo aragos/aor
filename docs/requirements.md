@@ -57,6 +57,9 @@ in [README](../README.md), and coding conventions in [AGENTS.md](../AGENTS.md).
   logs programmatically, validate explicit log upgrades, and purge games by ID to reclaim storage.
 - Administrative operations are authenticated, separated from player actions and audited. Private
   game data is available only to game members and authorized administrators.
+- Hosted storage uses managed PostgreSQL for all durable application state. Independent writers
+  preserve optimistic revisions and private submissions; failed writes roll back history, metadata
+  and associated administrative receipts together. Database-schema changes do not change game rules.
 - Prefer managed authentication, TLS and platform protection. Automate dependency/security checks
   and fresh deployment images as far as the hosting platform permits.
 

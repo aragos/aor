@@ -14,8 +14,23 @@ import io.ktor.server.testing.testApplication
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
-class FullGameHttpTest {
+@RunWith(Parameterized::class)
+class FullGameHttpTest(private val postgres: Boolean, private val playerCount: Int) {
+    private var sql: PostgresFixture? = null
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "postgres={0}, players={1}")
+        fun backends(): List<Array<Any>> =
+            listOf(arrayOf<Any>(false, 3)) + (3..6).map { arrayOf<Any>(true, it) }
+    }
+
+    private fun service(directory: Path, random: SetupRandom): GameService =
+        sql?.reopened(random) ?: createGameService(directory, random)
+
     @Test
     fun ordinaryHttpCommandsReachFinalScoresAfterDeckExhaustion() =
         completedGame { completed, _, _, _ ->
@@ -23,7 +38,7 @@ class FullGameHttpTest {
             assertThat(completed["game"]["deckRemaining"].asInt()).isEqualTo(0)
             assertThat(completed["game"]["currentEpoch"].asInt()).isEqualTo(3)
             assertThat(completed["game"]["endingTriggered"].asBoolean()).isTrue()
-            assertThat(completed["game"]["scores"].size()).isEqualTo(3)
+            assertThat(completed["game"]["scores"].size()).isEqualTo(playerCount)
             assertThat(completed["game"]["scores"].any { score -> score["winner"].asBoolean() })
                 .isTrue()
         }
@@ -31,7 +46,7 @@ class FullGameHttpTest {
     @Test
     fun completedHttpGameRecoversTheExactViewWithoutRequestingRandomness() =
         completedGame { completed, directory, id, token ->
-            val recovered = createGameService(directory, ReplayOnlyRandom).get(id, token)
+            val recovered = service(directory, ReplayOnlyRandom).get(id, token)
 
             assertThat(json.readTree(json.writeValueAsString(recovered))).isEqualTo(completed)
         }
@@ -39,13 +54,22 @@ class FullGameHttpTest {
     private fun completedGame(verify: (JsonNode, Path, String, String) -> Unit) = testApplication {
         val directory = Files.createTempDirectory("aor-full-http-")
         try {
-            application { module(createGameService(directory, OrderedRandom)) }
+            if (postgres) sql = PostgresFixture()
+            application { module(service(directory, OrderedRandom)) }
             val created =
                 json.readTree(
                     client
                         .post("/api/games") {
                             contentType(ContentType.Application.Json)
-                            setBody("""{"players":["Alice","Bob","Carol"]}""")
+                            setBody(
+                                json.writeValueAsString(
+                                    mapOf(
+                                        "players" to
+                                            listOf("Alice", "Bob", "Carol", "Dave", "Eve", "Faye")
+                                                .take(playerCount)
+                                    )
+                                )
+                            )
                         }
                         .bodyAsText()
                 )
@@ -77,12 +101,14 @@ class FullGameHttpTest {
                 return json.readTree(body)
             }
             command(0, "start")
-            command(0, "bid-capital 3")
-            command(1, "bid-capital 2")
-            command(2, "bid-capital 1")
-            command(0, "choose-capital venice")
-            command(1, "choose-capital genoa")
-            command(2, "choose-capital barcelona")
+            for (seat in 0 until playerCount) {
+                command(seat, "bid-capital ${playerCount - seat}")
+            }
+            listOf("venice", "genoa", "barcelona", "paris", "london", "hamburg")
+                .take(playerCount)
+                .forEachIndexed { seat, capital ->
+                    command(seat, "choose-capital $capital")
+                }
             var snapshot = view(0)
             repeat(5000) {
                 if (snapshot["game"]["stage"].asText() == "FINISHED") {
@@ -118,6 +144,7 @@ class FullGameHttpTest {
             }
             error("The three-epoch deck sequence must reach final scores.")
         } finally {
+            sql?.close()
             directory.toFile().deleteRecursively()
         }
     }

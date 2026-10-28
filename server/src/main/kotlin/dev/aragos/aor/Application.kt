@@ -53,7 +53,7 @@ fun main() {
 }
 
 fun Application.module(
-    service: GameService = createGameService(),
+    service: GameService = createConfiguredGameService(),
     hosted: HostedServices? = createHostedServices(service),
 ) {
     install(DefaultHeaders) {
@@ -87,14 +87,26 @@ fun Application.module(
             }
         }
     }
-    monitor.subscribe(ApplicationStopped) { (hosted?.verifier as? AutoCloseable)?.close() }
+    monitor.subscribe(ApplicationStopped) {
+        (hosted?.verifier as? AutoCloseable)?.close()
+        (service.store as? AutoCloseable)?.close()
+    }
 
     routing {
         get("/api/config") {
             call.respondJson(hosted?.publicConfig ?: PublicApplicationConfig("local", null, 1000))
         }
         if (hosted != null) hostedRoutes(hosted)
-        get("/api/health") { call.respondText("{\"status\":\"ok\"}", ContentType.Application.Json) }
+        get("/api/health") {
+            call.api {
+                withContext(Dispatchers.IO) {
+                    (service.store as? PostgresGameStore)?.database?.read { connection ->
+                        connection.createStatement().use { it.execute("SELECT 1") }
+                    }
+                }
+                call.respondJson(mapOf("status" to "ok"))
+            }
+        }
         post("/api/games") {
             call.api {
                 val body = call.body()

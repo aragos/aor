@@ -42,28 +42,57 @@ data class RegisteredAccount(
             "Display names require one through 60 printable characters."
         }
     }
+
+    companion object {
+        /** Canonicalizes registration input; intrinsic name/handle checks remain in their types. */
+        fun create(id: AccountId, handle: String, displayName: String): RegisteredAccount =
+            try {
+                RegisteredAccount(id, PlayerHandle.parse(handle), displayName.trim())
+            } catch (_: IllegalArgumentException) {
+                throw ServiceFailure(400, "INVALID_ACCOUNT")
+            }
+    }
+}
+
+/** Registered identities and creator permissions contain no passwords or email addresses. */
+interface AccountStore {
+    fun all(): List<RegisteredAccount>
+
+    fun find(id: AccountId): RegisteredAccount?
+
+    fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount
+
+    fun allowCreation(id: AccountId, allowed: Boolean): RegisteredAccount
+
+    fun search(query: String, limit: Int = 20): List<RegisteredAccount> {
+        val normalized = query.lowercase()
+        return all()
+            .filter {
+                normalized in it.handle.value ||
+                    normalized in it.displayName.lowercase() ||
+                    query == it.id.value
+            }
+            .sortedBy { it.handle.value }
+            .take(limit)
+    }
 }
 
 /** Account directory contains no passwords, refresh tokens or email addresses. */
-class AccountStore(private val path: Path, private val writer: GameWriter = AtomicGameWriter) {
+class FileAccountStore(private val path: Path, private val writer: GameWriter = AtomicGameWriter) :
+    AccountStore {
     private val lock = ReentrantLock()
 
-    fun all(): List<RegisteredAccount> = lock.withLock { load() }
+    override fun all(): List<RegisteredAccount> = lock.withLock { load() }
 
-    fun find(id: AccountId): RegisteredAccount? = all().singleOrNull { it.id == id }
+    override fun find(id: AccountId): RegisteredAccount? = all().singleOrNull { it.id == id }
 
-    fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount =
+    override fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount =
         lock.withLock {
             val accounts = load()
             if (accounts.any { it.id == id }) {
                 throw ServiceFailure(409, "ACCOUNT_ALREADY_REGISTERED")
             }
-            val account =
-                try {
-                    RegisteredAccount(id, PlayerHandle.parse(handle), displayName.trim())
-                } catch (_: IllegalArgumentException) {
-                    throw ServiceFailure(400, "INVALID_ACCOUNT")
-                }
+            val account = RegisteredAccount.create(id, handle, displayName)
             if (accounts.any { it.handle == account.handle }) {
                 throw ServiceFailure(409, "HANDLE_UNAVAILABLE")
             }
@@ -71,7 +100,7 @@ class AccountStore(private val path: Path, private val writer: GameWriter = Atom
             account
         }
 
-    fun allowCreation(id: AccountId, allowed: Boolean): RegisteredAccount = lock.withLock {
+    override fun allowCreation(id: AccountId, allowed: Boolean): RegisteredAccount = lock.withLock {
         val accounts = load()
         val account =
             accounts.singleOrNull { it.id == id } ?: throw ServiceFailure(404, "ACCOUNT_NOT_FOUND")

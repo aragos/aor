@@ -1,9 +1,7 @@
 package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.JsonNode
-import java.nio.file.Path
 import java.time.Clock
-import java.util.UUID
 
 /** Public list status is derived from engine readiness and the operational lifecycle. */
 enum class GameListStatus {
@@ -46,29 +44,6 @@ data class LogValidation(
     val stage: Stage,
 )
 
-/** Destructive requests retain intent receipts even if the following storage operation fails. */
-class AdministrationAudit(
-    private val directory: Path,
-    private val writer: GameWriter = AtomicGameWriter,
-    private val clock: Clock = Clock.systemUTC(),
-) {
-    fun record(actor: AccountId, action: AdministrativeAction, target: String, revision: Int) {
-        val record =
-            mapOf(
-                "at" to clock.millis(),
-                "actor" to actor.value,
-                "action" to action.name,
-                "target" to target,
-                "revision" to revision,
-                "outcome" to "REQUESTED",
-            )
-        writer.write(
-            directory.resolve("${clock.millis()}-${UUID.randomUUID()}.json"),
-            json.writeValueAsString(record),
-        )
-    }
-}
-
 /**
  * Authorized operational changes replay proposed logs before replaceable storage publishes them.
  */
@@ -76,6 +51,7 @@ class GameAdministration(
     private val store: ManagedGameStore,
     private val audit: AdministrationAudit,
     private val clock: Clock = Clock.systemUTC(),
+    private val transactions: StorageTransactions = FileTransactions,
 ) {
     fun list(
         viewer: AccountId,
@@ -85,37 +61,8 @@ class GameAdministration(
         limit: Int,
     ): GamePage {
         requireLimit(limit)
-        val status = parseFilter(filter)
-        val matches =
-            store
-                .ids()
-                .asSequence()
-                .filter { after == null || it > after }
-                .mapNotNull { id ->
-                    val root = json.readTree(store.document(id))
-                    if (
-                        !admin &&
-                            root["memberships"]?.properties()?.none {
-                                it.value.asText() == viewer.value
-                            } != false
-                    ) {
-                        return@mapNotNull null
-                    }
-                    val summary = summary(id, root, viewer)
-                    if (
-                        status == null ||
-                            summary.status == status ||
-                            (status == GameListStatus.ONGOING &&
-                                summary.status == GameListStatus.MY_MOVE)
-                    ) {
-                        summary
-                    } else {
-                        null
-                    }
-                }
-                .take(limit + 1)
-                .toList()
-        return GamePage(matches.take(limit), matches.takeIf { it.size > limit }?.get(limit - 1)?.id)
+        requireCursor(after)
+        return store.listGames(viewer, admin, parseFilter(filter), after, limit)
     }
 
     fun log(id: String, archive: String? = null): GameLog {
@@ -136,7 +83,8 @@ class GameAdministration(
 
     fun logs(after: String?, limit: Int): LogPage {
         requireLimit(limit)
-        val ids = store.ids().filter { after == null || it > after }.take(limit + 1)
+        requireCursor(after)
+        val ids = store.ids(after, limit + 1)
         return LogPage(ids.take(limit).map(::log), ids.takeIf { it.size > limit }?.get(limit - 1))
     }
 
@@ -171,7 +119,7 @@ class GameAdministration(
                     pendingReturns = emptyMap(),
                 )
             }
-        return summary(changed, actor)
+        return GameDirectory.summary(changed, actor)
     }
 
     /**
@@ -284,74 +232,12 @@ class GameAdministration(
         )
     }
 
-    fun purge(id: String, actor: AccountId, expectedRevision: Int) {
+    fun purge(id: String, actor: AccountId, expectedRevision: Int) = transactions.transaction {
         if (json.readTree(store.document(id)).field("revision").integer() != expectedRevision) {
             throw ServiceFailure(409, "STALE_REVISION")
         }
         audit.record(actor, AdministrativeAction.PURGE, id, expectedRevision)
         store.purge(id, expectedRevision)
-    }
-
-    private fun summary(id: String, root: JsonNode, viewer: AccountId): GameSummary =
-        try {
-            summary(store.read(id), viewer)
-        } catch (_: ServiceFailure) {
-            val players =
-                root["header"]
-                    ?.get("players")
-                    ?.mapNotNull { player ->
-                        runCatching {
-                            Player(
-                                PlayerId(player.field("id").string()),
-                                player.field("name").string(),
-                            )
-                        }
-                            .getOrNull()
-                    }
-                    .orEmpty()
-            GameSummary(
-                id,
-                root["createdAt"]?.asLong() ?: 0,
-                root["revision"]?.asInt() ?: 0,
-                GameListStatus.UNAVAILABLE,
-                null,
-                players,
-                false,
-            )
-        }
-
-    private fun summary(game: StoredGame, viewer: AccountId): GameSummary {
-        val state = game.state()
-        val seat = game.memberships.entries.singleOrNull { it.value == viewer.value }?.key
-        val prompt = state.prompts().singleOrNull()
-        val myMove =
-            game.status == GameStatus.ACTIVE &&
-                seat != null &&
-                when (prompt) {
-                    is Prompt.SinglePlayer -> prompt.player == seat
-                    is Prompt.MultiPlayer ->
-                        seat in prompt.players &&
-                            seat !in game.pendingBids &&
-                            seat !in game.pendingReturns
-                    else -> false
-                }
-        val status =
-            when {
-                game.status == GameStatus.CANCELLED -> GameListStatus.CANCELLED
-                game.status == GameStatus.ABANDONED -> GameListStatus.ABANDONED
-                state.stage == Stage.FINISHED -> GameListStatus.FINISHED
-                myMove -> GameListStatus.MY_MOVE
-                else -> GameListStatus.ONGOING
-            }
-        return GameSummary(
-            game.id,
-            game.createdAt,
-            game.revision,
-            status,
-            state.stage,
-            game.header.players,
-            myMove,
-        )
     }
 
     private fun effectiveText(root: JsonNode): List<String> =
@@ -375,5 +261,11 @@ class GameAdministration(
 
     private fun requireLimit(limit: Int) {
         if (limit !in 1..100) throw ServiceFailure(400, "INVALID_REQUEST")
+    }
+
+    private fun requireCursor(after: String?) {
+        if (after != null && !GameDocuments.GAME_ID_PATTERN.matches(after)) {
+            throw ServiceFailure(400, "INVALID_REQUEST")
+        }
     }
 }

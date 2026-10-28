@@ -8,9 +8,12 @@ publication credential issue was resolved using the configured SSH authenticatio
 - Create/choose the Firebase and Render projects, supply the service-account secret and initial
   admin UID, and choose the hostname under the Squarespace domain. Follow [deployment](deployment.md).
 - Complete a real sign-up/verification/reset flow, three-account privacy check, restart and backup
-  restore on Render. Confirm the first CI Docker build and memory/traffic/disk usage. Docker and live
-  hosting credentials were unavailable in this workspace; the $7.25 base is a starting configuration,
-  not a measured capacity promise.
+  restore on Render. Check actual memory, traffic, database size and concurrent-player load. The
+  $13.30/month app plus managed PostgreSQL base is a starting configuration, not a measured capacity
+  promise. CI verifies real PostgreSQL and production-container startup; live provider credentials,
+  email delivery and restore procedures still need deployment checks.
+- If preserving an existing file deployment, stop it, retain a private backup, import its current-format
+  directory into an empty database, and verify player views and archives before switching traffic.
 - Enable GitHub's required `verify` check, Dependabot security alerts and optional patch auto-merge.
   Supply the Render CI credentials if weekly runtime refreshes are wanted. Set billing alerts and
   decide the private backup retention period.

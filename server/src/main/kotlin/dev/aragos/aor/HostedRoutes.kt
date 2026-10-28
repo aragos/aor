@@ -48,7 +48,7 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
     }
     get("/api/players") {
         call.api {
-            val query = call.request.queryParameters["q"].orEmpty().trim().lowercase()
+            val query = call.request.queryParameters["q"].orEmpty().trim()
             if (query.length > 60) throw ServiceFailure(400, "INVALID_REQUEST")
             call.respondJson(
                 withContext(Dispatchers.IO) {
@@ -56,16 +56,7 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
                     if (query.length < 2) {
                         emptyList()
                     } else {
-                        hosted.accounts
-                            .all()
-                            .filter {
-                                query in it.handle.value ||
-                                    query in it.displayName.lowercase() ||
-                                    query == it.id.value
-                            }
-                            .sortedBy { it.handle.value }
-                            .take(20)
-                            .map(hosted::view)
+                        hosted.accounts.search(query).map(hosted::view)
                     }
                 }
             )
@@ -119,19 +110,14 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
             body.fieldsOnly("allowed")
             call.respondJson(
                 withContext(Dispatchers.IO) {
-                    val admin = hosted.requireAdmin(hosted.identity(call.token()))
                     val target =
                         AccountId(
                             checkNotNull(call.parameters["uid"]) {
                                 "The route requires an account ID."
                             }
                         )
-                    if (hosted.accounts.find(target) == null) {
-                        throw ServiceFailure(404, "ACCOUNT_NOT_FOUND")
-                    }
                     val allowed = body.field("allowed").boolean()
-                    hosted.administration.recordCreationPermission(admin.id, target, allowed)
-                    hosted.view(hosted.accounts.allowCreation(target, allowed))
+                    hosted.allowCreation(hosted.identity(call.token()), target, allowed)
                 }
             )
         }

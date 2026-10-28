@@ -7,8 +7,20 @@ ktfmt = "0.64"
 truth = "1.4.5"
 collectionsImmutable = "0.5.2"
 firebaseAdmin = "9.11.0"
+postgresql = "42.7.14"
+hikari = "7.1.0"
+flyway = "13.11.1"
+embeddedPostgres = "2.2.2"
+postgresBinaries = "18.3.0"
 
 [libraries]
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embeddedPostgres" }
+postgres-binaries = { module = "io.zonky.test.postgres:embedded-postgres-binaries-bom", version.ref = "postgresBinaries" }
+postgres-darwin-arm = { module = "io.zonky.test.postgres:embedded-postgres-binaries-darwin-arm64v8", version.ref = "postgresBinaries" }
 firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebaseAdmin" }
 ktor-serverBodyLimit = { module = "io.ktor:ktor-server-body-limit-jvm", version.ref = "ktor" }
 ktor-serverCompression = { module = "io.ktor:ktor-server-compression-jvm", version.ref = "ktor" }
