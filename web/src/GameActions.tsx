@@ -10,7 +10,7 @@ interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: stri
 const simpleActions = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
-    const {setSelectedCard, setSelected, setSelectedAdvance} = useMapSelection();
+    const {setSelectedCard, setSelected, setSelectedAdvance, setInspection} = useMapSelection();
     const [selectedAction, setSelectedAction] = useState('');
     const [relief, setRelief] = useState('');
     const commands = snapshot.legalChoices.commands;
@@ -44,7 +44,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         {['PLAY_CARDS', 'FINAL_CARD_PLAY'].includes(snapshot.game.stage) && <div className="decision-cards">{snapshot.game.cardOffers.filter(offer => offer.playable).map(offer => {
             const card = snapshot.game.hand.find(card => card.reference === offer.reference);
             return card && <button type="button" className="secondary eligible-card" key={offer.reference} data-eligible-card={offer.reference}
-                disabled={busy} onClick={() => {setSelectedCard(offer.reference); setSelected(''); setSelectedAdvance('');}}>{t(card.definition.messageId)}</button>;
+                disabled={busy} onClick={() => {setInspection(null); setSelectedCard(offer.reference); setSelected(''); setSelectedAdvance('');}}>{t(card.definition.messageId)}</button>;
         })}</div>}
         {finite.some(command => command.startsWith('reduce-marker ')) && <details className="marker-reduction"><summary>{t('action.reduceMarker')}</summary>
             <div className="action-buttons">{finite.filter(command => command.startsWith('reduce-marker ')).map(command =>

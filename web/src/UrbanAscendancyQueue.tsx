@@ -1,5 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {Snapshot} from './api';
+import {t} from './messages';
+import {advanceName} from './labels';
 
 /** A private browser draft submits only when the authoritative turn offers buying a card. */
 export function UrbanAscendancyQueue({snapshot, busy, submit}: {
@@ -28,13 +30,13 @@ export function UrbanAscendancyQueue({snapshot, busy, submit}: {
         void submit('buy-card').catch(() => false).finally(() => { submitting.current = false; });
     }, [busy, canBuy, queued, submit]);
     if (!waiting && !queued) return null;
-    return <section className="urban-ascendancy-queue" aria-label="Urban Ascendancy">
-        <p>Urban Ascendancy · $10</p>
+    return <section className="urban-ascendancy-queue" aria-label={advanceName('URBAN_ASCENDANCY')}>
+        <p>{advanceName('URBAN_ASCENDANCY')} · $10</p>
         {queued ? <>
-            <p role="status">A card purchase is queued for your turn. Keep this player view open.</p>
+            <p role="status">{t('urbanAscendancy.queued')}</p>
             <button type="button" className="secondary" disabled={busy}
-                onClick={() => setQueuedFor(null)}>Cancel queued purchase</button>
+                onClick={() => setQueuedFor(null)}>{t('urbanAscendancy.cancel')}</button>
         </> : <button type="button" className="secondary" disabled={busy}
-            onClick={() => setQueuedFor(scope)}>Buy a card when my turn starts · $10</button>}
+            onClick={() => setQueuedFor(scope)}>{t('urbanAscendancy.buyOnTurn')}</button>}
     </section>;
 }

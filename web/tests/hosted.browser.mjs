@@ -41,8 +41,9 @@ export async function checkHosted(page, web, artifacts) {
         async function check(description, action) {
             account = null;
             emailVerified = true;
+            const previousDocument = await page.evaluate('performance.timeOrigin');
             await page.send('Page.navigate', {url: web});
-            await page.wait(`document.querySelector('.google-sign-in')`, 'Google sign-in option');
+            await page.wait(`performance.timeOrigin !== ${previousDocument} && window.firebaseTest && document.querySelector('.google-sign-in')`, 'Google sign-in in the new document');
             await action();
             assert.deepEqual(failures, []);
             console.log(`Passed: ${description}`);

@@ -11,6 +11,8 @@ import {AdvanceBenefits} from './AdvanceBenefits';
 interface Props {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     mode?: 'inspection' | 'action' | 'all';
+    inspectedId?: string;
+    closeInspection?: () => void;
 }
 
 function choiceLabel(snapshot: Snapshot, choice: CardChoiceView): string {
@@ -22,13 +24,14 @@ function choiceLabel(snapshot: Snapshot, choice: CardChoiceView): string {
     return t('action.playCard');
 }
 
-export function CardDecision({snapshot, busy, submit, mode = 'all'}: Props) {
+export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId, closeInspection}: Props) {
     const {selectedCard, setSelectedCard} = useMapSelection();
+    const reference = inspectedId ?? selectedCard;
     const [choice, setChoice] = useState('');
     const [protection, setProtection] = useState('0');
     useEffect(() => { setChoice(''); setProtection('0'); }, [selectedCard]);
-    const card = snapshot.game.hand.find(candidate => candidate.reference === selectedCard);
-    const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === selectedCard);
+    const card = snapshot.game.hand.find(candidate => candidate.reference === reference);
+    const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === reference);
     const selection = useTargets(offer?.provinceTargets ?? [], offer?.requiredTargetCount ?? 0);
     const targets = selection.selected;
     if (!card) return null;
@@ -53,7 +56,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all'}: Props) {
     const inspection = mode !== 'action';
     const action = mode !== 'inspection';
     return <section className="object-decision card-decision">
-        {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setSelectedCard('')}>×</button>}
+        {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
         {inspection && <p className="eyebrow">{t(`kind.${card.definition.kind}`)}</p>}<h2>{t(card.definition.messageId)}</h2>
         {inspection && <><CardEventText definition={card.definition}/>
         {offer?.commodities.map(commodity => {
@@ -105,9 +108,9 @@ export function CardDecision({snapshot, busy, submit, mode = 'all'}: Props) {
     </section>;
 }
 
-export function AdvanceDecision({snapshot, busy, submit, mode = 'all'}: Props) {
+export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspectedId, closeInspection}: Props) {
     const {selectedAdvance, setSelectedAdvance} = useMapSelection();
-    const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
+    const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === (inspectedId ?? selectedAdvance));
     if (!advance) return null;
     const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === advance.id);
     const command = `buy-advance ${advance.letter}`;
@@ -116,7 +119,7 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all'}: Props) {
     const inspection = mode !== 'action';
     const action = mode !== 'inspection';
     return <section className="object-decision advance-decision">
-        {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setSelectedAdvance('')}>×</button>}
+        {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>}
         {inspection && <p className="eyebrow">{label(advance.category, 'category')}</p>}<h2>{advanceName(advance.id)}</h2>
         {inspection && <><AdvanceBenefits id={advance.id} snapshot={snapshot}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}

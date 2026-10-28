@@ -91,10 +91,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .activity-actor { display: inline-flex; align-items: center; gap: .3rem; }
 .activity-list { list-style: none; margin: 1rem 0; padding: 0; max-height: 360px; overflow-y: auto; }
 .activity-list li { border-top: 1px solid #dde4d4; padding: .7rem 0; }
-.activity-list li > small { display: block; margin-bottom: .4rem; color: #64795e; }
+.activity-list li > small { display: block; margin-bottom: .4rem; color: #4e6249; }
 .event-entity, .event-card, .event-die { border: 1px solid #d8dfcd; border-radius: 4px; padding: .15rem .4rem; background: #f5f5e9; }
 .event-die { display: inline-flex; align-items: center; gap: .3rem; }
-.event-detail { color: #66775e; }
+.event-detail { color: #4e6249; }
 @media (max-width: 700px) { .table-activity { padding-inline: 1rem; } .table-activity > summary { gap: .5rem; } }
 .table-icon { display: inline-block; width: 18px; height: 18px; flex-shrink: 0; vertical-align: middle; }
 .player-money > span, .player-stats > span { display: inline-flex; align-items: center; gap: .3rem; }
@@ -195,6 +195,11 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .danger {background:#8b2626; color:white;}
 
 .inspection-panel { padding: 1rem 1.5rem; border-top: 1px solid #c9d4bf; background: #fffef8; }
+.workspace-side { min-width: 0; background: #f8faf2; border-left: 1px solid #d7dece; }
+.workspace-side .decision-panel { border-left: 0; }
+.workspace-side .table-activity { padding: .9rem 1rem; }
+.workspace-side .table-activity > summary { flex-direction: column-reverse; align-items: flex-start; gap: .5rem; }
+.workspace-side .activity-list { max-height: 420px; }
 .inspection-panel .object-decision { border: 0; margin: 0; padding: 0; }
 .inspection-panel .close-detail { right: 0; }
 .military-summary { margin: 0 0 1rem; padding: .6rem; background: #eaf0e1; font-size: .82rem; }
@@ -209,6 +214,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .event-die.die-black { background: #29342e; border-color: #29342e; color: #fffef8; }
 .event-die.die-white { background: #fffef8; }
 @media (max-width: 700px) {
+    .workspace-side { border-left: 0; }
     .inspection-panel { padding: 1rem; }
     .game-brand > div { gap: .4rem; }
 }

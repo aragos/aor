@@ -14,6 +14,7 @@ import {useMapSelection} from './map/MapSelection';
 import {ProvinceActions, ProvinceInspector} from './map/ProvinceInspector';
 import {decisionIdentity} from './decision';
 import {DiagnosticMessage} from './DiagnosticMessage';
+import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
@@ -26,8 +27,8 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
 }) {
     const [commandsOpen, setCommandsOpen] = useState(false);
     const [sheetCollapsed, setSheetCollapsed] = useState(false);
-    const {selected, setSelected, selectedArea, selectedCard, setSelectedCard, selectedAdvance,
-        picker, workspace, setWorkspace, resetSelection} = useMapSelection();
+    const {selected, selectedArea, selectedCard, setSelectedCard, selectedAdvance,
+        picker, workspace, setWorkspace, resetSelection, inspection, setInspection} = useMapSelection();
     const decisionKey = decisionIdentity(snapshot);
     // Reset before new forms activate their automatic target pickers.
     useLayoutEffect(() => {
@@ -49,6 +50,9 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     useEffect(() => {
         if (selectedCard && !snapshot.game.hand.some(card => card.reference === selectedCard)) setSelectedCard('');
     }, [selectedCard, setSelectedCard, snapshot.game.hand]);
+    useEffect(() => {
+        if (inspection?.kind === 'card' && !snapshot.game.hand.some(card => card.reference === inspection.id)) setInspection(null);
+    }, [inspection, setInspection, snapshot.game.hand]);
     async function submit(command: string) {
         const accepted = await sendCommand(command);
         if (accepted && (command === 'pass' || command.startsWith('play '))) {
@@ -69,7 +73,13 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     const finished = snapshot.game.stage === 'FINISHED';
     const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
-    const hasInspection = !!(selectedCard || selectedAdvance || province);
+    const inspectedCard = inspection?.kind === 'card' ? inspection.id : !inspection ? selectedCard : '';
+    const inspectedAdvance = inspection?.kind === 'advance' ? inspection.id : !inspection ? selectedAdvance : '';
+    const inspectedProvince = inspection?.kind === 'province'
+        ? snapshot.game.catalog?.provinces.find(candidate => candidate.id === inspection.id)
+        : !inspection && !picker ? province : undefined;
+    const hasInspection = !!(inspectedCard || inspectedAdvance || inspectedProvince);
+    const closeInspection = inspection ? () => setInspection(null) : undefined;
     const cardAction = selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
     const advanceAction = advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
@@ -117,11 +127,12 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={snapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
                 {hasInspection && <section className="inspection-panel" aria-label={t('table.inspection')}>
-                    {selectedCard ? <CardDecision key={selectedCard} mode="inspection" snapshot={snapshot} busy={busy} submit={submit}/>
-                        : selectedAdvance ? <AdvanceDecision mode="inspection" snapshot={snapshot} busy={busy} submit={submit}/>
-                        : province && !picker && <ProvinceInspector snapshot={snapshot} province={province} select={setSelected}/>}
+                    {inspectedCard ? <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
+                        : inspectedAdvance ? <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
+                        : inspectedProvince && <ProvinceInspector snapshot={snapshot} province={inspectedProvince} select={id => setInspection({kind: 'province', id})}/>}
                 </section>}
             </div>
+            <div className="workspace-side">
             <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
                 <div className="decision-heading"><p className="eyebrow">{finished ? t('game.finished') : canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
                     {!canAct && snapshot.prompt && <strong>{snapshot.prompt.players.map(id => playerName(snapshot, id)).join(', ')}</strong>}
@@ -148,6 +159,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 {snapshot.undo?.available && <button type="button" className="secondary undo-action" disabled={busy}
                     onClick={() => { void submit('undo'); }}>{t('history.undo')}</button>}
                 {!inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
+                {!inactive && <UrbanAscendancyQueue snapshot={snapshot} busy={busy} submit={submit}/>}
                 {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                 <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
                 <div className="available-resources"><p className="eyebrow">{t('table.available')}</p><strong>${me.cash}</strong><small>{t('game.cash')}</small>
@@ -157,9 +169,10 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 </div>
                 </div>
             </aside>
+            <Activity snapshot={snapshot}/>
+            </div>
         </div>
         <Hand snapshot={snapshot}/>
-        <Activity snapshot={snapshot}/>
         <details className="table-effects"><summary>{t('game.thisTurn')} <span>{snapshot.game.deckRemaining} {t('game.cards').toLowerCase()}</span>
             {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)}</span>}
             {snapshot.game.effects.papalCategory && <span className="effect-badge">{t('game.forbiddenCategory')}: {label(snapshot.game.effects.papalCategory, 'category')}</span>}

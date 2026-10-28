@@ -21,6 +21,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.game-header').getBoundingClientRect().height <= 68`), true);
     assert.equal(await page.evaluate(`document.querySelector('.board-panel')`), null);
     assert.equal(await page.evaluate(`document.querySelector('.table-activity').open`), true, 'Activity is visible by default');
+    assert.equal(await page.evaluate(`document.querySelector('.table-activity').getBoundingClientRect().top < innerHeight`), true, 'Desktop activity starts in view beside the board');
 
     for (const [id, province] of [['the-crusades', 'jerusalem'], ['rebellion', 'rome']]) {
         const command = `play target province ${province}`;
@@ -37,6 +38,14 @@ export async function checkGameplayImprovements(page, web, baseline) {
         const count = await page.evaluate('window.mapCommands.length');
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
         assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Map choice only prepares the order');
+        if (id === 'rebellion') {
+            await click('#tab-advances');
+            await click('.advance-tile');
+            assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .advance-decision')`), true);
+            assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Advance inspection preserves the prepared card target');
+            await click('#tab-map');
+            assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="rome"].eligible')`), true, 'Inspection keeps the active map picker');
+        }
         await click('.decision-panel .card-decision form > button:last-child');
         assert.equal(await page.evaluate('window.mapCommands.at(-1)'), command);
         assert.equal(await page.evaluate(`document.querySelector('.card-decision')`), null, 'Successful card play closes both surfaces');
@@ -71,7 +80,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
         game: {stage: 'PURCHASE', reliefOffers: [{spaces: 1, cashCost: 20, ratingSpent: 1, affordable: false}],
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'RELIEF'}}});
     assert.equal(await page.evaluate(`document.querySelector('#relief-spaces button').disabled`), true);
-    assert.match(await page.evaluate(`document.querySelector('.game-actions .guided-form .blocker').textContent`), /cash/i);
+    assert.match(await page.evaluate(`document.querySelector('.game-actions .guided-form .blocker').textContent`), /afford/i);
     assert.equal(await page.evaluate(`document.querySelector('.game-actions .action-buttons button').disabled`), false, 'Unaffordable relief retains Pass');
 
     const order = [other.id, viewer, ...baseline.game.turnOrder.filter(id => id !== viewer && id !== other.id)];

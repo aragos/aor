@@ -153,14 +153,21 @@ export function Markets({snapshot}: {snapshot: Snapshot}) {
 }
 
 export function Hand({snapshot}: {snapshot: Snapshot}) {
-    const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker} = useMapSelection();
+    const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker, inspection, setInspection} = useMapSelection();
     return <section className="table-hand" aria-label={t('game.hand')}>
         <div className="hand-heading"><p className="eyebrow">{t('game.hand')}</p><strong>{snapshot.game.hand.length} {t('game.cards').toLowerCase()}</strong></div>
         <div className="hand-cards">{snapshot.game.hand.map(card => {
             const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
             return <button type="button" key={card.reference} data-hand-card={card.reference}
-                aria-pressed={selectedCard === card.reference} className={`hand-card ${card.definition.kind}`}
-                onClick={() => { setSelectedCard(card.reference); setSelected(''); setSelectedAdvance(''); if (selectedCard !== card.reference) setPicker(null); }}>
+                aria-pressed={selectedCard === card.reference || (inspection?.kind === 'card' && inspection.id === card.reference)} className={`hand-card ${card.definition.kind}`}
+                onClick={() => {
+                    if (!offer?.playable) {
+                        setInspection({kind: 'card', id: card.reference});
+                        return;
+                    }
+                    setInspection(null); setSelectedCard(card.reference); setSelected(''); setSelectedAdvance('');
+                    if (selectedCard !== card.reference) setPicker(null);
+                }}>
                 <span className="eyebrow">{t(`kind.${card.definition.kind}`)}</span><h3>{t(card.definition.messageId)}</h3>
                 <CardEventText definition={card.definition}/>
                 {snapshot.game.burdenReferences.includes(card.reference) && <span className="burden-badge">{t('game.burden')}</span>}
@@ -179,7 +186,7 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
 }
 
 export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
-    const {selectedAdvance, setSelectedAdvance, setSelected, setSelectedCard, setPicker} = useMapSelection();
+    const {selectedAdvance, setSelectedAdvance, setSelected, setSelectedCard, setPicker, inspection, setInspection} = useMapSelection();
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const advances = snapshot.game.catalog?.advances ?? [];
     const categories = [...new Set(advances.map(advance => advance.category))];
@@ -192,7 +199,13 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                 const owned = me?.advances.includes(advance.id);
                 const available = offer?.unavailableReason === null && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
                 return <button type="button" data-advance={advance.id} className={`advance-tile ${owned ? 'owned' : ''} ${available ? 'available' : ''} ${offer?.leaderDiscounts?.length ? 'discounted' : ''}`} key={advance.id}
-                    aria-pressed={selectedAdvance === advance.id} onClick={() => { setSelectedAdvance(advance.id); setSelected(''); setSelectedCard(''); setPicker(null); }}>
+                    aria-pressed={selectedAdvance === advance.id || (inspection?.kind === 'advance' && inspection.id === advance.id)} onClick={() => {
+                        if (!available) {
+                            setInspection({kind: 'advance', id: advance.id});
+                            return;
+                        }
+                        setInspection(null); setSelectedAdvance(advance.id); setSelected(''); setSelectedCard(''); setPicker(null);
+                    }}>
                     <span className="advance-letter">{advance.letter}</span><strong>{advanceName(advance.id)}</strong>
                     <span>{owned ? t('table.owned') : offer?.price !== null && offer?.price !== undefined ? `$${offer.price}` : '—'}</span>
                     <UnplayedLeaders snapshot={snapshot} advance={advance.id}/>

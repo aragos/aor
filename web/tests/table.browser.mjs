@@ -255,7 +255,10 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.wait(`window.uiCommands.length === ${count + 1}`, command + ' submitted');
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
-    await show('purchase-relief', ['relieve-misery'], {reliefOffers: [{spaces: 1, cashCost: 2, ratingSpent: 1, affordable: true}]}, 'PURCHASE');
+    await show('purchase-relief', ['relieve-misery'], {
+        reliefOffers: [{spaces: 1, cashCost: 2, ratingSpent: 1, affordable: true}],
+        activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'RELIEF'},
+    }, 'PURCHASE');
     await page.evaluate(`document.querySelector('#relief-spaces button').click()`);
     await page.evaluate(`document.querySelector('#relief-spaces').closest('form').querySelector(':scope > button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'relieve-misery 1'`, 'quoted misery relief');
@@ -312,7 +315,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
         advanceOffers:[{advance:advance.id,price:10,unavailableReason:'MISSING_ADVANCE_PREREQUISITE'}],
     }, 'PURCHASE');
     await page.evaluate(`[...document.querySelectorAll('.advance-tile')].find(tile=>tile.querySelector('.advance-letter').textContent===${JSON.stringify(advance.letter)}).click()`);
-    assert.equal(await page.evaluate(`document.querySelector('.advance-decision button:not(.close-detail)').disabled`), true, 'Blocked advance remains inspectable with disabled purchase');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision')`), null, 'Blocked advance inspection leaves the decision flow alone');
+    assert.match(await page.evaluate(`document.querySelector('.inspection-panel .advance-decision .blocker').textContent`), /prerequisite/i);
     await page.evaluate(`document.querySelector('.advance-decision .close-detail').click()`);
     const dualReference = 'fixture-dual';
     await show('play-cards', [`play ${dualReference} commodity cloth`, `play ${dualReference} commodity wine`], {

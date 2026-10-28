@@ -86,7 +86,7 @@ export interface HistoryEventView {
         'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' | 'WRITTEN_RECORD' |
         'OFFER_CARD' | 'PLAY_CARD' | 'ADJUST_MARKET' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
         'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL' |
-        'NEXT_EPOCH' | 'ENDING_TRIGGERED' | 'GAME_FINISHED' | 'INCOME';
+        'NEXT_EPOCH' | 'ENDING_TRIGGERED' | 'GAME_FINISHED' | 'INCOME' | 'HOLY_INDULGENCE';
     actor: string | null; target: string | null; turnNumber: number | null; stage: string;
     provinces: string[]; card: string | null; commodity: string | null; advance: string | null;
     amount: number | null; detail: string | null;
