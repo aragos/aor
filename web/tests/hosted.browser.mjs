@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {open} from './browser-support.mjs';
+import {open, createGame} from './browser-support.mjs';
 
 export async function checkHosted(page, web, artifacts) {
+    const fixture = await createGame(3);
+    const gameId = fixture.created.gameId;
+    const snapshot = await fixture.snapshot(fixture.links[0]);
+    snapshot.accountId = 'google-player';
+    snapshot.game.players[0].name = '@alice';
     const firebase = await readFile(new URL('./firebase-auth.stub.mjs', import.meta.url), 'utf8');
     const failures = [];
     const sessions = [];
     let account = null;
     let emailVerified = true;
+    const registrations = [];
     const intercept = async event => {
         const {method, params} = JSON.parse(event.data);
         if (method !== 'Fetch.requestPaused') return;
@@ -24,7 +30,13 @@ export async function checkHosted(page, web, artifacts) {
                 if (path === '/api/me') {
                     sessions.push(params.request.headers.Authorization);
                     body = JSON.stringify({id: 'google-player', emailVerified, account});
-                } else if (path === '/api/games') body = JSON.stringify({games: [], nextCursor: null});
+                } else if (path === '/api/players/register') {
+                    const registration = JSON.parse(params.request.postData);
+                    registrations.push(registration);
+                    account = {id: 'google-player', handle: registration.handle, admin: false, mayCreateGames: false};
+                    body = JSON.stringify(account);
+                } else if (path === `/api/games/${gameId}`) body = JSON.stringify(snapshot);
+                else if (path === '/api/games') body = JSON.stringify({games: [], nextCursor: null});
                 else throw new Error(`Unexpected hosted request: ${path}`);
             }
             await page.send('Fetch.fulfillRequest', {requestId: params.requestId, responseCode: 200,
@@ -46,11 +58,11 @@ export async function checkHosted(page, web, artifacts) {
     await page.send('Network.setCacheDisabled', {cacheDisabled: true});
     await page.send('Fetch.enable', {patterns: [{urlPattern: '*firebase_auth.js*'}, {urlPattern: '*/api/*'}]});
     try {
-        async function check(description, action) {
+        async function check(description, action, path = '') {
             account = null;
             emailVerified = true;
             const previousDocument = await page.evaluate('performance.timeOrigin');
-            await page.send('Page.navigate', {url: web});
+            await page.send('Page.navigate', {url: web + path});
             await page.wait(`performance.timeOrigin !== ${previousDocument} && window.firebaseTest && document.querySelector('.google-sign-in')`, 'Google sign-in in the new document');
             await action();
             assert.deepEqual(failures, []);
@@ -99,24 +111,46 @@ export async function checkHosted(page, web, artifacts) {
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('input[autocomplete=username]')`, 'Player registration');
             assert.equal(sessions.length, before + 1, 'Firebase ID token opens the server session');
+            assert.equal(await page.evaluate(`document.querySelector('input[autocomplete=nickname]')`), null, 'Registration only asks for a handle');
+            await page.fill('input[autocomplete=username]', 'new-player');
+            await page.click('Register player');
+            await page.wait(`document.querySelector('.portal-header .account-controls')?.textContent.includes('@new-player')`, 'Handle-only registration opens the dashboard');
+            assert.deepEqual(registrations, [{handle: 'new-player'}]);
         });
-        const registeredAccount = {id: 'google-player', handle: 'alice', displayName: 'Alice', admin: false, mayCreateGames: false};
+        const registeredAccount = {id: 'google-player', handle: 'alice', admin: false, mayCreateGames: false};
         await check('Registered Google users see their games', async () => {
             account = registeredAccount;
             await page.click('Sign in with Google');
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('.portal')`, 'Registered player dashboard');
-            assert.equal(await page.evaluate(`document.querySelector('.account-bar').textContent.includes('@alice')`), true);
+            assert.equal(await page.evaluate(`document.querySelector('.account-controls').textContent.includes('@alice')`), true);
         });
+        await check('Hosted game account controls share the game overview bar', async () => {
+            account = registeredAccount;
+            await page.click('Sign in with Google');
+            await page.evaluate(`window.firebaseTest.finishPopup()`);
+            await page.wait(`document.querySelector('.game-header .account-controls')`, 'Account controls in the game header');
+            assert.equal(await page.evaluate(`document.querySelectorAll('.account-controls').length`), 1, 'One account navigation surface');
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls a').getAttribute('href')`), '/');
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls').textContent.includes('@alice')`), true);
+            assert.equal(await page.evaluate(`document.querySelector('.private-seat-link')`), null, 'Hosted games use accounts');
+            await page.screenshot(join(artifacts, 'hosted-game-header.png'), 1280, 900);
+            assert(await page.evaluate(`document.querySelector('.game-header').getBoundingClientRect().height < 100`), 'Desktop account and game overview remain compact');
+            await page.screenshot(join(artifacts, 'hosted-game-header-mobile.png'), 390, 844, true);
+            assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'Combined header fits a phone');
+            await page.click('Sign out');
+            await page.wait(`document.querySelector('.google-sign-in')`, 'In-game sign out');
+            await page.send('Emulation.clearDeviceMetricsOverride');
+        }, `/games/${gameId}`);
         await check('Google users can sign out', async () => {
             await page.click('Sign in with Google');
             await page.evaluate(`window.firebaseTest.finishPopup()`);
-            await page.wait(`document.querySelector('.account-bar')`, 'Signed-in user');
+            await page.wait(`document.querySelector('.account-controls')`, 'Signed-in user');
 
             await page.click('Sign out');
 
             await page.wait(`document.querySelector('.google-sign-in')`, 'Sign out returns to sign-in');
-            assert.equal(await page.evaluate(`document.querySelector('.account-bar') === null`), true);
+            assert.equal(await page.evaluate(`document.querySelector('.account-controls') === null`), true);
         });
         await check('Server email verification remains required for Google users', async () => {
             emailVerified = false;

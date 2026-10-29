@@ -63,7 +63,7 @@ fun importFileStorage(directory: Path, database: PostgresDatabase): StorageImpor
         }
         val targetAccounts = PostgresAccountStore(database)
         accounts.forEach { account ->
-            targetAccounts.register(account.id, account.handle.value, account.displayName)
+            targetAccounts.register(account.id, account.handle.value)
             if (account.mayCreateGames) targetAccounts.allowCreation(account.id, true)
         }
         val target = PostgresGameStore(database)

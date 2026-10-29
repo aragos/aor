@@ -30,10 +30,10 @@ try {
     const player=before.game.players.find(player=>player.id===actor.id);
     const capital=player.capital.replace(/\b\w/g,letter=>letter.toUpperCase());
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(capital+': place 1 '+target));
-    await page.click('Display names');
+    await page.click('Player labels');
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(player.name+': place 1 '+target));
     await page.reload();
-    await page.wait(`document.querySelector('#history-identifiers button[aria-pressed=true]')?.textContent==='Display names'`, 'history name preference survives reload');
+    await page.wait(`document.querySelector('#history-identifiers button[aria-pressed=true]')?.textContent==='Player labels'`, 'history name preference survives reload');
     await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
     await page.click('Canonical IDs');
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(actor.id+': place 1 '+target));

@@ -3,7 +3,6 @@ import {hostedMessages} from './hostedMessages';
 export const en: Record<string, string> = {
     ...hostedMessages,
     'hosted.verificationInstructions': 'Open the verification email sent to {email}, then continue here.',
-    'hosted.created': 'Created {date} · {id}',
     'hosted.inactive': 'This game has been {status}. Its board and history remain available.',
     'hosted.gameStatus': 'Game {status}',
     'gameStatus.ACTIVE': 'ongoing', 'gameStatus.ONGOING': 'Ongoing', 'gameStatus.MY_MOVE': 'My move',
@@ -12,7 +11,7 @@ export const en: Record<string, string> = {
     'error.GAME_MEMBERSHIP_REQUIRED': 'Your account is not a participant in this game.',
     'error.GAME_INACTIVE': 'This game is cancelled or abandoned and no longer accepts moves.',
     'history.identifiers': 'Player identifiers', 'history.identifiers.capitals': 'Capitals',
-    'history.identifiers.names': 'Display names', 'history.identifiers.ids': 'Canonical IDs',
+    'history.identifiers.names': 'Player labels', 'history.identifiers.ids': 'Canonical IDs',
 
     'history.undo': 'Undo last action', 'history.policy': 'Undo policy', 'history.edit': 'Edit game history',
     'history.fromEntry': 'Replace from entry (zero-based)', 'history.loadSuffix': 'Load current actions',

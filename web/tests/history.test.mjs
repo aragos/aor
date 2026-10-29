@@ -20,7 +20,7 @@ test('aliases preserve reference fragments and unknown identifiers',()=>{
     assert.equal(displayHistoryLine('p1: pass',{}),'p1: pass');
 });
 
-test('display names remain literal text',()=>{
+test('player labels remain literal text',()=>{
     assert.equal(displayHistoryLine('p1: pass',{p1:'Ada $1 (East)'}),'Ada $1 (East): pass');
 });
 

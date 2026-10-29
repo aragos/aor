@@ -137,7 +137,7 @@ export interface Snapshot {
 }
 export interface CreatedGame {gameId: string; registered?: boolean; links: {id: string; name: string; path: string}[]}
 export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Record<string, string> | null; pollIntervalMs: number}
-export interface Account {id: string; handle: string; displayName: string; mayCreateGames: boolean; admin: boolean}
+export interface Account {id: string; handle: string; mayCreateGames: boolean; admin: boolean}
 export interface Session {id: string; emailVerified: boolean; account: Account | null}
 export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABANDONED' | 'UNAVAILABLE';
 export interface GameSummary {id: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean}

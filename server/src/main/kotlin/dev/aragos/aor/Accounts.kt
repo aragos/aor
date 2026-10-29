@@ -14,7 +14,7 @@ data class AccountId(val value: String) {
     }
 }
 
-/** Unique public account handle, independent of a mutable display name. */
+/** Unique public identity used throughout hosted play. */
 data class PlayerHandle(val value: String) {
     init {
         require(value.matches(Regex("[a-z][a-z0-9-]{2,23}"))) {
@@ -30,24 +30,13 @@ data class PlayerHandle(val value: String) {
 data class RegisteredAccount(
     val id: AccountId,
     val handle: PlayerHandle,
-    val displayName: String,
     val mayCreateGames: Boolean = false,
 ) {
-    init {
-        require(
-            displayName.isNotBlank() &&
-                displayName.length <= 60 &&
-                displayName.none(Char::isISOControl)
-        ) {
-            "Display names require one through 60 printable characters."
-        }
-    }
-
     companion object {
-        /** Canonicalizes registration input; intrinsic name/handle checks remain in their types. */
-        fun create(id: AccountId, handle: String, displayName: String): RegisteredAccount =
+        /** Canonicalizes registration input; intrinsic handle checks remain in its type. */
+        fun create(id: AccountId, handle: String): RegisteredAccount =
             try {
-                RegisteredAccount(id, PlayerHandle.parse(handle), displayName.trim())
+                RegisteredAccount(id, PlayerHandle.parse(handle))
             } catch (_: IllegalArgumentException) {
                 throw ServiceFailure(400, "INVALID_ACCOUNT")
             }
@@ -60,18 +49,14 @@ interface AccountStore {
 
     fun find(id: AccountId): RegisteredAccount?
 
-    fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount
+    fun register(id: AccountId, handle: String): RegisteredAccount
 
     fun allowCreation(id: AccountId, allowed: Boolean): RegisteredAccount
 
     fun search(query: String, limit: Int = 20): List<RegisteredAccount> {
         val normalized = query.lowercase()
         return all()
-            .filter {
-                normalized in it.handle.value ||
-                    normalized in it.displayName.lowercase() ||
-                    query == it.id.value
-            }
+            .filter { normalized in it.handle.value || query == it.id.value }
             .sortedBy { it.handle.value }
             .take(limit)
     }
@@ -86,19 +71,18 @@ class FileAccountStore(private val path: Path, private val writer: GameWriter = 
 
     override fun find(id: AccountId): RegisteredAccount? = all().singleOrNull { it.id == id }
 
-    override fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount =
-        lock.withLock {
-            val accounts = load()
-            if (accounts.any { it.id == id }) {
-                throw ServiceFailure(409, "ACCOUNT_ALREADY_REGISTERED")
-            }
-            val account = RegisteredAccount.create(id, handle, displayName)
-            if (accounts.any { it.handle == account.handle }) {
-                throw ServiceFailure(409, "HANDLE_UNAVAILABLE")
-            }
-            save(accounts + account)
-            account
+    override fun register(id: AccountId, handle: String): RegisteredAccount = lock.withLock {
+        val accounts = load()
+        if (accounts.any { it.id == id }) {
+            throw ServiceFailure(409, "ACCOUNT_ALREADY_REGISTERED")
         }
+        val account = RegisteredAccount.create(id, handle)
+        if (accounts.any { it.handle == account.handle }) {
+            throw ServiceFailure(409, "HANDLE_UNAVAILABLE")
+        }
+        save(accounts + account)
+        account
+    }
 
     override fun allowCreation(id: AccountId, allowed: Boolean): RegisteredAccount = lock.withLock {
         val accounts = load()
@@ -113,15 +97,14 @@ class FileAccountStore(private val path: Path, private val writer: GameWriter = 
         if (!Files.exists(path)) return emptyList()
         try {
             val root = json.readTree(Files.readString(path))
-            require(root.field("fileVersion").integer() == 1) {
-                "Only account file version 1 is supported."
+            require(root.field("fileVersion").integer() == 2) {
+                "Only account file version 2 is supported."
             }
             val accounts =
                 root.field("accounts").array().map { node ->
                     RegisteredAccount(
                         AccountId(node.field("id").string()),
                         PlayerHandle(node.field("handle").string()),
-                        node.field("displayName").string(),
                         node.field("mayCreateGames").boolean(),
                     )
                 }
@@ -140,13 +123,12 @@ class FileAccountStore(private val path: Path, private val writer: GameWriter = 
     private fun save(accounts: List<RegisteredAccount>) {
         val contents =
             mapOf(
-                "fileVersion" to 1,
+                "fileVersion" to 2,
                 "accounts" to
                     accounts.map { account ->
                         mapOf(
                             "id" to account.id.value,
                             "handle" to account.handle.value,
-                            "displayName" to account.displayName,
                             "mayCreateGames" to account.mayCreateGames,
                         )
                     },
@@ -158,3 +140,7 @@ class FileAccountStore(private val path: Path, private val writer: GameWriter = 
         }
     }
 }
+
+/** Live hosted labels use handles; recorded history retains its entry-time identities. */
+internal fun AccountStore.playerName(accountId: String?, fallback: String): String =
+    accountId?.let(::AccountId)?.let(::find)?.let { "@${it.handle.value}" } ?: fallback

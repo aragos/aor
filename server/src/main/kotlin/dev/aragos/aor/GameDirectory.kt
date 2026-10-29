@@ -11,6 +11,7 @@ internal object GameDirectory {
         status: GameListStatus?,
         after: String?,
         limit: Int,
+        accounts: AccountStore? = null,
     ): GamePage {
         val matches =
             store
@@ -26,7 +27,7 @@ internal object GameDirectory {
                     ) {
                         return@mapNotNull null
                     }
-                    val candidate = summary(store, id, root, viewer)
+                    val candidate = summary(store, id, root, viewer, accounts)
                     candidate.takeIf {
                         status == null ||
                             it.status == status ||
@@ -44,9 +45,10 @@ internal object GameDirectory {
         id: String,
         root: JsonNode,
         viewer: AccountId,
+        accounts: AccountStore? = null,
     ): GameSummary =
         try {
-            summary(store.read(id), viewer)
+            summary(store.read(id), viewer, accounts)
         } catch (_: ServiceFailure) {
             val players =
                 root["header"]
@@ -67,12 +69,20 @@ internal object GameDirectory {
                 root["revision"]?.asInt() ?: 0,
                 GameListStatus.UNAVAILABLE,
                 null,
-                players,
+                players.map { player ->
+                    player.copy(
+                        name =
+                            accounts?.playerName(
+                                root["memberships"]?.get(player.id.value)?.asText(),
+                                player.name,
+                            ) ?: player.name
+                    )
+                },
                 false,
             )
         }
 
-    fun summary(game: StoredGame, viewer: AccountId?): GameSummary {
+    fun summary(game: StoredGame, viewer: AccountId?, accounts: AccountStore? = null): GameSummary {
         val state = game.state()
         val seat = game.memberships.entries.singleOrNull { it.value == viewer?.value }?.key
         val prompt = state.prompts().singleOrNull()
@@ -101,7 +111,13 @@ internal object GameDirectory {
             game.revision,
             status,
             state.stage,
-            game.header.players,
+            game.header.players.map { player ->
+                player.copy(
+                    name =
+                        accounts?.playerName(game.memberships[player.id], player.name)
+                            ?: player.name
+                )
+            },
             myMove,
         )
     }

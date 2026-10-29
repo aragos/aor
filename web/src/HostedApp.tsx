@@ -13,6 +13,7 @@ import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
 import {t} from './messages';
 import {useTurnFavicon} from './favicon';
 import {HelpLink} from './HelpLink';
+import {AccountContext, AccountControls} from './AccountControls';
 
 // Google's pre-approved light button from https://developers.google.com/identity/branding-guidelines.
 const googleSignInButton = new URL('./assets/google-sign-in.png', import.meta.url).href;
@@ -95,19 +96,17 @@ function SignIn({auth}: {auth: Auth}) {
 
 function Register({refresh}: {refresh: () => Promise<void>}) {
     const [handle, setHandle] = useState('');
-    const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     async function register(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try {await request('/api/players/register', undefined, {handle, displayName: name}); await refresh();}
+        try {await request('/api/players/register', undefined, {handle}); await refresh();}
         catch (failure) {setError(message(failure));}
         finally {setBusy(false);}
     }
     return <main className="landing panel"><h1>{t('hosted.choose-your-player-identity')}</h1><form className="account-form" onSubmit={register}>
         <label>{t('hosted.public-handle')}<input value={handle} autoComplete="username" onChange={event => setHandle(event.target.value.toLowerCase())} pattern="[a-z][a-z0-9-]{2,23}" minLength={3} maxLength={24} required/></label>
         <p className="muted small">{t('hosted.a-unique-handle-lets-other')}</p>
-        <label>{t('hosted.display-name')}<input value={name} autoComplete="nickname" onChange={event => setName(event.target.value)} maxLength={60} required/></label>
         <Problem value={error}/><button disabled={busy}>{busy ? t('hosted.working') : t('hosted.register-player')}</button>
     </form></main>;
 }
@@ -158,11 +157,11 @@ function RegisteredGameForm({me}: {me: Account}) {
     return <details className="panel create-registered"><summary>{t('hosted.create-a-game')}</summary>
         {!me.mayCreateGames ? <p>{t('hosted.an-administrator-must-approve-your')}</p> : <form onSubmit={create}>
             <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-36-registered-players-including')}</p>
-            <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>{player.displayName}</strong> @{player.handle}</span>
+            <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>@{player.handle}</strong></span>
                 {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
             <label>{t('hosted.find-a-player-by-handle')}<input type="search" value={query} maxLength={60} onChange={event => setQuery(event.target.value)}/></label>
             {query.trim().length >= 2 && <ul className="player-directory" aria-label={t('hosted.matching-players')}>{matches.filter(player => !players.some(chosen => chosen.id === player.id)).map(player => <li key={player.id}>
-                <span><strong>{player.displayName}</strong> @{player.handle}</span>
+                <span><strong>@{player.handle}</strong></span>
                 <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => {setPlayers([...players, player]); setQuery('');}}>{t('hosted.add')}</button>
             </li>)}</ul>}
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
@@ -194,7 +193,7 @@ function AdminGame({game, refresh}: {game: GameSummary; refresh: () => void}) {
         setNotice(dryRun ? t('hosted.this-log-replays-successfully-with') : t('hosted.log-upgraded-the-previous-file'));
         if (!dryRun) {setReplacement(null); refresh();}
     }
-    return <details className="admin-game"><summary>{t('hosted.manage-game')}</summary><p className="small">{game.id} · {t('game.revision')} {game.revision}</p>
+    return <details className="admin-game"><summary className={`game-row ${game.myMove ? 'needs-action' : 'waiting'}`} aria-label={`${t('hosted.manage-game')}: ${game.players.map(player => player.name).join(', ')}`}><GameRow game={game}/></summary><p className="small">{game.id} · {t('game.revision')} {game.revision}</p>
         <div className="button-row"><button className="secondary" disabled={busy} onClick={() => {void run(async () => download(`${game.id}.json`, await request(`${path}/log`)));}}>{t('hosted.download-log')}</button>
             {['cancel', 'abandon'].map(action => <button key={action} className="secondary" disabled={busy || game.status === 'CANCELLED' || game.status === 'ABANDONED'} onClick={() => {void run(async () => {
                 await request(`${path}/status`, undefined, {expectedRevision: game.revision, action}); refresh();
@@ -236,9 +235,15 @@ function AdminPlayers() {
     }
     return <details className="panel" onToggle={event => {if (event.currentTarget.open) void load();}}><summary>{t('hosted.player-creation-permissions')}</summary>
         <p className="small">{t('hosted.with-the-default-approvedonly-policy')}</p>
-        <Problem value={error}/><ul className="player-directory">{players.map(player => <li key={player.id}><span>{player.displayName} @{player.handle}</span>
+        <Problem value={error}/><ul className="player-directory">{players.map(player => <li key={player.id}><span>@{player.handle}</span>
             <button className="secondary" disabled={!!busy || player.admin} onClick={() => {void approve(player);}}>{player.mayCreateGames ? t('hosted.revoke-creation') : t('hosted.allow-creation')}</button></li>)}</ul>
     </details>;
+}
+
+function GameRow({game}: {game: GameSummary}) {
+    return <><strong className="game-row-status">{t(`gameStatus.${game.status}`)}</strong>
+        <span className="game-row-players">{game.players.map(player => player.name).join(' · ')}</span>
+        <span className="game-row-stage">{game.stage && t(`stage.${game.stage}`)}</span></>;
 }
 
 export function Dashboard({me}: {me: Account}) {
@@ -293,7 +298,7 @@ export function Dashboard({me}: {me: Account}) {
             download('aor-game-logs.json', {exportedAt: new Date().toISOString(), games});
         } catch (failure) {setError(message(failure));} finally {setBusy(false);}
     }
-    return <main className="portal"><header><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')} <HelpLink label="Playing AoR"/></h1></header>
+    return <main className="portal"><header className="portal-header"><div><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')} <HelpLink label="Playing AoR"/></h1></div><AccountControls showGames={false}/></header>
         <RegisteredGameForm me={me}/>
         <section className="panel">
             {me.admin && <ChoiceButtons value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}
@@ -303,10 +308,8 @@ export function Dashboard({me}: {me: Account}) {
             <Problem value={error}/>{busy && <p role="status">{t('hosted.loading')}</p>}
             {!busy && !page.games.length && <p>{t('hosted.no-games-match-this-filter')}</p>}
             <ul className="game-directory">{page.games.map(game => <li key={game.id}>
-                <div className="game-list-heading"><strong className={game.myMove ? 'your-move' : ''}>{t(`gameStatus.${game.status}`)}</strong><span>{game.stage && t(`stage.${game.stage}`)}</span>
-                    {!all && <a className="button" href={`/games/${game.id}`}>{t('hosted.open-game')}</a>}</div>
-                <p>{game.players.map(player => player.name).join(' · ')}</p><p className="muted small">{t('hosted.created', {date: new Date(game.createdAt).toLocaleDateString(), id: game.id.slice(0, 8)})}</p>
-                {all && <AdminGame game={game} refresh={() => setRefresh(value => value + 1)}/>}
+                {all ? <AdminGame game={game} refresh={() => setRefresh(value => value + 1)}/>
+                    : <a className={`game-row ${game.myMove ? 'needs-action' : 'waiting'}`} href={`/games/${game.id}`}><GameRow game={game}/></a>}
             </li>)}</ul>
             <div className="button-row">{cursor && <button className="secondary" disabled={busy} onClick={() => setCursor(null)}>{t('hosted.first-page')}</button>}
                 {page.nextCursor && <button className="secondary" disabled={busy} onClick={() => setCursor(page.nextCursor)}>{t('hosted.next-page')}</button>}</div>
@@ -334,11 +337,14 @@ export default function HostedApp({config, game}: {config: ApplicationConfig; ga
         void setPersistence(auth, browserLocalPersistence).catch(() => { /* Firebase retains an in-memory session when storage is unavailable. */ });
         return () => {active = false; unsubscribe(); setAuthentication();};
     }, [auth]);
-    return <>{user && <nav className="account-bar" aria-label={t('hosted.account')}><a href="/">{t('hosted.my-games')}</a><span>{session?.account ? `@${session.account.handle}` : user.email}</span>
-        <button className="secondary" onClick={() => {void signOut(auth).catch(failure => setError(message(failure)));}}>{t('hosted.sign-out')}</button></nav>}
+    const ready = !loading && !error && user && session?.emailVerified && session.account;
+    const logOut = () => {void signOut(auth).catch(failure => setError(message(failure)));};
+    return <AccountContext.Provider value={ready ? {handle: ready.handle, signOut: logOut} : null}>
+        {user && !ready && <nav className="account-controls account-pending" aria-label={t('hosted.account')}><a href="/">{t('hosted.my-games')}</a>
+            <button className="secondary" onClick={logOut}>{t('hosted.sign-out')}</button></nav>}
         {loading ? <main className="landing panel"><p>{t('hosted.loading-your-account')}</p></main> : !user ? <SignIn auth={auth}/>
             : error ? <main className="landing panel"><Problem value={error}/><button onClick={() => {void refresh().then(() => setError('')).catch(failure => setError(message(failure)));}}>{t('hosted.retry')}</button></main>
             : !session?.emailVerified ? <VerifyEmail user={user} refresh={refresh}/>
             : !session.account ? <Register refresh={refresh}/>
-            : game ?? <Dashboard me={session.account}/>}</>;
+            : game ?? <Dashboard me={session.account}/>}</AccountContext.Provider>;
 }

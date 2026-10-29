@@ -16,6 +16,7 @@ import {decisionIdentity} from './decision';
 import {DiagnosticMessage} from './DiagnosticMessage';
 import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
 import {HelpLink} from './HelpLink';
+import {AccountControls} from './AccountControls';
 import {useTurnFavicon} from './favicon';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
@@ -99,6 +100,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                     href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
             </details>}
+            <AccountControls/>
             <HelpLink label="Playing AoR"/>
         </header>
         <PlayerOverview snapshot={snapshot}/>

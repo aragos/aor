@@ -185,13 +185,12 @@ class PostgresStoreTest {
     @Test
     fun uniqueHandlesAreEnforcedAcrossIndependentPools() =
         PostgresFixture().use { fixture ->
-            fixture.accounts.register(AccountId("alice"), "alice", "Alice")
+            fixture.accounts.register(AccountId("alice"), "alice")
             val other = fixture.reopened().store as PostgresGameStore
 
             val failure =
                 assertFailsWith<ServiceFailure> {
-                    PostgresAccountStore(other.database)
-                        .register(AccountId("other"), "Alice", "Other")
+                    PostgresAccountStore(other.database).register(AccountId("other"), "Alice")
                 }
 
             assertThat(failure.code).isEqualTo("HANDLE_UNAVAILABLE")
@@ -226,8 +225,8 @@ class PostgresStoreTest {
     @Test
     fun failedPermissionChangeRollsBackApprovalAndAuditTogether() =
         PostgresFixture().use { fixture ->
-            fixture.accounts.register(AccountId("admin"), "admin", "Admin")
-            fixture.accounts.register(AccountId("alice"), "alice", "Alice")
+            fixture.accounts.register(AccountId("admin"), "admin")
+            fixture.accounts.register(AccountId("alice"), "alice")
 
             assertFailsWith<IllegalStateException> {
                 fixture.database.transaction {

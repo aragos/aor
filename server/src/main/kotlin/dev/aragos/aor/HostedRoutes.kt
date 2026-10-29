@@ -30,7 +30,7 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
     post("/api/players/register") {
         call.api {
             val body = call.body()
-            body.fieldsOnly("handle", "displayName")
+            body.fieldsOnly("handle")
             call.respondJson(
                 withContext(Dispatchers.IO) {
                     val identity = hosted.identity(call.token())
@@ -39,7 +39,6 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
                         hosted.accounts.register(
                             identity.id,
                             body.field("handle").string(),
-                            body.field("displayName").string(),
                         )
                     )
                 }
@@ -73,6 +72,7 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
                         call.request.queryParameters["status"],
                         call.request.queryParameters["after"],
                         call.pageLimit(),
+                        hosted.accounts,
                     )
                 }
             )
@@ -89,6 +89,7 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
                         call.request.queryParameters["status"],
                         call.request.queryParameters["after"],
                         call.pageLimit(),
+                        hosted.accounts,
                     )
                 }
             )

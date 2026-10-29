@@ -45,8 +45,12 @@ data class GameSnapshot(
 class GameService(
     internal val store: GameStore,
     private val driver: GameDriver = GameDriver(),
+    private val accounts: AccountStore? = null,
 ) {
     private val credentialsRandom = SecureRandom()
+
+    internal fun forAccounts(accounts: AccountStore): GameService =
+        GameService(store, driver, accounts)
 
     fun create(
         names: List<String>,
@@ -125,7 +129,7 @@ class GameService(
         val header =
             GameHeader(
                 seats.map { (id, account) ->
-                    Player(id, "${account.displayName.take(32)} (@${account.handle.value})")
+                    Player(id, "@${account.handle.value}")
                 },
                 creatorId,
             )
@@ -287,7 +291,20 @@ class GameService(
             viewerId = player,
             creatorId = stored.header.creatorId,
             game =
-                state.viewForPlayer(player).let { view ->
+                state.viewForPlayer(player).let { original ->
+                    val view =
+                        original.copy(
+                            players =
+                                original.players.map { participant ->
+                                    participant.copy(
+                                        name =
+                                            accounts?.playerName(
+                                                stored.memberships[participant.id],
+                                                participant.name,
+                                            ) ?: participant.name
+                                    )
+                                }
+                        )
                     if (stored.status == GameStatus.ACTIVE) {
                         view
                     } else {

@@ -65,8 +65,12 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 
 ## Online operation and remaining scope
 
-Use stable registered identities and readable handles when creating hosted games. Administrators
-control creation permission; members can filter their own ongoing, awaiting-move and finished games.
+Use stable registered identities and unique public handles throughout hosted play; registration
+requires no separate display name. Live views of existing games use handles while recorded activity
+keeps its original identities. Account navigation shares the game overview bar. Each listed game is
+one clickable row, distinguished by pending-action status, without creation dates or visible IDs.
+Administrators control creation permission; members can filter their own ongoing, awaiting-move and
+finished games.
 Administrators may inspect games, cancel/abandon them, export logs, validate upgrades and purge by ID.
 These operations are authenticated, audited and distinct from player actions.
 
