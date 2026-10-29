@@ -57,8 +57,8 @@ export async function checkEuropeanMap(page, web) {
     await page.evaluate(`document.querySelector('[data-map-province="loire"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
     await page.wait(`document.querySelector('.province-inspector h2')?.textContent === 'Loire'`, 'Loire keyboard inspection');
     assert.match(await page.evaluate(`document.querySelector('.province-inspector .map-facts').textContent`), /Wine.*3.*III/);
-    assert.equal(await page.evaluate(`document.querySelector('.province-inspector .primary-expansion').disabled`), false);
-    await page.evaluate(`document.querySelector('.province-inspector .primary-expansion').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.province-actions .primary-expansion').disabled`), false);
+    await page.evaluate(`document.querySelector('.province-actions .primary-expansion').click()`);
     await page.wait(`document.querySelector('[data-province-label="loire"] [data-piece-kind="marker"]')`, 'live Loire marker placement');
     const placed = await snapshot(links[0]);
     assert.equal(placed.game.board.find(province => province.id === 'loire')?.marker?.owner, links[0].id);
