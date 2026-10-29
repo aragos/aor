@@ -32,7 +32,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.province-label [data-area-lock], .province-label [data-overseas-lock]').length`), 0);
     const unlockedGroups = baseline.game.catalog.provinces.filter(province=>province.area==='V' || province.overseas==='FAR_EAST').map(province=>province.id);
     await show({game:{lockedProvinces:baseline.game.lockedProvinces.filter(id=>!unlockedGroups.includes(id))}});
-    assert.equal(await page.evaluate(`document.querySelector('[data-area-lock="V"], [data-overseas-lock="FAR_EAST"]')`), null, 'Locks disappear when authoritative access unlocks the group');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-area-lock="V"], [data-overseas-lock="FAR_EAST"]')`), false, 'Locks disappear when authoritative access unlocks the group');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-overseas-lock="NEW_WORLD"]')`), true);
     await show({...baseline});
     const beforeAreaInspection = await page.evaluate('window.mapCommands.length');
@@ -44,14 +44,14 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeAreaInspection, 'Area inspection does not submit');
     await page.evaluate(`document.querySelector('[data-sea="NORTH_SEA"] path').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="IV"]').getAttribute('aria-pressed')`), 'false', 'Sea clicks deselect an inspected area');
-    assert.equal(await page.evaluate(`document.querySelector('[data-area-dimming]')`), null);
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-area-dimming]')`), false);
     await click('[data-map-province="genoa"]');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 1, 'Genoa highlights its connected sea');
     await click('[data-map-area-label="IV"]');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Area inspection clears province sea emphasis');
     await click('[data-map-province="genoa"]');
     await page.evaluate(`document.querySelector('[data-map-terrain]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
-    assert.equal(await page.evaluate(`document.querySelector('.province-inspector')`), null, 'Non-province land clears province inspection');
+    assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Non-province land clears province inspection');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Clearing inspection clears the sea emphasis');
     assert.equal(await page.evaluate(`document.querySelectorAll('.sea-shape[fill^="url("]').length`), 0, 'Clearing inspection restores the ordinary sea fill');
     for (const province of ['genoa', 'rome']) {
@@ -74,10 +74,10 @@ export async function checkContextualUx(page, web, baseline) {
     assert(reachable);
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"]').classList.contains('eligible')`), true);
 
-    assert.equal(await page.evaluate(`document.querySelector('.interactive-board select')`), null, 'Map has no drop-down menus');
+    assert.equal(await page.evaluate(`!!document.querySelector('.interactive-board select')`), false, 'Map has no drop-down menus');
     assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.map-zoom')).position`), 'absolute', 'Zoom controls float over the map');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"] .reach-shade').getAttribute('fill')`), '#ffffff', 'Reachable provinces use a light fill');
-    assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"] [stroke-dasharray]')`), null, 'Expansion highlights have no dashed border');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="${reachable.destination}"] [stroke-dasharray]')`), false, 'Expansion highlights have no dashed border');
     await show({game:{stage:'PURCHASE',activity:{...baseline.game.activity,actor:viewer,purchaseStep:'ADVANCES'}}});
     await page.wait(`document.querySelector('#tab-advances[aria-selected=true]')`, 'purchase workspace');
     await show({prompt:{messageId:'prompt.expand',players:[other.id]},game:{...baseline.game,activity:{...baseline.game.activity,actor:other.id,decisionPlayer:other.id}}});
@@ -98,7 +98,7 @@ export async function checkContextualUx(page, web, baseline) {
     await click('.primary-expansion');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `place 2 ${partial.destination}`);
     await click('.game-actions button');
-    assert.equal(await page.evaluate(`document.querySelector('.province-inspector')`), null, 'Pass clears selected province');
+    assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Pass clears selected province');
 
     await show({prompt:{messageId:'prompt.expand',players:[other.id]},legalChoices:{commands:[]},game:{
         expansionOffers:[],activity:{...baseline.game.activity,actor:other.id,decisionPlayer:other.id},
@@ -106,7 +106,7 @@ export async function checkContextualUx(page, web, baseline) {
     }});
     assert.equal(await page.evaluate(`document.querySelector('.pool-summary > strong').textContent`), String(other.poolTokens), 'After passing, prominently show the active power pool');
     assert.equal(await page.evaluate(`document.querySelector('.pool-summary .expansion-player > span').textContent`), await page.evaluate(`document.querySelector('[data-player="${other.id}"] .player-identity strong').textContent`), 'Pool summary identifies the active power');
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-pool')`), null, 'Own pool leaves capital summary after passing');
+    assert.equal(await page.evaluate(`!!document.querySelector('.player-summary.is-viewer .player-pool')`), false, 'Own pool leaves capital summary after passing');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-summary.is-viewer .detail-list dt')].some(element=>element.textContent==='Expansion pool')`), false, 'Own pool is also hidden in capital detail');
 
     const reference = 'single-fur';
@@ -114,11 +114,11 @@ export async function checkContextualUx(page, web, baseline) {
         game:{stage:'PLAY_CARDS', expansionOffers:[],hand:[{reference,definition:{id:'fur-1',kind:'commodity',messageId:'card.fur-1',shape:'CIRCLE'}}],
             cardOffers:[{reference,playable:true,blockers:[],choices:[{kind:'COMMODITY',value:'fur',command:`play ${reference} commodity fur`}],commodities:['FUR'],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click(`[data-hand-card="${reference}"]`);
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .target-choices')`), null, 'Single commodity needs no extra choice');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-decision .target-choices')`), false, 'Single commodity needs no extra choice');
     assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false);
     await click('.card-decision form > button:last-child');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play ${reference} commodity fur`);
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision')`), null, 'Card play clears detail');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-decision')`), false, 'Card play clears detail');
 
     const advance = baseline.game.catalog.advances.find(advance => !baseline.game.players.find(player=>player.id===viewer).advances.includes(advance.id));
     await show({prompt:{messageId:'prompt.purchase-advances',players:[viewer]},legalChoices:{commands:[`buy-advance ${advance.letter}`,'pass']},
@@ -135,19 +135,19 @@ export async function checkContextualUx(page, web, baseline) {
     await click(`[data-advance="${advance.id}"]`);
     assert.match(await page.evaluate(`document.querySelector('.advance-decision .leader-discount').textContent`), /30/);
     await show({game:{activity:{...fixture.game.activity,purchaseStep:'RELIEF'}}});
-    assert.equal(await page.evaluate(`document.querySelector('.advance-decision')`), null, 'Changing purchase steps clears advance inspection');
+    assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Changing purchase steps clears advance inspection');
     await show({game:{activity:{...fixture.game.activity,purchaseStep:'ADVANCES'}}});
     await click(`[data-advance="${advance.id}"]`);
     await click('.game-actions button');
-    assert.equal(await page.evaluate(`document.querySelector('.advance-decision')`), null, 'Pass clears advance');
+    assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Pass clears advance');
     await show({prompt:{messageId:'prompt.purchase-relief',players:[viewer]},legalChoices:{commands:['relieve-misery','pass']},game:{reliefOffers:[]}});
-    assert.equal(await page.evaluate(`document.querySelector('#relief-spaces')`), null, 'No relief purchase without a tier offer');
+    assert.equal(await page.evaluate(`!!document.querySelector('#relief-spaces')`), false, 'No relief purchase without a tier offer');
 
     await show({prompt:{messageId:'prompt.play-cards',players:[viewer]},legalChoices:{commands:[`play target player ${other.id}`]},
         game:{stage:'PLAY_CARDS',hand:[{reference:'target',definition:{id:'civil-war',kind:'event',messageId:'card.civil-war',shape:'SQUARE'}}],
             cardOffers:[{reference:'target',playable:true,blockers:[],choices:[{kind:'PLAYER',value:other.id,command:`play target player ${other.id}`}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click('[data-hand-card="target"]');
-    assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="target"] .card-event-text')`), null, 'Hand keeps dynamic game information');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'Hand keeps dynamic game information');
     assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#card-civil-war"]').target`), '_blank', 'Card rules have a dedicated reference');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
@@ -156,7 +156,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-player="${other.id}"].picked-target') !== null`), true);
     await click('.card-decision form > button:last-child');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play target player ${other.id}`);
-    assert.equal(await page.evaluate(`document.querySelector('.eligible-target')`), null);
+    assert.equal(await page.evaluate(`!!document.querySelector('.eligible-target')`), false);
 
     const targetOffers = ['first-map-card', 'second-map-card'].map((reference,index) => ({
         reference,playable:true,blockers:[],choices:[{kind:'PROVINCE',value:index ? 'genoa' : 'rome',command:`play ${reference} province ${index ? 'genoa' : 'rome'}`}],
@@ -173,7 +173,7 @@ export async function checkContextualUx(page, web, baseline) {
     await show();
     assert.equal(await page.evaluate(`!!document.querySelector('.card-decision') && !!document.querySelector('[data-map-province="genoa"].eligible')`), true, 'Polling preserves the current card and target picker');
     await show({game:{stage:'PURCHASE',activity:{...baseline.game.activity,purchaseStep:'ADVANCES'}}});
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision, .province-inspector, .eligible-target')`), null, 'Phase change clears card, province and player focus');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-decision, .province-inspector, .eligible-target')`), false, 'Phase change clears card, province and player focus');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="genoa"]').classList.contains('eligible')`), false, 'Phase change clears stale map targets');
     await show({game:{stage:'PLAY_CARDS'}});
     await click('[data-hand-card="second-map-card"]');
@@ -206,49 +206,25 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play area-target area viii');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'false', 'Playing an area card clears the area selection');
 
+    const participants = baseline.game.players.map(({id,name,capital})=>({id,name,capital}));
     const event = {...baseline.events.at(-1),id:'fixture-result',kind:'COMPETITION_RESULT',actor:viewer,stage:'EXPANSION',turnNumber:baseline.game.turnNumber,
-        provinces:['rome'],amount:8,detail:'COMPETITION',dice:[{player:null,value:1},{player:null,value:6},{player:null,value:4}],
-        competition:{attackerWon:true,defenders:[other.id]}};
+        provinces:['rome'],amount:8,detail:'COMPETITION',dice:[{player:null,value:1,color:'WHITE'},{player:null,value:6,color:'BLACK'},{player:null,value:4,color:'GREEN'}],
+        war:null,competition:{attackerWon:true,defenders:[other.id]},participants,cashChanges:[],miseryChanges:[]};
     await show({game:{stage:'EXPANSION'},events:[...baseline.events,event]});
-    assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /Competition won.*Rome/);
-    await show({events:[...baseline.events,event,{...event,id:'later',kind:'PASS',competition:null}]});
-    assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), true, 'Result survives unrelated activity');
-    const secondResult = {...event, id:'fixture-second-result',provinces:['naples'],competition:{...event.competition,attackerWon:false}};
-    await show({events:[...baseline.events,event,secondResult]});
-    assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 2,
-        'All competition results remain available in the expansion phase');
-    assert.equal(await page.evaluate(`document.querySelector('[data-competition-result="fixture-second-result"]').classList.contains('lost')`), true,
-        'Losing competitions use the loss treatment');
-    assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /White die 1.*Black die 6.*Green die 4/,
-        'Every competition die identifies its color');
-    await click('.clear-competition-results');
-    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
-        'Competition results can be cleared');
-    await show({events:[...baseline.events,event,secondResult]});
-    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
-        'Polling preserves the cleared results');
-    await show({events:[...baseline.events,event,secondResult,{...event,id:'fixture-fresh-result'}]});
-    assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 1,
-        'A new competition remains visible after clearing older results');
-    await show({game:{stage:'PURCHASE'},events:[...baseline.events,event,secondResult]});
-    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
-        'Competition log leaves the decision panel at the end of expansion');
-    await show({game:{stage:'EXPANSION'}});
+    assert.equal(await page.evaluate(`document.querySelector('.action-result-notice, .competition-log')`),null,
+        'Polling a historical competition cannot create an action receipt');
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /Competition won.*Rome/);
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /White die 1.*Black die 6.*Green die 4/,
+        'Every recorded competition die identifies its color');
     const war = {...event,id:'fixture-war',kind:'WAR_RESULT',actor:viewer,target:other.id,competition:null,
-        provinces:[],dice:[{player:viewer,value:3},{player:other.id,value:3}],
+        provinces:[],dice:[{player:viewer,value:3,color:'WHITE'},{player:other.id,value:3,color:'BLACK'}],
         war:{initiator:viewer,opponent:other.id,totals:{[viewer]:4,[other.id]:3},winner:viewer,requiredTransfers:1}};
     await show({events:[...baseline.events,war]});
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /won the War/);
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /White die 3 → total 4/);
-    await show({events:[...baseline.events,war,{...event,id:'later-war',kind:'PASS',war:null,competition:null}]});
-    assert.equal(await page.evaluate(`!!document.querySelector('.war-notice')`), true, 'War result survives later activity');
-    const tied = {...war,id:'fixture-war-tie',war:{...war.war,winner:null,totals:{[viewer]:3,[other.id]:3},requiredTransfers:0}};
-    await show({events:[...baseline.events,war,tied]});
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /War tied.*War continues/s);
-    await click('.war-notice .close-detail');
-    assert.equal(await page.evaluate(`document.querySelector('.war-notice')`), null);
+    assert.equal(await page.evaluate(`document.querySelector('.action-result-notice')`),null,
+        'A historical War stays in activity instead of reopening an outcome panel');
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-war"]').textContent`), /won the War/);
 
-    console.log('Passed: capital identity, player names/pools, reachability, remaining tokens, singleton commodity, phase focus, advance discounts, played leaders, target capitals, selection cleanup and persistent competition outcome.');
+    console.log('Passed: capital identity, player names/pools, reachability, remaining tokens, singleton commodity, phase focus, advance discounts, played leaders, target capitals, selection cleanup and recorded outcomes without persistent panels.');
 }
 
 export async function checkMapGestures(page) {

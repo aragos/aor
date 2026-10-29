@@ -360,7 +360,14 @@ Each player in turn order completes these steps in sequence:
 - A player may place tokens reachable from any province where it has a **coloured** token or domination marker.
 - Its **home capital** is always a base, even if another player dominates it; a player can never be wiped off
   the board.
-- Pieces placed this turn are not bases this turn. The one exception is Caravan's attack-through ([§6.3](#63-caravan)).
+- Pieces placed this turn do not create new bases. Caravan's attack-through is an exception ([§6.3](#63-caravan)).
+- Topping up a coloured-token holding to domination preserves that existing base for the rest of
+  Expansion. The immediate marker remains white: it still counts as new for the expansion bonus and
+  does not become coloured Caravan control or a current commodity-payment marker. The same rule
+  applies when winning a competition converts the attacker's existing coloured tokens to a marker.
+- Losing coloured tokens or their converted marker removes that base immediately. Removing or
+  capturing an occupancy cannot leave remembered reach behind or pass it to the new owner. The home
+  capital remains the independent exception above. Income flips the surviving white marker normally.
 - Pieces never move once placed. They leave the board only through competition, events or the voluntary swap
   ([§6.5](#65-domination)).
 
@@ -1024,6 +1031,9 @@ Dubrovnik, Durazzo and Bari. Belgrade shares land borders with Dubrovnik and Dur
 provinces no longer share either a land or a coastal-water border with each other.
 Durazzo has no direct sea-space incidences; its coastal-water neighbors remain available.
 Smyrna adjoins both the Aegean Sea and Eastern Mediterranean.
+The 2026-10-29 clarification confirms no Smyrna–Taurus land or direct coastal-water border on either
+map. Galleys may still reach Taurus from Smyrna in two coastal steps through Adalia; reachability
+does not imply adjacency. The reviewed catalog already has this graph.
 
 ---
 

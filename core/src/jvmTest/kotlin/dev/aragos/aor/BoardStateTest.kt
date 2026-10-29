@@ -112,6 +112,59 @@ class BoardStateTest {
     }
 
     @Test
+    fun convertedMarkerKeepsReachWithoutBecomingColouredCaravanControl() {
+        val rome = ProvinceId("rome")
+        val board = BoardState().replaceWithToken(rome, venice).board
+
+        val dominated = board.placeMarker(rome, venice, PieceSide.WHITE).board
+
+        assertThat(dominated.colouredPresence(venice)).containsExactly(rome)
+        assertThat(dominated.controller(rome)).isNull()
+    }
+
+    @Test
+    fun removingAConvertedMarkerDoesNotRememberItsBaseUponReoccupation() {
+        val rome = ProvinceId("rome")
+        val board =
+            BoardState()
+                .replaceWithToken(rome, venice)
+                .board
+                .placeMarker(rome, venice, PieceSide.WHITE)
+                .board
+
+        val reoccupied = board.remove(rome).board.placeMarker(rome, venice, PieceSide.WHITE).board
+
+        assertThat(reoccupied.colouredPresence(venice)).isEmpty()
+    }
+
+    @Test
+    fun incomeMakesAConvertedMarkerAnOrdinaryColouredBase() {
+        val rome = ProvinceId("rome")
+        val board =
+            BoardState()
+                .replaceWithToken(rome, venice)
+                .board
+                .placeMarker(rome, venice, PieceSide.WHITE)
+                .board
+
+        val flipped = board.flipWhitePieces()
+
+        assertThat(flipped.pieces[rome])
+            .isEqualTo(ProvincePieces.Marker(venice, PieceSide.COLOURED))
+        assertThat(flipped.colouredPresence(venice)).containsExactly(rome)
+    }
+
+    @Test
+    fun colouredMarkerCannotRetainRedundantConversionProvenance() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                ProvincePieces.Marker(venice, PieceSide.COLOURED, retainsColouredBase = true)
+            }
+
+        assertThat(failure).hasMessageThat().contains("white marker")
+    }
+
+    @Test
     fun incomeFlipsAllWhitePiecesWithoutChangingPhysicalPieceCounts() {
         val board =
             BoardState(

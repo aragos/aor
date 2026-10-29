@@ -20,7 +20,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.game-header h1').textContent`), 'AoR');
     assert.equal(await page.evaluate(`document.querySelector('.game-header').getBoundingClientRect().height <= 68`), true);
     assert.equal(await page.evaluate(`document.querySelector('.board-panel')`), null);
-    assert.equal(await page.evaluate(`document.querySelector('.table-activity').open`), true, 'Activity is visible by default');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-expanded')`), 'true', 'Activity is visible by default');
     assert.equal(await page.evaluate(`document.querySelector('.table-activity').getBoundingClientRect().top < innerHeight`), true, 'Desktop activity starts in view beside the board');
 
     for (const [id, province] of [['the-crusades', 'jerusalem'], ['rebellion', 'rome']]) {
@@ -33,7 +33,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
         await click('#tab-markets');
         await click('[data-hand-card="target"]');
         await page.wait(`document.querySelector('#tab-map[aria-selected=true]') && document.querySelector('[data-map-province="${province}"].eligible')`, `${id} activates its map target`);
-        assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-event-text')`), null, 'Card reference stays outside actions');
+        assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /.+/, 'Event descriptions accompany card actions');
         assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#card-${id}"]').target`), '_blank');
         const count = await page.evaluate('window.mapCommands.length');
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
@@ -88,6 +88,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     const waiting = {stage: 'BUY_CARD', players, turnOrder: order,
         activity: {...baseline.game.activity, actor: other.id, decisionPlayer: other.id}};
     await show({prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
+    assert.match(await page.evaluate(`document.querySelector('.urban-ascendancy-queue').textContent`), /Cash available: \$20/);
     const count = await page.evaluate('window.mapCommands.length');
     await click('.urban-ascendancy-queue button');
     assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Preregistration waits for the authoritative turn');

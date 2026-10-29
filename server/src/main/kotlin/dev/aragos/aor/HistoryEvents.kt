@@ -70,6 +70,17 @@ enum class CardDrawReason {
 /** Signed public cash movement caused by this entry, including automatic phase bookkeeping. */
 data class HistoryCashChangeView(val player: PlayerId, val amount: Int)
 
+/**
+ * Signed movement in track spaces; [fromValue] and [toValue] are the recorded printed box values. A
+ * null value denotes Chaos rather than a numeric box.
+ */
+data class HistoryMiseryChangeView(
+    val player: PlayerId,
+    val spaces: Int,
+    val fromValue: Int?,
+    val toValue: Int?,
+)
+
 /** White plus black selects the commodities; green selects the adjustment. */
 data class HistoryMarketRollView(
     val total: Int,
@@ -108,6 +119,7 @@ data class HistoryEventView(
     val competition: CompetitionResultView? = null,
     val war: WarOutcomeView? = null,
     val cashChanges: List<HistoryCashChangeView> = emptyList(),
+    val miseryChanges: List<HistoryMiseryChangeView> = emptyList(),
     val drawReason: CardDrawReason? = null,
     val protectionCash: Int? = null,
     val leaderRebate: Int? = null,
@@ -134,7 +146,12 @@ internal object HistoryEvents {
         val changes =
             if (incomeCollected) cashChanges(before, after)
             else projected?.cashChanges ?: cashChanges(before, after)
-        if ((projected == null || incomeCollected) && changes.isNotEmpty()) {
+        val misery =
+            if (incomeCollected) miseryChanges(before, after)
+            else projected?.miseryChanges ?: miseryChanges(before, after)
+        if (
+            (projected == null || incomeCollected) && (changes.isNotEmpty() || misery.isNotEmpty())
+        ) {
             add(
                 HistoryEventView(
                     if (projected == null) id else "$id:income",
@@ -144,6 +161,7 @@ internal object HistoryEvents {
                     before.turnNumber,
                     after.stage,
                     cashChanges = changes,
+                    miseryChanges = misery,
                 )
             )
         }
@@ -178,7 +196,10 @@ internal object HistoryEvents {
         projectEntry(id, before, after, entry, viewer)
             ?.copy(
                 cashChanges =
-                    if (incomeCollected(before, after)) emptyList() else cashChanges(before, after)
+                    if (incomeCollected(before, after)) emptyList() else cashChanges(before, after),
+                miseryChanges =
+                    if (incomeCollected(before, after)) emptyList()
+                    else miseryChanges(before, after),
             )
             ?.withParticipants(before)
 
@@ -186,7 +207,8 @@ internal object HistoryEvents {
         val ids =
             listOfNotNull(actor, target, war?.initiator, war?.opponent, war?.winner) +
                 dice.mapNotNull(HistoryDieView::player) +
-                cashChanges.map(HistoryCashChangeView::player)
+                cashChanges.map(HistoryCashChangeView::player) +
+                miseryChanges.map(HistoryMiseryChangeView::player)
         return copy(
             participants =
                 ids.distinct().map { id ->
@@ -205,6 +227,19 @@ internal object HistoryEvents {
         before.playerIds.mapNotNull { player ->
             val change = after.playerState(player).cash - before.playerState(player).cash
             HistoryCashChangeView(player, change).takeIf { change != 0 }
+        }
+
+    private fun miseryChanges(before: GameState, after: GameState): List<HistoryMiseryChangeView> =
+        before.playerIds.mapNotNull { player ->
+            val previous = before.playerState(player).misery
+            val current = after.playerState(player).misery
+            HistoryMiseryChangeView(
+                    player,
+                    current.ordinal - previous.ordinal,
+                    previous.value,
+                    current.value,
+                )
+                .takeIf { previous != current }
         }
 
     private fun projectEntry(

@@ -37,34 +37,43 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Preserve the fixed three-epoch format and the reviewed variant catalog.
 - Keep the AoR header compact and identify the assigned capital in the page title. Show the actor,
   decision and relevant resources; keep inspection separate from action forms and preserve drafts
-  while inspecting other objects.
+  while inspecting other objects. Show available cash alongside spending decisions; omit a permanent
+  resource section. Allow dragging an overflowing hand as well as scrolling it.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Prefer visible finite choices and playable cards beside Pass.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup
-  qualifications; omit the military box when nobody has an advantage. Losses use red result styling; results can be cleared without deleting history.
+  qualifications; omit the military box when nobody has an advantage. Keep results in activity;
+  explicitly show a dismissible outcome to the player whose submitted action just resolved it.
+  Losses use red result styling.
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
-  adjustments. Keep full payout boxes, legends, variant descriptions, card/advance rules, and
-  printed tracks on the public `/help` page, linked contextually in a new tab. Show matching unplayed leader counts for epochs I–III
-  beside each advance, with the public-information meaning above.
+  adjustments. Keep event and advance descriptions in the game, with current commodity payouts and
+  leader credits in card inspections. Identify whether each leader discount includes Written Record.
+  Keep full payout boxes, legends, variant descriptions and printed tracks on public `/help`, linked
+  contextually in a new tab. Show matching unplayed leader counts for epochs I–III beside each
+  advance, with the public-information meaning above.
 - Keep Help focused on reference and detailed undo policies; omit the game-flow walkthrough and
   consolidate shared rules. Color every misery box by track position: lower steps are less severe,
   progressing from green through amber to red and finally dark Chaos. Keep numeric labels.
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
   explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
   while waiting; submit once on the legal turn while that view remains open, with no failed retries.
-- Open a bounded, scrollable activity box by default and show every action once. Preserve
-  entry-time names and emblems as later history is appended; cards link to their reference.
+- Open bounded, scrollable activity by default, with an icon to hide/show it and no header or count.
+  Show every action once. Preserve entry-time names and emblems as later history is appended;
+  cards open the in-game inspector without changing an action draft.
   Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
-  protection money, leader rebates and related cash changes; label dice colors and omit continuation noise.
+  protection money, leader rebates and related cash/misery changes; label dice colors and omit
+  continuation noise.
 - Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
   retain correctable input; stale requests refresh without automatic resubmission.
 - Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.
   The game-list favicon checks all of the current player’s games regardless of filter or page.
-  Hidden game tabs continue occasional polling and recover after stalled reads or browser/network
-  suspension. Favicon changes must not require activating the tab or painting the game.
+  Hidden game tabs poll more often after recent game activity or engagement, return to occasional
+  checks while idle, and recover after stalled reads or browser/network suspension. Unchanged
+  responses do not keep a game active. Favicon changes must not require activating the tab or
+  painting the game.
 - Support keyboard, touch, narrow layouts, bounded map gestures, zoom and dense-piece inspection.
   Persist preferences and creation defaults in browser storage with an in-memory fallback.
 

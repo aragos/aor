@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
@@ -113,15 +114,21 @@ class ApplicationTest {
     fun playerViewsExposeOnlyTheCallersCard() = withGame {
         val started = view(0)
         val raw = started.bodyAsText()
+        val own = json.readTree(raw)
+        val privateFields = withoutCardInspections(own).toString()
         val other = json.readTree(view(1).bodyAsText())
 
         assertThat(started.status).isEqualTo(HttpStatusCode.OK)
         assertThat(started.headers[HttpHeaders.CacheControl]).isEqualTo("no-store")
-        assertThat(raw).contains("stone-1")
-        assertThat(raw).doesNotContain("stone-2")
-        assertThat(raw).doesNotContain("wool-1")
-        assertThat(raw).doesNotContain("wool-2")
-        assertThat(json.readTree(raw)["game"].has("deck")).isFalse()
+        assertThat(own["game"]["hand"].map { card -> card["definition"]["id"].asText() })
+            .containsExactly("stone-1")
+        assertThat(own["game"]["cardOffers"].toList()).isEmpty()
+        assertThat(privateFields).doesNotContain("stone-2")
+        assertThat(privateFields).doesNotContain("wool-1")
+        assertThat(privateFields).doesNotContain("wool-2")
+        assertThat(own["game"].has("deck")).isFalse()
+        assertThat(own["game"]["players"].none { player -> player.has("hand") }).isTrue()
+        assertThat(own["game"]["cardInspections"]).isEqualTo(other["game"]["cardInspections"])
         assertThat(other["game"]["hand"][0]["definition"]["id"].asText()).isEqualTo("stone-2")
     }
 
@@ -245,6 +252,7 @@ class ApplicationTest {
     @Test
     fun phaseDrawsStayPrivateInTheHttpSnapshotAndHistory() = withGame {
         selectCapitals()
+        val beforeDraws = json.readTree(view(1).bodyAsText())
         command(0, 6, "buy-tokens 0")
         command(1, 6, "buy-tokens 1")
         command(2, 6, "buy-tokens 2")
@@ -256,7 +264,17 @@ class ApplicationTest {
             .containsExactly("stone-1", "wool-2")
         assertThat(own["history"].map(JsonNode::asText)).contains("!draw p1 hand-4 wool-2")
         assertThat(other["history"].map(JsonNode::asText)).contains("!draw p1 hand-4 <hidden>")
-        assertThat(other.toString()).doesNotContain("wool-2")
+        assertThat(withoutCardInspections(other).toString()).doesNotContain("wool-2")
+        assertThat(other["game"]["hand"].none { card -> card["reference"].asText() == "hand-4" })
+            .isTrue()
+        assertThat(
+                other["game"]["cardOffers"].none { offer ->
+                    offer["reference"].asText() == "hand-4"
+                }
+            )
+            .isTrue()
+        assertThat(other["game"]["cardInspections"])
+            .isEqualTo(beforeDraws["game"]["cardInspections"])
         assertThat(other["game"]["deckRemaining"].asInt()).isEqualTo(23)
     }
 
@@ -324,6 +342,12 @@ class ApplicationTest {
             directory.toFile().deleteRecursively()
         }
     }
+
+    /** Retains every private-bearing field while excluding the public, location-free catalog. */
+    private fun withoutCardInspections(snapshot: JsonNode): JsonNode =
+        snapshot.deepCopy<ObjectNode>().apply {
+            (get("game") as ObjectNode).remove("cardInspections")
+        }
 
     private fun withGame(block: suspend ApiGame.() -> Unit) = testApplication {
         val directory = Files.createTempDirectory("aor-api-test-")

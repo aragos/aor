@@ -54,6 +54,105 @@ class BoardGameTest {
     }
 
     @Test
+    fun toppingUpOldTokensKeepsTheirReachWithAnImmediateWhiteMarker() {
+        val board = BoardState().replaceWithToken(id("rome"), p1).board
+        val initial = expansion(board)
+        val required = initial.catalog.map.province(id("rome")).marketNumber - 1
+
+        val toppedUp = initial.act("place $required rome")
+        val continued = toppedUp.act("place 1 naples")
+
+        assertThat(toppedUp.viewForPlayer(p1).board.single { it.id == id("rome") }.marker)
+            .isEqualTo(MarkerView(p1, PieceSide.WHITE))
+        assertThat(toppedUp.flow.markerOrigins[id("rome")])
+            .isEqualTo(MarkerPlacementOrigin.EXPANSION)
+        assertThat(continued.board.hasPresence(p1, id("naples"))).isTrue()
+    }
+
+    @Test
+    fun dominatingWithOnlyNewTokensDoesNotCreateAnotherBase() {
+        val toppedUp = expansion().act("place 4 florence")
+
+        val failure = assertFailsWith<RuleViolation> { toppedUp.act("place 1 rome") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.UNREACHABLE_PROVINCE)
+    }
+
+    @Test
+    fun winningWithOldTokensPreservesTheirExpansionBase() {
+        val board =
+            BoardState(
+                persistentMapOf(
+                    id("rome") to
+                        ProvincePieces.Tokens(
+                            persistentMapOf(
+                                p1 to TokenHolding(coloured = 1),
+                                p2 to TokenHolding(white = 1),
+                            )
+                        )
+                )
+            )
+
+        val won = expansion(board).act("attack rome").win()
+        val continued = won.act("place 1 naples")
+
+        assertThat(won.viewForPlayer(p1).board.single { it.id == id("rome") }.marker)
+            .isEqualTo(MarkerView(p1, PieceSide.WHITE))
+        assertThat(won.flow.markerOrigins[id("rome")]).isEqualTo(MarkerPlacementOrigin.EXPANSION)
+        assertThat(continued.board.hasPresence(p1, id("naples"))).isTrue()
+    }
+
+    @Test
+    fun losingOldTokensInCompetitionRemovesTheirExpansionBase() {
+        val board =
+            BoardState(
+                persistentMapOf(
+                    id("rome") to
+                        ProvincePieces.Tokens(
+                            persistentMapOf(
+                                p1 to TokenHolding(coloured = 1),
+                                p2 to TokenHolding(white = 1),
+                            )
+                        )
+                )
+            )
+        val pending = expansion(board).act("attack rome")
+
+        val lost =
+            pending.step(
+                GameOutcome.Roll(
+                    GameRollKind.COMPETITION,
+                    listOf(DieRoll(6), DieRoll(1), DieRoll(1)),
+                )
+            )
+        val failure = assertFailsWith<RuleViolation> { lost.act("place 1 naples") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.UNREACHABLE_PROVINCE)
+        assertThat(BoardGame.context(lost).bases(p1)).doesNotContain(id("rome"))
+    }
+
+    @Test
+    fun losingAConvertedMarkerRemovesItsBaseForBothCombatants() {
+        val board =
+            BoardState()
+                .replaceWithToken(id("rome"), p1)
+                .board
+                .replaceWithToken(id("naples"), p2)
+                .board
+        val initial = expansion(board)
+        val required = initial.catalog.map.province(id("rome")).marketNumber - 1
+        val defending = initial.act("place $required rome").act("pass")
+
+        val conquered = defending.act("attack rome", p2).win()
+        val context = BoardGame.context(conquered)
+
+        assertThat(context.bases(p1)).doesNotContain(id("rome"))
+        assertThat(context.bases(p2)).doesNotContain(id("rome"))
+        assertThat(conquered.viewForPlayer(p2).board.single { it.id == id("rome") }.marker)
+            .isEqualTo(MarkerView(p2, PieceSide.WHITE))
+    }
+
+    @Test
     fun attackingReservesOnlyTheAdditionalRequiredTokensBeforeRequestingDice() {
         val board =
             BoardState(

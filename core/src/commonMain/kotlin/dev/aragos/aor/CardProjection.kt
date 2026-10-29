@@ -94,7 +94,26 @@ data class CardOfferView(
     val protectionMax: Int?,
 )
 
+/** Public card facts with current viewer credits; never identifies any private card location. */
+data class CardInspectionView(
+    val definition: CardDefinition,
+    val commodities: Set<Commodity>,
+    val leaderDiscounts: List<LeaderDiscountView>,
+)
+
 internal object CardProjection {
+    fun inspections(state: GameState, viewer: PlayerState): List<CardInspectionView> {
+        val played = PlayedLeaderDiscountView.from(state, viewer).associateBy { it.leader.cardId }
+        return CardData.all.map { definition ->
+            val spec = CardEffectData.forCard(definition.id)
+            CardInspectionView(
+                definition,
+                (spec as? CardEffectSpec.CommodityChoices)?.choices.orEmpty(),
+                played[definition.id]?.discounts ?: discounts(state, viewer, spec),
+            )
+        }
+    }
+
     fun offers(state: GameState, viewer: PlayerState): List<CardOfferView> {
         if (state.turnNumber == null) return emptyList()
         val context = state.cardContext()
@@ -160,7 +179,7 @@ internal object CardProjection {
             listOfNotNull(block ?: CardOfferBlocker.INVALID_CHOICE.takeIf { choices.isEmpty() }),
             choices,
             (spec as? CardEffectSpec.CommodityChoices)?.choices.orEmpty(),
-            discounts(context, viewer, spec),
+            discounts(state, viewer, spec),
             targets,
             required,
             protection,
@@ -194,7 +213,7 @@ internal object CardProjection {
     }
 
     private fun discounts(
-        context: CardContext,
+        state: GameState,
         viewer: PlayerState,
         spec: CardEffectSpec,
     ): List<LeaderDiscountView> {
@@ -202,9 +221,9 @@ internal object CardProjection {
         return LeaderDiscountView.forLeader(
             spec.leader,
             viewer.advances.owned,
-            context.rules,
-            context.effects.crusadesPlayed,
-            context.voids.crusades,
+            state.rules,
+            state.effects.crusadesPlayed,
+            state.voids.crusades,
         )
     }
 

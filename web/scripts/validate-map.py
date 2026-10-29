@@ -206,6 +206,14 @@ for province, coast in water.items():
 assert set(seas) == {sea for sea, _ in sea_contacts}, (
     "The drawing must show exactly the selected map's connected seas."
 )
+assert ("smyrna", "taurus") not in pairs("land"), "Smyrna and Taurus have no land border."
+assert ("smyrna", "taurus") not in pairs("coast"), "Smyrna and Taurus have no direct coast border."
+assert land["smyrna"].distance(land["taurus"]) > 18, (
+    "Adalia must visibly separate Smyrna and Taurus on land."
+)
+assert water["smyrna"].distance(water["taurus"]) > 18, (
+    "Smyrna and Taurus coastal waters must remain visibly separated."
+)
 for sea in {sea for sea, province in sea_contacts if province == "smyrna"}:
     assert seas[sea].boundary.buffer(0.03).intersection(water["smyrna"].boundary).length > 12, (
         f"Smyrna must visibly adjoin {sea}."

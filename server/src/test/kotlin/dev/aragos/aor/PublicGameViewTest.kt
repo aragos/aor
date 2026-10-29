@@ -65,10 +65,73 @@ class PublicGameViewTest {
                             initial.playerState(PlayerId("p2")).copy(hand = listOf(card)))
             )
 
-        val serialized = json.writeValueAsString(state.viewForPlayer(PlayerId("p1")))
+        val view = state.viewForPlayer(PlayerId("p1"))
+        val serialized = json.writeValueAsString(view)
 
         assertThat(serialized).doesNotContain("secret-reference")
-        assertThat(serialized).doesNotContain("stone-1")
+        assertThat(view.hand).isEmpty()
+        assertThat(view.cardOffers).isEmpty()
+        assertThat(json.writeValueAsString(view.copy(cardInspections = emptyList())))
+            .doesNotContain("stone-1")
+        assertThat(view.cardInspections)
+            .isEqualTo(initial.viewForPlayer(PlayerId("p1")).cardInspections)
+    }
+
+    @Test
+    fun cardInspectionsDoNotChangeWhenAnotherPlayersHiddenHandIsReplaced() {
+        val initial = turnState()
+        val other = PlayerId("p2")
+        val firstHand =
+            initial
+                .playerState(other)
+                .copy(hand = listOf(HandCard("secret-original", CardData.definition("stone-1"))))
+        val replacedHand =
+            firstHand.copy(
+                hand = listOf(HandCard("secret-replacement", CardData.definition("charlemagne")))
+            )
+        val before =
+            initial
+                .copy(players = initial.players + (other to firstHand))
+                .viewForPlayer(PlayerId("p1"))
+        val after =
+            initial
+                .copy(players = initial.players + (other to replacedHand))
+                .viewForPlayer(PlayerId("p1"))
+
+        assertThat(after.cardInspections).isEqualTo(before.cardInspections)
+        assertThat(after.cardInspections.map { inspection -> inspection.definition.id })
+            .containsExactlyElementsIn(CardData.all.map(CardDefinition::id))
+        assertThat(json.writeValueAsString(after)).doesNotContain("secret-replacement")
+    }
+
+    @Test
+    fun cardInspectionsDoNotChangeWhenAnotherPlayerDrawsACard() {
+        val base = turnState()
+        val viewer = PlayerId("p1")
+        val other = PlayerId("p2")
+        val buyer = base.playerState(other).copy(poolTokens = 5, stockTokens = 31)
+        val initial =
+            base.copy(
+                stage = Stage.EXPANSION,
+                deck = listOf("stone-1", "stone-2"),
+                players = base.players + (other to buyer),
+                turnOrderSelection = TurnOrderSelection(base.playerIds),
+                flow = TurnFlow(actor = other, cursor = 1, phaseStarted = true),
+            )
+        val waiting = initial.step(Entry.Action(other, BoardCommand.BuyExpansionCard))
+        val draw = GameOutcome.Draw(other, "hand-1", "stone-1")
+        val drawn = waiting.step(draw)
+        val before = waiting.viewForPlayer(viewer)
+
+        val after = drawn.viewForPlayer(viewer)
+
+        assertThat(after.cardInspections).isEqualTo(before.cardInspections)
+        assertThat(after.hand).isEmpty()
+        assertThat(after.cardOffers).isEmpty()
+        assertThat(json.writeValueAsString(after)).doesNotContain("hand-1")
+        assertThat(HistoryProjection.line(waiting, draw, viewer))
+            .isEqualTo("!draw p2 hand-1 <hidden>")
+        assertThat(HistoryEvents.project("4:0", waiting, drawn, draw, viewer)?.card).isNull()
     }
 
     @Test

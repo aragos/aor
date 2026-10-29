@@ -253,6 +253,153 @@ class HistoryEventsTest {
     }
 
     @Test
+    fun miseryGainsAreRecordedWithTheirTrackSpacesAndPrintedBoxes() {
+        val base = competitionState()
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    hand = listOf(HandCard("famine", CardData.definition("famine"))),
+                    misery = MiseryStep.THIRTY,
+                )
+        val initial =
+            base.copy(stage = Stage.PLAY_CARDS, players = base.players + (owner to player))
+        val entry = Entry.Action(owner, CardCommand.PlayCard("famine"))
+        val after = initial.step(entry)
+
+        val event = HistoryEvents.project("4:0", initial, after, entry, observer)
+
+        assertThat(event?.miseryChanges).contains(HistoryMiseryChangeView(owner, 4, 30, 70))
+        assertThat(event?.participants)
+            .containsExactly(
+                HistoryParticipantView(owner, "Alice", "venice"),
+                HistoryParticipantView(recipient, "Bob", "genoa"),
+                HistoryParticipantView(observer, "Carol", "barcelona"),
+            )
+    }
+
+    @Test
+    fun miseryReliefRecordsSpacesRatherThanTheDifferenceBetweenPrintedValues() {
+        val initial =
+            before.copy(
+                players =
+                    before.players +
+                        (owner to
+                            before.playerState(owner).copy(misery = MiseryStep.HUNDRED_TWENTY_FIVE))
+            )
+        val after =
+            initial.copy(
+                players =
+                    initial.players +
+                        (owner to initial.playerState(owner).copy(misery = MiseryStep.HUNDRED))
+            )
+        val entry = Entry.Action(owner, TurnCommand.RelieveMisery(1))
+
+        val event = HistoryEvents.project("4:0", initial, after, entry, observer)
+
+        assertThat(event?.miseryChanges)
+            .containsExactly(HistoryMiseryChangeView(owner, -1, 125, 100))
+    }
+
+    @Test
+    fun enteringChaosRecordsTheFinalTrackSpaceWithoutInventingAPrintedValue() {
+        val initial =
+            before.copy(
+                players =
+                    before.players +
+                        (owner to before.playerState(owner).copy(misery = MiseryStep.THOUSAND))
+            )
+        val after =
+            initial.copy(
+                players =
+                    initial.players +
+                        (owner to initial.playerState(owner).copy(misery = MiseryStep.CHAOS))
+            )
+        val entry = Entry.Action(owner, TurnCommand.Stabilize(StabilizationPayment.MISERY))
+
+        val event = HistoryEvents.project("4:0", initial, after, entry, observer)
+
+        assertThat(event?.miseryChanges)
+            .containsExactly(HistoryMiseryChangeView(owner, 1, 1000, null))
+    }
+
+    @Test
+    fun omittedPurchasePassRetainsHolyIndulgenceMiseryWithoutAnyCashMovement() {
+        val base = competitionState()
+        val players =
+            base.players.mapValues { (id, player) ->
+                if (id == owner)
+                    player.copy(
+                        advances =
+                            PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.HOLY_INDULGENCE, 1)))
+                    )
+                else player.copy(poolTokens = 0, cash = 0)
+            }
+        val initial =
+            base.copy(
+                stage = Stage.PURCHASE,
+                players = players,
+                flow =
+                    TurnFlow(
+                        actor = observer,
+                        cursor = 2,
+                        purchaseStep = PurchaseStep.RELIEF,
+                        phaseStarted = true,
+                        phaseBookkeepingApplied = true,
+                    ),
+            )
+        val entry = Entry.Action(observer, TurnCommand.Pass)
+        val after = initial.step(entry)
+
+        val events = HistoryEvents.projectAll("4:0", initial, after, entry, observer)
+
+        assertThat(events.single().kind).isEqualTo(HistoryEventKind.HOLY_INDULGENCE)
+        assertThat(events.single().cashChanges).isEmpty()
+        assertThat(events.single().miseryChanges)
+            .containsExactly(
+                HistoryMiseryChangeView(recipient, 1, 0, 10),
+                HistoryMiseryChangeView(observer, 1, 0, 10),
+            )
+        assertThat(events.single().participants)
+            .containsExactly(
+                HistoryParticipantView(recipient, "Bob", "genoa"),
+                HistoryParticipantView(observer, "Carol", "barcelona"),
+            )
+    }
+
+    @Test
+    fun automaticIncomeReliefStaysWithIncomeInsteadOfTheExpansionBonusDraw() {
+        val base = competitionState()
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    misery = MiseryStep.TEN,
+                    advances = PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.NEW_WORLD, 1))),
+                )
+        val initial =
+            base.copy(
+                players = base.players + (owner to player),
+                deck = listOf("stone-1"),
+                board =
+                    BoardState().placeMarker(ProvinceId("venice"), owner, PieceSide.WHITE).board,
+                flow = TurnFlow(actor = observer, cursor = 2, phaseStarted = true),
+            )
+        val waiting = initial.step(Entry.Action(observer, TurnCommand.Pass))
+        val entry = GameOutcome.Draw(owner, "hand-1", "stone-1")
+        val after = waiting.step(entry)
+
+        val events = HistoryEvents.projectAll("4:0", waiting, after, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.DRAW_CARD, HistoryEventKind.INCOME)
+            .inOrder()
+        assertThat(events.first().miseryChanges).isEmpty()
+        assertThat(events.last().miseryChanges)
+            .containsExactly(HistoryMiseryChangeView(owner, -1, 10, 0))
+    }
+
+    @Test
     fun resolvingTheExpansionBonusAnnouncesIncomeSeparatelyFromTheCardDraw() {
         val initial =
             competitionState()

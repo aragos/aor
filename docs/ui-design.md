@@ -58,7 +58,8 @@ choice and understand its result through visual controls and commands, on deskto
   omit a manual Refresh button. Administrative changes refresh the list immediately.
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
   Commands remain in the bottom expander; omit their header button. Province facts remain in
-  inspection. Static reference belongs on public `/help`, with contextual links opening a new tab.
+  inspection. Event and advance descriptions remain available in the game. Legends, variant
+  descriptions, printed tracks and expanded rules belong on public `/help`, linked in a new tab.
   Help omits a game-flow walkthrough. Explain shared card/market rules once and link individual
   entries to them. Document all undo scopes, activity boundaries, creator permissions, retained
   answers and immutable randomness; creation and history controls link to that explanation.
@@ -69,13 +70,20 @@ choice and understand its result through visual controls and commands, on deskto
   placement and label it **Place maximum possible tokens**. Omit destinations with no feasible
   pool/shipping commitment. Keep marker reduction collapsed and competition commitments exact.
 - Expansion summaries show each player's white markers and active military cards with matchup
-  caveats. Omit the military box entirely when nobody has one. Competition results persist through expansion unless cleared; new results
-  still appear, and the activity history remains intact.
+  caveats. Omit the military box entirely when nobody has one. Competition and War outcomes live in
+  activity. A submitted action that resolves one also opens a dismissible result for its player;
+  loading or polling another player's result does not create an action notice.
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
   links to full payout boxes on the reference page; keep current owner payouts and adjustments
-  in the game. Move legends, printed tracks, card effects, and advance rules to that same page.
+  in the game. Activity cards open the same in-game inspector, even after leaving the hand, with
+  current payouts and viewer-specific leader credits. Inspection never replaces an active form.
 - Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
   and private discards stay counted; this cannot promise remaining drawable cards.
+- Leader totals explicitly include the viewer's Written Record bonus, or identify the displayed
+  credit as preceding Written Record. Played leaders retain their play-time enhancement.
+- Available cash appears with spending decisions, including blocked purchases, rather than a
+  permanent resource section. Overflowing hands support mouse/pen dragging, scrollbars, native
+  touch scrolling and keyboard activation; dragging cannot select a card or send an order.
 - Cancellation choices and confirmation show cost. Stabilization shows current → resulting misery
   boxes, including Chaos, on its payment button. Relief remains visible for an advance tier even
   when blocked, with Pass.
@@ -85,14 +93,19 @@ choice and understand its result through visual controls and commands, on deskto
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
   to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
-  It explains draw reasons, epoch/end triggers, protection money, leader rebates, related cash
+  An accessible icon toggles the panel; omit its header and count. It explains draw reasons,
+  epoch/end triggers, protection money, leader rebates, related cash/misery
   changes and shortage/surplus dice. All displayed dice identify their colors. Show an action only
   once and cap the box height with scrolling. Player names and emblems are those at entry time,
-  retained as later actions arrive. Activity cards link to their reference.
+  retained as later actions arrive. Record signed misery spaces and printed endpoints, including
+  Chaos, so later state changes cannot rewrite the explanation.
 - The shield favicon is colorful when this player has a required action and grayscale otherwise.
   The game list checks all the player’s awaiting games, independently of the visible filter/page.
-  Game tabs schedule background checks every 30 seconds and update their icon directly from accepted
-  responses, independently of rendering. Own one read/timer, bound snapshot reads (authentication,
+  Hidden game tabs check every five seconds for two minutes after opening, a visibility change,
+  an accepted changed snapshot or a successful mutation, then every 30 seconds while idle. Unchanged
+  responses, including 304s and identical 200s, do not extend recent activity. The game-list check
+  retains its 30-second cadence. Update the icon directly from accepted responses, independently
+  of rendering. Own one read/timer, bound snapshot reads (authentication,
   fetch and body) to 15 seconds, and discard canceled/superseded results. Visibility, resume,
   page-restoration and reconnect events refresh immediately; conditional 304 reads retain the icon.
 - Command history defaults to capital aliases, with saved player-label/ID alternatives. Aliases

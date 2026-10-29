@@ -35,6 +35,7 @@ export async function checkBackgroundPolling(front, web) {
         await page.send('Network.enable');
         await page.send('Page.bringToFront');
         await page.wait(`document.querySelector('#bid')`, 'Live game capital bid');
+        const initial = await game.snapshot(player);
         const ready = await page.evaluate(`document.querySelector('link[rel=icon]').href`);
         await page.fill('#bid', '3');
         await page.click('Submit bid');
@@ -49,7 +50,7 @@ export async function checkBackgroundPolling(front, web) {
 
         await game.send(game.links[1], 'bid-capital 2');
         await game.send(game.links[2], 'bid-capital 1');
-        await advance(page, 31000);
+        await advance(page, 5500);
 
         assert.equal(await page.evaluate(`document.hidden`), true, 'No activation is needed to refresh');
         assert.equal(await page.evaluate(`document.querySelector('link[rel=icon]').href`), ready, 'A hidden tab becomes colorful when another player makes it our turn');
@@ -58,14 +59,72 @@ export async function checkBackgroundPolling(front, web) {
         const current = await game.snapshot(player);
         assert(current.prompt.players.includes(player.id), 'The live server offers this player a capital');
         await game.send(player, current.legalChoices.commands[0]);
-        await advance(page, 31000);
+        await advance(page, 5500);
 
         assert.equal(await page.evaluate(`document.querySelector('link[rel=icon]').href`), waiting, 'A turn handled in another session clears the hidden tab favicon');
-        await advance(page, 31000);
+        await advance(page, 125000);
         assert(responses.includes(304), 'Unchanged hidden reads retain the view using conditional requests');
-        console.log('Passed: live hidden game polling changes the favicon in both directions without activation or animation frames.');
+        const idleReads = responses.length;
+        await advance(page, 5000);
+        assert.equal(responses.length, idleReads, 'Unchanged 304 reads do not prolong recent activity');
+        await advance(page, 30000);
+        assert.equal(responses.length, idleReads + 1, 'Quiet hidden games use thirty-second checks');
+
+        const beforeChange = await game.snapshot(player);
+        const actor = game.links.find(link => beforeChange.prompt.players.includes(link.id));
+        const acting = await game.snapshot(actor);
+        await game.send(actor, acting.legalChoices.commands[0]);
+        await advance(page, 31000);
+        const recentReads = responses.length;
+        await advance(page, 5500);
+        assert(responses.length > recentReads, 'Accepting another player’s activity restores five-second checks');
+
+        await checkUnconditionalPolling(front, web, initial);
+        console.log('Passed: hidden games refresh within five seconds of recent activity, idle at thirty seconds, and retain favicon/cancellation behavior without activation or animation frames.');
     } finally {
         page.ws.removeEventListener('message', record);
+        page.ws.close();
+        await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);
+    }
+}
+
+/** Duplicate 200 responses also stay idle; successful mutations renew activity independently. */
+async function checkUnconditionalPolling(front, web, initial) {
+    const page = await open(web + '/tests/ui-harness.html');
+    try {
+        await page.send('Page.bringToFront');
+        await page.wait(`typeof window.setUiSnapshot === 'function'`, 'Unconditional polling harness');
+        await page.evaluate(`window.setUiSnapshot(${JSON.stringify(initial)})`);
+        await page.wait(`document.querySelector('#bid')`, 'Initial game snapshot accepted');
+        await front.send('Page.bringToFront');
+        await page.wait(`document.hidden`, 'Unconditional game tab is actually hidden');
+        await advance(page, 125000);
+        const idleReads = await page.evaluate(`window.uiRequests`);
+
+        await advance(page, 5000);
+
+        assert.equal(await page.evaluate(`window.uiRequests`), idleReads, 'Identical 200 snapshots do not prolong recent activity');
+        await advance(page, 30000);
+        assert.equal(await page.evaluate(`window.uiRequests`), idleReads + 1);
+
+        await page.fill('#bid', '7');
+        await page.click('Submit bid');
+        await page.wait(`window.uiCommands.length === 1`, 'Successful unchanged mutation');
+        await advance(page, 31000);
+        const mutationReads = await page.evaluate(`window.uiRequests`);
+
+        await advance(page, 5500);
+
+        assert(await page.evaluate(`window.uiRequests > ${mutationReads}`), 'A successful mutation renews fast background checks even if its response is unchanged');
+        await advance(page, 125000);
+        await page.evaluate(`window.uiSnapshot = {...window.uiSnapshot, pendingBid: 7}`);
+        await advance(page, 31000);
+        const changedReads = await page.evaluate(`window.uiRequests`);
+
+        await advance(page, 5500);
+
+        assert(await page.evaluate(`window.uiRequests > ${changedReads}`), 'Accepted private readiness changes renew activity without a committed revision change');
+    } finally {
         page.ws.close();
         await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);
     }

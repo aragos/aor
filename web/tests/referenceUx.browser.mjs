@@ -9,7 +9,7 @@ export async function checkReferenceUx(page, web, baseline) {
     let revision = 16000;
     const event = {...baseline.events.at(-1), id:'immutable-activity', kind:'PLAY_CARD', actor:viewer,
         target:null, card:'the-crusades', provinces:[], dice:[], amount:null, detail:null,
-        war:null, competition:null, cashChanges:[], drawReason:null, leaderRebate:null,
+        war:null, competition:null, cashChanges:[], miseryChanges:[{player:viewer,spaces:2,fromValue:20,toValue:40}], drawReason:null, leaderRebate:null,
         protectionCash:null, marketRoll:null, participants:[{id:viewer,name:'Original player',capital:null}]};
     async function show(changes = {}) {
         const snapshot = {...baseline, events:[event], ...changes, revision:++revision,
@@ -23,14 +23,21 @@ export async function checkReferenceUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.commodity-legend, .track-reference')`),null);
     const entry = await page.evaluate(`document.querySelector('[data-event-id="immutable-activity"] .activity-content').innerHTML`);
     assert.equal(await page.evaluate(`document.querySelectorAll('.table-activity .event-card').length`),1,'The newest card is rendered once');
-    assert.equal(await page.evaluate(`document.querySelector('.event-card').getAttribute('href')`),'/help#card-the-crusades');
-    assert.equal(await page.evaluate(`document.querySelector('.event-card').target`),'_blank');
-    await show({game:{players:baseline.game.players.map(player => player.id === viewer ? {...player,name:'Changed current name',capital:'venice'} : player)}});
+    assert.equal(await page.evaluate(`document.querySelector('.event-card').tagName`),'BUTTON');
+    const gameLocation = await page.evaluate('location.href');
+    await page.evaluate(`document.querySelector('.event-card').click()`);
+    await page.wait(`document.querySelector('.inspection-panel')?.textContent.includes('The Crusades')`, 'Activity card opens inside the game');
+    assert.equal(await page.evaluate('location.href'),gameLocation,'Inspecting activity does not navigate to Help');
+    await page.evaluate(`document.querySelector('.inspection-panel .close-detail').click()`);
+    assert.match(await page.evaluate(`document.querySelector('.event-misery-change').textContent`), /\+2 misery.*20 → 40/);
+    await show({game:{players:baseline.game.players.map(player => player.id === viewer ? {...player,name:'Changed current name',capital:'venice',misery:1000} : player)}});
     assert.equal(await page.evaluate(`document.querySelector('[data-event-id="immutable-activity"] .activity-content').innerHTML`),entry,'Later identity changes cannot rewrite an activity entry');
     await show({game:{effects:{...baseline.game.effects,military:[{player:other.id,event:'ARMOR'}]}}});
     assert.match(await page.evaluate(`document.querySelector('.military-summary').textContent`),/Armor/);
     await show({events:Array.from({length:100},(_,index)=>({...event,id:`long-${index}`}))});
     assert.equal(await page.evaluate(`document.querySelector('.table-activity').getBoundingClientRect().height <= 416`),true,'Activity has a bounded height');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').textContent.trim()`),'','Activity control is icon only');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-label')`),'Hide activity');
     assert.equal(await page.evaluate(`document.querySelector('.activity-list').scrollHeight > document.querySelector('.activity-list').clientHeight`),true,'All entries remain reachable through scrolling');
     assert.equal(await page.evaluate(`document.querySelectorAll('.activity-list [data-event-id]').length`),100);
 

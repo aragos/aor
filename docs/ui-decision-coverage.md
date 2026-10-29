@@ -5,18 +5,12 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
-At the 2026-10-28 checkpoint, integrated core JVM, Kotlin/JS, server and formatting checks, web
-build/unit tests and the comprehensive browser suite pass. This includes gameplay, market,
-private-seat, hosted authentication and live European-map flows. The matrix retains earlier
-evidence with new cases identified below. See
+The 2026-10-29 checks cover integrated core JVM, Kotlin/JS, server and formatting checks, web
+build/unit tests, and the comprehensive browser suite, including private-seat, hosted and live
+European-map flows. Presentation fixtures use production StrictMode. The live Crusades regression
+first reproduced the lifecycle failure, then committed a map-selected province after its fix.
+Historical long runs and separate history-editor evidence remain identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
-
-The 2026-10-29 follow-up adds public contextual reference, turn-aware favicons, immutable activity
-identities, and bounded activity scrolling. Production StrictMode is enabled in presentation
-fixtures. A live Crusades regression reproduced the old failure, then passed after the lifecycle
-fix using authoritative offers, a real pointer click, and a committed province. The comprehensive
-browser suite, history editor, integrated Kotlin checks, web build/unit tests, and built-server
-help/favicon/reference smoke checks pass.
 
 ## Decision inventory
 
@@ -59,10 +53,11 @@ handlers do not make those rules selectable in current game creation.
 | Contract | Evidence and limits |
 | --- | --- |
 | Compact table and inspection | Gameplay fixture checks AoR/capital title, compact header and removed Board details. Desktop/phone visual inspection confirms six-player capital/handle rows, long-handle truncation and working detail expansion. Card reference/advance inspection is outside actions; inspecting an unrelated advance preserves the prepared Rebellion target and active picker. |
-| Activity and results | Immutable entry-time identities; one rendering per action; bounded scroll height and clickable cards; default-open activity; contextual unread/read/focus continuity; explicit colored dice, red losing results and clear-without-history-loss. Service tests derive draw reasons, market meanings, epoch/end triggers, protection, rebates and cash changes without exposing private cards. Desktop sidebar visibility has a browser assertion. |
-| Expansion resources | Market fixture checks each player's white markers including zero; contextual fixture identifies the acting pool. Military summary names recorded cards with matchup caveats; engine tests own actual advantage rules. |
-| Markets and leaders | Reference links open outside the game; the public page renders all 120 printed payout boxes and 26 advance descriptions. Adjustment counts remain visible. Public per-epoch leader counts update on play, not private draws/discards; core tests cover later turns/replay and all advances. |
-| Draft lifetimes | Full-App polling/workspace/viewport preservation, rejection, stale refresh without retries, quote supersession and changed-owner fixtures. Stable nested identity resets same-player/same-prompt replacement drafts. |
+| Activity and results | Immutable entry-time identities; one rendering per action; bounded default-open activity with an icon toggle and no count. Clickable cards open in-game inspections. Fixtures cover focus continuity, colored dice, red losses, local result receipts through Cathedral interruptions, dismissal without replay, and no persistent outcome panels. Service tests derive draw reasons, market meanings, epoch/end triggers, protection, rebates and signed cash/misery changes without exposing private card locations. |
+| Expansion resources | Market fixture checks each player's white markers including zero; contextual fixture identifies the acting pool. Core tests retain dark-token reach beneath a white marker, remove it on competition loss/capture, prevent resurrection and normalize at income. Both map graphs, reach tests and geometry validators exclude direct Smyrna–Taurus contact while retaining valid shipping via Adalia. Military tests own actual advantage rules. |
+| Markets and leaders | Reference links expose all 120 payout boxes and 26 advance descriptions. Historical commodity inspections update with live payouts/adjustments. Leader labels identify Written Record inclusion; core tests retain played enhancement and viewer-specific bonuses. Public per-epoch counts use public plays, not private draws/discards. Privacy tests show catalog inspections are unchanged by hidden hand replacement and draws. |
+| Hand and spending context | Browser fixtures exercise real pointer dragging, outside-release cancellation, activation after dragging, contextual cash on purchases and queued Urban Ascendancy, inline descriptions, and desktop/phone layouts. |
+| Draft lifetimes | Full-App polling/workspace/viewport preservation, rejection, stale refresh without retries, quote supersession and changed-owner fixtures. Activity inspection and closing either an explicit or implicit inspector preserve a prepared card target. Stable nested identity resets same-player/same-prompt replacement drafts. |
 | Feasible expansion | Pool/shipping regressions omit destinations with no valid commitment; peaceful partial placement remains. Marker-stock/access blockers are still explainable in inspection. |
 | Board and reductions | Live 3–6-player drawing, continental hit targets, mixed owners/ages, all twelve owner/age groups per province and combined rendered label/piece bounds. Dense provinces retain zoom/inspection fallback. |
 | Reviewed topology | Catalog/shipping/geometry/browser checks cover separate standard Aegean/Central seas and European merger, Crete/Smyrna contacts, Belgrade/Durazzo, Danish/Baltic exclusions/support and British/Channel coasts. Core tests verify Fez's exact sea contacts; regenerated standard/European geometry passes validation, including more than 20 SVG units of Western Mediterranean frontage. The [connection inventory](connection-inventory.md) owns the graph. |
@@ -75,7 +70,7 @@ handlers do not make those rules selectable in current game creation.
 | Keyboard/touch/reflow | Keyboard picking, real touch zoom, reduced motion, 390 × 844 and 430 × 1100 layouts, phone sheet/action reachability, 200% pinch and equivalent desktop reflow. Full-session screen-reader, physical-phone and browser-chrome zoom review remain manual. |
 | Accessible names/contrast | Browser accessibility-tree names and computed HTML text contrast checks. SVG, native controls, gradients and opacity-composited states require separate review. |
 | Private-seat recovery | Viewer-specific saveable link, own credential only, saved private bids and reload. Service tests establish restart and secrecy; a restarted live browser session is separate evidence. |
-| Background turn status | A live two-tab regression changes turns through real server commands while the game tab remains hidden, checks ready/waiting favicon changes without animation frames, and retains conditional 304 reads. It fails against the previous UI and passes after the fix; the default browser suite includes it. Deterministic tests cover read/auth/body deadlines, cancellation, retries, visibility coalescing, lifecycle/network wakeups and StrictMode cleanup. Browser-managed freezing remains outside a polling guarantee. |
+| Background turn status | A live two-tab regression changes turns through real server commands while the game tab remains hidden and checks ready/waiting favicon changes within five seconds without animation frames. Virtual-time checks prove a return to 30-second cadence after two quiet minutes, renewed activity after changed snapshots and successful mutations, and no renewal for 304s or identical 200s. A same-revision private-readiness change also renews activity. Deterministic tests cover recent/idle intervals, foreground cadence, mutation pauses, read/auth/body deadlines, cancellation, retries, visibility coalescing, lifecycle/network wakeups and StrictMode cleanup. Browser-managed freezing remains outside a polling guarantee. |
 | Hosted operation | Portal fixtures check unique handles without visible UIDs, single linked game rows, pending-action backgrounds, keyboard focus, phone reflow, creation, saved filters and administrative controls. Hosted authentication fixtures submit handle-only registration and verify a single account/My games/sign-out surface inside the game header on desktop and phone. Server tests cover handle uniqueness, live handle labels without history changes, and a V1-to-V2 PostgreSQL upgrade retaining account identity/permissions. Authentication, membership, game upgrades, purge and transactional behavior retain service coverage. Real Firebase delivery and Render deployment remain launch checks. |
 
 ## Historical long runs and reproduction
