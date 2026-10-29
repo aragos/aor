@@ -228,10 +228,10 @@ sealed interface CardResolution {
 
 object CardRules {
     /** Track spaces gained by the victim when Civil War is played. */
-    internal const val civilWarMiserySpaces = 1
+    internal const val CIVIL_WAR_MISERY_SPACES = 1
 
     /** Guaranteed after placement, including when the player forgoes or reuses a marker. */
-    internal const val crusadesMiserySpaces = 1
+    internal const val CRUSADES_MISERY_SPACES = 1
 
     private val sciences =
         AdvanceData.definitions

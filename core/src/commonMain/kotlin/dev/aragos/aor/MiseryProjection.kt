@@ -26,9 +26,9 @@ internal data class CardMiseryPreview(
             val spaces =
                 when (resolution) {
                     is CardResolution.CivilWar ->
-                        mapOf(resolution.victim to CardRules.civilWarMiserySpaces)
+                        mapOf(resolution.victim to CardRules.CIVIL_WAR_MISERY_SPACES)
                     is CardResolution.CrusadesPlacement ->
-                        mapOf(resolution.player to CardRules.crusadesMiserySpaces)
+                        mapOf(resolution.player to CardRules.CRUSADES_MISERY_SPACES)
                     is CardResolution.MiseryEvent -> resolution.spaces
                     is CardResolution.ReligiousStrife -> resolution.spaces
                     else -> emptyMap()
