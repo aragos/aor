@@ -31,7 +31,10 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             return;
         }
         const previous = String(previousBid.current ?? 0);
-        setBid(current => current === previous ? String(snapshot.pendingBid ?? 0) : current);
+        // Withdrawal clears readiness while retaining the amount as an editable, unsaved draft.
+        if (snapshot.pendingBid !== null) {
+            setBid(current => current === previous ? String(snapshot.pendingBid) : current);
+        }
         previousBid.current = snapshot.pendingBid;
     }, [snapshot.pendingBid, snapshot.game.stage]);
     const stage = snapshot.game.stage;
@@ -76,6 +79,11 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                 </button>
             </div>
             {snapshot.pendingBid !== null && <p className="pending-submission">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
+            {snapshot.legalChoices.commands.includes('withdraw-bid') && <button type="button"
+                className="secondary withdraw-bid" disabled={busy}
+                onClick={() => { void submit('withdraw-bid'); }}>
+                {t(isTokenPurchase ? 'controls.withdrawPurchase' : 'controls.withdrawBid')}
+            </button>}
 
             {isTokenPurchase && <div id="purchase-preview" className="purchase-preview" aria-live="polite">
                 {quoted ? <dl className="resources">

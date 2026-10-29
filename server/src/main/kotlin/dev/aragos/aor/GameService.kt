@@ -206,6 +206,7 @@ class GameService(
                 }
                 try {
                     when {
+                        text.trim() == "withdraw-bid" -> driver.withdrawBid(current, player)
                         text.trim() == "undo" -> HistoryEdits.undo(current, player)
                         text.trim().startsWith("undo ") ->
                             HistoryEdits.undo(
@@ -321,7 +322,11 @@ class GameService(
             prompt = prompt.takeIf { stored.status == GameStatus.ACTIVE },
             legalChoices =
                 if (stored.status == GameStatus.ACTIVE) {
-                    state.legalChoices(player)
+                    state.legalChoices(player).let { choices ->
+                        if (player in stored.pendingBids) {
+                            choices.copy(commands = choices.commands + "withdraw-bid")
+                        } else choices
+                    }
                 } else {
                     LegalChoices()
                 },

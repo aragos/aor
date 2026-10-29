@@ -29,6 +29,7 @@ export const en: Record<string, string> = {
     'error.HISTORY_INVALID_ENTRY': 'A replacement action or dependent action is no longer valid.',
     'error.INVALID_HISTORY_EDIT': 'The history edit is malformed.', 'error.HISTORY_NO_CHANGE': 'The proposed history is unchanged.',
     'error.UNDO_POLICY_FROZEN': 'Undo policy is fixed once setup starts.',
+    'error.NO_PENDING_BID': 'You have no unrevealed bid or token purchase to withdraw.',
     'error.REVISION_NOT_FOUND': 'That history revision does not exist.',
 
     'create.variants': 'Game variants',
@@ -334,6 +335,7 @@ export const en: Record<string, string> = {
     'rebuiltMarkerBonus.option.EXCLUDE': 'Exclude rebuilt markers',
     'rebuiltMarkerBonus.option.INCLUDE': 'Include rebuilt markers',
     'controls.bid': 'Your capital bid ($0–$40)', 'controls.saveBid': 'Submit bid', 'controls.replaceBid': 'Update bid',
+    'controls.withdrawBid': 'Withdraw bid', 'controls.withdrawPurchase': 'Withdraw token purchase',
     'controls.pending': 'Your private bid', 'controls.bidHint': 'Everyone pays their bid. Bids reveal together after the last player submits.',
     'controls.tokenPurchase': 'Your token purchase (signed whole number)',
     'controls.savePurchase': 'Buy tokens', 'controls.replacePurchase': 'Update token purchase',
