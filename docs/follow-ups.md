@@ -30,8 +30,6 @@ Current behavior is specified in [requirements](requirements.md), [UI contracts]
 
 ## Product decisions
 
-- Review the remaining constrained label space in Toulouse and Constantinople on the map. All
-  supported connections remain checked; these shapes still limit comfortable label placement.
 - Perform the human screen-reader and physical-phone review recorded in the UI requirements.
 
 ## Later maintenance

@@ -133,7 +133,8 @@ province's accessible name retains its identity, market and complete occupancy. 
 piece sizes, selecting a province also opens a readable occupancy line beside the map; the decision
 sheet retains separate owner, established/new age and count rows. Fit is an overview; inspect or
 zoom for dense counts. The larger Danish province removes Copenhagen's constrained label and
-dense-group sharing exceptions; constrained label fits remain in Toulouse and Constantinople.
+dense-group sharing exceptions. Toulouse and Constantinople retain constrained geometry metadata;
+the user accepted their current labels on 2026-10-29.
 
 ## Legibility review, 2026-10-27
 
@@ -143,10 +144,12 @@ the same topology-preserving simplification as the Baltic and British Isles. The
 validator retains all 146 land, 105 coastal and 95 sea contacts, including visible sea exclusions.
 
 Label fitting searches the province's own coastal interior when land cannot hold its name and
-market badge. Piece packing uses that final label position. Toulouse and Constantinople still have
-constrained fits; changing those footprints further needs a focused visual review.
+market badge. Piece packing uses that final label position. Toulouse and Constantinople's current
+labels are accepted; preserve their placement.
 
 Support paths are generated for all 77 catalogued arrows. Endpoints stay inside the supporting
 satellite and supported market; alternate crossings avoid names and normal control-marker slots
 where space permits. Dense token groups still take drawing priority. Arrow routing is drawing data
 and never changes the support graph. Regeneration includes `support_geometry.py`.
+Toulouse's Montpellier and Barcelona arrows use short, straight east/south crossings in both
+drawings, replacing the long coastal route and bent path while retaining the accepted labels.

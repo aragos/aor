@@ -6,12 +6,22 @@ from shapely.geometry import LineString, Point, box
 from shapely.ops import transform, unary_union
 
 
+# Display-space crossings shared by the standard and European drawings. Toulouse's
+# constrained label leaves clear east/south exits; automatic routing otherwise takes
+# a long coastal detour or bends around Barcelona's name.
+DIRECT_ROUTES = {
+    ("toulouse", "montpellier"): ((903, 1140), (943, 1140)),
+    ("toulouse", "barcelona"): ((843, 1177), (843, 1216)),
+}
+
+
 def support_paths(relations, provinces, footprints, compact_easting):
     """Return displayed SVG paths keyed by the catalog's ``satellite market`` pair.
 
     Endpoints remain inside their respective province. Score alternate straight
     crossings and bent crossings against the same label and piece bounds used by
     the renderer, rather than relying on a fixed offset from province centers.
+    Authored crossings take precedence for constrained spaces with clear exits.
     """
     domains = {
         key: transform(lambda x, y, z=None: (compact_easting(x), y), shape)
@@ -43,6 +53,12 @@ def support_paths(relations, provinces, footprints, compact_easting):
         assert candidates[key], f"{key}: support endpoints need clear province space."
     result = {}
     for source, target in relations:
+        if (source, target) in DIRECT_ROUTES:
+            direct = DIRECT_ROUTES[(source, target)]
+            result[f"{source} {target}"] = "M" + "L".join(
+                f"{x:.3f} {y:.3f}" for x, y in direct
+            )
+            continue
         pairs = sorted(
             ((a, b) for a in candidates[source] for b in candidates[target]
              if a.distance(b) >= 24),

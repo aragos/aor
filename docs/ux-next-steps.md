@@ -37,7 +37,6 @@ including deck exhaustion, Final Card Play and three final score rows.
 | Full-session accessibility | Record keyboard/screen-reader play through setup, waiting, interruptions and error recovery; every action has a named, reachable control and announced state. |
 | Physical-phone and browser-chrome zoom | Review real touch, scrolling, inspection/actions and 200% browser zoom alongside emulated coverage. Preserve prepared work and reachable commitment. |
 | Visual states outside HTML contrast checks | Review SVG, gradients, opacity-composited emphasis and native controls. Automated text checks do not establish these contrasts. |
-| Constrained map labels | Review Toulouse and Constantinople at Fit and practical phone zoom; retain readable inspection and all owner/age/count data. Existing collision tests establish containment, not human legibility. |
 | Production responsiveness | Measure representative six-seat, conflict-heavy late games and isolated React commit cost before changing transport or caching. Compare against the baseline below. |
 | Retired internal rule handlers | Remove only with separate review and replay/version checks; current configuration already rejects retired choices. |
 
