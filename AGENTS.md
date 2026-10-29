@@ -37,3 +37,5 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 - For browser changes, run `npm run build` from `web` and verify affected user interactions.
   Match production React StrictMode in interaction fixtures; exercise live server offers for
   lifecycle regressions rather than relying only on fabricated choices.
+- Serialize Gradle builds that write to the same checkout. Browser checks can reuse an installed
+  server through `AOR_BROWSER_SERVER`; use separate worktrees for concurrent build work.

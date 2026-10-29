@@ -81,12 +81,18 @@ choice and understand its result through visual controls and commands, on deskto
   links to full payout boxes on the reference page; keep current owner payouts and adjustments
   in the game. Activity cards open the same in-game inspector, even after leaving the hand, with
   current payouts and viewer-specific leader credits. Inspection never replaces an active form.
+  Live values update on accepted polling snapshots after competitions, counting all current circle
+  markers, including white ones. Remove the defeated owner immediately; ignore square tokens and
+  Chaos. These are forecasts using current adjustments, not a change to actual colored-only payouts.
 - Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
   and private discards stay counted; this cannot promise remaining drawable cards.
 - Leader totals explicitly include the viewer's Written Record bonus, or identify the displayed
   credit as preceding Written Record. Played leaders retain their play-time enhancement.
-- Every offered advance price identifies applied category credits, Institutional Research and
-  leaders, including Written Record. Detailed quotes show printed cost and the final price floor.
+- Advance tiles show a price and concise credit total. An optional inspection disclosure names
+  each contributing advance, Institutional Research and leaders, including Written Record. Use
+  prior-turn printed credits only; blocked quotes keep their reason and cannot authorize purchase.
+  Show printed costs for owned advances or when no running-game quote exists. Detailed quotes
+  retain the final price floor.
   Preview printed misery boxes for each affected player when playing a card or buying an advance;
   selected targets update that preview without committing. Mark dice-dependent outcomes as uncertain.
 - Available cash appears with spending decisions, including blocked purchases, rather than a
@@ -102,14 +108,15 @@ choice and understand its result through visual controls and commands, on deskto
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
   to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
-  An accessible icon toggles the panel; omit its header and count. It explains draw reasons,
+  An accessible icon toggles the panel, inset while open; omit its header and count. It explains draw reasons,
   epoch/end triggers, protection money, leader rebates, related cash/misery
   changes and shortage/surplus dice. All displayed dice identify their colors. Show an action only
   once and cap the box height with scrolling. Player names and emblems are those at entry time,
   retained as later actions arrive. Record signed misery spaces and printed endpoints, including
   Chaos, so later state changes cannot rewrite the explanation.
   Relief receipts show cash, rating spent and the current-turn rating sources without duplicating
-  the cash expense. Holy Indulgence records each player's actual pool ↔ stock movements separately
+  the cash expense. Every cash receipt uses the same recorded player name, emblem and signed amount,
+  including the acting player. Holy Indulgence records each player's actual pool ↔ stock movements separately
   from the action that opened Expansion; include token-only transfers.
 - The shield favicon is colorful when this player has a required action and grayscale otherwise.
   The game list checks all the player’s awaiting games, independently of the visible filter/page.

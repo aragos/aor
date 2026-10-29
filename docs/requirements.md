@@ -58,8 +58,10 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   contextually in a new tab. Show matching unplayed leader counts for epochs I–III beside each
   advance, with the public-information meaning above.
 - Label token-priced card purchases with the current token cost. Show applied category, research and
-  leader discounts with advance prices. Card plays and advance purchases preview every affected
-  player's misery boxes; identify outcomes that still depend on decisions or dice as uncertain.
+  leader discounts in optional price detail, naming the contributing advances. Keep tiles compact,
+  show prices for blocked advances, and retain printed costs when no live quote exists. Card plays
+  and advance purchases preview every affected player's misery boxes; identify outcomes that still
+  depend on decisions or dice as uncertain.
 - Keep Help focused on reference and detailed undo policies; omit the game-flow walkthrough and
   consolidate shared rules. Color every misery box by track position: lower steps are less severe,
   progressing from green through amber to red and finally dark Chaos. Keep numeric labels.
@@ -73,6 +75,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   protection money, leader rebates and related cash/misery changes; label dice colors and omit
   continuation noise. Misery relief itemizes cash and current-turn relief rating; Holy Indulgence
   records pool/stock token movements even when no cash changes.
+- Name every activity cash recipient or payer consistently, including the acting player. Inset the
+  open panel's close control. Commodity card/market values follow current circle ownership,
+  including white circles during Expansion; actual card payments retain the colored-marker rule.
 - Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
   retain correctable input; stale requests refresh without automatic resubmission.
 - Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.
