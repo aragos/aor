@@ -7,6 +7,10 @@ data class PlayerView(
     val id: PlayerId,
     val name: String,
     val cash: Int,
+    /**
+     * Dollars recorded at the latest token-purchase reveal; initially 40 before the first reveal.
+     */
+    val writtenCash: Int,
     val capital: String?,
     val handCount: Int,
     val stockTokens: Int = 36,
@@ -31,6 +35,7 @@ data class PlayerView(
                 id = player.player.id,
                 name = player.player.name,
                 cash = player.cash,
+                writtenCash = player.writtenCash,
                 capital = player.capital,
                 handCount = player.hand.size,
                 stockTokens = player.stockTokens,

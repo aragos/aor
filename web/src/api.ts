@@ -58,7 +58,7 @@ export interface ShippingOfferView {
     cost: number; ships: PlayerView['ships'] | null; cashAfter: number | null; blockers: string[];
 }
 export interface PlayerView {
-    id: string; name: string; cash: number; capital: string | null; handCount: number;
+    id: string; name: string; cash: number; writtenCash: number; capital: string | null; handCount: number;
     stockTokens: number; poolTokens: number; boardMarkers: number; stockMarkers: number; misery: number | null;
     income: IncomeView | null;
     poolAvailable: boolean;

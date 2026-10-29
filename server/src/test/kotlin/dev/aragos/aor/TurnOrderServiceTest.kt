@@ -96,7 +96,20 @@ class TurnOrderServiceTest {
         assertThat(other.history).isEqualTo(initial.history)
         assertThat(other.submitted).containsExactly(PlayerId("p1"))
         assertThat(other.game.revealedTokenPurchases).isEmpty()
+        assertThat(own.game.players.map(PlayerView::writtenCash)).containsExactly(40, 40, 40)
+        assertThat(other.game.players.map(PlayerView::writtenCash))
+            .isEqualTo(initial.game.players.map(PlayerView::writtenCash))
         assertThat(other.revision).isEqualTo(6)
+    }
+
+    @Test
+    fun capitalBiddingDoesNotReplaceTheInitialWrittenCashRecord() {
+        val fixture = ready()
+
+        val players = fixture.view(0).game.players
+
+        assertThat(players.map(PlayerView::cash)).containsExactly(37, 38, 39).inOrder()
+        assertThat(players.map(PlayerView::writtenCash)).containsExactly(40, 40, 40)
     }
 
     @Test
@@ -132,6 +145,9 @@ class TurnOrderServiceTest {
         assertThat(stored.revisions.last().command).isEqualTo("reveal-token-purchases")
         assertThat(revealed.submitted).isEmpty()
         assertThat(revealed.pendingBid).isNull()
+        assertThat(revealed.game.players.map(PlayerView::writtenCash))
+            .containsExactly(28, 33, 38)
+            .inOrder()
         assertThat(recovered).isEqualTo(revealed)
     }
 
