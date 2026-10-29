@@ -156,11 +156,11 @@ function RegisteredGameForm({me}: {me: Account}) {
     return <details className="panel create-registered"><summary>{t('hosted.create-a-game')}</summary>
         {!me.mayCreateGames ? <p>{t('hosted.an-administrator-must-approve-your')}</p> : <form onSubmit={create}>
             <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-36-registered-players-including')}</p>
-            <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>{player.displayName}</strong> @{player.handle}<small>{player.id}</small></span>
+            <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>{player.displayName}</strong> @{player.handle}</span>
                 {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
             <label>{t('hosted.find-a-player-by-handle')}<input type="search" value={query} maxLength={60} onChange={event => setQuery(event.target.value)}/></label>
             {query.trim().length >= 2 && <ul className="player-directory" aria-label={t('hosted.matching-players')}>{matches.filter(player => !players.some(chosen => chosen.id === player.id)).map(player => <li key={player.id}>
-                <span><strong>{player.displayName}</strong> @{player.handle}<small>{player.id}</small></span>
+                <span><strong>{player.displayName}</strong> @{player.handle}</span>
                 <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => {setPlayers([...players, player]); setQuery('');}}>{t('hosted.add')}</button>
             </li>)}</ul>}
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
@@ -234,7 +234,7 @@ function AdminPlayers() {
     }
     return <details className="panel" onToggle={event => {if (event.currentTarget.open) void load();}}><summary>{t('hosted.player-creation-permissions')}</summary>
         <p className="small">{t('hosted.with-the-default-approvedonly-policy')}</p>
-        <Problem value={error}/><ul className="player-directory">{players.map(player => <li key={player.id}><span>{player.displayName} @{player.handle}<small>{player.id}</small></span>
+        <Problem value={error}/><ul className="player-directory">{players.map(player => <li key={player.id}><span>{player.displayName} @{player.handle}</span>
             <button className="secondary" disabled={!!busy || player.admin} onClick={() => {void approve(player);}}>{player.mayCreateGames ? t('hosted.revoke-creation') : t('hosted.allow-creation')}</button></li>)}</ul>
     </details>;
 }

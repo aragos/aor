@@ -43,6 +43,8 @@ choice and understand its result through visual controls and commands, on deskto
 
 ## Current table contracts
 
+- Hosted player search, selected participants and administrator player lists show display names and
+  public handles. Account UIDs remain internal to selection and requests.
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
   Remove the redundant Board details expander; province facts remain in inspection.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and

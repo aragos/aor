@@ -66,7 +66,7 @@ handlers do not make those rules selectable in current game creation.
 | Keyboard/touch/reflow | Keyboard picking, real touch zoom, reduced motion, 390 × 844 and 430 × 1100 layouts, phone sheet/action reachability, 200% pinch and equivalent desktop reflow. Full-session screen-reader, physical-phone and browser-chrome zoom review remain manual. |
 | Accessible names/contrast | Browser accessibility-tree names and computed HTML text contrast checks. SVG, native controls, gradients and opacity-composited states require separate review. |
 | Private-seat recovery | Viewer-specific saveable link, own credential only, saved private bids and reload. Service tests establish restart and secrecy; a restarted live browser session is separate evidence. |
-| Hosted operation | Portal fixtures check stable-ID account search, combined creation, saved filters, administrator view, lifecycle actions and approvals. Server tests own authentication, membership, upgrades, purge and transactional SQL behavior. Real Firebase delivery and Render deployment remain launch checks. |
+| Hosted operation | Portal fixtures check names and handles without visible UIDs in player search, selected participants and administrator lists; creator approvals still target the selected account UID. They also check combined creation, saved filters, administrator view and lifecycle actions. Server tests own authentication, membership, upgrades, purge and transactional SQL behavior. Real Firebase delivery and Render deployment remain launch checks. |
 
 ## Historical long runs and reproduction
 
