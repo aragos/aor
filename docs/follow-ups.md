@@ -1,17 +1,9 @@
-# Follow-up decisions and checks
+# Follow-up checks
 
 Current behavior is specified in [requirements](requirements.md), [UI contracts](ui-design.md) and
-[rules](rules.md). This file keeps open decisions and the defaults chosen without blocking work.
-
-## Defaults from the gameplay improvements
-
-| Item | Implemented default | Follow-up decision |
-| --- | --- | --- |
-| Unplayed leaders | Count matching leaders by printed epoch minus public plays; include hands, future decks and private discards | Keep this privacy-preserving public meaning rather than exposing card availability |
-| Urban Ascendancy | A cancelable private browser draft buys once when legal; requires the view to stay open and never retries a rejected purchase | Decide whether reload-safe or server-saved preregistration is useful |
-| Battle results | Activity retains every result; only the player whose action just resolved a competition or War also sees a dismissible action notice. Competition notices expire at the end of that expansion | No persistent outcome panel or reload restoration |
-| Dice without a printed role | War initiator uses white and opponent black; independent capital-tie rolls use white | Treat these as display conventions; outcomes are unchanged |
-| Misery relief | A completed tier opens the decision even when relief is unaffordable or misery is zero; explain and offer Pass | No further decision required |
+[rules](rules.md). All gameplay defaults collected for follow-up were reviewed and approved on
+2026-10-29. Their owning contracts are authoritative; no gameplay default remains awaiting approval.
+This file retains operational checks and deferred work.
 
 ## Needed before public launch
 
@@ -26,9 +18,9 @@ Current behavior is specified in [requirements](requirements.md), [UI contracts]
   directory into an empty database, and verify player views and archives before switching traffic.
 - Enable GitHub's required `verify` check, Dependabot security alerts and optional patch auto-merge.
   Supply the Render CI credentials if weekly runtime refreshes are wanted. Set billing alerts and
-  decide the private backup retention period.
+  document the private backup retention period.
 
-## Product decisions
+## Human verification
 
 - Perform the human screen-reader and physical-phone review recorded in the UI requirements.
 
