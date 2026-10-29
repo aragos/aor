@@ -207,7 +207,14 @@ host maintenance. Firebase manages identity credentials and abuse limits. Applic
 verify membership/roles, cap request bodies, reject emulator tokens in hosted mode, set CSP/security
 headers, and never log bearer tokens or passwords. Revocation checks may be cached for up to 30
 seconds. Private responses are not stored by intermediary caches; unchanged polls use private
-ETags, and hidden tabs poll less often. Static hashed assets may be cached for a year.
+ETags. Game tabs schedule hidden polling every 30 seconds; accepted responses update the favicon
+without waiting for UI rendering. Snapshot reads time out after 15 seconds, including token refresh
+and body transfer; the next interval retries. Visibility, resume, page restoration and network
+reconnect trigger fresh reads. Each tab owns one read and timer; replaced reads are canceled.
+Browser throttling may lengthen background intervals, and frozen/discarded pages cannot keep running
+JavaScript; resumed pages refresh immediately. See the browser’s
+[page lifecycle contract](https://developer.chrome.com/docs/web-platform/page-lifecycle-api).
+Static hashed assets may be cached for a year.
 
 ## Game operations and programmatic access
 

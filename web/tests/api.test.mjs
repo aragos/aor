@@ -32,3 +32,65 @@ test('conditional reads retain snapshots on 304 and refresh the managed bearer t
         assert.deepEqual(await requestSnapshot('/api/games/test', undefined, '"private-version"'), {snapshot:null, etag:'"private-version"'});
     } finally {globalThis.fetch=original; setAuthentication();}
 });
+
+test('a stalled snapshot read times out so later background polls can recover', {timeout: 1000}, async context => {
+    const original = globalThis.fetch;
+    context.mock.timers.enable({apis: ['setTimeout']});
+    try {
+        globalThis.fetch = async () => new Promise(() => {});
+        const read = requestSnapshot('/api/games/test', 'seat-token');
+        const rejected = assert.rejects(read, error => error instanceof ApiError && error.code === 'NETWORK');
+
+        context.mock.timers.tick(15000);
+
+        await rejected;
+    } finally {globalThis.fetch = original;}
+});
+
+test('snapshot deadlines include authentication before the fetch starts', {timeout: 1000}, async context => {
+    const original = globalThis.fetch;
+    context.mock.timers.enable({apis: ['setTimeout']});
+    let fetched = false;
+    try {
+        setAuthentication(async () => new Promise(() => {}));
+        globalThis.fetch = async () => {fetched = true; return new Response('{}');};
+        const rejected = assert.rejects(requestSnapshot('/api/games/test'), error => error.code === 'NETWORK');
+
+        context.mock.timers.tick(15000);
+
+        await rejected;
+        assert.equal(fetched, false);
+    } finally {globalThis.fetch = original; setAuthentication();}
+});
+
+test('snapshot deadlines include a stalled response body', {timeout: 1000}, async context => {
+    const original = globalThis.fetch;
+    context.mock.timers.enable({apis: ['setTimeout']});
+    let beginBody;
+    const bodyStarted = new Promise(resolve => {beginBody = resolve;});
+    try {
+        globalThis.fetch = async () => ({headers: new Headers(), ok: true, status: 200,
+            json: async () => {beginBody(); return new Promise(() => {});}});
+        const rejected = assert.rejects(requestSnapshot('/api/games/test', 'seat-token'), error => error.code === 'NETWORK');
+        await bodyStarted;
+
+        context.mock.timers.tick(15000);
+
+        await rejected;
+    } finally {globalThis.fetch = original;}
+});
+
+test('canceling an obsolete read aborts its fetch', async () => {
+    const original = globalThis.fetch;
+    let requestSignal;
+    try {
+        globalThis.fetch = async (_, options) => {requestSignal = options.signal; return new Promise(() => {});};
+        const controller = new AbortController();
+        const rejected = assert.rejects(requestSnapshot('/api/games/test', 'seat-token', undefined, controller.signal), error => error.code === 'NETWORK');
+
+        controller.abort();
+
+        await rejected;
+        assert.equal(requestSignal.aborted, true);
+    } finally {globalThis.fetch = original;}
+});

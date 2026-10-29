@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import type {Snapshot} from '../src/api';
 import {GameTable} from '../src/GameTable';
 import {MapSelectionProvider} from '../src/map/MapSelection';
+import {hasPlayerAction, useTurnFavicon} from '../src/favicon';
 import '../src/app.css';
 
 declare global {
@@ -16,6 +17,7 @@ declare global {
 window.mapCommands = [];
 function Harness() {
     const [snapshot, setSnapshot] = useState(window.mapSnapshot);
+    useTurnFavicon(snapshot ? hasPlayerAction(snapshot) : false);
     useEffect(() => {window.setMapSnapshot = setSnapshot;}, []);
     if (!snapshot) return <p>Supply a snapshot through the browser test driver.</p>;
     const submit = async (command: string) => {window.mapCommands.push(command); return true;};

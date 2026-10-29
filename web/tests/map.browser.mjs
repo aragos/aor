@@ -5,6 +5,7 @@ import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkPortal} from './portal.browser.mjs';
 import {checkHosted} from './hosted.browser.mjs';
+import {checkBackgroundPolling} from './backgroundPolling.browser.mjs';
 import {checkEuropeanMap} from './european-map.browser.mjs';
 import {checkSetupEvidence, checkDecisionEvidence} from './nextsteps.browser.mjs';
 import {join} from 'node:path';
@@ -505,6 +506,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkSetupEvidence(page,web);
     await checkPortal(page,web);
     await checkHosted(page,web,artifacts);
+    await checkBackgroundPolling(page,web);
     await checkEuropeanMap(page,web);
     await checkLiveCardMap(page,web);
 } finally {

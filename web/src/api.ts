@@ -147,12 +147,14 @@ export class ApiError extends Error {
 }
 let authentication: (() => Promise<string | undefined>) | undefined;
 export function setAuthentication(provider?: () => Promise<string | undefined>) { authentication = provider; }
-async function fetchResponse(path: string, token?: string, body?: unknown, etag?: string): Promise<Response> {
+async function fetchResponse(path: string, token?: string, body?: unknown, etag?: string, signal?: AbortSignal): Promise<Response> {
     let response: Response;
     try {
         const credential = token ?? await authentication?.();
+        if (signal?.aborted) throw new ApiError('NETWORK');
         response = await fetch(path, {
             method: body === undefined ? 'GET' : 'POST', cache: 'no-store',
+            ...(signal ? {signal} : {}),
             headers: {...(credential ? {Authorization: `Bearer ${credential}`} : {}), ...(etag ? {'If-None-Match': etag} : {}), ...(body === undefined ? {} : {'Content-Type': 'application/json'})},
             ...(body === undefined ? {} : {body: JSON.stringify(body)}),
         });
@@ -170,10 +172,27 @@ async function responseJson<T>(response: Response): Promise<T> {
 export async function request<T>(path: string, token?: string, body?: unknown): Promise<T> {
     return responseJson<T>(await fetchResponse(path, token, body));
 }
-/** A 304 keeps the existing private snapshot without parsing an empty response. */
-export async function requestSnapshot(path: string, token?: string, etag?: string) {
-    const response = await fetchResponse(path, token, undefined, etag);
-    return {etag: response.headers.get('ETag') ?? undefined,
-        snapshot: response.status === 304 ? null : await responseJson<Snapshot>(response)};
+/** Bound the complete read, including authentication and response body; a 304 retains the view. */
+export async function requestSnapshot(path: string, token?: string, etag?: string, signal?: AbortSignal) {
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    signal?.addEventListener('abort', cancel, {once: true});
+    if (signal?.aborted) cancel();
+    const timer = setTimeout(cancel, 15000);
+    try {
+        const aborted = new Promise<never>((_, reject) => {
+            const fail = () => reject(new ApiError('NETWORK'));
+            if (controller.signal.aborted) fail();
+            else controller.signal.addEventListener('abort', fail, {once: true});
+        });
+        return await Promise.race([aborted, (async () => {
+            const response = await fetchResponse(path, token, undefined, etag, controller.signal);
+            return {etag: response.headers.get('ETag') ?? undefined,
+                snapshot: response.status === 304 ? null : await responseJson<Snapshot>(response)};
+        })()]);
+    } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+    }
 }
 export function errorCode(error: unknown): string { return error instanceof ApiError ? error.code : 'SERVER'; }

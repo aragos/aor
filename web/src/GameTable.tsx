@@ -17,7 +17,6 @@ import {DiagnosticMessage} from './DiagnosticMessage';
 import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
 import {HelpLink} from './HelpLink';
 import {AccountControls} from './AccountControls';
-import {useTurnFavicon} from './favicon';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
@@ -41,7 +40,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     }, [decisionKey, resetSelection]);
     useEffect(() => setSheetCollapsed(false), [selected, selectedArea, selectedCard, selectedAdvance]);
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
-    useTurnFavicon(canAct && snapshot.status !== 'CANCELLED' && snapshot.status !== 'ABANDONED');
     const expansion = snapshot.game.stage === 'EXPANSION';
     const expanding = canAct && expansion && snapshot.game.activity?.actor === snapshot.viewerId;
     useEffect(() => {

@@ -10,6 +10,8 @@ import {HelpLink} from './HelpLink';
 import {GameTable} from './GameTable';
 import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
+import {hasPlayerAction, setTurnFavicon} from './favicon';
+import {startPolling} from './polling';
 import './app.css';
 
 const HostedApp = lazy(() => import('./HostedApp'));
@@ -64,23 +66,29 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const etag = useRef<string>();
     const path = `/api/games/${id}`;
 
+    function acceptSnapshot(next: Snapshot) {
+        setTurnFavicon(hasPlayerAction(next));
+        setSnapshot(next);
+    }
+
     useEffect(() => {
         let active = true;
-        let timer: ReturnType<typeof setTimeout>;
-        async function poll() {
-            if (!busyRef.current) {
+        let readSequence = 0;
+        setTurnFavicon(false);
+        const stop = startPolling({intervalMs: pollInterval, paused: () => busyRef.current,
+            poll: async signal => {
                 const current = ++sequence.current;
-                try {
-                    const next = await requestSnapshot(path, token, etag.current);
-                    if (active && current === sequence.current) { etag.current = next.etag; if (next.snapshot) setSnapshot(next.snapshot); setConnectionError(''); }
-                } catch (failure) { if (active && current === sequence.current) setConnectionError(errorCode(failure)); }
-            }
-            if (active) timer = setTimeout(() => { void poll(); }, document.hidden ? 60000 : pollInterval);
-        }
-        const visible = () => {if (!document.hidden) {clearTimeout(timer); void poll();}};
-        document.addEventListener('visibilitychange', visible);
-        void poll();
-        return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
+                readSequence = current;
+                const next = await requestSnapshot(path, token, etag.current, signal);
+                if (active && !signal.aborted && current === sequence.current) {
+                    etag.current = next.etag;
+                    if (next.snapshot) acceptSnapshot(next.snapshot);
+                    setConnectionError('');
+                }
+            }, onError: failure => {
+                if (active && readSequence === sequence.current) setConnectionError(errorCode(failure));
+            }});
+        return () => {active = false; stop(); setTurnFavicon(false);};
     }, [path, token, pollInterval]);
 
     async function mutate(endpoint: string, operation: Record<string, unknown>): Promise<boolean> {
@@ -89,13 +97,16 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         etag.current = undefined;
         setBusy(true); setActionError(null); setSaved(false);
         try {
-            setSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...operation}));
+            acceptSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...operation}));
             setConnectionError(''); setSaved(true); return true;
         } catch (failure) {
             const code = errorCode(failure);
             setActionError(failure instanceof ApiError ? failure : new ApiError(code));
             if (code === 'STALE_REVISION') {
-                try { setSnapshot(await request<Snapshot>(path, token)); } catch (refreshFailure) { setConnectionError(errorCode(refreshFailure)); }
+                try {
+                    const refreshed = await requestSnapshot(path, token);
+                    if (refreshed.snapshot) acceptSnapshot(refreshed.snapshot);
+                } catch (refreshFailure) {setConnectionError(errorCode(refreshFailure));}
             }
             return false;
         } finally { busyRef.current = false; setBusy(false); }
