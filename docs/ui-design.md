@@ -28,7 +28,8 @@ choice and understand its result through visual controls and commands, on deskto
    effects before commitment. Distinguish current, projected, conditional and uncertain values;
    discounts, final prices and cash receipts are different quantities. Offer feasible alternatives.
 7. **Use consistent identity and emphasis.** Capital names identify powers; before assignment use
-   human names, retained in player overviews. Reuse symbols, owner silhouettes, quantities and terms.
+   public handles in hosted games, retained in player overviews. Reuse symbols, owner silhouettes,
+   quantities and terms.
    Dice state their colors. Wins/losses have text and green/red styling; color alone conveys nothing.
 8. **Keep summaries compact.** Give each fact a predictable home, with decision-relevant state at
    rest and full tracks/breakdowns in optional detail. Remove repeated structure before shrinking
@@ -45,8 +46,12 @@ choice and understand its result through visual controls and commands, on deskto
 
 - Expanded player details show total income, tokens, deployed markers, and owned advances. Omit
   income components, undeployed-marker counts, and misery-relief actions from this inspection.
-- Hosted player search, selected participants and administrator player lists show display names and
-  public handles. Account UIDs remain internal to selection and requests.
+- Hosted registration asks only for a unique handle. Search, selected participants, live game labels
+  and administrator player lists use `@handle`; account UIDs remain internal to selection and requests.
+- Hosted account, My games and sign-out controls share the game overview bar. Game listings use one
+  keyboard-accessible link per row, with a distinct background and status text for pending actions.
+  Omit creation dates, IDs and Open buttons. Administrative rows expand their operational controls;
+  they do not grant access to another player's seat.
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
   Commands remain in the bottom expander; omit their header button. Province facts remain in
   inspection. Static reference belongs on public `/help`, with contextual links opening a new tab.
@@ -75,7 +80,7 @@ choice and understand its result through visual controls and commands, on deskto
   retained as later actions arrive. Activity cards link to their reference.
 - The shield favicon is colorful when this player has a required action and grayscale otherwise.
   The game list checks all the player’s awaiting games, independently of the visible filter/page.
-- Command history defaults to capital aliases, with saved display-name/ID alternatives. Aliases
+- Command history defaults to capital aliases, with saved player-label/ID alternatives. Aliases
   cover actors, targets, attributed dice and edit authors; stored commands and `@entry` references
   remain canonical.
 

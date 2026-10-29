@@ -7,7 +7,6 @@ Current behavior is specified in [requirements](requirements.md), [UI contracts]
 
 | Item | Implemented default | Follow-up decision |
 | --- | --- | --- |
-| Fez | Add a direct Western Mediterranean contact on both maps, retaining Canary Basin access | Confirm this interpretation of the map correction |
 | Unplayed leaders | Count matching leaders by printed epoch minus public plays; include hands, future decks and private discards | Keep this privacy-preserving public meaning rather than exposing card availability |
 | Urban Ascendancy | A cancelable private browser draft buys once when legal; requires the view to stay open and never retries a rejected purchase | Decide whether reload-safe or server-saved preregistration is useful |
 | Competition results | Clear current notices locally; polling preserves dismissal, new results appear, activity retains every result | Decide whether dismissal should survive reload |

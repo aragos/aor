@@ -18,7 +18,7 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 
 | Placeholder | Meaning |
 | --- | --- |
-| `<player>` | Registered player id, `p1` through `p6`; independent of the chosen capital or display name. |
+| `<player>` | Registered player id, `p1` through `p6`; independent of the chosen capital or public handle. |
 | `<capital>` | Available catalog id: `venice`, `genoa`, `barcelona`, `paris`, `london`, or `hamburg`. Starting player count restricts availability. |
 | `<reference>` | Opaque reference to a physical card in the acting player's hand, such as `hand-4`; it does not encode the card's identity. |
 | `<card-id>` | Catalog identity of a history card, such as `stone-1`; only authority outcomes or revealed plays expose it. |

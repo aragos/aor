@@ -103,7 +103,10 @@ membership, lifecycle and undo policy remain attached. Player history edits use 
 administrative upgrades use a separate authenticated, validated API and never generate randomness.
 
 Managed-auth UIDs identify accounts across games; engine seat IDs remain local to a game's header.
-The server stores their membership mapping and a unique public handle/display name directory.
+The server stores their membership mapping and a unique public handle directory. Hosted registration
+stores no display name; live player labels use `@handle`, including games created before this change.
+Recorded headers and activity retain their historical identities. Storage upgrade contracts belong
+in [deployment](deployment.md).
 Creator/admin roles are explicit. Registered games have no transferable private-seat tokens.
 Cancellation and abandonment are audited operational revisions, suppress decisions and retain
 read access; purge removes game history/archives and leaves a small receipt. SQL supports multiple

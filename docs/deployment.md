@@ -72,11 +72,11 @@ quotas also apply; see [Firebase limits](https://firebase.google.com/docs/auth/l
 4. Create and verify the initial administrator's Firebase account. Copy its **UID**, not its email,
    to `AOR_ADMIN_UIDS`; multiple UIDs are comma-separated. An empty list grants no administration.
    Add the Render hostname and intended custom hostname to Firebase's authorized domains. Deploy,
-   then sign in and register the administrator's unique handle/display name in the application.
+   then sign in and register the administrator's unique handle in the application.
 5. Register a few players. Keep `AOR_GAME_CREATION_POLICY=approved` (default), and use **Player
    creation permissions** to approve game organizers. `registered` instead allows every verified,
    registered account to create games. Administrators always can. Games require 3–6 distinct
-   registered UIDs including the creator; public handles and names help find the intended person.
+   registered UIDs including the creator; public handles identify the intended person.
 6. Confirm that the database has no public IP allowlist entries and the application uses its
    internal URL. Startup applies checksum-validated Flyway schema migrations before accepting
    traffic. Health checks query PostgreSQL. The Blueprint sets `sslmode=require` because Render's
@@ -212,6 +212,8 @@ ETags, and hidden tabs poll less often. Static hashed assets may be cached for a
 ## Game operations and programmatic access
 
 The portal shows your participating games, with ongoing/my move/finished and lifecycle filters.
+Each game occupies one linked row, highlighted when it requires your action. Account navigation is
+part of the game overview bar. Administrative rows expand their management controls.
 Preferences and creation defaults use local browser storage with an in-memory fallback. Admins
 also have all-game views, creator approvals, cancellation/abandonment, log export, validation and
 permanent purge controls. An admin role does not impersonate a seat or reveal its private player
@@ -220,6 +222,11 @@ view; the explicit admin log API contains authoritative private outcomes.
 All hosted APIs use `Authorization: Bearer <Firebase ID token>`. `/api/config` is public;
 `/api/me` exposes the signed-in identity and registered player. Directory search (`/api/players?q=`)
 requires registration, returns at most 20 matches, and does not expose email addresses.
+`POST /api/players/register` accepts only `{"handle":"unique-handle"}`. Public account responses
+contain the handle and effective permissions, with no display name. Handles are canonical lowercase,
+3–24 letters/digits/hyphens, starting with a letter. PostgreSQL migration V2 removes the display-name
+column on startup and preserves existing handles, memberships and permissions; immutable game history
+keeps its recorded labels. Local account files use version 2 only.
 
 | Administrative endpoint | Contract |
 | --- | --- |
