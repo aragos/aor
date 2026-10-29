@@ -50,6 +50,12 @@ data class CardPlayerContext(
 /** Domination-marker facts needed by card rules. History cards refer to coloured counters only. */
 data class CardMarker(val owner: PlayerId, val coloured: Boolean = true)
 
+/** Actual card effects use coloured markers; a live forecast also counts new white control. */
+enum class CommodityHoldingBasis {
+    COLOURED_MARKERS,
+    CURRENT_MARKERS,
+}
+
 enum class CommodityAdjustment(val payoutOffset: Int) {
     SHORTAGE(1),
     SURPLUS(-1),
@@ -694,35 +700,45 @@ object CardRules {
     fun commodityPayment(
         context: CardContext,
         commodity: Commodity,
+        basis: CommodityHoldingBasis = CommodityHoldingBasis.COLOURED_MARKERS,
     ): CardResolution.CommodityPayment {
         val definition = CommodityData.definitions.single { entry -> entry.id == commodity }
         val adjustment = context.adjustments[commodity]?.firstOrNull()
         val payments =
             context.activePlayers.mapValues { (id, _) ->
-                val box = commodityPayoutBox(context, id, commodity)
+                val box = commodityPayoutBox(context, id, commodity, basis)
                 definition.baseValue * box * box
             }
         return CardResolution.CommodityPayment(commodity, payments, adjustment)
     }
 
-    /** Coloured domination markers are the only holdings that qualify for a current payout. */
+    /**
+     * Marker ownership only, excluding square tokens. The default preserves actual card payments
+     * and Famine; [CommodityHoldingBasis.CURRENT_MARKERS] is a forecast of current control.
+     */
     fun commodityHoldings(
         context: CardContext,
         player: PlayerId,
         commodity: Commodity,
+        basis: CommodityHoldingBasis = CommodityHoldingBasis.COLOURED_MARKERS,
     ): List<ProvinceId> =
         context.markers
             .filter { (province, marker) ->
                 marker.owner == player &&
-                    marker.coloured &&
+                    (marker.coloured || basis == CommodityHoldingBasis.CURRENT_MARKERS) &&
                     commodity in context.province(province).commodities
             }
             .keys
             .sortedBy(ProvinceId::value)
 
     /** Only the first queued adjustment affects this payout; non-owners never gain a box. */
-    fun commodityPayoutBox(context: CardContext, player: PlayerId, commodity: Commodity): Int {
-        val count = commodityHoldings(context, player, commodity).size
+    fun commodityPayoutBox(
+        context: CardContext,
+        player: PlayerId,
+        commodity: Commodity,
+        basis: CommodityHoldingBasis = CommodityHoldingBasis.COLOURED_MARKERS,
+    ): Int {
+        val count = commodityHoldings(context, player, commodity, basis).size
         if (count == 0) return 0
         val adjustment = context.adjustments[commodity]?.firstOrNull()?.payoutOffset ?: 0
         val industry = if (AdvanceId.INDUSTRY in context.player(player).advances) 1 else 0

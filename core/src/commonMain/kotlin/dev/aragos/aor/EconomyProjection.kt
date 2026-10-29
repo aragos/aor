@@ -33,7 +33,11 @@ data class IncomeView(
     }
 }
 
-/** A current payout, using coloured holdings and the first queued adjustment only. */
+/**
+ * Live commodity forecast from current marker owners, including white expansion markers. Square
+ * tokens and players in Chaos do not earn payouts. Only the first queued adjustment applies; actual
+ * card payments and Famine continue to require coloured markers.
+ */
 data class CommodityPayoutView(
     val commodity: Commodity,
     val adjustments: List<CommodityAdjustment>,
@@ -43,19 +47,20 @@ data class CommodityPayoutView(
         internal fun from(state: GameState): List<CommodityPayoutView> {
             if (state.turnNumber == null) return emptyList()
             val context = state.cardContext()
+            val basis = CommodityHoldingBasis.CURRENT_MARKERS
             return Commodity.entries.map { commodity ->
-                val payment = CardRules.commodityPayment(context, commodity)
+                val payment = CardRules.commodityPayment(context, commodity, basis)
                 CommodityPayoutView(
                     commodity,
                     context.adjustments[commodity].orEmpty(),
                     context.activePlayers.mapNotNull { (id, player) ->
-                        val provinces = CardRules.commodityHoldings(context, id, commodity)
+                        val provinces = CardRules.commodityHoldings(context, id, commodity, basis)
                         if (provinces.isEmpty()) return@mapNotNull null
                         CommodityOwnerView(
                             id,
                             provinces,
                             provinces.size,
-                            CardRules.commodityPayoutBox(context, id, commodity),
+                            CardRules.commodityPayoutBox(context, id, commodity, basis),
                             requireNotNull(payment.payments[id]) {
                                 "Every active owner has a payout."
                             },
