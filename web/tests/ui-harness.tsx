@@ -1,3 +1,4 @@
+import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import {App} from '../src/App';
 import type {Snapshot} from '../src/api';
@@ -33,7 +34,7 @@ window.setUiSnapshot = snapshot => {
     if (!mounted) {
         mounted = true;
         history.replaceState(null, '', `/games/${snapshot.gameId}#token=fixture`);
-        root.render(<App/>);
+        root.render(<StrictMode><App/></StrictMode>);
     }
 };
 window.fetch = async (input, init) => {
