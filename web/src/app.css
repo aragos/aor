@@ -106,6 +106,8 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 @media (max-width: 700px) { .table-activity { padding-inline: .75rem; } }
 .table-icon { display: inline-block; width: 18px; height: 18px; flex-shrink: 0; vertical-align: middle; }
 .player-money > span, .player-stats > span { display: inline-flex; align-items: center; gap: .3rem; }
+.player-advance-category h5 { margin: .65rem 0 .25rem; color: #536456; font-size: .78rem; }
+.player-advance-category .plain-list { margin-block: .25rem; }
 .player-stats .table-icon { width: 15px; height: 15px; }
 .pool-summary > .table-icon { width: 26px; height: 26px; }
 .token-stock-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: var(--resource-fill); border: 1px solid var(--resource-border); border-radius: 7px; padding: 1rem; margin: 0 0 1rem; }
