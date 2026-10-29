@@ -8,6 +8,17 @@ class AdvancePurchasesTest {
     private val turnTwo = PurchaseContext(currentTurn = 2)
 
     @Test
+    fun miseryQuoteSeparatesTheRuleContributionFromTheClampedActualMovement() {
+        val player = buyer(AdvanceId.THE_HEAVENS).copy(misery = MiseryStep.ZERO)
+
+        val misery = AdvancePurchases.miseryQuote(player, AdvanceId.HUMAN_BODY, turnTwo)
+        val purchase = AdvancePurchases.purchase(player, AdvanceId.HUMAN_BODY, turnTwo)
+
+        assertThat(misery).isEqualTo(AdvanceMiseryQuote(MiseryStep.ZERO, MiseryStep.ZERO, -1, 0))
+        assertThat(purchase.player.misery).isEqualTo(misery.after)
+    }
+
+    @Test
     fun everyAdvanceCanBePurchasedWhenItsPrerequisitesAreOwned() {
         for (advance in AdvanceId.entries) {
             val player =
