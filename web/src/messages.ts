@@ -2,6 +2,7 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'table.goldIvory': 'Gold / Ivory',
     'controls.miseryAfterAction': 'Misery after this action',
     'controls.chooseMiseryTarget': 'Choose a target to preview misery.',
     'controls.warMiseryUncertain': 'War dice and province cessions determine the resulting misery.',

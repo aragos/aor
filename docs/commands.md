@@ -103,7 +103,7 @@ cancellation, abandonment and purge; these are not player commands.
 | Command | Who and when; effect |
 | --- | --- |
 | `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization or ends Relief. In Expansion it returns unused pool tokens and ends the activity. Zero-cost stabilization and relief without a legal purchase advance automatically. It cannot skip positive-cost stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
-| `cancel-adjustment <commodity> <adjustment>` | First player before the ordinary draws; removes an existing marker for its commodity's base dollar cost. |
+| `cancel-adjustment <commodity> <adjustment>` | First player before the ordinary draws; removes an existing marker for its commodity's base dollar cost. Gold/Ivory removes one matching marker from each for $10 once. When both carry the selected adjustment, the offered command uses `gold`; any remaining singleton uses its own commodity. |
 | `buy-card` | Urban Ascendancy owner in Buy Card; once per turn, costs $10 and requests a draw. |
 | `discard-card <reference>` | Master Art owner in Buy Card; discards one owned card without effect, once per turn. Independent of buying a card; either order is accepted. |
 | `swap-order <player>` | Player answering a Renaissance decision; swap with an adjacent active player who lacks Renaissance. |
