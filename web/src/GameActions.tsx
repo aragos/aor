@@ -40,9 +40,18 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         if (action === 'adjust-market') return `${label(first.toUpperCase(), 'commodity')} · ${label(second.toUpperCase(), 'adjustment')}`;
         if (action === 'patronize') return `${t('action.patronize')} ${label(first, 'leader')}`;
         if (action === 'reduce-marker') return `${t('action.reduceMarker')} ${provinceName(first)}`;
+        if (action === 'replace-event-token') {
+            const replacement = snapshot.game.replacementToken;
+            if (!replacement) return t(first === 'pool' ? 'replacement.usePool' : 'replacement.leaveEmptyGeneric');
+            const province = provinceName(replacement.province);
+            return first === 'pool'
+                ? t('replacement.placePoolToken', {count: replacement.poolCost, province})
+                : t('replacement.leaveEmpty', {province});
+        }
         return `${label(action, 'action')} ${label(first)}`;
     };
     return <div className="game-actions">
+        {snapshot.game.replacementToken && <ReplacementTokenContext snapshot={snapshot}/>}
         {snapshot.game.activity?.purchaseStep === 'STABILIZATION' && <p>{t('controls.stabilizationCost')}: <strong>${snapshot.game.stabilizationCost}</strong></p>}
         <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}
             {command === 'buy-expansion-card' && <> · {snapshot.game.expansionCardCost ?? '—'} {t('table.tokens')}</>}
@@ -77,6 +86,25 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         {commands.includes('forgo-marker') && <EventMarkerPlacement snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.some(command => command.startsWith('cede-war')) && <WarSurrender snapshot={snapshot} busy={busy} submit={submit}/>}
     </div>;
+}
+
+function ReplacementTokenContext({snapshot}: {snapshot: Snapshot}) {
+    const replacement = snapshot.game.replacementToken;
+    if (!replacement) return null;
+    const province = provinceName(replacement.province);
+    return <section className="replacement-token-context" aria-label={t('action.replace-event-token')}>
+        <h3>{province}</h3>
+        <p>{t('replacement.context', {event: label(replacement.event, 'event'), player: playerName(snapshot, replacement.player), province})}</p>
+        <p>{t(replacement.poolAfter === null ? 'replacement.noPool' : 'replacement.noStock')}</p>
+        {replacement.poolAfter !== null && <>
+            <p>{t('replacement.poolBalance', {before: replacement.poolTokens, after: replacement.poolAfter})}</p>
+            <p>{t('replacement.coloredToken', {province})}</p>
+        </>}
+        <p>{t('game.misery')}: <MiseryBox value={replacement.misery} track={snapshot.game.catalog?.miseryTrack}/></p>
+        {replacement.event === 'CIVIL_WAR' && <p>{t('replacement.civilWarMiseryApplied')}</p>}
+        <p className="small muted">{t('replacement.noMisery')}</p>
+        {replacement.civilWarLossPending && <p>{t('replacement.civilWarLossPending')}</p>}
+    </section>;
 }
 
 function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {

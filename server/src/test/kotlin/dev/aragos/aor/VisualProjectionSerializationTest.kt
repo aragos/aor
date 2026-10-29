@@ -9,6 +9,20 @@ class VisualProjectionSerializationTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun publicWrittenCashSerializesSeparatelyFromCurrentCash() {
+        val initial = state()
+        val player = initial.playerState(p1).copy(cash = 17, writtenCash = 31)
+        val changed = initial.copy(players = initial.players + (p1 to player))
+
+        val view = json.readTree(json.writeValueAsString(changed.viewForPlayer(p2)))
+        val row = view["players"].single { it["id"].asText() == "p1" }
+
+        assertThat(row["writtenCash"].isInt).isTrue()
+        assertThat(row["writtenCash"].asInt()).isEqualTo(31)
+        assertThat(row["cash"].asInt()).isEqualTo(17)
+    }
+
+    @Test
     fun referenceTracksRetainPrintedValuesAndFleetIdentity() {
         val view = json.readTree(json.writeValueAsString(state().viewForPlayer(p1)))
         val catalog = view.path("catalog")

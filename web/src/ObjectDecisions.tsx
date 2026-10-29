@@ -11,6 +11,7 @@ import {AdvanceBenefits} from './AdvanceBenefits';
 import {LeaderCredit} from './LeaderCredit';
 import {AdvancePrice} from './AdvancePrice';
 import {MiseryPreview} from './MiseryPreview';
+import {CardRecurrence} from './CardRecurrence';
 
 interface Props {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
@@ -69,7 +70,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
         finiteChoices.some(candidate => (candidate.miseryChanges?.length ?? 0) > 0 || (candidate.miseryUncertainPlayers?.length ?? 0) > 0);
     return <section className="object-decision card-decision">
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
-        {inspection && <p className="eyebrow">{t(`kind.${definition.kind}`)}</p>}<h2>{t(definition.messageId)}</h2>
+        <h2>{t(definition.messageId)}</h2><CardRecurrence definition={definition}/>
         <CardEventText definition={definition}/>
         {inspection && <><HelpLink topic={`card-${definition.id}`} label="Card rules" compact={false}/>
         {(info?.commodities ?? offer?.commodities)?.length ? <CommodityValueNote snapshot={snapshot}/> : null}

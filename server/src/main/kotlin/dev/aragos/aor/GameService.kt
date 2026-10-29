@@ -311,6 +311,7 @@ class GameService(
                     } else {
                         view.copy(
                             expansionOffers = emptyList(),
+                            expansionInspections = emptyList(),
                             cardOffers = emptyList(),
                             advanceOffers = emptyList(),
                             tokenPurchaseOffers = emptyList(),

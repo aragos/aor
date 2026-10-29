@@ -23,7 +23,6 @@ export function TurnEffects({snapshot}: {snapshot: Snapshot}) {
     if (snapshot.game.turnNumber === null) return null;
     return <section className="panel turn-effects" aria-labelledby="effects-title">
         <h2 id="effects-title">{t('game.thisTurn')}</h2>
-        <p className="small">{t('game.deckRemaining')}: <strong>{snapshot.game.deckRemaining}</strong></p>
         {snapshot.game.endingTriggered && snapshot.game.stage !== 'FINISHED' && <p className="ending-notice">{t('game.endingNotice')}</p>}
         {adjustments.length > 0 && <ul className="plain-list">{adjustments.map(([commodity, markers]) => <li key={commodity}>
             {label(commodity, 'commodity')}: {markers.map(marker => label(marker, 'adjustment')).join(', ')}

@@ -14,7 +14,7 @@ data class PartialPlacementView(val tokens: Int, val resultingPool: Int)
 /**
  * The primary intention is a marker for markets, a token for satellites, or inspection for a
  * controlled province. A competition's incomeAfter is null because its outcome is uncertain. White
- * markers affect income immediately but do not qualify for current commodity payments.
+ * markers affect income and current commodity control immediately.
  */
 data class ExpansionOfferView(
     val destination: ProvinceId,
@@ -31,10 +31,13 @@ data class ExpansionOfferView(
     val incomeAfter: Int?,
     /** An accessible route exists, independently of pool, marker stock, and commitment size. */
     val reachable: Boolean,
+    /** Printed access conditions the viewer has not satisfied; independent of route existence. */
+    val missingAccess: List<AccessRequirement> = emptyList(),
 )
 
 internal object ExpansionProjection {
-    fun offers(state: GameState, viewer: PlayerState): List<ExpansionOfferView> {
+    /** All current destination evaluations, including failures excluded from candidate offers. */
+    fun inspections(state: GameState, viewer: PlayerState): List<ExpansionOfferView> {
         if (
             state.stage != Stage.EXPANSION ||
                 state.flow.actor != viewer.player.id ||
@@ -44,17 +47,21 @@ internal object ExpansionProjection {
             return emptyList()
         }
         val context = BoardGame.context(state)
-        return context.configuration.provinces
-            .map { province ->
-                offer(state, viewer, context, province)
-            }
-            .filter { offer ->
-                offer.blockers.none { blocker ->
-                    blocker == ViolationCode.INSUFFICIENT_EXPANSION_TOKENS ||
-                        blocker == ViolationCode.SHIPPING_CAPACITY_EXCEEDED
-                } || offer.partialPlacements.isNotEmpty()
-            }
+        return context.configuration.provinces.map { province ->
+            offer(state, viewer, context, province)
+        }
     }
+
+    /**
+     * Keep impossible pool/shipping commitments inspectable without offering them as candidates.
+     */
+    fun offers(inspections: List<ExpansionOfferView>): List<ExpansionOfferView> =
+        inspections.filter { offer ->
+            offer.blockers.none { blocker ->
+                blocker == ViolationCode.INSUFFICIENT_EXPANSION_TOKENS ||
+                    blocker == ViolationCode.SHIPPING_CAPACITY_EXCEEDED
+            } || offer.partialPlacements.isNotEmpty()
+        }
 
     private fun offer(
         state: GameState,
@@ -136,6 +143,9 @@ internal object ExpansionProjection {
             income,
             after?.let { board -> IncomeView.from(state, viewer, board)?.ordinary },
             routes.isNotEmpty(),
+            province.access.filterNot { requirement ->
+                requirement.isSatisfiedBy(viewer.advances.owned)
+            },
         )
     }
 

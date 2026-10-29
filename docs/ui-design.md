@@ -44,8 +44,10 @@ choice and understand its result through visual controls and commands, on deskto
 
 ## Current table contracts
 
-- Expanded player details show total income, tokens, deployed markers, and owned advances. Omit
-  income components, undeployed-marker counts, and misery-relief actions from this inspection.
+- Expanded player details show written cash, tokens, deployed markers, and owned advances. Keep
+  income only in the summary; omit undeployed-marker counts and misery-relief actions here.
+  Written cash is the public balance recorded at the latest simultaneous token-purchase reveal,
+  initially $40; subsequent income/expenses and unrevealed bids do not alter that record.
   Show the advance count in the collapsed player box, with an accessible label.
   Group expanded advances by printed category, then printed letter; omit empty categories.
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
@@ -62,6 +64,8 @@ choice and understand its result through visual controls and commands, on deskto
   they do not grant access to another player's seat. Poll the list every 30 seconds while visible;
   omit a manual Refresh button. Administrative changes refresh the list immediately.
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
+  Include the current deck count with the epoch, for example **Epoch 2 (22 cards remaining)**;
+  remove duplicate deck counts from the turn-effects section.
   Commands remain in the bottom expander; omit their header button. Province facts remain in
   inspection. Event and advance descriptions remain available in the game. Legends, variant
   descriptions, printed tracks and expanded rules belong on public `/help`, linked in a new tab.
@@ -71,9 +75,14 @@ choice and understand its result through visual controls and commands, on deskto
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
   the action button confirms it. Playable cards also appear beside Pass.
+  Card faces and inspections omit type headers. Mark recurring cards with a shared badge rather
+  than naming their printed shape; the public reference explains the recycling behavior.
 - Full-market placement is primary when legal. Otherwise use the largest engine-offered partial
   placement and label it **Place maximum possible tokens**. Omit destinations with no feasible
   pool/shipping commitment. Keep marker reduction collapsed and competition commitments exact.
+  Maintain separate full inspection evaluations so selecting an omitted destination still explains
+  pool/shipping limits, missing access, no route or existing control. Candidate highlights and
+  enabled controls use feasible commitments, including legal partial placements.
 - Expansion summaries show each player's white markers and active military cards with matchup
   caveats. Omit the military box entirely when nobody has one. Competition and War outcomes live in
   activity. A submitted action that resolves one also opens a dismissible result for its player;
@@ -108,6 +117,12 @@ choice and understand its result through visual controls and commands, on deskto
 - Misery boxes share a green-to-amber-to-red severity scale based on the authoritative track's
   ordered steps, with dark burgundy for Chaos. Apply it to player summaries, stabilization previews,
   final scores and the reference track. Retain printed values and accessible text.
+  Place small contextual track-help icons beside misery and shipping numbers. Opening help must
+  not select that player as a card target or disturb the prepared action.
+- Event replacement-token choices identify the triggering card, recipient and province, explain
+  the empty stock and exact pool-token result, and label the alternative as leaving that province
+  empty. Show the current misery box; Civil War's earlier misery is already applied. Queued choices
+  re-evaluate current pool supply and omit spending when none remains.
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
   to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.

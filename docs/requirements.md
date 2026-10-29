@@ -42,6 +42,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   while inspecting other objects. Show available cash alongside spending decisions; omit a permanent
   resource section. Keep hand cards compact, allow dragging as well as scrolling, and include each
   player's advance count in their summary. Expanded advances follow printed category and letter order.
+  Show written cash in expanded player details and keep income in the summary. Put the live deck
+  count beside the epoch, with no duplicate count in turn effects.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Prefer visible finite choices and playable cards beside Pass.
@@ -51,6 +53,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   qualifications; omit the military box when nobody has an advantage. Keep results in activity;
   explicitly show a dismissible outcome to the player whose submitted action just resolved it.
   Losses use red result styling.
+  Selecting an unavailable province explains its authoritative blocker without offering an invalid
+  action. Preserve legal smaller placements and keep missing access requirements specific.
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
   adjustments. Keep event and advance descriptions in the game, with current commodity payouts and
   leader credits in card inspections. Identify whether each leader discount includes Written Record.
@@ -65,9 +69,13 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Keep Help focused on reference and detailed undo policies; omit the game-flow walkthrough and
   consolidate shared rules. Color every misery box by track position: lower steps are less severe,
   progressing from green through amber to red and finally dark Chaos. Keep numeric labels.
+  Link track help through small question icons beside misery and shipping values. Card displays
+  use a Recurring badge when applicable, with no shape vocabulary or redundant type heading.
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
   explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
   while waiting; submit once on the legal turn while that view remains open, with no failed retries.
+  Replacement-token choices identify the event, recipient, province, pool cost and result; explain
+  when no pool token remains and avoid implying another misery charge.
 - Open bounded, scrollable activity by default, with an icon to hide/show it and no header or count.
   Show every action once. Preserve entry-time names and emblems as later history is appended;
   cards open the in-game inspector without changing an action draft.

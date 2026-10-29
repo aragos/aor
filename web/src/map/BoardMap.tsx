@@ -325,7 +325,7 @@ export function BoardMap({snapshot, busy}: {
                         const definition = definitions.get(id);
                         const pieces = occupancy.get(id);
                         const picked = picker?.selected.includes(id);
-                        const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : reachable.has(id);
+                        const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : legalDestinations.has(id);
                         return <g key={id} data-map-province={id} role={definition ? 'button' : undefined}
                             tabIndex={definition ? 0 : undefined} aria-pressed={definition ? id === inspectedProvince : undefined}
                             aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}

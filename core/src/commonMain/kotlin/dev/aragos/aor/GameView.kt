@@ -7,6 +7,10 @@ data class PlayerView(
     val id: PlayerId,
     val name: String,
     val cash: Int,
+    /**
+     * Dollars recorded at the latest token-purchase reveal; initially 40 before the first reveal.
+     */
+    val writtenCash: Int,
     val capital: String?,
     val handCount: Int,
     val stockTokens: Int = 36,
@@ -31,6 +35,7 @@ data class PlayerView(
                 id = player.player.id,
                 name = player.player.name,
                 cash = player.cash,
+                writtenCash = player.writtenCash,
                 capital = player.capital,
                 handCount = player.hand.size,
                 stockTokens = player.stockTokens,
@@ -83,6 +88,7 @@ data class GameView(
     val activeWar: WarState? = null,
     val warCession: WarCessionView? = null,
     val markerPlacement: MarkerPlacementView? = null,
+    val replacementToken: ReplacementTokenView? = null,
     val pirateTargets: PirateTargetsView? = null,
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
@@ -92,6 +98,8 @@ data class GameView(
     val stabilizationMisery: Int? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    /** Destination diagnostics include pool/shipping failures omitted from [expansionOffers]. */
+    val expansionInspections: List<ExpansionOfferView> = emptyList(),
     /** Missing printed access advances for this viewer; independent of phase, routes, and ships. */
     val lockedProvinces: Set<ProvinceId> = emptySet(),
     val commodityPayouts: List<CommodityPayoutView> = emptyList(),
@@ -105,8 +113,9 @@ data class GameView(
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
 ) {
     companion object {
-        internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
-            GameView(
+        internal fun forPlayer(state: GameState, viewer: PlayerState): GameView {
+            val expansionInspections = ExpansionProjection.inspections(state, viewer)
+            return GameView(
                 stage = state.stage,
                 currentEpoch = state.currentEpoch.number,
                 rules = state.rules,
@@ -157,6 +166,7 @@ data class GameView(
                         decision ->
                         MarkerPlacementView(decision.player, decision.destination)
                     },
+                replacementToken = ReplacementTokenView.from(state),
                 pirateTargets =
                     if (
                         state.turnNumber != null &&
@@ -179,7 +189,8 @@ data class GameView(
                     MiseryRules.payDebt(viewer.misery, PlayerEconomy.stabilizationCost(viewer))
                         .value,
                 burdenReferences = burdenReferences(state, viewer),
-                expansionOffers = ExpansionProjection.offers(state, viewer),
+                expansionOffers = ExpansionProjection.offers(expansionInspections),
+                expansionInspections = expansionInspections,
                 commodityPayouts = CommodityPayoutView.from(state),
                 cardOffers = CardProjection.offers(state, viewer),
                 cardInspections = CardProjection.inspections(state, viewer),
@@ -194,6 +205,7 @@ data class GameView(
                 playedLeaderDiscounts = PlayedLeaderDiscountView.from(state, viewer),
                 unplayedAdvanceLeaders = AdvanceLeaderAvailabilityView.from(state),
             )
+        }
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
             if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()

@@ -45,7 +45,8 @@ export async function checkTable(page, web, baseline) {
         assert(income.title && income.label, 'Income keeps hover and accessible labels');
     }
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#tracks"]').target`), '_blank', 'Tracks open outside the game');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#misery-track"]').target`), '_blank', 'Misery track opens outside the game');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#shipping-track"]').textContent`), '?', 'Shipping help sits beside its value');
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track')`), null, 'Static tracks leave the game view');
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
     const offer = fixture.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && offer.blockers.length === 0);
@@ -72,11 +73,12 @@ export async function checkTable(page, web, baseline) {
         'Shipping limit defaults to the maximum legal commitment');
     await show({game:{expansionOffers:baseline.game.expansionOffers}});
 
-    const blocked = fixture.game.expansionOffers.find(offer => offer.blockers.length > 0 && offer.primaryAction !== 'INSPECT');
+    const blocked = fixture.game.expansionOffers.find(offer => offer.blockers.length > 0 && offer.partialPlacements.length === 0 && offer.primaryAction !== 'INSPECT');
     assert(blocked, 'Fixture must include an inspectable blocked destination');
     await page.evaluate(`document.querySelector('[data-map-province="${blocked.destination}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     await page.wait(`document.querySelector('[data-map-province="${blocked.destination}"][aria-pressed="true"]')`, 'blocked market remains inspectable');
-    assert.equal(await page.evaluate(`document.querySelector('.map-orders .primary-expansion')?.disabled`), true, 'Blocked primary action cannot submit');
+    assert.equal(await page.evaluate(`!!document.querySelector('.map-orders .primary-expansion:not([disabled])')`), false, 'An unavailable province has no enabled placement action');
+    assert.equal(await page.evaluate(`!!document.querySelector('.province-actions [data-expansion-blocker]')`), true, 'The unavailable province explains its blocker');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0);
 
     // A mandatory interruption changes decision ownership; the old expansion draft cannot submit.

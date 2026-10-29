@@ -5,6 +5,7 @@ export interface ExpansionOfferView {
     destination: string; primaryAction: 'PLACE' | 'ATTACK' | 'INSPECT'; requiredTokens: number;
     availablePool: number; resultingPool: number | null; establishesMarker: boolean; uncertain: boolean;
     blockers: string[]; partialPlacements: {tokens: number; resultingPool: number}[];
+    missingAccess?: string[];
     shipping: {used: number; capacity: number | null; required: number} | null;
     incomeBefore: number | null; incomeAfter: number | null;
     reachable: boolean;
@@ -58,7 +59,7 @@ export interface ShippingOfferView {
     cost: number; ships: PlayerView['ships'] | null; cashAfter: number | null; blockers: string[];
 }
 export interface PlayerView {
-    id: string; name: string; cash: number; capital: string | null; handCount: number;
+    id: string; name: string; cash: number; writtenCash: number; capital: string | null; handCount: number;
     stockTokens: number; poolTokens: number; boardMarkers: number; stockMarkers: number; misery: number | null;
     income: IncomeView | null;
     poolAvailable: boolean;
@@ -142,6 +143,9 @@ export interface Snapshot {
         unplayedAdvanceLeaders?: {advance: string; epochs: {epoch: number; count: number}[]}[];
         pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
+        replacementToken?: {player: string; province: string; event: string; poolTokens: number;
+            poolCost: number; poolAfter: number | null; stockTokens: number; misery: number | null;
+            civilWarLossPending: boolean} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
@@ -149,7 +153,8 @@ export interface Snapshot {
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
-        expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
+        expansionOffers: ExpansionOfferView[]; expansionInspections?: ExpansionOfferView[];
+        commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         cardInspections: CardInspectionView[];
         tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null;
         expansionCardCost?: number | null};

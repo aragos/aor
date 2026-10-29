@@ -12,6 +12,18 @@ class VisualProjectionTest {
     private val florence = ProvinceId("florence")
 
     @Test
+    fun anotherPlayerCanSeeRecordedWrittenCashIndependentlyOfCurrentCash() {
+        val initial = state()
+        val player = initial.playerState(p1).copy(cash = 23, writtenCash = 72)
+        val changed = initial.copy(players = initial.players + (p1 to player))
+
+        val view = changed.viewForPlayer(p2).players.single { it.id == p1 }
+
+        assertThat(view.cash).isEqualTo(23)
+        assertThat(view.writtenCash).isEqualTo(72)
+    }
+
+    @Test
     fun inspectingCardsOutsideTheHandUsesPublicCommodityFacts() {
         val state = state()
         val inspection =
@@ -97,8 +109,16 @@ class VisualProjectionTest {
                             .copy(
                                 decisions =
                                     listOf(
-                                        CardDecision.ReplacementToken(p1, ProvinceId("rome")),
-                                        CardDecision.ReplacementToken(p1, florence),
+                                        CardDecision.ReplacementToken(
+                                            p1,
+                                            ProvinceId("rome"),
+                                            EventId.BLACK_DEATH,
+                                        ),
+                                        CardDecision.ReplacementToken(
+                                            p1,
+                                            florence,
+                                            EventId.BLACK_DEATH,
+                                        ),
                                     )
                             )
                 )
