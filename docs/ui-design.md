@@ -90,6 +90,10 @@ choice and understand its result through visual controls and commands, on deskto
   retained as later actions arrive. Activity cards link to their reference.
 - The shield favicon is colorful when this player has a required action and grayscale otherwise.
   The game list checks all the player’s awaiting games, independently of the visible filter/page.
+  Game tabs schedule background checks every 30 seconds and update their icon directly from accepted
+  responses, independently of rendering. Own one read/timer, bound snapshot reads (authentication,
+  fetch and body) to 15 seconds, and discard canceled/superseded results. Visibility, resume,
+  page-restoration and reconnect events refresh immediately; conditional 304 reads retain the icon.
 - Command history defaults to capital aliases, with saved player-label/ID alternatives. Aliases
   cover actors, targets, attributed dice and edit authors; stored commands and `@entry` references
   remain canonical.

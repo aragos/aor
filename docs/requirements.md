@@ -63,6 +63,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   retain correctable input; stale requests refresh without automatic resubmission.
 - Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.
   The game-list favicon checks all of the current player’s games regardless of filter or page.
+  Hidden game tabs continue occasional polling and recover after stalled reads or browser/network
+  suspension. Favicon changes must not require activating the tab or painting the game.
 - Support keyboard, touch, narrow layouts, bounded map gestures, zoom and dense-piece inspection.
   Persist preferences and creation defaults in browser storage with an in-memory fallback.
 
