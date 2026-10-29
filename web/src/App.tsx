@@ -64,9 +64,14 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const busyRef = useRef(false);
     const sequence = useRef(0);
     const etag = useRef<string>();
+    const acceptedSnapshot = useRef<string>();
+    const activityAt = useRef(0);
     const path = `/api/games/${id}`;
 
     function acceptSnapshot(next: Snapshot) {
+        const content = JSON.stringify(next);
+        if (content !== acceptedSnapshot.current) activityAt.current = Date.now();
+        acceptedSnapshot.current = content;
         setTurnFavicon(hasPlayerAction(next));
         setSnapshot(next);
     }
@@ -75,7 +80,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         let active = true;
         let readSequence = 0;
         setTurnFavicon(false);
-        const stop = startPolling({intervalMs: pollInterval, paused: () => busyRef.current,
+        const stop = startPolling({intervalMs: pollInterval, paused: () => busyRef.current, activityAt: () => activityAt.current,
             poll: async signal => {
                 const current = ++sequence.current;
                 readSequence = current;
@@ -98,6 +103,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         setBusy(true); setActionError(null); setSaved(false);
         try {
             acceptSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...operation}));
+            activityAt.current = Date.now();
             setConnectionError(''); setSaved(true); return true;
         } catch (failure) {
             const code = errorCode(failure);
