@@ -794,7 +794,8 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
 - **Civil War** (on target player)
     - The target gains +1 misery.
     - Its capital's domination marker, if any, becomes a token.
-    - After resolving its capital replacement, it chooses either half its last recorded cash (capped by cash actually held) or half its remaining expansion pool. Fractions round up; the choice shows the actual cost and remaining balance.
+    - After resolving its capital replacement, it chooses either half its last recorded cash
+      (capped by cash actually held) or half its remaining expansion pool. Fractions round up.
     - It moves to last in turn order at the start of Expansion.
 - **Enlightened Ruler** (on oneself)
     - For the rest of the turn, the player is immune to Mysticism Abounds, Religious Strife, Civil War, Revolutionary
