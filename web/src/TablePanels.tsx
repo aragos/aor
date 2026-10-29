@@ -47,14 +47,15 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const fleet = player.ships.fleet === 'NONE' ? '—' : `${label(player.ships.fleet, 'fleet')} ${player.ships.level}`;
             const eligible = playerPicker?.eligible.includes(player.id);
             const picked = playerPicker?.selected.includes(player.id);
+            const person = snapshot.accountId ? player.name.replace(/^@/, '') : player.name;
             const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
                     if (eligible) {event.preventDefault(); playerPicker?.pick(player.id);}
                 }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}`}>
-                    <span className="player-identity"><Emblem player={player}/><strong>{player.capital ? provinceName(player.capital) : player.name}</strong>
+                    <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>
+                        {player.capital && <span className="player-person" title={player.name}>{person}</span>}</span>
                         <small>{player.id === snapshot.viewerId ? t('table.you') : order.includes(player.id) ? String(order.indexOf(player.id) + 1).padStart(2, '0') : ''}</small></span>
-                    {player.capital && <span className="player-person">{player.name}</span>}
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span></span>
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> {player.misery ?? t('game.chaos')}</span>

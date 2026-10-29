@@ -48,6 +48,9 @@ choice and understand its result through visual controls and commands, on deskto
   income components, undeployed-marker counts, and misery-relief actions from this inspection.
 - Hosted registration asks only for a unique handle. Search, selected participants, live game labels
   and administrator player lists use `@handle`; account UIDs remain internal to selection and requests.
+  Compact player boxes put the handle beside the capital name and omit `@` there. Keep this identity
+  on one row; long handles truncate visually, with the full identity available on hover and to
+  assistive technology.
 - Hosted account, My games and sign-out controls share the game overview bar. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.
   Omit creation dates, IDs and Open buttons. Administrative rows expand their operational controls;
