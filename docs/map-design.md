@@ -62,7 +62,7 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 | Capital | Dark background behind the complete market badge, including commodity |
 | Owner | The same capital color and silhouette as every other player representation |
 | Piece kind / age | A count identifies tokens; an unnumbered piece is a marker. White is new, filled is established. Separate owners and ages. |
-| Directed support | Arrowhead with a contrasting outline; only catalogued support |
+| Directed support | Always-visible arrowhead with a contrasting outline; only catalogued support |
 | Area / shared access | A clear interior area badge, preferably in open sea space; locks on the owning area or overseas heading |
 
 Province fills retain commodity identity when control changes. Land and coastal water receive the
@@ -91,8 +91,9 @@ Coastal water selects the same province as land. A click prepares a draft; the e
 commits it. Sea or non-province background clicks clear inspection and focus; dragging preserves them
 and background clicks preserve an active action draft.
 
-Keep zoom in, zoom out and Fit floating over the board. Support modifier-scroll, trackpad pinch,
-two-finger touch pinch and dragging, centered on the gesture and constrained to board bounds.
+Keep zoom in, zoom out and Fit floating over the board. Always show support arrows; omit a visibility
+toggle. Support modifier-scroll, trackpad pinch, two-finger touch pinch and dragging, centered on the
+gesture and constrained to board bounds.
 Ordinary scrolling navigates the page. Keep map text unselectable during gestures. The province
 inspector provides structured occupancy, neighbors, sea contacts and support details outside the
 action panel; the duplicate board-details table is removed. Omit map search and navigation menus.

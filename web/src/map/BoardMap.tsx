@@ -1,5 +1,4 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {isBoolean, useStoredSetting} from '../preferences';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
@@ -102,7 +101,6 @@ export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
     const geometry: Geometry = snapshot.game.rules.map === 'EUROPEAN' ? europeanGeometryData : geometryData;
-    const [showSupport, setShowSupport] = useStoredSetting('support-arrows', true, isBoolean);
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
     const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? [], geometry), [snapshot.game.catalog, geometry]);
@@ -272,7 +270,6 @@ export function BoardMap({snapshot, busy}: {
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
                 <button type="button" className="secondary" onClick={() => setView(bounds)}>{t('board.fit')}</button>
-                <label className="check-label"><input type="checkbox" checked={showSupport} onChange={event => setShowSupport(event.target.checked)}/>{t('board.supportArrows')}</label>
                 <HelpLink topic="map-legend" label={t('board.mapKey')}/>
             </div>
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
@@ -349,7 +346,7 @@ export function BoardMap({snapshot, busy}: {
                         <path d={shape.path} fill="none" stroke={areaColors[area]} strokeWidth={8} strokeLinejoin="round"
                             clipPath={`url(#${prefix}-area-${area})`}/>
                     </g>)}
-                    {showSupport && catalog.satelliteSupports.map(edge => {
+                    {catalog.satelliteSupports.map(edge => {
                         const d = geometry.supports[`${edge.satellite} ${edge.market}`];
                         return <g key={`${edge.satellite}-${edge.market}`} data-support={`${edge.satellite} ${edge.market}`} pointerEvents="none">
                             <path d={d} fill="none" stroke="#fffdf3" strokeWidth={7}/><path d={d} fill="none" stroke="#263d4b" strokeWidth={3.5} markerEnd={`url(#${prefix}-arrow)`}/>

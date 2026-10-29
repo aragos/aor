@@ -76,8 +76,9 @@ choice and understand its result through visual controls and commands, on deskto
   in the game. Move legends, printed tracks, card effects, and advance rules to that same page.
 - Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
   and private discards stay counted; this cannot promise remaining drawable cards.
-- Cancellation choices and confirmation show cost. Stabilization shows its resulting misery box
-  or Chaos. Relief remains visible for an advance tier even when blocked, with Pass.
+- Cancellation choices and confirmation show cost. Stabilization shows current → resulting misery
+  boxes, including Chaos, on its payment button. Relief remains visible for an advance tier even
+  when blocked, with Pass.
 - Misery boxes share a green-to-amber-to-red severity scale based on the authoritative track's
   ordered steps, with dark burgundy for Chaos. Apply it to player summaries, stabilization previews,
   final scores and the reference track. Retain printed values and accessible text.

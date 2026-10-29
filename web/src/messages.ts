@@ -74,7 +74,7 @@ export const en: Record<string, string> = {
     'board.fit': 'Fit map', 'board.interactiveMap': 'Interactive game map',
     'board.mapKey': 'Map key', 'board.capital': 'Capital', 'board.advanceRequired': 'Advance required',
     'board.tokensCount': 'Tokens · count', 'board.newFace': 'New · white face', 'board.establishedFace': 'Filled · established',
-    'board.coastalWater': 'Coastal water', 'board.supportArrows': 'Support arrows', 'board.inset': 'INSET',
+    'board.coastalWater': 'Coastal water', 'board.inset': 'INSET',
     'board.notUsed': 'not used with this player count', 'board.reachable': 'reachable',
     'board.markerOccupancy': '{owner}, {age} marker',
     'board.tokenOccupancy': '{owner}, {old} established and {fresh} new tokens',

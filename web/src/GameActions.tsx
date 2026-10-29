@@ -14,6 +14,8 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     const {setSelectedCard, setSelected, setSelectedAdvance, setInspection} = useMapSelection();
     const [selectedAction, setSelectedAction] = useState('');
     const [relief, setRelief] = useState('');
+    const player = snapshot.game.players.find(candidate => candidate.id === snapshot.viewerId);
+    if (!player) return null;
     const commands = snapshot.legalChoices.commands;
     const finite = commands.filter(command => !simpleActions.includes(command) &&
         (command.startsWith('written-record ') || command.startsWith('swap-order ') || command.startsWith('cancel-adjustment ') ||
@@ -39,7 +41,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     };
     return <div className="game-actions">
         {snapshot.game.activity?.purchaseStep === 'STABILIZATION' && <p>{t('controls.stabilizationCost')}: <strong>${snapshot.game.stabilizationCost}</strong></p>}
-        <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}{command === 'stabilize misery' && <> · → <MiseryBox value={snapshot.game.stabilizationMisery} track={snapshot.game.catalog?.miseryTrack}/></>}</button>)}
+        <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}{command === 'stabilize misery' && <> · <span className="misery-transition"><MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/> → <MiseryBox value={snapshot.game.stabilizationMisery} track={snapshot.game.catalog?.miseryTrack}/></span></>}</button>)}
             {finite.filter(command => !command.startsWith('reduce-marker ')).map(command => <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}
         </div>
         {['PLAY_CARDS', 'FINAL_CARD_PLAY'].includes(snapshot.game.stage) && <div className="decision-cards">{snapshot.game.cardOffers.filter(offer => offer.playable).map(offer => {

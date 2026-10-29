@@ -45,7 +45,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup
   qualifications; omit the military box when nobody has an advantage. Losses use red result styling; results can be cleared without deleting history.
-- Show costs at offer and confirmation, stabilization's resulting misery box, current commodity
+- Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
   adjustments. Keep full payout boxes, legends, variant descriptions, card/advance rules, and
   printed tracks on the public `/help` page, linked contextually in a new tab. Show matching unplayed leader counts for epochs I–III
   beside each advance, with the public-information meaning above.
