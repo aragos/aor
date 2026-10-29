@@ -80,6 +80,6 @@ Prefer managed authentication/TLS and automated dependency checks and fresh depl
 
 [Follow-ups](follow-ups.md) own launch credentials, DNS and initial administrator decisions. Human
 screen-reader, physical-phone, browser-chrome zoom and composited/SVG contrast review remain separate
-from automated evidence. Toulouse and Constantinople retain constrained label fits. Broader removal
+from automated evidence. Toulouse and Constantinople's labels are accepted. Broader removal
 of unreachable retired-rule handlers requires separate review. Bots and persistent private plans
 remain deferred; the in-view Urban Ascendancy draft does not provide a general planning system.
