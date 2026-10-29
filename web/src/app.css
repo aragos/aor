@@ -85,7 +85,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .table-activity { position: relative; max-height: 26rem; overflow: hidden; border-block: 1px solid #bdcbb2; background: #f4f7ed; font-size: .85rem; padding: .55rem .75rem; }
 .table-activity .activity-toggle { display: flex; align-items: center; justify-content: center; width: 28px; min-height: 28px; margin-left: auto; padding: .2rem; color: #315447; }
 .table-activity[data-open="true"] .activity-toggle { position: absolute; top: .55rem; right: .75rem; z-index: 1; }
-.table-activity[data-open="true"] .activity-list li:first-child { padding-right: 2.5rem; }
+.table-activity[data-open="true"] .activity-list li { padding-right: 2.5rem; }
 .table-activity[data-open="true"] .activity-body > p { padding-right: 2.5rem; }
 .activity-toggle svg { width: 20px; height: 20px; }
 .activity-content { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .45rem; }

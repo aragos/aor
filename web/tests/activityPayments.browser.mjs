@@ -15,8 +15,14 @@ export async function checkActivityPayments(page, web, baseline) {
         cashChanges: [{player: actor, amount: 20}, {player: other, amount: 45}]};
     const payment = {...payout, id: 'cash-spent', kind: 'PATRONIZE', card: null, commodity: null, target: other,
         cashChanges: [{player: actor, amount: -10}, {player: other, amount: 10}]};
+    const longPayment = {...payment, id: 'long-payment', participants: [
+        {id: actor, name: 'Original actor with a recorded name near the length limit', capital: null},
+        participants[1],
+    ]};
     let revision = 25000;
-    const events = [payment, ...Array.from({length: 20}, (_, index) => ({...payout, id: `payout-${index}`})), payout];
+    const earlier = Array.from({length: 10}, (_, index) => ({...payout, id: `earlier-${index}`}));
+    const later = Array.from({length: 10}, (_, index) => ({...payout, id: `later-${index}`}));
+    const events = [payment, ...earlier, longPayment, ...later, payout];
     async function show(players = baseline.game.players) {
         const snapshot = {...baseline, revision: ++revision, events, game: {...baseline.game, players}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
@@ -66,6 +72,38 @@ export async function checkActivityPayments(page, web, baseline) {
         assert(geometry.firstTop < geometry.toggleBottom, 'Open activity control shares the first entry instead of adding a row');
         assert.equal(geometry.overlaps, false, `Inset control does not cover activity text at ${width}px`);
         assert(geometry.height <= 416, 'Activity remains bounded and scrollable');
+        await page.evaluate(`document.querySelector('.table-activity').scrollIntoView({block:'center'})`);
+        for (const offset of [0, 17, 39]) {
+            await page.evaluate(`(() => {
+                const list = document.querySelector('.activity-list');
+                const cash = document.querySelector('[data-event-id="long-payment"] .event-cash-change');
+                list.scrollTop += cash.getBoundingClientRect().top - list.getBoundingClientRect().top + ${offset};
+            })()`);
+            const overlaps = await page.evaluate(`(() => {
+                const list = document.querySelector('.activity-list');
+                const viewport = list.getBoundingClientRect();
+                const toggle = document.querySelector('.activity-toggle').getBoundingClientRect();
+                const text = document.createTreeWalker(list, NodeFilter.SHOW_TEXT);
+                for (let node = text.nextNode(); node; node = text.nextNode()) {
+                    if (!node.textContent.trim()) continue;
+                    const range = document.createRange(); range.selectNodeContents(node);
+                    if ([...range.getClientRects()].some(rect => rect.bottom > viewport.top && rect.top < viewport.bottom &&
+                        rect.left < toggle.right && rect.right > toggle.left && rect.top < toggle.bottom && rect.bottom > toggle.top)) return true;
+                }
+                return false;
+            })()`);
+            assert.equal(overlaps, false, `Scrolled activity text clears the inset control at ${width}px, offset ${offset}`);
+        }
+        const point = await page.evaluate(`(() => {
+            const button = document.querySelector('.activity-toggle'), rect = button.getBoundingClientRect();
+            const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+            return {x, y, hit: document.elementFromPoint(x, y)?.closest('.activity-toggle') === button};
+        })()`);
+        assert.equal(point.hit, true, 'The inset close control remains the pointer target after scrolling');
+        await page.send('Input.dispatchMouseEvent', {type:'mousePressed',x:point.x,y:point.y,button:'left',clickCount:1});
+        await page.send('Input.dispatchMouseEvent', {type:'mouseReleased',x:point.x,y:point.y,button:'left',clickCount:1});
+        await page.wait(`document.querySelector('.activity-toggle').getAttribute('aria-expanded') === 'false'`, 'scrolled close control responds to a pointer click');
+        await page.evaluate(`document.querySelector('.activity-toggle').click()`);
     }
     await checkInset(1280, 900, false);
     await checkInset(390, 844, true);
