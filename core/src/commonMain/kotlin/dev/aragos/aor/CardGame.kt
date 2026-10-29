@@ -304,7 +304,8 @@ object CardGame {
         aftermath: MarkerPlacementAftermath,
     ): GameState =
         when (aftermath) {
-            is MarkerPlacementAftermath.Crusades -> state.gainMisery(aftermath.player, 1)
+            is MarkerPlacementAftermath.Crusades ->
+                state.gainMisery(aftermath.player, CardRules.crusadesMiserySpaces)
             is MarkerPlacementAftermath.War ->
                 state
                     .gainMisery(aftermath.settlement.winner, 1)
@@ -422,7 +423,7 @@ object CardGame {
         }
 
     private fun civilWar(state: GameState, resolution: CardResolution.CivilWar): GameState {
-        val hurt = state.gainMisery(resolution.victim, 1)
+        val hurt = state.gainMisery(resolution.victim, CardRules.civilWarMiserySpaces)
         val ordered =
             if (resolution.moveLastAtExpansion) {
                 hurt.copy(

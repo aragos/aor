@@ -50,13 +50,19 @@ data class AppliedLeaderDiscount(
         get() = baseAmount.toLong() + writtenRecordBonus
 }
 
-/** Dollar components of the current price; excess credit is lost and never returned as cash. */
+/**
+ * Dollar components of the current price; excess credit is lost and never returned as cash.
+ * [miseryBefore] and [miseryAfter] are track positions from the same purchase calculation,
+ * including clamping at zero and terminal Chaos. Purchasing consumes this quoted destination.
+ */
 data class AdvanceQuote(
     val advance: AdvanceId,
     val baseCost: Int,
     val categoryCredit: Int,
     val institutionalResearchCredit: Int,
     val leaders: List<AppliedLeaderDiscount>,
+    val miseryBefore: MiseryStep,
+    val miseryAfter: MiseryStep,
 ) {
     val price: Int
         get() =
@@ -98,6 +104,13 @@ object AdvancePurchases {
                 0
             }
         val writtenRecord = LeaderRules.writtenRecordBonus(player.advances.owned, context.rules)
+        val acquired = player.advances.acquire(advance, context.currentTurn)
+        val completionRelief =
+            if (context.rules.miseryRelief == MiseryReliefRule.CATEGORY_COMPLETION) {
+                acquired.completionRelief - player.advances.completionRelief
+            } else {
+                0
+            }
         return AdvanceQuote(
             advance = advance,
             baseCost = definition.cost,
@@ -109,6 +122,9 @@ object AdvancePurchases {
                     .map { discount ->
                         AppliedLeaderDiscount(discount.leaderCardId, discount.amount, writtenRecord)
                     },
+            miseryBefore = player.misery,
+            miseryAfter =
+                MiseryRules.shift(player.misery, definition.purchaseMisery - completionRelief),
         )
     }
 
@@ -126,22 +142,12 @@ object AdvancePurchases {
                 else -> player.ships
             }
         val acquired = player.advances.acquire(advance, context.currentTurn)
-        val completionRelief =
-            if (context.rules.miseryRelief == MiseryReliefRule.CATEGORY_COMPLETION) {
-                acquired.completionRelief - player.advances.completionRelief
-            } else {
-                0
-            }
         return EconomyResult.forPlayer(
             player.copy(
                 cash = player.cash - quote.price,
                 advances = acquired,
                 ships = ships,
-                misery =
-                    MiseryRules.shift(
-                        player.misery,
-                        AdvanceData.definition(advance).purchaseMisery - completionRelief,
-                    ),
+                misery = quote.miseryAfter,
             )
         )
     }

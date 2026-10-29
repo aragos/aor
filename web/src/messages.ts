@@ -2,6 +2,13 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'controls.miseryAfterAction': 'Misery after this action',
+    'controls.chooseMiseryTarget': 'Choose a target to preview misery.',
+    'controls.warMiseryUncertain': 'War dice and province cessions determine the resulting misery.',
+    'table.categoryCredit': 'Category credit',
+    'table.institutionalResearchCredit': 'Institutional Research',
+    'table.finalPrice': 'Price',
+    'table.minimumPrice': 'Excess credit is unused; the price cannot fall below $0.',
     'hosted.verificationInstructions': 'Open the verification email sent to {email}, then continue here.',
     'hosted.inactive': 'This game has been {status}. Its board and history remain available.',
     'hosted.gameStatus': 'Game {status}',
