@@ -46,6 +46,10 @@ choice and understand its result through visual controls and commands, on deskto
 
 - Expanded player details show total income, tokens, deployed markers, and owned advances. Omit
   income components, undeployed-marker counts, and misery-relief actions from this inspection.
+  Show the advance count in the collapsed player box, with an accessible label.
+- Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
+  readiness while retaining the amount in the local input; reloading must not restore a withdrawn
+  submission. Committed history and resource balances change only on reveal.
 - Hosted registration asks only for a unique handle. Search, selected participants, live game labels
   and administrator player lists use `@handle`; account UIDs remain internal to selection and requests.
   Compact player boxes put the handle beside the capital name and omit `@` there. Keep this identity
@@ -81,8 +85,13 @@ choice and understand its result through visual controls and commands, on deskto
   and private discards stay counted; this cannot promise remaining drawable cards.
 - Leader totals explicitly include the viewer's Written Record bonus, or identify the displayed
   credit as preceding Written Record. Played leaders retain their play-time enhancement.
+- Every offered advance price identifies applied category credits, Institutional Research and
+  leaders, including Written Record. Detailed quotes show printed cost and the final price floor.
+  Preview printed misery boxes for each affected player when playing a card or buying an advance;
+  selected targets update that preview without committing. Mark dice-dependent outcomes as uncertain.
 - Available cash appears with spending decisions, including blocked purchases, rather than a
-  permanent resource section. Overflowing hands support mouse/pen dragging, scrollbars, native
+  permanent resource section. Buying a card with pool tokens shows its token cost. Compact hands
+  support mouse/pen dragging, scrollbars, native
   touch scrolling and keyboard activation; dragging cannot select a card or send an order.
 - Cancellation choices and confirmation show cost. Stabilization shows current → resulting misery
   boxes, including Chaos, on its payment button. Relief remains visible for an advance tier even
@@ -99,6 +108,9 @@ choice and understand its result through visual controls and commands, on deskto
   once and cap the box height with scrolling. Player names and emblems are those at entry time,
   retained as later actions arrive. Record signed misery spaces and printed endpoints, including
   Chaos, so later state changes cannot rewrite the explanation.
+  Relief receipts show cash, rating spent and the current-turn rating sources without duplicating
+  the cash expense. Holy Indulgence records each player's actual pool ↔ stock movements separately
+  from the action that opened Expansion; include token-only transfers.
 - The shield favicon is colorful when this player has a required action and grayscale otherwise.
   The game list checks all the player’s awaiting games, independently of the visible filter/page.
   Hidden game tabs check every five seconds for two minutes after opening, a visibility change,
