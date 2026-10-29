@@ -51,6 +51,18 @@ data class AppliedLeaderDiscount(
 }
 
 /**
+ * Signed purchase movement and nonnegative category relief, combined before track clamping.
+ * [before] and [after] are the actual endpoints; the components are rule contributions, not
+ * intermediate track positions. [completionRelief] is measured in misery spaces.
+ */
+data class AdvanceMiseryQuote(
+    val before: MiseryStep,
+    val after: MiseryStep,
+    val purchaseSpaces: Int,
+    val completionRelief: Int,
+)
+
+/**
  * Dollar components of the current price; excess credit is lost and never returned as cash.
  * [miseryBefore] and [miseryAfter] are track positions from the same purchase calculation,
  * including clamping at zero and terminal Chaos. Purchasing consumes this quoted destination.
@@ -82,6 +94,28 @@ data class AdvanceQuote(
 }
 
 object AdvancePurchases {
+    /** The misery part of a purchase, independent of prices, credits and eligibility checks. */
+    fun miseryQuote(
+        player: PlayerState,
+        advance: AdvanceId,
+        context: PurchaseContext,
+    ): AdvanceMiseryQuote {
+        val purchase = AdvanceData.definition(advance).purchaseMisery
+        val acquired = player.advances.acquire(advance, context.currentTurn)
+        val completion =
+            if (context.rules.miseryRelief == MiseryReliefRule.CATEGORY_COMPLETION) {
+                acquired.completionRelief - player.advances.completionRelief
+            } else {
+                0
+            }
+        return AdvanceMiseryQuote(
+            before = player.misery,
+            after = MiseryRules.shift(player.misery, purchase - completion),
+            purchaseSpaces = purchase,
+            completionRelief = completion,
+        )
+    }
+
     /** Quote a currently eligible advance, even when its price exceeds the buyer's cash. */
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
         requireEligible(player, advance, context)
@@ -132,13 +166,7 @@ object AdvancePurchases {
                 0
             }
         val writtenRecord = LeaderRules.writtenRecordBonus(player.advances.owned, context.rules)
-        val acquired = player.advances.acquire(advance, context.currentTurn)
-        val completionRelief =
-            if (context.rules.miseryRelief == MiseryReliefRule.CATEGORY_COMPLETION) {
-                acquired.completionRelief - player.advances.completionRelief
-            } else {
-                0
-            }
+        val misery = miseryQuote(player, advance, context)
         return AdvanceQuote(
             advance = advance,
             baseCost = definition.cost,
@@ -150,9 +178,8 @@ object AdvancePurchases {
                     .map { discount ->
                         AppliedLeaderDiscount(discount.leaderCardId, discount.amount, writtenRecord)
                     },
-            miseryBefore = player.misery,
-            miseryAfter =
-                MiseryRules.shift(player.misery, definition.purchaseMisery - completionRelief),
+            miseryBefore = misery.before,
+            miseryAfter = misery.after,
         )
     }
 

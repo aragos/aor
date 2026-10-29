@@ -114,7 +114,10 @@ export interface HistoryEventView {
     amount: number | null; detail: string | null;
     dice: {player: string | null; value: number; color: 'WHITE' | 'BLACK' | 'GREEN'}[];
     cashChanges: {player: string; amount: number}[];
-    miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null}[];
+    miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null;
+        reasons?: {kind: 'ADVANCE_PURCHASE' | 'CATEGORY_COMPLETION' | 'STABILIZATION' | 'PURCHASED_RELIEF' |
+            'INCOME_RELIEF' | 'CARD_EFFECT' | 'SURPLUS_DEBT' | 'HOLY_INDULGENCE'; spaces: number | null;
+            advance: string | null; card: string | null}[]}[];
     tokenChanges: {player: string; poolDelta: number; stockDelta: number}[];
     tokenPurchases: {player: string; amount: number; cashCost: number; tokensReceived: number}[];
     reliefPayment: {cashCost: number; ratingSpent: number; ratingAvailableBefore: number;

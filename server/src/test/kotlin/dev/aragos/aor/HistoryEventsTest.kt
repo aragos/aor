@@ -269,7 +269,18 @@ class HistoryEventsTest {
 
         val event = HistoryEvents.project("4:0", initial, after, entry, observer)
 
-        assertThat(event?.miseryChanges).contains(HistoryMiseryChangeView(owner, 4, 30, 70))
+        assertThat(event?.miseryChanges)
+            .contains(
+                HistoryMiseryChangeView(
+                    owner,
+                    4,
+                    30,
+                    70,
+                    listOf(
+                        HistoryMiseryReasonView(HistoryMiseryReason.CARD_EFFECT, card = "famine")
+                    ),
+                )
+            )
         assertThat(event?.participants)
             .containsExactly(
                 HistoryParticipantView(owner, "Alice", "venice"),
@@ -287,7 +298,15 @@ class HistoryEventsTest {
         val event = HistoryEvents.project("4:0", initial, after, entry, observer)
 
         assertThat(event?.miseryChanges)
-            .containsExactly(HistoryMiseryChangeView(owner, -1, 125, 100))
+            .containsExactly(
+                HistoryMiseryChangeView(
+                    owner,
+                    -1,
+                    125,
+                    100,
+                    listOf(HistoryMiseryReasonView(HistoryMiseryReason.PURCHASED_RELIEF)),
+                )
+            )
     }
 
     @Test
@@ -542,7 +561,15 @@ class HistoryEventsTest {
             .containsExactly(HistoryEventKind.STABILIZE, HistoryEventKind.HOLY_INDULGENCE)
             .inOrder()
         assertThat(events.first().miseryChanges)
-            .containsExactly(HistoryMiseryChangeView(observer, 1, 1000, null))
+            .containsExactly(
+                HistoryMiseryChangeView(
+                    observer,
+                    1,
+                    1000,
+                    null,
+                    listOf(HistoryMiseryReasonView(HistoryMiseryReason.STABILIZATION)),
+                )
+            )
         assertThat(events.last().tokenChanges)
             .containsExactly(
                 HistoryTokenChangeView(owner, poolDelta = 2, stockDelta = -2),
@@ -569,7 +596,15 @@ class HistoryEventsTest {
         val event = HistoryEvents.project("4:0", initial, after, entry, observer)
 
         assertThat(event?.miseryChanges)
-            .containsExactly(HistoryMiseryChangeView(owner, 1, 1000, null))
+            .containsExactly(
+                HistoryMiseryChangeView(
+                    owner,
+                    1,
+                    1000,
+                    null,
+                    listOf(HistoryMiseryReasonView(HistoryMiseryReason.STABILIZATION)),
+                )
+            )
     }
 
     @Test
@@ -606,8 +641,30 @@ class HistoryEventsTest {
         assertThat(events.single().cashChanges).isEmpty()
         assertThat(events.single().miseryChanges)
             .containsExactly(
-                HistoryMiseryChangeView(recipient, 1, 0, 10),
-                HistoryMiseryChangeView(observer, 1, 0, 10),
+                HistoryMiseryChangeView(
+                    recipient,
+                    1,
+                    0,
+                    10,
+                    listOf(
+                        HistoryMiseryReasonView(
+                            HistoryMiseryReason.HOLY_INDULGENCE,
+                            advance = AdvanceId.HOLY_INDULGENCE,
+                        )
+                    ),
+                ),
+                HistoryMiseryChangeView(
+                    observer,
+                    1,
+                    0,
+                    10,
+                    listOf(
+                        HistoryMiseryReasonView(
+                            HistoryMiseryReason.HOLY_INDULGENCE,
+                            advance = AdvanceId.HOLY_INDULGENCE,
+                        )
+                    ),
+                ),
             )
         assertThat(events.single().participants)
             .containsExactly(
@@ -646,7 +703,20 @@ class HistoryEventsTest {
             .inOrder()
         assertThat(events.first().miseryChanges).isEmpty()
         assertThat(events.last().miseryChanges)
-            .containsExactly(HistoryMiseryChangeView(owner, -1, 10, 0))
+            .containsExactly(
+                HistoryMiseryChangeView(
+                    owner,
+                    -1,
+                    10,
+                    0,
+                    listOf(
+                        HistoryMiseryReasonView(
+                            HistoryMiseryReason.INCOME_RELIEF,
+                            advance = AdvanceId.NEW_WORLD,
+                        )
+                    ),
+                )
+            )
     }
 
     @Test

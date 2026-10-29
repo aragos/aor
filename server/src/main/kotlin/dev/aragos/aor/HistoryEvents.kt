@@ -104,6 +104,7 @@ data class HistoryMiseryChangeView(
     val spaces: Int,
     val fromValue: Int?,
     val toValue: Int?,
+    val reasons: List<HistoryMiseryReasonView> = emptyList(),
 )
 
 /** White plus black selects the commodities; green selects the adjustment. */
@@ -211,8 +212,8 @@ internal object HistoryEvents {
             if (bookkeeping != null) cashChanges(applied, after)
             else projected?.cashChanges ?: cashChanges(before, after)
         val misery =
-            if (bookkeeping != null) miseryChanges(applied, after)
-            else projected?.miseryChanges ?: miseryChanges(before, after)
+            if (bookkeeping != null) MiseryHistory.changes(applied, after, automatic = bookkeeping)
+            else projected?.miseryChanges ?: MiseryHistory.changes(before, after, entry)
         val tokens =
             if (bookkeeping == HistoryEventKind.HOLY_INDULGENCE) tokenChanges(applied, after)
             else emptyList()
@@ -280,10 +281,13 @@ internal object HistoryEvents {
         viewer: PlayerId,
     ): HistoryEventView? =
         projectEntry(id, before, after, entry, viewer)
-            ?.copy(
-                cashChanges = cashChanges(before, after),
-                miseryChanges = miseryChanges(before, after),
-            )
+            ?.let { event ->
+                event.copy(
+                    cashChanges = cashChanges(before, after),
+                    miseryChanges =
+                        MiseryHistory.changes(before, after, entry, playedCard = event.card),
+                )
+            }
             ?.withParticipants(before)
 
     private fun HistoryEventView.withParticipants(state: GameState): HistoryEventView {
@@ -329,19 +333,6 @@ internal object HistoryEvents {
         before.playerIds.mapNotNull { player ->
             val change = after.playerState(player).cash - before.playerState(player).cash
             HistoryCashChangeView(player, change).takeIf { change != 0 }
-        }
-
-    private fun miseryChanges(before: GameState, after: GameState): List<HistoryMiseryChangeView> =
-        before.playerIds.mapNotNull { player ->
-            val previous = before.playerState(player).misery
-            val current = after.playerState(player).misery
-            HistoryMiseryChangeView(
-                    player,
-                    current.ordinal - previous.ordinal,
-                    previous.value,
-                    current.value,
-                )
-                .takeIf { previous != current }
         }
 
     private fun projectEntry(
@@ -540,9 +531,12 @@ internal object HistoryEvents {
                     )
             is CardCommand.ChooseCivilWarLoss ->
                 event(HistoryEventKind.CIVIL_WAR_LOSS).copy(detail = command.loss.name)
-            is CardCommand.ReplaceEventToken ->
+            is CardCommand.ReplaceEventTokens ->
                 event(HistoryEventKind.REPLACE_EVENT_TOKEN)
-                    .copy(detail = if (command.usePool) "POOL" else "NONE")
+                    .copy(
+                        provinces = command.provinces.sortedBy(ProvinceId::value),
+                        detail = if (command.provinces.isEmpty()) "NONE" else "POOL",
+                    )
             is CardCommand.CedeWar ->
                 event(HistoryEventKind.CEDE_WAR)
                     .copy(provinces = command.provinces.sortedBy(ProvinceId::value))

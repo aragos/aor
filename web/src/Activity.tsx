@@ -39,6 +39,12 @@ function CashPayment({event, player, amount, children}: {
     </span>;
 }
 
+function ActivityCard({cardId, onInspectCard}: {cardId: string; onInspectCard?: (cardId: string) => void}) {
+    return onInspectCard
+        ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {label(cardId, 'event')}</button>
+        : <span className="event-card">▤ {label(cardId, 'event')}</span>;
+}
+
 function EventContent({event, track, onInspectCard}: {
     event: HistoryEventView; track: Snapshot['game']['catalog']; onInspectCard?: (cardId: string) => void;
 }) {
@@ -55,9 +61,7 @@ function EventContent({event, track, onInspectCard}: {
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
         {event.war && <strong>{warHeading(event, event.war)}</strong>}
         {event.provinces.map(province => <span className="event-entity" key={province}>{provinceName(province)}</span>)}
-        {cardId && (onInspectCard
-            ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {label(cardId, 'event')}</button>
-            : <span className="event-card">▤ {label(cardId, 'event')}</span>)}
+        {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard}/>}
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
         {event.amount !== null && event.protectionCash == null && <strong>{event.kind === 'BID_CAPITAL' ? '$' : ''}{event.amount}</strong>}
@@ -103,6 +107,12 @@ function EventContent({event, track, onInspectCard}: {
             {change.player !== event.actor && eventName(event, change.player)}
             <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}
             <span>(<MiseryBox value={change.fromValue} track={track?.miseryTrack}/> → <MiseryBox value={change.toValue} track={track?.miseryTrack}/>)</span>
+            {change.reasons?.map((reason, index) => <span className="event-detail" key={index}>
+                {reason.advance && `${advanceName(reason.advance)} · `}
+                {reason.card && reason.card !== cardId && <ActivityCard cardId={reason.card} onInspectCard={onInspectCard}/>}
+                {t(`activity.miseryReason.${reason.kind}`)}
+                {reason.spaces != null && (change.reasons?.length ?? 0) > 1 && ` (${t('activity.ruleContribution', {spaces: signedAmount(reason.spaces)})})`}
+            </span>)}
         </span>)}
         {event.tokenChanges?.map(change => <span className="event-token-change" key={change.player}>
             {eventName(event, change.player)}{' '}
