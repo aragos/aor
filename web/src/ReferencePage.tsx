@@ -59,7 +59,7 @@ export default function ReferencePage() {
             </div>
             {catalog && <div className="reference-legend">{catalog.provinces.filter(province => province.capital).map(province => <span key={province.id}><svg viewBox="-28 -28 56 56" width="28" height="28" aria-hidden="true"><PlayerPiece capital={province.capital} size={44}/></svg>{label(province.id, 'capital')}</span>)}</div>}
             <p>Capital color and silhouette identify the owner everywhere. Land and its pale coastal band select the same province.</p>
-            <p>Named seas are distinct from coastal bands. Inspecting a province emphasizes its connected seas in deep blue with diagonal hatching; this does not guarantee a legal shipment. A shared corner is not a connection. Support arrows point from satellites to markets and can be toggled on the map.</p>
+            <p>Named seas are distinct from coastal bands. Inspecting a province emphasizes its connected seas in deep blue with diagonal hatching; this does not guarantee a legal shipment. A shared corner is not a connection. Support arrows are always visible and point from satellites to markets.</p>
             <p>Eligible targets use blue emphasis; the selected target has a stronger outline. Expansion reachability shades whole land/coastal footprints. Inspect an object for its occupants and actual legal actions. Zoom in to separate dense labels and tokens.</p>
             <p>Use +, −, and Fit, modifier-scroll, trackpad/two-finger pinch, or dragging. Ordinary scrolling moves the page. Keyboard Enter or Space selects a focused province or area. Arrow keys switch workspace tabs.</p>
         </section>
