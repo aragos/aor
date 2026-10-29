@@ -96,6 +96,16 @@ fun Application.module(
         get("/api/config") {
             call.respondJson(hosted?.publicConfig ?: PublicApplicationConfig("local", null, 1000))
         }
+        get("/api/reference") {
+            call.respondJson(
+                mapOf(
+                    "catalog" to PublicCatalog.forPlayers(6),
+                    "cards" to CardData.all,
+                    "leaders" to LeaderData.definitions,
+                    "rules" to RuleOptions(),
+                )
+            )
+        }
         if (hosted != null) hostedRoutes(hosted)
         get("/api/health") {
             call.api {
@@ -251,6 +261,10 @@ fun Application.module(
                 call.respondFile(File(web, "index.html"))
             }
             get("/games/{id}") {
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+                call.respondFile(File(web, "index.html"))
+            }
+            get("/help") {
                 call.response.header(HttpHeaders.CacheControl, "no-cache")
                 call.respondFile(File(web, "index.html"))
             }

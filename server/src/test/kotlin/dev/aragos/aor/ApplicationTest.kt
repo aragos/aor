@@ -19,6 +19,18 @@ import kotlin.test.Test
 
 class ApplicationTest {
     @Test
+    fun referenceCatalogIsPublicAndContainsNoGameState() = withGame {
+        val response = client.get("/api/reference")
+        val reference = json.readTree(response.bodyAsText())
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(reference["cards"].size()).isEqualTo(CardData.all.size)
+        assertThat(reference["catalog"]["advances"].size()).isEqualTo(26)
+        assertThat(reference.has("players")).isFalse()
+        assertThat(reference.has("deck")).isFalse()
+    }
+
+    @Test
     fun securityPolicyAllowsFirebaseGooglePopupScripts() = withGame {
         val response = client.get("/api/config")
         val policy =

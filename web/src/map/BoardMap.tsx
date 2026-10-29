@@ -4,6 +4,7 @@ import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
+import {HelpLink} from '../HelpLink';
 import {AccessLock, areaColors, CommodityIcon, commodityColors, PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
@@ -118,7 +119,7 @@ export function BoardMap({snapshot, busy}: {
     const pointers = useRef(new Map<number, {x: number; y: number}>());
     const gesture = useRef<{x: number; y: number; distance: number; view: MapView} | null>(null);
     const suppressClick = useRef(false);
-    const {picker, setPicker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
+    const {picker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
         selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection} = useMapSelection();
     useLayoutEffect(() => {
         setHovered(''); setFocused('');
@@ -265,13 +266,14 @@ export function BoardMap({snapshot, busy}: {
     // Keep the sea texture sparse at Fit, practical zoom, and narrow screen widths.
     const seaHatchScale = mapWidth ? view.w / mapWidth : 1;
     return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
-        {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong>
-            <button type="button" className="secondary" onClick={() => {setPicker(null); document.querySelector('.decision')?.scrollIntoView({behavior: 'smooth'});}}>{t('board.returnToOrder')}</button></div>}
+        {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong></div>}
         <div className="map-viewport">
             <div className="map-zoom" role="group" aria-label={t('board.zoom')}>
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
                 <button type="button" className="secondary" onClick={() => setView(bounds)}>{t('board.fit')}</button>
+                <label className="check-label"><input type="checkbox" checked={showSupport} onChange={event => setShowSupport(event.target.checked)}/>{t('board.supportArrows')}</label>
+                <HelpLink topic="map-legend" label={t('board.mapKey')}/>
             </div>
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
                 style={{aspectRatio: `${bounds.w} / ${bounds.h}`, height: 'auto', minHeight: 0}}
@@ -400,22 +402,9 @@ export function BoardMap({snapshot, busy}: {
             </svg>
         </div>
         {denseInspection && <div className="dense-map-detail" data-dense-province={inspectedProvince}>
-            <strong>{provinceName(inspectedProvince)}</strong><p>{t('board.denseOccupancy')}</p>
+            <strong>{provinceName(inspectedProvince)}</strong>
             <p>{occupancyDescription(snapshot, inspectedPieces)}</p>
         </div>}
-        <details className="commodity-legend"><summary>{t('board.mapKey')}</summary>        <div className="map-legend">
-            <span><svg viewBox="0 0 32 33" width="24" height="24" aria-hidden="true"><rect width="32" height="33" rx="7" fill="#263c3c"/><text x="16" y="25" textAnchor="middle" fontSize="27" fontWeight="750" fill="#fffdf5">4</text></svg>{t('board.capital')}</span>
-            <span><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><AccessLock/></svg>{t('board.advanceRequired')}</span>
-            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" size={40}/></svg>{t('board.marker')}</span>
-            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="venice" count={2} size={40}/></svg>{t('board.tokensCount')}</span>
-            <span><svg viewBox="-24 -24 48 48" width="24" height="24" aria-hidden="true"><PlayerPiece capital="barcelona" fresh size={40}/></svg>{t('board.newFace')}</span>
-            <span>{t('board.establishedFace')}</span><span className="satellite-key">{t('board.satellite')}</span><span className="coast-key">{t('board.coastalWater')}</span>
-            <label className="check-label"><input type="checkbox" checked={showSupport} onChange={event => setShowSupport(event.target.checked)}/>{t('board.supportArrows')}</label>
-        </div>
-<div className="map-legend">{Object.keys(commodityColors).map(commodity => <span key={commodity}>
-            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><CommodityIcon commodity={commodity}/></svg>{label(commodity, 'commodity')}</span>)}</div>
-
-        </details>
 
     </section>;
 }

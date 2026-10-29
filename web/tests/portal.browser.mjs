@@ -3,12 +3,17 @@ import assert from 'node:assert/strict';
 export async function checkPortal(page, web) {
     await page.send('Page.navigate', {url: web + '/tests/portal-harness.html'});
     await page.wait(`document.querySelector('.portal') && document.querySelectorAll('.game-directory > li').length === 2`, 'own ongoing games');
+    await page.wait(`document.querySelector('link[rel=icon]')`, 'Game list favicon');
+    const readyIcon = await page.evaluate(`document.querySelector('link[rel=icon]').href`);
+    const iconSvg = await fetch(readyIcon).then(response=>response.text());
+    assert(iconSvg.includes('#205c4b'), 'Any awaiting game colors the game-list favicon');
     await page.click('My move');
     await page.wait(`document.querySelectorAll('.game-directory > li').length === 1`, 'my move game filter');
     await page.reload();
     await page.wait(`document.querySelectorAll('.game-directory > li').length === 1 && [...document.querySelectorAll('button')].some(button=>button.textContent==='My move' && button.getAttribute('aria-pressed')==='true')`, 'persisted game filter');
     await page.click('Finished');
     await page.wait(`document.querySelector('.game-directory').textContent.includes('Finished')`, 'finished games');
+    assert.equal(await page.evaluate(`document.querySelector('link[rel=icon]').href`), readyIcon, 'Finished filter does not hide a turn in another game');
     await page.evaluate(`document.querySelector('.create-registered > summary').click()`);
     await page.fill('input[type=search]', 'bo');
     await page.wait(`document.querySelector('[aria-label="Matching players"]')?.textContent.includes('@bob')`, 'registered player directory search');
@@ -31,6 +36,7 @@ export async function checkPortal(page, web) {
     await page.wait(`window.portalRequests.some(request=>request.path.endsWith('/creation') && request.body.allowed===true)`, 'creator approval');
     await page.send('Emulation.setDeviceMetricsOverride', {width:390, height:844, deviceScaleFactor:1, mobile:true});
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'Portal fits a phone');
-    await page.evaluate(`localStorage.removeItem('aor.setting.game-filter')`);
-    console.log('Passed: registered-player search, stable IDs, creation form, persisted status filters, admin list, lifecycle and creator approvals.');
+    await page.evaluate(`window.portalHasTurn=false; document.dispatchEvent(new Event('visibilitychange')); localStorage.removeItem('aor.setting.game-filter')`);
+    await page.wait(`document.querySelector('link[rel=icon]').href !== ${JSON.stringify(readyIcon)}`, 'Game list becomes grayscale without awaiting games');
+    console.log('Passed: registered-player flow, independent turn favicon, creation, filters, administration, lifecycle and approvals.');
 }

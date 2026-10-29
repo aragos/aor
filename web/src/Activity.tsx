@@ -1,12 +1,22 @@
 import {useEffect, useState} from 'react';
 import {ResultNotice} from './DecisionControls';
 import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
-import {advanceName, label, playerName, provinceName} from './labels';
+import {advanceName, label, provinceName} from './labels';
 import {t} from './messages';
 import {Commodity, Emblem} from './TablePanels';
 
-function warHeading(snapshot: Snapshot, war: WarOutcomeView): string {
-    return war.winner ? t('table.warWinner').replace('{capital}', playerName(snapshot, war.winner)) : t('table.warTied');
+function eventPlayer(snapshot: Snapshot, event: HistoryEventView, id: string) {
+    return event.participants?.find(player => player.id === id) ??
+        {id, name: snapshot.game.players.find(player => player.id === id)?.name ?? id, capital: null};
+}
+
+function eventName(snapshot: Snapshot, event: HistoryEventView, id: string): string {
+    const player = eventPlayer(snapshot, event, id);
+    return player.capital ? provinceName(player.capital) : player.name;
+}
+
+function warHeading(snapshot: Snapshot, event: HistoryEventView, war: WarOutcomeView): string {
+    return war.winner ? t('table.warWinner').replace('{capital}', eventName(snapshot, event, war.winner)) : t('table.warTied');
 }
 
 function dieColor(event: HistoryEventView, index: number): string {
@@ -17,27 +27,27 @@ function dieColor(event: HistoryEventView, index: number): string {
 }
 
 function EventContent({event, snapshot}: {event: HistoryEventView; snapshot: Snapshot}) {
-    const actor = snapshot.game.players.find(player => player.id === event.actor);
-    const target = snapshot.game.players.find(player => player.id === event.target);
+    const actor = event.actor ? eventPlayer(snapshot, event, event.actor) : null;
+    const target = event.target ? eventPlayer(snapshot, event, event.target) : null;
     return <span className="activity-content">
-        {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{playerName(snapshot, actor.id)}</strong></span>}
+        {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{eventName(snapshot, event, actor.id)}</strong></span>}
         <span>{t(`activity.${event.kind}`)}</span>
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
-        {event.war && <strong>{warHeading(snapshot, event.war)}</strong>}
+        {event.war && <strong>{warHeading(snapshot, event, event.war)}</strong>}
         {event.provinces.map(province => <span className="event-entity" key={province}>{provinceName(province)}</span>)}
-        {event.card && <span className="event-card">▤ {label(event.card, 'event')}</span>}
+        {event.card && <a className="event-card" href={`/help#card-${event.card}`} target="_blank" rel="noreferrer">▤ {label(event.card, 'event')}</a>}
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
         {event.amount !== null && event.protectionCash == null && <strong>{event.kind === 'BID_CAPITAL' ? '$' : ''}{event.amount}</strong>}
         {event.protectionCash != null && <span className="event-detail">{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
         {event.leaderRebate != null && <span className="event-detail">{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
-        {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{playerName(snapshot, target.id)}</span>}
+        {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{eventName(snapshot, event, target.id)}</span>}
         {event.detail && <span className="event-detail">{label(event.detail)}</span>}
         {event.drawReason && <span className="event-detail">{t(`activity.drawReason.${event.drawReason}`)}</span>}
         {event.dice.map((die, index) => {
-            const player = snapshot.game.players.find(candidate => candidate.id === die.player);
+            const player = die.player ? eventPlayer(snapshot, event, die.player) : null;
             const color = dieColor(event, index);
-            return <span className={`event-die die-${color}`} key={index} aria-label={`${die.player ? `${playerName(snapshot, die.player)}: ` : ''}${t(`table.die.${color}`)} ${die.value}`}>
+            return <span className={`event-die die-${color}`} key={index} aria-label={`${die.player ? `${eventName(snapshot, event, die.player)}: ` : ''}${t(`table.die.${color}`)} ${die.value}`}>
                 {player && <Emblem player={player} size={13}/>}⚄ {t(`table.die.${color}`)} {die.value}
             </span>;
         })}
@@ -49,7 +59,7 @@ function EventContent({event, snapshot}: {event: HistoryEventView; snapshot: Sna
                 commodities: event.marketRoll.cancelled.map(commodity => label(commodity, 'commodity')).join(', ')})}`}
         </span>}
         {event.cashChanges?.map(change => <span className="event-cash-change" key={change.player}>
-            {change.player !== event.actor && playerName(snapshot, change.player)} <strong>{change.amount < 0 ? '−' : '+'}${Math.abs(change.amount)}</strong>
+            {change.player !== event.actor && eventName(snapshot, event, change.player)} <strong>{change.amount < 0 ? '−' : '+'}${Math.abs(change.amount)}</strong>
         </span>)}
     </span>;
 }
@@ -61,11 +71,11 @@ export function WarNotice({snapshot}: {snapshot: Snapshot}) {
     if (!event?.war || event.id === dismissed) return null;
     const war = event.war;
     return <ResultNotice className="war-notice" dismiss={() => setDismissed(event.id)}>
-        <strong>{warHeading(snapshot, war)}</strong>
+        <strong>{warHeading(snapshot, event, war)}</strong>
         <dl className="detail-list">{[war.initiator, war.opponent].map((player, index) => {
             const die = event.dice.find(candidate => candidate.player === player);
             return <div key={player}>
-                <dt>{playerName(snapshot, player)}</dt>
+                <dt>{eventName(snapshot, event, player)}</dt>
                 <dd>{t(`table.die.${dieColor(event, index)}`)} {die?.value ?? '—'} → {t('table.warTotal')} <b>{war.totals[player]}</b></dd>
             </div>;
         })}</dl>
@@ -98,14 +108,14 @@ export function Activity({snapshot}: {snapshot: Snapshot}) {
     useEffect(() => {
         if (open) setSeenCount(events.length);
     }, [open, events.length]);
-    const latest = events[events.length - 1];
     const unread = Math.max(0, events.length - seenCount);
     return <details className="table-activity" open={open} onToggle={event => {
         const next = event.currentTarget.open;
         setOpen(next);
     }}>
-        <summary><span className="recent-activity" aria-live="polite">{latest ? <EventContent event={latest} snapshot={snapshot}/> : t('table.noActivity')}</span>
-            <span className="activity-toggle">{t('table.activity')}{unread > 0 && <b className="unread-badge">{unread}</b>}</span></summary>
+        <summary><span className="activity-toggle">{t('table.activity')} · {events.length}</span>
+            {unread > 0 && <b className="unread-badge" aria-label={`${unread} unread actions`}>{unread}</b>}</summary>
+        {events.length === 0 && <p>{t('table.noActivity')}</p>}
         <ol className="activity-list">{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
             <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
             <EventContent event={event} snapshot={snapshot}/>

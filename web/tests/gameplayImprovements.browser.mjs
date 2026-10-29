@@ -34,7 +34,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
         await click('[data-hand-card="target"]');
         await page.wait(`document.querySelector('#tab-map[aria-selected=true]') && document.querySelector('[data-map-province="${province}"].eligible')`, `${id} activates its map target`);
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-event-text')`), null, 'Card reference stays outside actions');
-        assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .card-event-text')`), true);
+        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#card-${id}"]').target`), '_blank');
         const count = await page.evaluate('window.mapCommands.length');
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
         assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Map choice only prepares the order');

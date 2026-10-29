@@ -77,6 +77,11 @@ standard/European Mediterranean distinction. [Rules](docs/rules.md) and the
 25-marker limit, War/Crusades recipients may forgo an award or move another controlled marker.
 Commodity payments continue their quadratic formula beyond printed box 10.
 
+The in-app **?** links open the public `/help` reference for variants, map symbols, card and advance
+rules, printed tracks, and payout boxes without replacing a live game. Its catalog comes from the
+public read-only `/api/reference` endpoint; no game or private state is included. Activity uses
+entry-time identities, and tab favicons indicate outstanding player decisions.
+
 ## Verify changes
 
 ```sh

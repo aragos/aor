@@ -78,12 +78,18 @@ data class HistoryMarketRollView(
     val cancelled: List<Commodity>,
 )
 
+/** Public identity at the entry's position in effective history, before later capital selection. */
+data class HistoryParticipantView(val id: PlayerId, val name: String, val capital: String?)
+
 /**
  * Viewer-safe activity derived from committed entries. [id] is `revision:entryIndex`, with a
  * zero-based index in that revision's delta; synthetic transitions append `:kind`. [card] contains
  * a catalog identity only when public or visible to this viewer; hand references and unrevealed
  * submissions are never included. [detail] contains an enum name for a choice or roll kind, not
  * formatted prose.
+ *
+ * All values, including [participants], are derived at this entry's position in replay. Appending
+ * history must not change an existing event. An explicit history edit may replace affected events.
  */
 data class HistoryEventView(
     val id: String,
@@ -106,6 +112,7 @@ data class HistoryEventView(
     val protectionCash: Int? = null,
     val leaderRebate: Int? = null,
     val marketRoll: HistoryMarketRollView? = null,
+    val participants: List<HistoryParticipantView> = emptyList(),
 )
 
 /** Public outcome from the committed board change, including Cathedral resolutions. */
@@ -159,6 +166,7 @@ internal object HistoryEvents {
             add(transition(HistoryEventKind.GAME_FINISHED))
         }
     }
+        .map { event -> event.withParticipants(before) }
 
     fun project(
         id: String,
@@ -172,6 +180,21 @@ internal object HistoryEvents {
                 cashChanges =
                     if (incomeCollected(before, after)) emptyList() else cashChanges(before, after)
             )
+            ?.withParticipants(before)
+
+    private fun HistoryEventView.withParticipants(state: GameState): HistoryEventView {
+        val ids =
+            listOfNotNull(actor, target, war?.initiator, war?.opponent, war?.winner) +
+                dice.mapNotNull(HistoryDieView::player) +
+                cashChanges.map(HistoryCashChangeView::player)
+        return copy(
+            participants =
+                ids.distinct().map { id ->
+                    val player = state.playerState(id)
+                    HistoryParticipantView(id, player.player.name, player.capital)
+                }
+        )
+    }
 
     private fun incomeCollected(before: GameState, after: GameState): Boolean =
         after.stage == Stage.INCOME &&

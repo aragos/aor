@@ -2,11 +2,10 @@ import {useEffect, useState} from 'react';
 import type {CardChoiceView, Snapshot} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
-import {CardEventText} from './CardEventText';
+import {HelpLink} from './HelpLink';
 import {Commodity, CommodityAdjustments, Emblem, Payouts, PayoutReference, UnplayedLeaders} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
-import {AdvanceBenefits} from './AdvanceBenefits';
 
 interface Props {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
@@ -58,7 +57,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
     return <section className="object-decision card-decision">
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
         {inspection && <p className="eyebrow">{t(`kind.${card.definition.kind}`)}</p>}<h2>{t(card.definition.messageId)}</h2>
-        {inspection && <><CardEventText definition={card.definition}/>
+        {inspection && <><HelpLink topic={`card-${card.definition.id}`} label="Card rules" compact={false}/>
         {offer?.commodities.map(commodity => {
             const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
             return <div className="card-value" key={commodity}><Commodity commodity={commodity}/>{payout && <>
@@ -121,17 +120,14 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
     return <section className="object-decision advance-decision">
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>}
         {inspection && <p className="eyebrow">{label(advance.category, 'category')}</p>}<h2>{advanceName(advance.id)}</h2>
-        {inspection && <><AdvanceBenefits id={advance.id} snapshot={snapshot}/>
+        {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label="Advance rules" compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
         {offer?.price !== null && offer?.price !== undefined && <div className="price-quote"><strong>${offer.price}</strong><span>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</span></div>}
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
         {offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
             {label(discount.leaderCardId, 'leader')} <strong>−${discount.amount}</strong>
         </p>)}
-        {inspection && <dl className="detail-list"><div><dt>{t('table.printedCost')}</dt><dd>${advance.cost}</dd></div><div><dt>{t('advance.prerequisites')}</dt><dd>{advance.prerequisites.map(advanceName).join(', ') || '—'}</dd></div>
-            <div><dt>{t('advance.credit')}</dt><dd>${advance.credit}</dd></div><div><dt>{t('advance.mr')}</dt><dd>{advance.miseryRelief}</dd></div>
-            <div><dt>{t('table.purchaseMisery')}</dt><dd>{advance.purchaseMisery}</dd></div>
-            <div><dt>{t('advance.owners')}</dt><dd>{snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</dd></div></dl>}
+        {inspection && <p>{t('advance.owners')}: {snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</p>}
         {action && offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}
     </section>;
 }

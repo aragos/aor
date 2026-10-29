@@ -1,9 +1,9 @@
 .interactive-board { margin-bottom: 1.4rem; scroll-margin-top: 1rem; }
-.map-heading, .map-players, .map-legend, .map-pick-banner, .map-zoom { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem 1rem; }
+.map-heading, .map-players, .map-pick-banner, .map-zoom { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem 1rem; }
 .map-heading { justify-content: space-between; }
 .map-heading h2 { margin-bottom: .6rem; }
 .map-players { font-size: .8rem; }
-.map-players span, .map-legend span, .map-facts span { display: inline-flex; align-items: center; gap: .3rem; }
+.map-players span span, .map-facts span { display: inline-flex; align-items: center; gap: .3rem; }
 .map-players small { color: #667268; }
 .map-zoom { gap: .35rem; }
 .map-zoom button { margin: 0; }
@@ -21,12 +21,9 @@
 .map-area-label:focus .area-label-bg { stroke: #143e4e; stroke-width: 5; }
 .map-province.active { cursor: pointer; outline: none; }
 .map-province.inactive { opacity: .6; }
-.map-legend { font-size: .78rem; margin: .9rem 0; }
-.map-legend .check-label { margin: 0; }
 .satellite-key::before, .coast-key::before { content: ''; width: 20px; height: 18px; border: 1px solid #8d9e94; border-radius: 3px; }
 .satellite-key::before { background: radial-gradient(#879481 1px, transparent 1px) 0 0 / 6px 6px #e0e4d9; }
 .coast-key::before { background: #d2efed; border-color: #56929c; }
-.commodity-legend { font-size: .85rem; }
 .province-inspector { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; border-top: 1px solid #d3d9cc; margin-top: 1rem; padding-top: 1rem; }
 .province-inspector h3 { margin: 0 0 .4rem; font-size: 1rem; }
 .province-inspector p { margin: .5rem 0; }
@@ -52,8 +49,6 @@
 .map-zoom { gap: .25rem; } .map-zoom button { padding: .55rem .75rem; }
 .map-viewport { border: 0; border-radius: 0; }
 .world-map { height: min(65vh, 750px); min-height: 460px; }
-.commodity-legend { padding: .3rem 1rem; border-top: 1px solid #d7dece; font-size: .8rem; }
-.commodity-legend summary { min-height: 28px; }
 .province-inspector { display: block; padding: 0; margin: 0 0 1rem; border: 0; }
 .province-inspector h2 { margin-bottom: .8rem; font-size: 1.6rem; }
 .province-inspector p { font-size: .85rem; }

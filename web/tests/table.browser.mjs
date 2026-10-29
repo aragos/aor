@@ -45,14 +45,8 @@ export async function checkTable(page, web, baseline) {
         assert(income.title && income.label, 'Income keeps hover and accessible labels');
     }
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .track-reference').open`), false, 'Full tracks remain collapsed inside player details');
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track').checkVisibility()`), false, 'Closed reference track is not visible');
-    await page.evaluate(`document.querySelector('.player-summary.is-viewer .track-reference > summary').click()`);
-    const reference = await page.evaluate(`({misery:document.querySelectorAll('.player-summary.is-viewer .reference-track')[0].textContent, current:[...document.querySelectorAll('.player-summary.is-viewer .reference-track [aria-current=step]')].map(step=>step.textContent)})`);
-    const me = baseline.game.players.find(player=>player.id===baseline.viewerId);
-    assert(reference.current.includes(String(me.misery)), 'Misery reference highlights current printed value');
-    assert(reference.current.includes(String(me.ships.level)), 'Shipping reference highlights current level');
-    assert(reference.misery.includes('Chaos'), 'Complete misery reference includes Chaos');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#tracks"]').target`), '_blank', 'Tracks open outside the game');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track')`), null, 'Static tracks leave the game view');
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
     const offer = fixture.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && offer.blockers.length === 0);
     assert(offer, 'Live fixture must expose a legal marker establishment');
@@ -119,14 +113,14 @@ export async function checkTable(page, web, baseline) {
     await page.wait(`document.querySelector('.table-activity .unread-badge')?.textContent === '1'`, 'closed activity unread count');
     await page.evaluate(`document.querySelector('.table-activity > summary').click()`);
     await page.wait(`!document.querySelector('.table-activity .unread-badge')`, 'opening activity marks entries read');
-    await page.evaluate(`document.querySelector('.commands-toggle').focus()`);
+    await page.evaluate(`document.querySelector('.command-dock > summary').focus()`);
     const updatedEvents=[...events,{...nextEvent,id:'fixture-activity-2'}];
     await show({revision:fixture.revision+1,events:updatedEvents});
     await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     assert.equal(await page.evaluate(`document.querySelector('.table-activity .unread-badge')`), null, 'Events received while activity open remain read');
     await show({revision:fixture.revision+1,events:updatedEvents});
     assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.activity-list [data-event-id]')].map(entry=>entry.dataset.eventId)).size`), updatedEvents.filter(event=>event.kind!=='PASS').length, 'Repeated polling keeps stable unique activity entries');
-    assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.commands-toggle')`), true, 'Activity updates preserve focus');
+    assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.command-dock > summary')`), true, 'Activity updates preserve focus');
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /−\$10/,
         'Activity includes the cash spent in its purchase entry');
     await show({events:[...updatedEvents,{...nextEvent,id:'continued-omitted',kind:'PASS',cashChanges:[]}]});

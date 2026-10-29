@@ -17,6 +17,8 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 
 - Project costs, destinations, eligibility and consequences from authoritative domain state. Keep
   inspection separate from action drafts, and preserve valid drafts through polling and inspection.
+- Activity must use entry-time identities and facts; appending history must not rewrite existing
+  entries. Only explicit history edits may replace affected entries.
 - Derive public summaries only from public information; a count must not reveal a private card or
   decision. Distinguish a private browser draft from a committed or server-saved action.
 - Keep goals and acceptance in `docs/requirements.md`, reusable UI contracts in `docs/ui-design.md`,
@@ -31,3 +33,5 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 - Run focused tests appropriate to the changed behavior. The integrated Kotlin checks are
   `./gradlew :core:jvmTest :core:compileKotlinJs :server:test checkKotlinFormat`.
 - For browser changes, run `npm run build` from `web` and verify affected user interactions.
+  Match production React StrictMode in interaction fixtures; exercise live server offers for
+  lifecycle regressions rather than relying only on fabricated choices.

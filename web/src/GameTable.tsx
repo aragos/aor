@@ -15,6 +15,8 @@ import {ProvinceActions, ProvinceInspector} from './map/ProvinceInspector';
 import {decisionIdentity} from './decision';
 import {DiagnosticMessage} from './DiagnosticMessage';
 import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
+import {HelpLink} from './HelpLink';
+import {useTurnFavicon} from './favicon';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
@@ -38,6 +40,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     }, [decisionKey, resetSelection]);
     useEffect(() => setSheetCollapsed(false), [selected, selectedArea, selectedCard, selectedAdvance]);
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
+    useTurnFavicon(canAct && snapshot.status !== 'CANCELLED' && snapshot.status !== 'ABANDONED');
     const expansion = snapshot.game.stage === 'EXPANSION';
     const expanding = canAct && expansion && snapshot.game.activity?.actor === snapshot.viewerId;
     useEffect(() => {
@@ -69,7 +72,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     }, [seatTitle]);
     if (!me) return null;
     const expansionPlayer = expansion ? snapshot.game.players.find(player => player.id === snapshot.game.activity?.actor) : undefined;
-    const military = snapshot.game.effects.military.filter(play => play.player === expansionPlayer?.id);
+    const military = snapshot.game.effects.military;
     const finished = snapshot.game.stage === 'FINISHED';
     const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
@@ -96,7 +99,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                     href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
             </details>}
-            <button type="button" className="secondary commands-toggle" aria-expanded={commandsOpen} onClick={() => {setCommandsOpen(current => !current); if (!commandsOpen) setTimeout(() => document.querySelector('.command-dock')?.scrollIntoView({block: 'nearest'}), 0);}}>›_ {t('table.commands')}</button>
+            <HelpLink label="Playing AoR"/>
         </header>
         <PlayerOverview snapshot={snapshot}/>
         {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
@@ -146,10 +149,12 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     <div className="expansion-player"><span>{playerName(snapshot, expansionPlayer.id)}</span><small>{t('table.remainingPoolTokens')}</small></div>
                     <strong><TableIcon kind="token"/>{expansionPlayer.poolTokens}</strong>
                 </div>}
-                {expansionPlayer && <p className="military-summary"><strong>{t('table.militaryAdvantage')}:</strong>{' '}
-                    {military.length ? military.map(play => label(play.event, 'event')).join(', ') : t('table.noMilitaryAdvantage')}
-                    {military.length > 0 && <small>{t('table.militaryMatchups')}</small>}
-                </p>}
+                {expansionPlayer && military.length > 0 && <section className="military-summary"><strong>{t('table.militaryAdvantage')}</strong>
+                    {snapshot.game.players.filter(player => military.some(play => play.player === player.id)).map(player => <p key={player.id}>
+                        <Emblem player={player} size={15}/> {playerName(snapshot, player.id)}: {military.filter(play => play.player === player.id).map(play => label(play.event, 'event')).join(', ')}
+                    </p>)}
+                    <small>{t('table.militaryMatchups')}</small>
+                </section>}
                 <div id="decision-content" className="decision-content">
                 <CompetitionNotice snapshot={snapshot}/>
                 <WarNotice snapshot={snapshot}/>
@@ -182,6 +187,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}><dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd></div>)}
 </dl>
             <a href="/">{t('game.new')}</a>
+            <HelpLink topic="variants" label="Variant descriptions" compact={false}/>
         </details>
         <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory} open={commandsOpen} onToggle={setCommandsOpen}/>
     </main>;

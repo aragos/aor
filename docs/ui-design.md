@@ -44,18 +44,20 @@ choice and understand its result through visual controls and commands, on deskto
 ## Current table contracts
 
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
-  Remove the redundant Board details expander; province facts remain in inspection.
+  Commands remain in the bottom expander; omit their header button. Province facts remain in
+  inspection. Static reference belongs on public `/help`, with contextual links opening a new tab.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
   the action button confirms it. Playable cards also appear beside Pass.
 - Full-market placement is primary when legal. Otherwise use the largest engine-offered partial
   placement and label it **Place maximum possible tokens**. Omit destinations with no feasible
   pool/shipping commitment. Keep marker reduction collapsed and competition commitments exact.
-- Expansion summaries show each player's white markers and the actor's military cards with
-  matchup caveats. Competition results persist through expansion unless cleared; new results
+- Expansion summaries show each player's white markers and active military cards with matchup
+  caveats. Omit the military box entirely when nobody has one. Competition results persist through expansion unless cleared; new results
   still appear, and the activity history remains intact.
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
-  full payout boxes, collapsed by default, while preserving current owner payouts and overflow rules.
+  links to full payout boxes on the reference page; keep current owner payouts and adjustments
+  in the game. Move legends, printed tracks, card effects, and advance rules to that same page.
 - Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
   and private discards stay counted; this cannot promise remaining drawable cards.
 - Cancellation choices and confirmation show cost. Stabilization shows its resulting misery box
@@ -64,7 +66,11 @@ choice and understand its result through visual controls and commands, on deskto
   to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
   It explains draw reasons, epoch/end triggers, protection money, leader rebates, related cash
-  changes and shortage/surplus dice. All displayed dice identify their colors.
+  changes and shortage/surplus dice. All displayed dice identify their colors. Show an action only
+  once and cap the box height with scrolling. Player names and emblems are those at entry time,
+  retained as later actions arrive. Activity cards link to their reference.
+- The shield favicon is colorful when this player has a required action and grayscale otherwise.
+  The game list checks all the player’s awaiting games, independently of the visible filter/page.
 - Command history defaults to capital aliases, with saved display-name/ID alternatives. Aliases
   cover actors, targets, attributed dice and edit authors; stored commands and `@entry` references
   remain canonical.

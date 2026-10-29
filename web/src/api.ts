@@ -80,6 +80,7 @@ export interface CardDefinition {
 }
 export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
 export interface HistoryEventView {
+    participants?: {id: string; name: string; capital: string | null}[];
     id: string; kind: 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
         'RETURN_CARD' | 'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' |
         'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
