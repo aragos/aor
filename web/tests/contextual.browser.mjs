@@ -124,12 +124,12 @@ export async function checkContextualUx(page, web, baseline) {
     await show({prompt:{messageId:'prompt.purchase-advances',players:[viewer]},legalChoices:{commands:[`buy-advance ${advance.letter}`,'pass']},
         game:{stage:'PURCHASE',activity:{actor:viewer,decisionPlayer:viewer,choice:'purchase-advances',purchaseStep:'ADVANCES',startEntry:revision},
             advanceOffers:[{advance:advance.id,price:10,unavailableReason:null,leaderDiscounts:[{leaderCardId:'charlemagne',baseAmount:20,writtenRecordBonus:10,amount:30}],
-                priceBreakdown:{advance:advance.id,baseCost:40,categoryCredit:0,institutionalResearchCredit:0,leaders:[{leaderCardId:'charlemagne',baseAmount:20,writtenRecordBonus:10,amount:30}],price:10,miseryBefore:0,miseryAfter:0},miseryChanges:[]}],
+                priceBreakdown:{advance:advance.id,baseCost:40,categoryCredit:0,advanceCredits:[],effectiveDiscount:30,institutionalResearchCredit:0,leaders:[{leaderCardId:'charlemagne',baseAmount:20,writtenRecordBonus:10,amount:30}],price:10,miseryBefore:0,miseryAfter:0},miseryChanges:[]}],
             effects:{...baseline.game.effects,leaders:[{leader:'CHARLEMAGNE',owner:viewer,role:'DISPLAY',displayBox:null,protectionCash:0,patronageClaimants:[]}]},
             playedLeaderDiscounts:[{leader:'CHARLEMAGNE',usable:true,discounts:[{advance:advance.id,printedAmount:20,conditionalAmount:20,writtenRecordBonus:10,effectiveDiscount:30,condition:null}]}]}});
     await page.wait(`document.querySelector('#tab-advances[aria-selected=true]')`, 'advances workspace opens on purchase');
     assert.equal(await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').classList.contains('available')`), true);
-    assert.match(await page.evaluate(`document.querySelector('[data-advance="${advance.id}"] .advance-discount').textContent`), /30/);
+    assert.match(await page.evaluate(`document.querySelector('[data-advance="${advance.id}"] .advance-price-compact').textContent`), /−\$30 credits/);
     assert.match(await page.evaluate(`document.querySelector('.advances-workspace .leader-list').textContent`), /Charlemagne/);
     assert.match(await page.evaluate(`document.querySelector('.advances-workspace .leader-in-box .leader-role').textContent`), /In the box/);
     assert.match(await page.evaluate(`document.querySelector('.advances-workspace .leader-in-box .leader-discount').textContent`), /30/);

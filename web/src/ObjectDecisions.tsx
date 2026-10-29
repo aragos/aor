@@ -3,7 +3,7 @@ import type {CardChoiceView, Snapshot} from './api';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {HelpLink} from './HelpLink';
-import {Commodity, CommodityAdjustments, Emblem, Payouts, PayoutReference, UnplayedLeaders} from './TablePanels';
+import {Commodity, CommodityAdjustments, CommodityValueNote, Emblem, Payouts, PayoutReference, UnplayedLeaders} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
@@ -72,6 +72,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
         {inspection && <p className="eyebrow">{t(`kind.${definition.kind}`)}</p>}<h2>{t(definition.messageId)}</h2>
         <CardEventText definition={definition}/>
         {inspection && <><HelpLink topic={`card-${definition.id}`} label="Card rules" compact={false}/>
+        {(info?.commodities ?? offer?.commodities)?.length ? <CommodityValueNote snapshot={snapshot}/> : null}
         {(info?.commodities ?? offer?.commodities)?.map(commodity => {
             const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
             return <div className="card-value" key={commodity}><Commodity commodity={commodity}/>{payout && <>
@@ -139,14 +140,11 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
         {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label="Advance rules" compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
+        <AdvancePrice offer={offer} printedCost={advance.cost}/>
         {offer?.price !== null && offer?.price !== undefined && <>
-            <AdvancePrice offer={offer}/>
             <p className="small">{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
         </>}
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
-        {!offer?.priceBreakdown && offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
-            {label(discount.leaderCardId, 'leader')} <LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/>
-        </p>)}
         {inspection && <p>{t('advance.owners')}: {snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</p>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
         {action && offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}

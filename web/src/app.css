@@ -283,3 +283,9 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .advance-price-compact > small { font-weight: 400; color: #526256; }
 .misery-preview { margin-block: .7rem; }
 .misery-preview > p { margin-bottom: .4rem; }
+.price-total { display: block; font-size: 1.65rem; line-height: 1.2; }
+.price-details { margin-top: .35rem; font-size: .8rem; }
+.price-details > summary { color: #526256; }
+.price-details[open] > summary { margin-bottom: .6rem; }
+.price-breakdown { margin-block: .5rem; }
+.advance-price-compact { gap: .1rem; }

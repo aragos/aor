@@ -1,35 +1,40 @@
 import type {AdvanceOfferView} from './api';
-import {label} from './labels';
+import {advanceName, label} from './labels';
 import {t} from './messages';
 import {LeaderCredit} from './LeaderCredit';
 
-/** Displays the engine's quote without recomputing any credit or purchase total. */
-export function AdvancePrice({offer, compact = false}: {
-    offer: AdvanceOfferView | undefined; compact?: boolean;
+/** Keep the current price prominent; named credit sources belong in optional detail. */
+export function AdvancePrice({offer, printedCost, compact = false}: {
+    offer: AdvanceOfferView | undefined; printedCost: number; compact?: boolean;
 }) {
-    if (offer?.price === null || offer?.price === undefined) return <span>—</span>;
-    const quote = offer.priceBreakdown;
-    if (!quote) return <strong>${offer.price}</strong>;
+    const quote = offer?.priceBreakdown;
+    const price = offer?.price ?? printedCost;
+    const discount = quote?.effectiveDiscount ?? 0;
     if (compact) return <span className="advance-price-compact">
-        <strong>${quote.price}</strong>
-        <small>{t('table.printedCost')}: ${quote.baseCost}</small>
-        {quote.categoryCredit > 0 && <small>{t('table.categoryCredit')}: −${quote.categoryCredit}</small>}
-        {quote.institutionalResearchCredit > 0 && <small>{t('table.institutionalResearchCredit')}: −${quote.institutionalResearchCredit}</small>}
-        {quote.leaders.map(discount => <span className="advance-discount" key={discount.leaderCardId}>
-            {label(discount.leaderCardId, 'leader')} <LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/>
-        </span>)}
+        <strong>${price}</strong>
+        {discount > 0 && <small>{t('table.creditsApplied', {amount: discount})}</small>}
+        {!quote && <small>{t('table.printedCost')}</small>}
     </span>;
+    if (!quote) return <div className="advance-price"><strong className="price-total">${price}</strong>
+        <span className="small muted"> {t('table.printedCost')}</span></div>;
     return <div className="advance-price">
-        <dl className="detail-list price-breakdown">
-            <div><dt>{t('table.printedCost')}</dt><dd>${quote.baseCost}</dd></div>
-            {quote.categoryCredit > 0 && <div><dt>{t('table.categoryCredit')}</dt><dd>−${quote.categoryCredit}</dd></div>}
-            {quote.institutionalResearchCredit > 0 && <div><dt>{t('table.institutionalResearchCredit')}</dt><dd>−${quote.institutionalResearchCredit}</dd></div>}
-            {quote.leaders.map(discount => <div className="leader-discount" key={discount.leaderCardId}>
-                <dt>{label(discount.leaderCardId, 'leader')}</dt>
-                <dd><LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/></dd>
-            </div>)}
-            <div><dt>{t('table.finalPrice')}</dt><dd><strong>${quote.price}</strong></dd></div>
-        </dl>
-        {quote.price === 0 && <p className="small muted">{t('table.minimumPrice')}</p>}
+        <strong className="price-total">${price}</strong>
+        <details className="price-details">
+            <summary>{discount > 0 ? t('table.creditsApplied', {amount: discount}) : t('table.priceDetails')}</summary>
+            <dl className="detail-list price-breakdown">
+                <div><dt>{t('table.printedCost')}</dt><dd>${quote.baseCost}</dd></div>
+                {quote.advanceCredits.map(credit => <div className="advance-credit-source" data-credit-advance={credit.advance} key={credit.advance}>
+                    <dt>{advanceName(credit.advance)}</dt><dd>−${credit.amount}</dd>
+                </div>)}
+                {quote.institutionalResearchCredit > 0 && <div><dt>{t('table.institutionalResearchCredit')}</dt><dd>−${quote.institutionalResearchCredit}</dd></div>}
+                {quote.leaders.map(discount => <div className="leader-discount" key={discount.leaderCardId}>
+                    <dt>{label(discount.leaderCardId, 'leader')}</dt>
+                    <dd><LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/></dd>
+                </div>)}
+                <div><dt>{t('table.finalPrice')}</dt><dd><strong>${price}</strong></dd></div>
+            </dl>
+            <p className="small muted">{t('table.creditTiming')}</p>
+            {price === 0 && <p className="small muted">{t('table.minimumPrice')}</p>}
+        </details>
     </div>;
 }
