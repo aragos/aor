@@ -36,8 +36,9 @@ files; hosted deployment uses PostgreSQL for every durable application repositor
 ## 3. Game storage and configuration
 
 A game consists of player identities, metadata (e.g. when the game was created), rules/data compatibility versions and a
-versioned text log. Game option values are setup commands. `start` validates and freezes configuration. Once play
-starts, setup cannot be edited under any undo scope.
+versioned text log. Creation records the selected options, then automatically submits `start`, which
+validates and freezes configuration and resolves the opening outcomes. Setup cannot be edited
+under any undo scope once play starts.
 
 The supported variants are the deck-1 Timber/deck-2 War exchange, one mutually exclusive initial
 card restriction, immediate Master Art discard, and the European map. Map selection determines the

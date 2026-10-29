@@ -16,6 +16,7 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
   On the standard map, the Aegean and Central Mediterranean are separate seas within Area VIII; Crete's coastal water
   visibly adjoins each of them and the Eastern Mediterranean.
   Smyrna's coastal water visibly adjoins both the Aegean Sea and Eastern Mediterranean.
+  Fez visibly adjoins both the Canary Basin and Western Mediterranean on both maps.
   On the European map, the Aegean is part of the Central Mediterranean: show one continuous sea
   and one name, with every former Aegean contact transferred to the combined sea. Crete adjoins
   only the Central Mediterranean; Smyrna adjoins it and the Eastern Mediterranean.
@@ -92,8 +93,9 @@ and background clicks preserve an active action draft.
 
 Keep zoom in, zoom out and Fit floating over the board. Support modifier-scroll, trackpad pinch,
 two-finger touch pinch and dragging, centered on the gesture and constrained to board bounds.
-Ordinary scrolling navigates the page. Keep map text unselectable during gestures. The board table
-provides a structured alternative to spatial inspection; omit map search and navigation menus.
+Ordinary scrolling navigates the page. Keep map text unselectable during gestures. The province
+inspector provides structured occupancy, neighbors, sea contacts and support details outside the
+action panel; the duplicate board-details table is removed. Omit map search and navigation menus.
 
 ## Data and verification
 

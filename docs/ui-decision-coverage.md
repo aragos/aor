@@ -5,9 +5,10 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
-At the 2026-10-28 checkpoint, integrated core JVM, Kotlin/JS, server and formatting checks pass.
-Targeted gameplay, market and contextual browser regressions pass; the comprehensive browser rerun
-is pending. The matrix retains earlier evidence with new cases identified below. See
+At the 2026-10-28 checkpoint, integrated core JVM, Kotlin/JS, server and formatting checks, web
+build/unit tests and the comprehensive browser suite pass. This includes gameplay, market,
+private-seat, hosted authentication and live European-map flows. The matrix retains earlier
+evidence with new cases identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
 
 ## Decision inventory
@@ -69,10 +70,12 @@ handlers do not make those rules selectable in current game creation.
 
 ## Historical long runs and reproduction
 
-The live 2026-10-25 three-player run reached `FINISHED` through 473 canonical UI actions across three
-epochs, with all players in Chaos and three score rows. It was not rerun for this batch and did not
-visit Final Card Play; that phase has separate fixture evidence. A valid Chaos ending proves neither
-deck exhaustion nor final-round coverage.
+The live 2026-10-28 three-player run reached `FINISHED` through **469 canonical UI actions** over
+22 turns and all three epochs. It exhausted the deck, visited Final Card Play and displayed three
+final score rows. Creation and every decision used visible controls with the command dock closed;
+read-only snapshots verified canonical actions and private-batch revisions. Fixtures and domain
+tests cover choices the scenario did not make. The earlier 2026-10-25 run ended in Chaos before
+Final Card Play; it remains separate evidence.
 
 The 2026-10-27 six-seat epoch-3 profile measured 60 snapshot requests at p95 7.2 ms, maximum 145,955
 bytes, and 18 workspace interactions at p95 92.3 ms. It used an older catalog and local Vite under

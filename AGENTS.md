@@ -13,6 +13,16 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 - Keep domain rules and rulings in `docs/rules.md`; preserve the reviewed catalog and explicit game
   options when making implementation changes.
 
+## Interaction and documentation
+
+- Project costs, destinations, eligibility and consequences from authoritative domain state. Keep
+  inspection separate from action drafts, and preserve valid drafts through polling and inspection.
+- Derive public summaries only from public information; a count must not reveal a private card or
+  decision. Distinguish a private browser draft from a committed or server-saved action.
+- Keep goals and acceptance in `docs/requirements.md`, reusable UI contracts in `docs/ui-design.md`,
+  observed evidence in `docs/ui-decision-coverage.md`, and unresolved defaults in `docs/follow-ups.md`.
+  Update their owners instead of copying requirements into historical task lists.
+
 ## Formatting and verification
 
 - After editing Kotlin sources or Gradle Kotlin scripts, run `./gradlew formatKotlin` to completion.

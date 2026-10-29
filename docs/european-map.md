@@ -114,7 +114,8 @@ one Central Mediterranean sea in Area VIII.
 The selected map is used throughout setup, board validation, expansion, card targets, commodity
 ownership and public catalogs. Wine has seven ownership boxes on the full European board;
 payments use the same quadratic formula. The selected option is recorded in the initial revision
-and replayed on restart. Catalog version `ah1996-catalog-12` includes the merged European sea.
+and replayed on restart. Catalog version `ah1996-catalog-13` includes the merged European sea and
+Fez's Western Mediterranean contact, shared with the standard board.
 
 Province declarations do not redraw the browser asset. After changing the map, update its anchors
 in `web/scripts/map_geography.py` as needed, then export the resolved engine catalog and regenerate

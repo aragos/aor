@@ -28,7 +28,8 @@ outcomes and never generates randomness.
 
 Each game records its rules and data versions, registered players and explicit creator.
 The creator's role is independent of registration order. The log records player actions and authority outcomes.
-Game options are setup commands. `start` validates and freezes configuration; setup cannot be edited once play starts.
+Game options are setup commands. Application creation automatically records `start` after resolving
+options; the engine validates and freezes configuration. Setup cannot be edited once play starts.
 Waiting players and completion status are derived from state and prompts.
 
 All clients submit the same commands using locale-independent text with lossless round trips.

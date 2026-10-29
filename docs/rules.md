@@ -72,6 +72,8 @@ All fractions are **rounded up** unless stated otherwise.
 
 - The board has eight areas (I–VIII) plus the overseas boxes. Area membership, market numbers, commodities, satellite
   arrows, adjacency and coastal-water links are all **[data]**.
+- **Fez sea access.** Fez directly adjoins both the Canary Basin and Western Mediterranean
+  (user correction, 2026-10-28). This applies to both supported maps.
 - **Home areas:**
 
 | Capital | Home area |
@@ -133,6 +135,9 @@ All fractions are **rounded up** unless stated otherwise.
 ---
 
 ## 3. Setup
+
+Creating a game records the selected variants and starts setup immediately. Players enter their
+private views at the first decision; there is no separate Start setup action in the application.
 
 1. **Game length.** Games use three epochs, with no setup option for a shorter game (project
    decision, 2026-10-24). The 26th-advance ending trigger still applies ([§8](#8-end-of-game)).
@@ -526,6 +531,8 @@ at least the cost.
     - A player's *tier count* is the minimum number of advances it owns in any of the six categories.
     - It needs at least one tier to buy relief at all.
 - **How far.** Per turn, a player may move down up to one space per tier.
+  The application shows this decision for players with a completed tier even when they cannot
+  afford relief or are already at zero misery, explaining the limit and offering Pass.
 - **Cost.**
     - Each space costs the difference between the two box values.
     - The **MR** ratings of advances bought *this turn* are pooled and reduce the cost. Unused MR is lost.
@@ -913,9 +920,10 @@ The baseline remains the reviewed AH1996 rules, with these independent choices r
   players; the full map has seven Wine markets. Commodity payments keep the usual quadratic rule.
 
 Choose variants on the same screen as player registration. Every resolved option appears in the
-initial command log, and `start` freezes it. Earlier presets and all other optional mechanics are
-retired. Event-rebuilt markers do not count toward the expansion bonus; voluntary rebuilds do not
-count either. The [command reference](commands.md) owns exact keys and values.
+initial command log; creation automatically records `start` and freezes the options. Earlier presets
+and all other optional mechanics are retired. Event-rebuilt markers do not count toward the expansion
+bonus; voluntary rebuilds do not count either. The [command reference](commands.md) owns exact keys
+and values.
 
 ---
 

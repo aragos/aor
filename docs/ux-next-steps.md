@@ -22,9 +22,13 @@ without exposing hidden cards. Activity opens by default, labels dice colors, ex
 market rolls, records epoch/end triggers and cash changes, and omits continuation noise. Catalog 13
 adds the reviewed Fez–Western Mediterranean contact to both board variants.
 
-At the 2026-10-28 checkpoint, integrated Kotlin checks and targeted gameplay, market and contextual
-browser regressions pass; both map variants pass geometry validation. The comprehensive browser
-rerun is pending. Earlier evidence remains scoped in the coverage inventory.
+At the 2026-10-28 checkpoint, integrated Kotlin checks, web build/unit tests and the comprehensive
+browser suite pass, including gameplay, market, private-seat, hosted-authentication and European-map
+flows. Both map variants pass geometry validation. Earlier evidence remains scoped in the coverage
+inventory.
+
+A complete three-player browser game also passed: 469 visual actions over 22 turns and all epochs,
+including deck exhaustion, Final Card Play and three final score rows.
 
 ## Remaining review
 
