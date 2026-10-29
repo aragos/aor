@@ -108,21 +108,21 @@ export async function checkDecisionEvidence(page, web, baseline) {
     await page.send('Page.navigate',{url:web+'/tests/map-harness.html'});
     await page.wait(`typeof window.setMapSnapshot==='function'`,'decision identity harness');
     let fixture = {...baseline,prompt:{messageId:'prompt.replace-event-token',players:[baseline.viewerId]},
-        legalChoices:{commands:['replace-event-token pool','replace-event-token none']},
-        game:{...baseline.game,activity:{...baseline.game.activity,choice:'replace-event-token',decisionPlayer:baseline.viewerId,decisionEntry:1000}}};
+        legalChoices:{commands:['replace-event-tokens none']},
+        game:{...baseline.game,replacementToken:{player:baseline.viewerId,provinces:['rome'],event:'BLACK_DEATH',poolTokens:1,poolCost:1,maxReplacements:1,stockTokens:0,misery:0,civilWarLossPending:false},activity:{...baseline.game.activity,choice:'replace-event-token',decisionPlayer:baseline.viewerId,decisionEntry:1000}}};
     const show = async () => {
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${fixture.revision}"]')`,'decision fixture');
     };
     await show();
-    await page.evaluate(`document.querySelector('.game-actions .action-buttons button').click()`);
-    await page.wait(`document.querySelector('.selected-action')`,'prepared replacement');
+    await page.evaluate(`document.querySelector('[data-replacement-province=rome] button:first-child').click()`);
+    await page.wait(`document.querySelector('.event-replacements [aria-pressed=true]')`,'prepared replacement');
     fixture = {...fixture,revision:fixture.revision+1};
     await show();
-    assert(await page.evaluate(`!!document.querySelector('.selected-action')`),'Polling retains prepared choice');
+    assert(await page.evaluate(`!!document.querySelector('.event-replacements [aria-pressed=true]')`),'Polling retains prepared choice');
     fixture = {...fixture,revision:fixture.revision+1,game:{...fixture.game,activity:{...fixture.game.activity,decisionEntry:1001}}};
     await show();
-    assert.equal(await page.evaluate(`document.querySelector('.selected-action')`),null,'Same-player same-prompt replacement clears obsolete choice');
+    assert.equal(await page.evaluate(`document.querySelector('.event-replacements [aria-pressed=true]')`),null,'Same-player same-prompt replacement clears obsolete choice');
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
     for (const advance of baseline.game.catalog.advances) {
         await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);

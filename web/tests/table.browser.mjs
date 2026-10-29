@@ -230,7 +230,6 @@ export async function checkDecisionFamilies(page, web, baseline) {
         ['immediate-master-art-discard', `discard-card ${hand.reference}`, 'PURCHASE'],
         ['buy-card', `discard-card ${hand.reference}`, 'BUY_CARD'],
         ['civil-war-loss', 'civil-war-loss cash'],
-        ['replace-event-token', 'replace-event-token pool'],
         ['renaissance', `swap-order ${other}`],
         ['written-record', `written-record ${other}`],
         ['adjust-market', 'adjust-market grain shortage'],
@@ -247,6 +246,19 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.wait(`window.uiCommands.length === ${count + 1}`, choice + ' confirmed');
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
+    await show('replace-event-token', ['replace-event-tokens none'], {
+        replacementToken: {player: viewer, provinces: ['rome', 'florence'], event: 'BLACK_DEATH',
+            poolTokens: 1, poolCost: 1, maxReplacements: 1, stockTokens: 0, misery: 0, civilWarLossPending: false},
+    });
+    const beforeReplacement = await page.evaluate('window.uiCommands.length');
+    await page.evaluate(`document.querySelector('[data-replacement-province="rome"] button:first-child').click()`);
+    assert.equal(await page.evaluate('window.uiCommands.length'), beforeReplacement, 'Replacement choice only edits a draft');
+    assert.equal(await page.evaluate(`document.querySelector('.event-replacements > button:last-child').disabled`), true, 'Every province needs a choice');
+    assert.equal(await page.evaluate(`document.querySelector('[data-replacement-province="florence"] button:first-child').disabled`), true, 'Pool budget prevents a second replacement');
+    await page.evaluate(`document.querySelector('[data-replacement-province="florence"] button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    await page.wait(`window.uiCommands.length === ${beforeReplacement + 1}`, 'grouped event confirmed');
+    assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), 'replace-event-tokens rome');
     for (const [choice, command] of [['cathedral', 'cathedral'], ['windmill', 'windmill'], ['purchase-stabilization', 'stabilize misery'], ['buy-card', 'buy-card']]) {
         await show(choice, [command]);
         const count = await page.evaluate('window.uiCommands.length');

@@ -20,7 +20,8 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 - Presentation shortcuts must preserve domain provenance and lifecycle. Keep temporary facts with
   their live owner so replacing it cannot resurrect stale capabilities.
 - Activity must use entry-time identities and facts; appending history must not rewrite existing
-  entries. Only explicit history edits may replace affected entries.
+  entries. Only explicit history edits may replace affected entries. Attribute direct actions and
+  automatic phase receipts separately, retaining actual resource endpoints and public causes.
 - Derive public summaries only from public information; a count must not reveal a private card or
   decision. Distinguish a private browser draft from a committed or server-saved action.
 - Keep goals and acceptance in `docs/requirements.md`, reusable UI contracts in `docs/ui-design.md`,

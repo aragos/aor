@@ -52,7 +52,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   During expansion, show each player's white markers and active military cards with matchup
   qualifications; omit the military box when nobody has an advantage. Keep results in activity;
   explicitly show a dismissible outcome to the player whose submitted action just resolved it.
-  Losses use red result styling.
+  Losses use red result styling. Competition notices and pending result requests expire when their
+  expansion ends; later polling or a new expansion must not restore them.
   Selecting an unavailable province explains its authoritative blocker without offering an invalid
   action. Preserve legal smaller placements and keep missing access requirements specific.
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
@@ -74,8 +75,11 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
   explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
   while waiting; submit once on the legal turn while that view remains open, with no failed retries.
-  Replacement-token choices identify the event, recipient, province, pool cost and result; explain
-  when no pool token remains and avoid implying another misery charge.
+  Resolve event replacements in current player order. Offer all of the chooser's affected provinces
+  together, enforce their shared pool budget, and review the complete group before one confirmation.
+  Identify the event, recipient, pool cost and result; explain when no pool token remains and avoid
+  implying another misery charge. Civil War's subsequent choice shows both actual cash and token
+  losses and resulting balances, after capital replacement and rounding.
 - Open bounded, scrollable activity by default, with an icon to hide/show it and no header or count.
   Show every action once. Preserve entry-time names and emblems as later history is appended;
   cards open the in-game inspector without changing an action draft.
@@ -83,6 +87,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   protection money, leader rebates and related cash/misery changes; label dice colors and omit
   continuation noise. Misery relief itemizes cash and current-turn relief rating; Holy Indulgence
   records pool/stock token movements even when no cash changes.
+  Every actual misery change belongs to an entry with its cause and recorded boxes, including
+  automatic New World income relief and deferred card effects. Keep direct actions and automatic
+  phase receipts distinct, even when their changes cancel within one server response.
 - Show each round's fully revealed token purchases as one activity entry with every participant's
   signed bid, cash cost and actual tokens received. Unrevealed bids remain private and canonical
   command history remains unchanged. Gold/Ivory's shared adjustment has one priced cancellation

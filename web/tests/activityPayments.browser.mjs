@@ -122,6 +122,26 @@ export async function checkActivityPayments(page, web, baseline) {
     await page.evaluate(`document.querySelector('.activity-toggle').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.activity-list').scrollTop`), scroll,
         'Reopening preserves the prior scroll position');
+    const incomeRelief = {...payment, id: 'new-world-relief', kind: 'INCOME', actor: null, target: null,
+        cashChanges: [], miseryChanges: [{player: actor, spaces: -1, fromValue: 20, toValue: 10,
+            reasons: [{kind: 'INCOME_RELIEF', spaces: null, advance: 'NEW_WORLD', card: null}]}]};
+    const deferred = {...payment, id: 'deferred-misery', kind: 'FORGO_MARKER', target: null,
+        cashChanges: [], miseryChanges: [{player: actor, spaces: 1, fromValue: 20, toValue: 30,
+            reasons: [{kind: 'CARD_EFFECT', spaces: null, advance: null, card: 'the-crusades'}]}]};
+    events.push(incomeRelief, deferred);
+    await show();
+    const reliefSelector = '[data-event-id="new-world-relief"] .event-misery-change';
+    assert.match(await page.evaluate(`document.querySelector('${reliefSelector}').textContent`),
+        /Venice.*−1 misery.*20 → 10.*New World.*Income relief/s,
+        'Automatic relief names its public advance and records the actual boxes');
+    const reliefHtml = await page.evaluate(`document.querySelector('${reliefSelector}').innerHTML`);
+    events.push({...payment, id: 'after-relief'});
+    await show(baseline.game.players.map(player => ({...player, capital: 'barcelona', misery: 80})));
+    assert.equal(await page.evaluate(`document.querySelector('${reliefSelector}').innerHTML`), reliefHtml,
+        'Later activity and player state do not rewrite a misery receipt');
+    await page.evaluate(`document.querySelector('[data-event-id="deferred-misery"] .event-card').click()`);
+    await page.wait(`document.querySelector('.inspection-panel .card-event-text')`, 'Deferred misery cause opens its card in game');
+    assert.match(await page.evaluate(`document.querySelector('.inspection-panel .card-decision h2').textContent`), /Crusades/);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
     console.log('Passed: named immutable cash receipts, consistent signed payments, inset activity control, responsive text clearance and polling continuity.');
 }

@@ -114,7 +114,10 @@ export interface HistoryEventView {
     amount: number | null; detail: string | null;
     dice: {player: string | null; value: number; color: 'WHITE' | 'BLACK' | 'GREEN'}[];
     cashChanges: {player: string; amount: number}[];
-    miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null}[];
+    miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null;
+        reasons?: {kind: 'ADVANCE_PURCHASE' | 'CATEGORY_COMPLETION' | 'STABILIZATION' | 'PURCHASED_RELIEF' |
+            'INCOME_RELIEF' | 'CARD_EFFECT' | 'SURPLUS_DEBT' | 'HOLY_INDULGENCE'; spaces: number | null;
+            advance: string | null; card: string | null}[]}[];
     tokenChanges: {player: string; poolDelta: number; stockDelta: number}[];
     tokenPurchases: {player: string; amount: number; cashCost: number; tokensReceived: number}[];
     reliefPayment: {cashCost: number; ratingSpent: number; ratingAvailableBefore: number;
@@ -143,9 +146,10 @@ export interface Snapshot {
         unplayedAdvanceLeaders?: {advance: string; epochs: {epoch: number; count: number}[]}[];
         pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
-        replacementToken?: {player: string; province: string; event: string; poolTokens: number;
-            poolCost: number; poolAfter: number | null; stockTokens: number; misery: number | null;
+        replacementToken?: {player: string; provinces: string[]; event: string; poolTokens: number;
+            poolCost: number; maxReplacements: number; stockTokens: number; misery: number | null;
             civilWarLossPending: boolean} | null;
+        civilWarLoss?: {player: string; cashCost: number; tokenCost: number; cashAfter: number; poolAfter: number} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};

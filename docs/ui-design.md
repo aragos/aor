@@ -87,6 +87,8 @@ choice and understand its result through visual controls and commands, on deskto
   caveats. Omit the military box entirely when nobody has one. Competition and War outcomes live in
   activity. A submitted action that resolves one also opens a dismissible result for its player;
   loading or polling another player's result does not create an action notice.
+  Competition receipts and suspended requests belong to that turn's Expansion and expire when it
+  ends, including outcomes first received with the phase transition. Keep the activity entry.
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
   links to full payout boxes on the reference page; keep current owner payouts and adjustments
   in the game. Activity cards open the same in-game inspector, even after leaving the hand, with
@@ -119,10 +121,12 @@ choice and understand its result through visual controls and commands, on deskto
   final scores and the reference track. Retain printed values and accessible text.
   Place small contextual track-help icons beside misery and shipping numbers. Opening help must
   not select that player as a card target or disturb the prepared action.
-- Event replacement-token choices identify the triggering card, recipient and province, explain
-  the empty stock and exact pool-token result, and label the alternative as leaving that province
-  empty. Show the current misery box; Civil War's earlier misery is already applied. Queued choices
-  re-evaluate current pool supply and omit spending when none remains.
+- Event replacements resolve in current player order. Show every pending province for the chooser
+  in one form, with explicit pool/empty choices, a shared budget and one reviewed confirmation.
+  Identify the card and recipient once; province rows own their location labels. Show the current
+  misery box; Civil War's earlier misery is already applied. Disable spending beyond the pool.
+  After its capital replacement, Civil War shows the payable cash/token losses and remaining
+  balances, using the same rounded calculation as execution.
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
   to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
@@ -131,7 +135,11 @@ choice and understand its result through visual controls and commands, on deskto
   changes and shortage/surplus dice. All displayed dice identify their colors. Show an action only
   once and cap the box height with scrolling. Player names and emblems are those at entry time,
   retained as later actions arrive. Record signed misery spaces and printed endpoints, including
-  Chaos, so later state changes cannot rewrite the explanation.
+  Chaos, so later state changes cannot rewrite the explanation. Name every misery cause, including
+  New World income relief, debt payments and deferred War/Crusades effects. Record actual movement
+  separately from any combined rule contributions; clamping must not invent intermediate boxes.
+  Direct actions and automatic phase receipts retain their own changes when a response combines
+  them. Source cards open the same in-game inspector as other activity cards.
   Relief receipts show cash, rating spent and the current-turn rating sources without duplicating
   the cash expense. Every cash receipt uses the same recorded player name, emblem and signed amount,
   including the acting player. Holy Indulgence records each player's actual pool ↔ stock movements separately

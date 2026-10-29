@@ -140,11 +140,15 @@ sealed interface CardCommand : Command {
             CardGame.chooseCivilWarLoss(state, actor, loss)
     }
 
-    data class ReplaceEventToken(val usePool: Boolean) : CardCommand {
-        override fun toText(): String = "replace-event-token ${if (usePool) "pool" else "none"}"
+    /** Selected pending provinces receive pool tokens; every omitted province stays empty. */
+    data class ReplaceEventTokens(val provinces: Set<ProvinceId>) : CardCommand {
+        override fun toText(): String =
+            "replace-event-tokens " +
+                if (provinces.isEmpty()) "none"
+                else provinces.sortedBy(ProvinceId::value).joinToString(" ")
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            CardGame.replaceEventToken(state, actor, usePool)
+            CardGame.replaceEventTokens(state, actor, provinces)
     }
 
     data class CedeWar(val provinces: Set<ProvinceId>) : CardCommand {
@@ -206,15 +210,17 @@ sealed interface CardCommand : Command {
                             }
                         )
                     }
-                    "replace-event-token" -> {
-                        size(arguments, 1)
-                        ReplaceEventToken(
-                            when (arguments.single()) {
-                                "pool" -> true
-                                "none" -> false
-                                else -> throw RuleViolation(ViolationCode.INVALID_COMMAND)
-                            }
+                    "replace-event-tokens" -> {
+                        checkRule(
+                            arguments.isNotEmpty() && arguments.distinct().size == arguments.size,
+                            ViolationCode.INVALID_COMMAND,
                         )
+                        if (arguments == listOf("none")) {
+                            ReplaceEventTokens(emptySet())
+                        } else {
+                            checkRule("none" !in arguments, ViolationCode.INVALID_COMMAND)
+                            ReplaceEventTokens(arguments.map(::ProvinceId).toSet())
+                        }
                     }
                     "cede-war" -> {
                         checkRule(

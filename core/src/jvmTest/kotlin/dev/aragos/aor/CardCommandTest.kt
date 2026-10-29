@@ -18,8 +18,8 @@ class CardCommandTest {
                 "play hand-3 protect 5",
                 "civil-war-loss cash",
                 "civil-war-loss tokens",
-                "replace-event-token pool",
-                "replace-event-token none",
+                "replace-event-tokens genoa rome",
+                "replace-event-tokens none",
                 "pass",
                 "forgo-marker",
                 "move-marker venice",
@@ -34,20 +34,45 @@ class CardCommandTest {
 
     @Test
     fun supersededCardCommandNamesAreRejected() {
-        val commands = listOf("play-card hand-3", "patronize-leader rashid-ad-din")
+        val commands =
+            listOf("play-card hand-3", "patronize-leader rashid-ad-din", "replace-event-token pool")
 
         val failures = commands.map { text ->
             assertFailsWith<RuleViolation> { TextCodec.parseCommand(text) }.code
         }
 
         assertThat(failures)
-            .containsExactly(ViolationCode.INVALID_COMMAND, ViolationCode.INVALID_COMMAND)
+            .containsExactly(
+                ViolationCode.INVALID_COMMAND,
+                ViolationCode.INVALID_COMMAND,
+                ViolationCode.INVALID_COMMAND,
+            )
     }
 
     @Test
     fun duplicateWarSurrenderProvincesAreRejected() {
         val failure =
             assertFailsWith<RuleViolation> { TextCodec.parseCommand("cede-war tunis tunis") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
+    }
+
+    @Test
+    fun duplicateReplacementProvincesAreRejected() {
+        val failure =
+            assertFailsWith<RuleViolation> {
+                TextCodec.parseCommand("replace-event-tokens rome rome")
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
+    }
+
+    @Test
+    fun emptyReplacementCannotBeMixedWithProvinces() {
+        val failure =
+            assertFailsWith<RuleViolation> {
+                TextCodec.parseCommand("replace-event-tokens none rome")
+            }
 
         assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
     }

@@ -296,3 +296,6 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .player-stats { flex-wrap: wrap; row-gap: .3rem; }
 .help-link.inline-help { min-width: 24px; min-height: 24px; font-size: .7rem; }
 .replacement-token-context p { margin: .4rem 0; font-size: .85rem; }
+.replacement-province { padding: .55rem 0; border-bottom: 1px solid #c7d1c1; }
+.replacement-province h4 { margin: 0 0 .35rem; }
+.replacement-review ul { margin: .4rem 0; padding-left: 1.25rem; }

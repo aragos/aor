@@ -89,6 +89,7 @@ data class GameView(
     val warCession: WarCessionView? = null,
     val markerPlacement: MarkerPlacementView? = null,
     val replacementToken: ReplacementTokenView? = null,
+    val civilWarLoss: CivilWarLossView? = null,
     val pirateTargets: PirateTargetsView? = null,
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
@@ -167,6 +168,7 @@ data class GameView(
                         MarkerPlacementView(decision.player, decision.destination)
                     },
                 replacementToken = ReplacementTokenView.from(state),
+                civilWarLoss = CivilWarLossView.from(state),
                 pirateTargets =
                     if (
                         state.turnNumber != null &&

@@ -48,7 +48,28 @@ export async function checkActionContext(page, web, baseline) {
     await click('.decision-panel .action-buttons button');
     await show({...fixture, events: [...fixture.events, {...event, id: 'local-cathedral'}]});
     await page.wait(`document.querySelector('.competition-notice')`, 'local Cathedral explicitly shows its result');
-    await click('.competition-notice .close-detail');
+    await show({...fixture});
+    assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), true, 'Polling retains a result during its expansion');
+    const retainedResults = fixture.events;
+    await show({...fixture, prompt: {messageId: 'prompt.purchase-advances', players: [other.id]},
+        legalChoices: {commands: [], bidMax: null}, game: {...fixture.game, stage: 'PURCHASE',
+            activity: {...fixture.game.activity, choice: 'purchase-advances', decisionPlayer: other.id}}});
+    await page.wait(`!document.querySelector('.competition-notice')`, 'Expansion end clears its competition result');
+    assert.deepEqual(fixture.events, retainedResults, 'Clearing the popup retains every activity result');
+    await show({...fixture});
+    assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'Polling after expansion cannot restore the result');
+    await show({...fixture, game: {...fixture.game, stage: 'EXPANSION', turnNumber: baseline.game.turnNumber + 1}});
+    assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'The next expansion cannot resurrect an old result');
+
+    // A suspended result request also expires before a late outcome can be acquired.
+    await show({...fixture, prompt: {messageId: 'prompt.cathedral', players: [viewer]},
+        legalChoices: {commands: ['cathedral', 'pass'], bidMax: null},
+        game: {...fixture.game, turnNumber: baseline.game.turnNumber, activity: {...fixture.game.activity, choice: 'cathedral', decisionPlayer: viewer}}});
+    await click('.decision-panel .action-buttons button');
+    await show({...fixture, events: [...fixture.events, {...event, id: 'late-result'}], game: {...fixture.game, stage: 'INCOME'}});
+    assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'An outcome arriving with phase completion creates no expired popup');
+    await show({...fixture, game: {...fixture.game, stage: 'EXPANSION'}});
+    assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'An expired pending request stays cleared');
 
     await show({...fixture, legalChoices: {commands: ['pass'], bidMax: null}, game: {...fixture.game, stage: 'PLAY_CARDS',
         activeWar: {initiator: viewer, opponent: other.id, startedTurn: baseline.game.turnNumber, ties: 0},
