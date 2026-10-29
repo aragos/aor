@@ -27,6 +27,9 @@ export interface LeaderDiscountView {
     advance: string; printedAmount: number; conditionalAmount: number; writtenRecordBonus: number;
     effectiveDiscount: number; condition: string | null;
 }
+export interface CardInspectionView {
+    definition: CardDefinition; commodities: string[]; leaderDiscounts: LeaderDiscountView[];
+}
 export interface WarOutcomeView {
     initiator: string; opponent: string; totals: Record<string, number>; winner: string | null;
     requiredTransfers: number;
@@ -127,6 +130,7 @@ export interface Snapshot {
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
         expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
+        cardInspections: CardInspectionView[];
         tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};

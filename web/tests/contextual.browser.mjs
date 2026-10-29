@@ -32,7 +32,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.province-label [data-area-lock], .province-label [data-overseas-lock]').length`), 0);
     const unlockedGroups = baseline.game.catalog.provinces.filter(province=>province.area==='V' || province.overseas==='FAR_EAST').map(province=>province.id);
     await show({game:{lockedProvinces:baseline.game.lockedProvinces.filter(id=>!unlockedGroups.includes(id))}});
-    assert.equal(await page.evaluate(`document.querySelector('[data-area-lock="V"], [data-overseas-lock="FAR_EAST"]')`), null, 'Locks disappear when authoritative access unlocks the group');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-area-lock="V"], [data-overseas-lock="FAR_EAST"]')`), false, 'Locks disappear when authoritative access unlocks the group');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-overseas-lock="NEW_WORLD"]')`), true);
     await show({...baseline});
     const beforeAreaInspection = await page.evaluate('window.mapCommands.length');
@@ -44,14 +44,14 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeAreaInspection, 'Area inspection does not submit');
     await page.evaluate(`document.querySelector('[data-sea="NORTH_SEA"] path').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="IV"]').getAttribute('aria-pressed')`), 'false', 'Sea clicks deselect an inspected area');
-    assert.equal(await page.evaluate(`document.querySelector('[data-area-dimming]')`), null);
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-area-dimming]')`), false);
     await click('[data-map-province="genoa"]');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 1, 'Genoa highlights its connected sea');
     await click('[data-map-area-label="IV"]');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Area inspection clears province sea emphasis');
     await click('[data-map-province="genoa"]');
     await page.evaluate(`document.querySelector('[data-map-terrain]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
-    assert.equal(await page.evaluate(`document.querySelector('.province-inspector')`), null, 'Non-province land clears province inspection');
+    assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Non-province land clears province inspection');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Clearing inspection clears the sea emphasis');
     assert.equal(await page.evaluate(`document.querySelectorAll('.sea-shape[fill^="url("]').length`), 0, 'Clearing inspection restores the ordinary sea fill');
     for (const province of ['genoa', 'rome']) {
@@ -74,10 +74,10 @@ export async function checkContextualUx(page, web, baseline) {
     assert(reachable);
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"]').classList.contains('eligible')`), true);
 
-    assert.equal(await page.evaluate(`document.querySelector('.interactive-board select')`), null, 'Map has no drop-down menus');
+    assert.equal(await page.evaluate(`!!document.querySelector('.interactive-board select')`), false, 'Map has no drop-down menus');
     assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.map-zoom')).position`), 'absolute', 'Zoom controls float over the map');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"] .reach-shade').getAttribute('fill')`), '#ffffff', 'Reachable provinces use a light fill');
-    assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"] [stroke-dasharray]')`), null, 'Expansion highlights have no dashed border');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="${reachable.destination}"] [stroke-dasharray]')`), false, 'Expansion highlights have no dashed border');
     await show({game:{stage:'PURCHASE',activity:{...baseline.game.activity,actor:viewer,purchaseStep:'ADVANCES'}}});
     await page.wait(`document.querySelector('#tab-advances[aria-selected=true]')`, 'purchase workspace');
     await show({prompt:{messageId:'prompt.expand',players:[other.id]},game:{...baseline.game,activity:{...baseline.game.activity,actor:other.id,decisionPlayer:other.id}}});
@@ -98,7 +98,7 @@ export async function checkContextualUx(page, web, baseline) {
     await click('.primary-expansion');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `place 2 ${partial.destination}`);
     await click('.game-actions button');
-    assert.equal(await page.evaluate(`document.querySelector('.province-inspector')`), null, 'Pass clears selected province');
+    assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Pass clears selected province');
 
     await show({prompt:{messageId:'prompt.expand',players:[other.id]},legalChoices:{commands:[]},game:{
         expansionOffers:[],activity:{...baseline.game.activity,actor:other.id,decisionPlayer:other.id},
@@ -106,7 +106,7 @@ export async function checkContextualUx(page, web, baseline) {
     }});
     assert.equal(await page.evaluate(`document.querySelector('.pool-summary > strong').textContent`), String(other.poolTokens), 'After passing, prominently show the active power pool');
     assert.equal(await page.evaluate(`document.querySelector('.pool-summary .expansion-player > span').textContent`), await page.evaluate(`document.querySelector('[data-player="${other.id}"] .player-identity strong').textContent`), 'Pool summary identifies the active power');
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-pool')`), null, 'Own pool leaves capital summary after passing');
+    assert.equal(await page.evaluate(`!!document.querySelector('.player-summary.is-viewer .player-pool')`), false, 'Own pool leaves capital summary after passing');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-summary.is-viewer .detail-list dt')].some(element=>element.textContent==='Expansion pool')`), false, 'Own pool is also hidden in capital detail');
 
     const reference = 'single-fur';
@@ -114,11 +114,11 @@ export async function checkContextualUx(page, web, baseline) {
         game:{stage:'PLAY_CARDS', expansionOffers:[],hand:[{reference,definition:{id:'fur-1',kind:'commodity',messageId:'card.fur-1',shape:'CIRCLE'}}],
             cardOffers:[{reference,playable:true,blockers:[],choices:[{kind:'COMMODITY',value:'fur',command:`play ${reference} commodity fur`}],commodities:['FUR'],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click(`[data-hand-card="${reference}"]`);
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .target-choices')`), null, 'Single commodity needs no extra choice');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-decision .target-choices')`), false, 'Single commodity needs no extra choice');
     assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false);
     await click('.card-decision form > button:last-child');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play ${reference} commodity fur`);
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision')`), null, 'Card play clears detail');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-decision')`), false, 'Card play clears detail');
 
     const advance = baseline.game.catalog.advances.find(advance => !baseline.game.players.find(player=>player.id===viewer).advances.includes(advance.id));
     await show({prompt:{messageId:'prompt.purchase-advances',players:[viewer]},legalChoices:{commands:[`buy-advance ${advance.letter}`,'pass']},
@@ -135,19 +135,19 @@ export async function checkContextualUx(page, web, baseline) {
     await click(`[data-advance="${advance.id}"]`);
     assert.match(await page.evaluate(`document.querySelector('.advance-decision .leader-discount').textContent`), /30/);
     await show({game:{activity:{...fixture.game.activity,purchaseStep:'RELIEF'}}});
-    assert.equal(await page.evaluate(`document.querySelector('.advance-decision')`), null, 'Changing purchase steps clears advance inspection');
+    assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Changing purchase steps clears advance inspection');
     await show({game:{activity:{...fixture.game.activity,purchaseStep:'ADVANCES'}}});
     await click(`[data-advance="${advance.id}"]`);
     await click('.game-actions button');
-    assert.equal(await page.evaluate(`document.querySelector('.advance-decision')`), null, 'Pass clears advance');
+    assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Pass clears advance');
     await show({prompt:{messageId:'prompt.purchase-relief',players:[viewer]},legalChoices:{commands:['relieve-misery','pass']},game:{reliefOffers:[]}});
-    assert.equal(await page.evaluate(`document.querySelector('#relief-spaces')`), null, 'No relief purchase without a tier offer');
+    assert.equal(await page.evaluate(`!!document.querySelector('#relief-spaces')`), false, 'No relief purchase without a tier offer');
 
     await show({prompt:{messageId:'prompt.play-cards',players:[viewer]},legalChoices:{commands:[`play target player ${other.id}`]},
         game:{stage:'PLAY_CARDS',hand:[{reference:'target',definition:{id:'civil-war',kind:'event',messageId:'card.civil-war',shape:'SQUARE'}}],
             cardOffers:[{reference:'target',playable:true,blockers:[],choices:[{kind:'PLAYER',value:other.id,command:`play target player ${other.id}`}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click('[data-hand-card="target"]');
-    assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="target"] .card-event-text')`), null, 'Hand keeps dynamic game information');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'Hand keeps dynamic game information');
     assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#card-civil-war"]').target`), '_blank', 'Card rules have a dedicated reference');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
@@ -156,7 +156,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-player="${other.id}"].picked-target') !== null`), true);
     await click('.card-decision form > button:last-child');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play target player ${other.id}`);
-    assert.equal(await page.evaluate(`document.querySelector('.eligible-target')`), null);
+    assert.equal(await page.evaluate(`!!document.querySelector('.eligible-target')`), false);
 
     const targetOffers = ['first-map-card', 'second-map-card'].map((reference,index) => ({
         reference,playable:true,blockers:[],choices:[{kind:'PROVINCE',value:index ? 'genoa' : 'rome',command:`play ${reference} province ${index ? 'genoa' : 'rome'}`}],
@@ -173,7 +173,7 @@ export async function checkContextualUx(page, web, baseline) {
     await show();
     assert.equal(await page.evaluate(`!!document.querySelector('.card-decision') && !!document.querySelector('[data-map-province="genoa"].eligible')`), true, 'Polling preserves the current card and target picker');
     await show({game:{stage:'PURCHASE',activity:{...baseline.game.activity,purchaseStep:'ADVANCES'}}});
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision, .province-inspector, .eligible-target')`), null, 'Phase change clears card, province and player focus');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-decision, .province-inspector, .eligible-target')`), false, 'Phase change clears card, province and player focus');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="genoa"]').classList.contains('eligible')`), false, 'Phase change clears stale map targets');
     await show({game:{stage:'PLAY_CARDS'}});
     await click('[data-hand-card="second-map-card"]');

@@ -6,6 +6,8 @@ import {HelpLink} from './HelpLink';
 import {MiseryBox} from './MiseryBox';
 import {CommodityIcon, PlayerPiece} from './map/MapSymbols';
 import {useMapSelection} from './map/MapSelection';
+import {LeaderCredit} from './LeaderCredit';
+import {useDragScroll} from './useDragScroll';
 
 export function Emblem({player, size = 20}: {player: Pick<PlayerView, 'capital'>; size?: number}) {
     return <svg width={size} height={size} viewBox="-28 -28 56 56" aria-hidden="true">
@@ -123,9 +125,10 @@ export function Markets({snapshot}: {snapshot: Snapshot}) {
 
 export function Hand({snapshot}: {snapshot: Snapshot}) {
     const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker, inspection, setInspection} = useMapSelection();
+    const drag = useDragScroll(snapshot.game.hand.map(card => card.reference).join('|'));
     return <section className="table-hand" aria-label={t('game.hand')}>
         <div className="hand-heading"><p className="eyebrow">{t('game.hand')}</p><strong>{snapshot.game.hand.length} {t('game.cards').toLowerCase()}</strong></div>
-        <div className="hand-cards">{snapshot.game.hand.map(card => {
+        <div className="hand-cards" {...drag}>{snapshot.game.hand.map(card => {
             const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
             return <button type="button" key={card.reference} data-hand-card={card.reference}
                 aria-pressed={selectedCard === card.reference || (inspection?.kind === 'card' && inspection.id === card.reference)} className={`hand-card ${card.definition.kind}`}
@@ -146,7 +149,7 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
                     </>}</span>;
                 })}
                 {offer?.leaderDiscounts.map(discount => <span className="leader-discount" key={discount.advance}>
-                    <span>{advanceName(discount.advance)}</span><strong>−${discount.effectiveDiscount}</strong>
+                    <span>{advanceName(discount.advance)}</span><LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/>
                 </span>)}
             </button>;
         })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div>
@@ -178,7 +181,7 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                     <span>{owned ? t('table.owned') : offer?.price !== null && offer?.price !== undefined ? `$${offer.price}` : '—'}</span>
                     <UnplayedLeaders snapshot={snapshot} advance={advance.id}/>
                     {available && <small className="advance-available">{t('table.available')}</small>}
-                    {offer?.leaderDiscounts?.map(discount => <small className="advance-discount" key={discount.leaderCardId}>{label(discount.leaderCardId, 'leader')} −${discount.amount}</small>)}
+                    {offer?.leaderDiscounts?.map(discount => <span className="advance-discount" key={discount.leaderCardId}>{label(discount.leaderCardId, 'leader')} <LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/></span>)}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}
                 </button>;
             })}</div>
@@ -199,7 +202,8 @@ export function PlayedLeaders({snapshot}: {snapshot: Snapshot}) {
             <p className="small">{playerName(snapshot, leader.owner)}</p>
             {credits && <><p className="leader-credits-label">{t(credits.usable ? 'table.yourLeaderCredits' : 'table.leaderCredits')}</p>
                 {credits.discounts.map(discount => <div className="leader-discount" key={discount.advance}>
-                    <span>{advanceName(discount.advance)}</span><strong>−${credits.usable ? discount.effectiveDiscount : discount.conditionalAmount}</strong>
+                    <span>{advanceName(discount.advance)}</span><LeaderCredit amount={credits.usable ? discount.effectiveDiscount : discount.conditionalAmount}
+                        writtenRecordBonus={discount.writtenRecordBonus} includesWrittenRecord={credits.usable}/>
                 </div>)}</>}
             {leader.role === 'EXPOSED' && snapshot.game.rules.patronage === 'PROTECTION_MONEY' && <p className="small">{t('game.protection')}: ${leader.protectionCash}</p>}
             {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: {leader.patronageClaimants.map(id => playerName(snapshot, id)).join(', ')}</p>}

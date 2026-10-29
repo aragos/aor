@@ -90,7 +90,8 @@ class VisualProjectionSerializationTest {
                 .copy(hand = listOf(HandCard("private-card", CardData.definition("charlemagne"))))
         val held = state.copy(players = state.players + (p1 to viewer))
         val own = json.readTree(json.writeValueAsString(held.viewForPlayer(p1)))
-        val other = json.writeValueAsString(held.viewForPlayer(p2))
+        val otherView = held.viewForPlayer(p2)
+        val other = json.writeValueAsString(otherView)
 
         assertThat(own.path("cardOffers").single().path("reference").asText())
             .isEqualTo("private-card")
@@ -104,7 +105,11 @@ class VisualProjectionSerializationTest {
             )
             .isEqualTo("NATIONALISM")
         assertThat(other).doesNotContain("private-card")
-        assertThat(other).doesNotContain("charlemagne")
+        assertThat(otherView.hand).isEmpty()
+        assertThat(otherView.cardOffers).isEmpty()
+        assertThat(json.writeValueAsString(otherView.copy(cardInspections = emptyList())))
+            .doesNotContain("charlemagne")
+        assertThat(otherView.cardInspections).isEqualTo(state.viewForPlayer(p2).cardInspections)
     }
 
     @Test

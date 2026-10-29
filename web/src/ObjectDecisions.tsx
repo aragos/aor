@@ -6,11 +6,15 @@ import {HelpLink} from './HelpLink';
 import {Commodity, CommodityAdjustments, Emblem, Payouts, PayoutReference, UnplayedLeaders} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
+import {CardEventText} from './CardEventText';
+import {AdvanceBenefits} from './AdvanceBenefits';
+import {LeaderCredit} from './LeaderCredit';
 
 interface Props {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     mode?: 'inspection' | 'action' | 'all';
     inspectedId?: string;
+    historical?: boolean;
     closeInspection?: () => void;
 }
 
@@ -23,17 +27,19 @@ function choiceLabel(snapshot: Snapshot, choice: CardChoiceView): string {
     return t('action.playCard');
 }
 
-export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId, closeInspection}: Props) {
+export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId, historical = false, closeInspection}: Props) {
     const {selectedCard, setSelectedCard} = useMapSelection();
     const reference = inspectedId ?? selectedCard;
     const [choice, setChoice] = useState('');
     const [protection, setProtection] = useState('0');
     useEffect(() => { setChoice(''); setProtection('0'); }, [selectedCard]);
-    const card = snapshot.game.hand.find(candidate => candidate.reference === reference);
-    const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === reference);
+    const held = historical ? undefined : snapshot.game.hand.find(candidate => candidate.reference === reference);
+    const info = snapshot.game.cardInspections?.find(candidate => candidate.definition.id === (historical ? reference : held?.definition.id));
+    const definition = held?.definition ?? info?.definition;
+    const offer = historical ? undefined : snapshot.game.cardOffers.find(candidate => candidate.reference === reference);
     const selection = useTargets(offer?.provinceTargets ?? [], offer?.requiredTargetCount ?? 0);
     const targets = selection.selected;
-    if (!card) return null;
+    if (!definition) return null;
     const finiteChoices = offer?.choices.filter(candidate => candidate.command !== null) ?? [];
     const needsTargets = offer?.choices.some(candidate => candidate.kind === 'PROVINCES') ?? false;
     const needsProtection = offer?.choices.some(candidate => candidate.kind === 'PROTECTION') ?? false;
@@ -56,17 +62,18 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
     const action = mode !== 'inspection';
     return <section className="object-decision card-decision">
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
-        {inspection && <p className="eyebrow">{t(`kind.${card.definition.kind}`)}</p>}<h2>{t(card.definition.messageId)}</h2>
-        {inspection && <><HelpLink topic={`card-${card.definition.id}`} label="Card rules" compact={false}/>
-        {offer?.commodities.map(commodity => {
+        {inspection && <p className="eyebrow">{t(`kind.${definition.kind}`)}</p>}<h2>{t(definition.messageId)}</h2>
+        <CardEventText definition={definition}/>
+        {inspection && <><HelpLink topic={`card-${definition.id}`} label="Card rules" compact={false}/>
+        {(info?.commodities ?? offer?.commodities)?.map(commodity => {
             const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
             return <div className="card-value" key={commodity}><Commodity commodity={commodity}/>{payout && <>
                 <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/>
                 <PayoutReference snapshot={snapshot} payout={payout}/>
             </>}</div>;
         })}
-        {offer?.leaderDiscounts.map(discount => <details key={discount.advance} className="leader-discount-detail">
-            <summary>{advanceName(discount.advance)} <strong>−${discount.effectiveDiscount}</strong></summary>
+        {(info?.leaderDiscounts ?? offer?.leaderDiscounts)?.map(discount => <details key={discount.advance} className="leader-discount-detail">
+            <summary>{advanceName(discount.advance)} <LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/></summary>
             <dl className="detail-list"><div><dt>{t('table.printedDiscount')}</dt><dd>${discount.printedAmount}</dd></div>
                 <div><dt>{advanceName('written-record')}</dt><dd>${discount.writtenRecordBonus}</dd></div>
                 <div><dt>{t('table.conditionalDiscount')}</dt><dd>${discount.conditionalAmount}</dd></div></dl>
@@ -120,12 +127,13 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
     return <section className="object-decision advance-decision">
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>}
         {inspection && <p className="eyebrow">{label(advance.category, 'category')}</p>}<h2>{advanceName(advance.id)}</h2>
+        <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
         {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label="Advance rules" compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
         {offer?.price !== null && offer?.price !== undefined && <div className="price-quote"><strong>${offer.price}</strong><span>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</span></div>}
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
         {offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
-            {label(discount.leaderCardId, 'leader')} <strong>−${discount.amount}</strong>
+            {label(discount.leaderCardId, 'leader')} <LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/>
         </p>)}
         {inspection && <p>{t('advance.owners')}: {snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</p>}
         {action && offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}

@@ -4,6 +4,7 @@ import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
 import {advanceName, label, provinceName} from './labels';
 import {t} from './messages';
 import {Commodity, Emblem} from './TablePanels';
+import {MiseryBox} from './MiseryBox';
 
 function eventPlayer(event: HistoryEventView, id: string) {
     return event.participants?.find(player => player.id === id) ??
@@ -26,8 +27,8 @@ function dieColor(event: HistoryEventView, index: number): string {
     return event.war && index === 1 ? 'black' : 'white';
 }
 
-function EventContent({event, onInspectCard}: {
-    event: HistoryEventView; onInspectCard?: (cardId: string) => void;
+function EventContent({event, track, onInspectCard}: {
+    event: HistoryEventView; track: Snapshot['game']['catalog']; onInspectCard?: (cardId: string) => void;
 }) {
     const actor = event.actor ? eventPlayer(event, event.actor) : null;
     const target = event.target ? eventPlayer(event, event.target) : null;
@@ -69,7 +70,7 @@ function EventContent({event, onInspectCard}: {
         {event.miseryChanges?.map(change => <span className="event-misery-change" key={change.player}>
             {change.player !== event.actor && eventName(event, change.player)}
             <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}
-            <span>({change.fromValue ?? t('game.chaos')} → {change.toValue ?? t('game.chaos')})</span>
+            <span>(<MiseryBox value={change.fromValue} track={track?.miseryTrack}/> → <MiseryBox value={change.toValue} track={track?.miseryTrack}/>)</span>
         </span>)}
     </span>;
 }
@@ -82,6 +83,7 @@ function viewerOutcome(event: HistoryEventView, viewerId: string): string {
         }
         return '';
     }
+    if (event.war && ![event.war.initiator, event.war.opponent].includes(viewerId)) return '';
     if (!event.war?.winner) return '';
     return event.war.winner === viewerId ? ' won' : ' lost';
 }
@@ -94,7 +96,7 @@ export function ActionResultNotice({event, snapshot, onDismiss}: {
     if (!competition && !war) return null;
     const outcome = viewerOutcome(event, snapshot.viewerId);
     return <ResultNotice className={`action-result-notice ${competition ? 'competition-notice' : 'war-notice'}${outcome}`} dismiss={onDismiss}>
-        <EventContent event={event}/>
+        <EventContent event={event} track={snapshot.game.catalog}/>
         {war && <>
             <dl className="detail-list">{[war.initiator, war.opponent].map((player, index) => {
                 const die = event.dice.find(candidate => candidate.player === player);
@@ -128,7 +130,7 @@ export function Activity({snapshot, onInspectCard}: {
             {events.length === 0 && <p>{t('table.noActivity')}</p>}
             <ol className="activity-list">{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
                 <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
-                <EventContent event={event} onInspectCard={onInspectCard}/>
+                <EventContent event={event} track={snapshot.game.catalog} onInspectCard={onInspectCard}/>
             </li>)}</ol>
         </div>
     </section>;

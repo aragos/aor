@@ -29,9 +29,9 @@ export function UrbanAscendancyQueue({snapshot, busy, submit}: {
         setQueuedFor(null);
         void submit('buy-card').catch(() => false).finally(() => { submitting.current = false; });
     }, [busy, canBuy, queued, submit]);
-    if (!waiting && !queued) return null;
+    if (!player || (!waiting && !queued)) return null;
     return <section className="urban-ascendancy-queue" aria-label={advanceName('URBAN_ASCENDANCY')}>
-        <p>{advanceName('URBAN_ASCENDANCY')} · $10</p>
+        <p>{advanceName('URBAN_ASCENDANCY')} · $10<br/>{t('controls.availableCash')}: ${player.cash}</p>
         {queued ? <>
             <p role="status">{t('urbanAscendancy.queued')}</p>
             <button type="button" className="secondary" disabled={busy}

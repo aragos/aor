@@ -37,7 +37,7 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.expansion-form').length`), 0, 'Contextual flow replaces duplicate expansion form');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Initial render cannot submit');
 
-    assert.equal(await page.evaluate(`document.querySelector('.stock-details').open`), false, 'Marker stock starts collapsed during expansion');
+    assert.equal(await page.evaluate(`document.querySelector('.available-resources, .stock-details')`), null, 'Permanent resource section is omitted');
     const incomeLabels = await page.evaluate(`[...document.querySelectorAll('.income-value')].map(element => ({text:element.textContent, title:element.title, label:element.getAttribute('aria-label')}))`);
     assert.equal(incomeLabels.length, baseline.game.players.length);
     for (const income of incomeLabels) {

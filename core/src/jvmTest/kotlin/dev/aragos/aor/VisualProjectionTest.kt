@@ -12,6 +12,72 @@ class VisualProjectionTest {
     private val florence = ProvinceId("florence")
 
     @Test
+    fun inspectingCardsOutsideTheHandUsesPublicCommodityFacts() {
+        val state = state()
+        val inspection =
+            state.viewForPlayer(p1).cardInspections.single {
+                it.definition.id == "cloth-wine"
+            }
+
+        assertThat(state.playerState(p1).hand).isEmpty()
+        assertThat(inspection.commodities).containsExactly(Commodity.CLOTH, Commodity.WINE)
+        assertThat(state.viewForPlayer(p2).cardInspections.map { it.definition })
+            .containsExactlyElementsIn(
+                state.viewForPlayer(p1).cardInspections.map { it.definition }
+            )
+    }
+
+    @Test
+    fun inspectingAHistoricalLeaderIncludesTheViewersWrittenRecordBonus() {
+        val state = state(advances = setOf(AdvanceId.WRITTEN_RECORD))
+        val discount =
+            state
+                .viewForPlayer(p1)
+                .cardInspections
+                .single {
+                    it.definition.id == "charlemagne"
+                }
+                .leaderDiscounts
+                .single()
+
+        assertThat(discount.conditionalAmount).isEqualTo(20)
+        assertThat(discount.writtenRecordBonus).isEqualTo(10)
+        assertThat(discount.effectiveDiscount).isEqualTo(30)
+    }
+
+    @Test
+    fun inspectionRetainsAPlayedLeadersOriginalEnhancement() {
+        val state =
+            state()
+                .copy(
+                    voids = CardVoids(crusades = true),
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.MARCO_POLO,
+                                        p1,
+                                        CardLeaderRole.DISPLAY,
+                                        mongolEnhanced = false,
+                                    )
+                                )
+                        ),
+                )
+
+        assertThat(
+                state
+                    .viewForPlayer(p1)
+                    .cardInspections
+                    .single {
+                        it.definition.id == "marco-polo"
+                    }
+                    .leaderDiscounts
+            )
+            .isEqualTo(state.viewForPlayer(p1).playedLeaderDiscounts.single().discounts)
+    }
+
+    @Test
     fun anotherPlacementPreservesTheDecisionIdentity() {
         val before = state()
         val after = before.step(Entry.Action(p1, TextCodec.parseCommand("place 1 florence")))
