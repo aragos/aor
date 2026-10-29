@@ -3,6 +3,7 @@ import {checkActivityPayments} from './activityPayments.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkActionContext} from './actionContext.browser.mjs';
+import {checkLiveCompetitionLifecycle} from './competitionLifecycle.browser.mjs';
 import {checkBidWithdrawal, checkPurchaseClarity} from './purchaseClarity.browser.mjs';
 import {checkClearAdvancePrices, checkLiveCommodityValues} from './valueDetails.browser.mjs';
 import {checkAdvanceCategoryGroups, checkSharedMarketCancellation, checkTokenPurchaseRound} from './roundSummaries.browser.mjs';
@@ -526,6 +527,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkBackgroundPolling(page,web);
     await checkEuropeanMap(page,web);
     await checkLiveCardMap(page,web);
+    await checkLiveCompetitionLifecycle(page,web);
     await checkBidWithdrawal(page,web);
     await checkTokenPurchaseRound(page,web);
 } finally {

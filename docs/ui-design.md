@@ -87,6 +87,8 @@ choice and understand its result through visual controls and commands, on deskto
   caveats. Omit the military box entirely when nobody has one. Competition and War outcomes live in
   activity. A submitted action that resolves one also opens a dismissible result for its player;
   loading or polling another player's result does not create an action notice.
+  Competition receipts and suspended requests belong to that turn's Expansion and expire when it
+  ends, including outcomes first received with the phase transition. Keep the activity entry.
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
   links to full payout boxes on the reference page; keep current owner payouts and adjustments
   in the game. Activity cards open the same in-game inspector, even after leaving the hand, with

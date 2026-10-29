@@ -52,7 +52,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   During expansion, show each player's white markers and active military cards with matchup
   qualifications; omit the military box when nobody has an advantage. Keep results in activity;
   explicitly show a dismissible outcome to the player whose submitted action just resolved it.
-  Losses use red result styling.
+  Losses use red result styling. Competition notices and pending result requests expire when their
+  expansion ends; later polling or a new expansion must not restore them.
   Selecting an unavailable province explains its authoritative blocker without offering an invalid
   action. Preserve legal smaller placements and keep missing access requirements specific.
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity

@@ -9,7 +9,7 @@ Current behavior is specified in [requirements](requirements.md), [UI contracts]
 | --- | --- | --- |
 | Unplayed leaders | Count matching leaders by printed epoch minus public plays; include hands, future decks and private discards | Keep this privacy-preserving public meaning rather than exposing card availability |
 | Urban Ascendancy | A cancelable private browser draft buys once when legal; requires the view to stay open and never retries a rejected purchase | Decide whether reload-safe or server-saved preregistration is useful |
-| Battle results | Activity retains every result; only the player whose action just resolved a competition or War also sees a dismissible action notice | No persistent outcome panel or reload restoration |
+| Battle results | Activity retains every result; only the player whose action just resolved a competition or War also sees a dismissible action notice. Competition notices expire at the end of that expansion | No persistent outcome panel or reload restoration |
 | Dice without a printed role | War initiator uses white and opponent black; independent capital-tie rolls use white | Treat these as display conventions; outcomes are unchanged |
 | Misery relief | A completed tier opens the decision even when relief is unaffordable or misery is zero; explain and offer Pass | No further decision required |
 

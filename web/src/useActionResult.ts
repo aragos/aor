@@ -6,14 +6,21 @@ interface ResultRequest {
     kind: 'competition' | 'war'; actor: string; province?: string;
 }
 
-/** A local receipt follows its battle through interruptions, without resurfacing history. */
+/** Local receipts follow interruptions; competition receipts belong to their expansion phase. */
 export function useActionResult(snapshot: Snapshot, sendCommand: (command: string) => Promise<boolean>) {
     const [result, setResult] = useState<HistoryEventView | null>(null);
     const [resultRequest, setResultRequest] = useState<ResultRequest | null>(null);
+    const inExpansion = (turn: number | null) => snapshot.game.stage === 'EXPANSION' && snapshot.game.turnNumber === turn;
+    const visibleResult = result && snapshot.events.some(event => event.id === result.id) &&
+        (!result.competition || inExpansion(result.turnNumber)) ? result : null;
     useEffect(() => {
-        if (result && !snapshot.events.some(event => event.id === result.id)) setResult(null);
-    }, [result, snapshot.events]);
+        if (result && !visibleResult) setResult(null);
+    }, [result, visibleResult]);
     useEffect(() => {
+        if (resultRequest?.kind === 'competition' && !inExpansion(resultRequest.turn)) {
+            setResultRequest(null);
+            return;
+        }
         if (!resultRequest?.accepted || snapshot.revision <= resultRequest.revision) return;
         const outcome = [...snapshot.events].reverse().find(event => !resultRequest.ids.has(event.id) &&
             event.turnNumber === resultRequest.turn && event.actor === resultRequest.actor &&
@@ -47,5 +54,5 @@ export function useActionResult(snapshot: Snapshot, sendCommand: (command: strin
         setResultRequest(accepted && request ? {...request, accepted: true} : null);
         return accepted;
     }
-    return {result, dismiss: () => setResult(null), submit};
+    return {result: visibleResult, dismiss: () => setResult(null), submit};
 }
