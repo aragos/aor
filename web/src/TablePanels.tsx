@@ -21,15 +21,8 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
     return <div className="player-detail"><h3>{player.name}</h3>
         <dl className="detail-list">
             <div><dt>{t('table.income')}</dt><dd>{player.income ? `$${player.income.ordinary}` : t('table.unavailable')}</dd></div>
-            {player.income && <>
-                <div><dt>{t('table.baseIncome')}</dt><dd>${player.income.baseIncome}</dd></div>
-                <div><dt>{advanceName('middle-class')}</dt><dd>${player.income.middleClassBonus}</dd></div>
-                <div><dt>{t('table.conditionalProfit')}</dt><dd>${player.income.interestProfit}</dd></div>
-                <div><dt>{t('controls.spaces')} · {t('action.relieveMisery')}</dt><dd>{player.income.reliefSpaces}</dd></div>
-            </>}
             {player.poolAvailable && <div className="player-pool-detail"><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>}
             <div><dt>{t('game.tokens')}</dt><dd>{player.stockTokens}</dd></div>
-            <div><dt>{t('game.stockMarkers')}</dt><dd>{player.stockMarkers}</dd></div>
             <div><dt>{t('game.boardMarkers')}</dt><dd>{player.boardMarkers}</dd></div>
         </dl>
         <h4>{t('game.advances')}</h4>

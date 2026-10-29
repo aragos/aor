@@ -43,6 +43,8 @@ choice and understand its result through visual controls and commands, on deskto
 
 ## Current table contracts
 
+- Expanded player details show total income, tokens, deployed markers, and owned advances. Omit
+  income components, undeployed-marker counts, and misery-relief actions from this inspection.
 - Hosted player search, selected participants and administrator player lists show display names and
   public handles. Account UIDs remain internal to selection and requests.
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
