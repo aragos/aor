@@ -17,6 +17,8 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 
 - Project costs, destinations, eligibility and consequences from authoritative domain state. Keep
   inspection separate from action drafts, and preserve valid drafts through polling and inspection.
+- Presentation shortcuts must preserve domain provenance and lifecycle. Keep temporary facts with
+  their live owner so replacing it cannot resurrect stale capabilities.
 - Activity must use entry-time identities and facts; appending history must not rewrite existing
   entries. Only explicit history edits may replace affected entries.
 - Derive public summaries only from public information; a count must not reveal a private card or
