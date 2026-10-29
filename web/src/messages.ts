@@ -2,6 +2,16 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'civilWar.loseCash': 'Lose ${cost} cash · cash after: ${after}',
+    'civilWar.loseTokens': 'Lose {cost} expansion tokens · pool after: {after}',
+    'error.CARD_INSUFFICIENT_REPLACEMENT_TOKENS': 'Your expansion pool cannot pay for all selected replacements.',
+    'replacement.groupContext': '{event} reduced {player}’s domination markers.',
+    'replacement.chooseAll': 'No stock tokens remain. Choose which provinces receive a colored pool token and which stay empty.',
+    'replacement.reviewAll': 'Review every replacement',
+    'replacement.chooseEveryProvince': 'Choose a replacement or leave empty for every province before confirming.',
+    'replacement.leaveAllEmpty': 'Leave all provinces empty',
+    'replacement.totalCost': '{cost} pool tokens spent',
+    'replacement.confirmAll': 'Confirm replacements',
     'replacement.context': '{event} removed {player}’s domination marker from {province}.',
     'replacement.noStock': 'No stock tokens remain. Use a pool token to keep a colored token there, or leave the province empty.',
     'replacement.noPool': 'No pool tokens remain. Leave the province empty.',

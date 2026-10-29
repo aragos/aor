@@ -87,7 +87,7 @@ class CardGameTest {
             running("civil-war").withMarker("genoa", p2).withPlayer(p2) { player ->
                 player.copy(stockTokens = 0, poolTokens = 5)
             }
-        val awaiting = initial.play("p1: play hand-1 player p2", "p2: replace-event-token pool")
+        val awaiting = initial.play("p1: play hand-1 player p2", "p2: replace-event-tokens genoa")
 
         val replied = awaiting.play("p2: civil-war-loss tokens")
 
@@ -121,7 +121,7 @@ class CardGameTest {
             }
         val awaiting = initial.play("p1: play hand-1 province tunis")
 
-        val replied = awaiting.play("p2: replace-event-token none")
+        val replied = awaiting.play("p2: replace-event-tokens none")
 
         assertThat(replied.board.pieces[ProvinceId("tunis")]).isNull()
         assertThat(replied.playerState(p2).poolTokens).isEqualTo(10)

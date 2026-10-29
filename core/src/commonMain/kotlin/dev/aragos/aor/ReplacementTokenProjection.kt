@@ -1,18 +1,18 @@
 package dev.aragos.aor
 
 /**
- * Public context for the top event-token replacement decision. Its province is already empty.
+ * Public context for all provinces in the top event-token replacement decision; all are empty.
  * Spending [poolCost] places one coloured token; declining keeps it empty. Neither choice changes
  * misery. [misery] is the recipient's current printed box, including any already-applied Civil War
- * gain. [poolAfter] is null when the pool cannot pay, which can occur between queued replacements.
+ * gain. [maxReplacements] bounds the selected subset by both pending provinces and available pool.
  */
 data class ReplacementTokenView(
     val player: PlayerId,
-    val province: ProvinceId,
+    val provinces: List<ProvinceId>,
     val event: EventId,
     val poolTokens: Int,
     val poolCost: Int,
-    val poolAfter: Int?,
+    val maxReplacements: Int,
     val stockTokens: Int,
     val misery: MiseryStep,
     val civilWarLossPending: Boolean,
@@ -25,11 +25,11 @@ data class ReplacementTokenView(
             val cost = CardGame.REPLACEMENT_TOKEN_COST
             return ReplacementTokenView(
                 decision.player,
-                decision.province,
+                decision.provinces,
                 decision.event,
                 recipient.poolTokens,
                 cost,
-                (recipient.poolTokens - cost).takeIf { recipient.poolTokens >= cost },
+                minOf(decision.provinces.size, recipient.poolTokens / cost),
                 recipient.stockTokens,
                 recipient.misery,
                 state.flow.decisions.any { pending ->

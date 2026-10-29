@@ -17,11 +17,11 @@ class ReplacementTokenSerializationTest {
         val context = json.readTree(serialized).path("replacementToken")
 
         assertThat(context.path("player").asText()).isEqualTo("p2")
-        assertThat(context.path("province").asText()).isEqualTo("genoa")
+        assertThat(context.path("provinces").single().asText()).isEqualTo("genoa")
         assertThat(context.path("event").asText()).isEqualTo("CIVIL_WAR")
         assertThat(context.path("poolTokens").asInt()).isEqualTo(5)
         assertThat(context.path("poolCost").asInt()).isEqualTo(1)
-        assertThat(context.path("poolAfter").asInt()).isEqualTo(4)
+        assertThat(context.path("maxReplacements").asInt()).isEqualTo(1)
         assertThat(context.path("stockTokens").asInt()).isEqualTo(0)
         assertThat(context.path("misery").asInt()).isEqualTo(10)
         assertThat(context.path("civilWarLossPending").asBoolean()).isTrue()
@@ -29,23 +29,44 @@ class ReplacementTokenSerializationTest {
     }
 
     @Test
-    fun queuedReplacementWithoutPoolSerializesNoPoolQuoteAndAnActionableDecline() {
+    fun groupedReplacementSerializesAllTargetsAndAnAffordableBound() {
         val rome = ProvinceId("rome")
         val board =
             BoardState().placeMarker(rome, p2).board.placeMarker(ProvinceId("florence"), p2).board
         val before = game("black-death", board, pool = 1)
         val area = checkNotNull(ProvinceData.definition(rome).area) { "Rome requires an area." }
         val awaiting = CardGame.play(before, p1, "event", CardChoice.AreaChoice(area))
-        val next = CardGame.replaceEventToken(awaiting, p2, usePool = true)
 
         val context =
-            json.readTree(json.writeValueAsString(next.viewForPlayer(p2))).path("replacementToken")
-        val choices = json.readTree(json.writeValueAsString(next.legalChoices(p2))).path("commands")
+            json
+                .readTree(json.writeValueAsString(awaiting.viewForPlayer(p2)))
+                .path("replacementToken")
+        val choices =
+            json.readTree(json.writeValueAsString(awaiting.legalChoices(p2))).path("commands")
 
-        assertThat(context.path("event").asText()).isEqualTo("BLACK_DEATH")
-        assertThat(context.path("poolTokens").asInt()).isEqualTo(0)
-        assertThat(context.path("poolAfter").isNull).isTrue()
-        assertThat(choices.map { it.asText() }).containsExactly("replace-event-token none")
+        assertThat(context.path("provinces").map { it.asText() })
+            .containsExactly("rome", "florence")
+        assertThat(context.path("poolTokens").asInt()).isEqualTo(1)
+        assertThat(context.path("maxReplacements").asInt()).isEqualTo(1)
+        assertThat(context.has("poolAfter")).isFalse()
+        assertThat(choices.map { it.asText() }).containsExactly("replace-event-tokens none")
+    }
+
+    @Test
+    fun civilWarLossSerializesActualCostsOnlyAfterCapitalReplacement() {
+        val before = game("civil-war", BoardState().placeMarker(ProvinceId("genoa"), p2).board)
+        val event = CardGame.play(before, p1, "event", CardChoice.PlayerChoice(p2))
+        val awaiting = CardGame.replaceEventTokens(event, p2, setOf(ProvinceId("genoa")))
+
+        val loss =
+            json.readTree(json.writeValueAsString(awaiting.viewForPlayer(p3))).path("civilWarLoss")
+
+        assertThat(loss.path("player").asText()).isEqualTo("p2")
+        assertThat(loss.path("cashCost").asInt()).isEqualTo(20)
+        assertThat(loss.path("tokenCost").asInt()).isEqualTo(2)
+        assertThat(loss.path("cashAfter").asInt()).isEqualTo(20)
+        assertThat(loss.path("poolAfter").asInt()).isEqualTo(2)
+        assertThat(event.viewForPlayer(p3).civilWarLoss).isNull()
     }
 
     private fun game(card: String, board: BoardState, pool: Int = 5): GameState {

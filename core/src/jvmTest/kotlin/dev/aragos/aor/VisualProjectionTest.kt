@@ -111,19 +111,19 @@ class VisualProjectionTest {
                                     listOf(
                                         CardDecision.ReplacementToken(
                                             p1,
-                                            ProvinceId("rome"),
+                                            listOf(ProvinceId("rome")),
                                             EventId.BLACK_DEATH,
                                         ),
                                         CardDecision.ReplacementToken(
                                             p1,
-                                            florence,
-                                            EventId.BLACK_DEATH,
+                                            listOf(florence),
+                                            EventId.REBELLION,
                                         ),
                                     )
                             )
                 )
         val after =
-            before.step(Entry.Action(p1, TextCodec.parseCommand("replace-event-token none")))
+            before.step(Entry.Action(p1, TextCodec.parseCommand("replace-event-tokens none")))
 
         assertThat(after.viewForPlayer(p1).activity?.decisionEntry)
             .isGreaterThan(before.decisionStart)

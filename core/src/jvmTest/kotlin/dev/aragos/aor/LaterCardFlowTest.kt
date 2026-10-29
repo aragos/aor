@@ -37,7 +37,7 @@ class LaterCardFlowTest {
             }
         val awaiting = initial.play("p1: play hand-1 area vii")
 
-        val replied = awaiting.play("p2: replace-event-token pool")
+        val replied = awaiting.play("p2: replace-event-tokens venice")
 
         assertThat(replied.board.pieces.values.filterIsInstance<ProvincePieces.Marker>()).isEmpty()
         assertThat(replied.board.tokenCount(p2)).isEqualTo(2)
@@ -56,9 +56,9 @@ class LaterCardFlowTest {
                 .player(p2) { owner -> owner.copy(stockTokens = 0, poolTokens = 1) }
                 .player(p3) { owner -> owner.copy(stockTokens = 0, poolTokens = 1) }
         val awaiting = initial.play("p1: play hand-1 provinces genoa tunis")
-        val firstReply = awaiting.play("p3: replace-event-token none")
+        val firstReply = awaiting.play("p2: replace-event-tokens genoa")
 
-        val replied = firstReply.play("p2: replace-event-token pool")
+        val replied = firstReply.play("p3: replace-event-tokens none")
 
         assertThat(replied.board.pieces[ProvinceId("tunis")]).isNull()
         assertThat(replied.board.pieces[ProvinceId("genoa")])

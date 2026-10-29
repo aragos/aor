@@ -147,8 +147,8 @@ unused pool.
 | `play <reference> province <province>` | Selects an eligible target province, for example for Crusades. |
 | `play <reference> category <category>` | Papal Decree; category is `science`, `religion`, `exploration`, or `none` to decline a ban. |
 | `play <reference> protect <amount>` | Leader play; nonnegative dollars of protection on an exposed leader. |
-| `civil-war-loss cash` / `civil-war-loss tokens` | Civil War victim; chooses the loss type. |
-| `replace-event-token pool` / `replace-event-token none` | Counter's owner; spend one pool token on replacement or leave the province empty. |
+| `civil-war-loss cash` / `civil-war-loss tokens` | Civil War victim; chooses the quoted payable loss after capital replacement. Cash is half written cash rounded up, capped by current cash; tokens are half the remaining pool rounded up. |
+| `replace-event-tokens <province>...` / `replace-event-tokens none` | Current affected owner; confirm all pending provinces from one event atomically. Named provinces each spend one pool token; every omitted province stays empty. `none` leaves all empty. Distinct named provinces must belong to this pending group and fit the total pool budget. Owners resolve in current player order, with every province for one owner before the next. |
 | `cede-war <province> ...` | War loser; names the required distinct eligible provinces, respecting support and overseas limits. Canonical text sorts province ids. |
 | `patronize <leader-card-id>` | Eligible Patronage owner during advance purchases; claims an eligible exposed leader and pays its protection once. |
 | `forgo-marker` | Recipient of a War/Crusades award with no spare marker; leaves that destination empty. |

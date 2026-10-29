@@ -70,7 +70,7 @@ function choose(state) {
 const simple = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 function finite(commands) {
     return commands.filter(command => !simple.includes(command) &&
-        ['written-record ', 'swap-order ', 'cancel-adjustment ', 'return-card ', 'adjust-market ', 'discard-card ', 'civil-war-loss ', 'replace-event-token ', 'cathedral ', 'patronize ', 'offer-card ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
+        ['written-record ', 'swap-order ', 'cancel-adjustment ', 'return-card ', 'adjust-market ', 'discard-card ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'offer-card ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
 }
 
 async function playCard(state, command) {
@@ -126,6 +126,13 @@ async function perform(state, command) {
     if (choices.includes(command)) {
         await click('.game-actions > .action-buttons > button.secondary', choices.indexOf(command));
         return click('.game-actions .selected-action button');
+    }
+    if (verb === 'replace-event-tokens') {
+        const selected = command.split(' ').slice(1);
+        for (const province of state.game.replacementToken.provinces) {
+            await click(`[data-replacement-province="${province}"] button:${selected.includes(province) ? 'first' : 'last'}-child`);
+        }
+        return click('.event-replacements > button:last-child');
     }
     if (verb === 'forgo-marker') return page.click('Forgo this marker');
     if (verb === 'cede-war') {

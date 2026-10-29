@@ -77,28 +77,28 @@ export async function checkReplacementContext(page, web, baseline) {
     async function show(province, poolTokens, event = 'REBELLION') {
         const snapshot = {...baseline, revision: ++revision,
             prompt: {messageId: 'prompt.replace-event-token', players: [viewer]},
-            legalChoices: {commands: [...(poolTokens ? ['replace-event-token pool'] : []), 'replace-event-token none']},
+            legalChoices: {commands: ['replace-event-tokens none']},
             game: {...baseline.game, stage: 'PLAY_CARDS',
                 players: baseline.game.players.map(player => player.id === viewer ? {...player, poolTokens, stockTokens: 0, misery: 20} : player),
                 activity: {actor: other.id, decisionPlayer: viewer, choice: 'replace-event-token', purchaseStep: null, startEntry: 31900, decisionEntry: revision},
-                replacementToken: {player: viewer, province, event, poolTokens, poolCost: 1,
-                    poolAfter: poolTokens ? poolTokens - 1 : null, stockTokens: 0, misery: 20, civilWarLossPending: event === 'CIVIL_WAR'}}};
+                replacementToken: {player: viewer, provinces: [province], event, poolTokens, poolCost: 1,
+                    maxReplacements: poolTokens ? 1 : 0, stockTokens: 0, misery: 20, civilWarLossPending: event === 'CIVIL_WAR'}}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'replacement fixture');
     }
     await show('rome', 1);
     const description = await page.evaluate(`document.querySelector('.replacement-token-context').textContent`);
-    assert.match(description, /Rome.*Rebellion.*No stock tokens.*Pool tokens: 1 → 0.*colored token.*adds no misery/s);
-    await page.evaluate(`(() => {const button=[...document.querySelectorAll('.action-buttons button')].find(button=>button.textContent==='Place 1 pool token in Rome');button.click();})()`);
-    assert.match(await page.evaluate(`document.querySelector('.selected-action').textContent`), /Place 1 pool token in Rome/);
-    await page.evaluate(`document.querySelector('.selected-action button:last-child').click()`);
-    assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'replace-event-token pool');
+    assert.match(description, /Rebellion.*Rome.*No stock tokens.*colored pool token.*adds no misery/s);
+    await page.evaluate(`document.querySelector('[data-replacement-province="rome"] button:first-child').click()`);
+    assert.match(await page.evaluate(`document.querySelector('.replacement-review').textContent`), /Pool tokens: 1 → 0.*Place 1 pool token in Rome/s);
+    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'replace-event-tokens rome');
     await show('genoa', 0, 'CIVIL_WAR');
     const next = await page.evaluate(`document.querySelector('.replacement-token-context').textContent`);
-    assert.match(next, /Genoa.*Civil War.*No pool tokens.*misery has already been applied.*cash or token loss/s);
-    assert.equal(await page.evaluate(`[...document.querySelectorAll('.action-buttons button')].some(button=>button.textContent.includes('Place 1 pool token'))`), false);
-    await page.evaluate(`(() => {const button=[...document.querySelectorAll('.action-buttons button')].find(button=>button.textContent==='Leave Genoa empty');button.click();})()`);
-    await page.evaluate(`document.querySelector('.selected-action button:last-child').click()`);
-    assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'replace-event-token none');
+    assert.match(next, /Civil War.*Genoa.*No pool tokens.*misery has already been applied.*cash or token loss/s);
+    assert.equal(await page.evaluate(`document.querySelector('[data-replacement-province="genoa"] button:first-child').disabled`), true);
+    await page.evaluate(`document.querySelector('[data-replacement-province="genoa"] button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'replace-event-tokens none');
     console.log('Passed: event/recipient/province context, exact pool cost, explicit replacement/empty choices and exhausted multi-province flow.');
 }

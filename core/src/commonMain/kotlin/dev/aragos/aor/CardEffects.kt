@@ -15,6 +15,7 @@ enum class CardRuleCode {
     INVALID_LEADER_CLAIM,
     INVALID_WAR,
     INVALID_SURRENDER,
+    INSUFFICIENT_REPLACEMENT_TOKENS,
 }
 
 class CardRuleViolation(val code: CardRuleCode, val explanation: String) : Exception(explanation)
@@ -158,6 +159,12 @@ enum class CivilWarLossChoice {
 data class CivilWarLosses(val cash: Int, val expansionTokens: Int) {
     init {
         require(cash >= 0 && expansionTokens >= 0) { "Civil War losses cannot be negative." }
+    }
+
+    companion object {
+        /** Token loss uses the pool remaining after any capital replacement. */
+        internal fun forResources(writtenCash: Int, cash: Int, poolTokens: Int): CivilWarLosses =
+            CivilWarLosses(minOf(halfUp(writtenCash), cash), halfUp(poolTokens))
     }
 }
 
@@ -415,9 +422,10 @@ object CardRules {
                     if (context.finalCardPlay) {
                         CivilWarLosses(0, 0)
                     } else {
-                        CivilWarLosses(
-                            minOf(halfUp(player.writtenCash), player.cash),
-                            halfUp(player.poolTokens),
+                        CivilWarLosses.forResources(
+                            player.writtenCash,
+                            player.cash,
+                            player.poolTokens,
                         )
                     }
                 val marker = context.markers[player.capital]?.takeIf(CardMarker::coloured)
@@ -744,6 +752,6 @@ object CardRules {
         val industry = if (AdvanceId.INDUSTRY in context.player(player).advances) 1 else 0
         return (count + adjustment + industry).coerceAtLeast(0)
     }
-
-    private fun halfUp(amount: Int): Int = amount / 2 + amount % 2
 }
+
+private fun halfUp(amount: Int): Int = amount / 2 + amount % 2

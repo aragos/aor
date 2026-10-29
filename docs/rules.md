@@ -794,7 +794,7 @@ Leader cards are free to play. Their discounts apply only in the Purchase phase 
 - **Civil War** (on target player)
     - The target gains +1 misery.
     - Its capital's domination marker, if any, becomes a token.
-    - It loses either half its last recorded cash or half its expansion tokens; the target chooses.
+    - After resolving its capital replacement, it chooses either half its last recorded cash (capped by cash actually held) or half its remaining expansion pool. Fractions round up; the choice shows the actual cost and remaining balance.
     - It moves to last in turn order at the start of Expansion.
 - **Enlightened Ruler** (on oneself)
     - For the rest of the turn, the player is immune to Mysticism Abounds, Religious Strife, Civil War, Revolutionary
@@ -852,6 +852,7 @@ expansion-bonus credit if rebuilt later in the turn.
 - **Black Death**
     - Choose an area. Every token there returns to its stock.
     - Every domination marker there is reduced to a single token.
+
 - **Gunpowder**
     - Military advantage.
     - Voids Armor and Stirrups. Unplayed copies become burdens; copies already played this turn stop working against the
@@ -865,6 +866,12 @@ expansion-bonus credit if rebuilt later in the turn.
 - **Religious Strife**
     - See [§7.4](#74-misery-triggers).
     - Voids Papal Decree.
+
+**Event token replacements (Civil War, Rebellion, Pirates/Vikings, Black Death):**
+
+- Use available stock tokens automatically, in current player order. Black Death returns all affected square tokens before replacing markers.
+- When stock runs out, the owner may use one expansion-pool token per replacement or leave the province empty. Each owner reviews all its pending provinces together and confirms once; the combined selection must fit its pool.
+- Affected owners decide in current player order, finishing all their provinces before the next owner. Replacements are colored tokens and add no misery.
 
 ---
 

@@ -12,13 +12,16 @@ sealed interface CardDecision : TurnDecision {
             listOf("civil-war-loss cash", "civil-war-loss tokens")
     }
 
-    /** Public cause stays with each pending province, including consecutive multi-target events. */
+    /** All of one owner's pending provinces from one event are confirmed atomically. */
     data class ReplacementToken(
         override val player: PlayerId,
-        val province: ProvinceId,
+        val provinces: List<ProvinceId>,
         val event: EventId,
     ) : CardDecision {
         init {
+            require(provinces.isNotEmpty() && provinces.distinct().size == provinces.size) {
+                "Event replacements require distinct pending provinces."
+            }
             require(
                 event in
                     setOf(
@@ -35,14 +38,9 @@ sealed interface CardDecision : TurnDecision {
         override val choice: String
             get() = "replace-event-token"
 
+        // The projection supplies the bounded, user-edited subset; no exponential enumeration.
         override fun choices(state: GameState): List<String> =
-            listOfNotNull(
-                "replace-event-token pool"
-                    .takeIf {
-                        state.playerState(player).poolTokens >= CardGame.REPLACEMENT_TOKEN_COST
-                    },
-                "replace-event-token none",
-            )
+            listOf(CardCommand.ReplaceEventTokens(emptySet()).toText())
     }
 
     data class WarPreparation(override val player: PlayerId) : CardDecision {
@@ -230,40 +228,49 @@ object CardGame {
         val frame = state.flow.decisions.lastOrNull() as? CardDecision.CivilWarLoss
         checkRule(frame?.player == actor, ViolationCode.WRONG_PLAYER)
         val player = state.playerState(actor)
+        val losses = CivilWarLosses.forResources(player.writtenCash, player.cash, player.poolTokens)
         val updated =
             when (choice) {
-                CivilWarLossChoice.CASH ->
-                    player.copy(cash = (player.cash - halfUp(player.writtenCash)).coerceAtLeast(0))
+                CivilWarLossChoice.CASH -> player.copy(cash = player.cash - losses.cash)
                 // Capital replacement is resolved first, so this half uses the remaining expansion
                 // pool.
                 CivilWarLossChoice.EXPANSION_TOKENS -> {
-                    val loss = halfUp(player.poolTokens)
                     player.copy(
-                        poolTokens = player.poolTokens - loss,
-                        stockTokens = player.stockTokens + loss,
+                        poolTokens = player.poolTokens - losses.expansionTokens,
+                        stockTokens = player.stockTokens + losses.expansionTokens,
                     )
                 }
             }
         return state.popDecision().replacePlayer(updated)
     }
 
-    fun replaceEventToken(state: GameState, actor: PlayerId, usePool: Boolean): GameState {
+    fun replaceEventTokens(
+        state: GameState,
+        actor: PlayerId,
+        provinces: Set<ProvinceId>,
+    ): GameState {
         val frame = state.flow.decisions.lastOrNull() as? CardDecision.ReplacementToken
         checkRule(frame?.player == actor, ViolationCode.WRONG_PLAYER)
         val replacement =
-            requireNotNull(frame) { "A validated event replacement requires a frame." }
-        val next = state.popDecision()
-        if (!usePool) return next
-        val owner = next.playerState(actor)
+            requireNotNull(frame) { "Validated event replacements require a pending decision." }
         cardRule(
-            owner.poolTokens >= REPLACEMENT_TOKEN_COST,
+            replacement.provinces.containsAll(provinces),
             CardRuleCode.ILLEGAL_TARGET,
-            "A replacement requires one expansion token.",
+            "Choose only provinces awaiting this player's event replacements.",
         )
-        val change = next.board.replaceWithToken(replacement.province, actor)
-        return next
-            .withBoardChange(change.copy(tokensRequired = emptyMap()))
-            .replacePlayer(owner.copy(poolTokens = owner.poolTokens - REPLACEMENT_TOKEN_COST))
+        val owner = state.playerState(actor)
+        val cost = provinces.size * REPLACEMENT_TOKEN_COST
+        cardRule(
+            owner.poolTokens >= cost,
+            CardRuleCode.INSUFFICIENT_REPLACEMENT_TOKENS,
+            "The selected event replacements exceed the available expansion pool.",
+        )
+        val next =
+            provinces.fold(state.popDecision()) { current, province ->
+                val change = current.board.replaceWithToken(province, actor)
+                current.withBoardChange(change.copy(tokensRequired = emptyMap()))
+            }
+        return next.replacePlayer(owner.copy(poolTokens = owner.poolTokens - cost))
     }
 
     private fun prepareWarRoll(state: GameState): GameState {
@@ -399,14 +406,14 @@ object CardGame {
                     current.gainMisery(player, spaces)
                 }
             is CardResolution.CivilWar -> civilWar(state, resolution)
-            is CardResolution.MarkerReduction -> reduceMarker(state, resolution)
-            is CardResolution.MarkerReductions -> resolution.reductions.fold(state, ::reduceMarker)
+            is CardResolution.MarkerReduction -> reduceMarkers(state, listOf(resolution))
+            is CardResolution.MarkerReductions -> reduceMarkers(state, resolution.reductions)
             is CardResolution.BlackDeath -> {
                 val cleared =
                     resolution.tokenProvinces.fold(state) { current, province ->
                         current.withBoardChange(current.board.remove(province))
                     }
-                resolution.reductions.fold(cleared, ::reduceMarker)
+                reduceMarkers(cleared, resolution.reductions)
             }
             is CardResolution.MongolArmies ->
                 state
@@ -472,7 +479,31 @@ object CardGame {
                 ordered
             }
         val reduction = resolution.capitalReduction ?: return awaitingLoss
-        return reduceMarker(awaitingLoss, reduction)
+        return reduceMarkers(awaitingLoss, listOf(reduction))
+    }
+
+    /** Automatic stock replacements and optional groups follow the current player order. */
+    private fun reduceMarkers(
+        state: GameState,
+        reductions: List<CardResolution.MarkerReduction>,
+    ): GameState {
+        val byOwner = reductions.groupBy(CardResolution.MarkerReduction::owner)
+        val ordered = state.turnOrder.flatMap { player -> byOwner[player].orEmpty() }
+        val reduced = ordered.fold(state, ::reduceMarker)
+        val pending =
+            reduced.flow.decisions
+                .drop(state.flow.decisions.size)
+                .filterIsInstance<CardDecision.ReplacementToken>()
+                .groupBy(CardDecision.ReplacementToken::player)
+        val groups =
+            state.turnOrder.asReversed().mapNotNull { player ->
+                pending[player]?.let { choices ->
+                    choices
+                        .first()
+                        .copy(provinces = choices.flatMap(CardDecision.ReplacementToken::provinces))
+                }
+            }
+        return reduced.copy(flow = reduced.flow.copy(decisions = state.flow.decisions + groups))
     }
 
     private fun reduceMarker(
@@ -506,7 +537,7 @@ object CardGame {
                     .pushDecision(
                         CardDecision.ReplacementToken(
                             reduction.owner,
-                            reduction.province,
+                            listOf(reduction.province),
                             reduction.event,
                         )
                     )
@@ -607,6 +638,4 @@ object CardGame {
                 owner.copy(misery = MiseryRules.shift(owner.misery, spaces))
             }
         )
-
-    private fun halfUp(value: Int): Int = value / 2 + value % 2
 }
