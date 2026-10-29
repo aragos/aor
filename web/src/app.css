@@ -125,7 +125,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .reference-track li {border:1px solid #d0d9c8;border-radius:4px;padding:.2rem .4rem;font-variant-numeric:tabular-nums}
 .reference-track li[aria-current] {background:#245c50;color:#fffef8;border-color:#245c50}
 .fleet-reference > span {display:block;margin-top:.75rem}
-.player-person { display: block; color: #61756b; font-size: .78rem; margin: .2rem 0 .6rem; }
+.player-labels { display: flex; align-items: baseline; gap: .4rem; flex: 1; min-width: 0; }
+.player-identity > svg, .player-identity > small { flex-shrink: 0; }
+.player-labels > strong { flex-shrink: 0; max-width: 100%; margin-right: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-person { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #61756b; font-size: .78rem; }
 .player-pool { display: flex; align-items: center; gap: .4rem; margin-top: .55rem; color: var(--resource); }
 .player-pool b { font-size: 1.2rem; }
 .player-pool small { font-size: .72rem; }
