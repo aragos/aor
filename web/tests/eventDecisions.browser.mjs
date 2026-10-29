@@ -11,6 +11,7 @@ export async function checkGroupedReplacements(page, web, baseline) {
         prompt: {messageId: 'prompt.replace-event-token', players: [viewer]},
         legalChoices: {commands: ['replace-event-tokens none'], bidMin: null, bidMax: null},
         game: {...baseline.game, stage: 'PLAY_CARDS',
+            players: baseline.game.players.map(player => player.id === viewer ? {...player, poolTokens: 2, stockTokens: 0, misery: 20} : player),
             activity: {...baseline.game.activity, decisionPlayer: viewer, choice: 'replace-event-token', decisionEntry: 33000},
             replacementToken: {player: viewer, provinces, event: 'BLACK_DEATH', poolTokens: 2, poolCost: 1,
                 maxReplacements: 2, stockTokens: 0, misery: 20, civilWarLossPending: false}}};
@@ -118,11 +119,15 @@ export async function checkLiveCivilWar(page, web) {
     assert.equal(paid.cash, me.cash, 'Choosing token loss does not spend cash');
     assert.equal(after.game.board.find(province => province.id === me.capital).tokens.find(holding => holding.owner === player.id)?.coloured, 1);
     console.log('Passed: real Civil War capital replacement and authoritative cash/token offers match the committed token loss.');
+    return after;
 }
 
 if (process.argv[1]?.endsWith('/eventDecisions.browser.mjs')) {
     const page = await open('about:blank');
-    try { await checkLiveCivilWar(page, process.env.MAP_WEB_URL); }
+    try {
+        const baseline = await checkLiveCivilWar(page, process.env.MAP_WEB_URL);
+        await checkGroupedReplacements(page, process.env.MAP_WEB_URL, baseline);
+    }
     finally {
         page.ws.close();
         await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);
