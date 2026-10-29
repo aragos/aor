@@ -208,23 +208,25 @@ data class GameView(
             if (state.turnNumber == null || viewer.misery == MiseryStep.CHAOS) return emptyList()
             val context = state.purchaseContext(viewer.player.id)
             return AdvanceId.entries.filterNot(viewer.advances::owns).map { advance ->
-                try {
-                    val quote =
-                        AdvancePurchases.quote(
-                            viewer,
-                            advance,
-                            context,
-                        )
-                    AdvanceOfferView(
-                        advance,
-                        quote.price,
+                val quote = AdvancePurchases.estimate(viewer, advance, context)
+                val unavailableReason =
+                    try {
+                        AdvancePurchases.requireEligible(viewer, advance, context)
                         if (viewer.cash >= quote.price) {
                             null
                         } else {
                             ViolationCode.INSUFFICIENT_CASH.name
-                        },
-                        quote.leaders,
-                        quote,
+                        }
+                    } catch (failure: RuleViolation) {
+                        failure.code.name
+                    }
+                AdvanceOfferView(
+                    advance = advance,
+                    price = quote.price,
+                    unavailableReason = unavailableReason,
+                    leaderDiscounts = quote.leaders,
+                    priceBreakdown = quote,
+                    miseryChanges =
                         listOfNotNull(
                             MiseryChangeView.between(
                                 viewer.player.id,
@@ -232,10 +234,7 @@ data class GameView(
                                 quote.miseryAfter,
                             )
                         ),
-                    )
-                } catch (failure: RuleViolation) {
-                    AdvanceOfferView(advance, null, failure.code.name)
-                }
+                )
             }
         }
 
@@ -291,7 +290,10 @@ data class WarCessionView(
     }
 }
 
-/** Leader credits are already authorized and included in [price], never an additional rebate. */
+/**
+ * Informational price for an unowned advance, including when [unavailableReason] blocks purchase.
+ * Leader credits are already authorized and included in [price], never an additional rebate.
+ */
 data class AdvanceOfferView(
     val advance: AdvanceId,
     val price: Int?,

@@ -208,7 +208,7 @@ class VisualProjectionTest {
     }
 
     @Test
-    fun whiteMarkersDoNotQualifyForCurrentCommodityPayment() {
+    fun whiteMarkersCountInLiveValuesWithoutChangingActualCommodityPayments() {
         val board = BoardState().placeMarker(florence, p1, PieceSide.WHITE).board
         val view = state(board).viewForPlayer(p1)
         val commodities = ProvinceData.definition(florence).commodities
@@ -218,7 +218,12 @@ class VisualProjectionTest {
                     .filter { it.commodity in commodities }
                     .flatMap(CommodityPayoutView::owners)
             )
-            .isEmpty()
+            .isNotEmpty()
+        assertThat(
+                CardRules.commodityPayment(state(board).cardContext(), commodities.first())
+                    .payments[p1]
+            )
+            .isEqualTo(0)
         assertThat(view.players.first().income?.ordinary)
             .isGreaterThan(state().viewForPlayer(p1).players.first().income?.ordinary ?: -1)
     }

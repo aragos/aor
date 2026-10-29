@@ -66,18 +66,17 @@ export async function checkPurchaseClarity(page, web, baseline) {
     const discount = {leaderCardId: 'charlemagne', baseAmount: 20, writtenRecordBonus: 10, amount: 30};
     const offer = {advance: advance.id, price: 40, unavailableReason: null, leaderDiscounts: [discount],
         priceBreakdown: {advance: advance.id, baseCost: 100, categoryCredit: 20, institutionalResearchCredit: 10,
+            advanceCredits: [{advance: 'URBAN_ASCENDANCY', amount: 20}], effectiveDiscount: 60,
             leaders: [discount], price: 40, miseryBefore: 20, miseryAfter: 30},
         miseryChanges: [{player: viewer, fromValue: 20, toValue: 30}]};
     await show({prompt: {messageId: 'prompt.purchase-advances', players: [viewer]}, legalChoices: {commands: [`buy-advance ${advance.letter}`, 'pass']},
         game: {stage: 'PURCHASE', activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'ADVANCES'},
             advanceOffers: [offer]}});
     const tileText = await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').textContent`);
-    assert.match(tileText, /Printed cost: \$100/);
-    assert.match(tileText, /Category credit: −\$20/);
-    assert.match(tileText, /Institutional Research: −\$10/);
-    assert.match(tileText, /Charlemagne.*−\$30.*Includes \$10 Written Record/);
+    assert.match(tileText, /\$40.*−\$60 credits/);
     await click(`[data-advance="${advance.id}"]`);
-    assert.match(await page.evaluate(`document.querySelector('.decision-panel .price-breakdown').textContent`), /Printed cost\$100.*Category credit−\$20.*Institutional Research−\$10.*Price\$40/);
+    await click('.decision-panel .price-details > summary');
+    assert.match(await page.evaluate(`document.querySelector('.decision-panel .price-breakdown').textContent`), /Printed cost\$100.*Urban Ascendancy−\$20.*Institutional Research−\$10.*Price\$40/);
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.decision-panel [data-misery-preview-player] [data-misery-box]')].map(box => box.dataset.miseryBox)`), ['20', '30']);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-purchase-preview-desktop.png'), 1280, 900);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-purchase-preview-phone.png'), 390, 844, true);
@@ -95,7 +94,9 @@ export async function checkPurchaseClarity(page, web, baseline) {
         miseryChanges: [{player: viewer, spaces: -1, fromValue: 30, toValue: 20}]};
     await show({events: [event]});
     const receipt = await page.evaluate(`document.querySelector('[data-event-id="relief-breakdown"]').textContent`);
-    assert(receipt.includes(`Paid $${cash} cash + ${spent} MR`) && receipt.includes('MR earned this turn'));
+    assert(receipt.includes(`−$${cash}`) && receipt.includes(`${spent} MR used`) && receipt.includes('MR earned this turn'));
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-event-id="relief-breakdown"] .event-cash-change').length`), 1,
+        'Relief uses one named cash receipt with the MR component');
     assert.equal((receipt.match(new RegExp('\\$'+cash+'(?![0-9])','g')) ?? []).length, 1, 'Cash component appears once');
     const holy = {...event, id: 'holy-tokens', kind: 'HOLY_INDULGENCE', actor: null, amount: null, reliefPayment: null,
         cashChanges: [], miseryChanges: [], tokenChanges: [

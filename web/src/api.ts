@@ -24,6 +24,7 @@ export interface AppliedLeaderDiscount {
 }
 export interface AdvanceQuote {
     advance: string; baseCost: number; categoryCredit: number; institutionalResearchCredit: number;
+    advanceCredits: {advance: string; amount: number}[]; effectiveDiscount: number;
     leaders: AppliedLeaderDiscount[]; price: number;
     miseryBefore: number | null; miseryAfter: number | null;
 }

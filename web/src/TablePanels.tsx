@@ -100,6 +100,11 @@ export function PayoutReference({snapshot, payout}: {snapshot: Snapshot; payout:
     return <HelpLink topic={`commodity-${payout.commodity.toLowerCase()}`} label={t('table.fullPayouts')} compact={false}/>;
 }
 
+export function CommodityValueNote({snapshot}: {snapshot: Snapshot}) {
+    return snapshot.game.board.some(province => province.marker?.side === 'WHITE')
+        ? <p className="small muted commodity-value-note">{t('table.currentCommodityControl')}</p> : null;
+}
+
 export function UnplayedLeaders({snapshot, advance}: {snapshot: Snapshot; advance: string}) {
     const availability = snapshot.game.unplayedAdvanceLeaders?.find(candidate => candidate.advance === advance);
     if (!availability) return null;
@@ -110,6 +115,7 @@ export function UnplayedLeaders({snapshot, advance}: {snapshot: Snapshot; advanc
 
 export function Markets({snapshot}: {snapshot: Snapshot}) {
     return <section className="markets-workspace" aria-label={t('table.markets')}>
+        <CommodityValueNote snapshot={snapshot}/>
         <div className="market-grid">{snapshot.game.commodityPayouts.map(payout => <details className="market-tile" data-commodity={payout.commodity} key={payout.commodity}>
             <summary><Commodity commodity={payout.commodity}/>
                 <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/></summary>
@@ -180,7 +186,8 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                         setInspection(null); setSelectedAdvance(advance.id); setSelected(''); setSelectedCard(''); setPicker(null);
                     }}>
                     <span className="advance-letter">{advance.letter}</span><strong>{advanceName(advance.id)}</strong>
-                    {owned ? <span>{t('table.owned')}</span> : <AdvancePrice offer={offer} compact/>}
+                    <AdvancePrice offer={offer} printedCost={advance.cost} compact/>
+                    {owned && <small className="advance-owned">{t('table.owned')}</small>}
                     <UnplayedLeaders snapshot={snapshot} advance={advance.id}/>
                     {available && <small className="advance-available">{t('table.available')}</small>}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}

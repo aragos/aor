@@ -86,11 +86,48 @@ class ActionPreviewSerializationTest {
 
         assertThat(breakdown.path("baseCost").asInt()).isEqualTo(60)
         assertThat(breakdown.path("categoryCredit").asInt()).isEqualTo(20)
+        assertThat(breakdown.path("advanceCredits").single().path("advance").asText())
+            .isEqualTo("THE_HEAVENS")
+        assertThat(breakdown.path("advanceCredits").single().path("amount").asInt()).isEqualTo(20)
+        assertThat(breakdown.path("effectiveDiscount").asInt()).isEqualTo(60)
         assertThat(breakdown.path("institutionalResearchCredit").asInt()).isEqualTo(10)
         assertThat(breakdown.path("leaders").single().path("amount").asInt()).isEqualTo(30)
         assertThat(breakdown.path("price").asInt()).isEqualTo(offer.path("price").asInt())
         assertThat(offer.path("miseryChanges").single().path("fromValue").asInt()).isEqualTo(100)
         assertThat(offer.path("miseryChanges").single().path("toValue").asInt()).isEqualTo(90)
+    }
+
+    @Test
+    fun blockedAdvanceStillSerializesItsNamedCreditsAndPrice() {
+        val initial = state()
+        val player =
+            initial
+                .playerState(p1)
+                .copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.OVERLAND_EAST, 1)))
+                )
+        val before = initial.copy(players = initial.players + (p1 to player))
+
+        val view = json.readTree(json.writeValueAsString(before.viewForPlayer(p1)))
+        val offer =
+            view.path("advanceOffers").single {
+                it.path("advance").asText() == "OCEAN_NAVIGATION"
+            }
+
+        assertThat(offer.path("unavailableReason").asText())
+            .isEqualTo("MISSING_ADVANCE_PREREQUISITE")
+        assertThat(offer.path("price").asInt()).isEqualTo(100)
+        assertThat(offer.path("priceBreakdown").path("price").asInt()).isEqualTo(100)
+        assertThat(
+                offer
+                    .path("priceBreakdown")
+                    .path("advanceCredits")
+                    .single()
+                    .path("advance")
+                    .asText()
+            )
+            .isEqualTo("OVERLAND_EAST")
     }
 
     @Test

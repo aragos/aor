@@ -122,10 +122,14 @@ export async function checkActionContext(page, web, baseline) {
     await show({prompt: {messageId: 'prompt.purchase-advances', players: [viewer]}, legalChoices: {commands: [`buy-advance ${advance.letter}`, 'pass'], bidMax: null},
         game: {stage: 'PURCHASE', activity: {...baseline.game.activity, actor: viewer, purchaseStep: 'ADVANCES'},
             advanceOffers: [{advance: advance.id, price: 30, unavailableReason: null,
-                leaderDiscounts: [{leaderCardId: 'charlemagne', baseAmount: 20, writtenRecordBonus: 10, amount: 30}]}]}});
+                leaderDiscounts: [{leaderCardId: 'charlemagne', baseAmount: 20, writtenRecordBonus: 10, amount: 30}],
+                priceBreakdown: {advance: advance.id, baseCost: 60, categoryCredit: 0, advanceCredits: [], effectiveDiscount: 30,
+                    institutionalResearchCredit: 0, leaders: [{leaderCardId: 'charlemagne', baseAmount: 20, writtenRecordBonus: 10, amount: 30}],
+                    price: 30, miseryBefore: 0, miseryAfter: 0}}]}});
     await click(`[data-advance="${advance.id}"]`);
     assert.match(await page.evaluate(`document.querySelector('.action-cash').textContent`), /Cash available:.*\$/);
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .advance-benefits').textContent`), /.+/);
+    await click('.decision-panel .price-details > summary');
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .leader-discount').textContent`), /−\$30.*Includes \$10 Written Record/);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-action-context-desktop.png'), 1280, 900);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-action-context-phone.png'), 390, 844, true);

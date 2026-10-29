@@ -58,12 +58,19 @@ data class AppliedLeaderDiscount(
 data class AdvanceQuote(
     val advance: AdvanceId,
     val baseCost: Int,
-    val categoryCredit: Int,
+    val advanceCredits: List<AdvanceCredit>,
     val institutionalResearchCredit: Int,
     val leaders: List<AppliedLeaderDiscount>,
     val miseryBefore: MiseryStep,
     val miseryAfter: MiseryStep,
 ) {
+    val categoryCredit: Int
+        get() = advanceCredits.sumOf(AdvanceCredit::amount)
+
+    /** Actual reduction in dollars after the zero-price floor; excess discounts are excluded. */
+    val effectiveDiscount: Int
+        get() = baseCost - price
+
     val price: Int
         get() =
             (baseCost.toLong() -
@@ -75,10 +82,18 @@ data class AdvanceQuote(
 }
 
 object AdvancePurchases {
-    /**
-     * Quotes legal prerequisites/categories even when the buyer cannot afford the resulting price.
-     */
+    /** Quote a currently eligible advance, even when its price exceeds the buyer's cash. */
     fun quote(player: PlayerState, advance: AdvanceId, context: PurchaseContext): AdvanceQuote {
+        requireEligible(player, advance, context)
+        return estimate(player, advance, context)
+    }
+
+    /** Prerequisites and Papal Decree authorize purchases independently of informational prices. */
+    internal fun requireEligible(
+        player: PlayerState,
+        advance: AdvanceId,
+        context: PurchaseContext,
+    ) {
         player.requireActive()
         val definition = AdvanceData.definition(advance)
         val entity = listOf(advance.letter.toString())
@@ -94,6 +109,19 @@ object AdvancePurchases {
             ViolationCode.ADVANCE_CATEGORY_FORBIDDEN,
             entity,
         )
+    }
+
+    /**
+     * Price an unowned advance for an active player, even when prerequisites or Papal Decree
+     * prevent purchase. [requireEligible] owns eligibility; projections may show a blocked
+     * estimate.
+     */
+    internal fun estimate(
+        player: PlayerState,
+        advance: AdvanceId,
+        context: PurchaseContext,
+    ): AdvanceQuote {
+        val definition = AdvanceData.definition(advance)
         val research =
             if (
                 player.advances.owns(AdvanceId.INSTITUTIONAL_RESEARCH) &&
@@ -114,7 +142,7 @@ object AdvancePurchases {
         return AdvanceQuote(
             advance = advance,
             baseCost = definition.cost,
-            categoryCredit = player.advances.creditsFor(definition.category, context.currentTurn),
+            advanceCredits = player.advances.creditsFor(definition.category, context.currentTurn),
             institutionalResearchCredit = research,
             leaders =
                 context.leaderDiscounts

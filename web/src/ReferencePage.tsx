@@ -95,7 +95,7 @@ export default function ReferencePage() {
                     <p>Prerequisites: {advance.prerequisites.map(advanceName).join(', ') || 'None'}</p>
                 </article>)}
             </section>
-            <section id="commodities"><h2>Commodity payout boxes</h2><p>The effective box is established markets plus shortages, minus surpluses, with Industry’s bonus where applicable. Payouts continue the same quadratic formula beyond printed box 10. Current owner payouts and adjustments stay on the game’s Markets tab and cards.</p>
+            <section id="commodities"><h2>Commodity payout boxes</h2><p>The effective box is established markets plus shortages, minus surpluses, with Industry’s bonus where applicable. Payouts continue the same quadratic formula beyond printed box 10. Live values on the game’s Markets tab and cards follow current marker ownership, including white markers during Expansion. Actual card payments require colored markers.</p>
                 <p>White + black dice select the matching total below; the green die selects shortage or surplus. Canceling an adjustment costs the commodity’s base value.</p>
                 {catalog?.commodities.map(commodity => <article id={`commodity-${commodity.id.toLowerCase()}`} key={commodity.id}>
                     <h3><Commodity commodity={commodity.id}/></h3><p>Base value ${commodity.baseValue} · Dice total {commodity.diceTotal}</p>

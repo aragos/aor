@@ -49,7 +49,7 @@ class VisualProjectionSerializationTest {
     }
 
     @Test
-    fun currentPayoutIncludesZeroPayingColouredOwnerAndExcludesWhiteOwner() {
+    fun livePayoutIncludesZeroPayingColouredAndWhiteOwners() {
         val commodity = ProvinceData.definition(ProvinceId("florence")).commodities.single()
         val whiteProvince =
             CatalogConfiguration(3)
@@ -75,10 +75,16 @@ class VisualProjectionSerializationTest {
             view.path("commodityPayouts").single { it.path("commodity").asText() == commodity.name }
         val owners = payout.path("owners").toList()
 
-        assertThat(owners).hasSize(1)
-        assertThat(owners.single().path("player").asText()).isEqualTo("p1")
-        assertThat(owners.single().path("payout").asInt()).isEqualTo(0)
-        assertThat(owners.single().path("provinces").single().asText()).isEqualTo("florence")
+        assertThat(owners.map { it.path("player").asText() }).containsExactly("p1", "p2")
+        assertThat(owners.map { it.path("payout").asInt() }).containsExactly(0, 0)
+        assertThat(
+                owners
+                    .single { it.path("player").asText() == "p1" }
+                    .path("provinces")
+                    .single()
+                    .asText()
+            )
+            .isEqualTo("florence")
     }
 
     @Test

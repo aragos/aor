@@ -7,6 +7,13 @@ data class AdvanceAcquisition(val advance: AdvanceId, val turnNumber: Int) {
     }
 }
 
+/** Printed dollar credit from one eligible, previously acquired advance in the target category. */
+data class AdvanceCredit(val advance: AdvanceId, val amount: Int) {
+    init {
+        require(amount > 0) { "An applied advance credit must have a positive dollar amount." }
+    }
+}
+
 /**
  * Player-owned acquisition history. Ownership, tiers, category credits and current-turn relief are
  * derived from these records. Credits become eligible in the turn after acquisition; abilities and
@@ -71,13 +78,17 @@ data class PlayerAdvances(val acquisitions: List<AdvanceAcquisition> = emptyList
     fun creditsFor(
         category: AdvanceCategory,
         currentTurn: Int,
-    ): Int {
-        return acquisitions
-            .filter { acquisition ->
-                acquisition.turnNumber < currentTurn &&
-                    AdvanceData.definition(acquisition.advance).category == category
-            }
-            .sumOf { acquisition -> AdvanceData.definition(acquisition.advance).credit }
+    ): List<AdvanceCredit> = acquisitions.mapNotNull { acquisition ->
+        val definition = AdvanceData.definition(acquisition.advance)
+        if (
+            acquisition.turnNumber < currentTurn &&
+                definition.category == category &&
+                definition.credit > 0
+        ) {
+            AdvanceCredit(acquisition.advance, definition.credit)
+        } else {
+            null
+        }
     }
 
     /** Rating acquired in the authoritative game's [currentTurn]. */
