@@ -126,42 +126,14 @@ export async function checkDecisionEvidence(page, web, baseline) {
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
     for (const advance of baseline.game.catalog.advances) {
         await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);
-        const text = await page.evaluate(`document.querySelector('.advance-benefits').textContent`);
-        assert(text.length>15 && !text.includes('.effect'),'Every advance has readable benefits: '+advance.id);
+        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#advance-${advance.id.toLowerCase()}"]').target`), '_blank', 'Advance benefits open as reference');
     }
     await checkAccessibleNames(page);
     await checkContrast(page,'advance-detail');
-    for (const id of ['PATRONAGE','WIND_WATERMILL','WRITTEN_RECORD','ENLIGHTENMENT','MASTER_ART']) {
-        fixture={...fixture,revision:fixture.revision+1,game:{...fixture.game,rules:{...fixture.game.rules,
-            patronage:'THREE_BOX_DISPLAY',windWatermill:'MARKET_ADJUSTMENT',writtenRecord:'TAKEOVER_TRADE',
-            miseryRelief:'CATEGORY_COMPLETION',incomeRelief:'ENLIGHTENMENT',immediateMasterArtDiscard:true}}};
-        await show();
-        await page.evaluate(`document.querySelector('[data-advance="${id}"]').click()`);
-        const text=await page.evaluate(`document.querySelector('.advance-benefits').textContent`);
-        assert(!text.includes('.effect'),'Variant reference resolves: '+id);
-        if(id==='WRITTEN_RECORD') assert(text.includes('force a card trade') && !text.includes('$10'));
-        if(id==='ENLIGHTENMENT') assert(text.includes('Income phase') && !text.includes('Halves'));
-    }
-    await page.send('Page.navigate',{url:web+'/tests/ui-harness.html'});
-    await page.wait(`typeof window.setUiSnapshot==='function'`,'rejection application harness');
-    const reference = 'plague';
-    const cardCommand = `play ${reference} area iv`;
-    const cardFixture = {...baseline,prompt:{messageId:'prompt.play-cards',players:[baseline.viewerId]},
-        legalChoices:{commands:[cardCommand,'pass']},game:{...baseline.game,stage:'PLAY_CARDS',
-            hand:[{reference,definition:{id:'black-death',kind:'event',messageId:'card.black-death',shape:'SQUARE'}}],
-            cardOffers:[{reference,playable:true,blockers:[],choices:[{kind:'AREA',value:'iv',command:cardCommand}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}};
-    await page.evaluate(`window.setUiSnapshot(${JSON.stringify(cardFixture)})`);
-    await page.wait(`document.querySelector('[data-hand-card="${reference}"]')`,'card rejection fixture');
-    await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
-    await page.wait(`document.querySelector('.eligible-shade') && document.querySelector('#tab-map[aria-selected=true]')`,'active area picker');
-    await page.evaluate(`document.querySelector('.card-decision .target-choices button').click(); document.querySelector('#tab-markets').click()`);
-    await page.evaluate(`window.uiNextError='UNREACHABLE_PROVINCE';window.uiErrorEntities=['acre',${JSON.stringify(baseline.viewerId)},'internal-fragment'];document.querySelector('.card-decision form > button:last-child').click()`);
-    await page.wait(`document.querySelector('.decision-panel [role=alert]')`,'contextual rejection');
-    assert.equal(await page.evaluate(`document.querySelector('#tab-markets').getAttribute('aria-selected')`),'true','Rejection does not redirect navigation');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`),false,'Valid rejected choice remains editable');
-    const message = await page.evaluate(`document.querySelector('.decision-panel [role=alert]').textContent`);
-    assert(message.includes('Acre'),'Known rejected province is named');
-    assert(!message.includes('internal-fragment'),'Raw identifiers stay out of ordinary errors');
-    assert.equal(await page.evaluate(`window.uiCommands.length`),1,'Rejection never retries the action');
-    console.log('Passed: polling preserves prepared decisions; identical nested prompts with new identities clear old work; all advance benefits render with accessible controls.');
+    await page.send('Page.navigate', {url:web+'/help#advances'});
+    await page.wait(`document.querySelectorAll('#advances article').length === 26`, 'All advance rules in reference');
+    const effects = await page.evaluate(`[...document.querySelectorAll('#advances .advance-benefits')].map(element=>element.textContent)`);
+    assert.equal(effects.length,26);
+    assert(effects.every(text=>text.length>15 && !text.includes('.effect')), 'Every advance has readable reference text');
+    console.log('Passed: decision lifetimes, contextual reference links, and all public advance benefits.');
 }

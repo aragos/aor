@@ -2,11 +2,11 @@ import type {CommodityPayoutView, PlayerView, PublicCatalog, Snapshot} from './a
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {TableIcon} from './TableIcon';
-import {CardEventText} from './CardEventText';
+import {HelpLink} from './HelpLink';
 import {CommodityIcon, PlayerPiece} from './map/MapSymbols';
 import {useMapSelection} from './map/MapSelection';
 
-export function Emblem({player, size = 20}: {player: PlayerView; size?: number}) {
+export function Emblem({player, size = 20}: {player: Pick<PlayerView, 'capital'>; size?: number}) {
     return <svg width={size} height={size} viewBox="-28 -28 56 56" aria-hidden="true">
         <PlayerPiece capital={player.capital} size={44}/>
     </svg>;
@@ -34,17 +34,7 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
         </dl>
         <h4>{t('game.advances')}</h4>
         <ul className="plain-list">{player.advances.map(advance => <li key={advance}>{advanceName(advance)}</li>)}</ul>
-        {catalog && <details className="track-reference"><summary>{t('table.referenceTracks')}</summary>
-            <h4>{t('game.misery')}</h4>
-            <ol className="reference-track">{catalog.miseryTrack.map(value => <li key={value ?? 'chaos'}
-                aria-current={value === player.misery ? 'step' : undefined}>{value ?? t('game.chaos')}</li>)}</ol>
-            <h4>{t('game.ships')}</h4>
-            {[...new Set(catalog.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet} className="fleet-reference">
-                <span>{label(fleet, 'fleet')}</span>
-                <ol className="reference-track">{catalog.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}
-                    aria-current={fleet === player.ships.fleet && space.level === player.ships.level ? 'step' : undefined}>{space.level}</li>)}</ol>
-            </div>)}
-        </details>}
+        {catalog && <HelpLink topic="tracks" label={t('table.referenceTracks')} compact={false}/>}
     </div>;
 }
 
@@ -107,24 +97,8 @@ export function CommodityAdjustments({payout}: {payout: CommodityPayoutView}) {
 }
 
 export function PayoutReference({snapshot, payout}: {snapshot: Snapshot; payout: CommodityPayoutView}) {
-    const definition = snapshot.game.catalog?.commodities.find(commodity => commodity.id === payout.commodity);
-    if (!definition) return null;
-    return <details className="payout-reference" data-commodity={payout.commodity}><summary>{t('table.fullPayouts')}</summary>
-        <ol className="payout-boxes" aria-label={t('table.payoutBoxes')}>
-            {definition.printedPayouts.map((amount, index) => {
-                const owners = payout.owners.filter(owner => owner.effectiveBox === index + 1);
-                return <li key={index} className={`payout-box ${owners.length ? 'is-current' : ''}`}>
-                    <span>{index + 1}</span><strong>${amount}</strong>
-                    {owners.map(owner => {
-                        const player = snapshot.game.players.find(candidate => candidate.id === owner.player);
-                        return player && <span key={owner.player} title={playerName(snapshot, owner.player)}>
-                            <Emblem player={player} size={15}/><span className="sr-only">{playerName(snapshot, owner.player)}</span>
-                        </span>;
-                    })}
-                </li>;
-            })}
-        </ol><p className="small muted">{t('table.payoutOverflow')}</p>
-    </details>;
+    if (!snapshot.game.catalog) return null;
+    return <HelpLink topic={`commodity-${payout.commodity.toLowerCase()}`} label={t('table.fullPayouts')} compact={false}/>;
 }
 
 export function UnplayedLeaders({snapshot, advance}: {snapshot: Snapshot; advance: string}) {
@@ -169,7 +143,6 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
                     if (selectedCard !== card.reference) setPicker(null);
                 }}>
                 <span className="eyebrow">{t(`kind.${card.definition.kind}`)}</span><h3>{t(card.definition.messageId)}</h3>
-                <CardEventText definition={card.definition}/>
                 {snapshot.game.burdenReferences.includes(card.reference) && <span className="burden-badge">{t('game.burden')}</span>}
                 {offer?.commodities.map(commodity => {
                     const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);

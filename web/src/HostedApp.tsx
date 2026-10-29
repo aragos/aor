@@ -11,6 +11,8 @@ import {ChoiceButtons} from './DecisionControls';
 import {defaultVariants, validVariants, Variants} from './Variants';
 import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
 import {t} from './messages';
+import {useTurnFavicon} from './favicon';
+import {HelpLink} from './HelpLink';
 
 // Google's pre-approved light button from https://developers.google.com/identity/branding-guidelines.
 const googleSignInButton = new URL('./assets/google-sign-in.png', import.meta.url).href;
@@ -240,6 +242,24 @@ function AdminPlayers() {
 }
 
 export function Dashboard({me}: {me: Account}) {
+    const [hasTurn, setHasTurn] = useState(false);
+    useTurnFavicon(hasTurn);
+    useEffect(() => {
+        let active = true;
+        const load = async () => {
+            try {
+                const result = await request<GamePage>('/api/games?status=my-move&limit=1');
+                if (active) setHasTurn(result.games.length > 0);
+            } catch { /* Retain the last known turn status until the next refresh. */ }
+        };
+        void load();
+        const timer = setInterval(() => { void load(); }, 30000);
+        document.addEventListener('visibilitychange', load);
+        return () => {
+            active = false; clearInterval(timer);
+            document.removeEventListener('visibilitychange', load);
+        };
+    }, [me.id]);
     const [scope, setScope] = useState('mine');
     const [filter, setFilter] = useStoredSetting('game-filter', 'ongoing', isGameFilter);
     const [page, setPage] = useState<GamePage>({games: [], nextCursor: null});
@@ -273,7 +293,7 @@ export function Dashboard({me}: {me: Account}) {
             download('aor-game-logs.json', {exportedAt: new Date().toISOString(), games});
         } catch (failure) {setError(message(failure));} finally {setBusy(false);}
     }
-    return <main className="portal"><header><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')}</h1></header>
+    return <main className="portal"><header><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')} <HelpLink label="Playing AoR"/></h1></header>
         <RegisteredGameForm me={me}/>
         <section className="panel">
             {me.admin && <ChoiceButtons value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}

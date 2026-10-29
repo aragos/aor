@@ -43,18 +43,23 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   commits them. Prefer visible finite choices and playable cards beside Pass.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
-  During expansion, show each player's white markers and the acting player's military cards, with
-  matchup qualifications. Losses use red result styling; results can be cleared without deleting history.
+  During expansion, show each player's white markers and active military cards with matchup
+  qualifications; omit the military box when nobody has an advantage. Losses use red result styling; results can be cleared without deleting history.
 - Show costs at offer and confirmation, stabilization's resulting misery box, current commodity
-  adjustments and optional full payout boxes. Show matching unplayed leader counts for epochs I–III
+  adjustments. Keep full payout boxes, legends, variant descriptions, card/advance rules, and
+  printed tracks on the public `/help` page, linked contextually in a new tab. Show matching unplayed leader counts for epochs I–III
   beside each advance, with the public-information meaning above.
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
   explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
   while waiting; submit once on the legal turn while that view remains open, with no failed retries.
-- Open activity by default. Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
+- Open a bounded, scrollable activity box by default and show every action once. Preserve
+  entry-time names and emblems as later history is appended; cards link to their reference.
+  Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
   protection money, leader rebates and related cash changes; label dice colors and omit continuation noise.
 - Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
   retain correctable input; stale requests refresh without automatic resubmission.
+- Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.
+  The game-list favicon checks all of the current player’s games regardless of filter or page.
 - Support keyboard, touch, narrow layouts, bounded map gestures, zoom and dense-piece inspection.
   Persist preferences and creation defaults in browser storage with an in-memory fallback.
 

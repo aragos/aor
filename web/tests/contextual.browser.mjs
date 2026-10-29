@@ -147,8 +147,8 @@ export async function checkContextualUx(page, web, baseline) {
         game:{stage:'PLAY_CARDS',hand:[{reference:'target',definition:{id:'civil-war',kind:'event',messageId:'card.civil-war',shape:'SQUARE'}}],
             cardOffers:[{reference:'target',playable:true,blockers:[],choices:[{kind:'PLAYER',value:other.id,command:`play target player ${other.id}`}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click('[data-hand-card="target"]');
-    assert.match(await page.evaluate(`document.querySelector('[data-hand-card="target"] .card-event-text').textContent`), /half their last recorded cash/);
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-event-text').textContent`), await page.evaluate(`document.querySelector('[data-hand-card="target"] .card-event-text').textContent`), 'Hand and decision share event text');
+    assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="target"] .card-event-text')`), null, 'Hand keeps dynamic game information');
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#card-civil-war"]').target`), '_blank', 'Card rules have a dedicated reference');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
     await click(`[data-player="${other.id}"] > summary`);

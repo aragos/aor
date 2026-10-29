@@ -79,11 +79,14 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
     const active = picker?.id === id;
     const activated = useRef<number | null>(null);
     useEffect(() => {
-        if (!disabled && eligible.length > 0 && activated.current !== focusRevision) {
-            activated.current = focusRevision;
+        if (!disabled && eligible.length > 0) {
+            // Registration must survive StrictMode's setup → cleanup → setup cycle.
             setPicker(initialPicker.current);
-            setWorkspace('map');
-            requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}));
+            if (activated.current !== focusRevision) {
+                activated.current = focusRevision;
+                setWorkspace('map');
+                requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}));
+            }
         }
     }, [disabled, eligible.length, focusRevision, kind, setPicker, setWorkspace]);
     useEffect(() => {

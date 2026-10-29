@@ -26,7 +26,7 @@ await game.send(actor, `place 1 ${target}`);
 const page=await open(process.env.MAP_WEB_URL+actor.path);
 try {
     await page.wait(`document.querySelector('.undo-action:not([disabled])')`,'live undo available');
-    await page.evaluate(`document.querySelector('.commands-toggle').click()`);
+    await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
     const player=before.game.players.find(player=>player.id===actor.id);
     const capital=player.capital.replace(/\b\w/g,letter=>letter.toUpperCase());
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(capital+': place 1 '+target));
@@ -34,10 +34,10 @@ try {
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(player.name+': place 1 '+target));
     await page.reload();
     await page.wait(`document.querySelector('#history-identifiers button[aria-pressed=true]')?.textContent==='Display names'`, 'history name preference survives reload');
-    await page.evaluate(`document.querySelector('.commands-toggle').click()`);
+    await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
     await page.click('Canonical IDs');
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(actor.id+': place 1 '+target));
-    await page.evaluate(`document.querySelector('.commands-toggle').click()`);
+    await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
     await page.click('Undo last action');
     await page.wait(`document.querySelector('.command-dock pre').textContent.includes('undo ')`,'audited undo');
     assert.equal((await game.snapshot(actor)).game.board.some(province=>province.id===target),false);
@@ -46,7 +46,7 @@ try {
     await page.wait(`document.querySelector('.command-dock summary small').textContent.endsWith('${placed.revision}')`,'placement polling');
     const alternative=oneToken(placed).find(offer=>offer.destination!==target).destination;
     const from=placed.undo.actions.at(-1).entry;
-    await page.evaluate(`document.querySelector('.commands-toggle').click(); document.querySelector('.history-editor').open=true`);
+    await page.evaluate(`document.querySelector('.command-dock > summary').click(); document.querySelector('.history-editor').open=true`);
     await page.fill('#history-from',String(from));
     await page.click('Load current actions');
     assert.equal(await page.evaluate(`document.querySelector('#history-suffix').value`),'@'+from);

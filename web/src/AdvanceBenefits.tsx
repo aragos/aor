@@ -1,9 +1,8 @@
 import type {Snapshot} from './api';
 import {t} from './messages';
 
-/** Reference copy follows the configured rules; all prices and effects remain engine projections. */
-export function AdvanceBenefits({id, snapshot}: {id: string; snapshot: Snapshot}) {
-    const rules = snapshot.game.rules;
+/** Static rules reference; live prices and effects remain engine projections. */
+export function AdvanceBenefits({id, rules}: {id: string; rules: Snapshot['game']['rules']}) {
     const variant = id === 'ENLIGHTENMENT' && rules.miseryRelief === 'CATEGORY_COMPLETION' ? 'CATEGORY_COMPLETION'
         : id === 'WIND_WATERMILL' ? rules.windWatermill
         : id === 'WRITTEN_RECORD' ? rules.writtenRecord

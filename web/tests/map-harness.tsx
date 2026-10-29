@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {StrictMode, useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import type {Snapshot} from '../src/api';
 import {GameTable} from '../src/GameTable';
@@ -28,4 +28,4 @@ function Harness() {
             }}/>
     </div></MapSelectionProvider>;
 }
-createRoot(document.getElementById('root')!).render(<Harness/>);
+createRoot(document.getElementById('root')!).render(<StrictMode><Harness/></StrictMode>);

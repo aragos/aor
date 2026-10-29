@@ -29,6 +29,24 @@ class HistoryProjectionTest {
     }
 
     @Test
+    fun choosingACapitalDoesNotRewriteEarlierActivity() {
+        val driver = GameDriver(FixedRandom())
+        val started = driver.create("stable-history", header, emptyMap())
+        val early = HistoryProjection.forPlayer(started, owner).events
+        val afterBids =
+            header.players.fold(started) { game, player ->
+                driver.submit(game, player.id, "bid-capital ${if (player.id == owner) 5 else 0}")
+            }
+        val afterCapital = driver.submit(afterBids, owner, "choose-capital venice")
+
+        val later = HistoryProjection.forPlayer(afterCapital, owner).events
+
+        assertThat(later.take(early.size)).isEqualTo(early)
+        val draw = early.single { it.kind == HistoryEventKind.DRAW_CARD && it.actor == owner }
+        assertThat(draw.participants).containsExactly(HistoryParticipantView(owner, "Alice", null))
+    }
+
+    @Test
     fun projectedHistoryRetainsEntryOrderAndPrivateDrawAudiencesAcrossRevisions() {
         val stored = startedGame()
 
