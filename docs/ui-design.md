@@ -59,6 +59,9 @@ choice and understand its result through visual controls and commands, on deskto
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
   Commands remain in the bottom expander; omit their header button. Province facts remain in
   inspection. Static reference belongs on public `/help`, with contextual links opening a new tab.
+  Help omits a game-flow walkthrough. Explain shared card/market rules once and link individual
+  entries to them. Document all undo scopes, activity boundaries, creator permissions, retained
+  answers and immutable randomness; creation and history controls link to that explanation.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
   the action button confirms it. Playable cards also appear beside Pass.
@@ -75,6 +78,9 @@ choice and understand its result through visual controls and commands, on deskto
   and private discards stay counted; this cannot promise remaining drawable cards.
 - Cancellation choices and confirmation show cost. Stabilization shows its resulting misery box
   or Chaos. Relief remains visible for an advance tier even when blocked, with Pass.
+- Misery boxes share a green-to-amber-to-red severity scale based on the authoritative track's
+  ordered steps, with dark burgundy for Chaos. Apply it to player summaries, stabilization previews,
+  final scores and the reference track. Retain printed values and accessible text.
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
   to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
