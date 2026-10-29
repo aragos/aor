@@ -1,4 +1,5 @@
 import {checkReferenceUx} from './referenceUx.browser.mjs';
+import {checkActivityPayments} from './activityPayments.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkActionContext} from './actionContext.browser.mjs';
@@ -430,6 +431,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkGameplayImprovements(page, web, after);
     await checkActionContext(page, web, after);
     await checkPurchaseClarity(page, web, after);
+    await checkActivityPayments(page, web, after);
     await checkTokenContinuity(page, web, tokenFixture);
     await checkDecisionFamilies(page, web, after);
 

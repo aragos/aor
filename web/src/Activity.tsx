@@ -1,4 +1,5 @@
 import {useId, useState} from 'react';
+import type {ReactNode} from 'react';
 import {ResultNotice} from './DecisionControls';
 import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
 import {advanceName, label, provinceName} from './labels';
@@ -27,6 +28,17 @@ function dieColor(event: HistoryEventView, index: number): string {
     return event.war && index === 1 ? 'black' : 'white';
 }
 
+function CashPayment({event, player, amount, children}: {
+    event: HistoryEventView; player: string; amount: number; children?: ReactNode;
+}) {
+    const participant = eventPlayer(event, player);
+    const cash = amount === 0 ? '$0' : `${amount < 0 ? '−' : '+'}$${Math.abs(amount)}`;
+    return <span className="event-cash-change" data-cash-player={player}>
+        <Emblem player={participant} size={13}/><span>{eventName(event, player)}</span>
+        <strong>{cash}</strong>{children}
+    </span>;
+}
+
 function EventContent({event, track, onInspectCard}: {
     event: HistoryEventView; track: Snapshot['game']['catalog']; onInspectCard?: (cardId: string) => void;
 }) {
@@ -47,8 +59,8 @@ function EventContent({event, track, onInspectCard}: {
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
         {event.amount !== null && event.protectionCash == null && <strong>{event.kind === 'BID_CAPITAL' ? '$' : ''}{event.amount}</strong>}
-        {event.protectionCash != null && <span className="event-detail">{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
-        {event.leaderRebate != null && <span className="event-detail">{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
+        {event.protectionCash != null && <span className="event-detail">{actor && `${eventName(event, actor.id)} · `}{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
+        {event.leaderRebate != null && <span className="event-detail">{actor && `${eventName(event, actor.id)} · `}{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
         {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{eventName(event, target.id)}</span>}
         {event.detail && <span className="event-detail">{label(event.detail)}</span>}
         {event.drawReason && <span className="event-detail">{t(`activity.drawReason.${event.drawReason}`)}</span>}
@@ -66,17 +78,17 @@ function EventContent({event, track, onInspectCard}: {
             {event.marketRoll.cancelled.length > 0 && ` · ${t('activity.cancelledOpposite', {
                 commodities: event.marketRoll.cancelled.map(commodity => label(commodity, 'commodity')).join(', ')})}`}
         </span>}
-        {event.reliefPayment && <span className="event-relief-payment">
-            <strong>{t('activity.reliefPayment', {cash: event.reliefPayment.cashCost, rating: event.reliefPayment.ratingSpent})}</strong>
+        {event.reliefPayment && event.actor && <span className="event-relief-payment">
+            <CashPayment event={event} player={event.actor} amount={-event.reliefPayment.cashCost}>
+                <span>+ {event.reliefPayment.ratingSpent} {t('controls.mrUsed')}</span>
+            </CashPayment>
             {' · '}{t('activity.reliefRatingPool', {available: event.reliefPayment.ratingAvailableBefore})}
             {event.reliefPayment.ratingSources.length > 0 && <span>
                 {' · '}{t('activity.reliefRatingSources')}: {event.reliefPayment.ratingSources.map(source =>
                     `${advanceName(source.advance)} ${source.amount}`).join(', ')}
             </span>}
         </span>}
-        {cashChanges?.map(change => <span className="event-cash-change" key={change.player}>
-            {change.player !== event.actor && eventName(event, change.player)} <strong>{change.amount < 0 ? '−' : '+'}${Math.abs(change.amount)}</strong>
-        </span>)}
+        {cashChanges?.map(change => <CashPayment key={change.player} event={event} player={change.player} amount={change.amount}/>)}
         {event.miseryChanges?.map(change => <span className="event-misery-change" key={change.player}>
             {change.player !== event.actor && eventName(event, change.player)}
             <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}
@@ -136,7 +148,7 @@ export function Activity({snapshot, onInspectCard}: {
     const [open, setOpen] = useState(true);
     const contentId = useId();
     const toggleLabel = t(open ? 'table.hideActivity' : 'table.showActivity');
-    return <section className="table-activity" aria-label={t('table.activity')}>
+    return <section className="table-activity" data-open={open} aria-label={t('table.activity')}>
         <button type="button" className="secondary activity-toggle" title={toggleLabel}
             aria-label={toggleLabel} aria-expanded={open} aria-controls={contentId}
             onClick={() => setOpen(current => !current)}>
@@ -145,7 +157,7 @@ export function Activity({snapshot, onInspectCard}: {
                 <path d={open ? 'm11 17 3-3 3 3' : 'm11 14 3 3 3-3'}/>
             </svg>
         </button>
-        <div id={contentId} hidden={!open}>
+        <div id={contentId} className="activity-body" hidden={!open}>
             {events.length === 0 && <p>{t('table.noActivity')}</p>}
             <ol className="activity-list">{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
                 <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>

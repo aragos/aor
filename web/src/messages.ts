@@ -63,7 +63,6 @@ export const en: Record<string, string> = {
     'activity.GAME_FINISHED': 'Game finished',
     'activity.INCOME': 'Collected income',
     'activity.HOLY_INDULGENCE': 'Holy Indulgence payments',
-    'activity.reliefPayment': 'Paid ${cash} cash + {rating} MR',
     'activity.reliefRatingPool': '{available} MR available before payment',
     'activity.reliefRatingSources': 'MR earned this turn',
     'activity.tokenPool': '{amount} pool tokens',

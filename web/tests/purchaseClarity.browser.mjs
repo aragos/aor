@@ -95,7 +95,9 @@ export async function checkPurchaseClarity(page, web, baseline) {
         miseryChanges: [{player: viewer, spaces: -1, fromValue: 30, toValue: 20}]};
     await show({events: [event]});
     const receipt = await page.evaluate(`document.querySelector('[data-event-id="relief-breakdown"]').textContent`);
-    assert(receipt.includes(`Paid $${cash} cash + ${spent} MR`) && receipt.includes('MR earned this turn'));
+    assert(receipt.includes(`−$${cash}`) && receipt.includes(`${spent} MR used`) && receipt.includes('MR earned this turn'));
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-event-id="relief-breakdown"] .event-cash-change').length`), 1,
+        'Relief uses one named cash receipt with the MR component');
     assert.equal((receipt.match(new RegExp('\\$'+cash+'(?![0-9])','g')) ?? []).length, 1, 'Cash component appears once');
     const holy = {...event, id: 'holy-tokens', kind: 'HOLY_INDULGENCE', actor: null, amount: null, reliefPayment: null,
         cashChanges: [], miseryChanges: [], tokenChanges: [
