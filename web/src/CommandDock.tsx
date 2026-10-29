@@ -6,6 +6,7 @@ import {ChoiceButtons} from './DecisionControls';
 import {playerName} from './labels';
 import {displayHistoryLine} from './history';
 import {useStoredSetting} from './preferences';
+import {HelpLink} from './HelpLink';
 
 type HistoryIdentifiers = 'capitals' | 'names' | 'ids';
 const isHistoryIdentifiers = (value: unknown): value is HistoryIdentifiers =>
@@ -21,6 +22,7 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
     const aliases = Object.fromEntries(snapshot.game.players.map(player => [player.id,
         identifiers === 'capitals' ? playerName(snapshot, player.id) : identifiers === 'names' ? player.name : player.id]));
     const format = (line: string) => displayHistoryLine(line, aliases);
+    const undoPolicy = snapshot.undo?.policy.toLowerCase().replace(/_/g, '-');
     return <details className="command-dock" open={open} onToggle={event => onToggle(event.currentTarget.open)}>
         <summary>{t('table.commands')} <small>{t('game.revision')} {snapshot.revision}</small></summary>
         {snapshot.game.stage !== 'FINISHED' && (!snapshot.status || snapshot.status === 'ACTIVE') && <form className="console" onSubmit={async event => {
@@ -33,7 +35,7 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
             <div className="choices"><code>{snapshot.legalChoices.commands.join(' · ')}</code></div>
         </form>}
         <div className="command-private-hand">{snapshot.game.hand.map(card => <span key={card.reference}><code>{card.reference}</code> {t(card.definition.messageId)}</span>)}</div>
-        {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${snapshot.undo.policy.toLowerCase().replace(/_/g, '-')}`)}</p>}
+        {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${undoPolicy}`)} <HelpLink topic={`undo-${undoPolicy}`} label="Undo policy details"/></p>}
         {editHistory && snapshot.undo && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory} format={format}/>}
         <h3>{t('game.history')}</h3>
         <p>{t('history.identifiers')}</p><ChoiceButtons id="history-identifiers" value={identifiers} onChange={setIdentifiers}

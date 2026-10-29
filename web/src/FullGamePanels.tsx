@@ -2,6 +2,7 @@ import {PlayedLeaders} from './TablePanels';
 import type {Snapshot} from './api';
 import {label, playerName} from './labels';
 import {t} from './messages';
+import {MiseryBox} from './MiseryBox';
 
 export function FinalScores({snapshot}: {snapshot: Snapshot}) {
     if (snapshot.game.scores.length === 0) return null;
@@ -11,7 +12,7 @@ export function FinalScores({snapshot}: {snapshot: Snapshot}) {
         <p className="winner-announcement">{winners.length ? `${t(winners.length === 1 ? 'game.winner' : 'game.winners')}: ${winners.join(', ')}` : t('game.noWinner')}</p>
         <div className="table-scroll"><table><thead><tr>{['player', 'advances', 'cash', 'misery', 'score'].map(key => <th key={key} scope="col">{t(`game.${key}`)}</th>)}</tr></thead>
             <tbody>{snapshot.game.scores.map(score => <tr key={score.player} className={score.winner ? 'my-row' : ''}>
-                <td>{playerName(snapshot, score.player)}</td><td>{score.advancePoints}</td><td>${score.cash}</td><td>{score.misery ?? t('game.chaos')}</td><td><strong>{score.total ?? '—'}</strong></td>
+                <td>{playerName(snapshot, score.player)}</td><td>{score.advancePoints}</td><td>${score.cash}</td><td><MiseryBox value={score.misery} track={snapshot.game.catalog?.miseryTrack}/></td><td><strong>{score.total ?? '—'}</strong></td>
             </tr>)}</tbody></table></div>
     </section>;
 }

@@ -101,7 +101,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
             </details>}
             <AccountControls/>
-            <HelpLink label="Playing AoR"/>
+            <HelpLink label="AoR help"/>
         </header>
         <PlayerOverview snapshot={snapshot}/>
         {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}

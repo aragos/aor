@@ -6,6 +6,7 @@ import {t} from './messages';
 import {defaultVariants, validVariants, Variants} from './Variants';
 import {isUndoPolicy, useStoredSetting} from './preferences';
 import {ChoiceButtons} from './DecisionControls';
+import {HelpLink} from './HelpLink';
 import {GameTable} from './GameTable';
 import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
@@ -44,7 +45,7 @@ function CreateGame() {
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
             <p className="muted small">{t('create.threeEpochs')}</p>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
-            <p>{t('history.policy')}</p><ChoiceButtons id="undo-policy" value={undoPolicy} onChange={setUndoPolicy} disabled={busy}
+            <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons id="undo-policy" value={undoPolicy} onChange={setUndoPolicy} disabled={busy}
                 choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {error && <ErrorMessage code={error}/>}
             <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>

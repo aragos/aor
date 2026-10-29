@@ -7,6 +7,7 @@ import {CardEventText} from './CardEventText';
 import {AdvanceBenefits} from './AdvanceBenefits';
 import {Commodity} from './TablePanels';
 import {AccessLock, PlayerPiece} from './map/MapSymbols';
+import {MiseryBox} from './MiseryBox';
 
 interface ReferenceData {
     catalog: PublicCatalog;
@@ -40,21 +41,10 @@ export default function ReferencePage() {
     const cardGroups = reference ? [...new Set(reference.cards.map(card => card.messageId))]
         .map(messageId => reference.cards.filter(card => card.messageId === messageId)) : [];
     return <main className="reference-page">
-        <header><a href="/">AoR</a><h1>Playing AoR</h1><p>Functionality, rules reference, and the map key.</p></header>
-        <nav aria-label="Help topics"><a href="#playing">Playing</a><a href="#variants">Variants</a>
+        <header><a href="/">AoR</a><h1>Help and reference</h1><p>Variants, symbols, printed values, and undo policies.</p></header>
+        <nav aria-label="Help topics"><a href="#variants">Variants</a>
             <a href="#map-legend">Map key</a><a href="#cards">Cards</a><a href="#advances">Advances</a>
-            <a href="#commodities">Payout boxes</a><a href="#tracks">Tracks</a><a href="#history">Activity and commands</a></nav>
-        <section id="playing"><h2>Playing and taking turns</h2>
-            <p>Create a game with 3–6 players, choose variants and undo scope, and setup starts immediately. Every game uses three epochs. Local games provide private seat links; hosted games use registered accounts.</p>
-            <p>Hosted players register one unique public handle, shown as @handle. My games and account controls share the game’s top bar. In My games, click anywhere on a game row to open it; a highlighted row means it needs your action. Filters let you find waiting or completed games.</p>
-            <p>The decision panel names the acting player and the current choice. Waiting players can inspect the board, cards, and advances. Inspection preserves a prepared action. The colorful shield favicon means you have an outstanding decision; grayscale means you are waiting. In the game list it reflects all your games, regardless of the selected filter.</p>
-            <p>Choose an object to prepare an order, then confirm in the decision panel. Map target highlighting opens automatically for location cards. Clicking eligible provinces, coastal water, players, or area badges edits the same draft as the choice buttons. Nothing is committed until you confirm. Polling preserves drafts; a new decision clears obsolete ones. Rejected actions remain correctable.</p>
-            <p>Capital bids and token purchases are private until everyone submits. Replace your submission before the batch reveals. Capital bids cost the amount bid. Token purchases cost the absolute amount; positive amounts buy tokens up to your available stock, while negative bids buy none.</p>
-            <p>Turns proceed through token purchase and order, draws, Buy Card, Play Cards, purchases, expansion, and income. Nested decisions identify who must answer before the enclosing activity resumes. The final round requires playing all non-burden cards before scoring.</p>
-            <p>Expansion defaults to filling a market. If pool or shipping limits prevent that, “Place maximum possible tokens” uses the largest legal partial commitment. Competition commitments are exact. White markers are new this turn; player summaries show their counts. Military advantages depend on the opposing cards.</p>
-            <p>Urban Ascendancy owners can queue a $10 card purchase while waiting. This private browser draft requires the view to stay open, can be canceled, submits once when legal, and never retries a rejected purchase. It does not automatically pass a remaining decision.</p>
-            <p>Purchases proceed through ships, advances, stabilization, and misery relief. Stabilization previews its destination box. A completed advance tier keeps relief explicit even when it is blocked; Pass finishes that step.</p>
-        </section>
+            <a href="#commodities">Payout boxes</a><a href="#tracks">Tracks</a><a href="#history">Undo policies</a></nav>
         <section id="variants"><h2>Game variants</h2>{variants.map(variant => <article id={`variant-${variant.key}`} key={variant.key}>
             <h3>{variant.title}</h3><p>{variant.text}</p></article>)}</section>
         <section id="map-legend"><h2>Map key and navigation</h2>
@@ -68,15 +58,21 @@ export default function ReferencePage() {
                 <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect x="1" y="1" width="30" height="30" fill="#d2efed" stroke="#56929c"/></svg>Pale water: a province’s coastal band</span>
             </div>
             {catalog && <div className="reference-legend">{catalog.provinces.filter(province => province.capital).map(province => <span key={province.id}><svg viewBox="-28 -28 56 56" width="28" height="28" aria-hidden="true"><PlayerPiece capital={province.capital} size={44}/></svg>{label(province.id, 'capital')}</span>)}</div>}
-            <p>Dark market badges identify capitals. Market numbers and commodity symbols belong to provinces. Stippled provinces are satellites. Capital color and silhouette identify the owner everywhere. Land and its pale coastal band select the same province.</p>
+            <p>Capital color and silhouette identify the owner everywhere. Land and its pale coastal band select the same province.</p>
             <p>Named seas are distinct from coastal bands. Inspecting a province emphasizes its connected seas in deep blue with diagonal hatching; this does not guarantee a legal shipment. A shared corner is not a connection. Support arrows point from satellites to markets and can be toggled on the map.</p>
             <p>Eligible targets use blue emphasis; the selected target has a stronger outline. Expansion reachability shades whole land/coastal footprints. Inspect an object for its occupants and actual legal actions. Zoom in to separate dense labels and tokens.</p>
             <p>Use +, −, and Fit, modifier-scroll, trackpad/two-finger pinch, or dragging. Ordinary scrolling moves the page. Keyboard Enter or Space selects a focused province or area. Arrow keys switch workspace tabs.</p>
-            {catalog && <div className="reference-legend">{catalog.commodities.map(commodity => <Commodity key={commodity.id} commodity={commodity.id}/>)}</div>}
         </section>
         {!reference && <p role="status">{error ? 'Reference data could not be loaded. Reload to try again.' : 'Loading the public catalog…'}</p>}
         {reference && <>
-            <section id="cards"><h2>History cards</h2><p>Circle cards recycle into the next epoch when eligible; square cards leave play. Unplayed-leader counts in the game mean “not publicly played”: held cards, future decks, and private discards remain counted to preserve secrecy.</p>
+            <section id="cards"><h2>History cards</h2><p>Circle cards recycle into the next epoch when eligible; square cards leave play.</p>
+                <article id="commodity-cards"><h3>Commodity cards</h3>
+                    <p>Pay every player for their established markets. Choose one commodity on a dual card; white markers do not pay. The chosen commodity’s shortage/surplus adjustments are consumed. <a href="#commodities">Payout rules and boxes</a>.</p>
+                </article>
+                <article id="leader-cards"><h3>Leaders</h3>
+                    <p>Discounts apply to eligible advance purchases this turn. The first leader occupies the reserved box; later leaders are exposed. Patronage may claim eligible exposed leaders by paying their protection money. Printed Word rebates are distinct from discounts and protection money.</p>
+                    <p>Unplayed-leader counts mean “not publicly played”: held cards, future decks, and private discards remain counted to preserve secrecy.</p>
+                </article>
                 <div className="reference-index">{cardGroups.map(group => <a key={group[0].id} href={`#card-${group[0].id}`}>{t(group[0].messageId)}</a>)}</div>
                 {cardGroups.map(group => {
                     const card = group[0];
@@ -85,8 +81,8 @@ export default function ReferencePage() {
                         {group.slice(1).map(copy => <span className="reference-anchor" id={`card-${copy.id}`} key={copy.id}/>)}
                         <h3>{t(card.messageId)}</h3><p className="eyebrow">{t(`kind.${card.kind}`)} · {label(card.shape)}</p>
                         <CardEventText definition={card}/>
-                        {card.kind === 'commodity' && <p>Choose one of this card’s commodities. Every player receives the corresponding payout for established markets, adjusted by shortages, surpluses, and Industry. White markers do not pay yet. The commodity’s adjustments are consumed. <a href="#commodities">See all payout boxes.</a></p>}
-                        {leader && <><p>Discounts apply to eligible advance purchases this turn. The first leader occupies the reserved box; later leaders are exposed. Patronage may claim eligible exposed leaders by paying their protection money. Printed Word rebates are distinct from discounts and protection money.</p>
+                        {card.kind === 'commodity' && <p><a href="#commodity-cards">Commodity card rules</a> · <a href="#commodities">Payout boxes</a></p>}
+                        {leader && <><p><a href="#leader-cards">Leader rules</a></p>
                             <ul>{leader.discounts.map(discount => <li key={discount.advance}><a href={`#advance-${discount.advance.toLowerCase()}`}>{advanceName(discount.advance)}</a>: ${discount.amount}{discount.condition && `; $${discount.increasedAmount} with ${label(discount.condition).toLowerCase()}`}</li>)}</ul></>}
                     </article>;
                 })}
@@ -100,24 +96,44 @@ export default function ReferencePage() {
                 </article>)}
             </section>
             <section id="commodities"><h2>Commodity payout boxes</h2><p>The effective box is established markets plus shortages, minus surpluses, with Industry’s bonus where applicable. Payouts continue the same quadratic formula beyond printed box 10. Current owner payouts and adjustments stay on the game’s Markets tab and cards.</p>
+                <p>White + black dice select the matching total below; the green die selects shortage or surplus. Canceling an adjustment costs the commodity’s base value.</p>
                 {catalog?.commodities.map(commodity => <article id={`commodity-${commodity.id.toLowerCase()}`} key={commodity.id}>
-                    <h3><Commodity commodity={commodity.id}/></h3><p>Base value ${commodity.baseValue}. White + black dice total {commodity.diceTotal}; the green die selects shortage or surplus. Canceling an adjustment costs its base value.</p>
+                    <h3><Commodity commodity={commodity.id}/></h3><p>Base value ${commodity.baseValue} · Dice total {commodity.diceTotal}</p>
                     <ol className="payout-boxes" aria-label={`${label(commodity.id, 'commodity')} payout boxes`}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
                 </article>)}
             </section>
             <section id="tracks"><h2>Misery and shipping tracks</h2><h3>Misery</h3>
-                <ol className="reference-track">{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}>{value ?? t('game.chaos')}</li>)}</ol>
-                <p>Misery changes move by spaces, not by subtracting printed box values. Chaos removes a player from ordinary play and produces no numeric final score. A tier is the minimum number of advances owned in any category. Purchased relief is limited by tiers and uses this turn’s misery-relief ratings; Enlightenment reduces its cash cost.</p>
+                <ol className="reference-track misery-track" aria-label="Misery track">{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}><MiseryBox value={value} track={catalog.miseryTrack}/></li>)}</ol>
+                <p>Colors progress from green through amber to red as track steps become more severe; Chaos is the darkest box. Misery changes move by spaces, not by subtracting printed box values. Chaos removes a player from ordinary play and produces no numeric final score.</p>
+                <p>A tier is the minimum number of advances owned in any category. Purchased relief is limited by tiers and uses this turn’s misery-relief ratings; Enlightenment reduces its cash cost.</p>
                 <h3>Shipping</h3>{[...new Set(catalog?.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet}><h4>{label(fleet, 'fleet')}</h4>
                     <ol className="reference-track">{catalog?.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}>{space.level}</li>)}</ol></div>)}
                 <p>Shipping commitments and available capacity are calculated per destination in the game. A fleet level is not a count of spare ships; access advances and route restrictions still apply.</p>
             </section>
         </>}
-        <section id="history"><h2>Activity, commands, and undo</h2>
-            <p>Activity records committed actions and outcomes once, newest first. Scroll within its bounded box; collapse it to save space. Cards in activity open their reference here. Player names and emblems reflect their identity when the event occurred and stay unchanged as later actions are appended. An explicit history edit can replace affected entries.</p>
-            <p>White, black, and green dice are named explicitly. Market rolls explain their meaning; card draws identify their cause. Cash movements, Printed Word rebates, and protection money are separate quantities. Clearing competition notices leaves the permanent activity intact.</p>
-            <p>The Commands expander remains at the bottom of the game. It contains the command input, canonical history, player-label preferences, and authorized history editor. Capital aliases are a display preference for command history; they do not rewrite activity or stored commands.</p>
-            <p>Undo defaults to regular turn: your own current-phase actions until another player acts or an outcome is recorded. Competitive scope is stricter; friendly-turn and friendly-game scopes allow broader changes. Setup and complete private batches remain protected. Stale revisions refresh the view and require an explicit retry.</p>
+        <section id="history"><h2>Undo policies</h2>
+            <p>Choose a policy when creating the game; it is fixed once setup starts. Here, “turn” means your activity within one phase, including interruptions such as Cathedral. It does not extend across phases.</p>
+            <article id="undo-competitive"><h3>{t('undoPolicy.competitive')}</h3>
+                <p>Committed actions are final. Unsubmitted drafts remain editable, and you may replace your own unrevealed private submission until its batch commits.</p>
+            </article>
+            <article id="undo-regular-turn"><h3>{t('undoPolicy.regular-turn')} (default)</h3>
+                <p>You may edit your own actions in your current phase activity. The window starts after the most recent activity boundary, another player’s action, or recorded random outcome. It closes when your activity ends.</p>
+                <p>For example, you may correct an unopposed Expansion placement before passing, provided it caused no draw or other recorded outcome.</p>
+            </article>
+            <article id="undo-friendly-turn"><h3>{t('undoPolicy.friendly-turn')}</h3>
+                <p>The current activity’s owner may edit back to its start, including across other players’ interruption answers and recorded outcomes. The shared restrictions below still apply. The window closes when the activity ends.</p>
+            </article>
+            <article id="undo-friendly-game"><h3>{t('undoPolicy.friendly-game')}</h3>
+                <p>Everyone has Friendly turn permissions. The game’s creator may additionally edit any post-setup history, including earlier phases and completed games. This extra permission belongs to the creator, not every player.</p>
+            </article>
+            <h3>Limits shared by all editable policies</h3>
+            <ul>
+                <li>Setup is protected. Committed simultaneous decisions must remain complete batches; an edit cannot cut through one.</li>
+                <li>Dice, draws, shuffles, and random trades must remain the same outcomes of the same events. No policy allows rerolls or an edit that adds or removes a required random event. A rolled attack cannot be deleted to try again.</li>
+                <li>You can retain another player’s original answer by reference or remove it when the remaining history is valid. You cannot write a different answer for them or reveal their private information.</li>
+                <li>Every later action must still be legal. An invalid edit is rejected in full; existing play stays intact.</li>
+            </ul>
+            <p>Undo last action appears in the decision panel when permitted. Open Commands → Edit history for the suffix editor; its <code>@entry</code> references retain recorded actions. Accepted edits keep an audit trail and clear obsolete drafts; stale edits need a fresh review and retry. Activity keeps its entry-time identities unless an explicit edit replaces the affected entries.</p>
         </section>
     </main>;
 }

@@ -165,7 +165,7 @@ function RegisteredGameForm({me}: {me: Account}) {
                 <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => {setPlayers([...players, player]); setQuery('');}}>{t('hosted.add')}</button>
             </li>)}</ul>}
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
-            <p>{t('history.policy')}</p><ChoiceButtons value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
+            <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             <Problem value={error}/><button disabled={busy || players.length < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
         </form>}
     </details>;
@@ -298,7 +298,7 @@ export function Dashboard({me}: {me: Account}) {
             download('aor-game-logs.json', {exportedAt: new Date().toISOString(), games});
         } catch (failure) {setError(message(failure));} finally {setBusy(false);}
     }
-    return <main className="portal"><header className="portal-header"><div><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')} <HelpLink label="Playing AoR"/></h1></div><AccountControls showGames={false}/></header>
+    return <main className="portal"><header className="portal-header"><div><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')} <HelpLink label="AoR help"/></h1></div><AccountControls showGames={false}/></header>
         <RegisteredGameForm me={me}/>
         <section className="panel">
             {me.admin && <ChoiceButtons value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}

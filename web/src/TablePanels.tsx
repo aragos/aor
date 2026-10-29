@@ -3,6 +3,7 @@ import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {TableIcon} from './TableIcon';
 import {HelpLink} from './HelpLink';
+import {MiseryBox} from './MiseryBox';
 import {CommodityIcon, PlayerPiece} from './map/MapSymbols';
 import {useMapSelection} from './map/MapSelection';
 
@@ -58,7 +59,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                         <small>{player.id === snapshot.viewerId ? t('table.you') : order.includes(player.id) ? String(order.indexOf(player.id) + 1).padStart(2, '0') : ''}</small></span>
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span></span>
-                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> {player.misery ?? t('game.chaos')}</span>
+                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/></span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}</span><span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span></span>
                     {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
                     {snapshot.game.stage === 'EXPANSION' && <span className="player-white-markers" aria-label={`${t('table.whiteMarkers')}: ${whiteMarkers}`}>

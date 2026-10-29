@@ -49,6 +49,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   adjustments. Keep full payout boxes, legends, variant descriptions, card/advance rules, and
   printed tracks on the public `/help` page, linked contextually in a new tab. Show matching unplayed leader counts for epochs I–III
   beside each advance, with the public-information meaning above.
+- Keep Help focused on reference and detailed undo policies; omit the game-flow walkthrough and
+  consolidate shared rules. Color every misery box by track position: lower steps are less severe,
+  progressing from green through amber to red and finally dark Chaos. Keep numeric labels.
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
   explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
   while waiting; submit once on the legal turn while that view remains open, with no failed retries.
