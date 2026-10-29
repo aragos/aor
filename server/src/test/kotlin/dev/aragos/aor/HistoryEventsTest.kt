@@ -280,25 +280,274 @@ class HistoryEventsTest {
 
     @Test
     fun miseryReliefRecordsSpacesRatherThanTheDifferenceBetweenPrintedValues() {
-        val initial =
-            before.copy(
-                players =
-                    before.players +
-                        (owner to
-                            before.playerState(owner).copy(misery = MiseryStep.HUNDRED_TWENTY_FIVE))
-            )
-        val after =
-            initial.copy(
-                players =
-                    initial.players +
-                        (owner to initial.playerState(owner).copy(misery = MiseryStep.HUNDRED))
-            )
+        val initial = reliefState()
         val entry = Entry.Action(owner, TurnCommand.RelieveMisery(1))
+        val after = initial.step(entry)
 
         val event = HistoryEvents.project("4:0", initial, after, entry, observer)
 
         assertThat(event?.miseryChanges)
             .containsExactly(HistoryMiseryChangeView(owner, -1, 125, 100))
+    }
+
+    @Test
+    fun reliefPaymentSeparatesCashAndPooledRatingFromNewAdvances() {
+        val base = reliefState()
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    advances =
+                        base
+                            .playerState(owner)
+                            .advances
+                            .acquire(AdvanceId.HUMAN_BODY, 2)
+                            .acquire(AdvanceId.LAWS_OF_MATTER, 2)
+                )
+        val initial = base.copy(players = base.players + (owner to player))
+        val entry = Entry.Action(owner, TurnCommand.RelieveMisery(1))
+        val after = initial.step(entry)
+
+        val events = HistoryEvents.projectAll("4:0", initial, after, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.RELIEVE_MISERY)
+        assertThat(events.single().reliefPayment)
+            .isEqualTo(
+                HistoryReliefPaymentView(
+                    cashCost = 10,
+                    ratingSpent = 15,
+                    ratingAvailableBefore = 15,
+                    ratingSources =
+                        listOf(
+                            HistoryReliefRatingSourceView(AdvanceId.HUMAN_BODY, 10),
+                            HistoryReliefRatingSourceView(AdvanceId.LAWS_OF_MATTER, 5),
+                        ),
+                )
+            )
+        assertThat(events.single().cashChanges).containsExactly(HistoryCashChangeView(owner, -10))
+    }
+
+    @Test
+    fun reliefPaymentUsesTheRoundedEnlightenmentPriceBeforeSpendingRating() {
+        val base = reliefState()
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    advances =
+                        base
+                            .playerState(owner)
+                            .advances
+                            .acquire(AdvanceId.ENLIGHTENMENT, 1)
+                            .acquire(AdvanceId.LAWS_OF_MATTER, 2)
+                )
+        val initial = base.copy(players = base.players + (owner to player))
+        val entry = Entry.Action(owner, TurnCommand.RelieveMisery(1))
+        val after = initial.step(entry)
+
+        val event = HistoryEvents.project("4:0", initial, after, entry, observer)
+
+        assertThat(event?.reliefPayment)
+            .isEqualTo(
+                HistoryReliefPaymentView(
+                    cashCost = 8,
+                    ratingSpent = 5,
+                    ratingAvailableBefore = 5,
+                    ratingSources =
+                        listOf(HistoryReliefRatingSourceView(AdvanceId.LAWS_OF_MATTER, 5)),
+                )
+            )
+    }
+
+    @Test
+    fun reliefPaymentExcludesRatingSpentEarlierThisTurn() {
+        val base = reliefState()
+        val secondTier =
+            listOf(
+                    AdvanceId.LAWS_OF_MATTER,
+                    AdvanceId.HOLY_INDULGENCE,
+                    AdvanceId.WIND_WATERMILL,
+                    AdvanceId.PRINTED_WORD,
+                    AdvanceId.SEAWORTHY_VESSELS,
+                    AdvanceId.NATIONALISM,
+                )
+                .map { advance -> AdvanceAcquisition(advance, 1) }
+        val advances =
+            PlayerAdvances(base.playerState(owner).advances.acquisitions + secondTier)
+                .acquire(AdvanceId.HUMAN_BODY, 2)
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    advances = advances,
+                    miseryReliefUsage =
+                        MiseryReliefUsage(turnNumber = 2, spaces = 1, ratingSpent = 7),
+                )
+        val initial = base.copy(players = base.players + (owner to player))
+        val entry = Entry.Action(owner, TurnCommand.RelieveMisery(1))
+        val after = initial.step(entry)
+
+        val event = HistoryEvents.project("4:0", initial, after, entry, observer)
+
+        assertThat(event?.reliefPayment)
+            .isEqualTo(
+                HistoryReliefPaymentView(
+                    cashCost = 22,
+                    ratingSpent = 3,
+                    ratingAvailableBefore = 3,
+                    ratingSources = listOf(HistoryReliefRatingSourceView(AdvanceId.HUMAN_BODY, 10)),
+                )
+            )
+    }
+
+    @Test
+    fun reliefPaymentDoesNotCarryRatingOrUsageAcrossTurns() {
+        val base = reliefState()
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    advances = base.playerState(owner).advances.acquire(AdvanceId.HUMAN_BODY, 2),
+                    miseryReliefUsage =
+                        MiseryReliefUsage(turnNumber = 1, spaces = 1, ratingSpent = 5),
+                )
+        val initial = base.copy(players = base.players + (owner to player))
+        val entry = Entry.Action(owner, TurnCommand.RelieveMisery(1))
+        val after = initial.step(entry)
+
+        val event = HistoryEvents.project("4:0", initial, after, entry, observer)
+
+        assertThat(event?.reliefPayment?.ratingAvailableBefore).isEqualTo(10)
+        assertThat(event?.reliefPayment?.ratingSpent).isEqualTo(10)
+        assertThat(event?.reliefPayment?.ratingSources)
+            .containsExactly(HistoryReliefRatingSourceView(AdvanceId.HUMAN_BODY, 10))
+    }
+
+    @Test
+    fun tokenOnlyHolyIndulgenceHasOneActivityWithEachPlayersOwnPoolAndStockMovement() {
+        val base = competitionState()
+        val player =
+            base
+                .playerState(owner)
+                .copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.HOLY_INDULGENCE, 1)))
+                )
+        val initial =
+            base.copy(
+                stage = Stage.PURCHASE,
+                players = base.players + (owner to player),
+                flow =
+                    TurnFlow(
+                        actor = observer,
+                        cursor = 2,
+                        purchaseStep = PurchaseStep.RELIEF,
+                        phaseStarted = true,
+                        phaseBookkeepingApplied = true,
+                    ),
+            )
+        val entry = Entry.Action(observer, TurnCommand.Pass)
+        val after = initial.step(entry)
+
+        val events = HistoryEvents.projectAll("4:0", initial, after, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.HOLY_INDULGENCE)
+        assertThat(events.single().cashChanges).isEmpty()
+        assertThat(events.single().miseryChanges).isEmpty()
+        assertThat(events.single().tokenChanges)
+            .containsExactly(
+                HistoryTokenChangeView(owner, poolDelta = 4, stockDelta = -4),
+                HistoryTokenChangeView(recipient, poolDelta = -2, stockDelta = 2),
+                HistoryTokenChangeView(observer, poolDelta = -2, stockDelta = 2),
+            )
+        assertThat(events.single().participants)
+            .containsExactly(
+                HistoryParticipantView(owner, "Alice", "venice"),
+                HistoryParticipantView(recipient, "Bob", "genoa"),
+                HistoryParticipantView(observer, "Carol", "barcelona"),
+            )
+    }
+
+    @Test
+    fun finalStabilizationAndHolyIndulgenceKeepTheirSeparateCashAndTokenFacts() {
+        val base = competitionState()
+        val indulgenceOwner =
+            base
+                .playerState(owner)
+                .copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.HOLY_INDULGENCE, 1)))
+                )
+        val finalBuyer = base.playerState(observer).copy(hand = listOf(card))
+        val initial =
+            base.copy(
+                stage = Stage.PURCHASE,
+                players = base.players + (owner to indulgenceOwner) + (observer to finalBuyer),
+                flow =
+                    TurnFlow(
+                        actor = observer,
+                        cursor = 2,
+                        purchaseStep = PurchaseStep.STABILIZATION,
+                        phaseStarted = true,
+                        phaseBookkeepingApplied = true,
+                    ),
+            )
+        val entry = Entry.Action(observer, TurnCommand.Stabilize(StabilizationPayment.CASH))
+        val after = initial.step(entry)
+
+        val events = HistoryEvents.projectAll("4:0", initial, after, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.STABILIZE, HistoryEventKind.HOLY_INDULGENCE)
+            .inOrder()
+        assertThat(events.first().cashChanges).containsExactly(HistoryCashChangeView(observer, -1))
+        assertThat(events.last().cashChanges).isEmpty()
+        assertThat(events.last().tokenChanges)
+            .contains(HistoryTokenChangeView(observer, poolDelta = -2, stockDelta = 2))
+    }
+
+    @Test
+    fun chaosCleanupIsNotMisreportedAsAHolyIndulgenceTokenPayment() {
+        val base = competitionState()
+        val indulgenceOwner =
+            base
+                .playerState(owner)
+                .copy(
+                    advances =
+                        PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.HOLY_INDULGENCE, 1)))
+                )
+        val finalBuyer =
+            base.playerState(observer).copy(hand = listOf(card), misery = MiseryStep.THOUSAND)
+        val initial =
+            base.copy(
+                stage = Stage.PURCHASE,
+                players = base.players + (owner to indulgenceOwner) + (observer to finalBuyer),
+                flow =
+                    TurnFlow(
+                        actor = observer,
+                        cursor = 2,
+                        purchaseStep = PurchaseStep.STABILIZATION,
+                        phaseStarted = true,
+                        phaseBookkeepingApplied = true,
+                    ),
+            )
+        val entry = Entry.Action(observer, TurnCommand.Stabilize(StabilizationPayment.MISERY))
+        val after = initial.step(entry)
+
+        val events = HistoryEvents.projectAll("4:0", initial, after, entry, observer)
+
+        assertThat(events.map(HistoryEventView::kind))
+            .containsExactly(HistoryEventKind.STABILIZE, HistoryEventKind.HOLY_INDULGENCE)
+            .inOrder()
+        assertThat(events.first().miseryChanges)
+            .containsExactly(HistoryMiseryChangeView(observer, 1, 1000, null))
+        assertThat(events.last().tokenChanges)
+            .containsExactly(
+                HistoryTokenChangeView(owner, poolDelta = 2, stockDelta = -2),
+                HistoryTokenChangeView(recipient, poolDelta = -2, stockDelta = 2),
+            )
     }
 
     @Test
@@ -364,6 +613,7 @@ class HistoryEventsTest {
             .containsExactly(
                 HistoryParticipantView(recipient, "Bob", "genoa"),
                 HistoryParticipantView(observer, "Carol", "barcelona"),
+                HistoryParticipantView(owner, "Alice", "venice"),
             )
     }
 
@@ -702,6 +952,38 @@ class HistoryEventsTest {
         assertThat(event?.war?.winner).isNull()
         assertThat(event?.war?.totals).containsExactly(owner, 2, recipient, 2)
         assertThat(after.activeWar?.ties).isEqualTo(1)
+    }
+
+    private fun reliefState(): GameState {
+        val base = competitionState()
+        val advances =
+            PlayerAdvances(
+                listOf(
+                        AdvanceId.THE_HEAVENS,
+                        AdvanceId.PATRONAGE,
+                        AdvanceId.CARAVAN,
+                        AdvanceId.WRITTEN_RECORD,
+                        AdvanceId.OVERLAND_EAST,
+                        AdvanceId.URBAN_ASCENDANCY,
+                    )
+                    .map { advance -> AdvanceAcquisition(advance, 1) }
+            )
+        val player =
+            base
+                .playerState(owner)
+                .copy(advances = advances, misery = MiseryStep.HUNDRED_TWENTY_FIVE)
+        return base.copy(
+            stage = Stage.PURCHASE,
+            turnNumber = 2,
+            players = base.players + (owner to player),
+            flow =
+                TurnFlow(
+                    actor = owner,
+                    purchaseStep = PurchaseStep.RELIEF,
+                    phaseStarted = true,
+                    phaseBookkeepingApplied = true,
+                ),
+        )
     }
 
     private fun warState(): GameState {
