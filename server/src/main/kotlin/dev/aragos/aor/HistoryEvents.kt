@@ -5,6 +5,7 @@ enum class HistoryEventKind {
     BID_CAPITAL,
     CHOOSE_CAPITAL,
     BUY_TOKENS,
+    TOKEN_PURCHASES,
     CHOOSE_TURN_POSITION,
     RETURN_CARD,
     PASS,
@@ -73,6 +74,14 @@ data class HistoryCashChangeView(val player: PlayerId, val amount: Int)
 /** Signed changes to a player's own pool and stock; never a physical transfer between players. */
 data class HistoryTokenChangeView(val player: PlayerId, val poolDelta: Int, val stockDelta: Int)
 
+/** A revealed signed bid, its cash expense, and the actual stock-funded token allocation. */
+data class HistoryTokenPurchaseView(
+    val player: PlayerId,
+    val amount: Int,
+    val cashCost: Int,
+    val tokensReceived: Int,
+)
+
 /** MR earned from one publicly purchased advance this turn, before pooling and expenditure. */
 data class HistoryReliefRatingSourceView(val advance: AdvanceId, val amount: Int)
 
@@ -137,6 +146,7 @@ data class HistoryEventView(
     val cashChanges: List<HistoryCashChangeView> = emptyList(),
     val miseryChanges: List<HistoryMiseryChangeView> = emptyList(),
     val tokenChanges: List<HistoryTokenChangeView> = emptyList(),
+    val tokenPurchases: List<HistoryTokenPurchaseView> = emptyList(),
     val reliefPayment: HistoryReliefPaymentView? = null,
     val drawReason: CardDrawReason? = null,
     val protectionCash: Int? = null,
@@ -150,6 +160,40 @@ data class CompetitionResultView(val attackerWon: Boolean, val defenders: Set<Pl
 
 /** Projects structured activity from typed entries, using the same audiences as command history. */
 internal object HistoryEvents {
+    /** Called only after all active participants' purchases have been committed and revealed. */
+    fun tokenPurchases(
+        firstEntryId: String,
+        before: GameState,
+        after: GameState,
+        amounts: Map<PlayerId, Int>,
+    ): HistoryEventView {
+        val purchases = amounts.map { (player, amount) ->
+            val previous = before.playerState(player)
+            val paid = after.playerState(player)
+            HistoryTokenPurchaseView(
+                player = player,
+                amount = amount,
+                cashCost = previous.cash - paid.cash,
+                tokensReceived = previous.stockTokens - paid.stockTokens,
+            )
+        }
+        return HistoryEventView(
+                id = "$firstEntryId:token_purchases",
+                kind = HistoryEventKind.TOKEN_PURCHASES,
+                actor = null,
+                turnNumber = before.turnNumber,
+                stage = before.stage,
+                cashChanges =
+                    purchases.mapNotNull { purchase ->
+                        HistoryCashChangeView(purchase.player, -purchase.cashCost).takeIf {
+                            purchase.cashCost != 0
+                        }
+                    },
+                tokenPurchases = purchases,
+            )
+            .withParticipants(before)
+    }
+
     /** One replay entry may also announce a public epoch or ending transition. */
     fun projectAll(
         id: String,
@@ -248,7 +292,8 @@ internal object HistoryEvents {
                 dice.mapNotNull(HistoryDieView::player) +
                 cashChanges.map(HistoryCashChangeView::player) +
                 miseryChanges.map(HistoryMiseryChangeView::player) +
-                tokenChanges.map(HistoryTokenChangeView::player)
+                tokenChanges.map(HistoryTokenChangeView::player) +
+                tokenPurchases.map(HistoryTokenPurchaseView::player)
         return copy(
             participants =
                 ids.distinct().map { id ->

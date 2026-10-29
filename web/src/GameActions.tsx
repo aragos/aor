@@ -27,7 +27,10 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         if (action === 'swap-order') return `${t('action.swapOrder')} ${playerName(snapshot, first)}`;
         if (action === 'cancel-adjustment') {
             const cost = snapshot.game.catalog?.commodities.find(commodity => commodity.id === first.toUpperCase())?.baseValue;
-            return `${t('action.cancel')} ${label(first.toUpperCase(), 'commodity')} ${label(second.toUpperCase(), 'adjustment')} · $${cost ?? '—'}`;
+            const shared = ['gold', 'ivory'].includes(first) && ['GOLD', 'IVORY'].every(commodity =>
+                snapshot.game.adjustments[commodity]?.some(adjustment => adjustment.toLowerCase() === second));
+            const commodity = shared ? t('table.goldIvory') : label(first.toUpperCase(), 'commodity');
+            return `${t('action.cancel')} ${commodity} ${label(second.toUpperCase(), 'adjustment')} · $${cost ?? '—'}`;
         }
         if (action === 'discard-card' || action === 'offer-card' || action === 'return-card') {
             const card = snapshot.game.hand.find(card => card.reference === first);

@@ -2,6 +2,7 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'table.goldIvory': 'Gold / Ivory',
     'controls.miseryAfterAction': 'Misery after this action',
     'controls.chooseMiseryTarget': 'Choose a target to preview misery.',
     'controls.warMiseryUncertain': 'War dice and province cessions determine the resulting misery.',
@@ -274,6 +275,9 @@ export const en: Record<string, string> = {
     'activity.BID_CAPITAL': 'Capital bid',
     'activity.CHOOSE_CAPITAL': 'Chose capital',
     'activity.BUY_TOKENS': 'Token purchase',
+    'activity.TOKEN_PURCHASES': 'Token purchases revealed',
+    'activity.tokenPurchaseBid': 'Bid {amount}',
+    'activity.tokensReceived': '{tokens} tokens received',
     'activity.CHOOSE_TURN_POSITION': 'Chose turn position',
     'activity.RETURN_CARD': 'Returned a card',
     'activity.PASS': 'Continued',

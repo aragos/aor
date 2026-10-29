@@ -47,6 +47,7 @@ choice and understand its result through visual controls and commands, on deskto
 - Expanded player details show total income, tokens, deployed markers, and owned advances. Omit
   income components, undeployed-marker counts, and misery-relief actions from this inspection.
   Show the advance count in the collapsed player box, with an accessible label.
+  Group expanded advances by printed category, then printed letter; omit empty categories.
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
   readiness while retaining the amount in the local input; reloading must not restore a withdrawn
   submission. Committed history and resource balances change only on reveal.
@@ -102,6 +103,8 @@ choice and understand its result through visual controls and commands, on deskto
 - Cancellation choices and confirmation show cost. Stabilization shows current → resulting misery
   boxes, including Chaos, on its payment button. Relief remains visible for an advance tier even
   when blocked, with Pass.
+  Gold and Ivory offer one joint $10 cancellation for each shared adjustment type. If commodity
+  play leaves only one side with that type, label the remaining choice as that commodity alone.
 - Misery boxes share a green-to-amber-to-red severity scale based on the authoritative track's
   ordered steps, with dark burgundy for Chaos. Apply it to player summaries, stabilization previews,
   final scores and the reference track. Retain printed values and accessible text.
@@ -118,6 +121,10 @@ choice and understand its result through visual controls and commands, on deskto
   the cash expense. Every cash receipt uses the same recorded player name, emblem and signed amount,
   including the acting player. Holy Indulgence records each player's actual pool ↔ stock movements separately
   from the action that opened Expansion; include token-only transfers.
+  Group a complete revealed token-purchase batch into one round receipt. Each participant retains
+  a named cash cost, signed bid and actual tokens received, including zero, negative and stock-capped
+  purchases. Private submissions never enter it; later rounds and polling cannot rewrite it.
+  Keep replay commands and undo references separate from this presentation grouping.
 - The shield favicon is colorful when this player has a required action and grayscale otherwise.
   The game list checks all the player’s awaiting games, independently of the visible filter/page.
   Hidden game tabs check every five seconds for two minutes after opening, a visibility change,

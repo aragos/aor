@@ -41,7 +41,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   decision and relevant resources; keep inspection separate from action forms and preserve drafts
   while inspecting other objects. Show available cash alongside spending decisions; omit a permanent
   resource section. Keep hand cards compact, allow dragging as well as scrolling, and include each
-  player's advance count in their summary.
+  player's advance count in their summary. Expanded advances follow printed category and letter order.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Prefer visible finite choices and playable cards beside Pass.
@@ -75,6 +75,10 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   protection money, leader rebates and related cash/misery changes; label dice colors and omit
   continuation noise. Misery relief itemizes cash and current-turn relief rating; Holy Indulgence
   records pool/stock token movements even when no cash changes.
+- Show each round's fully revealed token purchases as one activity entry with every participant's
+  signed bid, cash cost and actual tokens received. Unrevealed bids remain private and canonical
+  command history remains unchanged. Gold/Ivory's shared adjustment has one priced cancellation
+  choice; unpaired remaining markers retain individual choices.
 - Name every activity cash recipient or payer consistently, including the acting player. Inset the
   open panel's close control. Commodity card/market values follow current circle ownership,
   including white circles during Expansion; actual card payments retain the colored-marker rule.

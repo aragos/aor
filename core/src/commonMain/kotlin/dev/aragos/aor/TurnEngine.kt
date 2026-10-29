@@ -54,7 +54,14 @@ internal object TurnEngine {
         val cash = state.playerState(actor).cash
         return listOf("pass") +
             state.adjustments.flatMap { (commodity, markers) ->
-                adjustmentChoices(commodity, markers, cash)
+                // Gold names the shared cancellation; an unmatched Ivory marker remains legal.
+                val offeredMarkers =
+                    if (commodity == Commodity.IVORY) {
+                        markers.filterNot { it in state.adjustments[Commodity.GOLD].orEmpty() }
+                    } else {
+                        markers
+                    }
+                adjustmentChoices(commodity, offeredMarkers, cash)
             }
     }
 

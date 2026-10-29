@@ -22,6 +22,8 @@ export function Commodity({commodity}: {commodity: string}) {
 }
 
 function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCatalog | null}) {
+    const advances = catalog?.advances.filter(advance => player.advances.includes(advance.id));
+    const categories = [...new Set(advances?.map(advance => advance.category))];
     return <div className="player-detail"><h3>{player.name}</h3>
         <dl className="detail-list">
             <div><dt>{t('table.income')}</dt><dd>{player.income ? `$${player.income.ordinary}` : t('table.unavailable')}</dd></div>
@@ -30,7 +32,10 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
             <div><dt>{t('game.boardMarkers')}</dt><dd>{player.boardMarkers}</dd></div>
         </dl>
         <h4>{t('game.advances')}</h4>
-        <ul className="plain-list">{player.advances.map(advance => <li key={advance}>{advanceName(advance)}</li>)}</ul>
+        {advances ? categories.map(category => <section className="player-advance-category" data-advance-category={category} key={category}>
+            <h5>{label(category, 'category')}</h5>
+            <ul className="plain-list">{advances.filter(advance => advance.category === category).map(advance => <li key={advance.id}>{advanceName(advance.id)}</li>)}</ul>
+        </section>) : <ul className="plain-list">{player.advances.map(advance => <li key={advance}>{advanceName(advance)}</li>)}</ul>}
         {catalog && <HelpLink topic="tracks" label={t('table.referenceTracks')} compact={false}/>}
     </div>;
 }

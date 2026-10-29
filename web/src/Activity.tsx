@@ -45,8 +45,10 @@ function EventContent({event, track, onInspectCard}: {
     const actor = event.actor ? eventPlayer(event, event.actor) : null;
     const target = event.target ? eventPlayer(event, event.target) : null;
     const cardId = event.card;
-    const cashChanges = event.cashChanges?.filter(change => !event.reliefPayment ||
-        change.player !== event.actor || change.amount !== -event.reliefPayment.cashCost);
+    const cashChanges = event.cashChanges?.filter(change => {
+        if (event.reliefPayment && change.player === event.actor && change.amount === -event.reliefPayment.cashCost) return false;
+        return !event.tokenPurchases?.some(purchase => purchase.player === change.player && change.amount === -purchase.cashCost);
+    });
     return <span className="activity-content">
         {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{eventName(event, actor.id)}</strong></span>}
         <span>{t(`activity.${event.kind}`)}</span>
@@ -87,6 +89,14 @@ function EventContent({event, track, onInspectCard}: {
                 {' · '}{t('activity.reliefRatingSources')}: {event.reliefPayment.ratingSources.map(source =>
                     `${advanceName(source.advance)} ${source.amount}`).join(', ')}
             </span>}
+        </span>}
+        {event.tokenPurchases && event.tokenPurchases.length > 0 && <span className="token-purchase-round">
+            {event.tokenPurchases.map(purchase => <span className="token-purchase-row" data-token-purchase-player={purchase.player} key={purchase.player}>
+                <CashPayment event={event} player={purchase.player} amount={-purchase.cashCost}>
+                    <span>{t('activity.tokenPurchaseBid', {amount: signedAmount(purchase.amount)})}</span>
+                    <span>{t('activity.tokensReceived', {tokens: purchase.tokensReceived})}</span>
+                </CashPayment>{' '}
+            </span>)}
         </span>}
         {cashChanges?.map(change => <CashPayment key={change.player} event={event} player={change.player} amount={change.amount}/>)}
         {event.miseryChanges?.map(change => <span className="event-misery-change" key={change.player}>
