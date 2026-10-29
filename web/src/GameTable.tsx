@@ -97,7 +97,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <header className="game-header">
             <div className="game-brand"><div><h1>{t('app.title')}</h1>
-                <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{t('game.epoch')} {snapshot.game.currentEpoch}</p></div></div>
+                <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
             <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
             {!snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                 <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
@@ -178,7 +178,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             </div>
         </div>
         <Hand snapshot={snapshot}/>
-        <details className="table-effects"><summary>{t('game.thisTurn')} <span>{snapshot.game.deckRemaining} {t('game.cards').toLowerCase()}</span>
+        <details className="table-effects"><summary>{t('game.thisTurn')}
             {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)}</span>}
             {snapshot.game.effects.papalCategory && <span className="effect-badge">{t('game.forbiddenCategory')}: {label(snapshot.game.effects.papalCategory, 'category')}</span>}
         </summary><TurnEffects snapshot={snapshot}/></details>

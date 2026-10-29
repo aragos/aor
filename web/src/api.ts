@@ -5,6 +5,7 @@ export interface ExpansionOfferView {
     destination: string; primaryAction: 'PLACE' | 'ATTACK' | 'INSPECT'; requiredTokens: number;
     availablePool: number; resultingPool: number | null; establishesMarker: boolean; uncertain: boolean;
     blockers: string[]; partialPlacements: {tokens: number; resultingPool: number}[];
+    missingAccess?: string[];
     shipping: {used: number; capacity: number | null; required: number} | null;
     incomeBefore: number | null; incomeAfter: number | null;
     reachable: boolean;
@@ -152,7 +153,8 @@ export interface Snapshot {
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
-        expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
+        expansionOffers: ExpansionOfferView[]; expansionInspections?: ExpansionOfferView[];
+        commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         cardInspections: CardInspectionView[];
         tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null;
         expansionCardCost?: number | null};

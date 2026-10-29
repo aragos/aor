@@ -8,6 +8,7 @@ import {AdvanceBenefits} from './AdvanceBenefits';
 import {Commodity} from './TablePanels';
 import {AccessLock, PlayerPiece} from './map/MapSymbols';
 import {MiseryBox} from './MiseryBox';
+import {CardRecurrence} from './CardRecurrence';
 
 interface ReferenceData {
     catalog: PublicCatalog;
@@ -65,7 +66,7 @@ export default function ReferencePage() {
         </section>
         {!reference && <p role="status">{error ? 'Reference data could not be loaded. Reload to try again.' : 'Loading the public catalog…'}</p>}
         {reference && <>
-            <section id="cards"><h2>History cards</h2><p>Circle cards recycle into the next epoch when eligible; square cards leave play.</p>
+            <section id="cards"><h2>History cards</h2><p>Recurring cards can return in a later epoch if already discarded. Other cards leave the deck after use.</p>
                 <article id="commodity-cards"><h3>Commodity cards</h3>
                     <p>Pay every player for their established markets. Choose one commodity on a dual card; white markers do not pay. The chosen commodity’s shortage/surplus adjustments are consumed. <a href="#commodities">Payout rules and boxes</a>.</p>
                 </article>
@@ -79,7 +80,7 @@ export default function ReferencePage() {
                     const leader = reference.leaders.find(candidate => candidate.id.toLowerCase().replace(/_/g, '-') === card.id);
                     return <article id={`card-${card.id}`} key={card.id}>
                         {group.slice(1).map(copy => <span className="reference-anchor" id={`card-${copy.id}`} key={copy.id}/>)}
-                        <h3>{t(card.messageId)}</h3><p className="eyebrow">{t(`kind.${card.kind}`)} · {label(card.shape)}</p>
+                        <h3>{t(card.messageId)}</h3><CardRecurrence definition={card}/>
                         <CardEventText definition={card}/>
                         {card.kind === 'commodity' && <p><a href="#commodity-cards">Commodity card rules</a> · <a href="#commodities">Payout boxes</a></p>}
                         {leader && <><p><a href="#leader-cards">Leader rules</a></p>
@@ -102,11 +103,11 @@ export default function ReferencePage() {
                     <ol className="payout-boxes" aria-label={`${label(commodity.id, 'commodity')} payout boxes`}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
                 </article>)}
             </section>
-            <section id="tracks"><h2>Misery and shipping tracks</h2><h3>Misery</h3>
+            <section id="tracks"><h2>Misery and shipping tracks</h2><h3 id="misery-track">Misery</h3>
                 <ol className="reference-track misery-track" aria-label="Misery track">{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}><MiseryBox value={value} track={catalog.miseryTrack}/></li>)}</ol>
                 <p>Colors progress from green through amber to red as track steps become more severe; Chaos is the darkest box. Misery changes move by spaces, not by subtracting printed box values. Chaos removes a player from ordinary play and produces no numeric final score.</p>
                 <p>A tier is the minimum number of advances owned in any category. Purchased relief is limited by tiers and uses this turn’s misery-relief ratings; Enlightenment reduces its cash cost.</p>
-                <h3>Shipping</h3>{[...new Set(catalog?.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet}><h4>{label(fleet, 'fleet')}</h4>
+                <h3 id="shipping-track">Shipping</h3>{[...new Set(catalog?.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet}><h4>{label(fleet, 'fleet')}</h4>
                     <ol className="reference-track">{catalog?.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}>{space.level}</li>)}</ol></div>)}
                 <p>Shipping commitments and available capacity are calculated per destination in the game. A fleet level is not a count of spare ships; access advances and route restrictions still apply.</p>
             </section>

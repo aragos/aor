@@ -25,7 +25,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
                     : baseline.game.board,
             }};
         await page.evaluate('window.setMapSnapshot(' + JSON.stringify(fixture) + ')');
-        await page.wait('document.querySelector("[data-test-revision=' + revision + ']")', 'expansion diagnostic fixture');
+        await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'expansion diagnostic fixture');
         await page.evaluate('document.querySelector(' + JSON.stringify('[data-map-province="' + inspection.destination + '"]') +
             ').dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}))');
     }

@@ -9,6 +9,7 @@ import {useMapSelection} from './map/MapSelection';
 import {LeaderCredit} from './LeaderCredit';
 import {useDragScroll} from './useDragScroll';
 import {AdvancePrice} from './AdvancePrice';
+import {CardRecurrence} from './CardRecurrence';
 
 export function Emblem({player, size = 20}: {player: Pick<PlayerView, 'capital'>; size?: number}) {
     return <svg width={size} height={size} viewBox="-28 -28 56 56" aria-hidden="true">
@@ -26,7 +27,7 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
     const categories = [...new Set(advances?.map(advance => advance.category))];
     return <div className="player-detail"><h3>{player.name}</h3>
         <dl className="detail-list">
-            <div><dt>{t('table.income')}</dt><dd>{player.income ? `$${player.income.ordinary}` : t('table.unavailable')}</dd></div>
+            <div className="written-cash"><dt title={t('game.writtenCashHelp')}>{t('game.writtenCash')}</dt><dd>${player.writtenCash}</dd></div>
             {player.poolAvailable && <div className="player-pool-detail"><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>}
             <div><dt>{t('game.tokens')}</dt><dd>{player.stockTokens}</dd></div>
             <div><dt>{t('game.boardMarkers')}</dt><dd>{player.boardMarkers}</dd></div>
@@ -36,7 +37,6 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
             <h5>{label(category, 'category')}</h5>
             <ul className="plain-list">{advances.filter(advance => advance.category === category).map(advance => <li key={advance.id}>{advanceName(advance.id)}</li>)}</ul>
         </section>) : <ul className="plain-list">{player.advances.map(advance => <li key={advance}>{advanceName(advance)}</li>)}</ul>}
-        {catalog && <HelpLink topic="tracks" label={t('table.referenceTracks')} compact={false}/>}
     </div>;
 }
 
@@ -60,6 +60,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
+                    if (event.target instanceof Element && event.target.closest('a')) return;
                     if (eligible) {event.preventDefault(); playerPicker?.pick(player.id);}
                 }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
                     <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>
@@ -68,8 +69,9 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span>
                         <span className="player-advance-count" title={t('game.advances')} aria-label={`${t('game.advances')}: ${player.advances.length}`}><TableIcon kind="advances"/> <b>{player.advances.length}</b></span></span>
-                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/></span>
-                        <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}</span><span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span></span>
+                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')} inline/></span>
+                        <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
+                        <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')} inline/></span></span>
                     {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
                     {snapshot.game.stage === 'EXPANSION' && <span className="player-white-markers" aria-label={`${t('table.whiteMarkers')}: ${whiteMarkers}`}>
                         <b>{whiteMarkers}</b><small>{t('table.whiteMarkers')}</small>
@@ -153,7 +155,7 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
                     setInspection(null); setSelectedCard(card.reference); setSelected(''); setSelectedAdvance('');
                     if (selectedCard !== card.reference) setPicker(null);
                 }}>
-                <span className="eyebrow">{t(`kind.${card.definition.kind}`)}</span><h3>{t(card.definition.messageId)}</h3>
+                <h3>{t(card.definition.messageId)}</h3><CardRecurrence definition={card.definition}/>
                 {snapshot.game.burdenReferences.includes(card.reference) && <span className="burden-badge">{t('game.burden')}</span>}
                 {offer?.commodities.map(commodity => {
                     const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
