@@ -26,6 +26,17 @@ class GameCatalogTest {
     }
 
     @Test
+    fun smyrnaAndTaurusShareNeitherLandNorCoastalBorderOnEitherMap() {
+        for (map in MapRule.entries) {
+            val configuration = CatalogConfiguration(6, RuleOptions(map = map))
+            val connection = edge("smyrna", "taurus")
+
+            assertThat(configuration.landBorders).doesNotContain(connection)
+            assertThat(configuration.coastalConnections).doesNotContain(connection)
+        }
+    }
+
+    @Test
     fun smyrnaTouchesTheAegeanAndEasternMediterranean() {
         val seas =
             BoardConnectionData.seaCoasts

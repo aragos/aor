@@ -1031,6 +1031,9 @@ Dubrovnik, Durazzo and Bari. Belgrade shares land borders with Dubrovnik and Dur
 provinces no longer share either a land or a coastal-water border with each other.
 Durazzo has no direct sea-space incidences; its coastal-water neighbors remain available.
 Smyrna adjoins both the Aegean Sea and Eastern Mediterranean.
+The 2026-10-29 clarification confirms no Smyrna–Taurus land or direct coastal-water border on either
+map. Galleys may still reach Taurus from Smyrna in two coastal steps through Adalia; reachability
+does not imply adjacency. The reviewed catalog already has this graph.
 
 ---
 

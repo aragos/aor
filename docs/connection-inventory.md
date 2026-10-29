@@ -96,7 +96,7 @@ Each listed neighbor is connected in both directions. Source is the Board region
 | salonika | gallipoli, corfu, athens | E |
 | corfu | athens | E |
 | constantinople | smyrna, angora | E; user correction 2026-10-26 |
-| smyrna | adalia | E |
+| smyrna | adalia | E; user clarification 2026-10-29: no Taurus land border |
 | adalia | taurus | E |
 | taurus | aleppo | E |
 | aleppo | levant | E |
@@ -169,7 +169,7 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | salonika | gallipoli | E |
 | gallipoli | varna, constantinople | E |
 | constantinople | smyrna | E |
-| smyrna | adalia | E; user correction 2026-10-26: no Crete contact |
+| smyrna | adalia | E; user correction 2026-10-26: no Crete contact; 2026-10-29: no direct Taurus contact |
 | adalia | taurus, cyprus | E |
 | taurus | cyprus, aleppo | E |
 | cyprus | aleppo, levant | E |

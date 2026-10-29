@@ -11,6 +11,59 @@ class ExpansionReachTest {
     private val barcelona = PlayerId("p3")
 
     @Test
+    fun smyrnaCannotReachTaurusByLandOnEitherMap() {
+        for (map in MapRule.entries) {
+            val context = smyrnaContext(map)
+
+            assertThat(ExpansionReach.routesTo(context, venice, id("taurus"))).isEmpty()
+        }
+    }
+
+    @Test
+    fun smyrnaReachesTaurusThroughAdaliaInTwoCoastalStepsOnEitherMap() {
+        for (map in MapRule.entries) {
+            val context = smyrnaContext(map, ShippingCapability.GALLEY_2)
+
+            assertThat(ExpansionReach.routesTo(context, venice, id("taurus")))
+                .containsExactly(
+                    ExpansionRoute.Shipping(
+                        id("smyrna"),
+                        listOf(
+                            ShippingSpace.Coast(id("smyrna")),
+                            ShippingSpace.Coast(id("adalia")),
+                            ShippingSpace.Coast(id("taurus")),
+                        ),
+                    )
+                )
+        }
+    }
+
+    @Test
+    fun smyrnaCannotShipDirectlyToTaurusOnEitherMap() {
+        for (map in MapRule.entries) {
+            val context = smyrnaContext(map, ShippingCapability.GALLEY_2)
+
+            val failure =
+                assertFailsWith<RuleViolation> {
+                    ExpansionReach.validate(
+                        context,
+                        venice,
+                        id("taurus"),
+                        ExpansionRoute.Shipping(
+                            id("smyrna"),
+                            listOf(
+                                ShippingSpace.Coast(id("smyrna")),
+                                ShippingSpace.Coast(id("taurus")),
+                            ),
+                        ),
+                    )
+                }
+
+            assertThat(failure.code).isEqualTo(ViolationCode.UNREACHABLE_PROVINCE)
+        }
+    }
+
+    @Test
     fun smyrnaCrossesTheEasternMediterraneanWithHeavens() {
         val context =
             context(
@@ -689,6 +742,19 @@ class ExpansionReachTest {
 
         assertThat(failure.code).isEqualTo(ViolationCode.OVERSEAS_LIMIT_EXCEEDED)
     }
+
+    private fun smyrnaContext(
+        map: MapRule,
+        ships: ShippingCapability = ShippingCapability.NONE,
+    ): BoardRulesContext =
+        context(
+                ships = ships,
+                board =
+                    BoardState(definition = map.definition)
+                        .replaceWithToken(id("smyrna"), venice)
+                        .board,
+            )
+            .copy(configuration = CatalogConfiguration(3, RuleOptions(map = map)))
 
     private fun colouredTokensAt(province: String): BoardState =
         BoardState(
