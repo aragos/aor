@@ -303,8 +303,7 @@ export function Dashboard({me}: {me: Account}) {
         <section className="panel">
             {me.admin && <ChoiceButtons value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}
             <ChoiceButtons value={filter} onChange={value => {setFilter(value); setCursor(null);}} choices={['ongoing', 'my-move', 'finished', 'cancelled', 'abandoned', ...(all ? ['unavailable'] : []), 'all'].map(value => ({value, label: t(`gameStatus.${value.replace(/-/g, '_').toUpperCase()}`)}))}/>
-            <div className="button-row"><button className="secondary" disabled={busy} onClick={() => setRefresh(value => value + 1)}>{t('hosted.refresh')}</button>
-                {me.admin && <button className="secondary" disabled={busy} onClick={() => {void exportAll();}}>{t('hosted.export-all-command-logs')}</button>}</div>
+            {me.admin && <div className="button-row"><button className="secondary" disabled={busy} onClick={() => {void exportAll();}}>{t('hosted.export-all-command-logs')}</button></div>}
             <Problem value={error}/>{busy && <p role="status">{t('hosted.loading')}</p>}
             {!busy && !page.games.length && <p>{t('hosted.no-games-match-this-filter')}</p>}
             <ul className="game-directory">{page.games.map(game => <li key={game.id}>

@@ -74,7 +74,6 @@ export const hostedMessages: Record<string, string> = {
     "hosted.allow-creation": "Allow creation",
     "hosted.all-games": "All games",
     "hosted.my-games": "My games",
-    "hosted.refresh": "Refresh",
     "hosted.export-all-command-logs": "Export all command logs",
     "hosted.loading": "Loading…",
     "hosted.no-games-match-this-filter": "No games match this filter.",

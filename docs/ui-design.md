@@ -51,7 +51,8 @@ choice and understand its result through visual controls and commands, on deskto
 - Hosted account, My games and sign-out controls share the game overview bar. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.
   Omit creation dates, IDs and Open buttons. Administrative rows expand their operational controls;
-  they do not grant access to another player's seat.
+  they do not grant access to another player's seat. Poll the list every 30 seconds while visible;
+  omit a manual Refresh button. Administrative changes refresh the list immediately.
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
   Commands remain in the bottom expander; omit their header button. Province facts remain in
   inspection. Static reference belongs on public `/help`, with contextual links opening a new tab.
