@@ -64,6 +64,43 @@ class AdvancePurchasesTest {
     }
 
     @Test
+    fun namedAdvanceCreditsAndOtherDiscountsMatchTheChargedPrice() {
+        val player =
+            buyer(
+                AdvanceId.THE_HEAVENS,
+                AdvanceId.HUMAN_BODY,
+                AdvanceId.INSTITUTIONAL_RESEARCH,
+                AdvanceId.WRITTEN_RECORD,
+            )
+        val context =
+            turnTwo.copy(
+                leaderDiscounts =
+                    listOf(
+                        AuthorizedLeaderDiscount(
+                            "henry-oldenburg",
+                            AdvanceId.ENLIGHTENMENT,
+                            30,
+                        )
+                    )
+            )
+
+        val quote = AdvancePurchases.quote(player, AdvanceId.ENLIGHTENMENT, context)
+        val purchased = AdvancePurchases.purchase(player, AdvanceId.ENLIGHTENMENT, context)
+
+        assertThat(quote.advanceCredits)
+            .containsExactly(
+                AdvanceCredit(AdvanceId.THE_HEAVENS, 20),
+                AdvanceCredit(AdvanceId.HUMAN_BODY, 20),
+            )
+        assertThat(quote.categoryCredit).isEqualTo(40)
+        assertThat(quote.institutionalResearchCredit).isEqualTo(10)
+        assertThat(quote.leaders).containsExactly(AppliedLeaderDiscount("henry-oldenburg", 30, 10))
+        assertThat(quote.price).isEqualTo(30)
+        assertThat(quote.effectiveDiscount).isEqualTo(90)
+        assertThat(player.cash - purchased.player.cash).isEqualTo(quote.price)
+    }
+
+    @Test
     fun newPrerequisitesApplyImmediatelyWithoutAddingCategoryCredit() {
         val player = AdvancePurchases.purchase(buyer(), AdvanceId.CARAVAN, turnTwo).player
 
@@ -142,6 +179,21 @@ class AdvancePurchasesTest {
         val result = AdvancePurchases.purchase(player, AdvanceId.NATIONALISM, context)
 
         assertThat(result.player.cash).isEqualTo(7)
+    }
+
+    @Test
+    fun effectiveDiscountExcludesCreditsBeyondTheZeroPriceFloor() {
+        val context =
+            turnTwo.copy(
+                leaderDiscounts =
+                    listOf(AuthorizedLeaderDiscount("charlemagne", AdvanceId.NATIONALISM, 100))
+            )
+
+        val quote = AdvancePurchases.quote(buyer(), AdvanceId.NATIONALISM, context)
+
+        assertThat(quote.price).isEqualTo(0)
+        assertThat(quote.effectiveDiscount).isEqualTo(quote.baseCost)
+        assertThat(quote.effectiveDiscount).isEqualTo(60)
     }
 
     @Test
