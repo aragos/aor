@@ -124,6 +124,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .reference-track {display:flex;flex-wrap:wrap;gap:.25rem;list-style:none;padding:0;margin:.5rem 0}
 .reference-track li {border:1px solid #d0d9c8;border-radius:4px;padding:.2rem .4rem;font-variant-numeric:tabular-nums}
 .reference-track li[aria-current] {background:#245c50;color:#fffef8;border-color:#245c50}
+.misery-box {display:inline-flex; align-items:center; justify-content:center; padding:.04rem .32rem; min-width:2ch; border:1px solid #aab2a4; border-radius:4px; background:#f0f2ed; color:#354333; font-variant-numeric:tabular-nums; line-height:1.4; vertical-align:baseline;}
+.misery-box[data-misery-step] {background:hsl(var(--misery-hue) 60% 91%); border-color:hsl(var(--misery-hue) 42% 48%); color:hsl(var(--misery-hue) 55% 23%);}
+.misery-box.is-chaos {background:#642538; border-color:#642538; color:#fff; font-weight:700;}
+.misery-track > li {padding:0; border:0;}
 .fleet-reference > span {display:block;margin-top:.75rem}
 .player-labels { display: flex; align-items: baseline; gap: .4rem; flex: 1; min-width: 0; }
 .player-identity > svg, .player-identity > small { flex-shrink: 0; }

@@ -4,6 +4,7 @@ import {label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {MapPicker, useMapSelection} from './map/MapSelection';
 import {ChoiceButtons, InvalidChoice, useTargets} from './DecisionControls';
+import {MiseryBox} from './MiseryBox';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
@@ -38,7 +39,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     };
     return <div className="game-actions">
         {snapshot.game.activity?.purchaseStep === 'STABILIZATION' && <p>{t('controls.stabilizationCost')}: <strong>${snapshot.game.stabilizationCost}</strong></p>}
-        <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}{command === 'stabilize misery' && ` · → ${snapshot.game.stabilizationMisery ?? t('game.chaos')}`}</button>)}
+        <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}{command === 'stabilize misery' && <> · → <MiseryBox value={snapshot.game.stabilizationMisery} track={snapshot.game.catalog?.miseryTrack}/></>}</button>)}
             {finite.filter(command => !command.startsWith('reduce-marker ')).map(command => <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}
         </div>
         {['PLAY_CARDS', 'FINAL_CARD_PLAY'].includes(snapshot.game.stage) && <div className="decision-cards">{snapshot.game.cardOffers.filter(offer => offer.playable).map(offer => {
