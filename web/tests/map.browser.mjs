@@ -1,3 +1,5 @@
+import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
+import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkPortal} from './portal.browser.mjs';
 import {checkHosted} from './hosted.browser.mjs';
@@ -66,7 +68,7 @@ const game = await createGame(6);
 const page = await open(web + game.links[0].path);
 try {
 await page.wait(`document.querySelector('.game-table')`, 'configuration controls');
-await page.click('Start setup');
+assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Start setup')`), false, 'Creation starts setup implicitly');
 await page.wait(`document.querySelector('#bid')`, 'capital bidding');
 await page.fill('#bid', '7');
 await page.click('Submit bid');
@@ -418,6 +420,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkTable(page, web, after);
     await checkFinished(page, web, after);
     await checkContextualUx(page, web, after);
+    await checkMarketInsights(page, web, after);
+    await checkGameplayImprovements(page, web, after);
     await checkTokenContinuity(page, web, tokenFixture);
     await checkDecisionFamilies(page, web, after);
 

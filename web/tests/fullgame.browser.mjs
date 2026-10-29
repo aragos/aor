@@ -37,12 +37,12 @@ async function show(link, revision) {
         page = pages.get(link.id);
         currentPlayer = link.id;
     }
+    await page.send('Page.bringToFront');
     await page.wait(`document.querySelector('.player-summary.is-viewer summary')?.getAttribute('aria-label')?.includes(${JSON.stringify(link.name + ',')}) && document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + revision)}`, `${link.name} at revision ${revision}`);
 }
 
 function choose(state) {
     const commands = state.legalChoices.commands;
-    if (state.game.stage === 'CONFIGURATION') return 'start';
     if (state.game.stage === 'BIDDING') return `bid-capital ${3 - links.findIndex(link => link.id === state.viewerId)}`;
     if (state.game.stage === 'TOKEN_PURCHASE') return `buy-tokens ${links.findIndex(link => link.id === state.viewerId)}`;
     const capital = commands.find(command => command.startsWith('choose-capital '));
@@ -100,7 +100,6 @@ async function playCard(state, command) {
 
 async function perform(state, command) {
     const [verb, argument] = command.split(' ');
-    if (verb === 'start') return page.click('Start setup');
     if (verb === 'bid-capital' || verb === 'buy-tokens') {
         await page.fill('#bid', argument);
         return click('.decision-panel form:has(#bid) button');
@@ -141,7 +140,7 @@ async function perform(state, command) {
 try {
     await page.wait('document.querySelector("#names")', 'visual game creation');
     await page.fill('#names', 'Ada\nBruno\nClara');
-    await click('.landing form button');
+    await click('.landing form > button:last-child');
     await page.wait('document.querySelectorAll(".seat-links a").length === 3', 'three private seat links');
     const paths = await page.evaluate('[...document.querySelectorAll(".seat-links li")].map(row => ({name:row.querySelector("strong").textContent, path:row.querySelector("a").getAttribute("href")}))');
     gameId = paths[0].path.split('/')[2].split('#')[0];

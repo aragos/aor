@@ -121,7 +121,7 @@ class TurnFlowTest {
     }
 
     @Test
-    fun tierAtZeroMiserySkipsUnavailableRelief() {
+    fun tierAtZeroMiseryStillOffersAnExplicitReliefPass() {
         val initial =
             purchase().updatePlayer(p1) { player ->
                 player.copy(hand = emptyList(), advances = oneTier(), misery = MiseryStep.ZERO)
@@ -129,8 +129,9 @@ class TurnFlowTest {
 
         val state = initial.play("p1: pass", "p1: pass")
 
-        assertThat(state.flow.actor).isEqualTo(p2)
-        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
+        assertThat(state.flow.actor).isEqualTo(p1)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.RELIEF)
+        assertThat(state.legalChoices(p1).commands).containsExactly("pass")
     }
 
     private fun oneTier(): PlayerAdvances =

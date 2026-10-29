@@ -1,8 +1,6 @@
-import {ChoiceButtons} from './DecisionControls';
 import {PlayedLeaders} from './TablePanels';
-import {isBoolean, isString, useStoredSetting} from './preferences';
-import type {ProvinceDefinition, ProvinceView, PublicCatalog, Snapshot} from './api';
-import {label, playerName, provinceName} from './labels';
+import type {Snapshot} from './api';
+import {label, playerName} from './labels';
 import {t} from './messages';
 
 export function FinalScores({snapshot}: {snapshot: Snapshot}) {
@@ -35,111 +33,5 @@ export function TurnEffects({snapshot}: {snapshot: Snapshot}) {
         {snapshot.game.activeWar && <p>{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)} · {t('game.warTies')}: {snapshot.game.activeWar.ties}</p>}
         <PlayedLeaders snapshot={snapshot}/>
         {adjustments.length === 0 && effects.leaders.length === 0 && !effects.papalCategory && effects.military.length === 0 && effects.enlightenedRulers.length === 0 && !snapshot.game.activeWar && <p className="muted small">{t('game.noEffects')}</p>}
-    </section>;
-}
-
-function provinceNeighbors(
-    connections: PublicCatalog['landBorders'],
-    id: string,
-): string {
-    return connections.flatMap(connection => {
-        if (connection.first === id) return [connection.second];
-        if (connection.second === id) return [connection.first];
-        return [];
-    }).map(provinceName).join(', ');
-}
-
-function ProvinceOccupants({snapshot, pieces}: {snapshot: Snapshot; pieces?: ProvinceView}) {
-    if (pieces?.marker) {
-        const marker = pieces.marker;
-        const isNew = marker.side === 'WHITE';
-        return <span className={isNew ? 'new-piece' : ''}>
-            {playerName(snapshot, marker.owner)} · {t('board.marker')}
-            {isNew && ` · ${t('board.new')}`}
-        </span>;
-    }
-    if (!pieces?.tokens.length) return <>—</>;
-    return <>{pieces.tokens.map(holding => <div key={holding.owner}>
-        {playerName(snapshot, holding.owner)}: {holding.coloured > 0 && `${holding.coloured} ${t('board.old')}`}
-        {holding.coloured > 0 && holding.white > 0 && ' + '}
-        {holding.white > 0 && <span className="new-piece">{holding.white} {t('board.new')}</span>}
-    </div>)}</>;
-}
-
-function ProvinceRow({snapshot, catalog, province}: {
-    snapshot: Snapshot;
-    catalog: PublicCatalog;
-    province: ProvinceDefinition;
-}) {
-    const pieces = snapshot.game.board.find(holding => holding.id === province.id);
-    const supports = catalog.satelliteSupports
-        .filter(link => link.satellite === province.id)
-        .map(link => provinceName(link.market));
-    return <tr>
-        <td>
-            <details>
-                <summary>{provinceName(province.id)}{province.capital && ' ★'}</summary>
-                <p className="small">{t('board.area')}: {province.area ?? label(province.overseas ?? '')}</p>
-                <p className="small">{t('board.landNeighbors')}: {provinceNeighbors(catalog.landBorders, province.id) || '—'}</p>
-                {province.coastal && <p className="small">
-                    {t('board.coastalNeighbors')}: {provinceNeighbors(catalog.coastalConnections, province.id) || '—'}
-                </p>}
-                {supports.length > 0 && <p className="small">{t('board.supports')}: {supports.join(', ')}</p>}
-                {province.access.length > 0 && <p className="small">
-                    {t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join(', ')}
-                </p>}
-                <code>{province.id}</code>
-            </details>
-        </td>
-        <td>{province.marketNumber}{province.satellite && ` · ${t('board.satellite')}`}</td>
-        <td>{province.commodities.map(commodity => label(commodity, 'commodity')).join(', ') || '—'}</td>
-        <td><ProvinceOccupants snapshot={snapshot} pieces={pieces}/></td>
-    </tr>;
-}
-
-export function BoardPanel({snapshot}: {snapshot: Snapshot}) {
-    const [filter, setFilter] = useStoredSetting('board-search', '', isString);
-    const [occupiedOnly, setOccupiedOnly] = useStoredSetting('board-occupied', false, isBoolean);
-    const [area, setArea] = useStoredSetting('board-area', '', isString);
-    const catalog = snapshot.game.catalog;
-    if (!catalog || snapshot.game.turnNumber === null) return null;
-    const provinces = catalog.provinces.filter(province => {
-        const occupied = snapshot.game.board.some(pieces => pieces.id === province.id);
-        return (!occupiedOnly || occupied) && (!area || (province.area ?? province.overseas) === area) &&
-            `${provinceName(province.id)} ${province.commodities.map(commodity => label(commodity, 'commodity')).join(' ')}`.toLowerCase().includes(filter.toLowerCase());
-    });
-    const areas = [...new Set(catalog.provinces.map(province => province.area ?? province.overseas).filter(Boolean))];
-    return <section className="panel board-panel" aria-labelledby="board-title">
-        <details><summary id="board-title">{t('table.boardDetails')}</summary>
-        <div className="board-filters">
-            <label>
-                {t('board.search')}
-                <input type="search" value={filter} onChange={event => setFilter(event.target.value)}/>
-            </label>
-            <label>
-                {t('board.area')}
-                <ChoiceButtons value={area} onChange={setArea} choices={[{value: '', label: t('board.allAreas')},
-                    ...areas.map(value => ({value: value!, label: value!}))]}/>
-            </label>
-            <label className="check-label">
-                <input type="checkbox" checked={occupiedOnly} onChange={event => setOccupiedOnly(event.target.checked)}/>
-                {t('board.occupiedOnly')}
-            </label>
-        </div>
-
-        <div className="table-scroll" tabIndex={0} role="region" aria-labelledby="board-title">
-            <table className="board-table">
-                <thead>
-                    <tr>{['province', 'market', 'commodity', 'pieces'].map(key =>
-                        <th key={key} scope="col">{t(`board.${key}`)}</th>
-                    )}</tr>
-                </thead>
-                <tbody>{provinces.map(province =>
-                    <ProvinceRow key={province.id} snapshot={snapshot} catalog={catalog} province={province}/>
-                )}</tbody>
-            </table>
-        </div>
-        {provinces.length === 0 && <p className="muted">{t('board.noMatches')}</p>}
-        </details>
     </section>;
 }

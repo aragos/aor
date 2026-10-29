@@ -17,7 +17,7 @@ internal object HistoryProjection {
                 val entry = TextCodec.parse(recorded.text)
                 add(line(state, entry, viewer))
                 val after = state.step(entry)
-                HistoryEvents.project(recorded.id, state, after, entry, viewer)?.let(events::add)
+                events.addAll(HistoryEvents.projectAll(recorded.id, state, after, entry, viewer))
                 state = after
             }
             stored.revisions

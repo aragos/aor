@@ -1,7 +1,18 @@
-# Decisions and checks after the task batch
+# Follow-up decisions and checks
 
-The deployment implementation and intact CI workflows are now published on `main`. The GitHub
-publication credential issue was resolved using the configured SSH authentication.
+Current behavior is specified in [requirements](requirements.md), [UI contracts](ui-design.md) and
+[rules](rules.md). This file keeps open decisions and the defaults chosen without blocking work.
+
+## Defaults from the gameplay improvements
+
+| Item | Implemented default | Follow-up decision |
+| --- | --- | --- |
+| Fez | Add a direct Western Mediterranean contact on both maps, retaining Canary Basin access | Confirm this interpretation of the map correction |
+| Unplayed leaders | Count matching leaders by printed epoch minus public plays; include hands, future decks and private discards | Keep this privacy-preserving public meaning rather than exposing card availability |
+| Urban Ascendancy | A cancelable private browser draft buys once when legal; requires the view to stay open and never retries a rejected purchase | Decide whether reload-safe or server-saved preregistration is useful |
+| Competition results | Clear current notices locally; polling preserves dismissal, new results appear, activity retains every result | Decide whether dismissal should survive reload |
+| Dice without a printed role | War initiator uses white and opponent black; independent capital-tie rolls use white | Treat these as display conventions; outcomes are unchanged |
+| Misery relief | A completed tier opens the decision even when relief is unaffordable or misery is zero; explain and offer Pass | No further decision required |
 
 ## Needed before public launch
 
@@ -26,11 +37,6 @@ publication credential issue was resolved using the configured SSH authenticatio
 
 ## Later maintenance
 
-The supported variant surface is simplified and rejects retired choices. Some unreachable retired
-handlers remain internally. Automatic approval review rejected the proposed bulk removal because
-it could remove baseline mechanics; that broad deletion was not executed. A separate reviewed,
-incremental cleanup can remove those handlers with focused behavioral evidence.
-
-The cleanup instead consolidated requirements/document ownership, static catalog ownership,
-parsing and related calculations, and corrected stale descriptions. Strategy controllers and
-private plans remain explicitly deferred.
+Some unreachable retired-rule handlers remain internally. Remove them incrementally with focused
+behavioral evidence; preserve baseline mechanics and the supported variants. Strategy controllers
+and private plans remain deferred.

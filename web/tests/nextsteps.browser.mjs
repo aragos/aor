@@ -73,7 +73,7 @@ export async function checkSetupEvidence(page, web) {
     await page.send('Page.navigate',{url:web+creator.path});
     await page.wait(`document.querySelector('.game-table')`,'configured game');
     assert.equal(await page.evaluate(`document.querySelector('.rule-options')`),null,'Variants are selected with registration');
-    await page.click('Start setup');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Start setup')`), false, 'Creation starts setup implicitly');
     await page.wait(`document.querySelector('#bid')`,'one-card setup proceeds to bidding');
     const dealt=await snapshot(creator);
     assert(dealt.game.players.every(player=>player.handCount===1));

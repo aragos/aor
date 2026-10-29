@@ -392,6 +392,7 @@ object BoardConnectionData {
                 "tunis",
                 "algiers",
                 "oran",
+                "fez",
             )
             sea(
                 SeaArea.ADRIATIC_SEA,

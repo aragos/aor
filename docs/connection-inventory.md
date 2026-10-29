@@ -258,7 +258,7 @@ is the only ocean and is flagged separately; it is not a sea usable with The Hea
 | baltic sea | malmo, stockholm, visby, stettin, danzig, mitau, riga, novgorod | Board N; user corrections 2026-10-27: no Copenhagen or Lubeck incidence |
 | bay of biscay | edinburgh, armagh, waterford, wales, cornwall, portsmouth, st-malo, bordeaux, toulouse, basque, leon, lisbon, seville | Board N/W + Errata; user corrections 2026-10-27: no Paris or Chester incidence |
 | canary basin | seville, fez, west-africa | Board W, lower-left |
-| western mediterranean | granada, valencia, barcelona, palma, montpellier, marseilles, genoa, cagliari, rome, naples, bari, sicily, tunis, algiers, oran | Board W, including west of Italian peninsula |
+| western mediterranean | granada, valencia, barcelona, palma, montpellier, marseilles, genoa, cagliari, rome, naples, bari, sicily, tunis, algiers, oran, fez | Board W; user correction 2026-10-28: Fez incidence |
 | adriatic sea | venice, florence, rome, naples, bari, dubrovnik, belgrade | Board W/E + Hexagonia PDF p. 12; Belgrade/Durazzo coastal corrections 2026-10-27 |
 | central mediterranean | bari, sicily, tunis, tripoli, barca, corfu, athens, crete | Board W/E; user correction 2026-10-27: separate from the Aegean |
 | aegean sea | salonika, gallipoli, constantinople, smyrna, athens, crete | Board E; user correction 2026-10-27: separate sea in Area VIII |
@@ -362,7 +362,8 @@ Lubeck–Prague as a land border,
 Milan–Salzburg as separated by St. Gall, Cagliari–Marseilles/Genoa as coastal neighbors, and Cagliari–Rome
 as only a corner contact. Salonika and Constantinople have no direct coastal edge because Gallipoli’s
 coastal water lies between them. At Gibraltar, Seville and Fez touch Canary Basin; Granada does not.
-Fez has no Western Mediterranean sea edge (only a corner at the Oran junction).
+The 2026-10-28 correction adds a direct Fez–Western Mediterranean sea edge; Fez also retains its
+Canary Basin edge. Both board drawings show a continuous Western Mediterranean frontage.
 
 The inventory remains available for review as a whole. Automated validation checks its structural
 invariants; source references and the recorded user ruling establish the transcription decisions.

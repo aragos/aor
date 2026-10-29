@@ -85,10 +85,16 @@ export interface HistoryEventView {
         'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
         'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' | 'WRITTEN_RECORD' |
         'OFFER_CARD' | 'PLAY_CARD' | 'ADJUST_MARKET' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
-        'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL';
+        'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL' |
+        'NEXT_EPOCH' | 'ENDING_TRIGGERED' | 'GAME_FINISHED' | 'INCOME' | 'HOLY_INDULGENCE';
     actor: string | null; target: string | null; turnNumber: number | null; stage: string;
     provinces: string[]; card: string | null; commodity: string | null; advance: string | null;
-    amount: number | null; detail: string | null; dice: {player: string | null; value: number}[];
+    amount: number | null; detail: string | null;
+    dice: {player: string | null; value: number; color: 'WHITE' | 'BLACK' | 'GREEN'}[];
+    cashChanges: {player: string; amount: number}[];
+    drawReason: 'INITIAL_DEAL' | 'TURN_DRAW' | 'URBAN_ASCENDANCY' | 'EXPANSION_PURCHASE' | 'EXPANSION_BONUS' | 'SHORTAGE' | null;
+    protectionCash: number | null; leaderRebate: number | null;
+    marketRoll: {total: number; commodities: string[]; adjustment: 'SHORTAGE' | 'SURPLUS'; cancelled: string[]} | null;
     competition: {attackerWon: boolean; defenders: string[]} | null;
     war: WarOutcomeView | null;
 }
@@ -107,6 +113,7 @@ export interface Snapshot {
         scores: ScoreView[]; adjustments: Record<string, ('SHORTAGE' | 'SURPLUS')[]>;
         effects: CardTurnEffects; activeWar: {initiator: string; opponent: string; startedTurn: number; ties: number} | null;
         playedLeaderDiscounts: {leader: string; usable: boolean; discounts: LeaderDiscountView[]}[];
+        unplayedAdvanceLeaders?: {advance: string; epochs: {epoch: number; count: number}[]}[];
         pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
@@ -115,7 +122,7 @@ export interface Snapshot {
         advanceOffers: {advance: string; price: number | null; unavailableReason: string | null;
             leaderDiscounts: {leaderCardId: string; baseAmount: number; writtenRecordBonus: number; amount: number}[]}[];
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
-        stabilizationCost: number | null; burdenReferences: string[];
+        stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
         expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null};

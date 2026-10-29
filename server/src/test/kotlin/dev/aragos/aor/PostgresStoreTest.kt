@@ -13,7 +13,6 @@ class PostgresStoreTest {
         PostgresFixture().use { fixture ->
             val writer = fixture.service()
             val game = writer.create(listOf("Alice", "Bob", "Carol"))
-            writer.submit(game.gameId, token(game, 0), 1, "start")
             writer.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
             val reader = fixture.reopened(NoPostgresRandom)
             assertThat(reader.get(game.gameId, token(game, 0)).pendingBid).isEqualTo(12)
@@ -31,7 +30,7 @@ class PostgresStoreTest {
         PostgresFixture().use { fixture ->
             val service = fixture.service()
             val game = service.create(listOf("Alice", "Bob", "Carol"))
-            val started = service.submit(game.gameId, token(game, 0), 1, "start")
+            val started = service.get(game.gameId, token(game, 0))
             val before = fixture.store.document(game.gameId)
             val entries = fixture.administration.log(game.gameId).entries
             fixture.database.write { connection ->
@@ -60,7 +59,6 @@ class PostgresStoreTest {
             val service = fixture.service()
             val game = service.create(listOf("Alice", "Bob", "Carol"))
             val token = game.links[0].path.substringAfter("token=")
-            service.submit(game.gameId, token, 1, "start")
             val submitted = service.submit(game.gameId, token, 2, "bid-capital 12")
 
             val recovered = fixture.reopened(NoPostgresRandom).get(game.gameId, token)
@@ -74,7 +72,6 @@ class PostgresStoreTest {
         PostgresFixture().use { fixture ->
             val service = fixture.service()
             val game = service.create(listOf("Alice", "Bob", "Carol"))
-            service.submit(game.gameId, token(game, 0), 1, "start")
             val writers = listOf(service, fixture.reopened(), fixture.reopened())
             val start = CountDownLatch(1)
             val executor = Executors.newFixedThreadPool(3)
@@ -111,6 +108,9 @@ class PostgresStoreTest {
         PostgresFixture().use { fixture ->
             val first = fixture.service()
             val game = first.create(listOf("Alice", "Bob", "Carol"))
+            first.submit(game.gameId, token(game, 0), 2, "bid-capital 3")
+            first.submit(game.gameId, token(game, 1), 2, "bid-capital 2")
+            first.submit(game.gameId, token(game, 2), 2, "bid-capital 1")
             val writers = listOf(first, fixture.reopened())
             val start = CountDownLatch(1)
             val executor = Executors.newFixedThreadPool(2)
@@ -121,7 +121,12 @@ class PostgresStoreTest {
                             Callable {
                                 start.await()
                                 runCatching {
-                                    writer.submit(game.gameId, token(game, 0), 1, "start")
+                                    writer.submit(
+                                        game.gameId,
+                                        token(game, 0),
+                                        3,
+                                        "choose-capital venice",
+                                    )
                                 }
                             }
                         )
@@ -135,11 +140,11 @@ class PostgresStoreTest {
             assertThat(results.count(Result<GameSnapshot>::isSuccess)).isEqualTo(1)
             assertThat((results.single { it.isFailure }.exceptionOrNull() as ServiceFailure).code)
                 .isEqualTo("STALE_REVISION")
-            assertThat(fixture.store.read(game.gameId).revision).isEqualTo(2)
+            assertThat(fixture.store.read(game.gameId).revision).isEqualTo(4)
         }
 
     @Test
-    fun failedWriteRollsBackAllRevisionAndPrivateStateChanges() =
+    fun failedWriteRollsBackPrivateSubmissionChanges() =
         PostgresFixture().use { fixture ->
             val service = fixture.service()
             val game = service.create(listOf("Alice", "Bob", "Carol"))
@@ -147,14 +152,14 @@ class PostgresStoreTest {
 
             assertFailsWith<IllegalStateException> {
                 fixture.database.transaction {
-                    service.submit(game.gameId, token(game, 0), 1, "start")
-                    error("Injected failure after the revision insert")
+                    service.submit(game.gameId, token(game, 0), 2, "bid-capital 3")
+                    error("Injected failure after the private submission update")
                 }
             }
 
             assertThat(fixture.store.document(game.gameId)).isEqualTo(before)
             assertThat(fixture.reopened(NoPostgresRandom).get(game.gameId, token(game, 0)).revision)
-                .isEqualTo(1)
+                .isEqualTo(2)
         }
 
     @Test
@@ -164,17 +169,17 @@ class PostgresStoreTest {
             val game = service.create(listOf("Alice", "Bob", "Carol"))
             assertFailsWith<IllegalStateException> {
                 fixture.database.transaction {
-                    service.submit(game.gameId, token(game, 0), 1, "start")
+                    service.submit(game.gameId, token(game, 0), 2, "bid-capital 3")
                     service.get(game.gameId, token(game, 0))
                     error("Injected failure after reading the uncommitted game")
                 }
             }
 
-            service.submit(game.gameId, token(game, 0), 1, "set-option deck-modification enabled")
+            service.submit(game.gameId, token(game, 0), 2, "bid-capital 9")
             val recovered = service.get(game.gameId, token(game, 0))
 
-            assertThat(recovered.game.stage).isEqualTo(Stage.CONFIGURATION)
-            assertThat(fixture.store.read(game.gameId).state().rules.deckModification).isTrue()
+            assertThat(recovered.game.stage).isEqualTo(Stage.BIDDING)
+            assertThat(recovered.pendingBid).isEqualTo(9)
         }
 
     @Test
@@ -198,7 +203,6 @@ class PostgresStoreTest {
         PostgresFixture().use { fixture ->
             val service = fixture.service()
             val game = service.create(listOf("Alice", "Bob", "Carol"))
-            service.submit(game.gameId, token(game, 0), 1, "start")
             fixture.administration.replaceLog(
                 game.gameId,
                 AccountId("admin"),
@@ -247,7 +251,6 @@ class PostgresStoreTest {
         PostgresFixture().use { fixture ->
             val service = fixture.service()
             val game = service.create(listOf("Alice", "Bob", "Carol"))
-            service.submit(game.gameId, token(game, 0), 1, "start")
 
             val metadata =
                 fixture.database.read { connection ->

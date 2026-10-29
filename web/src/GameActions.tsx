@@ -10,7 +10,7 @@ interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: stri
 const simpleActions = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
-    const {setSelectedCard, setSelected, setSelectedAdvance} = useMapSelection();
+    const {setSelectedCard, setSelected, setSelectedAdvance, setInspection} = useMapSelection();
     const [selectedAction, setSelectedAction] = useState('');
     const [relief, setRelief] = useState('');
     const commands = snapshot.legalChoices.commands;
@@ -22,7 +22,10 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         const [action, first, second] = command.split(' ');
         if (action === 'written-record') return `${t('action.written-record')} · ${playerName(snapshot, first)}`;
         if (action === 'swap-order') return `${t('action.swapOrder')} ${playerName(snapshot, first)}`;
-        if (action === 'cancel-adjustment') return `${t('action.cancel')} ${label(first.toUpperCase(), 'commodity')} ${label(second.toUpperCase(), 'adjustment')}`;
+        if (action === 'cancel-adjustment') {
+            const cost = snapshot.game.catalog?.commodities.find(commodity => commodity.id === first.toUpperCase())?.baseValue;
+            return `${t('action.cancel')} ${label(first.toUpperCase(), 'commodity')} ${label(second.toUpperCase(), 'adjustment')} · $${cost ?? '—'}`;
+        }
         if (action === 'discard-card' || action === 'offer-card' || action === 'return-card') {
             const card = snapshot.game.hand.find(card => card.reference === first);
             const actionKey = action === 'discard-card' ? 'action.discard' : action === 'return-card' ? 'action.returnCard' : 'action.offerCard';
@@ -35,13 +38,13 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     };
     return <div className="game-actions">
         {snapshot.game.activity?.purchaseStep === 'STABILIZATION' && <p>{t('controls.stabilizationCost')}: <strong>${snapshot.game.stabilizationCost}</strong></p>}
-        <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}</button>)}
+        <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}{command === 'stabilize misery' && ` · → ${snapshot.game.stabilizationMisery ?? t('game.chaos')}`}</button>)}
             {finite.filter(command => !command.startsWith('reduce-marker ')).map(command => <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}
         </div>
         {['PLAY_CARDS', 'FINAL_CARD_PLAY'].includes(snapshot.game.stage) && <div className="decision-cards">{snapshot.game.cardOffers.filter(offer => offer.playable).map(offer => {
             const card = snapshot.game.hand.find(card => card.reference === offer.reference);
             return card && <button type="button" className="secondary eligible-card" key={offer.reference} data-eligible-card={offer.reference}
-                disabled={busy} onClick={() => {setSelectedCard(offer.reference); setSelected(''); setSelectedAdvance('');}}>{t(card.definition.messageId)}</button>;
+                disabled={busy} onClick={() => {setInspection(null); setSelectedCard(offer.reference); setSelected(''); setSelectedAdvance('');}}>{t(card.definition.messageId)}</button>;
         })}</div>}
         {finite.some(command => command.startsWith('reduce-marker ')) && <details className="marker-reduction"><summary>{t('action.reduceMarker')}</summary>
             <div className="action-buttons">{finite.filter(command => command.startsWith('reduce-marker ')).map(command =>
@@ -55,13 +58,13 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             {snapshot.game.shippingOffer.blockers.map(blocker => <p key={blocker} className="blocker">{t(`error.${blocker}`)}</p>)}
             <button disabled={busy || !commands.includes('upgrade-ships') || snapshot.game.shippingOffer.blockers.length > 0} onClick={() => { void submit('upgrade-ships'); }}>{t('action.upgrade-ships')}</button>
         </div>}
-        {snapshot.game.reliefOffers.length > 0 && commands.some(command => command === 'relieve-misery' || command.startsWith('relieve-misery ')) && <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
+        {snapshot.game.activity?.purchaseStep === 'RELIEF' && <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
             <label htmlFor="relief-spaces">{t('action.relieveMisery')}</label>
             <ChoiceButtons id="relief-spaces" value={relief} onChange={setRelief} disabled={busy}
                 choices={snapshot.game.reliefOffers.map(offer => ({value: String(offer.spaces), disabled: !offer.affordable,
                     label: `${offer.spaces} ${t('controls.spaces')} · $${offer.cashCost} · ${offer.ratingSpent} ${t('controls.mrUsed')}`}))}/>
             <button disabled={busy || !snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)}>{t('action.relieveMisery')}</button>
-            {snapshot.game.reliefOffers.length === 0 && <p className="small muted">{t('controls.noRelief')}</p>}
+            {snapshot.game.reliefOffers.length === 0 ? <p className="small muted">{t('controls.noRelief')}</p> : !snapshot.game.reliefOffers.some(offer => offer.affordable) && <p className="blocker">{t('error.INSUFFICIENT_CASH')}</p>}
         </form>}
         {commands.includes('forgo-marker') && <EventMarkerPlacement snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.some(command => command.startsWith('cede-war')) && <WarSurrender snapshot={snapshot} busy={busy} submit={submit}/>}

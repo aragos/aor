@@ -152,7 +152,13 @@ object CardGame {
             state.replacePlayer(
                 player.copy(hand = player.hand.filterNot { held -> held.reference == reference })
             )
-        return apply(committed.discardCards(listOf(card)), resolution)
+        val recorded =
+            if (resolution is CardResolution.LeaderPlay) {
+                committed.copy(playedLeaders = committed.playedLeaders + resolution.leader.leader)
+            } else {
+                committed
+            }
+        return apply(recorded.discardCards(listOf(card)), resolution)
     }
 
     /** Shared phase and decision ownership checks for commands and read-only card offers. */

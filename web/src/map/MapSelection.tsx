@@ -10,6 +10,8 @@ interface Picker {
     pick: (province: string) => void;
 }
 
+type Inspection = {kind: 'card' | 'advance' | 'province'; id: string} | null;
+
 const MapSelection = createContext<{
     workspace: 'map' | 'markets' | 'advances';
     setWorkspace: Dispatch<SetStateAction<'map' | 'markets' | 'advances'>>;
@@ -27,9 +29,12 @@ const MapSelection = createContext<{
     setPlayerPicker: Dispatch<SetStateAction<Picker | null>>;
     resetSelection: () => void;
     focusRevision: number;
+    inspection: Inspection;
+    setInspection: Dispatch<SetStateAction<Inspection>>;
 }>({workspace: 'map', setWorkspace: () => undefined, selected: '', setSelected: () => undefined, selectedArea: '', setSelectedArea: () => undefined, selectedCard: '', setSelectedCard: () => undefined,
     selectedAdvance: '', setSelectedAdvance: () => undefined, picker: null, setPicker: () => undefined,
-    playerPicker: null, setPlayerPicker: () => undefined, resetSelection: () => undefined, focusRevision: 0});
+    playerPicker: null, setPlayerPicker: () => undefined, resetSelection: () => undefined, focusRevision: 0,
+    inspection: null, setInspection: () => undefined});
 
 export function MapSelectionProvider({children}: {children: ReactNode}) {
     const [picker, setPicker] = useState<Picker | null>(null);
@@ -40,15 +45,18 @@ export function MapSelectionProvider({children}: {children: ReactNode}) {
     const [selectedCard, setSelectedCard] = useState('');
     const [selectedAdvance, setSelectedAdvance] = useState('');
     const [focusRevision, setFocusRevision] = useState(0);
+    const [inspection, setInspection] = useState<Inspection>(null);
     const resetSelection = useCallback(() => {
         setSelected(''); setSelectedArea(''); setSelectedCard(''); setSelectedAdvance('');
         setPicker(null); setPlayerPicker(null); setFocusRevision(revision => revision + 1);
+        setInspection(null);
     }, []);
     useEffect(() => {
         if (selected || selectedCard || selectedAdvance) setSelectedArea('');
     }, [selected, selectedCard, selectedAdvance]);
     return <MapSelection.Provider value={{picker, setPicker, playerPicker, setPlayerPicker, workspace, setWorkspace, selected, setSelected, selectedArea, setSelectedArea, selectedCard,
-        setSelectedCard, selectedAdvance, setSelectedAdvance, resetSelection, focusRevision}}>{children}</MapSelection.Provider>;
+        setSelectedCard, selectedAdvance, setSelectedAdvance, resetSelection, focusRevision,
+        inspection, setInspection}}>{children}</MapSelection.Provider>;
 }
 
 export const useMapSelection = () => useContext(MapSelection);
@@ -63,21 +71,21 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
     kind?: 'province' | 'area';
 }) {
     const id = useId();
-    const {picker, setPicker, setWorkspace} = useMapSelection();
+    const {picker, setPicker, setWorkspace, focusRevision} = useMapSelection();
     const latestPick = useRef(onPick);
     latestPick.current = onPick;
     const initialPicker = useRef({id, kind, title, eligible, selected, pick: (province: string) => latestPick.current(province)});
     initialPicker.current = {id, kind, title, eligible, selected, pick: province => latestPick.current(province)};
     const active = picker?.id === id;
-    const activated = useRef(false);
+    const activated = useRef<number | null>(null);
     useEffect(() => {
-        if (!disabled && eligible.length > 0 && !activated.current) {
-            activated.current = true;
+        if (!disabled && eligible.length > 0 && activated.current !== focusRevision) {
+            activated.current = focusRevision;
             setPicker(initialPicker.current);
             setWorkspace('map');
             requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}));
         }
-    }, [disabled, eligible.length, kind, setPicker, setWorkspace]);
+    }, [disabled, eligible.length, focusRevision, kind, setPicker, setWorkspace]);
     useEffect(() => {
         if (!active) return;
         setPicker(current => {

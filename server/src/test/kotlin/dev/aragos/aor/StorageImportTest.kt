@@ -27,7 +27,6 @@ class StorageImportTest {
                         UndoPolicy.FRIENDLY_GAME,
                     )
                 val access = GameAccess.Account(players[0].id)
-                service.submit(game.gameId, access, 1, "start")
                 val admin =
                     GameAdministration(
                         source,

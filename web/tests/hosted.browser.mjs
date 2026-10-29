@@ -36,13 +36,16 @@ export async function checkHosted(page, web, artifacts) {
         }
     };
     page.ws.addEventListener('message', intercept);
+    // Earlier portal checks may have loaded the real Firebase module into the HTTP cache.
+    await page.send('Network.setCacheDisabled', {cacheDisabled: true});
     await page.send('Fetch.enable', {patterns: [{urlPattern: '*firebase_auth.js*'}, {urlPattern: '*/api/*'}]});
     try {
         async function check(description, action) {
             account = null;
             emailVerified = true;
+            const previousDocument = await page.evaluate('performance.timeOrigin');
             await page.send('Page.navigate', {url: web});
-            await page.wait(`document.querySelector('.google-sign-in')`, 'Google sign-in option');
+            await page.wait(`performance.timeOrigin !== ${previousDocument} && window.firebaseTest && document.querySelector('.google-sign-in')`, 'Google sign-in in the new document');
             await action();
             assert.deepEqual(failures, []);
             console.log(`Passed: ${description}`);
@@ -131,6 +134,7 @@ export async function checkHosted(page, web, artifacts) {
         });
     } finally {
         await page.send('Fetch.disable');
+        await page.send('Network.setCacheDisabled', {cacheDisabled: false});
         page.ws.removeEventListener('message', intercept);
         await page.send('Emulation.clearDeviceMetricsOverride');
     }

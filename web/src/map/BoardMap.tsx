@@ -118,7 +118,8 @@ export function BoardMap({snapshot, busy}: {
     const pointers = useRef(new Map<number, {x: number; y: number}>());
     const gesture = useRef<{x: number; y: number; distance: number; view: MapView} | null>(null);
     const suppressClick = useRef(false);
-    const {picker, setPicker, selected, setSelected, selectedArea, setSelectedArea, setSelectedCard, setSelectedAdvance, focusRevision} = useMapSelection();
+    const {picker, setPicker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
+        selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection} = useMapSelection();
     useLayoutEffect(() => {
         setHovered(''); setFocused('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
@@ -127,16 +128,21 @@ export function BoardMap({snapshot, busy}: {
     const catalog = snapshot.game.catalog;
     const definitions = useMemo(() => new Map(catalog?.provinces.map(province => [province.id, province])), [catalog]);
     const occupancy = useMemo(() => new Map(snapshot.game.board.map(pieces => [pieces.id, pieces])), [snapshot.game.board]);
-    const landNeighbors = new Set(neighbors(catalog?.landBorders ?? [], selected));
-    const coastNeighbors = new Set(neighbors(catalog?.coastalConnections ?? [], selected));
-    const selectedSeas = new Set(catalog?.seaCoasts.filter(coast => coast.province === selected).map(coast => coast.sea));
+    const inspectedProvince = inspection?.kind === 'province' ? inspection.id : selected;
+    const landNeighbors = new Set(neighbors(catalog?.landBorders ?? [], inspectedProvince));
+    const coastNeighbors = new Set(neighbors(catalog?.coastalConnections ?? [], inspectedProvince));
+    const selectedSeas = new Set(catalog?.seaCoasts.filter(coast => coast.province === inspectedProvince).map(coast => coast.sea));
+    const cardDraft = snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
+    const advanceDraft = catalog?.advances.some(advance => advance.id === selectedAdvance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`));
     const chooseArea = (area: string) => {
+        setInspection(null);
         setSelected('');
         setSelectedArea(area);
-        if (!picker) { setSelectedCard(''); setSelectedAdvance(''); }
+        if (!picker && !cardDraft && !advanceDraft) { setSelectedCard(''); setSelectedAdvance(''); }
         if (!busy && picker?.kind === 'area' && picker.eligible.includes(area)) picker.pick(area);
     };
     const clearInspection = () => {
+        setInspection(null);
         setSelected(''); setSelectedArea(''); setHovered(''); setFocused('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
     };
@@ -146,6 +152,11 @@ export function BoardMap({snapshot, busy}: {
             if (area) chooseArea(area);
             return;
         }
+        if (!picker && (cardDraft || advanceDraft)) {
+            setInspection({kind: 'province', id});
+            return;
+        }
+        setInspection(null);
         setSelectedArea('');
         setSelected(id);
         if (!picker) { setSelectedCard(''); setSelectedAdvance(''); }
@@ -216,7 +227,7 @@ export function BoardMap({snapshot, busy}: {
         reachable: picker ? (picker.kind === 'area'
             ? picker.eligible.includes(definitions.get(id)?.area ?? '')
             : picker.eligible.includes(id)) : expansionHighlight && definitions.has(id) ? reachable.has(id) : undefined,
-        selected: id === selected || (picker?.kind !== 'area' && (picker?.selected.includes(id) ?? false)),
+        selected: id === inspectedProvince || (picker?.kind !== 'area' && (picker?.selected.includes(id) ?? false)),
         eligible: picker ? (picker.kind === 'area' ? picker.eligible.includes(definitions.get(id)?.area ?? '') : picker.eligible.includes(id)) : legalDestinations.has(id),
         neighbor: landNeighbors.has(id) || coastNeighbors.has(id),
         emphasized: hovered === id || focused === id,
@@ -241,15 +252,15 @@ export function BoardMap({snapshot, busy}: {
         return [group, members.length > 0 && members.every(province => lockedProvinces.has(province.id))];
     }));
     const highlights = [
-        ...catalog.provinces.map(province => ({id: province.id, kind: 'province', inspected: province.id === selected, path: geometry.provinces[province.id].outline, state: highlight(province.id)})),
+        ...catalog.provinces.map(province => ({id: province.id, kind: 'province', inspected: province.id === inspectedProvince, path: geometry.provinces[province.id].outline, state: highlight(province.id)})),
         ...areaEntries.map(([area, shape]) => ({id: area, kind: 'area', inspected: area === selectedArea, path: shape.path, state: highlightArea(area)})),
     ].filter(item => highlightPriority(item.state) > 0)
         .sort((first, second) => highlightPriority(first.state) - highlightPriority(second.state) || Number(first.inspected) - Number(second.inspected));
     const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
-    const inspectedPieces = occupancy.get(selected);
+    const inspectedPieces = occupancy.get(inspectedProvince);
     const groupCount = inspectedPieces?.marker ? 1 : inspectedPieces?.tokens.reduce((count, tokens) =>
         count + Number(tokens.coloured > 0) + Number(tokens.white > 0), 0) ?? 0;
-    const inspectedLayout = geometry.provinces[selected]?.pieces[String(groupCount)];
+    const inspectedLayout = geometry.provinces[inspectedProvince]?.pieces[String(groupCount)];
     const denseInspection = inspectedLayout && (inspectedLayout.crowded || inspectedLayout.size * mapWidth / view.w < 14);
     // Keep the sea texture sparse at Fit, practical zoom, and narrow screen widths.
     const seaHatchScale = mapWidth ? view.w / mapWidth : 1;
@@ -305,7 +316,7 @@ export function BoardMap({snapshot, busy}: {
                         onPointerEnter={() => setHovered(id)} onPointerLeave={() => setHovered('')}
                         onClick={() => {if (!suppressClick.current) choose(id);}}>
                         <title>{provinceName(id)} {t('board.coastalWater')}</title>
-                        <path d={path} fill={id === selected || coastNeighbors.has(id) ? '#9adddf' : '#d2efed'} stroke="#56929c" strokeWidth={1.4}/>
+                        <path d={path} fill={id === inspectedProvince || coastNeighbors.has(id) ? '#9adddf' : '#d2efed'} stroke="#56929c" strokeWidth={1.4}/>
                         <ProvinceHighlight path={path} {...highlight(id)} outline={false}/>
                     </g>)}
                     <g fill="#f6f3e8" stroke="#a5b5aa" strokeWidth={1.5} pointerEvents="none">
@@ -317,7 +328,7 @@ export function BoardMap({snapshot, busy}: {
                         const picked = picker?.selected.includes(id);
                         const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : reachable.has(id);
                         return <g key={id} data-map-province={id} role={definition ? 'button' : undefined}
-                            tabIndex={definition ? 0 : undefined} aria-pressed={definition ? id === selected : undefined}
+                            tabIndex={definition ? 0 : undefined} aria-pressed={definition ? id === inspectedProvince : undefined}
                             aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}
                             className={`map-province ${definition ? 'active' : 'inactive'} ${expansionHighlight && definition ? reachable.has(id) ? 'expansion-reachable' : 'expansion-unreachable' : ''} ${picked ? 'picked' : ''} ${eligible ? 'eligible' : ''}`}
                             onPointerEnter={() => {if (definition) setHovered(id);}} onPointerLeave={() => setHovered('')}
@@ -388,8 +399,8 @@ export function BoardMap({snapshot, busy}: {
                 <path d={geometry.frame} fill="none" stroke="#84958b" strokeWidth={2} pointerEvents="none"/>
             </svg>
         </div>
-        {denseInspection && <div className="dense-map-detail" data-dense-province={selected}>
-            <strong>{provinceName(selected)}</strong><p>{t('board.denseOccupancy')}</p>
+        {denseInspection && <div className="dense-map-detail" data-dense-province={inspectedProvince}>
+            <strong>{provinceName(inspectedProvince)}</strong><p>{t('board.denseOccupancy')}</p>
             <p>{occupancyDescription(snapshot, inspectedPieces)}</p>
         </div>}
         <details className="commodity-legend"><summary>{t('board.mapKey')}</summary>        <div className="map-legend">

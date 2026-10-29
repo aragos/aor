@@ -29,7 +29,7 @@ export async function checkEuropeanMap(page, web) {
     assert.equal((await snapshot(links[0])).game.rules.map, 'EUROPEAN');
     await page.send('Page.navigate', {url: web + links[0].path});
     await page.wait(`document.querySelector('.game-table')`, 'European game table');
-    await page.click('Start setup');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Start setup')`), false, 'Creation starts setup implicitly');
     await page.wait(`document.querySelector('#bid')`, 'European capital bids');
     for (const [index, link] of links.entries()) await send(link, 'bid-capital ' + (6 - index));
     const capitals = ['paris', 'london', 'hamburg', 'venice', 'genoa', 'barcelona'];
@@ -57,8 +57,8 @@ export async function checkEuropeanMap(page, web) {
     await page.evaluate(`document.querySelector('[data-map-province="loire"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
     await page.wait(`document.querySelector('.province-inspector h2')?.textContent === 'Loire'`, 'Loire keyboard inspection');
     assert.match(await page.evaluate(`document.querySelector('.province-inspector .map-facts').textContent`), /Wine.*3.*III/);
-    assert.equal(await page.evaluate(`document.querySelector('.province-inspector .primary-expansion').disabled`), false);
-    await page.evaluate(`document.querySelector('.province-inspector .primary-expansion').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.province-actions .primary-expansion').disabled`), false);
+    await page.evaluate(`document.querySelector('.province-actions .primary-expansion').click()`);
     await page.wait(`document.querySelector('[data-province-label="loire"] [data-piece-kind="marker"]')`, 'live Loire marker placement');
     const placed = await snapshot(links[0]);
     assert.equal(placed.game.board.find(province => province.id === 'loire')?.marker?.owner, links[0].id);

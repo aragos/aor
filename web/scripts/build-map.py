@@ -1100,7 +1100,6 @@ water["granada"] = union_all([water["granada"], granada_front], grid_size=0.001)
 water["fez"] = (
     union_all([water["fez"], front], grid_size=0.001)
     .difference(granada_front)
-    .difference(seas["WESTERN_MEDITERRANEAN"].buffer(0.15))
     .buffer(0)
 )
 # Keep the new Gibraltar front clear of Oran as well as of the Canary Basin.

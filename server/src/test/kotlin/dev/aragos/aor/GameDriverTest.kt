@@ -25,8 +25,12 @@ class GameDriverTest {
                     credentials = emptyMap(),
                 )
 
-        assertThat(stored.revisions.single().entries)
+        assertThat(stored.revisions.first().entries)
             .containsExactlyElementsIn(defaultConfigurationText(PlayerId("p2")))
             .inOrder()
+        assertThat(stored.state().stage).isEqualTo(Stage.BIDDING)
+        assertThat(stored.revisions.last().author).isEqualTo(PlayerId("p2"))
+        assertThat(stored.revisions.last().entries.first()).isEqualTo("p2: start")
+        requireCompletedTransaction(stored.state())
     }
 }

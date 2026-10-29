@@ -32,7 +32,7 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 
 | Command | Who and when; parameter constraints |
 | --- | --- |
-| `start` | Creator; freezes configuration and requests the shuffle and starting draws. |
+| `start` | Automatically recorded for the creator during game creation; freezes configuration and requests the opening shuffle and draws. Retained for engine replay. |
 | `bid-capital <amount>` | Each player during private capital bidding; integer $0–$40. Bids reveal together. |
 | `choose-capital <capital>` | Current capital chooser; the capital must remain available. |
 | `buy-tokens <amount>` | Each active player during private Order of Play. Pays the absolute amount, including negative bids; only positive amounts buy pool tokens, capped by stock. Must be affordable in full. |
@@ -43,8 +43,10 @@ field. The existing 26th-advance ending can still finish a game before the third
 
 ### Game variants
 
-The creator chooses variants while registering players. The creation transaction records every
-resolved value explicitly. The creator may use these commands before `start`; play freezes them.
+The creator chooses variants while registering players. Creation records every resolved value,
+then automatically records `start`. Hosted and local application games are already started when
+creation returns. The commands below describe engine configuration and replay; they cannot change
+an application game after creation.
 
 | Command key (`set-option <key> <value>`) | Values (default first) |
 | --- | --- |

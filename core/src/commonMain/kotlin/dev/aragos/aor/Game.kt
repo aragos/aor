@@ -1,7 +1,7 @@
 package dev.aragos.aor
 
 const val RULES_VERSION = "ah1996-three-epoch-2"
-const val DATA_VERSION = "ah1996-catalog-12"
+const val DATA_VERSION = "ah1996-catalog-13"
 
 /**
  * A registered participant, independent of their capital or creator role.
@@ -85,6 +85,8 @@ data class GameState(
             player.id to PlayerState(player = player)
         },
     val effects: CardTurnEffects = CardTurnEffects(),
+    /** Public leader plays across all turns; private discards never change this information. */
+    val playedLeaders: Set<LeaderId> = emptySet(),
     val activeWar: WarState? = null,
     val voids: CardVoids = CardVoids(),
     val board: BoardState = BoardState(definition = rules.map.definition),
