@@ -9,6 +9,8 @@ import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
 import {AdvanceBenefits} from './AdvanceBenefits';
 import {LeaderCredit} from './LeaderCredit';
+import {AdvancePrice} from './AdvancePrice';
+import {MiseryPreview} from './MiseryPreview';
 
 interface Props {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
@@ -60,6 +62,11 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
     const areaChoices = finiteChoices.filter(candidate => candidate.kind === 'AREA');
     const inspection = mode !== 'action';
     const action = mode !== 'inspection';
+    const misery = selectedChoice ?? (noChoice ? finiteChoices[0] : undefined);
+    const miseryChanges = misery?.miseryChanges ?? offer?.miseryChanges ?? [];
+    const uncertainPlayers = misery?.miseryUncertainPlayers ?? offer?.miseryUncertainPlayers ?? [];
+    const chooseMiseryTarget = !misery && !miseryChanges.length && !uncertainPlayers.length &&
+        finiteChoices.some(candidate => (candidate.miseryChanges?.length ?? 0) > 0 || (candidate.miseryUncertainPlayers?.length ?? 0) > 0);
     return <section className="object-decision card-decision">
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
         {inspection && <p className="eyebrow">{t(`kind.${definition.kind}`)}</p>}<h2>{t(definition.messageId)}</h2>
@@ -109,6 +116,8 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
             <InvalidChoice invalid={!!(choice && !selectedChoice) || invalidTargets} clear={() => {setChoice(''); selection.clear();}}/>
+            <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
+            {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
             <button disabled={busy || !actionable}>{t('action.playCard')}</button>
         </form>}
     </section>;
@@ -130,12 +139,16 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
         {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label="Advance rules" compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
-        {offer?.price !== null && offer?.price !== undefined && <div className="price-quote"><strong>${offer.price}</strong><span>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</span></div>}
+        {offer?.price !== null && offer?.price !== undefined && <>
+            <AdvancePrice offer={offer}/>
+            <p className="small">{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
+        </>}
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
-        {offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
+        {!offer?.priceBreakdown && offer?.leaderDiscounts?.map(discount => <p className="leader-discount" key={discount.leaderCardId}>
             {label(discount.leaderCardId, 'leader')} <LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/>
         </p>)}
         {inspection && <p>{t('advance.owners')}: {snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</p>}
+        <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
         {action && offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}
     </section>;
 }

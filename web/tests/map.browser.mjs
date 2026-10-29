@@ -2,6 +2,7 @@ import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkActionContext} from './actionContext.browser.mjs';
+import {checkBidWithdrawal, checkPurchaseClarity} from './purchaseClarity.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkPortal} from './portal.browser.mjs';
@@ -428,6 +429,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkReferenceUx(page, web, after);
     await checkGameplayImprovements(page, web, after);
     await checkActionContext(page, web, after);
+    await checkPurchaseClarity(page, web, after);
     await checkTokenContinuity(page, web, tokenFixture);
     await checkDecisionFamilies(page, web, after);
 
@@ -511,6 +513,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkBackgroundPolling(page,web);
     await checkEuropeanMap(page,web);
     await checkLiveCardMap(page,web);
+    await checkBidWithdrawal(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

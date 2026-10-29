@@ -11,8 +11,18 @@ enum class CardChoiceKind {
     PROTECTION,
 }
 
-/** Command is an authorized complete choice; null denotes a bounded user-edited choice. */
-data class CardChoiceView(val kind: CardChoiceKind, val value: String?, val command: String?)
+/**
+ * Command is an authorized complete choice; null denotes a bounded user-edited choice. Known
+ * [miseryChanges] use printed box endpoints; [miseryUncertainPlayers] identifies participants whose
+ * destinations require unresolved dice or decisions instead of inventing an outcome.
+ */
+data class CardChoiceView(
+    val kind: CardChoiceKind,
+    val value: String?,
+    val command: String?,
+    val miseryChanges: List<MiseryChangeView> = emptyList(),
+    val miseryUncertainPlayers: List<PlayerId> = emptyList(),
+)
 
 /** Viewer-specific credit; authorization to use a played leader is projected separately. */
 data class LeaderDiscountView(
@@ -92,6 +102,9 @@ data class CardOfferView(
     val provinceTargets: Set<ProvinceId>,
     val requiredTargetCount: Int?,
     val protectionMax: Int?,
+    /** Consequences identical across all authorized choices, known before selecting a target. */
+    val miseryChanges: List<MiseryChangeView> = emptyList(),
+    val miseryUncertainPlayers: List<PlayerId> = emptyList(),
 )
 
 /** Public card facts with current viewer credits; never identifies any private card location. */
@@ -132,16 +145,17 @@ internal object CardProjection {
             if (block != null) {
                 emptyList()
             } else {
-                CardGame.choices(context, spec).filter { choice ->
+                CardGame.choices(context, spec).mapNotNull { choice ->
                     try {
-                        CardRules.resolve(
-                            context,
-                            viewer.player.id,
-                            CardPlay(card.definition.id, choice),
-                        )
-                        true
+                        val resolution =
+                            CardRules.resolve(
+                                context,
+                                viewer.player.id,
+                                CardPlay(card.definition.id, choice),
+                            )
+                        choice to CardMiseryPreview.from(context, resolution)
                     } catch (_: CardRuleViolation) {
-                        false
+                        null
                     }
                 }
             }
@@ -161,9 +175,13 @@ internal object CardProjection {
             } else null
         val choices =
             legal
-                .filterNot { choice -> pirate && choice != CardChoice.None }
-                .map { choice ->
+                .filterNot { (choice, _) -> pirate && choice != CardChoice.None }
+                .map { (choice, preview) ->
                     choiceView(card.reference, choice)
+                        .copy(
+                            miseryChanges = preview.changes,
+                            miseryUncertainPlayers = preview.uncertainPlayers,
+                        )
                 } +
                 listOfNotNull(
                     CardChoiceView(CardChoiceKind.PROVINCES, null, null).takeIf {
@@ -173,6 +191,7 @@ internal object CardProjection {
                         protection != null
                     },
                 )
+        val commonMisery = legal.map { (_, preview) -> preview }.distinct().singleOrNull()
         return CardOfferView(
             card.reference,
             block == null && choices.isNotEmpty(),
@@ -183,6 +202,8 @@ internal object CardProjection {
             targets,
             required,
             protection,
+            commonMisery?.changes.orEmpty(),
+            commonMisery?.uncertainPlayers.orEmpty(),
         )
     }
 

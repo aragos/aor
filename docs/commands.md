@@ -41,6 +41,20 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 Games always use three epochs. There is no `set-option epochs` command or `epochs` creation
 field. The existing 26th-advance ending can still finish a game before the third deck is exhausted.
 
+### Private submission withdrawal
+
+`withdraw-bid` is an authenticated application operation for the caller's pending capital bid or
+token purchase. Send it through `POST /api/games/{id}/commands` with the current `expectedRevision`,
+without an actor prefix or arguments. It removes only the caller's unrevealed submission and restores
+their readiness prompt and My move status. Other pending amounts remain private and unchanged.
+
+Withdrawal is durable but does not change the committed revision, cash, tokens or replay history.
+The form retains the amount as an unsaved draft until a round/decision change; reloading has no saved
+amount to restore. Submit again when ready. Reveal and withdrawal serialize atomically: if withdrawal
+wins, the other players cannot reveal without a replacement submission; if reveal wins, the old
+revision is stale (`STALE_REVISION`, 409). With the current revision, an absent or already revealed
+submission returns `NO_PENDING_BID` (422). Neither case changes saved state.
+
 ### Game variants
 
 The creator chooses variants while registering players. Creation records every resolved value,

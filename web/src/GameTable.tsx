@@ -88,7 +88,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     const advanceAction = advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
     const spending = !inactive && ((snapshot.legalChoices.bidMax != null && me.misery !== null) || canAct && (!!advanceAction || buyingAdvances ||
         snapshot.game.activity?.purchaseStep === 'RELIEF' || !!snapshot.game.shippingOffer ||
-        snapshot.legalChoices.commands.some(command => /^(buy-card|buy-expansion-card|cancel-adjustment|stabilize cash|patronize)( |$)/.test(command)) ||
+        snapshot.legalChoices.commands.some(command => /^(buy-card|cancel-adjustment|stabilize cash|patronize)( |$)/.test(command)) ||
         (!!cardAction && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.protectionMax !== null))));
     const hasContext = !!(cardAction || advanceAction || (province && !picker && expanding));
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;

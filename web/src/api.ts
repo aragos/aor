@@ -16,12 +16,28 @@ export interface CommodityPayoutView {
 export interface CardChoiceView {
     kind: 'NONE' | 'COMMODITY' | 'PLAYER' | 'PROVINCE' | 'PROVINCES' | 'AREA' | 'CATEGORY' | 'PROTECTION';
     value: string | null; command: string | null;
+    miseryChanges?: MiseryChangeView[]; miseryUncertainPlayers?: string[];
+}
+export interface MiseryChangeView {player: string; fromValue: number | null; toValue: number | null}
+export interface AppliedLeaderDiscount {
+    leaderCardId: string; baseAmount: number; writtenRecordBonus: number; amount: number;
+}
+export interface AdvanceQuote {
+    advance: string; baseCost: number; categoryCredit: number; institutionalResearchCredit: number;
+    leaders: AppliedLeaderDiscount[]; price: number;
+    miseryBefore: number | null; miseryAfter: number | null;
+}
+export interface AdvanceOfferView {
+    advance: string; price: number | null; unavailableReason: string | null;
+    leaderDiscounts: AppliedLeaderDiscount[];
+    priceBreakdown?: AdvanceQuote | null; miseryChanges?: MiseryChangeView[];
 }
 export interface CardOfferView {
     reference: string; playable: boolean; blockers: string[]; choices: CardChoiceView[];
     commodities: string[];
     leaderDiscounts: LeaderDiscountView[];
     provinceTargets: string[]; requiredTargetCount: number | null; protectionMax: number | null;
+    miseryChanges?: MiseryChangeView[]; miseryUncertainPlayers?: string[];
 }
 export interface LeaderDiscountView {
     advance: string; printedAmount: number; conditionalAmount: number; writtenRecordBonus: number;
@@ -97,6 +113,9 @@ export interface HistoryEventView {
     dice: {player: string | null; value: number; color: 'WHITE' | 'BLACK' | 'GREEN'}[];
     cashChanges: {player: string; amount: number}[];
     miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null}[];
+    tokenChanges: {player: string; poolDelta: number; stockDelta: number}[];
+    reliefPayment: {cashCost: number; ratingSpent: number; ratingAvailableBefore: number;
+        ratingSources: {advance: string; amount: number}[]} | null;
     drawReason: 'INITIAL_DEAL' | 'TURN_DRAW' | 'URBAN_ASCENDANCY' | 'EXPANSION_PURCHASE' | 'EXPANSION_BONUS' | 'SHORTAGE' | null;
     protectionCash: number | null; leaderRebate: number | null;
     marketRoll: {total: number; commodities: string[]; adjustment: 'SHORTAGE' | 'SURPLUS'; cancelled: string[]} | null;
@@ -124,14 +143,14 @@ export interface Snapshot {
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
-        advanceOffers: {advance: string; price: number | null; unavailableReason: string | null;
-            leaderDiscounts: {leaderCardId: string; baseAmount: number; writtenRecordBonus: number; amount: number}[]}[];
+        advanceOffers: AdvanceOfferView[];
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
         expansionOffers: ExpansionOfferView[]; commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         cardInspections: CardInspectionView[];
-        tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null};
+        tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null;
+        expansionCardCost?: number | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
     submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];

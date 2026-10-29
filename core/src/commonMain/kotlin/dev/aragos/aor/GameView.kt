@@ -99,6 +99,8 @@ data class GameView(
     val cardInspections: List<CardInspectionView> = emptyList(),
     val tokenPurchaseOffers: List<TokenPurchaseOfferView> = emptyList(),
     val shippingOffer: ShippingOfferView? = null,
+    /** Pool-token cost for the viewer's current Expansion offer; never a cash price. */
+    val expansionCardCost: Int? = null,
     val playedLeaderDiscounts: List<PlayedLeaderDiscountView> = emptyList(),
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
 ) {
@@ -183,6 +185,12 @@ data class GameView(
                 cardInspections = CardProjection.inspections(state, viewer),
                 tokenPurchaseOffers = TokenPurchaseProjection.offers(state, viewer),
                 shippingOffer = ShippingOfferView.from(state, viewer),
+                expansionCardCost =
+                    if (state.stage == Stage.EXPANSION && state.flow.actor == viewer.player.id) {
+                        EconomyTables.expansionCardCost(state.flow.expansionCardCount)
+                    } else {
+                        null
+                    },
                 playedLeaderDiscounts = PlayedLeaderDiscountView.from(state, viewer),
                 unplayedAdvanceLeaders = AdvanceLeaderAvailabilityView.from(state),
             )
@@ -216,6 +224,14 @@ data class GameView(
                             ViolationCode.INSUFFICIENT_CASH.name
                         },
                         quote.leaders,
+                        quote,
+                        listOfNotNull(
+                            MiseryChangeView.between(
+                                viewer.player.id,
+                                quote.miseryBefore,
+                                quote.miseryAfter,
+                            )
+                        ),
                     )
                 } catch (failure: RuleViolation) {
                     AdvanceOfferView(advance, null, failure.code.name)
@@ -281,6 +297,8 @@ data class AdvanceOfferView(
     val price: Int?,
     val unavailableReason: String?,
     val leaderDiscounts: List<AppliedLeaderDiscount> = emptyList(),
+    val priceBreakdown: AdvanceQuote? = null,
+    val miseryChanges: List<MiseryChangeView> = emptyList(),
 )
 
 data class ReliefOfferView(

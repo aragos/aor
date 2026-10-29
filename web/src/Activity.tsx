@@ -33,6 +33,8 @@ function EventContent({event, track, onInspectCard}: {
     const actor = event.actor ? eventPlayer(event, event.actor) : null;
     const target = event.target ? eventPlayer(event, event.target) : null;
     const cardId = event.card;
+    const cashChanges = event.cashChanges?.filter(change => !event.reliefPayment ||
+        change.player !== event.actor || change.amount !== -event.reliefPayment.cashCost);
     return <span className="activity-content">
         {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{eventName(event, actor.id)}</strong></span>}
         <span>{t(`activity.${event.kind}`)}</span>
@@ -64,7 +66,15 @@ function EventContent({event, track, onInspectCard}: {
             {event.marketRoll.cancelled.length > 0 && ` · ${t('activity.cancelledOpposite', {
                 commodities: event.marketRoll.cancelled.map(commodity => label(commodity, 'commodity')).join(', ')})}`}
         </span>}
-        {event.cashChanges?.map(change => <span className="event-cash-change" key={change.player}>
+        {event.reliefPayment && <span className="event-relief-payment">
+            <strong>{t('activity.reliefPayment', {cash: event.reliefPayment.cashCost, rating: event.reliefPayment.ratingSpent})}</strong>
+            {' · '}{t('activity.reliefRatingPool', {available: event.reliefPayment.ratingAvailableBefore})}
+            {event.reliefPayment.ratingSources.length > 0 && <span>
+                {' · '}{t('activity.reliefRatingSources')}: {event.reliefPayment.ratingSources.map(source =>
+                    `${advanceName(source.advance)} ${source.amount}`).join(', ')}
+            </span>}
+        </span>}
+        {cashChanges?.map(change => <span className="event-cash-change" key={change.player}>
             {change.player !== event.actor && eventName(event, change.player)} <strong>{change.amount < 0 ? '−' : '+'}${Math.abs(change.amount)}</strong>
         </span>)}
         {event.miseryChanges?.map(change => <span className="event-misery-change" key={change.player}>
@@ -72,7 +82,16 @@ function EventContent({event, track, onInspectCard}: {
             <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}
             <span>(<MiseryBox value={change.fromValue} track={track?.miseryTrack}/> → <MiseryBox value={change.toValue} track={track?.miseryTrack}/>)</span>
         </span>)}
+        {event.tokenChanges?.map(change => <span className="event-token-change" key={change.player}>
+            {eventName(event, change.player)}{' '}
+            <strong>{t('activity.tokenPool', {amount: signedAmount(change.poolDelta)})}</strong>
+            {' · '}{t('activity.tokenStock', {amount: signedAmount(change.stockDelta)})}
+        </span>)}
     </span>;
+}
+
+function signedAmount(value: number): string {
+    return `${value < 0 ? '−' : '+'}${Math.abs(value)}`;
 }
 
 function viewerOutcome(event: HistoryEventView, viewerId: string): string {

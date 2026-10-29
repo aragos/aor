@@ -35,10 +35,13 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 
 - Creation selects players, current variants and undo policy, then starts setup automatically.
   Preserve the fixed three-epoch format and the reviewed variant catalog.
+- Allow each player to withdraw their unrevealed capital bid or token purchase. Restore their
+  pending action, retain the local amount as an unsaved draft, and keep withdrawn amounts private.
 - Keep the AoR header compact and identify the assigned capital in the page title. Show the actor,
   decision and relevant resources; keep inspection separate from action forms and preserve drafts
   while inspecting other objects. Show available cash alongside spending decisions; omit a permanent
-  resource section. Allow dragging an overflowing hand as well as scrolling it.
+  resource section. Keep hand cards compact, allow dragging as well as scrolling, and include each
+  player's advance count in their summary.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Prefer visible finite choices and playable cards beside Pass.
@@ -54,6 +57,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Keep full payout boxes, legends, variant descriptions and printed tracks on public `/help`, linked
   contextually in a new tab. Show matching unplayed leader counts for epochs I–III beside each
   advance, with the public-information meaning above.
+- Label token-priced card purchases with the current token cost. Show applied category, research and
+  leader discounts with advance prices. Card plays and advance purchases preview every affected
+  player's misery boxes; identify outcomes that still depend on decisions or dice as uncertain.
 - Keep Help focused on reference and detailed undo policies; omit the game-flow walkthrough and
   consolidate shared rules. Color every misery box by track position: lower steps are less severe,
   progressing from green through amber to red and finally dark Chaos. Keep numeric labels.
@@ -65,7 +71,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   cards open the in-game inspector without changing an action draft.
   Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
   protection money, leader rebates and related cash/misery changes; label dice colors and omit
-  continuation noise.
+  continuation noise. Misery relief itemizes cash and current-turn relief rating; Holy Indulgence
+  records pool/stock token movements even when no cash changes.
 - Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
   retain correctable input; stale requests refresh without automatic resubmission.
 - Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.

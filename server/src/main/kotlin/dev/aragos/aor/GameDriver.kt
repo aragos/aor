@@ -147,6 +147,16 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         return submit(stored, state, player, action.command)
     }
 
+    /**
+     * Withdraw only the caller's unrevealed amount. Private changes do not advance the committed
+     * revision or enter replay history; the service serializes this with reveal and checks
+     * revision.
+     */
+    fun withdrawBid(stored: StoredGame, player: PlayerId): StoredGame {
+        if (player !in stored.pendingBids) throw ServiceFailure(422, "NO_PENDING_BID")
+        return stored.copy(pendingBids = stored.pendingBids - player)
+    }
+
     private fun submit(
         stored: StoredGame,
         state: GameState,
