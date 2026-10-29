@@ -102,7 +102,7 @@ export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
 export interface HistoryEventView {
     participants?: {id: string; name: string; capital: string | null}[];
     id: string; kind: 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
-        'RETURN_CARD' | 'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' |
+        'RETURN_CARD' | 'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' | 'TOKEN_PURCHASES' |
         'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
         'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' | 'WRITTEN_RECORD' |
         'OFFER_CARD' | 'PLAY_CARD' | 'ADJUST_MARKET' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
@@ -115,6 +115,7 @@ export interface HistoryEventView {
     cashChanges: {player: string; amount: number}[];
     miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null}[];
     tokenChanges: {player: string; poolDelta: number; stockDelta: number}[];
+    tokenPurchases: {player: string; amount: number; cashCost: number; tokensReceived: number}[];
     reliefPayment: {cashCost: number; ratingSpent: number; ratingAvailableBefore: number;
         ratingSources: {advance: string; amount: number}[]} | null;
     drawReason: 'INITIAL_DEAL' | 'TURN_DRAW' | 'URBAN_ASCENDANCY' | 'EXPANSION_PURCHASE' | 'EXPANSION_BONUS' | 'SHORTAGE' | null;
