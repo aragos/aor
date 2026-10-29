@@ -31,8 +31,14 @@ export async function checkHosted(page, web, artifacts) {
                 responseHeaders: [{name: 'Content-Type', value: path.endsWith('.js') ? 'text/javascript' : 'application/json'}],
                 body: Buffer.from(body).toString('base64')});
         } catch (failure) {
+            // Navigation may cancel a paused background request before its reply is fulfilled.
+            if (/^Invalid InterceptionId\.?$/.test(failure.message)) return;
             failures.push(failure);
-            await page.send('Fetch.failRequest', {requestId: params.requestId, errorReason: 'Failed'});
+            try {
+                await page.send('Fetch.failRequest', {requestId: params.requestId, errorReason: 'Failed'});
+            } catch (cancelled) {
+                if (!/^Invalid InterceptionId\.?$/.test(cancelled.message)) failures.push(cancelled);
+            }
         }
     };
     page.ws.addEventListener('message', intercept);

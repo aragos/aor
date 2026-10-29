@@ -11,6 +11,13 @@ private-seat, hosted authentication and live European-map flows. The matrix reta
 evidence with new cases identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
 
+The 2026-10-29 follow-up adds public contextual reference, turn-aware favicons, immutable activity
+identities, and bounded activity scrolling. Production StrictMode is enabled in presentation
+fixtures. A live Crusades regression reproduced the old failure, then passed after the lifecycle
+fix using authoritative offers, a real pointer click, and a committed province. The comprehensive
+browser suite, history editor, integrated Kotlin checks, web build/unit tests, and built-server
+help/favicon/reference smoke checks pass.
+
 ## Decision inventory
 
 | Prompt / state | Canonical actions and visual path | Evidence |
