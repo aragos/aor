@@ -93,6 +93,7 @@ export interface HistoryEventView {
     amount: number | null; detail: string | null;
     dice: {player: string | null; value: number; color: 'WHITE' | 'BLACK' | 'GREEN'}[];
     cashChanges: {player: string; amount: number}[];
+    miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null}[];
     drawReason: 'INITIAL_DEAL' | 'TURN_DRAW' | 'URBAN_ASCENDANCY' | 'EXPANSION_PURCHASE' | 'EXPANSION_BONUS' | 'SHORTAGE' | null;
     protectionCash: number | null; leaderRebate: number | null;
     marketRoll: {total: number; commodities: string[]; adjustment: 'SHORTAGE' | 'SURPLUS'; cancelled: string[]} | null;

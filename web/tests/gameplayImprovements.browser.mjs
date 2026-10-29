@@ -20,7 +20,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.game-header h1').textContent`), 'AoR');
     assert.equal(await page.evaluate(`document.querySelector('.game-header').getBoundingClientRect().height <= 68`), true);
     assert.equal(await page.evaluate(`document.querySelector('.board-panel')`), null);
-    assert.equal(await page.evaluate(`document.querySelector('.table-activity').open`), true, 'Activity is visible by default');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-expanded')`), 'true', 'Activity is visible by default');
     assert.equal(await page.evaluate(`document.querySelector('.table-activity').getBoundingClientRect().top < innerHeight`), true, 'Desktop activity starts in view beside the board');
 
     for (const [id, province] of [['the-crusades', 'jerusalem'], ['rebellion', 'rome']]) {

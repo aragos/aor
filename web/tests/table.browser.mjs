@@ -101,28 +101,31 @@ export async function checkTable(page, web, baseline) {
     await page.wait(`window.uiCommands.length === 2 && !document.querySelector('.primary-expansion').disabled`, 'stale response refresh completed');
     assert.equal(await page.evaluate('window.uiCommands.at(-1).expectedRevision'), oldRevision, 'Stale submission uses rendered revision');
     assert.equal(await page.evaluate('window.uiCommands.length'), 2, 'Refresh never automatically retries rejected intent');
-    assert.equal(await page.evaluate(`document.querySelector('.table-activity').open`), true,
+    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-expanded')`), 'true',
         'Activity is visible by default');
-    await page.evaluate(`document.querySelector('.table-activity > summary').click()`);
-    await page.wait(`!document.querySelector('.table-activity').open`, 'activity explicitly collapsed');
+    await page.evaluate(`document.querySelector('.activity-toggle').click()`);
+    await page.wait(`document.querySelector('.activity-toggle').getAttribute('aria-expanded') === 'false'`, 'activity explicitly collapsed');
     const nextEvent = {...baseline.events.at(-1),id:'fixture-activity-1',kind:'BUY_CARD',actor:baseline.viewerId,
         card:null,provinces:[],dice:[],amount:null,detail:null,drawReason:null,protectionCash:null,leaderRebate:null,
-        marketRoll:null,cashChanges:[{player:baseline.viewerId,amount:-10}]};
+        marketRoll:null,cashChanges:[{player:baseline.viewerId,amount:-10}],
+        miseryChanges:[{player:baseline.viewerId,spaces:2,fromValue:20,toValue:40}]};
     const events = [...baseline.events,nextEvent];
     await show({...baseline, revision:fixture.revision+1,events});
-    await page.wait(`document.querySelector('.table-activity .unread-badge')?.textContent === '1'`, 'closed activity unread count');
-    await page.evaluate(`document.querySelector('.table-activity > summary').click()`);
-    await page.wait(`!document.querySelector('.table-activity .unread-badge')`, 'opening activity marks entries read');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-list').checkVisibility()`), false, 'Closed activity remains hidden during polling');
+    await page.evaluate(`document.querySelector('.activity-toggle').click()`);
+    await page.wait(`document.querySelector('.activity-list').checkVisibility()`, 'activity reopened');
     await page.evaluate(`document.querySelector('.command-dock > summary').focus()`);
     const updatedEvents=[...events,{...nextEvent,id:'fixture-activity-2'}];
     await show({revision:fixture.revision+1,events:updatedEvents});
     await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
-    assert.equal(await page.evaluate(`document.querySelector('.table-activity .unread-badge')`), null, 'Events received while activity open remain read');
+    assert.equal(await page.evaluate(`document.querySelector('.table-activity .unread-badge, .table-activity h2, .table-activity h3')`), null, 'Activity has no heading or unread count');
     await show({revision:fixture.revision+1,events:updatedEvents});
     assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.activity-list [data-event-id]')].map(entry=>entry.dataset.eventId)).size`), updatedEvents.filter(event=>event.kind!=='PASS').length, 'Repeated polling keeps stable unique activity entries');
     assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.command-dock > summary')`), true, 'Activity updates preserve focus');
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /−\$10/,
         'Activity includes the cash spent in its purchase entry');
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /\+2 misery.*20 → 40/,
+        'Activity includes signed misery spaces and the recorded boxes');
     await show({events:[...updatedEvents,{...nextEvent,id:'continued-omitted',kind:'PASS',cashChanges:[]}]});
     assert.equal(await page.evaluate(`document.querySelector('[data-event-id="continued-omitted"]')`), null,
         'Continued entries are omitted from activity');

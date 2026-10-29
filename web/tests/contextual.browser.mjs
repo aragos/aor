@@ -206,49 +206,25 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play area-target area viii');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'false', 'Playing an area card clears the area selection');
 
+    const participants = baseline.game.players.map(({id,name,capital})=>({id,name,capital}));
     const event = {...baseline.events.at(-1),id:'fixture-result',kind:'COMPETITION_RESULT',actor:viewer,stage:'EXPANSION',turnNumber:baseline.game.turnNumber,
-        provinces:['rome'],amount:8,detail:'COMPETITION',dice:[{player:null,value:1},{player:null,value:6},{player:null,value:4}],
-        competition:{attackerWon:true,defenders:[other.id]}};
+        provinces:['rome'],amount:8,detail:'COMPETITION',dice:[{player:null,value:1,color:'WHITE'},{player:null,value:6,color:'BLACK'},{player:null,value:4,color:'GREEN'}],
+        war:null,competition:{attackerWon:true,defenders:[other.id]},participants,cashChanges:[],miseryChanges:[]};
     await show({game:{stage:'EXPANSION'},events:[...baseline.events,event]});
-    assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /Competition won.*Rome/);
-    await show({events:[...baseline.events,event,{...event,id:'later',kind:'PASS',competition:null}]});
-    assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), true, 'Result survives unrelated activity');
-    const secondResult = {...event, id:'fixture-second-result',provinces:['naples'],competition:{...event.competition,attackerWon:false}};
-    await show({events:[...baseline.events,event,secondResult]});
-    assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 2,
-        'All competition results remain available in the expansion phase');
-    assert.equal(await page.evaluate(`document.querySelector('[data-competition-result="fixture-second-result"]').classList.contains('lost')`), true,
-        'Losing competitions use the loss treatment');
-    assert.match(await page.evaluate(`document.querySelector('.competition-notice').textContent`), /White die 1.*Black die 6.*Green die 4/,
-        'Every competition die identifies its color');
-    await click('.clear-competition-results');
-    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
-        'Competition results can be cleared');
-    await show({events:[...baseline.events,event,secondResult]});
-    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
-        'Polling preserves the cleared results');
-    await show({events:[...baseline.events,event,secondResult,{...event,id:'fixture-fresh-result'}]});
-    assert.equal(await page.evaluate(`document.querySelectorAll('[data-competition-result]').length`), 1,
-        'A new competition remains visible after clearing older results');
-    await show({game:{stage:'PURCHASE'},events:[...baseline.events,event,secondResult]});
-    assert.equal(await page.evaluate(`document.querySelector('.competition-log')`), null,
-        'Competition log leaves the decision panel at the end of expansion');
-    await show({game:{stage:'EXPANSION'}});
+    assert.equal(await page.evaluate(`document.querySelector('.action-result-notice, .competition-log')`),null,
+        'Polling a historical competition cannot create an action receipt');
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /Competition won.*Rome/);
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /White die 1.*Black die 6.*Green die 4/,
+        'Every recorded competition die identifies its color');
     const war = {...event,id:'fixture-war',kind:'WAR_RESULT',actor:viewer,target:other.id,competition:null,
-        provinces:[],dice:[{player:viewer,value:3},{player:other.id,value:3}],
+        provinces:[],dice:[{player:viewer,value:3,color:'WHITE'},{player:other.id,value:3,color:'BLACK'}],
         war:{initiator:viewer,opponent:other.id,totals:{[viewer]:4,[other.id]:3},winner:viewer,requiredTransfers:1}};
     await show({events:[...baseline.events,war]});
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /won the War/);
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /White die 3 → total 4/);
-    await show({events:[...baseline.events,war,{...event,id:'later-war',kind:'PASS',war:null,competition:null}]});
-    assert.equal(await page.evaluate(`!!document.querySelector('.war-notice')`), true, 'War result survives later activity');
-    const tied = {...war,id:'fixture-war-tie',war:{...war.war,winner:null,totals:{[viewer]:3,[other.id]:3},requiredTransfers:0}};
-    await show({events:[...baseline.events,war,tied]});
-    assert.match(await page.evaluate(`document.querySelector('.war-notice').textContent`), /War tied.*War continues/s);
-    await click('.war-notice .close-detail');
-    assert.equal(await page.evaluate(`document.querySelector('.war-notice')`), null);
+    assert.equal(await page.evaluate(`document.querySelector('.action-result-notice')`),null,
+        'A historical War stays in activity instead of reopening an outcome panel');
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-war"]').textContent`), /won the War/);
 
-    console.log('Passed: capital identity, player names/pools, reachability, remaining tokens, singleton commodity, phase focus, advance discounts, played leaders, target capitals, selection cleanup and persistent competition outcome.');
+    console.log('Passed: capital identity, player names/pools, reachability, remaining tokens, singleton commodity, phase focus, advance discounts, played leaders, target capitals, selection cleanup and recorded outcomes without persistent panels.');
 }
 
 export async function checkMapGestures(page) {
