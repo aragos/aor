@@ -14,7 +14,7 @@ class StorageImportTest {
                 val accounts = FileAccountStore(directory.resolve("accounts.json"))
                 val players =
                     listOf("alice", "bobby", "carol").map { id ->
-                        accounts.register(AccountId(id), id, id)
+                        accounts.register(AccountId(id), id)
                     }
                 accounts.allowCreation(players[0].id, true)
                 val source = FileGameStore(directory)
@@ -58,7 +58,7 @@ class StorageImportTest {
             val directory = Files.createTempDirectory("aor-import-invalid-")
             try {
                 FileAccountStore(directory.resolve("accounts.json"))
-                    .register(AccountId("alice"), "alice", "Alice")
+                    .register(AccountId("alice"), "alice")
                 val game = createGameService(directory).create(listOf("Alice", "Bob", "Carol"))
                 val path = directory.resolve("${game.gameId}.json")
                 Files.writeString(
@@ -80,7 +80,7 @@ class StorageImportTest {
         PostgresFixture().use { fixture ->
             val directory = Files.createTempDirectory("aor-import-nonempty-")
             try {
-                fixture.accounts.register(AccountId("alice"), "alice", "Alice")
+                fixture.accounts.register(AccountId("alice"), "alice")
 
                 assertFailsWith<IllegalArgumentException> {
                     importFileStorage(directory, fixture.database)

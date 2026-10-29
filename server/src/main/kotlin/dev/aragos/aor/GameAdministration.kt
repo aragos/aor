@@ -59,10 +59,11 @@ class GameAdministration(
         filter: String?,
         after: String?,
         limit: Int,
+        accounts: AccountStore? = null,
     ): GamePage {
         requireLimit(limit)
         requireCursor(after)
-        return store.listGames(viewer, admin, parseFilter(filter), after, limit)
+        return store.listGames(viewer, admin, parseFilter(filter), after, limit, accounts)
     }
 
     fun log(id: String, archive: String? = null): GameLog {

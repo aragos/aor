@@ -23,13 +23,13 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
         find(connection, id)
     }
 
-    override fun register(id: AccountId, handle: String, displayName: String): RegisteredAccount {
-        val account = RegisteredAccount.create(id, handle, displayName)
+    override fun register(id: AccountId, handle: String): RegisteredAccount {
+        val account = RegisteredAccount.create(id, handle)
         return database.write { connection ->
             connection
                 .prepareStatement(
                     """
-                    INSERT INTO accounts (id, handle, display_name) VALUES (?, ?, ?)
+                    INSERT INTO accounts (id, handle) VALUES (?, ?)
                     ON CONFLICT DO NOTHING
                     """
                         .trimIndent()
@@ -37,7 +37,6 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
                 .use { statement ->
                     statement.setString(1, id.value)
                     statement.setString(2, account.handle.value)
-                    statement.setString(3, account.displayName)
                     if (statement.executeUpdate() == 0) {
                         if (find(connection, id) != null)
                             throw ServiceFailure(409, "ACCOUNT_ALREADY_REGISTERED")
@@ -74,16 +73,15 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
                 .prepareStatement(
                     """
                     SELECT * FROM accounts WHERE strpos(handle, ?) > 0
-                        OR strpos(lower(display_name), ?) > 0 OR id = ?
+                        OR id = ?
                     ORDER BY handle LIMIT ?
                     """
                         .trimIndent()
                 )
                 .use { statement ->
                     statement.setString(1, normalized)
-                    statement.setString(2, normalized)
-                    statement.setString(3, query)
-                    statement.setInt(4, limit)
+                    statement.setString(2, query)
+                    statement.setInt(3, limit)
                     statement.executeQuery().use { rows ->
                         buildList {
                             while (rows.next()) {
@@ -104,7 +102,6 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
         RegisteredAccount(
             AccountId(rows.getString("id")),
             PlayerHandle(rows.getString("handle")),
-            rows.getString("display_name"),
             rows.getBoolean("may_create_games"),
         )
 }

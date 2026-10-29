@@ -231,12 +231,15 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         status: GameListStatus?,
         after: String?,
         limit: Int,
+        accounts: AccountStore?,
     ): GamePage = database.read { connection ->
         val cursor = after?.let(::key)
         val sql =
             """
             WITH directory AS (
                 SELECT g.id, g.revision, g.document, p.needs_move,
+                    (SELECT jsonb_object_agg(m.seat, m.account_id)
+                        FROM game_players m WHERE m.game_id = g.id) AS memberships,
                     CASE WHEN g.document->>'fileVersion' <> '5'
                         OR g.document->'header'->>'rulesVersion' <> ?
                         OR g.document->'header'->>'dataVersion' <> ? THEN 'UNAVAILABLE'
@@ -269,6 +272,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                     buildList {
                         while (rows.next()) {
                             val root = json.readTree(rows.getString("document"))
+                            val memberships = json.readTree(rows.getString("memberships"))
                             val viewStatus = GameListStatus.valueOf(rows.getString("viewer_status"))
                             add(
                                 GameSummary(
@@ -284,7 +288,11 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                                     root.field("header").field("players").array().map { player ->
                                         Player(
                                             PlayerId(player.field("id").string()),
-                                            player.field("name").string(),
+                                            accounts?.playerName(
+                                                memberships[player.field("id").string()]
+                                                    ?.textValue(),
+                                                player.field("name").string(),
+                                            ) ?: player.field("name").string(),
                                         )
                                     },
                                     viewStatus == GameListStatus.MY_MOVE,

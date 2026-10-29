@@ -72,7 +72,6 @@ enum class GameCreationPolicy {
 data class AccountView(
     val id: String,
     val handle: String,
-    val displayName: String,
     val mayCreateGames: Boolean,
     val admin: Boolean,
 )
@@ -87,7 +86,7 @@ data class PublicApplicationConfig(
 
 /** Application authorization uses verified UIDs; player-facing names never grant access. */
 class HostedServices(
-    val games: GameService,
+    games: GameService,
     val accounts: AccountStore,
     val verifier: IdentityVerifier,
     private val administrators: Set<AccountId>,
@@ -96,6 +95,8 @@ class HostedServices(
     val administration: GameAdministration,
     private val transactions: StorageTransactions = FileTransactions,
 ) {
+    val games: GameService = games.forAccounts(accounts)
+
     fun identity(token: String): AccountIdentity = verifier.verify(token)
 
     fun account(identity: AccountIdentity): RegisteredAccount {
@@ -120,7 +121,6 @@ class HostedServices(
         AccountView(
             account.id.value,
             account.handle.value,
-            account.displayName,
             mayCreate(account),
             isAdmin(account.id),
         )

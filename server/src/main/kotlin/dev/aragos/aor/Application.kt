@@ -56,6 +56,7 @@ fun Application.module(
     service: GameService = createConfiguredGameService(),
     hosted: HostedServices? = createHostedServices(service),
 ) {
+    val gameService = hosted?.games ?: service
     install(DefaultHeaders) {
         header("Server", "aor")
         header("X-Content-Type-Options", "nosniff")
@@ -89,7 +90,7 @@ fun Application.module(
     }
     monitor.subscribe(ApplicationStopped) {
         (hosted?.verifier as? AutoCloseable)?.close()
-        (service.store as? AutoCloseable)?.close()
+        (gameService.store as? AutoCloseable)?.close()
     }
 
     routing {
@@ -110,7 +111,7 @@ fun Application.module(
         get("/api/health") {
             call.api {
                 withContext(Dispatchers.IO) {
-                    (service.store as? PostgresGameStore)?.database?.read { connection ->
+                    (gameService.store as? PostgresGameStore)?.database?.read { connection ->
                         connection.createStatement().use { it.execute("SELECT 1") }
                     }
                 }
@@ -140,7 +141,7 @@ fun Application.module(
                     withContext(Dispatchers.IO) {
                         val players = body.field("players").array().map(JsonNode::string)
                         if (hosted == null) {
-                            service.create(players, rules, undoPolicy)
+                            gameService.create(players, rules, undoPolicy)
                         } else {
                             hosted.create(hosted.identity(call.token()), players, rules, undoPolicy)
                         }
@@ -152,7 +153,7 @@ fun Application.module(
             call.api {
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.read(
+                        gameService.read(
                             call.parameters["id"]!!,
                             call.gameAccess(hosted),
                             call.request.headers[HttpHeaders.IfNoneMatch],
@@ -175,7 +176,7 @@ fun Application.module(
                         ?: throw ServiceFailure(400, "INVALID_REQUEST")
                 call.respondJson(
                     withContext(Dispatchers.IO) {
-                        service.getRevision(
+                        gameService.getRevision(
                             call.parameters["id"]!!,
                             call.gameAccess(hosted),
                             revision,
@@ -196,7 +197,7 @@ fun Application.module(
                 }
                 call.respondJson(
                     withContext(Dispatchers.IO) {
-                        service.editHistory(
+                        gameService.editHistory(
                             call.parameters["id"]!!,
                             call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),
@@ -213,7 +214,7 @@ fun Application.module(
                 body.fieldsOnly("expectedRevision", "amount")
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.quoteTokenPurchase(
+                        gameService.quoteTokenPurchase(
                             call.parameters["id"]!!,
                             call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),
@@ -233,7 +234,7 @@ fun Application.module(
                 }
                 val result =
                     withContext(Dispatchers.IO) {
-                        service.submit(
+                        gameService.submit(
                             call.parameters["id"]!!,
                             call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),

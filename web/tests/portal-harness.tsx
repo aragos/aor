@@ -1,18 +1,20 @@
 import {createRoot} from 'react-dom/client';
+import {StrictMode} from 'react';
 import {Dashboard} from '../src/HostedApp';
+import {AccountContext} from '../src/AccountControls';
 import type {Account, GameSummary} from '../src/api';
 import '../src/app.css';
 
 declare global {
     interface Window {portalHasTurn: boolean; portalRequests: {path: string; body?: unknown}[]}
 }
-const me: Account = {id: 'uid-alice', handle: 'alice', displayName: 'Alice', admin: true, mayCreateGames: true};
-const bob = {...me, id: 'uid-bob', handle: 'bob', displayName: 'Bob', admin: false, mayCreateGames: false};
-const carol = {...bob, id: 'uid-carol', handle: 'carol', displayName: 'Carol'};
+const me: Account = {id: 'uid-alice', handle: 'alice', admin: true, mayCreateGames: true};
+const bob = {...me, id: 'uid-bob', handle: 'bob', admin: false, mayCreateGames: false};
+const carol = {...bob, id: 'uid-carol', handle: 'carol'};
 const games: GameSummary[] = ['MY_MOVE', 'ONGOING', 'FINISHED'].map((status, index) => ({
     id: `00000000-0000-0000-0000-00000000000${index}`, revision: 4, createdAt: Date.now(),
     status: status as GameSummary['status'], stage: index === 2 ? 'FINISHED' : 'EXPANSION',
-    players: [me, bob, carol].map(player => ({id: player.id, name: player.displayName})), myMove: index === 0,
+    players: [me, bob, carol].map(player => ({id: player.id, name: `@${player.handle}`})), myMove: index === 0,
 }));
 window.portalRequests = [];
 window.portalHasTurn = true;
@@ -33,4 +35,4 @@ window.fetch = async (input, init) => {
     else throw new Error(`Unexpected portal request: ${path}`);
     return new Response(JSON.stringify(result), {headers: {'Content-Type': 'application/json'}});
 };
-createRoot(document.getElementById('root')!).render(<Dashboard me={me}/>);
+createRoot(document.getElementById('root')!).render(<StrictMode><AccountContext.Provider value={{handle: me.handle, signOut: () => {}}}><Dashboard me={me}/></AccountContext.Provider></StrictMode>);

@@ -50,7 +50,7 @@ internal class PostgresFixture : AutoCloseable {
     }
 }
 
-private object TestPostgres {
+internal object TestPostgres {
     private val embedded: EmbeddedPostgres? by lazy {
         if (System.getenv("AOR_TEST_DATABASE_URL") == null) {
             EmbeddedPostgres.builder()

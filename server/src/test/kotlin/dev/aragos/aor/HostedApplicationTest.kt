@@ -17,6 +17,7 @@ import io.ktor.server.testing.testApplication
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import org.junit.Assume.assumeFalse
@@ -37,7 +38,7 @@ class HostedApplicationTest(private val postgres: Boolean) {
             post(
                 "/api/players/register",
                 "unverified",
-                mapOf("handle" to "new-player", "displayName" to "New Player"),
+                mapOf("handle" to "new-player"),
             )
 
         assertThat(response.status).isEqualTo(HttpStatusCode.Forbidden)
@@ -46,18 +47,89 @@ class HostedApplicationTest(private val postgres: Boolean) {
 
     @Test
     fun publicHandlesRemainUniqueAcrossServerRestarts() = withHosted {
-        accounts.register(AccountId("new-user"), "New-Player", "New Player")
+        accounts.register(AccountId("new-user"), "New-Player")
 
         val response =
             post(
                 "/api/players/register",
                 "another-user",
-                mapOf("handle" to "new-player", "displayName" to "Someone Else"),
+                mapOf("handle" to "new-player"),
             )
 
         assertThat(response.status).isEqualTo(HttpStatusCode.Conflict)
         assertThat(reopenedAccounts().find(AccountId("new-user"))?.handle)
             .isEqualTo(PlayerHandle("new-player"))
+    }
+
+    @Test
+    fun registrationRequiresOnlyAUniqueHandle() = withHosted {
+        val response = post("/api/players/register", "new-user", mapOf("handle" to "New-Player"))
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+        val account = json.readTree(response.bodyAsText())
+        assertThat(account["handle"].asText()).isEqualTo("new-player")
+        assertThat(account.has("displayName")).isFalse()
+        assertThat(reopenedAccounts().find(AccountId("new-user")))
+            .isEqualTo(RegisteredAccount(AccountId("new-user"), PlayerHandle("new-player")))
+    }
+
+    @Test
+    fun registeredGamesUseHandlesForPlayerNames() = withHosted {
+        val game = game()
+
+        val response = client.get("/api/games/${game.gameId}") { bearerAuth("alice") }
+
+        val players = json.readTree(response.bodyAsText())["game"]["players"]
+        assertThat(players.map { it["name"].asText() }).containsExactly("@alice", "@bob", "@carol")
+    }
+
+    @Test
+    fun administrativeListingsRetainLocalSeatNamesWithoutAccountMemberships() = withHosted {
+        accounts.register(AccountId("null"), "literal-null")
+        service.create(listOf("Local Alice", "Local Bob", "Local Carol"))
+
+        val response = client.get("/api/admin/games?status=all") { bearerAuth("admin") }
+
+        val players = json.readTree(response.bodyAsText())["games"][0]["players"]
+        assertThat(players.map { it["name"].asText() })
+            .containsExactly("Local Alice", "Local Bob", "Local Carol")
+    }
+
+    @Test
+    fun existingGamesShowHandlesWithoutRewritingRecordedHistory() = withHosted {
+        val players =
+            listOf("alice", "bob", "carol").mapIndexed { index, account ->
+                PlayerId("p${index + 1}") to account
+            }
+        val game =
+            GameDriver(FixedRandom())
+                .create(
+                    UUID.randomUUID().toString(),
+                    GameHeader(
+                        players = players.map { (id, _) -> Player(id, "Former $id") },
+                        creatorId = PlayerId("p1"),
+                    ),
+                    emptyMap(),
+                )
+                .copy(memberships = players.toMap())
+        store.create(game)
+        val storedBefore = store.document(game.id)
+        val eventsBefore = service.get(game.id, GameAccess.Account(AccountId("alice"))).events
+
+        val response = client.get("/api/games/${game.id}") { bearerAuth("alice") }
+        val listing = client.get("/api/games?status=all") { bearerAuth("alice") }
+
+        val snapshot = json.readTree(response.bodyAsText())
+        assertThat(snapshot["game"]["players"].map { it["name"].asText() })
+            .containsExactly("@alice", "@bob", "@carol")
+        assertThat(
+                json.readTree(listing.bodyAsText())["games"][0]["players"].map {
+                    it["name"].asText()
+                }
+            )
+            .containsExactly("@alice", "@bob", "@carol")
+        assertThat(snapshot["events"]).isEqualTo(json.valueToTree(eventsBefore))
+        assertThat(store.document(game.id)).isEqualTo(storedBefore)
     }
 
     @Test
@@ -401,7 +473,7 @@ private class HostedFixture(postgres: Boolean) : AutoCloseable {
 
     init {
         listOf("admin", "alice", "bob", "carol", "outsider").forEach { id ->
-            accounts.register(AccountId(id), id, id.replaceFirstChar(Char::uppercase))
+            accounts.register(AccountId(id), id)
         }
         accounts.allowCreation(AccountId("alice"), true)
         hosted =

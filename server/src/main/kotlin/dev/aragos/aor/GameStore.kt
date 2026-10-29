@@ -31,7 +31,8 @@ interface ManagedGameStore : GameStore {
         status: GameListStatus?,
         after: String?,
         limit: Int,
-    ): GamePage = GameDirectory.list(this, viewer, admin, status, after, limit)
+        accounts: AccountStore? = null,
+    ): GamePage = GameDirectory.list(this, viewer, admin, status, after, limit, accounts)
 
     fun document(id: String): String
 
