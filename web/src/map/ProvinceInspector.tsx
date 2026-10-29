@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import type {ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
+import type {ExpansionOfferView, ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
 import {TableIcon} from '../TableIcon';
@@ -12,6 +12,39 @@ export function neighbors(connections: PublicCatalog['landBorders'], province: s
     return connections.flatMap(edge => edge.first === province ? [edge.second] : edge.second === province ? [edge.first] : []);
 }
 
+function ExpansionAvailability({offer, province}: {
+    offer: ExpansionOfferView | undefined; province: ProvinceDefinition;
+}) {
+    if (!offer) return null;
+    if (offer.primaryAction === 'INSPECT') {
+        return <p className="expansion-availability muted">{t('expansion.alreadyControlled')}</p>;
+    }
+    if (offer.blockers.length === 0) return null;
+    const blockerText = (blocker: string) => {
+        if (blocker === 'INSUFFICIENT_EXPANSION_TOKENS') {
+            return t('expansion.poolRequired', {required: offer.requiredTokens, available: offer.availablePool});
+        }
+        if (blocker === 'SHIPPING_CAPACITY_EXCEEDED' && offer.shipping) {
+            return t('expansion.shippingRequired', {required: offer.shipping.required,
+                used: offer.shipping.used, capacity: offer.shipping.capacity ?? '∞'});
+        }
+        if (blocker === 'PROVINCE_ACCESS_DENIED' && offer.missingAccess?.length) {
+            return t('expansion.missingAccess', {
+                requirements: offer.missingAccess.map(requirement => label(requirement, 'access')).join(', '),
+            });
+        }
+        if (blocker === 'UNREACHABLE_PROVINCE') {
+            return t(province.coastal ? 'expansion.noRoute' : 'expansion.inlandNoRoute');
+        }
+        return t('error.' + blocker);
+    };
+    return <section className="expansion-availability" aria-label={t('expansion.availability')}>
+        {offer.blockers.map(blocker => <p className="blocker" data-expansion-blocker={blocker}
+            key={blocker}>{blockerText(blocker)}</p>)}
+        {offer.partialPlacements.length > 0 && <p className="small muted">{t('expansion.partialAvailable')}</p>}
+    </section>;
+}
+
 export function ProvinceActions({snapshot, province, busy, submit}: {
     snapshot: Snapshot; province: ProvinceDefinition; busy: boolean;
     submit: (command: string) => Promise<boolean>;
@@ -22,8 +55,9 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     if (!catalog) return null;
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const offer = snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
+    const inspection = snapshot.game.expansionInspections?.find(candidate => candidate.destination === province.id) ?? offer;
     const primary = offer && offer.primaryAction !== 'INSPECT';
-    const remainingPlacement = primary && offer.primaryAction === 'PLACE' && offer.resultingPool === null
+    const remainingPlacement = primary && offer.resultingPool === null
         ? offer.partialPlacements.reduce<typeof offer.partialPlacements[number] | undefined>(
             (maximum, choice) => !maximum || choice.tokens > maximum.tokens ? choice : maximum, undefined)
         : undefined;
@@ -35,14 +69,20 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
     const command = offer?.primaryAction === 'ATTACK' && !remainingPlacement ? `attack ${province.id}` : `place ${requiredTokens} ${province.id}`;
     const commands = provinceOrders(snapshot, province.id);
-    if (!primary && commands.length === 0) return null;
+    const hasPlacement = primary && (available || offer.partialPlacements.length > 0);
+    if (!hasPlacement && commands.length === 0) {
+        return inspection ? <section className="province-actions" aria-label={t('table.selectedProvince')}>
+            <h2>{provinceName(province.id)}</h2>
+            <ExpansionAvailability offer={inspection} province={province}/>
+        </section> : null;
+    }
     return <div className="province-actions" aria-label={t('table.selectedProvince')}>
         <div>
             <p className="eyebrow">{remainingPlacement ? t('table.remainingTokens') : primary ? uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
             <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
         </div>
         <div className="map-orders">
-            {primary && <>
+            {primary && hasPlacement && <>
                 <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {resultingPool ?? '—'}</strong></div>
                 <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
                     <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={establishesMarker ? undefined : requiredTokens}/></svg>
@@ -88,6 +128,8 @@ export function ProvinceInspector({snapshot, province, select}: {
     const catalog = snapshot.game.catalog;
     if (!catalog) return null;
     const pieces = snapshot.game.board.find(holding => holding.id === province.id);
+    const availability = snapshot.game.expansionInspections?.find(candidate => candidate.destination === province.id)
+        ?? snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
     const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button"
         className="map-link" key={id} onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
     return <section className="province-inspector" aria-label={t('table.selectedProvince')}>
@@ -100,6 +142,7 @@ export function ProvinceInspector({snapshot, province, select}: {
             : pieces?.tokens.length ? <ul className="plain-list">{pieces.tokens.map(tokens => <li key={tokens.owner}>
                 {playerName(snapshot, tokens.owner)}: {tokens.coloured} {t('board.old')} + {tokens.white} {t('board.new')}
             </li>)}</ul> : <p className="muted">{t('table.unoccupied')}</p>}
+        <ExpansionAvailability offer={availability} province={province}/>
         <details className="province-details"><summary>{t('table.provinceDetails')}</summary>
             {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
             <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>

@@ -98,6 +98,8 @@ data class GameView(
     val stabilizationMisery: Int? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    /** Destination diagnostics include pool/shipping failures omitted from [expansionOffers]. */
+    val expansionInspections: List<ExpansionOfferView> = emptyList(),
     /** Missing printed access advances for this viewer; independent of phase, routes, and ships. */
     val lockedProvinces: Set<ProvinceId> = emptySet(),
     val commodityPayouts: List<CommodityPayoutView> = emptyList(),
@@ -111,8 +113,9 @@ data class GameView(
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
 ) {
     companion object {
-        internal fun forPlayer(state: GameState, viewer: PlayerState): GameView =
-            GameView(
+        internal fun forPlayer(state: GameState, viewer: PlayerState): GameView {
+            val expansionInspections = ExpansionProjection.inspections(state, viewer)
+            return GameView(
                 stage = state.stage,
                 currentEpoch = state.currentEpoch.number,
                 rules = state.rules,
@@ -186,7 +189,8 @@ data class GameView(
                     MiseryRules.payDebt(viewer.misery, PlayerEconomy.stabilizationCost(viewer))
                         .value,
                 burdenReferences = burdenReferences(state, viewer),
-                expansionOffers = ExpansionProjection.offers(state, viewer),
+                expansionOffers = ExpansionProjection.offers(expansionInspections),
+                expansionInspections = expansionInspections,
                 commodityPayouts = CommodityPayoutView.from(state),
                 cardOffers = CardProjection.offers(state, viewer),
                 cardInspections = CardProjection.inspections(state, viewer),
@@ -201,6 +205,7 @@ data class GameView(
                 playedLeaderDiscounts = PlayedLeaderDiscountView.from(state, viewer),
                 unplayedAdvanceLeaders = AdvanceLeaderAvailabilityView.from(state),
             )
+        }
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
             if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()
