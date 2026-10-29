@@ -2,6 +2,18 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'replacement.context': '{event} removed {player}’s domination marker from {province}.',
+    'replacement.noStock': 'No stock tokens remain. Use a pool token to keep a colored token there, or leave the province empty.',
+    'replacement.noPool': 'No pool tokens remain. Leave the province empty.',
+    'replacement.poolBalance': 'Pool tokens: {before} → {after}',
+    'replacement.coloredToken': 'Using the pool places one colored token in {province}.',
+    'replacement.noMisery': 'This replacement choice adds no misery.',
+    'replacement.civilWarMiseryApplied': 'Civil War’s misery has already been applied.',
+    'replacement.civilWarLossPending': 'After this, choose the Civil War cash or token loss.',
+    'replacement.placePoolToken': 'Place {count} pool token in {province}',
+    'replacement.leaveEmpty': 'Leave {province} empty',
+    'replacement.usePool': 'Use a pool token',
+    'replacement.leaveEmptyGeneric': 'Leave the province empty',
     'table.goldIvory': 'Gold / Ivory',
     'controls.miseryAfterAction': 'Misery after this action',
     'controls.chooseMiseryTarget': 'Choose a target to preview misery.',

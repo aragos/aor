@@ -109,8 +109,16 @@ class VisualProjectionTest {
                             .copy(
                                 decisions =
                                     listOf(
-                                        CardDecision.ReplacementToken(p1, ProvinceId("rome")),
-                                        CardDecision.ReplacementToken(p1, florence),
+                                        CardDecision.ReplacementToken(
+                                            p1,
+                                            ProvinceId("rome"),
+                                            EventId.BLACK_DEATH,
+                                        ),
+                                        CardDecision.ReplacementToken(
+                                            p1,
+                                            florence,
+                                            EventId.BLACK_DEATH,
+                                        ),
                                     )
                             )
                 )

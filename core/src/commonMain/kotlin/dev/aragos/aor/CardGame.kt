@@ -12,13 +12,37 @@ sealed interface CardDecision : TurnDecision {
             listOf("civil-war-loss cash", "civil-war-loss tokens")
     }
 
-    data class ReplacementToken(override val player: PlayerId, val province: ProvinceId) :
-        CardDecision {
+    /** Public cause stays with each pending province, including consecutive multi-target events. */
+    data class ReplacementToken(
+        override val player: PlayerId,
+        val province: ProvinceId,
+        val event: EventId,
+    ) : CardDecision {
+        init {
+            require(
+                event in
+                    setOf(
+                        EventId.CIVIL_WAR,
+                        EventId.REBELLION,
+                        EventId.PIRATES_VIKINGS,
+                        EventId.BLACK_DEATH,
+                    )
+            ) {
+                "A replacement token requires a marker-reducing event."
+            }
+        }
+
         override val choice: String
             get() = "replace-event-token"
 
         override fun choices(state: GameState): List<String> =
-            listOf("replace-event-token pool", "replace-event-token none")
+            listOfNotNull(
+                "replace-event-token pool"
+                    .takeIf {
+                        state.playerState(player).poolTokens >= CardGame.REPLACEMENT_TOKEN_COST
+                    },
+                "replace-event-token none",
+            )
     }
 
     data class WarPreparation(override val player: PlayerId) : CardDecision {
@@ -101,6 +125,9 @@ sealed interface CardDecision : TurnDecision {
  * Applies finite pure card outcomes to the authoritative game, without choosing dice or victims.
  */
 object CardGame {
+    /** Number of expansion-pool tokens used to replace one event-reduced domination marker. */
+    internal const val REPLACEMENT_TOKEN_COST = 1
+
     fun isBurden(state: GameState, cardId: String): Boolean =
         CardRules.isBurden(state.cardContext(), cardId)
 
@@ -229,14 +256,14 @@ object CardGame {
         if (!usePool) return next
         val owner = next.playerState(actor)
         cardRule(
-            owner.poolTokens > 0,
+            owner.poolTokens >= REPLACEMENT_TOKEN_COST,
             CardRuleCode.ILLEGAL_TARGET,
             "A replacement requires one expansion token.",
         )
         val change = next.board.replaceWithToken(replacement.province, actor)
         return next
             .withBoardChange(change.copy(tokensRequired = emptyMap()))
-            .replacePlayer(owner.copy(poolTokens = owner.poolTokens - 1))
+            .replacePlayer(owner.copy(poolTokens = owner.poolTokens - REPLACEMENT_TOKEN_COST))
     }
 
     private fun prepareWarRoll(state: GameState): GameState {
@@ -462,7 +489,7 @@ object CardGame {
         val replacement =
             when {
                 owner.stockTokens > 0 -> EventTokenReplacement.STOCK
-                owner.misery != MiseryStep.CHAOS && owner.poolTokens > 0 ->
+                owner.misery != MiseryStep.CHAOS && owner.poolTokens >= REPLACEMENT_TOKEN_COST ->
                     EventTokenReplacement.POOL_OR_EMPTY
                 else -> EventTokenReplacement.EMPTY
             }
@@ -477,7 +504,11 @@ object CardGame {
                 marked
                     .withBoardChange(marked.board.remove(reduction.province))
                     .pushDecision(
-                        CardDecision.ReplacementToken(reduction.owner, reduction.province)
+                        CardDecision.ReplacementToken(
+                            reduction.owner,
+                            reduction.province,
+                            reduction.event,
+                        )
                     )
         }
     }

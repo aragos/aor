@@ -142,6 +142,9 @@ export interface Snapshot {
         unplayedAdvanceLeaders?: {advance: string; epochs: {epoch: number; count: number}[]}[];
         pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
+        replacementToken?: {player: string; province: string; event: string; poolTokens: number;
+            poolCost: number; poolAfter: number | null; stockTokens: number; misery: number | null;
+            civilWarLossPending: boolean} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
