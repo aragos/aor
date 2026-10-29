@@ -460,12 +460,8 @@ object BoardGame {
         plan: PlacementPlan,
         newAcquisition: Boolean,
     ): GameState {
-        if (
-            state.board.pieces[plan.destination] !=
-                ProvincePieces.Marker(plan.player, PieceSide.WHITE)
-        ) {
-            return state
-        }
+        val marker = state.board.pieces[plan.destination] as? ProvincePieces.Marker ?: return state
+        if (marker.owner != plan.player || marker.side != PieceSide.WHITE) return state
         val origin =
             when {
                 newAcquisition -> MarkerPlacementOrigin.EXPANSION

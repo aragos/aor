@@ -41,6 +41,7 @@ data class BoardRulesContext(
         return configuration.map.province(province)
     }
 
+    /** Live coloured presence includes an existing base retained by its white marker conversion. */
     fun bases(player: PlayerId): Set<ProvinceId> =
         board.colouredPresence(player) + player(player).capital
 

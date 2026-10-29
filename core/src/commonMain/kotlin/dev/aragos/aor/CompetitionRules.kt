@@ -1,6 +1,5 @@
 package dev.aragos.aor
 
-import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentMap
 
 enum class MilitaryCard {
@@ -282,11 +281,11 @@ object CompetitionRules {
         plan: PlacementPlan.Competition,
     ): BoardChange {
         val isSatellite = context.province(plan.destination).isSatellite
-        val replacement: ProvincePieces =
+        val change =
             if (isSatellite) {
-                ProvincePieces.Tokens(persistentMapOf(plan.player to TokenHolding(white = 1)))
+                context.board.replaceWithToken(plan.destination, plan.player, PieceSide.WHITE)
             } else {
-                ProvincePieces.Marker(plan.player, PieceSide.WHITE)
+                context.board.placeMarker(plan.destination, plan.player, PieceSide.WHITE)
             }
         val defendingTokens =
             (context.board.pieces[plan.destination] as? ProvincePieces.Tokens)
@@ -295,14 +294,12 @@ object CompetitionRules {
                 .filterKeys { owner -> owner != plan.player }
                 .mapValues { holding -> holding.value.total }
         val returnedAttackers = plan.existingTokens + plan.addedTokens - if (isSatellite) 1 else 0
-        return context.board
-            .replace(plan.destination, replacement)
-            .copy(
-                tokensReturned =
-                    defendingTokens +
-                        mapOf(plan.player to returnedAttackers).filterValues { count -> count > 0 },
-                tokensRequired = emptyMap(),
-            )
+        return change.copy(
+            tokensReturned =
+                defendingTokens +
+                    mapOf(plan.player to returnedAttackers).filterValues { count -> count > 0 },
+            tokensRequired = emptyMap(),
+        )
     }
 
     private fun attackerDefeat(

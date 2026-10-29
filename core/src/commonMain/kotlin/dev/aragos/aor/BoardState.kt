@@ -50,8 +50,24 @@ sealed interface ProvincePieces {
             )
     }
 
-    data class Marker(val owner: PlayerId, val side: PieceSide) : ProvincePieces {
-        override fun flipWhitePieces(): Marker = copy(side = PieceSide.COLOURED)
+    /**
+     * [retainsColouredBase] preserves the owner's existing coloured-token reach after conversion to
+     * a white marker. It belongs to this occupancy and disappears if the marker is replaced. It
+     * does not make the new marker coloured for Caravan control or commodity payments.
+     */
+    data class Marker(
+        val owner: PlayerId,
+        val side: PieceSide,
+        val retainsColouredBase: Boolean = false,
+    ) : ProvincePieces {
+        init {
+            require(!retainsColouredBase || side == PieceSide.WHITE) {
+                "Only a white marker needs to retain a converted coloured-token base."
+            }
+        }
+
+        override fun flipWhitePieces(): Marker =
+            copy(side = PieceSide.COLOURED, retainsColouredBase = false)
     }
 }
 
@@ -127,13 +143,17 @@ data class BoardState(
         marker?.owner == player && commodity in definition.province(entry.key).commodities
     }
 
-    /** Any coloured presence is a base, even if the player's tokens do not fill the market. */
+    /**
+     * Any coloured presence is a base, including a partial holding converted to a white marker. The
+     * marker retains that reach only while the same occupancy remains on the board.
+     */
     fun colouredPresence(player: PlayerId): Set<ProvinceId> =
         pieces
             .filterValues { occupants ->
                 when (occupants) {
                     is ProvincePieces.Marker ->
-                        occupants.owner == player && occupants.side == PieceSide.COLOURED
+                        occupants.owner == player &&
+                            (occupants.side == PieceSide.COLOURED || occupants.retainsColouredBase)
                     is ProvincePieces.Tokens -> (occupants.holdings[player]?.coloured ?: 0) > 0
                 }
             }
@@ -154,13 +174,25 @@ data class BoardState(
         }
 
     /**
-     * Card placement replaces all occupants and uses the coloured side unless explicitly changed.
+     * Card placement uses the coloured side. White expansion markers retain the owner's existing
+     * coloured-token base, without retaining a defeated owner's reach or changing the marker side.
      */
     fun placeMarker(
         province: ProvinceId,
         owner: PlayerId,
         side: PieceSide = PieceSide.COLOURED,
-    ): BoardChange = replace(province, ProvincePieces.Marker(owner, side))
+    ): BoardChange {
+        val colouredTokens =
+            (pieces[province] as? ProvincePieces.Tokens)?.holdings.orEmpty()[owner]?.coloured ?: 0
+        return replace(
+            province,
+            ProvincePieces.Marker(
+                owner,
+                side,
+                retainsColouredBase = side == PieceSide.WHITE && colouredTokens > 0,
+            ),
+        )
+    }
 
     /** Event reductions and the voluntary swap use a single coloured square token. */
     fun replaceWithToken(

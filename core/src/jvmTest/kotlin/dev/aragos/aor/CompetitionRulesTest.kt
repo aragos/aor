@@ -56,7 +56,7 @@ class CompetitionRulesTest {
         val change = BoardPlacementRules.applyPeaceful(context, plan)
 
         assertThat(change.board.pieces[id("florence")])
-            .isEqualTo(ProvincePieces.Marker(venice, PieceSide.WHITE))
+            .isEqualTo(ProvincePieces.Marker(venice, PieceSide.WHITE, retainsColouredBase = true))
         assertThat(change.tokensRequired).containsExactly(venice, 3)
         assertThat(change.tokensReturned).containsExactly(venice, 4)
     }
@@ -410,7 +410,7 @@ class CompetitionRulesTest {
 
         assertThat(resolution.change.tokensReturned).containsExactly(venice, 5, genoa, 1)
         assertThat(resolution.change.board.pieces[id("florence")])
-            .isEqualTo(ProvincePieces.Marker(venice, PieceSide.WHITE))
+            .isEqualTo(ProvincePieces.Marker(venice, PieceSide.WHITE, retainsColouredBase = true))
     }
 
     @Test
