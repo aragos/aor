@@ -61,6 +61,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   event effects. Keep unavailable cards readable and explain their blockers when selected. Show held
   cards only from the viewer's projected hand; reference catalogs cannot reveal another player's hand.
   Play, discard and trade use this same hand selection surface, with separate explicit confirmation.
+  Card selection and playability remain visually distinct without redundant text badges.
   A selected card has one action context that explicitly states its play effect, chosen targets or
   commodity, and projected cash/misery consequences before confirmation. Leader credits are identified
   as becoming available after play. Show known effects directly rather than hiding them behind a rules
@@ -77,6 +78,10 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   and returning focus preserve the active action and its prepared choices. Advance inspection retains
   its existing workspace surface; commodity cards retain their own live values and direct payout
   reference links.
+- Keep Pass and Undo together at the top right of the action panel. Undo withdraws an unrevealed
+  bid or token purchase while preserving the local draft; after reveal it follows the chosen policy.
+  Player boxes share a wrapping status/pool row. Expansion uses one current → projected pool balance
+  rather than separate remaining-token and balance panels. Center action labels and inline identities.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup
@@ -99,7 +104,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Label token-priced card purchases with the current token cost. Show applied category, research and
   leader discounts in optional price detail, naming the contributing advances. Keep tiles compact,
   show prices for blocked advances, and retain printed costs when no live quote exists. Card plays
-  and advance purchases preview every affected player's misery boxes; identify outcomes that still
+  and advance purchases preview every affected player's misery boxes. Group misery events include
+  unchanged/protected active players in both preview and activity; identify outcomes that still
   depend on decisions or dice as uncertain.
 - Keep Help focused on printed data lookup, variants and non-obvious app behavior, including undo;
   omit general game rules and the game-flow walkthrough. Remove redundant or technical play text.

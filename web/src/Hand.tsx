@@ -145,8 +145,8 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
             const inspected = inspection?.kind === 'card' && inspection.id === card.reference;
             const playable = !!finite || !!offer?.playable;
             const burden = snapshot.game.burdenReferences.includes(card.reference);
-            const status = selected ? t('hand.selected') : finite ? t(finite.kind === 'discard'
-                ? 'action.discard' : 'action.offerCard') : playable ? t('hand.playable') : t('hand.notPlayable');
+            const status = finite ? t(finite.kind === 'discard' ? 'action.discard' : 'action.offerCard')
+                : !playable ? t('hand.notPlayable') : null;
             return <div className="object-control" key={card.reference}>
                 <button type="button" data-hand-card={card.reference} aria-pressed={selected}
                     disabled={busy && playable}
@@ -190,9 +190,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                     </small>}
                     <span className="hand-card-badges"><CardRecurrence definition={card.definition}/>
                         {burden && <span className="burden-badge">{t('game.burden')}</span>}
-                        <span className={`hand-card-status ${selected ? 'selected' : playable ? 'playable' : 'reference'}`}>
-                            {selected && '✓ '}{status}
-                        </span>
+                        {status && <span className="hand-card-status">{status}</span>}
                     </span>
                 </button>
                 <span className="card-track-links">{commodities.map(commodity =>

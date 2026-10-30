@@ -48,13 +48,9 @@
 .map-orders form { display: block; } .map-orders form label { max-width: none; }
 .map-orders form select { width: 100%; margin: .5rem 0; }
 .map-orders form button { margin-top: .6rem; width: 100%; }
-.pool-change { display: flex; justify-content: space-between; align-items: center; gap: .7rem; background: var(--resource-fill); padding: 1rem; border: 1px solid var(--resource-border); border-radius: 7px; margin: 1.3rem 0 1rem; }
-.pool-change > span { font-size: .85rem; font-weight: 700; }
-.pool-change strong { font-size: 2.3rem; color: #345c3e; white-space: nowrap; }
-.pool-change strong span { font-size: 1.4rem; padding: 0 .2rem; color: #73886c; }
-.commitment-preview { display: flex; justify-content: space-between; align-items: center; border: 1px solid #d3dcc8; border-radius: 7px; padding: 1rem; margin-bottom: 1rem; background: #fffef9; }
-.commitment-preview > span { display: block; text-align: center; } .commitment-preview strong { font-size: 1.7rem; }
-.commitment-preview small { display: block; font-size: .75rem; color: #63765e; margin-top: .4rem; }
+.commitment-preview { display: flex; justify-content: space-between; align-items: center; border: 1px solid #d3dcc8; border-radius: 7px; padding: .5rem .65rem; margin-bottom: .6rem; background: #fffef9; }
+.commitment-preview > span { display: block; text-align: center; } .commitment-preview strong { font-size: 1.25rem; }
+.commitment-preview small { display: block; font-size: .75rem; color: #63765e; margin-top: .2rem; }
 .value-change { display: flex; justify-content: space-between; gap: .5rem; }
 .primary-expansion { width: 100%; margin-top: .7rem !important; font-weight: 700; }
 .partial-placement { margin-top: .8rem; }
@@ -63,8 +59,6 @@
 .map-pick-banner { margin: .5rem 1rem; } .map-pick-banner button { min-height: 40px; }
 @media (max-width: 700px) {
     .interactive-board { padding: 0; } .world-map { min-height: 310px; height: 43vh; max-height: 420px; }
-    .pool-change { margin-top: .8rem; padding: .6rem 1rem; } .pool-change strong { font-size: 1.8rem; }
-    .commitment-preview { padding: .65rem 1rem; margin-bottom: .7rem; }
     .primary-expansion { position: sticky; bottom: .5rem; z-index: 2; box-shadow: 0 3px 12px #263d3330; min-height: 46px; }
 }
 

@@ -61,7 +61,7 @@ export const en: Record<string, string> = {
     'history.identifiers': 'Player identifiers', 'history.identifiers.capitals': 'Capitals',
     'history.identifiers.names': 'Player labels', 'history.identifiers.ids': 'Canonical IDs',
 
-    'history.undo': 'Undo last action', 'history.policy': 'Undo policy', 'history.edit': 'Edit game history',
+    'history.undo': 'Undo', 'history.policy': 'Undo policy', 'history.edit': 'Edit game history',
     'history.fromEntry': 'Replace from entry (zero-based)', 'history.loadSuffix': 'Load current actions',
     'history.replacement': 'Replacement actions', 'history.publish': 'Apply history edit',
     'history.editHelp': 'Keep an original action with @ followed by its entry number. Delete a line to remove it, reorder lines, or add your own commands. Recorded random outcomes must remain valid. Setup is protected.',
@@ -189,8 +189,6 @@ export const en: Record<string, string> = {
     'card.receivesCash': '{player} receives ${amount}',
     'card.losesCash': '{player} loses ${amount}',
     'hand.collapse': 'Collapse hand',
-    'hand.selected': 'Selected',
-    'hand.playable': 'Playable',
     'hand.notPlayable': 'Not playable now',
     'card.alchemists-gold.summary': 'Halve an eligible player’s written cash, up to their available cash.',
     'card.armor.summary': 'Military advantage for this turn, including War.',
@@ -442,7 +440,7 @@ export const en: Record<string, string> = {
     "reference.dice-draws-shuffles-and-random-trades": "Dice, draws, shuffles, and random trades must remain the same outcomes of the same events. No policy allows rerolls or an edit that adds or removes a required random event. A rolled attack cannot be deleted to try again.",
     "reference.you-can-retain-another-player-s": "You can retain another player’s original answer by reference or remove it when the remaining history is valid. You cannot write a different answer for them or reveal their private information.",
     "reference.every-later-action-must-still-be": "Every later action must still be legal. An invalid edit is rejected in full; existing play stays intact.",
-    "reference.undo-last-action-appears-in-the": "Use Undo last action in the decision panel, or Commands → Edit history for earlier changes. ",
+    "reference.undo-last-action-appears-in-the": "Use Undo at the top right of the action panel to withdraw an unrevealed bid or token purchase, retaining its amount as a private draft, or undo the last committed action under the chosen policy. Use Commands → Edit history for earlier changes. ",
 
     "reference.references-retain-recorded-actions-accepted-edits": " keeps an original action. Accepted edits are recorded and clear affected selections. If play has moved on, review the refreshed history before retrying.",
     "reference.pageTitle": "AoR · Help",

@@ -235,7 +235,7 @@ St. Gall → Nuremberg is deliberately absent under the AH errata.
 | athens | salonika, crete | E |
 | adalia | smyrna, cyprus | E |
 | taurus | aleppo, cyprus | E |
-| levant | aleppo, cyprus | E |
+| levant | aleppo, cyprus, acre | E; user correction 2026-10-30 |
 | jerusalem | acre, suez | E |
 | libya | alexandria | E |
 | barca | tripoli | E |

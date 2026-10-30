@@ -326,7 +326,7 @@ object BoardConnectionData {
             supports("athens", "salonika", "crete")
             supports("adalia", "smyrna", "cyprus")
             supports("taurus", "aleppo", "cyprus")
-            supports("levant", "aleppo", "cyprus")
+            supports("levant", "aleppo", "cyprus", "acre")
             supports("jerusalem", "acre", "suez")
             supports("libya", "alexandria")
             supports("barca", "tripoli")

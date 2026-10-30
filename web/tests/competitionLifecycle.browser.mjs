@@ -37,7 +37,7 @@ export async function checkLiveCompetitionLifecycle(page, web) {
     assert(attacker && target, 'Adjacent real capitals offer a legal first-round competition');
     const turn = state.game.turnNumber;
     await page.send('Page.navigate', {url: web + attacker.path});
-    await page.wait(`document.querySelector('.expansion-player')`, 'live competition actor');
+    await page.wait(`document.querySelector('.pool-summary')`, 'live competition actor');
     await page.evaluate(`document.querySelector('[data-map-province="${target.destination}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     await page.wait(`document.querySelector('.primary-expansion:not([disabled])')`, 'live authoritative attack');
     await page.evaluate(`document.querySelector('.primary-expansion').click()`);

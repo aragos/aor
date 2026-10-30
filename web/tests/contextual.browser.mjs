@@ -22,8 +22,8 @@ export async function checkContextualUx(page, web, baseline) {
     await show({...baseline});
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-person').textContent`), baseline.game.players.find(player => player.id === viewer).name);
     const ownPool = baseline.game.players.find(player => player.id === viewer).poolTokens;
-    assert.equal(await page.evaluate(`document.querySelector('.pool-summary > strong').textContent`), String(ownPool));
-    assert.equal(await page.evaluate(`document.querySelector('.pool-summary .expansion-player > span').textContent`), await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-identity strong').textContent`));
+    assert.equal(await page.evaluate(`document.querySelector('.pool-summary [data-pool-current]').textContent`), String(ownPool));
+    assert.equal(await page.evaluate(`document.querySelector('.pool-summary > .identity-label').textContent`), await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-identity strong').textContent`));
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-capital-market]').length`), 6, 'Every capital uses a market badge');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('[data-capital-market]')].every(badge=>badge.querySelector(':scope > rect').getAttribute('fill')==='#263c3c' && badge.querySelector(':scope > text').getAttribute('fill')==='#fffdf5' && badge.querySelector(':scope > g'))`), true, 'Capital background includes both market number and commodity');
     assert.equal(await page.evaluate(`document.querySelectorAll('.province-label > path').length`), 0, 'Capital crowns no longer extend outside market labels');
@@ -60,7 +60,7 @@ export async function checkContextualUx(page, web, baseline) {
         assert.equal(await page.evaluate(`(() => {const levels=[...document.querySelectorAll('[data-highlight-priority]')].map(element=>Number(element.dataset.highlightPriority));return levels.every((level,index)=>!index || levels[index-1]<=level);})()`), true, 'Highlight paint order follows semantic priority');
     }
     await show({game:{players:baseline.game.players.map(player=>player.id===viewer ? {...player,poolTokens:ownPool-1} : player)}});
-    assert.equal(await page.evaluate(`document.querySelector('.pool-summary > strong').textContent`), String(ownPool-1), 'Prominent pool updates with the current position');
+    assert.equal(await page.evaluate(`document.querySelector('.pool-summary [data-pool-current]').textContent`), String(ownPool-1), 'Prominent pool updates with the current position');
     await show({...baseline});
     const coastShades = await page.evaluate(`[...document.querySelectorAll('[data-coastal-space]')].map(coast=>{
         const land=document.querySelector('[data-map-province="'+coast.dataset.coastalSpace+'"] .reach-shade');
@@ -97,15 +97,15 @@ export async function checkContextualUx(page, web, baseline) {
     assert.match(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), /Place maximum possible tokens.*2/);
     await click('.primary-expansion');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `place 2 ${partial.destination}`);
-    await click('.game-actions button');
+    await click('.decision-toolbar .pass-action');
     assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Pass clears selected province');
 
     await show({prompt:{messageId:'prompt.expand',players:[other.id]},legalChoices:{commands:[]},game:{
         expansionOffers:[],activity:{...baseline.game.activity,actor:other.id,decisionPlayer:other.id},
         players:baseline.game.players.map(player=>({...player,poolAvailable:player.id!==viewer})),
     }});
-    assert.equal(await page.evaluate(`document.querySelector('.pool-summary > strong').textContent`), String(other.poolTokens), 'After passing, prominently show the active power pool');
-    assert.equal(await page.evaluate(`document.querySelector('.pool-summary .expansion-player > span').textContent`), await page.evaluate(`document.querySelector('[data-player="${other.id}"] .player-identity strong').textContent`), 'Pool summary identifies the active power');
+    assert.equal(await page.evaluate(`document.querySelector('.pool-summary [data-pool-current]').textContent`), String(other.poolTokens), 'After passing, prominently show the active power pool');
+    assert.equal(await page.evaluate(`document.querySelector('.pool-summary > .identity-label').textContent`), await page.evaluate(`document.querySelector('[data-player="${other.id}"] .player-identity strong').textContent`), 'Pool summary identifies the active power');
     assert.equal(await page.evaluate(`!!document.querySelector('.player-summary.is-viewer .player-pool')`), false, 'Own pool leaves capital summary after passing');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-summary.is-viewer .detail-list dt')].some(element=>element.textContent==='Expansion pool')`), false, 'Own pool is also hidden in capital detail');
 
@@ -139,7 +139,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Changing purchase steps clears advance inspection');
     await show({game:{activity:{...fixture.game.activity,purchaseStep:'ADVANCES'}}});
     await click(`[data-advance="${advance.id}"]`);
-    await click('.game-actions button');
+    await click('.decision-toolbar .pass-action');
     assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Pass clears advance');
     await show({prompt:{messageId:'prompt.purchase-relief',players:[viewer]},legalChoices:{commands:['relieve-misery','pass']},game:{reliefOffers:[]}});
     assert.equal(await page.evaluate(`!!document.querySelector('#relief-spaces')`), false, 'No relief purchase without a tier offer');

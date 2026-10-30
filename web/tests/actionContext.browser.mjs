@@ -74,7 +74,7 @@ export async function checkActionContext(page, web, baseline) {
     await show({...fixture, legalChoices: {commands: ['pass'], bidMax: null}, game: {...fixture.game, stage: 'PLAY_CARDS',
         activeWar: {initiator: viewer, opponent: other.id, startedTurn: baseline.game.turnNumber, ties: 0},
         activity: {...fixture.game.activity, choice: 'war-preparation'}}});
-    await click('.decision-panel .action-buttons button');
+    await click('.decision-toolbar .pass-action');
     const war = {...event, id: 'local-war', kind: 'WAR_RESULT', competition: null,
         war: {initiator: viewer, opponent: other.id, winner: other.id, totals: {[viewer]: 2, [other.id]: 5}, requiredTransfers: 3}};
     await show({...fixture, events: [...fixture.events, war]});

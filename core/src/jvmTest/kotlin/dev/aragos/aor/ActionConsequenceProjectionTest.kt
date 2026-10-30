@@ -220,6 +220,43 @@ class ActionConsequenceProjectionTest {
     }
 
     @Test
+    fun revolutionaryUprisingsPreviewsCommerceAndUnaffectedPlayers() {
+        val initial = state(card = "revolutionary-uprisings", advances = listOf(AdvanceId.CARAVAN))
+        val before =
+            initial.copy(
+                players =
+                    initial.players +
+                        (p3 to initial.playerState(p3).copy(misery = MiseryStep.CHAOS))
+            )
+        val offer = before.viewForPlayer(p1).cardOffers.single()
+
+        val after = CardGame.play(before, p1, "hand-1", CardChoice.None)
+
+        assertThat(offer.miseryChanges)
+            .containsExactly(MiseryChangeView(p1, 100, 125), MiseryChangeView(p2, 100, 100))
+        assertThat(offer.choices.single().miseryChanges).isEqualTo(offer.miseryChanges)
+        for (change in offer.miseryChanges) {
+            assertThat(change.toValue).isEqualTo(after.playerState(change.player).misery.value)
+        }
+    }
+
+    @Test
+    fun revolutionaryUprisingsPreviewsEnlightenedRulerImmunity() {
+        val before =
+            state(card = "revolutionary-uprisings", advances = listOf(AdvanceId.CARAVAN))
+                .copy(effects = CardTurnEffects(enlightenedRulers = setOf(p1)))
+
+        val offer = before.viewForPlayer(p1).cardOffers.single()
+
+        assertThat(offer.miseryChanges)
+            .containsExactly(
+                MiseryChangeView(p1, 100, 100),
+                MiseryChangeView(p2, 100, 100),
+                MiseryChangeView(p3, 100, 100),
+            )
+    }
+
+    @Test
     fun civilWarMiseryPreviewFollowsTheChosenVictim() {
         val initial = state(card = "civil-war")
         val before =
