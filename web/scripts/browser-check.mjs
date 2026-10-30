@@ -116,7 +116,7 @@ try {
     await Promise.all([ready(`${api}/api/health`, server), ready(web, vite), ready(`${cdp}/json/version`, browser)]);
     await checked(launch('browser interactions', process.execPath, [resolve(root, 'web/tests', process.env.AOR_BROWSER_SUITE ?? 'map.browser.mjs')], {
         MAP_API_URL: api, MAP_WEB_URL: web, MAP_CDP_URL: cdp, AOR_BROWSER_ARTIFACTS: artifacts,
-    }), Number(process.env.AOR_BROWSER_TIMEOUT_MS ?? 180000));
+    }), Number(process.env.AOR_BROWSER_TIMEOUT_MS ?? 300000));
     console.log(`Browser checks passed. Screenshots: ${artifacts}`);
 } finally {
     await cleanup();

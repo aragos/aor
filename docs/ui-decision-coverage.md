@@ -132,7 +132,8 @@ Run `npm run test:browser` from `web`. The runner owns an isolated server, Vite,
 game files; it cleans up on success/failure and prints the retained screenshot directory. Use
 `CHROME_BIN` for Chrome, `AOR_BROWSER_ARTIFACTS` for artifacts or `AOR_BROWSER_SERVER` for an alternate
 server launcher. Artifacts stay outside the repository and include desktop/phone/zoom captures.
-The default focused suite has a three-minute budget. The longer live scenario is:
+The default comprehensive browser suite has a five-minute budget. Its Linux CI run includes all
+decision families and live game flows; per-interaction waits retain their existing deadlines. The longer live scenario is:
 
 ```sh
 AOR_BROWSER_SUITE=fullgame.browser.mjs AOR_BROWSER_TIMEOUT_MS=1800000 npm run test:browser
