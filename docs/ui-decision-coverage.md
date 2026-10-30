@@ -32,8 +32,10 @@ Before/After controls, plus capital-symbol alignment in ordinary cash receipts. 
 browser captures are in `aor-browser-artifacts-FFMhNS`; the live history-editor and Undo check passed
 separately in `aor-browser-artifacts-cErUrV`. Core checks compare Revolutionary Uprisings previews with execution, including
 commerce, immunity and Chaos exclusion; service checks record changed and unchanged active players
-with public card causes. Map validation checks all 78 directed support paths, including Levant → Acre;
-regeneration changed only that added support path.
+with public card causes. Authoritative-catalog validation checks all 78 standard and 76 European directed support paths,
+including Levant → Acre on both maps. Regeneration changed only that added support path in each
+asset. The European live browser flow also passed with an explicit arrow assertion
+(`aor-browser-artifacts-Jdy6TM`).
 
 ## Decision inventory
 
