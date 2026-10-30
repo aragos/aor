@@ -158,3 +158,8 @@ where space permits. Dense token groups still take drawing priority. Arrow routi
 and never changes the support graph. Regeneration includes `support_geometry.py`.
 Toulouse's Montpellier and Barcelona arrows use short, straight east/south crossings in both
 drawings, replacing the long coastal route and bent path while retaining the accepted labels.
+
+Label fitting reserves extra room for platform font substitutions while keeping names readable.
+Tight footprints retain their fitted label budget before accepting a constrained layout. Both map
+assets use this clearance; changing it repositions labels and pieces without changing province
+boundaries. Browser fit failures report the affected label part, bounds and overflow coordinates.

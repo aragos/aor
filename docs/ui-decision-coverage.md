@@ -37,6 +37,14 @@ including Levant → Acre on both maps. Regeneration changed only that added sup
 asset. The European live browser flow also passed with an explicit arrow assertion
 (`aor-browser-artifacts-Jdy6TM`).
 
+Release preparation found a Linux Chrome fit failure for Jerusalem. Both generated maps now
+reserve additional font clearance where it fits, retaining the original tight-footprint budget before
+accepting constrained layouts. No province boundaries changed and no new constrained-label exceptions
+were added. Both authoritative catalog validators and the web build pass; browser overflow failures
+now include the label part, measured bounds and coordinates. The final comprehensive local browser
+run passed (`aor-browser-artifacts-XoIFpO`). Pool review asserts the exact projected balance in the
+shared summary rather than searching the removed panel for an incidental matching number.
+
 ## Decision inventory
 
 | Prompt / state | Canonical actions and visual path | Evidence |

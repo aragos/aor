@@ -56,7 +56,8 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Keyboard selection prepares a draft');
     const selected = await page.evaluate(`document.querySelector('.map-orders').textContent`);
     assert(selected.includes(String(offer.requiredTokens)), 'Marker commitment is shown');
-    assert(selected.includes(String(offer.resultingPool)), 'Remaining pool is shown');
+    assert.equal(await page.evaluate(`document.querySelector('.pool-summary [data-pool-after]').textContent`),
+        String(offer.resultingPool), 'Remaining pool is shown in the shared summary');
     const viewBox = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
     await show({revision: fixture.revision + 1});
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').getAttribute('aria-pressed')`), 'true', 'Selection survives polling');

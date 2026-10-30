@@ -151,11 +151,15 @@ await page.send('Page.navigate', {url: web + actor.path});
                 const matrix=land.getScreenCTM().inverse().multiply(part.getScreenCTM());
                 for(const dx of [0,.5,1]) for(const dy of [0,.5,1]){
                     const point=new DOMPoint(rect.x+rect.width*dx,rect.y+rect.height*dy).matrixTransform(matrix);
-                    if(!land.isPointInFill(point) && (fit==='LAND' || !coast?.isPointInFill(point))) failures.push(id+':'+fit);
+                    if(!land.isPointInFill(point) && (fit==='LAND' || !coast?.isPointInFill(point))) failures.push({
+                        province: id, fit, part: part.getAttribute('class'),
+                        bounds: {x: rect.x, y: rect.y, width: rect.width, height: rect.height},
+                        point: {x: point.x, y: point.y},
+                    });
                 }
             }
         }
-        return [...new Set(failures)];
+        return failures;
     })()`);
     assert.deepEqual(textOverflows, [], 'Actual rendered names and badges fit their designated land or coastal footprint');
     await checkPieceBounds(page);
