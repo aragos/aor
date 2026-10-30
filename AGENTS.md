@@ -15,6 +15,9 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
 
 ## Interaction and documentation
 
+- Review UI changes against the game-table review gate in `docs/ui-design.md`: remove duplicate
+  controls/panels/copy, keep consequences beside actions, retain capital symbols, and check successful
+  cleanup separately from rejected/polling draft preservation. Help owns lookup data and app behavior.
 - Project costs, destinations, eligibility and consequences from authoritative domain state. Keep
   inspection separate from action drafts, and preserve valid drafts through polling and inspection.
 - Presentation shortcuts must preserve domain provenance and lifecycle. Keep temporary facts with

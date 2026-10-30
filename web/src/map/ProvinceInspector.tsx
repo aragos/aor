@@ -1,8 +1,8 @@
 import type {ExpansionOfferView, ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
-import {label, playerName, provinceName} from '../labels';
+import {label} from '../labels';
 import {t} from '../messages';
+import {ProvinceLabel} from '../IdentityLabel';
 import {TableIcon} from '../TableIcon';
-import {Commodity} from '../TablePanels';
 import {PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {ChoiceButtons} from '../DecisionControls';
@@ -41,7 +41,6 @@ function ExpansionAvailability({offer, province}: {
     return <section className="expansion-availability" aria-label={t('expansion.availability')}>
         {offer.blockers.map(blocker => <p className="blocker" data-expansion-blocker={blocker}
             key={blocker}>{blockerText(blocker)}</p>)}
-        {offer.partialPlacements.length > 0 && <p className="small muted">{t('expansion.partialAvailable')}</p>}
     </section>;
 }
 
@@ -71,14 +70,14 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     const hasPlacement = primary && (available || offer.partialPlacements.length > 0);
     if (!hasPlacement && commands.length === 0) {
         return inspection ? <section className="province-actions" aria-label={t('table.selectedProvince')}>
-            <h2>{provinceName(province.id)}</h2>
+            <h2><ProvinceLabel snapshot={snapshot} id={province.id}/></h2>
             <ExpansionAvailability offer={inspection} province={province}/>
         </section> : null;
     }
     return <div className="province-actions" aria-label={t('table.selectedProvince')}>
         <div>
             <p className="eyebrow">{remainingPlacement ? t('table.remainingTokens') : primary ? uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
-            <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
+            <h2><ProvinceLabel snapshot={snapshot} id={province.id}/></h2>
         </div>
         <div className="map-orders">
             {primary && hasPlacement && <>
@@ -88,7 +87,7 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
                         <small>{establishesMarker ? t(uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
                 {!remainingPlacement && offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
                 {uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
-                {remainingPlacement && <p className="consequence">{t('table.markerNeedsTokens').replace('{count}', String(offer.requiredTokens))}</p>}
+                {remainingPlacement && <><p className="consequence">{t('table.markerNeedsTokens', {count: offer.requiredTokens})}</p><ExpansionAvailability offer={offer} province={province}/></>}
                 {!remainingPlacement && offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
                 <button type="button" className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>
                     {remainingPlacement ? t('table.remainingTokens') : uncertain ? t('action.attack') : province.satellite ? t('action.place') : t('table.establishMarker')} · {requiredTokens} {t('table.tokens')}
@@ -118,37 +117,4 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
 
         </div>
     </div>;
-}
-
-/** Province reference stays outside the panel that owns the current decision. */
-export function ProvinceInspector({snapshot, province, select}: {
-    snapshot: Snapshot; province: ProvinceDefinition; select: (province: string) => void;
-}) {
-    const catalog = snapshot.game.catalog;
-    if (!catalog) return null;
-    const pieces = snapshot.game.board.find(holding => holding.id === province.id);
-    const availability = snapshot.game.expansionInspections?.find(candidate => candidate.destination === province.id)
-        ?? snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
-    const links = (ids: string[]) => ids.length ? ids.map(id => <button type="button"
-        className="map-link" key={id} onClick={() => select(id)}>{provinceName(id)}</button>) : '—';
-    return <section className="province-inspector" aria-label={t('table.selectedProvince')}>
-        <h2>{provinceName(province.id)}{province.capital && ' ♛'}</h2>
-        <p className="map-facts">{province.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
-            <span>{t('board.market')} {province.marketNumber}</span> · {province.area ? `${t('board.area')} ${province.area}` : label(province.overseas ?? '')}</p>
-        {pieces?.marker ? <p className="occupancy"><svg width="24" height="24" viewBox="-24 -24 48 48" aria-hidden="true"><PlayerPiece size={40}
-            capital={snapshot.game.players.find(player => player.id === pieces.marker?.owner)?.capital ?? null} fresh={pieces.marker.side === 'WHITE'}/></svg>
-            {' '}{playerName(snapshot, pieces.marker.owner)} · {t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')} {t('board.marker')}</p>
-            : pieces?.tokens.length ? <ul className="plain-list">{pieces.tokens.map(tokens => <li key={tokens.owner}>
-                {playerName(snapshot, tokens.owner)}: {tokens.coloured} {t('board.old')} + {tokens.white} {t('board.new')}
-            </li>)}</ul> : <p className="muted">{t('table.unoccupied')}</p>}
-        <ExpansionAvailability offer={availability} province={province}/>
-        <details className="province-details"><summary>{t('table.provinceDetails')}</summary>
-            {!!province.access.length && <p>{t('board.access')}: {province.access.map(requirement => label(requirement, 'access')).join('; ')}</p>}
-            <p>{t('board.landNeighbors')}: {links(neighbors(catalog.landBorders, province.id))}</p>
-            <p>{t('board.coastalNeighbors')}: {links(neighbors(catalog.coastalConnections, province.id))}</p>
-            <p>{t('board.seas')}: {catalog.seaCoasts.filter(coast => coast.province === province.id).map(coast => label(coast.sea)).join(', ') || '—'}</p>
-            <p>{t('board.supports')}: {links(catalog.satelliteSupports.filter(edge => edge.satellite === province.id).map(edge => edge.market))}</p>
-            <p>{t('board.supportedBy')}: {links(catalog.satelliteSupports.filter(edge => edge.market === province.id).map(edge => edge.satellite))}</p>
-        </details>
-    </section>;
 }

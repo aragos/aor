@@ -163,10 +163,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     }
     const restingAegeanFill = await page.evaluate(`getComputedStyle(document.querySelector('[data-sea="AEGEAN_SEA"] .sea-shape')).fill`);
     await page.evaluate(`document.querySelector('[data-map-province="crete"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
-    await page.wait(`document.querySelector('.province-inspector .province-details')`, 'Crete inspection');
-    await page.evaluate(`document.querySelector('.province-details').open=true`);
-    const creteDetails = await page.evaluate(`document.querySelector('.province-details').textContent`);
-    for (const sea of ['Aegean Sea','Central Mediterranean','Eastern Mediterranean']) assert(creteDetails.includes(sea), 'Crete inspection names '+sea);
+    assert.equal(await page.evaluate(`document.querySelector('.province-inspector, .dense-map-detail')`), null, 'Province inspection stays on the map');
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-connected-sea]')].map(sea=>sea.dataset.connectedSea).sort()`),
         ['AEGEAN_SEA','CENTRAL_MEDITERRANEAN','EASTERN_MEDITERRANEAN'], 'Crete highlights all three connected sea footprints');
     assert.notEqual(await page.evaluate(`getComputedStyle(document.querySelector('[data-sea="AEGEAN_SEA"] .sea-shape')).fill`), restingAegeanFill,
@@ -209,13 +206,16 @@ await page.send('Page.navigate', {url: web + actor.path});
         ['smyrna', ['Aegean Sea', 'Eastern Mediterranean', 'Adalia'], []],
     ]) {
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
-        await page.wait(`document.querySelector('[data-map-province="${province}"][aria-pressed="true"]') && document.querySelector('.province-inspector .province-details')`, province+' inspection');
-        await page.evaluate(`document.querySelector('.province-details').open=true`);
-        const details=await page.evaluate(`document.querySelector('.province-details').textContent`);
+        await page.wait(`document.querySelector('[data-map-province="${province}"][aria-pressed="true"]')`, province+' inspection');
         assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-connected-sea]')].map(sea=>sea.dataset.connectedSea).sort()`),
             before.game.catalog.seaCoasts.filter(coast=>coast.province===province).map(coast=>coast.sea).sort(), province+' highlights only its direct sea connections');
-        for(const name of expected) assert(details.includes(name),province+' inspector includes '+name);
-        for(const name of excluded) assert(!details.includes(name),province+' inspector excludes '+name);
+        const connected = await page.evaluate(`[...document.querySelectorAll('[data-connected-sea]')].map(node=>node.dataset.connectedSea.replaceAll('_',' ')).join(' ')`);
+        for (const name of expected.filter(name => /Sea|Mediterranean|Biscay/.test(name))) assert(connected.toLowerCase().includes(name.toLowerCase()), province+' highlights '+name);
+        for (const name of excluded.filter(name => /Sea|Mediterranean|Biscay/.test(name))) assert(!connected.toLowerCase().includes(name.toLowerCase()), province+' excludes '+name);
+        const neighbors = before.game.catalog.landBorders.concat(before.game.catalog.coastalConnections).flatMap(edge => edge.first === province ? [edge.second] : edge.second === province ? [edge.first] : []);
+        for (const neighbor of neighbors) {
+            assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${neighbor}"] .province-highlight')`), true, province+' highlights its neighbor '+neighbor);
+        }
         if (province === 'edinburgh') {
             const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(490,300).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
             await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:-400,modifiers:2});
@@ -240,8 +240,7 @@ await page.send('Page.navigate', {url: web + actor.path});
             await page.click('Fit map');
         }
         if (province === 'paris' || province === 'chester' || province === 'durazzo') {
-            const seas=await page.evaluate(`[...document.querySelectorAll('.province-details p')].find(paragraph => paragraph.textContent.startsWith('Seas:'))?.textContent`);
-            assert.equal(seas,'Seas: —',province+' has no direct sea access');
+            assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, province+' has no direct sea access');
         }
         if (province === 'durazzo') {
             const point=await page.evaluate(`(() => {const svg=document.querySelector('.world-map');svg.scrollIntoView({block:'center',behavior:'instant'});const point=new DOMPoint(1750,1240).matrixTransform(svg.getScreenCTM());return {x:point.x,y:point.y};})()`);
@@ -265,11 +264,8 @@ await page.send('Page.navigate', {url: web + actor.path});
             await page.click('Fit map');
         }
         if (province === 'malmo' || province === 'lubeck') {
-            const neighbors=await page.evaluate(`[...document.querySelectorAll('.province-details p')].filter(paragraph => paragraph.textContent.startsWith('Land neighbors:') || paragraph.textContent.startsWith('Coastal-water neighbors:')).map(paragraph => paragraph.textContent).join(' ')`);
-            assert(!neighbors.includes(province === 'malmo' ? 'Lubeck' : 'Malmo'), 'Malmo and Lubeck are not physical neighbors');
-            const supportNames=await page.evaluate(`[...document.querySelectorAll('.province-details p')].find(paragraph=>paragraph.textContent.startsWith(${JSON.stringify(province === 'malmo' ? 'Supports:' : 'Supported by:')}))?.textContent`);
-            assert.equal(supportNames,province === 'malmo' ? 'Supports: Stockholm' : 'Supported by: Copenhagen',
-                province+' inspector shows its corrected support links');
+            const support = province === 'malmo' ? 'malmo stockholm' : 'copenhagen lubeck';
+            assert.equal(await page.evaluate(`!!document.querySelector('[data-support="${support}"]')`), true, 'Corrected support is drawn on the map');
         }
         if (province === 'copenhagen') {
             for (const [component, x, y] of [['northern Jutland',1325,292.5],['Funen',1365,370.5],['Zealand',1435,351],
@@ -349,6 +345,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.wait(`[...document.querySelectorAll('.save-status')].some(e => e.textContent.includes('Saved'))`, 'successful placement');
     let after = await page.snapshot();
     assert.equal(after.revision, before.revision + 1);
+    assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${target}"]').getAttribute('aria-pressed')`), 'false', 'Accepted token placement clears the province');
     assert(after.game.board.some(p => p.id === target && p.tokens.some(t => t.owner === after.viewerId && t.white === 1)));
     await page.wait(`document.querySelector('.undo-action:not([disabled])')`, 'own placement can be undone');
     await page.evaluate(`document.querySelector('.undo-action').click()`);
@@ -365,17 +362,16 @@ await page.send('Page.navigate', {url: web + actor.path});
     await pick(market.destination);
     await page.evaluate(`document.querySelector('.partial-placement').open = true`);
     await page.evaluate(`document.querySelector('#partial-count button').click()`);
-    await page.evaluate(`document.querySelector('.map-zoom button[aria-pressed]').click()`);
-    const inspectProvince = after.game.catalog.provinces.find(province => province.id !== market.destination).id;
-    await pick(inspectProvince);
     await page.evaluate(`document.querySelector('.world-map > rect').dispatchEvent(new MouseEvent('click', {bubbles:true}))`);
-    await page.evaluate(`document.querySelector('.map-zoom button[aria-pressed]').click()`);
     await new Promise(resolve => setTimeout(resolve, 1200));
-    assert.equal(await page.evaluate(`document.querySelector('#partial-count button[aria-pressed=true]')?.textContent`), '1', 'Independent inspection, closing and polling preserve the live partial placement');
+    assert.equal(await page.evaluate(`document.querySelector('#partial-count button[aria-pressed=true]')?.textContent`), '1', 'Background clicks and polling preserve the live partial placement');
 
     assert.equal((await page.snapshot()).revision, after.revision, 'Partial amount selection cannot submit');
     await page.evaluate(`document.querySelector('.partial-placement form > button').click()`);
-    await page.wait(`document.querySelector('.primary-expansion')?.textContent.includes('${market.requiredTokens - 1}')`, 'remaining marker commitment after partial occupation');
+    await page.wait(`!document.querySelector('.primary-expansion')`, 'accepted partial placement clears its action');
+    assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${market.destination}"]').getAttribute('aria-pressed')`), 'false');
+    await pick(market.destination);
+    await page.wait(`document.querySelector('.primary-expansion')?.textContent.includes('${market.requiredTokens - 1}')`, 'remaining marker commitment after reselecting');
     const partialState = await page.snapshot();
     assert.equal(partialState.revision, after.revision + 1);
     assert.equal(partialState.game.expansionOffers.find(offer => offer.destination === market.destination).requiredTokens, market.requiredTokens - 1, 'Existing friendly token reduces marker commitment');
@@ -383,6 +379,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.wait(`!document.querySelector('.primary-expansion')`, 'marker established');
     after = await page.snapshot();
     assert.equal(after.game.board.find(province => province.id === market.destination).marker.owner, after.viewerId);
+    assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${market.destination}"]').getAttribute('aria-pressed')`), 'false', 'Accepted marker placement clears the province');
     console.log('Passed: live satellite placement, partial-market draft and remaining marker establishment.');
     await page.reload();
     await page.wait(`document.querySelector('.world-map')`, 'fresh live keyboard traversal');
@@ -510,8 +507,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     assert.deepEqual(collisions,[],'Actual rendered labels and dense pieces never overlap');
     for (const province of ['copenhagen','acre','levant','north-america','south-america']) {
         await pick(province);
-        await page.wait(`document.querySelector('[data-dense-province="${province}"]')`,'readable dense occupancy fallback');
-        const text = await page.evaluate(`document.querySelector('[data-dense-province="${province}"]').textContent`);
+        assert.equal(await page.evaluate(`document.querySelector('.dense-map-detail')`), null, 'Dense provinces do not add an inspection panel');
+        const text = await page.evaluate(`document.querySelector('[data-map-province="${province}"]').getAttribute('aria-label')`);
         assert.equal((text.match(/1 established and 1 new tokens/g)??[]).length,6,'Every owner and age is retained at readable size');
         if (province === 'copenhagen') {
             await page.screenshot(join(artifacts,'aor-crowded-fit.png'),1440);

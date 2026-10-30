@@ -1,9 +1,10 @@
 import {useEffect, useState} from 'react';
 import type {CardChoiceView, Snapshot} from './api';
-import {advanceName, label, playerName, provinceName} from './labels';
+import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
+import {advanceName, label} from './labels';
 import {t} from './messages';
 import {HelpLink} from './HelpLink';
-import {Commodity, CommodityAdjustments, CommodityValueNote, Emblem, Payouts, PayoutReference, UnplayedLeaders} from './TablePanels';
+import {UnplayedLeaders} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
@@ -21,9 +22,9 @@ interface Props {
     closeInspection?: () => void;
 }
 
-function choiceLabel(snapshot: Snapshot, choice: CardChoiceView): string {
-    if (choice.kind === 'PLAYER') return playerName(snapshot, choice.value ?? '');
-    if (choice.kind === 'PROVINCE') return provinceName(choice.value ?? '');
+function choiceLabel(snapshot: Snapshot, choice: CardChoiceView) {
+    if (choice.kind === 'PLAYER') return <PlayerLabel snapshot={snapshot} id={choice.value ?? ''}/>;
+    if (choice.kind === 'PROVINCE') return <ProvinceLabel snapshot={snapshot} id={choice.value ?? ''}/>;
     if (choice.kind === 'COMMODITY') return label(choice.value?.toUpperCase() ?? '', 'commodity');
     if (choice.kind === 'CATEGORY') return choice.value ? label(choice.value.toUpperCase(), 'category') : t('table.noCategory');
     if (choice.kind === 'AREA') return `${t('board.area')} ${choice.value?.toUpperCase()}`;
@@ -72,15 +73,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
         <h2>{t(definition.messageId)}</h2><CardRecurrence definition={definition}/>
         <CardEventText definition={definition}/>
-        {inspection && <><HelpLink topic={`card-${definition.id}`} label="Card rules" compact={false}/>
-        {(info?.commodities ?? offer?.commodities)?.length ? <CommodityValueNote snapshot={snapshot}/> : null}
-        {(info?.commodities ?? offer?.commodities)?.map(commodity => {
-            const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
-            return <div className="card-value" key={commodity}><Commodity commodity={commodity}/>{payout && <>
-                <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/>
-                <PayoutReference snapshot={snapshot} payout={payout}/>
-            </>}</div>;
-        })}
+        {inspection && <>
         {(info?.leaderDiscounts ?? offer?.leaderDiscounts)?.map(discount => <details key={discount.advance} className="leader-discount-detail">
             <summary>{advanceName(discount.advance)} <LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/></summary>
             <dl className="detail-list"><div><dt>{t('table.printedDiscount')}</dt><dd>${discount.printedAmount}</dd></div>
@@ -93,24 +86,23 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
             {!noChoice && finiteChoices.length > 0 && <fieldset className="target-choices"><legend>{t('controls.cardChoice')}</legend>
                 {finiteChoices.map(candidate => <button type="button" key={candidate.command} className="secondary"
                     aria-pressed={candidate.command === choice} onClick={() => { setChoice(candidate.command ?? ''); setProtection(''); }}>
-                    {candidate.kind === 'PLAYER' && snapshot.game.players.filter(player => player.id === candidate.value).map(player => <Emblem player={player} key={player.id}/>)}
                     {choiceLabel(snapshot, candidate)}</button>)}
             </fieldset>}
             {finiteChoices.some(candidate => candidate.kind === 'PLAYER') && <PlayerPicker disabled={busy}
                 eligible={finiteChoices.filter(candidate => candidate.kind === 'PLAYER').flatMap(candidate => candidate.value ? [candidate.value] : [])}
                 selected={selectedChoice?.value ? [selectedChoice.value] : []}
                 onPick={id => setChoice(finiteChoices.find(candidate => candidate.kind === 'PLAYER' && candidate.value === id)?.command ?? '')}/>}
-            {provinceChoices.length > 0 && <MapPicker title={t('controls.cardChoice')} disabled={busy} eligible={provinceChoices.flatMap(candidate => candidate.value ? [candidate.value] : [])}
+            {provinceChoices.length > 0 && <MapPicker title={t('table.pickTarget')} disabled={busy} eligible={provinceChoices.flatMap(candidate => candidate.value ? [candidate.value] : [])}
                 selected={selectedChoice?.value ? [selectedChoice.value] : []} onPick={id => setChoice(provinceChoices.find(candidate => candidate.value === id)?.command ?? '')}/>}
-            {areaChoices.length > 0 && <MapPicker kind="area" title={t('controls.cardChoice')} disabled={busy}
+            {areaChoices.length > 0 && <MapPicker kind="area" title={t('table.pickTarget')} disabled={busy}
                 eligible={areaChoices.flatMap(candidate => candidate.value ? [candidate.value.toUpperCase()] : [])}
                 selected={selectedChoice?.kind === 'AREA' && selectedChoice.value ? [selectedChoice.value.toUpperCase()] : []}
                 onPick={area => setChoice(areaChoices.find(candidate => candidate.value?.toUpperCase() === area)?.command ?? '')}/>}
-            {needsTargets && offer && <fieldset className="target-choices"><legend>{t('table.targets')} · {targets.length}/{offer.requiredTargetCount}</legend>
+            {needsTargets && offer && <fieldset className="target-choices"><legend>{t(offer.requiredTargetCount === 1 ? 'table.pickTarget' : 'table.pickTargets', {count: offer.requiredTargetCount ?? 0})} · {targets.length}/{offer.requiredTargetCount}</legend>
                 {offer.provinceTargets.map(province => <button type="button" key={province} className="secondary" aria-pressed={targets.includes(province)}
                     disabled={busy || !selection.canPick(province)}
-                    onClick={() => selection.pick(province)}>{provinceName(province)}</button>)}
-                <MapPicker title={t('table.targets')} disabled={busy} selected={targets}
+                    onClick={() => selection.pick(province)}><ProvinceLabel snapshot={snapshot} id={province}/></button>)}
+                <MapPicker title={t(offer.requiredTargetCount === 1 ? 'table.pickTarget' : 'table.pickTargets', {count: offer.requiredTargetCount ?? 0})} disabled={busy} selected={targets}
                     eligible={offer.provinceTargets.filter(target => selection.canPick(target))}
                     onPick={selection.pick}/>
             </fieldset>}
@@ -118,7 +110,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
             <InvalidChoice invalid={!!(choice && !selectedChoice) || invalidTargets} clear={() => {setChoice(''); selection.clear();}}/>
-            {(!needsProtection || amount === 0 ? misery?.cashChanges : [])?.map(change => <p className="cash-preview" key={change.player}>{playerName(snapshot, change.player)} · {t('game.cash')}: ${change.before} → ${change.after}</p>)}
+            {(!needsProtection || amount === 0 ? misery?.cashChanges : [])?.map(change => <p className="cash-preview" key={change.player}><PlayerLabel snapshot={snapshot} id={change.player}/> · {t('game.cash')}: ${change.before} → ${change.after}</p>)}
             <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
             {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
             <button disabled={busy || !actionable}>{t('action.playCard')}</button>
@@ -140,14 +132,14 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
         {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>}
         {inspection && <p className="eyebrow">{label(advance.category, 'category')}</p>}<h2>{advanceName(advance.id)}</h2>
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
-        {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label="Advance rules" compact={false}/>
+        {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label={t('reference.printedValues')} compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
         <AdvancePrice offer={offer} printedCost={advance.cost}/>
         {offer?.price !== null && offer?.price !== undefined && <>
             <p className="small">{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
         </>}
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
-        {inspection && <p>{t('advance.owners')}: {snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => playerName(snapshot, player.id)).join(', ') || '—'}</p>}
+        {inspection && <p>{t('advance.owners')}: <PlayerLabels snapshot={snapshot} ids={snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.id)}/></p>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
         {action && offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}
     </section>;

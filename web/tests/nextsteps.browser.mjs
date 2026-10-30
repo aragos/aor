@@ -131,9 +131,10 @@ export async function checkDecisionEvidence(page, web, baseline) {
     await checkAccessibleNames(page);
     await checkContrast(page,'advance-detail');
     await page.send('Page.navigate', {url:web+'/help#advances'});
-    await page.wait(`document.querySelectorAll('#advances article').length === 26`, 'All advance rules in reference');
-    const effects = await page.evaluate(`[...document.querySelectorAll('#advances .advance-benefits')].map(element=>element.textContent)`);
-    assert.equal(effects.length,26);
-    assert(effects.every(text=>text.length>15 && !text.includes('.effect')), 'Every advance has readable reference text');
-    console.log('Passed: decision lifetimes, contextual reference links, and all public advance benefits.');
+    await page.wait(`document.querySelectorAll('#advances article').length === 26`, 'All advance data in reference');
+    const data = await page.evaluate(`[...document.querySelectorAll('#advances article')].map(element=>element.textContent)`);
+    assert.equal(data.length,26);
+    assert(data.every(text=>text.includes('Printed cost') && text.includes('Prerequisites:')), 'Every advance has printed lookup data');
+    assert.equal(await page.evaluate(`document.querySelector('#advances .advance-benefits')`), null, 'General advance rules stay out of app help');
+    console.log('Passed: decision lifetimes, contextual reference links, and all public advance data.');
 }

@@ -149,7 +149,7 @@ export async function checkContextualUx(page, web, baseline) {
             cardOffers:[{reference:'target',playable:true,blockers:[],choices:[{kind:'PLAYER',value:other.id,command:`play target player ${other.id}`}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click('[data-hand-card="target"]');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'Hand keeps dynamic game information');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#card-civil-war"]').target`), '_blank', 'Card rules have a dedicated reference');
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href^="/help#card-"]')`), null, 'Card inspection omits the redundant rules link');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
     await click(`[data-player="${other.id}"] > summary`);

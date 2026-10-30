@@ -17,23 +17,35 @@ choice and understand its result through visual controls and commands, on deskto
 3. **Organize attention around action.** Show actor, request and relevant resources together. Open
    the relevant workspace once per decision boundary; polling must not repeatedly redirect it.
    Interruptions name the required responder and the activity that resumes.
-4. **Separate reference from action.** Cards, advances, provinces and players remain inspectable in
-   a dedicated surface. Inspecting another object must preserve the active form, prepared targets
-   and picker. Inspection, eligibility, draft selection and commitment have distinct cues.
+4. **Use the game objects as controls.** Click cards, advances and players for their relevant detail
+   or choice; do not add a parallel Inspect button or map mode. Province connections are shown by
+   map highlights, without a second province panel. Commodity cards show current payouts and a
+   small question link to each full payout track, without a commodity inspector. Reference access
+   must preserve the active form, prepared targets and picker. Distinguish inspection, eligibility,
+   draft selection and commitment; a component click never commits an order.
 5. **Define draft lifetimes.** Polling and navigation preserve valid drafts and viewport. Replaced
    decisions and accepted history edits clear obsolete selections. Successful pass/card play closes
-   its action context; rejection retains correctable input. Mark invalid choices and prevent stale
-   submission. A preauthorized queued action submits once only when legal, never retries a failure.
+   its action context; accepted token/marker placement clears its province and amount. Rejection retains
+   correctable input. Mark invalid choices and prevent stale submission. A preauthorized queued action submits once only when legal, never retries a failure.
 6. **Explain consequences locally.** Show costs, modifiers, remaining resources and deterministic
-   effects before commitment. Distinguish current, projected, conditional and uncertain values;
+   effects beside the action before commitment. Upgrades show current → new values. Partial
+   placement explains the marker requirement and limiting resource beside its placement action,
+   rather than in inspection. Map pickers ask “Pick a target” or “Pick N targets.” Distinguish current,
+   projected, conditional and uncertain values;
    discounts, final prices and cash receipts are different quantities. Offer feasible alternatives.
 7. **Use consistent identity and emphasis.** Capital names identify powers; before assignment use
    public handles in hosted games, retained in player overviews. Reuse symbols, owner silhouettes,
-   quantities and terms.
+   quantities and terms. Every visible capital name carries its board silhouette, including previews,
+   choices, reference lists and recorded activity. Text-only titles and accessible names retain names.
    Dice state their colors. Wins/losses have text and green/red styling; color alone conveys nothing.
 8. **Keep summaries compact.** Give each fact a predictable home, with decision-relevant state at
    rest and full tracks/breakdowns in optional detail. Remove repeated structure before shrinking
-   text. Localize ordinary play; command syntax and internal IDs belong in technical views.
+   text. Every extra control, panel and sentence must help a player choose, understand an effect or
+   find data. Remove wording already implied by controls and implementation terms such as “signed
+   whole number”; retain material exceptions in plain language. Track help in player boxes looks
+   like a footnote, with a larger invisible hit area. Localize ordinary play; command syntax and
+   internal IDs belong in technical views. Help is for printed data and non-obvious app behavior
+   (variants, previews, navigation and undo), not general game rules already available elsewhere.
 9. **Show consequential feedback.** Distinguish accepted, rejected, waiting and private-submission
    states. Keep results until dismissed or their scope ends; dismissing results never deletes
    history. Activity opens by default, explains effects and excludes continuation noise. Announce
@@ -66,11 +78,10 @@ choice and understand its result through visual controls and commands, on deskto
 - The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
   Include the current deck count with the epoch, for example **Epoch 2 (22 cards remaining)**;
   remove duplicate deck counts from the turn-effects section.
-  Commands remain in the bottom expander; omit their header button. Province facts remain in
-  inspection. Event and advance descriptions remain available in the game. Legends, variant
-  descriptions, printed tracks and expanded rules belong on public `/help`, linked in a new tab.
-  Help omits a game-flow walkthrough. Explain shared card/market rules once and link individual
-  entries to them. Document all undo scopes, activity boundaries, creator permissions, retained
+  Commands remain in the bottom expander; omit their header button. Province connections remain
+  on the map. Event and advance descriptions remain available in the game. Legends, variant
+  descriptions, printed data and app help belong on public `/help`, linked in a new tab.
+  Omit general card/market/advance rules and the game-flow walkthrough from Help. Document all undo scopes, activity boundaries, creator permissions, retained
   answers and immutable randomness; creation and history controls link to that explanation.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
@@ -91,8 +102,9 @@ choice and understand its result through visual controls and commands, on deskto
   ends, including outcomes first received with the phase transition. Keep the activity entry.
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
   links to full payout boxes on the reference page; keep current owner payouts and adjustments
-  in the game. Activity cards open the same in-game inspector, even after leaving the hand, with
-  current payouts and viewer-specific leader credits. Inspection never replaces an active form.
+  in the game. Commodity cards link directly to their payout tracks; other activity cards open
+  the same in-game inspector, even after leaving the hand, with viewer-specific leader credits.
+  Inspection never replaces an active form.
   Live values update on accepted polling snapshots after competitions, counting all current circle
   markers, including white ones. Remove the defeated owner immediately; ignore square tokens and
   Chaos. These are forecasts using current adjustments, not a change to actual colored-only payouts.
@@ -162,10 +174,9 @@ choice and understand its result through visual controls and commands, on deskto
   remain canonical.
 
 - A decision owns its expansion destination and partial amount independently of inspection. Background
-  clicks close inspection without discarding that draft. The map has an explicit Inspection mode;
-  cards and advances have named inspection controls. Player details remain independently accessible
-  while a target is eligible. Finite hand discard/trade, Patronage, order swap and market cancellation
-  controls prepare the same command as their component controls and share one selection state.
+  clicks close connection highlights without discarding that draft. Use existing object controls
+  and native player disclosures, without separate inspection buttons or an Inspection mode. Finite
+  hand discard/trade, Patronage, order swap and market cancellation controls prepare the same command as their component controls and share one selection state.
 - Every finite group has an accessible question. Map pressed state follows exact draft membership,
   including multiple targets, rather than the most recently inspected province. The map uses a roving
   province tab stop, arrow traversal and focus panning at zoom; Tab can leave the map for confirmation.
@@ -180,3 +191,23 @@ interruptions, blockers, rejection and stale revisions. Domain tests own calcula
 own authorization, privacy and persistence; browser tests own interaction and rendered geometry.
 Fixtures prove only what they exercise. Record human accessibility/legibility findings separately.
 The [design studies](ui-proposals/index.html) illustrate visual direction; current contracts govern.
+
+## Review gate for the game-table principle
+
+Before accepting a UI change, review a normal turn at desktop and phone widths in this order:
+
+1. Start at rest: which object carries the choice, and what can be removed without losing a fact,
+   action or reference? Count duplicate homes, labels and controls as defects, not extra coverage.
+2. Prepare a choice: does the prompt say what to pick and how many? Do names retain symbols?
+   Are current → new values, limiting resources and exceptions next to the action?
+3. Open help/reference and return: is it lookup data or non-obvious app behavior? Does it preserve
+   the draft, without requiring another inspector or restating general game rules?
+4. Commit, reject and poll: accepted placement clears its selection; rejection retains correctable
+   work; polling alone preserves a valid draft. Check these separately in live offers.
+5. Inspect rendered desktop/phone views: do footnote links, card references, targets and confirmation
+   remain legible and reachable? DOM existence and screenshots captured without review cannot
+   establish visual clarity. Record automated facts and human observations separately.
+
+Apply these questions to the changed flow and one neighboring flow (for example commodity and event
+cards, full and partial placement, or shipping and advance purchase). A positive “feature exists”
+assertion is insufficient: verify the unwanted duplicate is absent and the remaining path still works.

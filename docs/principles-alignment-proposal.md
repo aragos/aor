@@ -180,6 +180,10 @@ executed in this review.
 
 ### T5 Complete component interaction and independent inspection
 
+October 30 follow-up: the explicit inspection controls/mode proposed below proved redundant in play.
+The current [UI contracts](ui-design.md) supersede those affordances; the
+[clarity postmortem](ui-decision-coverage.md#october-30-game-table-clarity-postmortem) explains the gap.
+
 **Observed inconsistency.** Supported discard, trade offer, patronage claim, Renaissance swap, and
 adjustment cancellation are routed through command-label lists in
 [GameActions](../web/src/GameActions.tsx#L20). Existing hand cards, leader displays, player panels, and

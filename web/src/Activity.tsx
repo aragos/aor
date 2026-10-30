@@ -5,6 +5,8 @@ import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
 import {advanceName, label, provinceName} from './labels';
 import {t} from './messages';
 import {Commodity, Emblem} from './TablePanels';
+import {CapitalLabel, LabelMessage} from './IdentityLabel';
+import {HelpLink} from './HelpLink';
 import {MiseryBox} from './MiseryBox';
 
 function eventPlayer(event: HistoryEventView, id: string) {
@@ -17,8 +19,8 @@ function eventName(event: HistoryEventView, id: string): string {
     return player.capital ? provinceName(player.capital) : player.name;
 }
 
-function warHeading(event: HistoryEventView, war: WarOutcomeView): string {
-    return war.winner ? t('table.warWinner').replace('{capital}', eventName(event, war.winner)) : t('table.warTied');
+function warHeading(event: HistoryEventView, war: WarOutcomeView) {
+    return war.winner ? <LabelMessage text={t('table.warWinner')} values={{capital: <CapitalLabel capital={eventPlayer(event, war.winner).capital}>{eventName(event, war.winner)}</CapitalLabel>}}/> : t('table.warTied');
 }
 
 function dieColor(event: HistoryEventView, index: number): string {
@@ -39,13 +41,15 @@ function CashPayment({event, player, amount, children}: {
     </span>;
 }
 
-function ActivityCard({cardId, onInspectCard}: {cardId: string; onInspectCard?: (cardId: string) => void}) {
+function ActivityCard({cardId, onInspectCard, commodities = []}: {cardId: string; onInspectCard?: (cardId: string) => void; commodities?: string[]}) {
+    if (commodities.length) return <span className="event-card">▤ {label(cardId, 'event')}{commodities.map(commodity => <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`} inline/>)}</span>;
     return onInspectCard
         ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {label(cardId, 'event')}</button>
         : <span className="event-card">▤ {label(cardId, 'event')}</span>;
 }
 
-function EventContent({event, track, onInspectCard}: {
+function EventContent({event, track, onInspectCard, cardInspections}: {
+    cardInspections?: Snapshot['game']['cardInspections'];
     event: HistoryEventView; track: Snapshot['game']['catalog']; onInspectCard?: (cardId: string) => void;
 }) {
     const actor = event.actor ? eventPlayer(event, event.actor) : null;
@@ -60,13 +64,13 @@ function EventContent({event, track, onInspectCard}: {
         <span>{t(`activity.${event.kind}`)}</span>
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
         {event.war && <strong>{warHeading(event, event.war)}</strong>}
-        {event.provinces.map(province => <span className="event-entity" key={province}>{provinceName(province)}</span>)}
-        {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard}/>}
+        {event.provinces.map(province => <span className="event-entity" key={province}><CapitalLabel capital={track?.provinces.find(candidate => candidate.id === province)?.capital ?? null}>{provinceName(province)}</CapitalLabel></span>)}
+        {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard} commodities={cardInspections?.find(card => card.definition.id === cardId)?.commodities}/>}
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
         {event.amount !== null && event.protectionCash == null && <strong>{event.kind === 'BID_CAPITAL' ? '$' : ''}{event.amount}</strong>}
-        {event.protectionCash != null && <span className="event-detail">{actor && `${eventName(event, actor.id)} · `}{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
-        {event.leaderRebate != null && <span className="event-detail">{actor && `${eventName(event, actor.id)} · `}{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
+        {event.protectionCash != null && <span className="event-detail">{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
+        {event.leaderRebate != null && <span className="event-detail">{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
         {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{eventName(event, target.id)}</span>}
         {event.detail && <span className="event-detail">{label(event.detail)}</span>}
         {event.drawReason && <span className="event-detail">{t(`activity.drawReason.${event.drawReason}`)}</span>}
@@ -104,7 +108,7 @@ function EventContent({event, track, onInspectCard}: {
         </span>}
         {cashChanges?.map(change => <CashPayment key={change.player} event={event} player={change.player} amount={change.amount}/>)}
         {event.miseryChanges?.map(change => <span className="event-misery-change" key={change.player}>
-            {change.player !== event.actor && eventName(event, change.player)}
+            {change.player !== event.actor && <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>}
             <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}
             <span>(<MiseryBox value={change.fromValue} track={track?.miseryTrack}/> → <MiseryBox value={change.toValue} track={track?.miseryTrack}/>)</span>
             {change.reasons?.map((reason, index) => <span className="event-detail" key={index}>
@@ -115,7 +119,7 @@ function EventContent({event, track, onInspectCard}: {
             </span>)}
         </span>)}
         {event.tokenChanges?.map(change => <span className="event-token-change" key={change.player}>
-            {eventName(event, change.player)}{' '}
+            <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>{' '}
             <strong>{t('activity.tokenPool', {amount: signedAmount(change.poolDelta)})}</strong>
             {' · '}{t('activity.tokenStock', {amount: signedAmount(change.stockDelta)})}
         </span>)}
@@ -152,7 +156,7 @@ export function ActionResultNotice({event, snapshot, onDismiss}: {
             <dl className="detail-list">{[war.initiator, war.opponent].map((player, index) => {
                 const die = event.dice.find(candidate => candidate.player === player);
                 return <div key={player}>
-                    <dt>{eventName(event, player)}</dt>
+                    <dt><CapitalLabel capital={eventPlayer(event, player).capital}>{eventName(event, player)}</CapitalLabel></dt>
                     <dd>{t(`table.die.${dieColor(event, index)}`)} {die?.value ?? '—'} → {t('table.warTotal')} <b>{war.totals[player]}</b></dd>
                 </div>;
             })}</dl>
@@ -181,7 +185,7 @@ export function Activity({snapshot, onInspectCard}: {
             {events.length === 0 && <p>{t('table.noActivity')}</p>}
             <ol className="activity-list">{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
                 <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
-                <EventContent event={event} track={snapshot.game.catalog} onInspectCard={onInspectCard}/>
+                <EventContent event={event} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections} onInspectCard={onInspectCard}/>
             </li>)}</ol>
         </div>
     </section>;

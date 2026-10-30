@@ -29,20 +29,20 @@ export async function checkLiveCommodityValues(page, web, baseline) {
     }
     const original = await show(viewer, 'COLOURED');
     await page.evaluate(`document.querySelector('[data-hand-card="live-stone"]').click()`);
-    await page.wait(`document.querySelector('.inspection-panel .owner-payout')`, 'commodity inspector');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .owner-payout').title`), original + ': $2');
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .card-decision')`), null, 'Commodity card values stay on the card');
+    assert.equal(await page.evaluate(`document.querySelector('.table-hand a[href="/help#commodity-stone"]').target`), '_blank');
+    assert.equal(await page.evaluate(`document.querySelector('.hand-card .owner-payout').title`), original + ': $2');
     const newOwner = await show(other.id, 'WHITE');
-    for (const selector of ['.hand-card .owner-payout', '.inspection-panel .owner-payout', '[data-commodity="STONE"] .owner-payout']) {
+    for (const selector of ['.hand-card .owner-payout', '[data-commodity="STONE"] .owner-payout']) {
         assert.equal(await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).title`), newOwner + ': $2', 'All commodity surfaces use the new white-marker owner');
     }
-    assert.equal(await page.evaluate(`document.querySelectorAll('.inspection-panel .owner-payout').length`), 1, 'The defeated owner is removed');
-    assert.match(await page.evaluate(`document.querySelector('.inspection-panel .commodity-value-note').textContent`), /including white markers/);
+    assert.equal(await page.evaluate(`document.querySelectorAll('.hand-card .owner-payout').length`), 1, 'The defeated owner is removed');
     await page.evaluate(`document.querySelector('#tab-markets').click()`);
     assert.match(await page.evaluate(`document.querySelector('.markets-workspace .commodity-value-note').textContent`), /including white markers/);
     const reclaimed = await show(viewer, 'WHITE');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .owner-payout').title`), reclaimed + ': $2', 'Reclaiming changes live values again without a new hand');
+    assert.equal(await page.evaluate(`document.querySelector('.hand-card .owner-payout').title`), reclaimed + ': $2', 'Reclaiming changes live values again without a new hand');
     assert.equal(await page.evaluate(`window.uiCommands.length`), 0, 'Polling, inspection and value updates send no orders');
-    console.log('Passed: App polling updates hand, inspection and markets for white-marker ownership changes and reclamation.');
+    console.log('Passed: App polling updates hand and markets for white-marker ownership changes and reclamation.');
 }
 
 export async function checkClearAdvancePrices(page, web, baseline) {

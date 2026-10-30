@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import type {Snapshot} from './api';
-import {label, playerName, provinceName} from './labels';
+import {LabelMessage, PlayerLabel, ProvinceLabel} from './IdentityLabel';
+import {label, provinceName} from './labels';
 import {t} from './messages';
 import {MapPicker, useMapSelection} from './map/MapSelection';
 import {ChoiceButtons, InvalidChoice, useTargets} from './DecisionControls';
@@ -20,7 +21,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     const finite = finiteDecisions(snapshot).map(offer => offer.command);
     const finiteLabel = (command: string) => {
         const [action, first, second] = command.split(' ');
-        if (action === 'swap-order') return `${t('action.swapOrder')} ${playerName(snapshot, first)}`;
+        if (action === 'swap-order') return <>{t('action.swapOrder')} <PlayerLabel snapshot={snapshot} id={first}/></>;
         if (action === 'cancel-adjustment') {
             const quote = snapshot.game.adjustmentOffers?.find(offer => offer.command === command);
             const cost = quote?.cost ?? snapshot.game.catalog?.commodities.find(commodity => commodity.id === first.toUpperCase())?.baseValue;
@@ -36,9 +37,9 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         }
         if (action === 'patronize') {
             const leader = snapshot.game.effects.leaders.find(candidate => candidate.leader.toLowerCase().replace(/_/g, '-') === first);
-            return `${t('action.patronize')} ${label(first, 'leader')} · $${leader?.protectionCash ?? '—'} → ${leader ? playerName(snapshot, leader.owner) : '—'}`;
+            return <>{t('action.patronize')} {label(first, 'leader')} · ${leader?.protectionCash ?? '—'} → {leader ? <PlayerLabel snapshot={snapshot} id={leader.owner}/> : '—'}</>;
         }
-        if (action === 'reduce-marker') return `${t('action.reduceMarker')} ${provinceName(first)}`;
+        if (action === 'reduce-marker') return <>{t('action.reduceMarker')} <ProvinceLabel snapshot={snapshot} id={first}/></>;
         if (action === 'civil-war-loss' && snapshot.game.civilWarLoss) {
             const loss = snapshot.game.civilWarLoss;
             return first === 'cash'
@@ -66,9 +67,9 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
                 <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command}
                     onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}</div>
         </details>}
-        {selectedAction && <div className="selected-action"><p>{finiteLabel(selectedAction)}</p>{snapshot.game.patronageOffers?.filter(offer => offer.command === selectedAction).map(offer => <p key={offer.command}>{playerName(snapshot, offer.payer)}: ${offer.payerCashAfter} · {playerName(snapshot, offer.recipient)}: ${offer.recipientCashAfter}</p>)}{snapshot.game.adjustmentOffers?.filter(offer => offer.command === selectedAction).map(offer => <p key={offer.command}>{t('controls.remainingCash')}: ${offer.cashAfter}</p>)}<InvalidChoice invalid={!finite.includes(selectedAction)} clear={() => setSelectedAction('')}/><button disabled={busy || !finite.includes(selectedAction)} onClick={async () => { if (await submit(selectedAction)) setSelectedAction(''); }}>{t('table.confirm')}</button></div>}
+        {selectedAction && <div className="selected-action"><p>{finiteLabel(selectedAction)}</p>{snapshot.game.patronageOffers?.filter(offer => offer.command === selectedAction).map(offer => <p key={offer.command}><PlayerLabel snapshot={snapshot} id={offer.payer}/>: ${offer.payerCashAfter} · <PlayerLabel snapshot={snapshot} id={offer.recipient}/>: ${offer.recipientCashAfter}</p>)}{snapshot.game.adjustmentOffers?.filter(offer => offer.command === selectedAction).map(offer => <p key={offer.command}>{t('controls.remainingCash')}: ${offer.cashAfter}</p>)}<InvalidChoice invalid={!finite.includes(selectedAction)} clear={() => setSelectedAction('')}/><button disabled={busy || !finite.includes(selectedAction)} onClick={async () => { if (await submit(selectedAction)) setSelectedAction(''); }}>{t('table.confirm')}</button></div>}
         {snapshot.game.shippingOffer && <div className="purchase-preview">
-            <p>{t('game.ships')}: {snapshot.game.shippingOffer.ships ? `${label(snapshot.game.shippingOffer.ships.fleet, 'fleet')} ${snapshot.game.shippingOffer.ships.level}` : '—'}</p>
+            <p>{t('game.ships')}: {player.ships.fleet === 'NONE' ? '—' : `${label(player.ships.fleet, 'fleet')} ${player.ships.level}`} → {snapshot.game.shippingOffer.ships ? `${label(snapshot.game.shippingOffer.ships.fleet, 'fleet')} ${snapshot.game.shippingOffer.ships.level}` : '—'}</p>
             <p>{t('controls.purchaseCost')}: ${snapshot.game.shippingOffer.cost} · {t('controls.remainingCash')}: ${snapshot.game.shippingOffer.cashAfter ?? '—'}</p>
             {snapshot.game.shippingOffer.blockers.map(blocker => <p key={blocker} className="blocker">{t(`error.${blocker}`)}</p>)}
             <button disabled={busy || !commands.includes('upgrade-ships') || snapshot.game.shippingOffer.blockers.length > 0} onClick={() => { void submit('upgrade-ships'); }}>{t('action.upgrade-ships')}</button>
@@ -90,10 +91,10 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
 function ReplacementTokenContext({snapshot}: {snapshot: Snapshot}) {
     const replacement = snapshot.game.replacementToken;
     if (!replacement) return null;
-    const provinces = replacement.provinces.map(provinceName).join(', ');
+    const provinces = replacement.provinces.map((id, index) => <span key={id}>{index > 0 && ', '}<ProvinceLabel snapshot={snapshot} id={id}/></span>);
     return <section className="replacement-token-context" aria-label={t('action.replace-event-token')}>
-        <h3>{label(replacement.event, 'event')} · {playerName(snapshot, replacement.player)}</h3>
-        <p>{t(replacement.provinces.length === 1 ? 'replacement.context' : 'replacement.groupContext', {event: label(replacement.event, 'event'), player: playerName(snapshot, replacement.player), province: provinces})}</p>
+        <h3>{label(replacement.event, 'event')} · <PlayerLabel snapshot={snapshot} id={replacement.player}/></h3>
+        <p><LabelMessage text={t(replacement.provinces.length === 1 ? 'replacement.context' : 'replacement.groupContext')} values={{event: label(replacement.event, 'event'), player: <PlayerLabel snapshot={snapshot} id={replacement.player}/>, province: provinces}}/></p>
         <p>{t(replacement.maxReplacements === 0 ? 'replacement.noPool' : 'replacement.chooseAll')}</p>
         <p>{t('game.misery')}: <MiseryBox value={replacement.misery} track={snapshot.game.catalog?.miseryTrack}/></p>
         {replacement.event === 'CIVIL_WAR' && <p>{t('replacement.civilWarMiseryApplied')}</p>}
@@ -117,20 +118,20 @@ function EventTokenReplacements({snapshot, busy, submit}: ActionProps) {
     }}>
         <h3>{t('replacement.reviewAll')}</h3>
         {replacement.provinces.map(province => <div className="replacement-province" key={province} data-replacement-province={province}>
-            <h4>{provinceName(province)}</h4>
+            <h4><ProvinceLabel snapshot={snapshot} id={province}/></h4>
             <ChoiceButtons label={provinceName(province)} id={`replace-${province}`} value={choices[province] ?? ''}
                 onChange={value => setChoices(previous => ({...previous, [province]: value as 'pool' | 'empty'}))}
                 disabled={busy} choices={[
-                    {value: 'pool', label: t('replacement.placePoolToken', {count: replacement.poolCost, province: provinceName(province)}),
+                    {value: 'pool', label: <LabelMessage text={t('replacement.placePoolToken', {count: replacement.poolCost})} values={{province: <ProvinceLabel snapshot={snapshot} id={province}/>}}/>,
                         disabled: selected.length >= replacement.maxReplacements && choices[province] !== 'pool'},
-                    {value: 'empty', label: t('replacement.leaveEmpty', {province: provinceName(province)})},
+                    {value: 'empty', label: <LabelMessage text={t('replacement.leaveEmpty')} values={{province: <ProvinceLabel snapshot={snapshot} id={province}/>}}/>},
                 ]}/>
         </div>)}
         <button type="button" className="secondary" disabled={busy} onClick={() => setChoices(Object.fromEntries(replacement.provinces.map(province => [province, 'empty'])))}>{t('replacement.leaveAllEmpty')}</button>
         <div className="replacement-review" aria-live="polite">
             <p>{t('replacement.poolBalance', {before: replacement.poolTokens, after: replacement.poolTokens - cost})} · {t('replacement.totalCost', {cost})}</p>
             {!complete && <p className="small muted">{t('replacement.chooseEveryProvince')}</p>}
-            {complete && <ul>{replacement.provinces.map(province => <li key={province}>{t(choices[province] === 'pool' ? 'replacement.placePoolToken' : 'replacement.leaveEmpty', {count: replacement.poolCost, province: provinceName(province)})}</li>)}</ul>}
+            {complete && <ul>{replacement.provinces.map(province => <li key={province}><LabelMessage text={t(choices[province] === 'pool' ? 'replacement.placePoolToken' : 'replacement.leaveEmpty', {count: replacement.poolCost})} values={{province: <ProvinceLabel snapshot={snapshot} id={province}/>}}/></li>)}</ul>}
         </div>
         <button disabled={busy || !valid}>{t('replacement.confirmAll')}</button>
     </form>;
@@ -141,7 +142,7 @@ function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {
     const destination = snapshot.game.markerPlacement?.destination;
     const sources = snapshot.legalChoices.commands.filter(command => command.startsWith('move-marker '));
     return <div className="guided-form">
-        <h3>{t('controls.markerPlacement')}{destination ? ` · ${provinceName(destination)}` : ''}</h3>
+        <h3>{t('controls.markerPlacement')}{destination && <> · <ProvinceLabel snapshot={snapshot} id={destination}/></>}</h3>
 
         <button className="secondary" disabled={busy} onClick={async () => { if (await submit('forgo-marker')) setSource(''); }}>{t('action.forgo-marker')}</button>
         {sources.length > 0 && <form onSubmit={async event => {
@@ -150,7 +151,7 @@ function EventMarkerPlacement({snapshot, busy, submit}: ActionProps) {
         }}>
             <p>{t('controls.markerSource')}</p>
             <ChoiceButtons label={t('controls.markerSource')} id="marker-source" value={source} onChange={setSource} disabled={busy}
-                choices={sources.map(command => ({value: command, label: provinceName(command.split(' ')[1])}))}/>
+                choices={sources.map(command => ({value: command, label: <ProvinceLabel snapshot={snapshot} id={command.split(' ')[1]}/>}))}/>
             <button disabled={busy || !sources.includes(source)}>{t('action.move-marker')}</button>
             <InvalidChoice invalid={!!source && !sources.includes(source)} clear={() => setSource('')}/>
             <MapPicker title={t('controls.chooseMarkerSource')} eligible={sources.map(command => command.split(' ')[1])}
@@ -170,8 +171,8 @@ function WarSurrender({snapshot, busy, submit}: ActionProps) {
     const winner = snapshot.game.players.find(player => player.id === cession?.winner);
     const validSelection = !!cession && selection.valid;
     return <form className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && validSelection) void submit(`cede-war ${selected.join(' ')}`.trim()); }}>
-        <h3>{t('action.cedeWar')} · {selected.length}/{required}</h3><p>{t('controls.warWinner')}: {winner ? playerName(snapshot, winner.id) : '—'}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
-        <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || !selection.canPick(province.id)} onChange={() => selection.pick(province.id)}/>{provinceName(province.id)}</label>)}</div>
+        <h3>{t('action.cedeWar')} · {selected.length}/{required}</h3><p>{t('controls.warWinner')}: {winner ? <PlayerLabel snapshot={snapshot} id={winner.id}/> : '—'}. {t('controls.overseasCapacity')}: {cession?.overseasCapacity}.</p>
+        <div className="province-checks">{provinces.map(province => <label className="check-label" key={province.id}><input type="checkbox" checked={selected.includes(province.id)} disabled={busy || !selection.canPick(province.id)} onChange={() => selection.pick(province.id)}/><ProvinceLabel snapshot={snapshot} id={province.id}/></label>)}</div>
         <MapPicker title={t('controls.chooseCession').replace('{count}', String(required))} selected={selected} disabled={busy}
             eligible={provinces.filter(province => selection.canPick(province.id)).map(province => province.id)} onPick={selection.pick}/>
         <InvalidChoice invalid={selection.invalid} clear={selection.clear}/>

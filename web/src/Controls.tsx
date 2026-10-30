@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {Snapshot} from './api';
 import {t} from './messages';
-import {playerName} from './labels';
+import {CapitalLabel, LabelMessage, PlayerLabel, PlayerLabels} from './IdentityLabel';
 import {GameActions} from './GameActions';
 import {MapPicker} from './map/MapSelection';
 import type {PurchaseQuote, QuotePurchase} from './GameTable';
@@ -41,7 +41,6 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     const capitalChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-capital '));
     const turnChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-turn-position '));
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
-    const nameFor = (playerId: string) => playerName(snapshot, playerId);
     const isTokenPurchase = stage === 'TOKEN_PURCHASE';
     const eligiblePurchase = isTokenPurchase && me.misery !== null;
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
@@ -64,9 +63,9 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     const positionLabel = (slot: number) => {
         const order = snapshot.game.provisionalTieOrder;
         if (order.length === 0) return t('controls.firstPosition');
-        if (slot === 1) return t('controls.before').replace('{name}', nameFor(order[0]));
-        if (slot > order.length) return t('controls.after').replace('{name}', nameFor(order[order.length - 1]));
-        return t('controls.between').replace('{before}', nameFor(order[slot - 2])).replace('{after}', nameFor(order[slot - 1]));
+        if (slot === 1) return <LabelMessage text={t('controls.before')} values={{name: <PlayerLabel snapshot={snapshot} id={order[0]}/>}}/>;
+        if (slot > order.length) return <LabelMessage text={t('controls.after')} values={{name: <PlayerLabel snapshot={snapshot} id={order[order.length - 1]}/>}}/>;
+        return <LabelMessage text={t('controls.between')} values={{before: <PlayerLabel snapshot={snapshot} id={order[slot - 2]}/>, after: <PlayerLabel snapshot={snapshot} id={order[slot - 1]}/>}}/>;
     };
     return <>
         {eligiblePurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
@@ -94,11 +93,11 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                 </dl> : <p className="small">{validPurchase ? t('table.quotePending') : t('controls.purchaseRange').split('{cash}').join(String(me.cash))}</p>}
             </div>}
         </form>}
-        {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}>{t(`capital.${choice.split(' ')[1]}`)}</button>)}<button disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</button></div>}
+        {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}><CapitalLabel capital={choice.split(' ')[1]}>{t(`capital.${choice.split(' ')[1]}`)}</CapitalLabel></button>)}<button disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</button></div>}
         {capitalChoices.length > 0 && <MapPicker title={t('controls.chooseProvince')} eligible={capitalChoices.map(choice => choice.split(' ')[1])}
             selected={capital ? [capital.split(' ')[1]] : []} disabled={busy} onPick={id => setCapital(`choose-capital ${id}`)}/>}
         {stage === 'TURN_ORDER_TIE' && <div className="turn-tie">
-            <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? snapshot.game.provisionalTieOrder.map(nameFor).join(' → ') : t('controls.noPositions')}</p>
+            <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? <PlayerLabels snapshot={snapshot} ids={snapshot.game.provisionalTieOrder} separator=" → "/> : t('controls.noPositions')}</p>
             {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button type="button" className="secondary" key={choice} disabled={busy} aria-pressed={position === choice} onClick={() => setPosition(choice)}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}<button disabled={busy || !turnChoices.includes(position)} onClick={() => { void submit(position); }}>{t('table.confirm')}</button></div>}
         </div>}
         {canAct && <GameActions snapshot={snapshot} busy={busy} submit={submit}/>}
