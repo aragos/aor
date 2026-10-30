@@ -128,7 +128,7 @@ choice and understand its result through visual controls and commands, on deskto
   After its capital replacement, Civil War shows the payable cash/token losses and remaining
   balances, using the same rounded calculation as execution.
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
-  to remain open, clears on expiry and submits once when offered; it does not auto-pass Master Art.
+  to remain open, clears on expiry or a history edit and submits once when offered; it does not auto-pass Master Art.
 - Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
   An accessible icon toggles the panel, inset while open; omit its header and count. It explains draw reasons,
   epoch/end triggers, protection money, leader rebates, related cash/misery
@@ -154,12 +154,24 @@ choice and understand its result through visual controls and commands, on deskto
   an accepted changed snapshot or a successful mutation, then every 30 seconds while idle. Unchanged
   responses, including 304s and identical 200s, do not extend recent activity. The game-list check
   retains its 30-second cadence. Update the icon directly from accepted responses, independently
-  of rendering. Own one read/timer, bound snapshot reads (authentication,
+  of rendering. Own one read/timer, bound all API requests (authentication,
   fetch and body) to 15 seconds, and discard canceled/superseded results. Visibility, resume,
   page-restoration and reconnect events refresh immediately; conditional 304 reads retain the icon.
 - Command history defaults to capital aliases, with saved player-label/ID alternatives. Aliases
   cover actors, targets, attributed dice and edit authors; stored commands and `@entry` references
   remain canonical.
+
+- A decision owns its expansion destination and partial amount independently of inspection. Background
+  clicks close inspection without discarding that draft. The map has an explicit Inspection mode;
+  cards and advances have named inspection controls. Player details remain independently accessible
+  while a target is eligible. Finite hand discard/trade, Patronage, order swap and market cancellation
+  controls prepare the same command as their component controls and share one selection state.
+- Every finite group has an accessible question. Map pressed state follows exact draft membership,
+  including multiple targets, rather than the most recently inspected province. The map uses a roving
+  province tab stop, arrow traversal and focus panning at zoom; Tab can leave the map for confirmation.
+- Costs and deterministic cash/misery endpoints come from domain quotes. Private submission status
+  compares the editable amount with the authoritative saved value; generic operation success cannot
+  label an edited or withdrawn value as saved.
 
 ## Acceptance evidence
 

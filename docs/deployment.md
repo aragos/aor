@@ -270,7 +270,7 @@ full account-directory/disaster-recovery backup.
 1. Export logs before an engine change and run `:server:verifyGameLogs` with the proposed engine.
    It reports every active log's compatibility without IO/randomness during replay or storage writes.
 2. If syntax/rules/data versions change, transform an exported game's `entries` deliberately.
-   Use canonical text and preserve every recorded `!` outcome exactly and in order. The full log
+   Use canonical text and preserve every recorded `!` outcome exactly and in order, bound to its original logical request. Incompatible source versions without a validated event mapping are rejected. The full log
    must replay without a pending authority request or an incomplete simultaneous transaction.
 3. After deploying the corresponding engine, validate against the game's current revision:
 
@@ -309,3 +309,10 @@ it, then stop writes and repoint the application. Use an appropriate trusted IP 
 external backup tool needs access; the Blueprint blocks external database connections by default.
 Test recovery before launch, and retain backups beyond the Hobby three-day window if desired.
 A restore loses subsequent moves; a restored database and the old database must not both accept play.
+
+Before deploying rules version `ah1996-three-epoch-3`, retain a complete private backup. Version-2
+histories with empty Renaissance passes cannot be interpreted safely by simply changing their header.
+The current server lists incompatible games as unavailable and permits administrative export; it
+rejects unproved upgrades. Finish such games with their matching engine or supply an explicit validated
+upgrade implementation. The release branch and green CI do not substitute for the hosted recovery and
+identity checks in [follow-ups](follow-ups.md).

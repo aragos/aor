@@ -56,7 +56,19 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: ./gradlew :core:jvmTest :core:compileKotlinJs :server:test checkKotlinFormat
+      - run: ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :server:test checkKotlinFormat
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Independent geometry and public option catalogs
+        run: |
+          python3 -m pip install -r web/scripts/map-requirements.txt
+          ./gradlew :server:exportMapCatalog -Pmap=standard -PmapOutput=/tmp/aor-standard.json
+          ./gradlew :server:exportMapCatalog -Pmap=european -PmapOutput=/tmp/aor-european.json
+          python3 web/scripts/validate-map.py --catalog /tmp/aor-standard.json
+          python3 web/scripts/validate-map.py --catalog /tmp/aor-european.json --geometry web/src/map/europeanBoardGeometry.json
+          ./gradlew :server:exportRuleOptions -PruleOptionsOutput=/tmp/aor-rule-options.json
+          diff web/src/ruleOptions.json /tmp/aor-rule-options.json
       - run: npm test --workspace web
       - run: npm run build
       - run: npm audit --audit-level=low

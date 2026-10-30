@@ -98,7 +98,17 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   open panel's close control. Commodity card/market values follow current circle ownership,
   including white circles during Expansion; actual card payments retain the colored-marker rule.
 - Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
-  retain correctable input; stale requests refresh without automatic resubmission.
+  retain correctable input; stale requests refresh without automatic resubmission. Same-account
+  credential refresh preserves the mounted table, viewport, inspector and history editor; sign-out,
+  identity changes and authorization loss clear private work. Superseded session results cannot restore it.
+- Bound credentials, fetch and response bodies to 15 seconds. An uncertain mutation releases the UI,
+  reconciles an authorized snapshot and explains that its outcome is unknown; never replay it automatically.
+- Private saves, replacements and withdrawals check an opaque owner-specific receipt inside the same
+  transaction as the public revision. A stale same-seat write conflicts; another seat's private write
+  does not. Saving and returning to an earlier amount still changes the receipt. Distinguish the saved
+  private value from an unsaved browser draft, including after withdrawal.
+- Skip publicly empty Renaissance windows at activation, using the same target calculation as swaps.
+  Treat the resulting replay continuation change as an explicit rules-version boundary.
 - Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.
   The game-list favicon checks all of the current player’s games regardless of filter or page.
   Hidden game tabs poll more often after recent game activity or engagement, return to occasional
@@ -125,6 +135,5 @@ Prefer managed authentication/TLS and automated dependency checks and fresh depl
 
 [Follow-ups](follow-ups.md) own launch credentials, DNS and initial administrator decisions. Human
 screen-reader, physical-phone, browser-chrome zoom and composited/SVG contrast review remain separate
-from automated evidence. Toulouse and Constantinople's labels are accepted. Broader removal
-of unreachable retired-rule handlers requires separate review. Bots and persistent private plans
+from automated evidence. Toulouse and Constantinople's labels are accepted. Bots and persistent private plans
 remain deferred; the in-view Urban Ascendancy draft does not provide a general planning system.
