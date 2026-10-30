@@ -50,22 +50,33 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Ask “Pick a target” or “Pick N targets” during card targeting. Prefer visible finite
   choices; select held cards from the hand rather than a second list beside Pass.
-- Keep the viewer's hand in a reserved bottom area during card play, other decisions and waiting.
-  Workspace, action and activity scrolling must not push it below the viewport or cover it. On
-  narrow screens, coordinate the action review and confirmation above the hand rather than overlaying
-  separate fixed panels. Keep Commands, turn effects and configuration reachable.
+- Keep the viewer's hand beneath the map/workspace column during card play, other decisions and
+  waiting. On desktop, the action and activity sidebar extends beside the hand instead of surrendering
+  its lower space to it. Workspace, action and activity scrolling must not push the hand below the
+  viewport or cover it. On narrow screens, coordinate the action review and confirmation above the
+  hand rather than overlaying separate fixed panels. Keep Commands, turn effects and configuration
+  reachable. Omit the visible private-hand heading and card count. Size cards and the hand to their
+  contents, with a height cap only when needed to retain usable workspace and actions.
   Card summaries show current commodity payouts and adjustments, relevant leader credits and concise
   event effects. Keep unavailable cards readable and explain their blockers when selected. Show held
   cards only from the viewer's projected hand; reference catalogs cannot reveal another player's hand.
   Play, discard and trade use this same hand selection surface, with separate explicit confirmation.
-  A selected card has one action context for its choices and consequences. Other panes do not repeat
-  hand contents, held-leader reminders or potential-credit badges; public leader availability, played
+  A selected card has one action context that explicitly states its play effect, chosen targets or
+  commodity, and projected cash/misery consequences before confirmation. Leader credits are identified
+  as becoming available after play. Show known effects directly rather than hiding them behind a rules
+  disclosure; retain unresolved decisions and dice as uncertainty. Other panes do not repeat hand
+  contents, held-leader reminders or potential-credit badges; public leader availability, played
   leaders and actual purchase discounts remain distinct facts.
   Support mouse/pen dragging, scrollbars, native touch scrolling and keyboard access to every card;
-  dragging cannot select or play one. Expand the same hand for large hands without replacing action
+  dragging cannot select or play one. Offer expansion only when cards overflow or their content needs
+  more space; keep Collapse available while expanded. Expand the same hand without replacing action
   drafts. Selecting a playable card returns to the compact hand. Preserve valid card selection,
   targets, amounts and hand scroll through inspection, polling and rejection; accepted actions and
   changed decisions clear obsolete drafts.
+- Event and leader inspections open in a popup, including references from activity. Escape, closing
+  and returning focus preserve the active action and its prepared choices. Advance inspection retains
+  its existing workspace surface; commodity cards retain their own live values and direct payout
+  reference links.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup
@@ -106,7 +117,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   losses and resulting balances, after capital replacement and rounding.
 - Open bounded, scrollable activity by default, with an icon to hide/show it and no header or count.
   Show every action once. Preserve entry-time names and emblems as later history is appended;
-  cards open the in-game inspector without changing an action draft.
+  cards open the card-inspection popup without changing an action draft.
   Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
   protection money, leader rebates and related cash/misery changes; label dice colors and omit
   continuation noise. Misery relief itemizes cash and current-turn relief rating; Holy Indulgence
@@ -139,6 +150,10 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   checks while idle, and recover after stalled reads or browser/network suspension. Unchanged
   responses do not keep a game active. Favicon changes must not require activating the tab or
   painting the game.
+- Start the map fitted to the width of its viewport and constrain dragging/zooming in both axes so
+  the view cannot expose empty space outside the board. A viewport taller than the board's proportions
+  uses the minimum height-cover view needed to avoid empty bands. Resizing preserves the prepared
+  action and bounds the resulting view.
 - Support keyboard, touch, narrow layouts, bounded map gestures, zoom and dense-piece inspection.
   Persist preferences and creation defaults in browser storage with an in-memory fallback.
 

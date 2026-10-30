@@ -52,8 +52,8 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .player-summary { border: 1px solid #d0d9c8; border-radius: 6px; background: #fcfcf6; min-width: 0; position: relative; } .player-summary.is-viewer { border-top: 3px solid #b76d50; } .player-summary.is-active { box-shadow: inset 0 0 0 1px #abbc9e; }
 .player-summary > summary { display: block; list-style: none; padding: .65rem .8rem .4rem; } .player-summary > summary::-webkit-details-marker { display: none; }
 .player-identity, .player-money, .player-stats { display: flex; align-items: center; justify-content: space-between; gap: .35rem; } .player-identity strong { margin-right: auto; font-size: .88rem; overflow-wrap: anywhere; } .player-identity small { font-size: .63rem; text-transform: uppercase; color: #6b7766; } .player-money { margin-top: .6rem; font-size: .88rem; } .income-value { color: #35724d; } .player-stats { font-size: .78rem; margin-top: .5rem; white-space: nowrap; } .player-status { display: block; margin-top: .35rem; text-align: right; font-size: .65rem; color: #627465; } .player-detail { padding: .9rem; border-top: 1px solid #d8dfce; font-size: .84rem; }
-.table-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; align-items: stretch; flex: 1; min-height: min(20dvh, 10rem); }
-.workspace-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.table-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "workspace side" "hand side"; align-items: stretch; flex: 1; min-height: min(20dvh, 10rem); }
+.workspace-main { grid-area: workspace; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .workspace-main > [role="tabpanel"] { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .workspace-tabs { flex: none; }
 .workspace-tabs { display: flex; align-items: stretch; min-height: 56px; gap: 1.25rem; padding: 0 1.5rem; border-bottom: 1px solid #d6ddcd; } .workspace-tabs button { background: transparent; color: #263f3d; border: none; border-radius: 0; padding: .9rem .2rem; font-weight: 700; } .workspace-tabs button[aria-selected=true] { border-bottom: 3px solid #346e61; } .workspace-tabs small { margin-left: .5rem; color: var(--muted); }
@@ -67,12 +67,9 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .target-choices { border: 1px solid #cdd8c4; border-radius: 5px; padding: .6rem; margin: 1rem 0; } .target-choices legend { font-size: .85rem; } .target-choices button { display: flex; align-items: center; gap: .4rem; text-align: left; min-height: 44px; }
 .error, .blocker { background: var(--blocker-fill); border-left: 3px solid var(--blocker-border); color: var(--blocker); padding: .7rem .8rem; font-size: .85rem; border-radius: 3px; } .save-status { min-height: 1.3em; font-size: .8rem; color: #47714e; } .connection-error { margin: .6rem 1rem; }
 .object-decision { border-bottom: 1px solid #d4ddc9; padding-bottom: 1rem; margin-bottom: 1rem; position: relative; } .close-detail { position: absolute; right: -.6rem; top: -.7rem; padding: .3rem .65rem; min-height: 36px; background: transparent; border: none; color: #315b50; font-size: 1.5rem; } .object-decision h2 { padding-right: .7rem; } .card-value { margin: .7rem 0; } .price-quote > strong { display: block; font-size: 2rem; } .price-quote > span { font-size: .8rem; } .leader-discount-detail { font-size: .85rem; margin-bottom: .5rem; } .leader-discount-detail summary { display: flex; justify-content: space-between; gap: 1rem; }
-.table-hand { flex: 0 0 clamp(12.5rem, 26dvh, 15.5rem); min-height: 0; display: flex; flex-direction: column; gap: .35rem; border-block: 1px solid #cbd5c1; padding: .5rem .9rem; background: #f5f3e9; }
-.hand-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex: none; }
-.hand-title { display: flex; align-items: baseline; gap: .6rem; font-size: .85rem; }
-.hand-title > span { font-size: .78rem; color: var(--muted); }
-.hand-toggle { min-height: 32px; padding: .3rem .65rem; font-size: .78rem; }
-.hand-cards { display: flex; align-items: stretch; flex: 1; gap: .55rem; overflow: auto; min-width: 0; min-height: 0; padding: .2rem .2rem .45rem; overscroll-behavior: contain; scrollbar-width: thin; }
+.table-hand { grid-area: hand; min-height: 0; max-height: min(26dvh, 15rem); display: flex; align-items: stretch; gap: .4rem; border-top: 1px solid #cbd5c1; padding: .4rem .6rem; background: #f5f3e9; overflow: hidden; }
+.hand-toggle { order: 2; align-self: center; flex: none; min-height: 32px; max-width: 4.5rem; padding: .35rem .45rem; font-size: .78rem; }
+.hand-cards { display: flex; align-items: flex-start; flex: 1; gap: .5rem; overflow: auto; min-width: 0; min-height: 0; padding: .2rem .2rem .35rem; overscroll-behavior: contain; scrollbar-width: thin; }
 .hand-card { display: flex; flex-direction: column; gap: .25rem; background: #f2e8db; border: 1px solid #c8cdbd; color: #263f3d; text-align: left; padding: .55rem .65rem; box-shadow: 0 2px 3px #263d3310; min-height: 0; }
 .hand-card:hover { background: #f7eddf; border-color: #678269; }
 .hand-card.leader { background: #e7ead9; }
@@ -88,11 +85,11 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .hand-card .card-commodity > .payouts { grid-column: 1 / -1; margin: 0; gap: .2rem .45rem; }
 .hand-card .card-commodity .adjustment-badges { flex-wrap: wrap; font-size: .65rem; }
 .hand-card .owner-payout { font-size: .78rem; }
-.table-hand.hand-expanded { flex-basis: min(48dvh, 30rem); }
-.table-hand[data-empty="true"] { flex-basis: 5rem; }
+.table-hand.hand-expanded { max-height: min(45dvh, 28rem); }
+.table-hand[data-empty="true"] { padding-block: .2rem; }
 .hand-cards > .muted { margin: .2rem 0; }
 .hand-expanded .hand-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-content: start; overflow-x: hidden; }
-.hand-expanded .hand-card { min-height: 10rem; }
+.hand-expanded .hand-card { height: auto; }
 .table-tools { display: flex; flex-wrap: wrap; flex: 0 1 auto; min-height: 36px; max-height: 35dvh; overflow-y: auto; background: #f1f2e9; }
 .table-tools > details { flex: 1; min-width: 0; padding: .15rem .8rem; margin: 0; }
 .table-tools > details[open] { flex-basis: 100%; }
@@ -105,8 +102,6 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .object-heading { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
 .object-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1.35rem; }
 .object-heading .close-detail { position: static; flex: none; padding: .25rem .5rem; }
-.card-effect-detail { margin: 0 0 .45rem; }
-.card-effect-detail > summary { font-size: .8rem; }
 .card-decision form > .target-choices { margin-block: .45rem; padding: .4rem; }
 .card-decision .cash-preview { margin-block: .4rem; font-size: .85rem; }
 .card-commodity { display: block; margin: .45rem 0 0; }
@@ -123,7 +118,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 @media (max-width: 700px) {
     .game-shell { margin: .5rem; } .game-table { border-radius: 8px; } .game-header { flex-wrap: wrap; gap: .4rem .65rem; } .game-brand { flex: 1; } .game-brand h1 { font-size: 1.3rem; } .header-stage { order: 3; width: 100%; justify-content: space-between; font-size: .85rem; }
     .player-overview { display: flex; gap: .5rem; overflow-x: auto; padding: .7rem; scroll-snap-type: x proximity; } .player-summary { flex: 0 0 208px; scroll-snap-align: start; }
-    .table-workspace { display: flex; flex-direction: column; } .workspace-tabs { padding: 0 1rem; min-height: 48px; } .decision-panel { border-left: 0; border-top: 1px solid #d7dece; padding: 1rem; } .decision-heading { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .8rem; } .decision-heading h2 { margin-bottom: .7rem; font-size: 1.4rem; }
+    .workspace-tabs { padding: 0 1rem; min-height: 48px; } .decision-panel { border-left: 0; border-top: 1px solid #d7dece; padding: 1rem; } .decision-heading { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .8rem; } .decision-heading h2 { margin-bottom: .7rem; font-size: 1.4rem; }
     .pool-summary { padding: .65rem 1rem; margin: 0 0 1rem; } .pool-summary > strong { font-size: 2.6rem; } .pool-summary > span:last-child { max-width: none; }
     .markets-workspace, .advances-workspace { padding: 1rem; min-height: 350px; } .table-effects, .table-configuration, .command-dock { padding-inline: 1rem; } .landing { margin: 1rem; padding: 1.5rem; } .target-choices button { min-height: 44px; }
 }
@@ -174,11 +169,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
     .player-stats { margin-top: .3rem; }
     .player-status { display: none; }
     .table-overview { max-height: 30%; }
-    .table-workspace { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 40%); }
-    .game-table.has-context .table-workspace { grid-template-rows: minmax(0, 1fr) minmax(0, 55%); }
+    .table-workspace { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, auto) auto; grid-template-areas: "workspace" "side" "hand"; }
     .workspace-tabs { min-height: 44px; }
     .workspace-tabs button { padding-block: .65rem; }
-    .workspace-side { max-height: 35dvh; overflow-y: auto; overscroll-behavior: contain; }
+    .workspace-side { max-height: 30dvh; overflow-y: auto; overscroll-behavior: contain; }
     .workspace-side .decision-panel { overflow-y: auto; padding: .65rem .8rem; }
     .decision-panel.has-context .decision-heading > .eyebrow { display: none; }
     .decision-panel.has-context .decision-heading:not(.object-heading) h2 { font-size: .85rem; font-family: inherit; font-weight: 600; margin: 0; color: #61756b; }
@@ -192,9 +186,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
     .decision-panel.has-context .pool-summary > strong { font-size: 1.8rem; }
     .decision-panel.has-context .province-actions > div > .eyebrow, .decision-panel.has-context .province-actions h2 { display: none; }
     .card-confirmation { bottom: -.65rem; }
-    .table-hand { flex-basis: clamp(10.5rem, 23dvh, 13rem); padding: .4rem .6rem; gap: .15rem; }
-    .hand-heading { margin: 0; }
-    .hand-title { font-size: .8rem; }
+    .table-hand { max-height: 24dvh; padding: .3rem .45rem; gap: .25rem; }
     .hand-card { padding: .45rem .55rem; }
     .hand-card h3 { font-size: .95rem; }
     .hand-card-summary { font-size: .8rem; }
@@ -302,16 +294,18 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .danger {background:#8b2626; color:white;}
 
 .inspection-panel { padding: 1rem 1.5rem; border-top: 1px solid #c9d4bf; background: #fffef8; flex: 0 1 auto; max-height: 55%; overflow: auto; min-height: 0; }
-.workspace-side { min-width: 0; min-height: 0; background: #f8faf2; border-left: 1px solid #d7dece; display: flex; flex-direction: column; overflow: hidden; }
-.workspace-side .decision-panel { border-left: 0; flex: 1; }
-.workspace-side .table-activity { flex: 0 1 24%; min-height: 44px; max-height: 12rem; display: flex; flex-direction: column; }
+.workspace-side { grid-area: side; min-width: 0; min-height: 0; background: #f8faf2; border-left: 1px solid #d7dece; display: flex; flex-direction: column; overflow: hidden; }
+.workspace-side .decision-panel { border-left: 0; flex: 0 1 auto; max-height: 65%; }
+.workspace-side .table-activity { flex: 1; min-height: 44px; max-height: none; display: flex; flex-direction: column; }
+.workspace-side:has(.table-activity[data-open="false"]) .decision-panel { max-height: calc(100% - 44px); }
 .workspace-side .table-activity[data-open="false"] { flex: none; }
-.workspace-side .activity-body { min-height: 0; display: flex; flex-direction: column; }
+.workspace-side .activity-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .workspace-side .activity-body > p { margin: .3rem 0; }
-.workspace-side .activity-list { min-height: 0; max-height: none; overflow: auto; }
+.workspace-side .activity-list { flex: 1; min-height: 0; max-height: none; overflow: auto; }
 @media (max-width: 700px) {
     .workspace-side { display: flex; overflow: hidden; }
-    .workspace-side .table-activity { max-height: 10rem; }
+    .workspace-side .table-activity { flex: 0 1 25%; min-height: 40px; max-height: 7rem; }
+    .workspace-side .decision-panel { max-height: none; flex: 1; }
 }
 .inspection-panel .object-decision { border: 0; margin: 0; padding: 0; }
 .inspection-panel .close-detail { right: 0; }
@@ -385,10 +379,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 
 fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .object-control {position: relative; display: flex; flex-direction: column;}
-.object-control > .hand-card, .object-control > .advance-tile {height: 100%;}
+.object-control > .advance-tile {height: 100%;}
 
-.hand-cards > .object-control {flex: 0 0 200px; min-height: min-content;}
-.object-control > .hand-card {flex: 1 1 auto;}
+.hand-cards > .object-control {flex: 0 0 200px; min-height: 0;}
+.object-control > .hand-card {height: auto; flex: none;}
 
 .object-control > .card-track-links { position: absolute; top: .3rem; right: .3rem; display: flex; gap: .4rem; }
 
@@ -399,3 +393,13 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .card-track-links .help-link { width: auto; gap: 2px; }
 
 .hand-card .hand-leader-note { font-size: .7rem; line-height: 1.35; color: #536456; }
+
+.card-inspection-dialog { width: min(38rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 1.25rem; border: 1px solid #b5c6ac; border-radius: 9px; color: var(--ink); background: var(--surface); box-shadow: 0 15px 55px #142a3140; overflow: auto; }
+.card-inspection-dialog::backdrop { background: #142a3155; }
+.card-inspection-dialog .object-decision { border: 0; padding: 0; margin: 0; }
+.card-inspection-dialog .close-detail { top: -.4rem; right: -.4rem; }
+.card-inspection-dialog h2 { padding-right: 2rem; }
+.card-play-effects { margin-block: .6rem; font-size: .85rem; line-height: 1.5; }
+.card-play-effects p { margin-block: .4rem; }
+.card-play-effects .card-event-text { margin: 0; font: inherit; line-height: 1.5; }
+.card-play-credit-context { margin-block: .5rem; font-size: .85rem; line-height: 1.5; }

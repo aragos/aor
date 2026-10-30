@@ -89,7 +89,7 @@ export async function checkActionContext(page, web, baseline) {
     await show({events: [cardEvent], game: {commodityPayouts: [payout]}});
     const beforeCommands = await page.evaluate('window.mapCommands.length');
     assert.equal(await page.evaluate(`document.querySelector('.event-card a[href="/help#commodity-stone"]').target`), '_blank', 'Historical commodities link to their payout track');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .card-value')`), null);
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-value')`), null);
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeCommands);
 
     const card = {reference: 'draft', definition: {id: 'the-crusades', kind: 'event', messageId: 'card.the-crusades', shape: 'CIRCLE'}};
@@ -103,11 +103,11 @@ export async function checkActionContext(page, web, baseline) {
     await click('.event-card');
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Activity inspection preserves a prepared card target');
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /Area VI/);
-    await click('.inspection-panel .close-detail');
-    assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel')`), false);
+    await click('.card-inspection-dialog .close-detail');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-inspection-dialog[open]')`), false);
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Closing inspection preserves the prepared target');
     await click('[data-hand-card="draft"]');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel')`), null, 'The active card has one action context, without an automatic duplicate inspector');
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'The active card has one action context, without an automatic duplicate inspector');
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Reselecting the active card preserves its target');
 
     const hand = Array.from({length: 12}, (_, index) => ({reference: `drag-${index}`, definition: card.definition}));
@@ -132,7 +132,7 @@ export async function checkActionContext(page, web, baseline) {
     await page.send('Input.dispatchMouseEvent', {type: 'mouseMoved', x: bounds.x - 100, y: bounds.y, buttons: 0});
     assert.equal(await page.evaluate(`document.querySelector('.hand-cards').scrollLeft`), scrolled, 'Releasing outside the hand cannot leave a drag armed');
     await page.evaluate(`document.querySelector('[data-hand-card="drag-2"]').focus(); document.querySelector('[data-hand-card="drag-2"]').click()`);
-    assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .card-decision')`), true, 'Keyboard/programmatic card inspection still works after dragging');
+    assert.equal(await page.evaluate(`!!document.querySelector('.card-inspection-dialog .card-decision')`), true, 'Keyboard/programmatic card inspection still works after dragging');
 
     const advance = baseline.game.catalog.advances.find(candidate => candidate.id === 'NATIONALISM');
     await show({prompt: {messageId: 'prompt.purchase-advances', players: [viewer]}, legalChoices: {commands: [`buy-advance ${advance.letter}`, 'pass'], bidMax: null},

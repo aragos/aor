@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 
 const api = process.env.MAP_API_URL ?? 'http://127.0.0.1:8095';
 const cdp = process.env.MAP_CDP_URL ?? 'http://127.0.0.1:9351';
+
+class CdpError extends Error {
+    constructor(message, code, method) {
+        super(message);
+        this.name = 'CdpError';
+        this.code = code;
+        this.method = method;
+    }
+}
+
+// A navigation may replace the document while a read predicate is being evaluated.
+// Keep this restricted to protocol errors; a page exception with the same text is a real failure.
+function isNavigationContextError(error) {
+    return error instanceof CdpError && error.method === 'Runtime.evaluate' && error.code === -32000 &&
+        /^(?:Inspected target navigated or closed|Execution context was destroyed(?:, most likely because of a navigation)?|Cannot find context with specified id|Cannot find default execution context)\.?$/.test(error.message);
+}
+
 export class Page {
     constructor(ws) {
         this.ws = ws; this.next = 0; this.pending = new Map();
@@ -12,7 +29,7 @@ export class Page {
                 const pending = this.pending.get(message.id);
                 this.pending.delete(message.id);
                 if (!pending) return;
-                if (message.error) pending.reject(new Error(message.error.message)); else pending.resolve(message.result);
+                if (message.error) pending.reject(new CdpError(message.error.message, message.error.code, pending.method)); else pending.resolve(message.result);
             }
         });
     }
@@ -27,7 +44,7 @@ export class Page {
         return new Promise((resolve, reject) => {
             const id = ++this.next;
             const timeout = setTimeout(() => { this.pending.delete(id); reject(new Error(`CDP timed out: ${method}`)); }, 15000);
-            this.pending.set(id, {resolve: value => {clearTimeout(timeout); resolve(value);}, reject: error => {clearTimeout(timeout); reject(error);}});
+            this.pending.set(id, {method, resolve: value => {clearTimeout(timeout); resolve(value);}, reject: error => {clearTimeout(timeout); reject(error);}});
             this.ws.send(JSON.stringify({id, method, params}));
         });
     }
@@ -37,11 +54,17 @@ export class Page {
         return result.result.value;
     }
     async wait(expression, description) {
+        let navigationError;
         for (let attempt = 0; attempt < 100; attempt++) {
-            if (await this.evaluate(`Boolean(${expression})`)) return;
+            try {
+                if (await this.evaluate(`Boolean(${expression})`)) return;
+            } catch (error) {
+                if (!isNavigationContextError(error)) throw error;
+                navigationError = error;
+            }
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        throw new Error(`Timed out: ${description}`);
+        throw new Error(`Timed out: ${description}`, {cause: navigationError});
     }
     async reload() {
         const previous = await this.evaluate('performance.timeOrigin');

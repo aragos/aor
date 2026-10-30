@@ -33,7 +33,7 @@ export async function checkMarketInsights(page, web, baseline) {
     await page.wait(`document.querySelector('.table-hand a[href="/help#commodity-fur"]')`, 'Selected commodity reference');
     assert.equal(await page.evaluate(`document.querySelector('.table-hand a[href="/help#commodity-fur"]').target`), '_blank');
     assert.match(await page.evaluate(`document.querySelector('.hand-card .adjustment-badge.SHORTAGE').textContent`), /Shortage/i);
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .card-decision')`), null, 'Commodity cards do not create an inspection box');
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-decision')`), null, 'Commodity cards do not create an inspection box');
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
     assert.match(await page.evaluate(`document.querySelector('[data-advance="${advance.id}"] .unplayed-leaders').textContent`), /I: 2.*II: 1.*III: 0/);
     await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);

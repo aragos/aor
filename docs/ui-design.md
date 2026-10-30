@@ -17,23 +17,26 @@ choice and understand its result through visual controls and commands, on deskto
 3. **Organize attention around action.** Show actor, request and relevant resources together. Open
    the relevant workspace once per decision boundary; polling must not repeatedly redirect it.
    Interruptions name the required responder and the activity that resumes. Keep the private hand
-   visible beside every decision through its reserved bottom area, without repeating held-card
-   reminders in the workspace or action pane.
+   visible below the workspace column, leaving the sidebar's height available for action and activity,
+   without repeating held-card reminders in the workspace or action pane.
 4. **Use the game objects as controls.** Click cards, advances and players for their relevant detail
    or choice; do not add a parallel Inspect button or map mode. Province connections are shown by
    map highlights, without a second province panel. Commodity cards show current payouts and a
    small question link to each full payout track, without a commodity inspector. Reference access
-   must preserve the active form, prepared targets and picker. Distinguish inspection, eligibility,
-   draft selection and commitment; a component click never commits an order.
+   must preserve the active form, prepared targets and picker. Event and leader inspections use a
+   popup that returns focus when closed; advance inspection retains its workspace surface.
+   Distinguish inspection, eligibility, draft selection and commitment; a component click never
+   commits an order.
 5. **Define draft lifetimes.** Polling and navigation preserve valid drafts and viewport. Replaced
    decisions and accepted history edits clear obsolete selections. Successful pass/card play closes
    its action context; accepted token/marker placement clears its province and amount. Rejection retains
    correctable input. Mark invalid choices and prevent stale submission. A preauthorized queued action submits once only when legal, never retries a failure.
 6. **Explain consequences locally.** Show costs, modifiers, remaining resources and deterministic
-   effects beside the action before commitment. Keep the chosen cash and misery endpoints beside
-   confirmation, with full event rules available in an optional disclosure. Upgrades show current →
-   new values. Partial placement explains the marker requirement and limiting resource beside its
-   placement action, rather than in inspection. Map pickers ask “Pick a target” or “Pick N targets.”
+   effects beside the action before commitment. State the selected card's effect explicitly, including
+   the chosen commodity or targets and known cash/misery endpoints; do not hide the play's effect in
+   a collapsed disclosure. Upgrades show current → new values. Partial placement explains its marker
+   requirement and limiting resource beside the action, rather than in inspection. Map pickers ask
+   “Pick a target” or “Pick N targets.”
    Distinguish current, projected, conditional and uncertain values; discounts, final prices and
    cash receipts are different quantities. Offer feasible alternatives.
 7. **Use consistent identity and emphasis.** Capital names identify powers; before assignment use
@@ -91,18 +94,24 @@ choice and understand its result through visual controls and commands, on deskto
   the action button confirms it. Select playable cards from the persistent hand, without another
   card list beside Pass. The selected card's choices and consequences have one action context;
   selection does not also open an automatic duplicate inspector. Name the selected object once in
-  that context. Full event rules are optional detail; the chosen cash and misery effects stay beside
-  confirmation rather than repeating the full rules or burying the outcome below them.
+  that context. Show the selected card's effect directly, then its chosen target/commodity and projected
+  consequences beside confirmation. Cash changes identify who receives or loses money; leader credits
+  say they become available after play. Preserve uncertainty where decisions or dice remain unresolved.
   Card faces and inspections omit type headers. Mark recurring cards with a shared badge rather
   than naming their printed shape; the public reference explains the recycling behavior.
-- The viewer's hand occupies a reserved bottom area during play, purchases, expansion and waiting.
-  Bound workspace, action and activity scrolling so long content cannot push the hand offscreen.
+- The viewer's hand occupies the bottom of the map/workspace column during play, purchases,
+  expansion and waiting. Its desktop width matches that column; the action/activity sidebar extends
+  down beside it. Bound workspace, action and activity scrolling so long content cannot push the hand
+  offscreen.
   Narrow layouts place the action review and reachable confirmation above the same hand area;
   neither it nor the hand overlays map targets. Commands, turn effects and configuration remain
-  reachable without displacing the hand.
+  reachable without displacing the hand. Omit a visible private-hand title and count; retain an
+  accessible name for the hand. Cards use their natural content height rather than stretching to an
+  arbitrary tall row, capped only when needed to leave room for the workspace and actions.
   Compact cards show current commodity owner payouts and adjustments, relevant leader credits and
   concise event effects. Keep unavailable cards readable, with selection opening their blocker or
-  reference while preserving the active draft. Expand the same hand surface for large hands;
+  reference while preserving the active draft. Show Expand only when cards or their contents need
+  more space, and retain Collapse while expanded. Expand the same hand surface;
   selecting a playable card returns it to compact form. Keep card order stable and preserve hand
   scroll through polling and inspection. Keyboard focus brings an offscreen card into view without
   scrolling the whole table.
@@ -125,8 +134,9 @@ choice and understand its result through visual controls and commands, on deskto
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
   links to full payout boxes on the reference page; keep current owner payouts and adjustments
   in the game. Commodity cards link directly to their payout tracks; other activity cards open
-  the same in-game inspector, even after leaving the hand, with viewer-specific leader credits.
-  Inspection never replaces an active form.
+  the same card-inspection popup, even after leaving the hand, with viewer-specific leader credits.
+  Opening, Escape/close and focus restoration preserve the active form, target picker and prepared
+  values; inspection never replaces that form. Advance inspections retain their workspace surface.
   Live values update on accepted polling snapshots after competitions, counting all current circle
   markers, including white ones. Remove the defeated owner immediately; ignore square tokens and
   Chaos. These are forecasts using current adjustments, not a change to actual colored-only payouts.
@@ -175,7 +185,7 @@ choice and understand its result through visual controls and commands, on deskto
   New World income relief, debt payments and deferred War/Crusades effects. Record actual movement
   separately from any combined rule contributions; clamping must not invent intermediate boxes.
   Direct actions and automatic phase receipts retain their own changes when a response combines
-  them. Source cards open the same in-game inspector as other activity cards.
+  them. Source cards open the same card-inspection popup as other activity cards.
   Relief receipts show cash, rating spent and the current-turn rating sources without duplicating
   the cash expense. Every cash receipt uses the same recorded player name, emblem and signed amount,
   including the acting player. Holy Indulgence records each player's actual pool ↔ stock movements separately

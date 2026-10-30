@@ -36,6 +36,9 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
     const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker, inspection,
         setInspection, selectedAction, setSelectedAction} = useMapSelection();
     const [expanded, setExpanded] = useState(false);
+    const [needsExpansion, setNeedsExpansion] = useState(false);
+    const hand = useRef<HTMLElement>(null);
+    const measureOverflow = useRef<() => void>();
     const compactScroll = useRef(0);
     const expandedScroll = useRef(0);
     const previousExpanded = useRef(false);
@@ -44,6 +47,10 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
     const decisions = finiteDecisions(snapshot);
     const selectedReference = selectedCard || decisions.find(decision =>
         decision.subject.kind === 'card' && decision.command === selectedAction)?.subject.id;
+
+    useLayoutEffect(() => {
+        if (!references) setExpanded(false);
+    }, [references]);
 
     useLayoutEffect(() => {
         const container = drag.ref.current;
@@ -60,10 +67,20 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
 
     useLayoutEffect(() => {
         const container = drag.ref.current;
-        if (!container) return;
+        const section = hand.current;
+        if (!container || !section) return;
         let width = container.clientWidth;
         let height = container.clientHeight;
-        const observer = new ResizeObserver(() => {
+        const measure = () => {
+            const style = getComputedStyle(section);
+            // Ignore the toggle's own width so showing it cannot manufacture persistent overflow.
+            const availableWidth = section.clientWidth - parseFloat(style.paddingLeft) -
+                parseFloat(style.paddingRight);
+            const cards = [...container.querySelectorAll<HTMLElement>('[data-hand-card]')];
+            const contentClipped = cards.some(card => card.scrollHeight > card.clientHeight + 1 ||
+                card.scrollWidth > card.clientWidth + 1);
+            setNeedsExpansion(cards.length > 0 && (container.scrollWidth > availableWidth + 1 ||
+                container.scrollHeight > container.clientHeight + 1 || contentClipped));
             if (width === container.clientWidth && height === container.clientHeight) return;
             width = container.clientWidth;
             height = container.clientHeight;
@@ -72,10 +89,27 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                 ? focused.closest('.object-control')
                 : container.querySelector('[data-hand-card][aria-pressed="true"]');
             if (card) revealCard(container, card);
-        });
+        };
+        measureOverflow.current = measure;
+        const observer = new ResizeObserver(measure);
+        observer.observe(section);
         observer.observe(container);
-        return () => observer.disconnect();
-    }, [drag.ref]);
+        [...container.children].forEach(card => {
+            observer.observe(card);
+            const button = card.querySelector('[data-hand-card]');
+            if (button) observer.observe(button);
+        });
+        measure();
+        return () => {
+            measureOverflow.current = undefined;
+            observer.disconnect();
+        };
+    }, [drag.ref, references, expanded]);
+
+    useLayoutEffect(() => {
+        measureOverflow.current?.();
+    }, [snapshot.game.hand, snapshot.game.cardOffers, snapshot.game.cardInspections,
+        snapshot.game.commodityPayouts]);
 
     function setHandExpanded(next: boolean) {
         const container = drag.ref.current;
@@ -86,16 +120,13 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
         setExpanded(next);
     }
 
-    return <section className={`table-hand ${expanded ? 'hand-expanded' : ''}`}
-        data-empty={snapshot.game.hand.length === 0} aria-label={t('game.hand')}>
-        <div className="hand-heading">
-            <div className="hand-title"><strong>{t('game.hand')}</strong>
-                <span>{snapshot.game.hand.length} {t('game.cards').toLowerCase()}</span></div>
-            {snapshot.game.hand.length > 0 && <button type="button" className="secondary hand-toggle"
-                aria-expanded={expanded} aria-controls="hand-cards" onClick={() => setHandExpanded(!expanded)}>
-                {t(expanded ? 'hand.collapse' : 'hand.expand')}
-            </button>}
-        </div>
+    return <section ref={hand} className={`table-hand ${expanded ? 'hand-expanded' : ''}`}
+        data-empty={snapshot.game.hand.length === 0} data-overflow={needsExpansion}
+        aria-label={t('game.hand')}>
+        {(expanded || needsExpansion) && <button type="button" className="secondary hand-toggle"
+            aria-expanded={expanded} aria-controls="hand-cards" onClick={() => setHandExpanded(!expanded)}>
+            {t(expanded ? 'hand.collapse' : 'hand.expand')}
+        </button>}
         <div id="hand-cards" className="hand-cards" {...drag} onFocusCapture={event => {
             const card = event.target.closest('.object-control');
             if (card && drag.ref.current) revealCard(drag.ref.current, card);

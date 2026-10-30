@@ -27,9 +27,10 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-hand-card="recurring"] .recurring-badge').length`), 1);
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-hand-card="once"] .recurring-badge').length`), 0);
     await page.evaluate(`document.querySelector('[data-hand-card="recurring"]').click()`);
-    await page.wait(`document.querySelector('.inspection-panel .card-decision')`, 'recurring card inspection');
-    assert.equal(await page.evaluate(`document.querySelectorAll('.inspection-panel .card-decision > .eyebrow').length`), 0);
-    assert.match(await page.evaluate(`document.querySelector('.inspection-panel .recurring-badge').textContent`), /Recurring/);
+    await page.wait(`document.querySelector('.card-inspection-dialog .card-decision')`, 'recurring card inspection');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.card-inspection-dialog .card-decision > .eyebrow').length`), 0);
+    assert.match(await page.evaluate(`document.querySelector('.card-inspection-dialog .recurring-badge').textContent`), /Recurring/);
+    await page.evaluate(`document.querySelector('.card-inspection-dialog .close-detail')?.click()`);
     await page.evaluate(`document.querySelector('[data-player="${viewer}"] > summary').click()`);
     assert.equal(await page.evaluate(`document.querySelector('[data-player="${viewer}"] .written-cash dd').textContent`), '$40');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('[data-player="${viewer}"] .player-detail dt')].some(label=>label.textContent==='Income')`), false);

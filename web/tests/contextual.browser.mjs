@@ -150,7 +150,7 @@ export async function checkContextualUx(page, web, baseline) {
     await click('[data-hand-card="target"]');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'The compact hand omits full event paragraphs');
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="target"] .hand-card-summary').textContent`), /.+/, 'The held event has a concise effect summary');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href^="/help#card-"]')`), null, 'Card inspection omits the redundant rules link');
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog a[href^="/help#card-"]')`), null, 'Card inspection omits the redundant rules link');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
     await click(`[data-player="${other.id}"] > summary`);
@@ -230,16 +230,37 @@ export async function checkContextualUx(page, web, baseline) {
 }
 
 export async function checkMapGestures(page) {
+    await page.send('Page.bringToFront');
     await page.send('Emulation.setDeviceMetricsOverride', {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
     await page.click('Fit map');
+    await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     const view = () => page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox').split(' ').map(Number)`);
     const fit = await view();
+    const bounds = await page.evaluate(`document.querySelector('.world-map').dataset.mapBounds.split(' ').map(Number)`);
     await page.evaluate(`document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'})`);
     const center = await page.evaluate(`(() => {const r=document.querySelector('.world-map').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
-    const seaLabel = await page.evaluate(`(() => {const r=document.querySelector('[data-sea="NORTH_SEA"] text').getBoundingClientRect();getSelection()?.removeAllRanges();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
-    await page.send('Input.dispatchMouseEvent', {type:'mousePressed',...seaLabel,button:'left',clickCount:1});
-    await page.send('Input.dispatchMouseEvent', {type:'mouseMoved',x:seaLabel.x+90,y:seaLabel.y+12,button:'left',buttons:1});
-    await page.send('Input.dispatchMouseEvent', {type:'mouseReleased',x:seaLabel.x+90,y:seaLabel.y+12,button:'left',clickCount:1});
+    const seaLabel = await page.evaluate(`(() => {
+        const svg=document.querySelector('.world-map');
+        const frame=svg.getBoundingClientRect();
+        getSelection()?.removeAllRanges();
+        for(const label of svg.querySelectorAll('[data-sea] text')) {
+            const rect=label.getBoundingClientRect();
+            const x=rect.x+rect.width/2,y=rect.y+rect.height/2;
+            const hit=document.elementFromPoint(x,y);
+            if(x>frame.left+15 && x<frame.right-15 && y>frame.top+15 && y<frame.bottom-25 && hit?.closest('.world-map')) {
+                return {x,y,dx:x>frame.left+120?-90:90};
+            }
+        }
+        return null;
+    })()`);
+    assert(seaLabel,'A visible sea label offers a real SVG drag target away from floating controls');
+    const {x,y,dx}=seaLabel;
+    await page.send('Input.dispatchMouseEvent', {type:'mousePressed',x,y,button:'left',clickCount:1});
+    await page.send('Input.dispatchMouseEvent', {type:'mouseMoved',x:x+Math.sign(dx)*12,y,button:'left',buttons:1});
+    await page.evaluate('new Promise(resolve => requestAnimationFrame(resolve))');
+    await page.send('Input.dispatchMouseEvent', {type:'mouseMoved',x:x+dx,y:y+12,button:'left',buttons:1});
+    await page.evaluate('new Promise(resolve => requestAnimationFrame(resolve))');
+    await page.send('Input.dispatchMouseEvent', {type:'mouseReleased',x:x+dx,y:y+12,button:'left',clickCount:1});
     assert.equal(await page.evaluate(`getSelection()?.toString()`), '', 'Dragging a sea label never selects map text');
     await page.send('Input.dispatchMouseEvent', {type:'mouseWheel',...center,deltaX:0,deltaY:-150,modifiers:2});
     await page.wait(`Number(document.querySelector('.world-map').getAttribute('viewBox').split(' ')[2]) < ${fit[2]}`, 'modifier scroll zoom');
@@ -248,10 +269,13 @@ export async function checkMapGestures(page) {
     assert.deepEqual(await view(), zoomed, 'Ordinary scrolling does not zoom');
     for (const direction of [-1,1]) {
         await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...center,button:'left',clickCount:1});
+        await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:center.x+direction*12,y:center.y+direction*12,button:'left',buttons:1});
+        await page.evaluate('new Promise(resolve => requestAnimationFrame(resolve))');
         await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:center.x+direction*2500,y:center.y+direction*2500,button:'left',buttons:1});
+        await page.evaluate('new Promise(resolve => requestAnimationFrame(resolve))');
         await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:center.x+direction*2500,y:center.y+direction*2500,button:'left',clickCount:1});
         const [x,y,w,h] = await view();
-        assert(x>=fit[0] && y>=fit[1] && x+w<=fit[0]+fit[2]+.01 && y+h<=fit[1]+fit[3]+.01, 'Pan stays within map bounds');
+        assert(x>=bounds[0]-.01 && y>=bounds[1]-.01 && x+w<=bounds[0]+bounds[2]+.01 && y+h<=bounds[1]+bounds[3]+.01, 'Pan stays within map bounds');
     }
     await page.click('Fit map');
     await page.evaluate(`document.querySelector('.world-map').scrollIntoView({block:'center',behavior:'instant'})`);

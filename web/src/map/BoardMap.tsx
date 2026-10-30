@@ -7,6 +7,8 @@ import {HelpLink} from '../HelpLink';
 import {AccessLock, areaColors, CommodityIcon, commodityColors, PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
+import {clampMapView, fitMapView, resizeMapView, zoomMapView} from './mapView';
+import type {MapView, MapViewport} from './mapView';
 import geometryData from './boardGeometry.json';
 import europeanGeometryData from './europeanBoardGeometry.json';
 import './map.css';
@@ -22,7 +24,6 @@ interface Geometry {
     terrain: string;
     supports: Record<string, string>;
 }
-interface MapView {x: number; y: number; w: number; h: number}
 
 /** Trim unused eastern provinces on smaller boards without changing the province geometry. */
 function mapBounds(provinces: ProvinceDefinition[], geometry: Geometry): MapView {
@@ -31,17 +32,6 @@ function mapBounds(provinces: ProvinceDefinition[], geometry: Geometry): MapView
         (geometry.provinces[province.id]?.path.match(/-?\d+(?:\.\d+)?/g) ?? [])
             .filter((_, index) => index % 2 === 0).map(Number)));
     return {...initialView, w: Math.min(initialView.w, Number.isFinite(right) ? right + 12 : initialView.w)};
-}
-
-function clampView(view: MapView, bounds: MapView): MapView {
-    const w = Math.min(bounds.w, Math.max(500, view.w)), h = w * bounds.h / bounds.w;
-    return {w, h, x: Math.max(bounds.x, Math.min(bounds.x + bounds.w - w, view.x)),
-        y: Math.max(bounds.y, Math.min(bounds.y + bounds.h - h, view.y))};
-}
-
-/** SVG uses a centered, uniformly scaled viewBox when its viewport has a different aspect ratio. */
-function mapScale(view: MapView, width: number, height: number): number {
-    return width > 0 && height > 0 ? Math.min(width / view.w, height / view.h) : 1;
 }
 
 /** Land and coastal water share one province's shading, selection, and target emphasis. */
@@ -112,19 +102,28 @@ export function BoardMap({snapshot, busy}: {
     const [tabArea, setTabArea] = useState('');
     const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? [], geometry), [snapshot.game.catalog, geometry]);
     const [view, setView] = useState(bounds);
-    useEffect(() => setView(current => clampView(current, bounds)), [bounds.w, bounds.h]);
     const svg = useRef<SVGSVGElement>(null);
-    const [mapSize, setMapSize] = useState({width: 0, height: 0});
-    useEffect(() => {
+    const [mapSize, setMapSize] = useState<MapViewport | null>(null);
+    const measured = useRef(false);
+    useLayoutEffect(() => {
         if (!svg.current) return;
-        const observer = new ResizeObserver(([entry]) => {
-            const {width, height} = entry.contentRect;
-            setMapSize(current => current.width === width && current.height === height
+        const measure = ({width, height}: {width: number; height: number}) => {
+            // Hidden workspace tabs report zero size; retain the last visible frame.
+            if (width <= 0 || height <= 0) return;
+            setMapSize(current => current && current.width === width && current.height === height
                 ? current : {width, height});
-        });
+        };
+        measure(svg.current.getBoundingClientRect());
+        const observer = new ResizeObserver(([entry]) => measure(entry.contentRect));
         observer.observe(svg.current);
         return () => observer.disconnect();
     }, [!!snapshot.game.catalog]);
+    useLayoutEffect(() => {
+        if (!mapSize) return;
+        const initial = !measured.current;
+        measured.current = true;
+        setView(current => initial ? fitMapView(bounds, mapSize) : resizeMapView(current, bounds, mapSize));
+    }, [bounds.x, bounds.y, bounds.w, bounds.h, mapSize]);
     const pointers = useRef(new Map<number, {x: number; y: number}>());
     const gesture = useRef<{x: number; y: number; distance: number; view: MapView} | null>(null);
     const suppressClick = useRef(false);
@@ -175,7 +174,8 @@ export function BoardMap({snapshot, busy}: {
     };
     const reveal = ([x, y]: number[]) => setView(current =>
         x < current.x + 50 || x > current.x + current.w - 50 || y < current.y + 50 || y > current.y + current.h - 50
-            ? clampView({...current, x: x - current.w / 2, y: y - current.h / 2}, bounds) : current);
+            ? clampMapView({...current, x: x - current.w / 2, y: y - current.h / 2}, bounds,
+                mapSize ?? {width: current.w, height: current.h}) : current);
     const traverse = (event: ReactKeyboardEvent<SVGGElement>, id: string, ids: string[], attribute: string) => {
         if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
@@ -185,14 +185,13 @@ export function BoardMap({snapshot, busy}: {
     };
     const zoomView = (current: MapView, factor: number, clientX?: number, clientY?: number) => {
         const rect = svg.current?.getBoundingClientRect();
-        const scale = rect ? mapScale(current, rect.width, rect.height) : 1;
+        const viewport = rect && rect.width > 0 && rect.height > 0 ? rect
+            : mapSize ?? {width: current.w, height: current.h};
         const anchorX = rect && clientX !== undefined
-            ? Math.max(0, Math.min(1, (clientX - rect.left - (rect.width - current.w * scale) / 2) / (current.w * scale))) : .5;
+            ? Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) : .5;
         const anchorY = rect && clientY !== undefined
-            ? Math.max(0, Math.min(1, (clientY - rect.top - (rect.height - current.h * scale) / 2) / (current.h * scale))) : .5;
-        const w = Math.max(500, Math.min(bounds.w, current.w * factor)), h = w * bounds.h / bounds.w;
-        return clampView({x: current.x + (current.w - w) * anchorX,
-            y: current.y + (current.h - h) * anchorY, w, h}, bounds);
+            ? Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) : .5;
+        return zoomMapView(current, bounds, viewport, factor, {x: anchorX, y: anchorY});
     };
     const zoom = (factor: number) => setView(current => zoomView(current, factor));
     const wheelZoom = useRef<(event: WheelEvent) => void>();
@@ -232,8 +231,9 @@ export function BoardMap({snapshot, busy}: {
         const rect = svg.current.getBoundingClientRect();
         const next = current.distance && start.distance
             ? zoomView(start.view, start.distance / current.distance, start.x, start.y) : start.view;
-        const scale = mapScale(next, rect.width, rect.height);
-        setView(clampView({...next, x: next.x - dx / scale, y: next.y - dy / scale}, bounds));
+        const unitsPerPixel = next.w / rect.width;
+        setView(clampMapView({...next, x: next.x - dx * unitsPerPixel,
+            y: next.y - dy * unitsPerPixel}, bounds, rect));
     };
     const pointerEnd = (event: ReactPointerEvent<SVGSVGElement>) => {
         pointers.current.delete(event.pointerId);
@@ -279,18 +279,19 @@ export function BoardMap({snapshot, busy}: {
         .sort((first, second) => highlightPriority(first.state) - highlightPriority(second.state) || Number(first.inspected) - Number(second.inspected));
     const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
     // Keep the sea texture sparse at Fit, practical zoom, and narrow screen widths.
-    const seaHatchScale = 1 / mapScale(view, mapSize.width, mapSize.height);
+    const seaHatchScale = mapSize ? view.w / mapSize.width : 1;
     return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
         {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong></div>}
         <div className="map-viewport">
             <div className="map-zoom" role="group" aria-label={t('board.zoom')}>
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
-                <button type="button" className="secondary" onClick={() => setView(bounds)}>{t('board.fit')}</button>
+                <button type="button" className="secondary" onClick={() => setView(fitMapView(bounds,
+                    mapSize ?? {width: bounds.w, height: bounds.h}))}>{t('board.fit')}</button>
                 <HelpLink topic="map-legend" label={t('board.mapKey')}/>
             </div>
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
-                style={{aspectRatio: `${bounds.w} / ${bounds.h}`}}
+                data-map-bounds={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`}
                 onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd}
                 onPointerLeave={() => setHovered('')}
                 onClick={event => {

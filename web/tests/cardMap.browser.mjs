@@ -63,7 +63,7 @@ export async function checkLiveCardMap(page, web) {
     await page.send('Input.dispatchMouseEvent', {type:'mouseReleased',...point,button:'left',clickCount:1});
     await page.wait(`document.querySelector('.decision-panel .card-decision .card-confirmation > button:not([disabled])')`, 'Map selection prepares Crusades');
     assert.equal((await game.snapshot(player)).revision, before.revision, 'Selecting a province only edits the draft');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .card-decision')`), null, 'Live card has one preview beside its confirmation');
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-decision')`), null, 'Live card has one preview beside its confirmation');
     await assertBottomHandVisible(page, 'Live Crusades confirmation');
     await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').click()`);
     await page.wait(`!document.querySelector('[data-hand-card="${card.reference}"]')`, 'Real Crusades committed');
