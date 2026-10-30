@@ -54,6 +54,7 @@ export async function checkEuropeanMap(page, web) {
     await page.reload();
     await page.wait(`document.querySelectorAll('[data-map-province]').length === 108`, 'European board renders');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="smolensk"]')`), false);
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-support="levant acre"]')`), true, 'European map retains Levant support for Acre');
     await page.evaluate(`document.querySelector('[data-map-province="loire"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
     await page.wait(`document.querySelector('[data-map-province="loire"][aria-pressed="true"]')`, 'Loire keyboard inspection');
     assert.match(await page.evaluate(`document.querySelector('[data-map-province="loire"]').getAttribute('aria-label')`), /Wine.*|market.*3/i);

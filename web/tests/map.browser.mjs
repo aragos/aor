@@ -127,6 +127,8 @@ await page.send('Page.navigate', {url: web + actor.path});
         'Malmo has no support arrow to Lubeck');
     assert.equal(await page.evaluate(`document.querySelector('[data-support="malmo stockholm"]') !== null`), true,
         'Malmo retains its support arrow to Stockholm');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-support="levant acre"]')`), true,
+        'Standard map shows Levant support for Acre');
     const expectedSeaAreas = {BALTIC_SEA:'I', GREENLAND_SEA:'II', BLACK_SEA:'V',
         EASTERN_MEDITERRANEAN:'VI', ADRIATIC_SEA:'VII', CENTRAL_MEDITERRANEAN:'VIII', AEGEAN_SEA:'VIII', CANARY_BASIN:'VIII'};
     assert.deepEqual(before.game.catalog.seaAreas, expectedSeaAreas, 'Catalog exposes only the assigned sea areas');
