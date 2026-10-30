@@ -1315,11 +1315,12 @@ def sea_label(sea, shape):
     return [x, y]
 
 
-def province_label(id):
+def province_label(id, extra_font_clearance=True):
     """Fit the name and market badge in land first, then within the province's own coast.
 
     Bounds use the renderer's SVG font and badge dimensions. Invert the eastern compression
     for horizontal text extents because the text itself keeps its displayed font size.
+    Extra font clearance is preferred; tight footprints retry the standard fitted budget.
     """
     offset = LABEL_OFFSETS[id] if id in LABEL_OFFSETS else (0, 0)
     authored = Point(positions[id][0] + offset[0], positions[id][1] + offset[1])
@@ -1333,8 +1334,12 @@ def province_label(id):
         if provinces[id]["commodity"] == "—"
         else len(provinces[id]["commodity"].split(","))
     )
-    half_width = max(max(map(len, words)) * 9.5 + 8, 40 + commodities * 27) / 2
-    top = 44 + (len(words) - 1) * 20
+    # Leave room for font substitutions whose glyph bounds extend beyond SVG textLength.
+    # Linux Chrome needs more clearance than the default macOS font at narrow land edges.
+    name_padding = 16 if extra_font_clearance else 8
+    top_padding = 48 if extra_font_clearance else 44
+    half_width = max(max(map(len, words)) * 9.5 + name_padding, 40 + commodities * 27) / 2
+    top = top_padding + (len(words) - 1) * 20
 
     def expand_x(x):
         return (
@@ -1390,6 +1395,9 @@ def province_label(id):
                 "fit": fit,
                 "box": [-half_width, -top, half_width * 2, top + 24],
             }
+    if extra_font_clearance:
+        # Tight footprints retain their fitted layout rather than gaining a new exception.
+        return province_label(id, extra_font_clearance=False)
     candidate = min(
         candidates,
         key=lambda point: (
