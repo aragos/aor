@@ -36,7 +36,7 @@ export async function checkPurchaseClarity(page, web, baseline) {
     await show({legalChoices: {commands: ['buy-expansion-card', 'pass'], bidMin: null, bidMax: null},
         prompt: {messageId: 'prompt.expand', players: [viewer]}, game: {stage: 'EXPANSION', expansionCardCost: 9,
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, choice: 'expand'}}});
-    assert.match(await page.evaluate(`[...document.querySelectorAll('.action-buttons button')].find(button => button.textContent.includes('Buy card with tokens')).textContent`), /9.*tokens/);
+    assert.match(await page.evaluate(`[...document.querySelectorAll('.decision-actions .simple-action')].find(button => button.textContent.includes('Buy card with tokens')).textContent`), /9.*tokens/);
     assert.equal(await page.evaluate(`!!document.querySelector('.action-cash')`), false, 'A token-priced card does not imply a cash purchase');
 
     const famine = baseline.game.cardInspections.find(card => card.definition.id === 'famine').definition;
@@ -149,7 +149,7 @@ export async function checkBidWithdrawal(page, web) {
     assert.equal((await game.snapshot(player)).game.stage, 'TOKEN_PURCHASE');
     await page.wait(`document.querySelector('#bid')?.min === '-32' && !document.querySelector('.withdraw-bid')`, 'revealed capital bids no longer withdrawable');
     await page.fill('#bid', '6');
-    await page.wait(`!document.querySelector('#bid').closest('form').querySelector('button').disabled`, 'token quote ready');
+    await page.wait(`!document.querySelector('.bid-action').disabled`, 'token quote ready');
     await page.evaluate(`document.querySelector('#bid').closest('form').requestSubmit()`);
     await page.wait(`document.querySelector('.withdraw-bid:not([disabled])')`, 'saved token purchase can be withdrawn');
     await page.evaluate(`document.querySelector('.withdraw-bid').click()`);

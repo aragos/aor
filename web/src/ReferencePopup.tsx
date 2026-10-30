@@ -1,0 +1,123 @@
+import {useEffect, useState} from 'react';
+import {request} from './api';
+import type {PublicCatalog} from './api';
+import {advanceName, label} from './labels';
+import {t} from './messages';
+import {Commodity} from './TablePanels';
+import {AccessLock, PlayerPiece} from './map/MapSymbols';
+import {MiseryBox} from './MiseryBox';
+import ruleOptions from './ruleOptions.json';
+import {CardInspectionDialog} from './CardInspectionDialog';
+
+interface ReferenceData {catalog: PublicCatalog}
+let publicReference: Promise<ReferenceData> | undefined;
+function loadReference() {
+    return publicReference ??= request<ReferenceData>('/api/reference').catch(error => {
+        publicReference = undefined;
+        throw error;
+    });
+}
+
+const topics = [
+    ['variants', 'reference.variants'],
+    ['map-legend', 'reference.map-key'],
+    ['commodities', 'reference.payout-boxes'],
+    ['misery-track', 'reference.misery-track'],
+    ['shipping-track', 'reference.shipping'],
+    ['history', 'reference.undo-policies'],
+];
+
+/** Contextual public lookup leaves the live game, current draft and page title intact. */
+export default function ReferencePopup({initialTopic, close}: {initialTopic: string; close: () => void}) {
+    const [topic, setTopic] = useState(initialTopic);
+    const [reference, setReference] = useState<ReferenceData | null>(null);
+    const [error, setError] = useState(false);
+    const needsCatalog = topic === 'map-legend' || topic === 'commodities' ||
+        topic.startsWith('commodity-') || topic.startsWith('advance-') || topic.endsWith('-track');
+    useEffect(() => {
+        if (!needsCatalog) return;
+        let active = true;
+        setError(false);
+        void loadReference().then(data => {if (active) setReference(data);})
+            .catch(() => {if (active) setError(true);});
+        return () => {active = false;};
+    }, [needsCatalog]);
+    const catalog = reference?.catalog;
+    return <CardInspectionDialog label={t('reference.help-and-reference')} close={close} className="reference-dialog">
+        <div className="reference-popup" data-help-content={topic}>
+            <button type="button" className="close-detail" aria-label={t('table.close')} onClick={close}>×</button>
+            {topic && <button type="button" className="reference-link" onClick={() => setTopic('')}>{t('reference.help-topics')}</button>}
+            {!topic && <><h2>{t('reference.help-and-reference')}</h2>
+                <nav aria-label={t('reference.help-topics')}>{topics.map(([id, key]) =>
+                    <button type="button" className="secondary" key={id} onClick={() => setTopic(id)}>{t(key)}</button>)}</nav>
+            </>}
+            {needsCatalog && !catalog && <p role="status">{t(error ? 'reference.unavailable' : 'reference.loading')}</p>}
+            {(topic === 'variants' || topic.startsWith('variant-')) && <section id="variants"><h2>{t("reference.game-variants")}</h2>{ruleOptions.filter(variant => !topic.startsWith('variant-') || variant.key === topic.slice(8)).map(variant => <article id={`variant-${variant.key}`} key={variant.key}>
+            <h3>{t(`option.${variant.key}`)}</h3><p>{t(`reference.variant.${variant.key}`)}</p></article>)}</section>}
+            {topic === 'map-legend' && <section id="map-legend"><h2>{t("reference.map-key-and-navigation")}</h2>
+            <div className="reference-legend">
+                <span><svg viewBox="0 0 32 33" width="28" height="28" aria-hidden="true"><rect width="32" height="33" rx="7" fill="#263c3c"/><text x="16" y="25" textAnchor="middle" fontSize="27" fill="#fffdf5">4</text></svg>{t("reference.dark-badge-capital-market")}</span>
+                <span><svg viewBox="-28 -28 56 56" width="32" height="32" aria-hidden="true"><PlayerPiece capital="barcelona" size={44}/></svg>{t("reference.unnumbered-silhouette-domination-marker")}</span>
+                <span><svg viewBox="-28 -28 56 56" width="32" height="32" aria-hidden="true"><PlayerPiece capital="venice" count={2} size={44}/></svg>{t("reference.numbered-silhouette-token-count")}</span>
+                <span><svg viewBox="-28 -28 56 56" width="32" height="32" aria-hidden="true"><PlayerPiece capital="barcelona" fresh size={44}/></svg>{t("reference.white-face-new-this-turn-filled")}</span>
+                <span><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><AccessLock/></svg>{t("reference.lock-an-advance-is-required")}</span>
+                <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><defs><pattern id="reference-satellite" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#e0e4d9"/><circle cx="3" cy="3" r="1" fill="#879481"/></pattern></defs><rect width="32" height="32" fill="url(#reference-satellite)"/></svg>{t("reference.stippling-satellite")}</span>
+                <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect x="1" y="1" width="30" height="30" fill="#d2efed" stroke="#56929c"/></svg>{t("reference.pale-water-a-province-s-coastal")}</span>
+            </div>
+            {catalog && <div className="reference-legend">{catalog.provinces.filter(province => province.capital).map(province => <span key={province.id}><svg viewBox="-28 -28 56 56" width="28" height="28" aria-hidden="true"><PlayerPiece capital={province.capital} size={44}/></svg>{label(province.id, 'capital')}</span>)}</div>}
+            <p>{t("reference.capital-color-and-silhouette-identify-the")}</p>
+            <p>{t("reference.named-seas-are-distinct-from-coastal")}</p>
+            <p>{t("reference.use-and-fit-modifier-scroll-trackpad")}</p>
+            <p>{t("reference.resizeActivity")}</p>
+        </section>}
+            {topic === 'commodities' && <section><h2>{t('reference.commodity-payout-boxes')}</h2><nav>{catalog?.commodities.map(commodity => <button type="button" className="secondary" key={commodity.id} onClick={() => setTopic(`commodity-${commodity.id.toLowerCase()}`)}><Commodity commodity={commodity.id}/></button>)}</nav></section>}
+            {topic.startsWith('commodity-') && <section id="commodities"><h2>{t("reference.commodity-payout-boxes")}</h2><p>{t("reference.the-effective-box-is-established-markets")}</p>
+                {catalog?.commodities.filter(commodity => topic === `commodity-${commodity.id.toLowerCase()}`).map(commodity => <article id={`commodity-${commodity.id.toLowerCase()}`} key={commodity.id}>
+                    <h3><Commodity commodity={commodity.id}/></h3><p>{t("reference.base-value")}{commodity.baseValue}{t("reference.dice-total")}{commodity.diceTotal}</p>
+                    <ol className="payout-boxes" aria-label={t('reference.payoutBoxes', {commodity: label(commodity.id, 'commodity')})}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
+                </article>)}
+            </section>}
+            {topic.startsWith('advance-') && catalog?.advances.filter(advance =>
+                topic === `advance-${advance.id.toLowerCase()}`).map(advance => <section key={advance.id} id={`advance-${advance.id.toLowerCase()}`}>
+                <h2>{advance.letter} · {advanceName(advance.id)}</h2>
+                <dl className="detail-list">
+                    <div><dt>{t('reference.advanceCredit')}</dt><dd>${advance.credit}</dd></div>
+                    <div><dt>{t('reference.reliefRating')}</dt><dd>{advance.miseryRelief}</dd></div>
+                    <div><dt>{t('reference.prerequisites')}</dt><dd>{advance.prerequisites.map(advanceName).join(', ') || t('reference.none')}</dd></div>
+                </dl>
+            </section>)}
+            {topic === 'misery-track' && <section id="misery-track"><h2>{t('reference.misery-track')}</h2>
+            <ol className="reference-track misery-track" aria-label={t('reference.misery-track')}>{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}><MiseryBox value={value} track={catalog.miseryTrack}/></li>)}</ol>
+            <p>{t('reference.colors-progress-from-green-through-amber')}</p>
+        </section>}
+            {topic === 'shipping-track' && <section id="shipping-track"><h2>{t('reference.shipping')}</h2>
+            {[...new Set(catalog?.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet}><h3>{label(fleet, 'fleet')}</h3>
+                <ol className="reference-track">{catalog?.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}>{space.level}</li>)}</ol></div>)}
+        </section>}
+            {(topic === 'history' || topic.startsWith('undo-')) && <section id="history"><h2>{t("reference.undo-policies-55")}</h2>
+            <p>{t("reference.choose-a-policy-when-creating-the")}</p>
+            {(topic === 'history' || topic === 'undo-competitive') && <article id="undo-competitive"><h3>{t('undoPolicy.competitive')}</h3>
+                <p>{t("reference.committed-actions-are-final-unsubmitted-drafts")}</p>
+            </article>}
+            {(topic === 'history' || topic === 'undo-regular-turn') && <article id="undo-regular-turn"><h3>{t('undoPolicy.regular-turn')}{t("reference.default")}</h3>
+                <p>{t("reference.you-may-edit-your-own-actions")}</p>
+                <p>{t("reference.for-example-you-may-correct-an")}</p>
+            </article>}
+            {(topic === 'history' || topic === 'undo-friendly-turn') && <article id="undo-friendly-turn"><h3>{t('undoPolicy.friendly-turn')}</h3>
+                <p>{t("reference.the-current-activity-s-owner-may")}</p>
+            </article>}
+            {(topic === 'history' || topic === 'undo-friendly-game') && <article id="undo-friendly-game"><h3>{t('undoPolicy.friendly-game')}</h3>
+                <p>{t("reference.everyone-has-friendly-turn-permissions-the")}</p>
+            </article>}
+            <h3>{t("reference.limits-shared-by-all-editable-policies")}</h3>
+            <ul>
+                <li>{t("reference.setup-is-protected-committed-simultaneous-decisions")}</li>
+                <li>{t("reference.dice-draws-shuffles-and-random-trades")}</li>
+                <li>{t("reference.you-can-retain-another-player-s")}</li>
+                <li>{t("reference.every-later-action-must-still-be")}</li>
+            </ul>
+            <p>{t("reference.undo-last-action-appears-in-the")}<code>@entry</code>{t("reference.references-retain-recorded-actions-accepted-edits")}</p>
+        </section>}
+        </div>
+    </CardInspectionDialog>;
+}

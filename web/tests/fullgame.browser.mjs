@@ -95,7 +95,7 @@ async function playCard(state, command) {
         const automatic = choices.length === 1 && ['NONE', 'COMMODITY'].includes(choices[0].kind);
         if (!automatic) await click('.card-decision .target-choices > button:not(.map-picker)', index);
     }
-    await click('.card-decision .card-confirmation > button');
+    await click('.decision-actions .play-card-action');
 }
 
 async function perform(state, command) {
@@ -107,7 +107,7 @@ async function perform(state, command) {
     if (verb === 'choose-capital' || verb === 'choose-turn-position') {
         const options = state.legalChoices.commands.filter(choice => choice.startsWith(verb + ' '));
         await click('.capital-choices > button.secondary', options.indexOf(command));
-        return click('.capital-choices > button:not(.secondary)');
+        return click('.decision-actions .capital-confirmation, .decision-actions .turn-confirmation');
     }
     if (verb === 'play') return playCard(state, command);
     if (verb === 'buy-advance') {
@@ -116,35 +116,35 @@ async function perform(state, command) {
         const id = state.game.catalog.advances[index]?.id;
         assert(id, `Advance letter ${argument} is in catalog`);
         await page.evaluate(`(() => {const button = [...document.querySelectorAll('.advance-tile')].find(button => button.querySelector('.advance-letter')?.textContent === ${JSON.stringify(argument)}); if (!button) throw Error('Missing advance tile'); button.click();})()`);
-        return click('.advance-decision .card-confirmation > button');
+        return click('.decision-actions .buy-advance-action');
     }
-    if (command === 'pass') return click('.decision-toolbar .pass-action');
+    if (command === 'pass') return click('.decision-actions .pass-action');
     if (simple.includes(command)) {
         const offered = state.legalChoices.commands.filter(choice => simple.includes(choice));
-        return click('.game-actions > .action-buttons > button:not(.secondary)', offered.indexOf(command));
+        return click('.decision-actions .simple-action', offered.indexOf(command));
     }
     if (verb === 'discard-card' || verb === 'offer-card') {
         await click(`[data-hand-card="${argument}"]`);
-        return click('.game-actions .selected-action button');
+        return click('.decision-actions .selected-action-confirmation');
     }
     const choices = finite(state.legalChoices.commands);
     if (choices.includes(command)) {
         await click('.game-actions > .action-buttons > button.secondary', choices.indexOf(command));
-        return click('.game-actions .selected-action button');
+        return click('.decision-actions .selected-action-confirmation');
     }
     if (verb === 'replace-event-tokens') {
         const selected = command.split(' ').slice(1);
         for (const province of state.game.replacementToken.provinces) {
             await click(`[data-replacement-province="${province}"] button:${selected.includes(province) ? 'first' : 'last'}-child`);
         }
-        return click('.event-replacements > button:last-child');
+        return click('.replacement-confirmation');
     }
     if (verb === 'forgo-marker') return page.click('Forgo this marker');
     if (verb === 'cede-war') {
         const provinces = command.split(' ').slice(1);
         const candidates = state.game.catalog.provinces.filter(province => state.game.warCession.eligibleProvinces.includes(province.id));
         for (const province of provinces) await click('.province-checks input', candidates.findIndex(candidate => candidate.id === province));
-        return click('.game-actions form:has(.province-checks) > button:last-child');
+        return click('.cede-war-action');
     }
     throw new Error(`No visual driver for supported action: ${command}`);
 }

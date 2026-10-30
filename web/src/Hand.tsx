@@ -79,7 +79,8 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
             const cards = [...container.querySelectorAll<HTMLElement>('[data-hand-card]')];
             const contentClipped = cards.some(card => card.scrollHeight > card.clientHeight + 1 ||
                 card.scrollWidth > card.clientWidth + 1);
-            setNeedsExpansion(cards.length > 0 && (container.scrollWidth > availableWidth + 1 ||
+            setNeedsExpansion(cards.length > 0 && (matchMedia('(max-width: 700px)').matches ||
+                container.scrollWidth > availableWidth + 1 ||
                 container.scrollHeight > container.clientHeight + 1 || contentClipped));
             if (width === container.clientWidth && height === container.clientHeight) return;
             width = container.clientWidth;

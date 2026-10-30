@@ -36,9 +36,9 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
     assert.equal(await page.evaluate(`[...document.querySelectorAll('[data-player="${viewer}"] .player-detail dt')].some(label=>label.textContent==='Income')`), false);
     assert.match(await page.evaluate(`document.querySelector('[data-player="${viewer}"] .player-money').textContent`), /\$75/);
     for (const topic of ['misery-track', 'shipping-track']) {
-        const help = `[data-player="${viewer}"] .player-stats a[href="/help#${topic}"]`;
+        const help = `[data-player="${viewer}"] .player-stats button[data-help-topic="${topic}"]`;
         assert.equal(await page.evaluate(`document.querySelector('${help}').textContent`), '?');
-        assert.equal(await page.evaluate(`document.querySelector('${help}').target`), '_blank');
+        assert.equal(await page.evaluate(`document.querySelector('${help}').getAttribute('aria-haspopup')`), 'dialog');
     }
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-detail .reference-link').length`), 0, 'Standalone reference-track links are removed');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-player-context-desktop.png'), 1280, 900);
@@ -56,16 +56,13 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
                 commodities: [], leaderDiscounts: [], provinceTargets: [], requiredTargetCount: null, protectionMax: null}]}});
     await page.evaluate(`document.querySelector('[data-hand-card="target"]').click()`);
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'eligible Civil War player');
-    await page.evaluate(`(() => {const link=document.querySelector('[data-player="${other.id}"] a[href="/help#misery-track"]');link.addEventListener('click',event=>event.preventDefault(),{once:true});link.click();})()`);
+    await page.evaluate(`(() => {const link=document.querySelector('[data-player="${other.id}"] button[data-help-topic="misery-track"]');link.addEventListener('click',event=>event.preventDefault(),{once:true});link.click();})()`);
     assert.equal(await page.evaluate(`document.querySelectorAll('.picked-target').length`), 0, 'Help does not choose a player target');
     assert.equal(await page.evaluate(`window.mapCommands.length`), 0);
 
-    await page.send('Page.navigate', {url: web + '/help#cards'});
-    await page.wait(`document.querySelector('#card-charlemagne')`, 'recurring reference labels');
-    const reference = await page.evaluate(`document.querySelector('#cards').textContent`);
-    assert(!/\b(circle|square)\b/i.test(reference), 'Card reference uses behavior rather than shape vocabulary');
-    assert.equal(await page.evaluate(`document.querySelectorAll('#cards article .eyebrow').length`), 0);
-    assert.equal(await page.evaluate(`!!document.querySelector('#misery-track') && !!document.querySelector('#shipping-track')`), true);
+    await page.wait(`document.querySelector('.reference-dialog #misery-track')`, 'Target help popup');
+    assert.equal(await page.evaluate(`document.querySelector('#card-charlemagne, #advances')`), null, 'Contextual track lookup omits duplicate card and advance catalogs');
+    await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     console.log('Passed: recurring badges, concise card displays, live epoch counter, contextual track links, written cash and preserved target selection.');
 }
 
@@ -92,14 +89,14 @@ export async function checkReplacementContext(page, web, baseline) {
     assert.match(description, /Rebellion.*Rome.*No stock tokens.*colored pool token.*adds no misery/s);
     await page.evaluate(`document.querySelector('[data-replacement-province="rome"] button:first-child').click()`);
     assert.match(await page.evaluate(`document.querySelector('.replacement-review').textContent`), /Pool tokens: 1 → 0.*Place 1 pool token in Rome/s);
-    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.replacement-confirmation').click()`);
     assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'replace-event-tokens rome');
     await show('genoa', 0, 'CIVIL_WAR');
     const next = await page.evaluate(`document.querySelector('.replacement-token-context').textContent`);
     assert.match(next, /Civil War.*Genoa.*No pool tokens.*misery has already been applied.*cash or token loss/s);
     assert.equal(await page.evaluate(`document.querySelector('[data-replacement-province="genoa"] button:first-child').disabled`), true);
     await page.evaluate(`document.querySelector('[data-replacement-province="genoa"] button:last-child').click()`);
-    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.replacement-confirmation').click()`);
     assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'replace-event-tokens none');
     console.log('Passed: event/recipient/province context, exact pool cost, explicit replacement/empty choices and exhausted multi-province flow.');
 }

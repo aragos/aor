@@ -21,7 +21,7 @@ export async function checkGroupedReplacements(page, web, baseline) {
     };
     await show();
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-replacement-province]').length`), 3, 'Every province is offered together');
-    const confirm = '.event-replacements > button:last-child';
+    const confirm = '.replacement-confirmation';
     const choose = (province, pool) => page.evaluate(`document.querySelector('[data-replacement-province="${province}"] button:${pool ? 'first' : 'last'}-child').click()`);
     assert.equal(await page.evaluate(`document.querySelector('${confirm}').disabled`), true, 'Every province needs a decision');
     const before = await page.evaluate('window.mapCommands.length');
@@ -90,13 +90,13 @@ export async function checkLiveCivilWar(page, web) {
     await page.evaluate(`document.querySelector('[data-hand-card="${card.reference}"]').click()`);
     await page.wait(`document.querySelector('[data-player="${player.id}"].eligible-target')`, 'Civil War target picker');
     await page.evaluate(`document.querySelector('[data-player="${player.id}"] > summary').click()`);
-    await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').click()`);
+    await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
     await page.wait(`document.querySelector('[data-replacement-province="${me.capital}"]')`, 'live capital replacement');
     const pending = await game.snapshot(player);
     assert.deepEqual(pending.game.replacementToken.provinces, [me.capital]);
     assert.equal(pending.game.civilWarLoss, null, 'Loss choices wait for capital replacement');
     await page.evaluate(`document.querySelector('[data-replacement-province="${me.capital}"] button:first-child').click()`);
-    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.replacement-confirmation').click()`);
     await page.wait(`document.querySelector('.action-buttons button')?.textContent.includes('Lose $')`, 'live Civil War costs');
     const lossState = await game.snapshot(player);
     const loss = lossState.game.civilWarLoss;
@@ -110,8 +110,8 @@ export async function checkLiveCivilWar(page, web) {
     assert(labels.includes(expectedTokens), 'Token option uses the pool after capital replacement');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-live-civil-war.png'), 1280, 900);
     await page.click(expectedTokens);
-    assert.match(await page.evaluate(`document.querySelector('.selected-action').textContent`), new RegExp(`Lose ${loss.tokenCost} expansion tokens`));
-    await page.evaluate(`document.querySelector('.selected-action button:last-child').click()`);
+    assert.match(await page.evaluate(`document.querySelector('.selected-action-confirmation').textContent`), new RegExp(`Lose ${loss.tokenCost} expansion tokens`));
+    await page.evaluate(`document.querySelector('.selected-action-confirmation').click()`);
     await page.wait(`!document.querySelector('.selected-action')`, 'Civil War loss committed');
     const after = await game.snapshot(player);
     const paid = after.game.players.find(candidate => candidate.id === player.id);

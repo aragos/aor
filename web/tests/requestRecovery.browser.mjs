@@ -13,7 +13,7 @@ export async function checkRequestRecovery(page, web, baseline) {
     await page.wait(`document.querySelector('#bid')`, 'editable private bid');
     await page.fill('#bid', '7');
     await page.evaluate(`window.uiNextError = 'OUTCOME_UNKNOWN'; document.querySelector('#bid').form.requestSubmit()`);
-    await page.wait(`document.querySelector('.decision-panel [role=alert]')?.textContent.includes('response was lost') && !document.querySelector('#bid').form.querySelector('button').disabled`, 'uncertain write releases the form');
+    await page.wait(`document.querySelector('.decision-panel [role=alert]')?.textContent.includes('response was lost') && !document.querySelector('.bid-action').disabled`, 'uncertain write releases the form');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7');
     const reads = await page.evaluate('window.uiRequests');
     await page.wait(`window.uiRequests > ${reads}`, 'reads resume after the unknown write');

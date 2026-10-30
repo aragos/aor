@@ -37,8 +37,10 @@ window.setUiSnapshot = snapshot => {
         root.render(<StrictMode><App/></StrictMode>);
     }
 };
+const nativeFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
     const path = String(input);
+    if (path === '/api/reference') return nativeFetch(input, init);
     if (path === '/api/config') return new Response(JSON.stringify({authMode: 'local', firebase: null, pollIntervalMs: 1000}));
     if (!path.startsWith('/api/games/')) throw new Error(`Unexpected harness request: ${path}`);
     window.uiRequests++;

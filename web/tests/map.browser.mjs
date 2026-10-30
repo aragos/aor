@@ -1,3 +1,4 @@
+import {checkActionButtons} from './actionButtons.browser.mjs';
 import {checkRequestRecovery} from './requestRecovery.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkActivityPayments} from './activityPayments.browser.mjs';
@@ -5,6 +6,7 @@ import {checkLiveCardMap} from './cardMap.browser.mjs';
 import {assertBottomHandVisible, checkBottomHand} from './bottomHand.browser.mjs';
 import {checkMapViewport} from './mapViewport.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
+import {checkCompactPresentation} from './compactPresentation.browser.mjs';
 import {checkTableConsistency} from './tableConsistency.browser.mjs';
 import {checkActionContext} from './actionContext.browser.mjs';
 import {checkLiveCompetitionLifecycle} from './competitionLifecycle.browser.mjs';
@@ -358,9 +360,9 @@ await page.send('Page.navigate', {url: web + actor.path});
     const pick = id => page.evaluate(`document.querySelector('[data-map-province="${id}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
     await pick(target);
     assert.equal((await page.snapshot()).revision, before.revision, 'Inspection cannot submit');
-    await page.wait(`document.querySelector('.map-orders .primary-expansion')`, 'selected satellite action');
-    assert.equal(await page.evaluate(`document.querySelector('.map-orders .primary-expansion').disabled`), false);
-    await page.evaluate(`document.querySelector('.map-orders .primary-expansion').click()`);
+    await page.wait(`document.querySelector('.decision-actions .primary-expansion')`, 'selected satellite action');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .primary-expansion').disabled`), false);
+    await page.evaluate(`document.querySelector('.decision-actions .primary-expansion').click()`);
     await page.wait(`[...document.querySelectorAll('.save-status')].some(e => e.textContent.includes('Saved'))`, 'successful placement');
     let after = await page.snapshot();
     assert.equal(after.revision, before.revision + 1);
@@ -386,8 +388,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     assert.equal(await page.evaluate(`document.querySelector('#partial-count button[aria-pressed=true]')?.textContent`), '1', 'Background clicks and polling preserve the live partial placement');
 
     assert.equal((await page.snapshot()).revision, after.revision, 'Partial amount selection cannot submit');
-    await page.evaluate(`document.querySelector('.partial-placement form > button').click()`);
-    await page.wait(`!document.querySelector('.primary-expansion')`, 'accepted partial placement clears its action');
+    await page.evaluate(`document.querySelector('.partial-expansion').click()`);
+    await page.wait(`!document.querySelector('.partial-expansion')`, 'accepted partial placement clears its action');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${market.destination}"]').getAttribute('aria-pressed')`), 'false');
     await pick(market.destination);
     await page.wait(`document.querySelector('.primary-expansion')?.textContent.includes('${market.requiredTokens - 1}')`, 'remaining marker commitment after reselecting');
@@ -500,6 +502,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);
     await checkReferenceUx(page, web, after);
+    await checkActionButtons(page, web, after);
+    await checkCompactPresentation(page, web, after);
     await checkTableConsistency(page, web, after);
     await checkGameplayImprovements(page, web, after);
     await checkActionContext(page, web, after);
@@ -569,11 +573,11 @@ await page.send('Page.navigate', {url: web + actor.path});
         pirateTargets:{requiredCount:2,eligibleProvinces:['genoa','rome']},
         cardOffers:pirateFixture.game.cardOffers.map(offer=>({...offer,provinceTargets:['genoa','rome']}))}});
     await page.wait(`document.querySelector('.card-decision .clear-targets')`, 'lost pirate target explained');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), true, 'Lost target disables card submission');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), true, 'Lost target disables card submission');
     await page.evaluate(`document.querySelector('.card-decision .clear-targets').click()`);
     assert.equal(await page.evaluate('window.mapCommands.length'), 0, 'Clearing invalid targets never submits');
     await pick('genoa'); await pick('rome');
-    await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
+    await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play hand-pirates provinces genoa rome');
 
     await page.evaluate(`document.querySelector('.decision-heading [data-close-action]')?.click()`);
@@ -582,7 +586,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.wait(`document.querySelector('.eligible-shade') && document.querySelector('#tab-map[aria-selected=true]')`, 'war cession targets activate automatically');
     await page.evaluate(`['china','india','genoa'].forEach(id => document.querySelector('[data-map-province="'+id+'"]').dispatchEvent(new MouseEvent('click',{bubbles:true})))`);
     assert.equal(await page.evaluate(`document.querySelectorAll('.province-checks input:checked').length`), 2);
-    await page.evaluate(`document.querySelector('.decision form > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.decision-actions .cede-war-action').click()`);
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'cede-war china genoa');
 
     await show({legalChoices: {commands: []}, game: {board: [{id: 'toledo', marker: null,

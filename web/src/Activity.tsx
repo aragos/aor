@@ -1,4 +1,4 @@
-import {useId, useState} from 'react';
+import {useId} from 'react';
 import type {ReactNode} from 'react';
 import {ResultNotice} from './DecisionControls';
 import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
@@ -165,17 +165,17 @@ export function ActionResultNotice({event, snapshot, onDismiss}: {
     </ResultNotice>;
 }
 
-export function Activity({snapshot, onInspectCard}: {
+export function Activity({snapshot, onInspectCard, open, setOpen}: {
     snapshot: Snapshot; onInspectCard: (cardId: string) => void;
+    open: boolean; setOpen: (open: boolean) => void;
 }) {
     const events = snapshot.events.filter(event => event.kind !== 'PASS');
-    const [open, setOpen] = useState(true);
     const contentId = useId();
     const toggleLabel = t(open ? 'table.hideActivity' : 'table.showActivity');
     return <section className="table-activity" data-open={open} aria-label={t('table.activity')}>
         <button type="button" className="secondary activity-toggle" title={toggleLabel}
             aria-label={toggleLabel} aria-expanded={open} aria-controls={contentId}
-            onClick={() => setOpen(current => !current)}>
+            onClick={() => setOpen(!open)}>
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <path d="M3 4h10M3 8h10M3 12h6"/>
                 <path d={open ? 'm11 17 3-3 3 3' : 'm11 14 3 3 3-3'}/>

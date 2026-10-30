@@ -163,7 +163,7 @@ export async function checkBottomHand(page, web, baseline) {
         await page.evaluate(`document.querySelector('.card-decision .target-choices button:last-child').click()`);
         assert.match(await page.evaluate(`document.querySelector('.decision-panel .cash-preview').textContent`), /\$80 → \$100/);
         assert.equal(await page.evaluate(`!!document.querySelector('.cash-preview .identity-label svg')`), true, 'Cash preview retains the capital silhouette');
-        await assertControlReachable(page, '.decision-panel .card-decision .card-confirmation > button', `${viewport} commodity preview`);
+        await assertControlReachable(page, '.decision-actions .play-card-action', `${viewport} commodity preview`);
         await assertEffectReachable(page, '.decision-panel .cash-preview', `${viewport} commodity consequence`);
         await capture('commodity');
 
@@ -178,7 +178,7 @@ export async function checkBottomHand(page, web, baseline) {
         assert.equal(await page.evaluate(`document.querySelector('.card-play-effects .card-event-text').checkVisibility()`), true, 'The selected event spells out its effects');
         assert.match(await page.evaluate(`document.querySelector('.card-play-effects').textContent`), /Area VI.*Jerusalem/s);
         assert.match(await page.evaluate(`document.querySelector('.misery-preview').textContent`), /20.*30/);
-        await assertControlReachable(page, '.decision-panel .card-decision .card-confirmation > button', `${viewport} event targeting`);
+        await assertControlReachable(page, '.decision-actions .play-card-action', `${viewport} event targeting`);
         await assertEffectReachable(page, `.decision-panel [data-misery-preview-player="${viewer}"]`, `${viewport} event consequence`);
         await capture('target');
         const commandCount = await page.evaluate('window.mapCommands.length');
@@ -188,7 +188,7 @@ export async function checkBottomHand(page, web, baseline) {
             await assertBottomHandVisible(page, `${viewport} expanded hand`);
             await click('.hand-toggle');
         }
-        assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Expanding the hand preserves the event target');
+        assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Expanding the hand preserves the event target');
         assert.equal(await page.evaluate('window.mapCommands.length'), commandCount, 'Expanding the hand cannot submit');
 
         mark(viewport + ' purchase and popup');
@@ -222,7 +222,7 @@ export async function checkBottomHand(page, web, baseline) {
         await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:2,y:2,button:'left',clickCount:1});
         await page.wait(`!document.querySelector('.card-inspection-dialog[open]')`, 'Backdrop dismisses card popup');
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision').textContent`), preparedPurchase, 'Backdrop dismissal leaves the purchase draft intact');
-        await assertControlReachable(page, '.decision-panel .advance-decision .card-confirmation > button', `${viewport} purchase confirmation`);
+        await assertControlReachable(page, '.decision-actions .buy-advance-action', `${viewport} purchase confirmation`);
         assert.equal(await page.evaluate(`document.querySelector('.held-leader-note, [data-held-card], .waiting-hand-summary')`), null, 'No mirrored held-card reminders accompany another decision');
         await capture('purchase');
 
@@ -266,8 +266,8 @@ export async function checkBottomHand(page, web, baseline) {
     for (const [width,height,mobile] of [[1280,800,false],[390,844,true]]) {
         await page.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});
         await show('expand','EXPANSION',{game:{hand:[hand[3]],burdenReferences:[]},legalChoices:{commands:[]}},other);
-        await page.wait(`document.querySelector('.table-hand[data-overflow="false"]')`, 'A small hand fits without expansion');
-        assert.equal(await page.evaluate(`document.querySelector('.hand-toggle')`),null,'A fitting hand has no Expand button');
+        await page.wait(`document.querySelector('.table-hand[data-overflow="${mobile}"]')`, 'Small hand expansion follows the viewport');
+        assert.equal(await page.evaluate(`!!document.querySelector('.hand-toggle')`), mobile, 'A name-only phone hand always offers expansion');
         assert(await page.evaluate(`document.querySelector('.table-hand').getBoundingClientRect().height<150`),'A short one-card hand follows its content height');
         await assertBottomHandVisible(page,`${width} short natural hand`);
     }
@@ -311,16 +311,16 @@ export async function checkBottomHand(page, web, baseline) {
         await assertControlReachable(page, '.player-summary.is-viewer > summary', `${width} expanded hand and player details`);
         await click('.player-summary.is-viewer > summary');
         await page.wait(`document.querySelector('.player-summary.is-viewer').open`, 'Viewer details open');
+        await click('.player-detail:popover-open .close-detail');
+        await page.wait(`!document.querySelector('.player-detail:popover-open')`, 'Player detail closes before returning to tools');
         await assertControlReachable(page, '.command-dock > summary', `${width} expanded hand and Commands`);
         await click('.command-dock > summary');
-        await page.wait(`document.querySelector('.command-dock').open`, 'Commands open beside player details and expanded hand');
+        await page.wait(`document.querySelector('.command-dock').open`, 'Commands open after closing player details with the hand expanded');
         await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
         if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-bottom-hand-${width}-expanded-and-tools.png`));
-        await assertBottomHandVisible(page, `${width} expanded hand with Commands and player details`);
+        await assertBottomHandVisible(page, `${width} expanded hand with Commands after player inspection`);
         await click('.command-dock > summary');
         await page.wait(`!document.querySelector('.command-dock').open`, 'Combined Commands closes');
-        await click('.player-summary.is-viewer > summary');
-        await page.wait(`!document.querySelector('.player-summary.is-viewer').open`, 'Combined viewer details close');
         await click('.hand-toggle');
     }
 
@@ -332,13 +332,13 @@ export async function checkBottomHand(page, web, baseline) {
             {legalChoices: {commands}});
         const count = await page.evaluate('window.mapCommands.length');
         await click('[data-hand-card="bottom-commodity"]');
-        await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]') && document.querySelector('.selected-action button:not([disabled])')`, `${action} prepares a review`);
+        await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]') && document.querySelector('.selected-action-confirmation:not([disabled])')`, `${action} prepares a review`);
         await click('.sheet-toggle');
         assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'false', 'Phone review can be minimized');
         await click('[data-hand-card="bottom-target"]');
-        await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]') && document.querySelector('.selected-action button').checkVisibility()`, `${action} selection reopens review`);
-        assert.match(await page.evaluate(`document.querySelector('.selected-action').textContent`), /Crusades/);
-        await assertControlReachable(page, '.selected-action button', `${action} reopens phone confirmation`);
+        await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]') && document.querySelector('.selected-action-confirmation').checkVisibility()`, `${action} selection reopens review`);
+        assert.match(await page.evaluate(`document.querySelector('.selected-action-confirmation').textContent`), /Crusades/);
+        await assertControlReachable(page, '.selected-action-confirmation', `${action} reopens phone confirmation`);
         assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Changing a finite hand selection only edits the draft');
     }
 

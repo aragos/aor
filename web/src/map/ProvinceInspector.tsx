@@ -1,3 +1,5 @@
+import {useState} from 'react';
+import {DecisionAction, DecisionForm} from '../DecisionActions';
 import type {ExpansionOfferView, ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
 import {label} from '../labels';
 import {t} from '../messages';
@@ -48,6 +50,7 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     snapshot: Snapshot; province: ProvinceDefinition; busy: boolean;
     submit: (command: string) => Promise<boolean>;
 }) {
+    const [partialOpen, setPartialOpen] = useState(false);
     const {partial, setPartial} = useMapSelection();
     const catalog = snapshot.game.catalog;
     if (!catalog) return null;
@@ -62,7 +65,7 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     const available = primary && (!!remainingPlacement || (offer.blockers.length === 0 && offer.resultingPool !== null));
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
     const command = offer?.primaryAction === 'ATTACK' && !remainingPlacement ? `attack ${province.id}` : `place ${requiredTokens} ${province.id}`;
-    const commands = provinceOrders(snapshot, province.id);
+    const commands = provinceOrders(snapshot, province.id).filter(command => !command.startsWith('reduce-marker '));
     const hasPlacement = primary && (available || offer.partialPlacements.length > 0);
     if (!hasPlacement && commands.length === 0) {
         return inspection ? <section className="province-actions" aria-label={t('table.selectedProvince')}>
@@ -83,32 +86,26 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
                 {uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
                 {remainingPlacement && <><p className="consequence">{t('table.markerNeedsTokens', {count: offer.requiredTokens})}</p><ExpansionAvailability offer={offer} province={province}/></>}
                 {!remainingPlacement && offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
-                <button type="button" className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>
+                {!partialOpen && <DecisionAction className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>
                     {remainingPlacement ? t('table.remainingTokens') : uncertain ? t('action.attack') : province.satellite ? t('action.place') : t('table.establishMarker')} · {requiredTokens} {t('table.tokens')}
-                </button>
-                {offer.partialPlacements.length > 0 && <details className="partial-placement"><summary>{t('table.placeFewer')}</summary>
-                    <form onSubmit={event => { event.preventDefault(); if (partialOffer) void submit(`place ${partialOffer.tokens} ${province.id}`); }}>
+                </DecisionAction>}
+                {offer.partialPlacements.length > 0 && <details className="partial-placement" onToggle={event => setPartialOpen(event.currentTarget.open)}><summary>{t('table.placeFewer')}</summary>
+                    <DecisionForm onSubmit={event => { event.preventDefault(); if (partialOffer) void submit(`place ${partialOffer.tokens} ${province.id}`); }}>
                         <p>{t('controls.tokenCount')}</p>
                         <ChoiceButtons label={t('controls.tokenCount')} id="partial-count" value={partial} onChange={setPartial} disabled={busy}
                             choices={offer.partialPlacements.map(choice => ({value: String(choice.tokens), label: String(choice.tokens)}))}/>
                         {partial && !partialOffer && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
                         {partialOffer && <p>{t('game.pool')}: {offer.availablePool} → {partialOffer.resultingPool}</p>}
-                        <button disabled={busy || !partialOffer}>{t('action.place')}</button>
-                    </form>
+                        {partialOpen && <DecisionAction type="submit" className="partial-expansion" disabled={busy || !partialOffer}>{t('action.place')} · {partialOffer?.tokens ?? '—'} {t('table.tokens')}</DecisionAction>}
+                    </DecisionForm>
                 </details>}
                 <details><summary>{t('table.placementDetails')}</summary>
                     {offer.shipping && <dl className="detail-list"><div><dt>{t('table.destinationShipping')}</dt><dd>{offer.shipping.used} / {offer.shipping.capacity ?? '∞'}</dd></div><div><dt>{t('table.shippingRequired')}</dt><dd>{remainingPlacement?.tokens ?? offer.shipping.required}</dd></div></dl>}
                     <p>{t('game.stockMarkers')}: {me?.stockMarkers}</p>
                 </details>
             </>}
-            <div className="action-buttons">{commands.filter(command => !command.startsWith('reduce-marker ')).map(command => <button type="button" key={command} className="secondary"
-                disabled={busy} onClick={() => { void submit(command); }}>{label(command.split(' ')[0], 'action')}</button>)}</div>
-            {commands.some(command => command.startsWith('reduce-marker ')) && <details className="marker-reduction">
-                <summary>{t('action.reduceMarker')}</summary>
-                {commands.filter(command => command.startsWith('reduce-marker ')).map(command => <button type="button" key={command}
-                    className="secondary" disabled={busy} onClick={() => { void submit(command); }}>{t('table.confirm')}</button>)}
-            </details>}
-
+            <div className="action-buttons">{commands.map(command => <DecisionAction key={command} className="secondary"
+                disabled={busy} onClick={() => { void submit(command); }}>{label(command.split(' ')[0], 'action')}</DecisionAction>)}</div>
         </div>
     </div>;
 }

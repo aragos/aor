@@ -97,7 +97,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.match(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), /Place maximum possible tokens.*2/);
     await click('.primary-expansion');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `place 2 ${partial.destination}`);
-    await click('.decision-toolbar .pass-action');
+    await click('.decision-actions .pass-action');
     assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Pass clears selected province');
 
     await show({prompt:{messageId:'prompt.expand',players:[other.id]},legalChoices:{commands:[]},game:{
@@ -115,8 +115,8 @@ export async function checkContextualUx(page, web, baseline) {
             cardOffers:[{reference,playable:true,blockers:[],choices:[{kind:'COMMODITY',value:'fur',command:`play ${reference} commodity fur`}],commodities:['FUR'],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click(`[data-hand-card="${reference}"]`);
     assert.equal(await page.evaluate(`!!document.querySelector('.card-decision .target-choices')`), false, 'Single commodity needs no extra choice');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false);
-    await click('.card-decision .card-confirmation > button');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false);
+    await click('.decision-actions .play-card-action');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play ${reference} commodity fur`);
     assert.equal(await page.evaluate(`!!document.querySelector('.card-decision')`), false, 'Card play clears detail');
 
@@ -139,7 +139,7 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Changing purchase steps clears advance inspection');
     await show({game:{activity:{...fixture.game.activity,purchaseStep:'ADVANCES'}}});
     await click(`[data-advance="${advance.id}"]`);
-    await click('.decision-toolbar .pass-action');
+    await click('.decision-actions .pass-action');
     assert.equal(await page.evaluate(`!!document.querySelector('.advance-decision')`), false, 'Pass clears advance');
     await show({prompt:{messageId:'prompt.purchase-relief',players:[viewer]},legalChoices:{commands:['relieve-misery','pass']},game:{reliefOffers:[]}});
     assert.equal(await page.evaluate(`!!document.querySelector('#relief-spaces')`), false, 'No relief purchase without a tier offer');
@@ -150,13 +150,13 @@ export async function checkContextualUx(page, web, baseline) {
     await click('[data-hand-card="target"]');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'The compact hand omits full event paragraphs');
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="target"] .hand-card-summary').textContent`), /.+/, 'The held event has a concise effect summary');
-    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog a[href^="/help#card-"]')`), null, 'Card inspection omits the redundant rules link');
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog button[data-help-topic^="card-"]')`), null, 'Card inspection omits the redundant rules link');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
     await click(`[data-player="${other.id}"] > summary`);
     assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Capital target selection only prepares draft');
     assert.equal(await page.evaluate(`document.querySelector('[data-player="${other.id}"].picked-target') !== null`), true);
-    await click('.card-decision .card-confirmation > button');
+    await click('.decision-actions .play-card-action');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play target player ${other.id}`);
     assert.equal(await page.evaluate(`!!document.querySelector('.eligible-target')`), false);
 
@@ -189,7 +189,7 @@ export async function checkContextualUx(page, web, baseline) {
         const paths=area.querySelectorAll(':scope > path');
         return paths.length===1 && paths[0].hasAttribute('clip-path');
     })`), true, 'Each area border stays within its exact member footprint without a separating halo');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false);
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false);
     await click('.decision-heading [data-close-action]');
 
     await show({game:{hand:[{reference:'area-target',definition:{id:'black-death',kind:'event',messageId:'card.black-death',shape:'CIRCLE'}}],
@@ -203,8 +203,8 @@ export async function checkContextualUx(page, web, baseline) {
     await click('[data-map-area-label="VIII"]');
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeAreaTarget, 'Area target click only edits the draft');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'true');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false);
-    await click('.card-decision .card-confirmation > button');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false);
+    await click('.decision-actions .play-card-action');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play area-target area viii');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'false', 'Playing an area card clears the area selection');
 

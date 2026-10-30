@@ -45,8 +45,8 @@ export async function checkTable(page, web, baseline) {
         assert(income.title && income.label, 'Income keeps hover and accessible labels');
     }
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#misery-track"]').target`), '_blank', 'Misery track opens outside the game');
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#shipping-track"]').textContent`), '?', 'Shipping help sits beside its value');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer button[data-help-topic="misery-track"]').getAttribute('aria-haspopup')`), 'dialog', 'Misery track opens a reference popup');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer button[data-help-topic="shipping-track"]').textContent`), '?', 'Shipping help sits beside its value');
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track')`), null, 'Static tracks leave the game view');
     const offer = fixture.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && offer.blockers.length === 0);
     assert(offer, 'Live fixture must expose a legal marker establishment');
@@ -94,7 +94,7 @@ export async function checkTable(page, web, baseline) {
     assert(blocked, 'Fixture must include an inspectable blocked destination');
     await page.evaluate(`document.querySelector('[data-map-province="${blocked.destination}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     await page.wait(`document.querySelector('[data-map-province="${blocked.destination}"][aria-pressed="true"]')`, 'blocked market remains inspectable');
-    assert.equal(await page.evaluate(`!!document.querySelector('.map-orders .primary-expansion:not([disabled])')`), false, 'An unavailable province has no enabled placement action');
+    assert.equal(await page.evaluate(`!!document.querySelector('.decision-actions .primary-expansion:not([disabled])')`), false, 'An unavailable province has no enabled placement action');
     assert.equal(await page.evaluate(`!!document.querySelector('.province-actions [data-expansion-blocker]')`), true, 'The unavailable province explains its blocker');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0);
 
@@ -103,7 +103,7 @@ export async function checkTable(page, web, baseline) {
     await show({revision: fixture.revision + 1, prompt: {messageId: 'prompt.civil-war-loss', players: [other]},
         legalChoices: {...fixture.legalChoices, commands: []},
         game: {expansionOffers: [], activity: {...fixture.game.activity, actor: fixture.viewerId, decisionPlayer: other, choice: 'civil-war-loss'}}});
-    await page.wait(`!document.querySelector('.map-orders .primary-expansion:not([disabled])')`, 'interruption disables stale expansion');
+    await page.wait(`!document.querySelector('.decision-actions .primary-expansion:not([disabled])')`, 'interruption disables stale expansion');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Changed prompt cannot auto-submit');
     assert((await page.evaluate(`document.querySelector('.decision-panel').textContent`)).includes(fixture.game.players.find(player => player.id === other).capital.replace(/\b\w/g, letter=>letter.toUpperCase())), 'Interruption names recipient');
     await show({...baseline, revision: fixture.revision + 1});
@@ -195,9 +195,9 @@ export async function checkTokenContinuity(page, web, tokenFixture) {
     await page.wait(`window.uiQuoteRequests.some(request => request.amount === -2)`, 'held negative quote');
     await page.fill('#bid', String(largeAmount));
     await page.wait(`window.uiQuoteRequests.some(request => request.amount === ${largeAmount})`, 'held stock-capped quote');
-    assert.equal(await page.evaluate(`document.querySelector('#bid').form.querySelector('button').disabled`), true, 'Cannot submit while exact quote is outstanding');
+    assert.equal(await page.evaluate(`document.querySelector('.bid-action').disabled`), true, 'Cannot submit while exact quote is outstanding');
     await page.evaluate(`window.uiHoldQuotes = false; window.releaseUiQuotes()`);
-    await page.wait(`!document.querySelector('#bid').form.querySelector('button').disabled`, 'latest quote enabled');
+    await page.wait(`!document.querySelector('.bid-action').disabled`, 'latest quote enabled');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), String(largeAmount));
     assert((await page.evaluate(`document.querySelector('#purchase-preview').textContent`)).includes(`$${quotes[largeAmount].quote.cashAfter}`), 'Late earlier amount cannot replace latest preview');
     const requests = await page.evaluate('window.uiRequests');
@@ -208,7 +208,7 @@ export async function checkTokenContinuity(page, web, tokenFixture) {
     // Revision supersession invalidates every quote from the previous position.
     await page.evaluate(`window.uiQuoteReplies = {}; window.setUiSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1})})`);
     await page.wait(`window.uiQuoteRequests.some(request => request.expectedRevision === ${snapshot.revision + 1})`, 'quote revalidation after revision change');
-    assert.equal(await page.evaluate(`document.querySelector('#bid').form.querySelector('button').disabled`), true, 'Stale quote cannot authorize submission');
+    assert.equal(await page.evaluate(`document.querySelector('.bid-action').disabled`), true, 'Stale quote cannot authorize submission');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0);
     const quotesBeforeChaos = await page.evaluate('window.uiQuoteRequests.length');
     const chaos = {...snapshot, revision:snapshot.revision+2, prompt:{messageId:'prompt.buy-tokens',players:[]},
@@ -260,9 +260,9 @@ export async function checkDecisionFamilies(page, web, baseline) {
         if (/^(discard-card|offer-card) /.test(command)) {
             assert.equal(await page.evaluate(`document.querySelector('.game-actions .action-buttons button.secondary')`), null, 'Card choices have one home in the hand');
         }
-        await page.wait(`document.querySelector('.selected-action button:not([disabled])')`, choice + ' selected');
+        await page.wait(`document.querySelector('.selected-action-confirmation:not([disabled])')`, choice + ' selected');
         assert.equal(await page.evaluate('window.uiCommands.length'), count, `${choice} selection cannot submit`);
-        await page.evaluate(`document.querySelector('.selected-action button').click()`);
+        await page.evaluate(`document.querySelector('.selected-action-confirmation').click()`);
         await page.wait(`window.uiCommands.length === ${count + 1}`, choice + ' confirmed');
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
@@ -273,16 +273,16 @@ export async function checkDecisionFamilies(page, web, baseline) {
     const beforeReplacement = await page.evaluate('window.uiCommands.length');
     await page.evaluate(`document.querySelector('[data-replacement-province="rome"] button:first-child').click()`);
     assert.equal(await page.evaluate('window.uiCommands.length'), beforeReplacement, 'Replacement choice only edits a draft');
-    assert.equal(await page.evaluate(`document.querySelector('.event-replacements > button:last-child').disabled`), true, 'Every province needs a choice');
+    assert.equal(await page.evaluate(`document.querySelector('.replacement-confirmation').disabled`), true, 'Every province needs a choice');
     assert.equal(await page.evaluate(`document.querySelector('[data-replacement-province="florence"] button:first-child').disabled`), true, 'Pool budget prevents a second replacement');
     await page.evaluate(`document.querySelector('[data-replacement-province="florence"] button:last-child').click()`);
-    await page.evaluate(`document.querySelector('.event-replacements > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.replacement-confirmation').click()`);
     await page.wait(`window.uiCommands.length === ${beforeReplacement + 1}`, 'grouped event confirmed');
     assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), 'replace-event-tokens rome');
     for (const [choice, command] of [['cathedral', 'cathedral'], ['windmill', 'windmill'], ['purchase-stabilization', 'stabilize misery'], ['buy-card', 'buy-card']]) {
         await show(choice, [command]);
         const count = await page.evaluate('window.uiCommands.length');
-        await page.evaluate(`document.querySelector('.game-actions .action-buttons button').click()`);
+        await page.evaluate(`document.querySelector('.decision-actions .simple-action').click()`);
         await page.wait(`window.uiCommands.length === ${count + 1}`, command + ' submitted');
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
@@ -291,21 +291,21 @@ export async function checkDecisionFamilies(page, web, baseline) {
         activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'RELIEF'},
     }, 'PURCHASE');
     await page.evaluate(`document.querySelector('#relief-spaces button').click()`);
-    await page.evaluate(`document.querySelector('#relief-spaces').closest('form').querySelector(':scope > button').click()`);
+    await page.evaluate(`document.querySelector('.relief-action').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'relieve-misery 1'`, 'quoted misery relief');
 
     await show('choose-turn-position', ['choose-turn-position 1','choose-turn-position 2'], {provisionalTieOrder:[other]}, 'TURN_ORDER_TIE');
-    assert.equal(await page.evaluate(`document.querySelector('.turn-tie .capital-choices button:not(.secondary)').disabled`), true, 'Turn tie requires explicit slot selection');
+    assert.equal(await page.evaluate(`document.querySelector('.turn-confirmation').disabled`), true, 'Turn tie requires explicit slot selection');
     await page.evaluate(`document.querySelector('.turn-tie .capital-choices button.secondary').click()`);
-    await page.evaluate(`document.querySelector('.turn-tie .capital-choices button:not(.secondary)').click()`);
+    await page.evaluate(`document.querySelector('.turn-confirmation').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'choose-turn-position 1'`, 'tie slot confirmed');
     const source = baseline.game.board.find(province => province.marker?.owner===viewer).id;
     await show('place-event-marker', ['forgo-marker',`move-marker ${source}`], {markerPlacement:{player:viewer,destination:'rome'}});
     await page.evaluate(`document.querySelector('#marker-source button').click()`);
-    await page.evaluate(`document.querySelector('#marker-source').closest('form').querySelector(':scope > button').click()`);
+    await page.evaluate(`document.querySelector('.move-marker-action').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'move-marker ${source}'`, 'event marker moved');
     await show('place-event-marker', ['forgo-marker'], {markerPlacement:{player:viewer,destination:'rome'}});
-    await page.evaluate(`document.querySelector('.game-actions .guided-form > button.secondary').click()`);
+    await page.evaluate(`document.querySelector('.forgo-marker-action').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'forgo-marker'`, 'event marker forgone');
 
     for (const [id,kind,value] of [['civil-war','PLAYER',other],['black-death','AREA','i'],['the-crusades','PROVINCE','acre'],['papal-decree','CATEGORY','none']]) {
@@ -329,7 +329,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
             await page.evaluate(`document.querySelector('.card-decision .target-choices button:not(.map-picker)').click()`);
         }
         assert.equal(await page.evaluate('window.uiCommands.length'),before,kind+' selection cannot submit');
-        await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
+        await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`,kind+' canonical play');
     }
     const advance = baseline.game.catalog.advances[0];
@@ -339,8 +339,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
     }, 'PURCHASE');
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
     await page.evaluate(`[...document.querySelectorAll('.advance-tile')].find(tile=>tile.querySelector('.advance-letter').textContent===${JSON.stringify(advance.letter)}).click()`);
-    await page.wait(`document.querySelector('.advance-decision .card-confirmation > button:not([disabled])')`, 'affordable advance decision');
-    await page.evaluate(`document.querySelector('.advance-decision .card-confirmation > button').click()`);
+    await page.wait(`document.querySelector('.decision-actions .buy-advance-action:not([disabled])')`, 'affordable advance decision');
+    await page.evaluate(`document.querySelector('.decision-actions .buy-advance-action').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'buy-advance ${advance.letter}'`, 'advance purchase canonical command');
     await show('purchase-advances', [`buy-advance ${advance.letter}`], {
         advanceOffers:[{advance:advance.id,price:10,unavailableReason:'MISSING_ADVANCE_PREREQUISITE'}],
@@ -372,7 +372,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
     const beforeChoice = await page.evaluate('window.uiCommands.length');
     await page.evaluate(`document.querySelector('.card-decision .target-choices button').click()`);
     assert.equal(await page.evaluate('window.uiCommands.length'), beforeChoice, 'Commodity selection prepares draft');
-    await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
+    await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'play ${dualReference} commodity cloth'`, 'dual commodity play');
 
     // Protection is an explicit amount choice. Invalid drafts must not fall back to a bare play.
@@ -387,13 +387,13 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
     await page.wait(`document.querySelector('.card-decision input[type=number]')`, 'leader protection');
     assert.equal(await page.evaluate(`document.querySelector('.card-decision input[type=number]').value`), '0', 'Protection starts at zero');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false, 'Default protection is ready to play');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Default protection is ready to play');
     for (const amount of ['', '-1', '6']) {
         await page.fill('.card-decision input[type=number]', amount);
-        assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), true, `Invalid protection ${amount} cannot become a bare play`);
+        assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), true, `Invalid protection ${amount} cannot become a bare play`);
     }
     await page.fill('.card-decision input[type=number]', '3');
-    await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
+    await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'play ${reference} protect 3'`, 'valid protection submission');
     for (const [stage, prompt, id, kind] of [['FINAL_CARD_PLAY','final-card-play','grain','commodity'], ['PLAY_CARDS','prepare-war','gunpowder','event']]) {
         const cardReference = `fixture-${prompt}`;
@@ -403,8 +403,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
             cardOffers:[{reference:cardReference,playable:true,blockers:[],choices:[{kind:'NONE',value:null,command}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}],
         }, stage);
         await page.evaluate(`document.querySelector('[data-hand-card="${cardReference}"]').click()`);
-        await page.wait(`document.querySelector('.card-decision .card-confirmation > button:not([disabled])')`, prompt+' card draft');
-        await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
+        await page.wait(`document.querySelector('.decision-actions .play-card-action:not([disabled])')`, prompt+' card draft');
+        await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`, prompt+' canonical play');
     }
     console.log('Passed: immediate discard, Civil War, replacement, Renaissance, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');

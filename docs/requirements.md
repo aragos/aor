@@ -44,6 +44,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   retaining correctable work after rejection. Show available cash alongside spending decisions; omit
   a permanent resource section. Include each player's advance count in their summary. Expanded
   advances follow printed category and letter order.
+  Expanded player details omit the repeated name and float without resizing the player strip or map.
   Show written cash in expanded player details and keep income in the summary. Put the live deck
   count beside the epoch, with no duplicate count in turn effects.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
@@ -56,7 +57,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   viewport or cover it. On narrow screens, coordinate the action review and confirmation above the
   hand rather than overlaying separate fixed panels. Keep Commands, turn effects and configuration
   reachable. Omit the visible private-hand heading and card count. Size cards and the hand to their
-  contents, with a height cap only when needed to retain usable workspace and actions.
+  contents, with a height cap only when needed to retain usable workspace and actions. Compact narrow
+  hands show card names only; expansion reveals their full content.
   Card summaries show current commodity payouts and adjustments, relevant leader credits and concise
   event effects. Keep unavailable cards readable and explain their blockers when selected. Show held
   cards only from the viewer's projected hand; reference catalogs cannot reveal another player's hand.
@@ -78,10 +80,14 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   and returning focus preserve the active action and its prepared choices. Advance inspection retains
   its existing workspace surface; commodity cards retain their own live values and direct payout
   reference links.
-- Keep Pass and Undo together at the top right of the action panel. Undo withdraws an unrevealed
-  bid or token purchase while preserving the local draft; after reveal it follows the chosen policy.
-  Player boxes share a wrapping status/pool row. Expansion uses one current → projected pool balance
-  rather than separate remaining-token and balance panels. Center action labels and inline identities.
+- Keep Undo at the upper right and all final actions, including Pass, in a pinned action footer.
+  Join exactly one action plus Pass with a divider while retaining complete labels, independent
+  activation and native form behavior. Larger sets use separate buttons; keep draft choices by their
+  inputs. Undo withdraws an unrevealed bid or token purchase while preserving the local draft; after
+  reveal it follows the chosen policy. Let players resize open activity with pointer, touch and
+  keyboard controls, preserving that split through polling and minimize/reopen. Keep minimized
+  activity at the bottom. Player boxes share a wrapping status/pool row. Expansion uses one current
+  → projected pool balance. Center action labels and inline identities.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup
@@ -98,9 +104,10 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   question links to full payout tracks, without an inspection box. Every visible capital name
   includes its symbol, including cash/misery previews. Shipping upgrades show current → new shipping.
   Identify whether each leader discount includes Written Record.
-  Keep full payout boxes, legends, variant descriptions and printed tracks on public `/help`, linked
-  contextually in a new tab. Show matching unplayed leader counts for epochs I–III beside each
-  advance, with the public-information meaning above.
+  Open full payout boxes, legends, variant descriptions, printed tracks and app help in contextual
+  popups. Omit duplicate card/advance catalogs available in the game; retain unique printed credits,
+  relief ratings and prerequisites in contextual advance popups. Show one clickable printed-epoch
+  circle per publicly unplayed matching leader beside each advance. Commodity choices include symbols.
 - Label token-priced card purchases with the current token cost. Show applied category, research and
   leader discounts in optional price detail, naming the contributing advances. Keep tiles compact,
   show prices for blocked advances, and retain printed costs when no live quote exists. Card plays

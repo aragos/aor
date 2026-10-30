@@ -3,9 +3,11 @@ import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label} from './labels';
 import {t} from './messages';
+import {ActionSidebar} from './ActionSidebar';
+import {DecisionActions} from './DecisionActions';
 import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
-import {Activity, ActionResultNotice} from './Activity';
+import {ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
 import {FinalScores, TurnEffects} from './FullGamePanels';
 import {AdvanceTiles, PlayerOverview, Markets} from './TablePanels';
@@ -154,12 +156,12 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
                 </section>}
             </div>
-            <div className="workspace-side">
+            <ActionSidebar snapshot={snapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}>
             <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
-                <div className={`decision-header ${objectAction ? 'object-header' : ''}`}>
+                <DecisionActions pass={!inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
+                    <button type="button" className="pass-action" disabled={busy} onClick={() => { void submit('pass'); }}>{t('action.pass')}</button>}>
+                <div className="decision-header">
                     <div className="decision-toolbar">
-                        {!inactive && canAct && snapshot.legalChoices.commands.includes('pass') && <button type="button"
-                            className="pass-action" disabled={busy} onClick={() => { void submit('pass'); }}>{t('action.pass')}</button>}
                         {!inactive && (withdrawing || snapshot.undo?.available) && <button type="button"
                             className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
                             title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
@@ -180,6 +182,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                         {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                     </div>
                 </div>
+                <div className="decision-scroll">
                 {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status">
                     <PlayerLabel snapshot={snapshot} id={expansionPlayer.id}/>
                     <span>{t('table.poolTokens')}</span><strong><TableIcon kind="token"/><span data-pool-current>{expansionPlayer.poolTokens}</span>
@@ -196,15 +199,17 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 {spending && <p className="action-cash">{t('controls.availableCash')}: <strong>${me.cash}</strong></p>}
                 {cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                     : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
-                    : province && !picker && <ProvinceActions snapshot={snapshot} province={province} busy={busy} submit={submit}/>}
+                    : province && !picker && <ProvinceActions key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit}/>}
                 {!inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
                 {!inactive && <UrbanAscendancyQueue snapshot={snapshot} busy={busy} submit={submit}/>}
                 {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                 {(busy || saved && !['BIDDING', 'TOKEN_PURCHASE'].includes(snapshot.game.stage)) && <p className="save-status" aria-live="polite">{t(busy ? 'status.working' : 'status.saved')}</p>}
                 </div>
+                </div>
+
+                </DecisionActions>
             </aside>
-            <Activity snapshot={snapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}/>
-            </div>
+            </ActionSidebar>
             <Hand snapshot={snapshot} busy={busy}/>
         </div>
         {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>

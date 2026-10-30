@@ -1,6 +1,9 @@
+import {checkActionButtons} from './actionButtons.browser.mjs';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
+import {checkCompactPresentation} from './compactPresentation.browser.mjs';
+import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkTable} from './table.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkBottomHand} from './bottomHand.browser.mjs';
@@ -27,14 +30,15 @@ export async function checkTableConsistency(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-pool-after]').textContent`), String(offer.resultingPool));
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .pass-action, .decision-panel .undo-action').length`), 2);
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-content .pass-action, .decision-content .undo-action').length`), 0);
-    const assertToolbar = async () => assert.equal(await page.evaluate(`(() => {
-        const pass=document.querySelector('.decision-toolbar .pass-action');
-        const undo=document.querySelector('.decision-toolbar .undo-action');
-        const p=pass.getBoundingClientRect(), u=undo.getBoundingClientRect();
-        return p.right<=u.left && Math.abs((p.top+p.bottom)/2-(u.top+u.bottom)/2)<1 &&
-            !pass.classList.contains('secondary') && p.height>=38 &&
-            getComputedStyle(pass).backgroundColor!==getComputedStyle(undo).backgroundColor;
-    })()`), true, 'Pass is prominent and stays to the left of Undo on one row');
+    const assertToolbar = async () => page.wait(`(() => {
+        const pass=document.querySelector('.decision-actions .pass-action').getBoundingClientRect();
+        const undo=document.querySelector('.decision-toolbar .undo-action').getBoundingClientRect();
+        const panel=document.querySelector('.decision-panel').getBoundingClientRect();
+        const footer=document.querySelector('.decision-actions').getBoundingClientRect();
+        return undo.top>=panel.top && undo.right<=panel.right &&
+            pass.top>=footer.top && pass.bottom<=panel.bottom && footer.top>undo.bottom &&
+            !document.querySelector('.decision-toolbar .pass-action');
+    })()`, 'Undo stays at the upper right and Pass belongs to the pinned action footer');
     await assertToolbar();
     assert.equal(await page.evaluate(`(() => {
         const row=document.querySelector('.player-summary.is-viewer .player-status-row');
@@ -66,9 +70,9 @@ export async function checkTableConsistency(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-misery-preview-player]').length`), changes.length, 'Group misery shows every active player including unchanged boxes');
     assert.equal(await page.evaluate(`document.querySelector('[data-hand-card]').textContent.includes('Playable') || document.querySelector('[data-hand-card]').textContent.includes('Selected')`), false);
     assert.equal(await page.evaluate(`document.querySelector('[data-hand-card]').getAttribute('aria-pressed')`), 'true');
-    assert.equal(await page.evaluate(`document.querySelector('.card-confirmation > button').disabled`), false);
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .card-confirmation').disabled`), false);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-group-misery-preview.png'), 1440, 1000);
-    await click('.decision-toolbar .pass-action');
+    await click('.decision-actions .pass-action');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'pass');
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision')`), null, 'Pass closes the prepared card');
 
@@ -145,6 +149,9 @@ if (process.argv[1]?.endsWith('/tableConsistency.browser.mjs')) {
             await game.send(actor, command);
         }
         assert(baseline);
+        await checkActionButtons(page, web, baseline);
+        await checkCompactPresentation(page, web, baseline);
+        await checkReferenceUx(page, web, baseline);
         await checkTable(page, web, baseline);
         await checkTableConsistency(page, web, baseline);
         await checkMarketInsights(page, web, baseline);

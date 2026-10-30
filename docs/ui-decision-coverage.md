@@ -62,6 +62,30 @@ completed. The focused correction waits for the camera to match the rendered vie
 its baseline, then waits for the polled revision and compares both the exact camera and viewport size.
 The focused table suite passes (`aor-browser-artifacts-QzqZdQ`), as do the web build and 53 unit tests.
 
+The subsequent compact-phone and popup revision passes the web build, 53 web unit tests and the
+comprehensive browser suite (`aor-browser-artifacts-KDDfA0`). Desktop/phone fixtures verify matching
+fixed Pass/Undo dimensions, bottom-pinned minimized activity, floating player details without resizing
+the overview or map, no repeated detail name, name-only compact phone cards with 44-pixel targets,
+full expanded contents and commodity symbols on choices. Contextual reference checks cover payout
+boxes, map key, printed tracks, variants, all four undo policies and unique printed advance values;
+duplicate card/advance catalogs are omitted. Popup polling, Escape, focus restoration and creation/
+commodity drafts remain covered. Existing live targeting, competition, Civil War, sealed purchases,
+withdrawal/reload, hosted flows and both boards also pass. These changes affect browser presentation;
+no Kotlin or domain behavior changed.
+
+The action-footer overhaul passes the web build, 53 web unit tests and the comprehensive browser
+suite (`aor-browser-artifacts-bYPrs9`). Final actions share a pinned footer, Undo remains in the
+upper-right toolbar, and exactly one action plus Pass forms a joined control. Desktop, 390-pixel
+and 320-pixel fixtures check complete long placement and priced-cancellation labels, equal joined
+heights, separate larger action sets, action-to-Pass tab order, native validation and Enter submission.
+The focused run (`aor-browser-artifacts-EQuYir`) additionally exercises mouse, touch and keyboard
+activity resizing, bounded sizes, and polling/minimize/reopen preservation under reduced motion.
+The global reduced-motion rule disables transitions rather than introducing a transition duration
+on otherwise static controls. Live Undo/history editing also passes (`aor-browser-artifacts-lkI7do`).
+Reviewed desktop and phone captures: the joined divider is visible, long labels wrap without clipping,
+Undo stays above the actions, and stabilization choices remain separate. These observations do not
+replace the outstanding physical-device and screen-reader reviews.
+
 ## Decision inventory
 
 | Prompt / state | Canonical actions and visual path | Evidence |

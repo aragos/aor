@@ -1,3 +1,4 @@
+import {DecisionAction, DecisionForm} from './DecisionActions';
 import {useEffect, useRef, useState} from 'react';
 import type {Snapshot} from './api';
 import {t} from './messages';
@@ -70,12 +71,12 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     return <>
         {eligiblePurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
         {eligiblePurchase && quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
-        {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <form onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
+        {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <DecisionForm onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
             <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-preview' : undefined} required/>
-                <button disabled={busy || (isTokenPurchase && (!validPurchase || !quoted))}>
+                <DecisionAction type="submit" className="bid-action" disabled={busy || (isTokenPurchase && (!validPurchase || !quoted))}>
                     {bidSubmitLabel(snapshot)}
-                </button>
+                </DecisionAction>
             </div>
             <p className="private-draft-status" role="status">{t(snapshot.pendingBid !== null && bid === String(snapshot.pendingBid) ? 'controls.savedPrivately' : 'controls.unsavedDraft', {amount: bid})}</p>
             {snapshot.pendingBid !== null && <p className="pending-submission">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
@@ -86,13 +87,13 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                     <div><dt>{t('controls.remainingCash')}</dt><dd>${quoted.cashAfter}</dd></div><div><dt>{t('game.tokens')}</dt><dd>{me.stockTokens} → {quoted.stockAfter}</dd></div>
                 </dl> : <p className="small">{validPurchase ? t('table.quotePending') : t('controls.purchaseRange').split('{cash}').join(String(me.cash))}</p>}
             </div>}
-        </form>}
-        {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}><CapitalLabel capital={choice.split(' ')[1]}>{t(`capital.${choice.split(' ')[1]}`)}</CapitalLabel></button>)}<button disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</button></div>}
+        </DecisionForm>}
+        {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}><CapitalLabel capital={choice.split(' ')[1]}>{t(`capital.${choice.split(' ')[1]}`)}</CapitalLabel></button>)}<DecisionAction className="capital-confirmation" disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</DecisionAction></div>}
         {capitalChoices.length > 0 && <MapPicker title={t('controls.chooseProvince')} eligible={capitalChoices.map(choice => choice.split(' ')[1])}
             selected={capital ? [capital.split(' ')[1]] : []} disabled={busy} onPick={id => setCapital(`choose-capital ${id}`)}/>}
         {stage === 'TURN_ORDER_TIE' && <div className="turn-tie">
             <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? <PlayerLabels snapshot={snapshot} ids={snapshot.game.provisionalTieOrder} separator=" → "/> : t('controls.noPositions')}</p>
-            {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button type="button" className="secondary" key={choice} disabled={busy} aria-pressed={position === choice} onClick={() => setPosition(choice)}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}<button disabled={busy || !turnChoices.includes(position)} onClick={() => { void submit(position); }}>{t('table.confirm')}</button></div>}
+            {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button type="button" className="secondary" key={choice} disabled={busy} aria-pressed={position === choice} onClick={() => setPosition(choice)}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}<DecisionAction className="turn-confirmation" disabled={busy || !turnChoices.includes(position)} onClick={() => { void submit(position); }}>{t('table.confirm')}</DecisionAction></div>}
         </div>}
         {canAct && <GameActions snapshot={snapshot} busy={busy} submit={submit}/>}
 

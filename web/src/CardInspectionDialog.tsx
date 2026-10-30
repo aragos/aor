@@ -2,8 +2,8 @@ import {useLayoutEffect, useRef} from 'react';
 import type {ReactNode} from 'react';
 
 /** A reference popup leaves the prepared action mounted and returns focus without moving the table. */
-export function CardInspectionDialog({label, close, children}: {
-    label: string; close: () => void; children: ReactNode;
+export function CardInspectionDialog({label, close, children, className = ''}: {
+    label: string; close: () => void; children: ReactNode; className?: string;
 }) {
     const ref = useRef<HTMLDialogElement>(null);
     useLayoutEffect(() => {
@@ -17,7 +17,7 @@ export function CardInspectionDialog({label, close, children}: {
             }
         };
     }, []);
-    return <dialog ref={ref} className="card-inspection-dialog" aria-label={label}
+    return <dialog ref={ref} className={`card-inspection-dialog ${className}`} aria-label={label}
         onCancel={event => {event.preventDefault(); close();}}
         onClick={event => {
             if (event.target !== event.currentTarget) return;

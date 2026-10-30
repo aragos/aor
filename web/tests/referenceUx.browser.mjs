@@ -51,19 +51,40 @@ export async function checkReferenceUx(page, web, baseline) {
     const colorful = await page.evaluate(`fetch(document.querySelector('link[rel=icon]').href).then(response=>response.text())`);
     assert(colorful.includes('#205c4b') && colorful.includes('#f5ce62'),'Turn favicon uses the colorful shield and money bag');
 
-    await page.send('Page.navigate', {url:web+'/help#commodity-stone'});
-    await page.wait(`document.querySelector('#commodity-stone .payout-box')`, 'Public card reference loads without a player token');
-    assert.equal(await page.evaluate(`document.querySelector('.reference-page .card-event-text, .reference-page .advance-benefits, #commodity-cards')`), null, 'Help omits general game rules');
-    assert.equal(await page.evaluate(`document.title`),'AoR · Help');
-    assert.equal(await page.evaluate(`document.querySelectorAll('#commodities .payout-box').length`),120);
-    assert.equal(await page.evaluate(`document.querySelectorAll('#advances article').length`),26);
-    assert.equal(await page.evaluate(`document.querySelectorAll('#map-legend svg').length > 10`),true);
-    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS,'aor-help-desktop.png'),1280,900);
-    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS,'aor-help-phone.png'),390,844,true);
-    assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`),true,'Reference fits a phone');
+    const gameLocationBeforeHelp = await page.evaluate('location.href');
+    await page.evaluate(`document.querySelector('.game-header [data-help-topic=""]').click()`);
+    await page.wait(`document.querySelector('.reference-popup nav')`, 'Help topics popup');
+    const choose = async name => {
+        await page.evaluate(`[...document.querySelectorAll('.reference-popup nav button')].find(button => button.textContent === ${JSON.stringify(name)}).click()`);
+    };
+    await choose('Payout boxes');
+    await page.wait(`document.querySelector('.reference-popup .commodity-name')`, 'Public commodity catalog');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup nav button').length`), 12);
+    await choose('Stone');
+    await page.wait(`document.querySelector('#commodity-stone .payout-box')`, 'Requested payout popup');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup .payout-box').length`), 10);
+    assert.equal(await page.evaluate(`document.querySelector('.reference-popup .card-event-text, .reference-popup .advance-benefits, #advances, #card-charlemagne')`), null, 'Reference omits duplicated card and advance catalogs');
+    assert.equal(await page.evaluate('location.href'), gameLocationBeforeHelp, 'Reference stays inside the game');
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS,'aor-help-popup-desktop.png'),1280,900);
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS,'aor-help-popup-phone.png'),390,844,true);
+    assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`),true,'Popup fits a phone');
+    for (const [name, selector] of [['Map key', '#map-legend .reference-legend'],
+        ['Misery track', '#misery-track .reference-track'], ['Shipping', '#shipping-track .reference-track'],
+        ['Undo policies', '#undo-friendly-game'], ['Variants', '#variant-map']]) {
+        await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);
+        await choose(name);
+        await page.wait(`document.querySelector(${JSON.stringify(selector)})`, name + ' popup');
+    }
+    await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     await page.send('Page.navigate', {url:web+'/'});
-    await page.wait(`document.querySelector('#variant-map')`, 'Variant help links');
+    await page.wait(`document.querySelector('#variant-map')`, 'Variant help controls');
     assert.equal(await page.evaluate(`document.querySelector('#variant-map button:first-child').textContent`),'Standard map');
-    assert.equal(await page.evaluate(`document.querySelector('#variant-label-map a').getAttribute('href')`),'/help#variant-map');
+    assert.equal(await page.evaluate(`document.querySelector('#variant-label-map [data-help-topic="variant-map"]').getAttribute('aria-haspopup')`),'dialog');
+    const namesBefore = await page.evaluate(`document.querySelector('textarea').value`);
+    await page.evaluate(`document.querySelector('#variant-label-map [data-help-topic="variant-map"]').click()`);
+    await page.wait(`document.querySelector('.reference-popup #variant-map')`, 'Public variant popup without a game');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup #variants article').length`), 1, 'Only the requested variant is shown');
+    await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('textarea').value`), namesBefore, 'Variant help preserves creation draft');
     console.log('Passed: immutable and unique bounded activity, clickable cards, turn favicons, conditional military summary, and public contextual reference.');
 }

@@ -1,3 +1,4 @@
+import {useLayoutEffect, useRef} from 'react';
 import type {CommodityPayoutView, PlayerView, PublicCatalog, Snapshot} from './api';
 import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {advanceName, label, playerName, provinceName} from './labels';
@@ -22,10 +23,47 @@ export function Commodity({commodity}: {commodity: string}) {
         <CommodityIcon commodity={commodity}/></svg>{label(commodity, 'commodity')}</span>;
 }
 
+/** The native top layer keeps expanded details outside the strip’s layout and clipping. */
 function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCatalog | null}) {
+    const ref = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        const panel = ref.current;
+        const details = panel?.closest('details');
+        if (!panel || !details) return;
+        panel.popover = 'auto';
+        const position = () => {
+            const summary = details.querySelector('summary');
+            if (!summary) return;
+            const bounds = summary.getBoundingClientRect();
+            const width = Math.min(320, innerWidth - 24);
+            const top = Math.min(bounds.bottom + 6, innerHeight - 100);
+            Object.assign(panel.style, {width: `${width}px`, top: `${top}px`,
+                left: `${Math.max(12, Math.min(bounds.left, innerWidth - width - 12))}px`,
+                maxHeight: `${innerHeight - top - 12}px`});
+        };
+        const sync = () => {
+            if (details.open) {position(); panel.showPopover();}
+            else panel.hidePopover();
+        };
+        const dismissed = () => {
+            if (!panel.matches(':popover-open')) details.open = false;
+        };
+        details.addEventListener('toggle', sync);
+        panel.addEventListener('toggle', dismissed);
+        window.addEventListener('resize', position);
+        document.addEventListener('scroll', position, true);
+        return () => {
+            details.removeEventListener('toggle', sync);
+            panel.removeEventListener('toggle', dismissed);
+            window.removeEventListener('resize', position);
+            document.removeEventListener('scroll', position, true);
+            panel.hidePopover();
+        };
+    }, []);
     const advances = catalog?.advances.filter(advance => player.advances.includes(advance.id));
     const categories = [...new Set(advances?.map(advance => advance.category))];
-    return <div className="player-detail"><h3>{player.name}</h3>
+    return <div ref={ref} className="player-detail" role="region" aria-label={player.name}>
+        <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => ref.current?.hidePopover()}>×</button>
         <dl className="detail-list">
             <div className="written-cash"><dt title={t('game.writtenCashHelp')}>{t('game.writtenCash')}</dt><dd>${player.writtenCash}</dd></div>
             {player.poolAvailable && <div className="player-pool-detail"><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>}
@@ -61,7 +99,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
-                    if (event.target instanceof Element && event.target.closest('a')) return;
+                    if (event.target instanceof Element && event.target.closest('button, a')) return;
                     if (eligible) { if (swap) setSelectedAction(swap); else playerPicker?.pick(player.id);}
                 }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
                     <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>

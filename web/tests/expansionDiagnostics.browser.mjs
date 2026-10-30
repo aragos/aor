@@ -34,7 +34,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
     await show({...blocked, availablePool: 0, blockers: ['INSUFFICIENT_EXPANSION_TOKENS']});
     assert.match(await page.evaluate('document.querySelector(".province-actions [data-expansion-blocker]").textContent'),
         /Needs.*tokens.*have 0/i);
-    assert.equal(await page.evaluate('document.querySelector(".province-actions .primary-expansion")'), null,
+    assert.equal(await page.evaluate('document.querySelector(".decision-actions .primary-expansion")'), null,
         'A filtered destination has an explanation without a placement control');
     assert.equal(await page.evaluate('document.querySelector(' +
         JSON.stringify('[data-map-province="' + province + '"]') + ').classList.contains("eligible")'), false,
@@ -52,7 +52,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
         blockers: ['PROVINCE_ACCESS_DENIED'], missingAccess: ['OCEAN_NAVIGATION']}, true);
     assert.match(await page.evaluate('document.querySelector(".province-actions [data-expansion-blocker]").textContent'),
         /Missing access: Ocean Navigation/);
-    assert.equal(await page.evaluate('document.querySelector(".province-actions .primary-expansion")'), null);
+    assert.equal(await page.evaluate('document.querySelector(".decision-actions .primary-expansion")'), null);
 
     const partial = {...original, requiredTokens: 4, availablePool: 2, resultingPool: null,
         blockers: ['INSUFFICIENT_EXPANSION_TOKENS'], missingAccess: [],

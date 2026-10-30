@@ -93,8 +93,8 @@ export async function checkSharedMarketCancellation(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('${choice}').length`), 1);
     assert.match(await page.evaluate(`document.querySelector('${choice}').textContent`), /Gold \/ Ivory.*Surplus.*\$10/);
     await page.evaluate(`document.querySelector('${choice}').click()`);
-    assert.match(await page.evaluate(`document.querySelector('.selected-action').textContent`), /Gold \/ Ivory.*Surplus.*\$10/);
-    await page.evaluate(`document.querySelector('.selected-action button:last-child').click()`);
+    assert.match(await page.evaluate(`document.querySelector('.selected-action-confirmation').textContent`), /Gold \/ Ivory.*Surplus.*\$10/);
+    await page.evaluate(`document.querySelector('.selected-action-confirmation').click()`);
     assert.equal(await page.evaluate(`window.mapCommands.at(-1)`), 'cancel-adjustment gold surplus');
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...fixture, revision: 29101, game: {...fixture.game,
         adjustments: {GOLD: ['SURPLUS'], IVORY: []}}})})`);

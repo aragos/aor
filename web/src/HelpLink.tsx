@@ -1,11 +1,20 @@
+import {lazy, Suspense, useState} from 'react';
 import type {ReactNode} from 'react';
+import {createPortal} from 'react-dom';
+import {t} from './messages';
 
-/** Open static reference material without replacing the player's live game or draft. */
+const ReferencePopup = lazy(() => import('./ReferencePopup'));
+
+/** Inspect reference material in place while retaining the prepared game action. */
 export function HelpLink({topic = '', label = 'Help', compact = true, inline = false, icon}: {
     topic?: string; label?: string; compact?: boolean; inline?: boolean; icon?: ReactNode;
 }) {
-    return <a className={compact ? `help-link${inline ? ' inline-help' : ''}` : 'reference-link'} href={`/help${topic ? `#${topic}` : ''}`}
-        target="_blank" rel="noreferrer" aria-label={`Help: ${label}`} title={label}>
+    const [open, setOpen] = useState(false);
+    return <><button type="button" className={compact ? `help-link${inline ? ' inline-help' : ''}` : 'reference-link'}
+        data-help-topic={topic} aria-label={`Help: ${label}`} title={label} aria-haspopup="dialog"
+        onClick={event => {event.preventDefault(); event.stopPropagation(); setOpen(true);}}>
         {compact ? <>{icon}?</> : label}
-    </a>;
+    </button>{open && createPortal(<Suspense fallback={<p role="status">{t('reference.loading')}</p>}>
+        <ReferencePopup initialTopic={topic} close={() => setOpen(false)}/>
+    </Suspense>, document.body)}</>;
 }

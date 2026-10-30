@@ -15,7 +15,6 @@ import {startPolling} from './polling';
 import './app.css';
 
 const HostedApp = lazy(() => import('./HostedApp'));
-const ReferencePage = lazy(() => import('./ReferencePage'));
 
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
 
@@ -140,11 +139,9 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 export function App() {
     const [config, setConfig] = useState<ApplicationConfig | null>(null);
     const [error, setError] = useState('');
-    const reference = window.location.pathname === '/help';
     useEffect(() => {
-        if (!reference) void request<ApplicationConfig>('/api/config').then(setConfig).catch(failure => setError(errorCode(failure)));
-    }, [reference]);
-    if (reference) return <Suspense fallback={<main className="landing panel"><p>{t('game.loading')}</p></main>}><ReferencePage/></Suspense>;
+        void request<ApplicationConfig>('/api/config').then(setConfig).catch(failure => setError(errorCode(failure)));
+    }, []);
     const match = /^\/games\/([0-9a-f-]+)\/?$/.exec(window.location.pathname);
     if (!config) return <main className="landing panel"><h1>{t('app.title')}</h1>{error ? <ErrorMessage code={error}/> : <p>{t('game.loading')}</p>}</main>;
     if (config.authMode === 'firebase') return <Suspense fallback={<main className="landing panel"><p>{t('game.loading')}</p></main>}><HostedApp config={config} game={match ? <Game id={match[1]} pollInterval={config.pollIntervalMs}/> : null}/></Suspense>;

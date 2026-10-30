@@ -84,7 +84,7 @@ export async function checkSetupEvidence(page, web) {
         assert.match(await otherPage.evaluate(`document.querySelector('.private-seat-link summary').textContent`),/Bruno/);
         for (const amount of [7,9]) {
             await page.fill('#bid',String(amount));
-            await page.evaluate(`document.querySelector('#bid').form.querySelector('button').click()`);
+            await page.evaluate(`document.querySelector('.bid-action').click()`);
             await page.wait(`document.querySelector('.pending-submission')?.textContent.includes('$${amount}')`,'private bid saved');
             assert.equal((await snapshot(creator)).revision,dealt.revision,'Private replacement retains committed revision');
         }
@@ -126,15 +126,16 @@ export async function checkDecisionEvidence(page, web, baseline) {
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
     for (const advance of baseline.game.catalog.advances) {
         await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);
-        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href="/help#advance-${advance.id.toLowerCase()}"]').target`), '_blank', 'Advance benefits open as reference');
+        assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .advance-benefits')`), true, 'Advance benefits stay in the game');
+        await page.evaluate(`document.querySelector('.inspection-panel [data-help-topic="advance-${advance.id.toLowerCase()}"]').click()`);
+        await page.wait(`document.querySelector('.reference-dialog #advance-${advance.id.toLowerCase()}')`, 'Unique printed advance values');
+        const values = await page.evaluate(`[...document.querySelectorAll('.reference-dialog dd')].map(value => value.textContent)`);
+        assert.deepEqual(values.slice(0, 2), [`$${advance.credit}`, String(advance.miseryRelief)]);
+        assert.equal(values.length, 3, 'Reference keeps credit, relief rating and prerequisites only');
+        assert.equal(await page.evaluate(`document.querySelector('.reference-dialog .advance-benefits, .reference-dialog .advance-price')`), null, 'Advance effects and prices retain their existing game surfaces');
+        await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     }
     await checkAccessibleNames(page);
     await checkContrast(page,'advance-detail');
-    await page.send('Page.navigate', {url:web+'/help#advances'});
-    await page.wait(`document.querySelectorAll('#advances article').length === 26`, 'All advance data in reference');
-    const data = await page.evaluate(`[...document.querySelectorAll('#advances article')].map(element=>element.textContent)`);
-    assert.equal(data.length,26);
-    assert(data.every(text=>text.includes('Printed cost') && text.includes('Prerequisites:')), 'Every advance has printed lookup data');
-    assert.equal(await page.evaluate(`document.querySelector('#advances .advance-benefits')`), null, 'General advance rules stay out of app help');
     console.log('Passed: decision lifetimes, contextual reference links, and all public advance data.');
 }

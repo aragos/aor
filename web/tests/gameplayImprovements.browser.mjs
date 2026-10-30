@@ -34,7 +34,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
         await click('[data-hand-card="target"]');
         await page.wait(`document.querySelector('#tab-map[aria-selected=true]') && document.querySelector('[data-map-province="${province}"].eligible')`, `${id} activates its map target`);
         assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /.+/, 'Event descriptions accompany card actions');
-        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog a[href^="/help#card-"]')`), null);
+        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog button[data-help-topic^="card-"]')`), null);
         assert.equal(await page.evaluate(`document.querySelector('.map-pick-banner').textContent`), 'Pick a target');
         const count = await page.evaluate('window.mapCommands.length');
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
@@ -43,11 +43,11 @@ export async function checkGameplayImprovements(page, web, baseline) {
             await click('#tab-advances');
             await click('.advance-tile');
             assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .advance-decision')`), true);
-            assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Advance inspection preserves the prepared card target');
+            assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Advance inspection preserves the prepared card target');
             await click('#tab-map');
             assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="rome"].eligible')`), true, 'Inspection keeps the active map picker');
         }
-        await click('.decision-panel .card-decision .card-confirmation > button');
+        await click('.decision-actions .play-card-action');
         assert.equal(await page.evaluate('window.mapCommands.at(-1)'), command);
         assert.equal(await page.evaluate(`document.querySelector('.card-decision')`), null, 'Successful card play closes both surfaces');
     }
@@ -63,7 +63,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     for (const province of ['genoa', 'rome']) {
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     }
-    await click('.decision-panel .card-decision .card-confirmation > button');
+    await click('.decision-actions .play-card-action');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play pirates provinces genoa rome');
 
     await show({prompt: {messageId: 'prompt.cancel-adjustment', players: [viewer]},
@@ -72,18 +72,18 @@ export async function checkGameplayImprovements(page, web, baseline) {
     const cancel = '.game-actions .action-buttons button[aria-pressed]';
     assert.match(await page.evaluate(`document.querySelector('${cancel}').textContent`), new RegExp(`\\$${base}`));
     await click(cancel);
-    assert.match(await page.evaluate(`document.querySelector('.game-actions .selected-action').textContent`), new RegExp(`\\$${base}`));
+    assert.match(await page.evaluate(`document.querySelector('.selected-action-confirmation').textContent`), new RegExp(`\\$${base}`));
 
     await show({prompt: {messageId: 'prompt.purchase-stabilization', players: [viewer]},
         legalChoices: {commands: ['stabilize misery']}, game: {stage: 'PURCHASE', stabilizationCost: 8, stabilizationMisery: 20,
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'STABILIZATION'}}});
-    assert.match(await page.evaluate(`document.querySelector('.game-actions .action-buttons button').textContent`), /misery.*20/i);
+    assert.match(await page.evaluate(`document.querySelector('.decision-actions .simple-action').textContent`), /misery.*20/i);
     await show({prompt: {messageId: 'prompt.purchase-relief', players: [viewer]}, legalChoices: {commands: ['pass']},
         game: {stage: 'PURCHASE', reliefOffers: [{spaces: 1, cashCost: 20, ratingSpent: 1, affordable: false}],
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'RELIEF'}}});
     assert.equal(await page.evaluate(`document.querySelector('#relief-spaces button').disabled`), true);
     assert.match(await page.evaluate(`document.querySelector('.game-actions .guided-form .blocker').textContent`), /afford/i);
-    assert.equal(await page.evaluate(`document.querySelector('.decision-toolbar .pass-action').disabled`), false, 'Unaffordable relief retains Pass');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .pass-action').disabled`), false, 'Unaffordable relief retains Pass');
 
     const order = [other.id, viewer, ...baseline.game.turnOrder.filter(id => id !== viewer && id !== other.id)];
     const players = baseline.game.players.map(player => player.id === viewer ? {...player, cash: 20, advances: [...player.advances, 'URBAN_ASCENDANCY']} : player);
@@ -92,7 +92,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     await show({prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
     assert.match(await page.evaluate(`document.querySelector('.urban-ascendancy-queue').textContent`), /Cash available: \$20/);
     const count = await page.evaluate('window.mapCommands.length');
-    await click('.urban-ascendancy-queue button');
+    await click('.urban-queue-action');
     assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Preregistration waits for the authoritative turn');
     await show({prompt: {messageId: 'prompt.buy-card', players: [viewer]}, legalChoices: {commands: ['buy-card', 'pass']},
         game: {...waiting, activity: {...waiting.activity, actor: viewer, decisionPlayer: viewer}}});
@@ -103,7 +103,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.equal(await page.evaluate('window.mapCommands.length'), count + 1, 'Polling cannot repeat a queued purchase');
     // History replacement invalidates preauthorization even when game, viewer and turn stay equal.
     await show({prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
-    await click('.urban-ascendancy-queue button');
+    await click('.urban-queue-action');
     const afterFirstQueue = await page.evaluate('window.mapCommands.length');
     await show({undo: {...baseline.undo, editRevision: (baseline.undo?.editRevision ?? 0) + 1},
         prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
@@ -126,12 +126,14 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'A commodity has no inspection box');
     assert.equal(await page.evaluate(`!!document.querySelector('.cash-preview .identity-label svg')`), true, 'Commodity cash previews retain the capital symbol');
     assert.match(await page.evaluate(`document.querySelector('.cash-preview').textContent`), /\$40 → \$42/);
-    assert.equal(await page.evaluate(`document.querySelector('.table-hand a[href="/help#commodity-stone"]').textContent`), '?');
+    assert.equal(await page.evaluate(`document.querySelector('.table-hand button[data-help-topic="commodity-stone"]').textContent`), '?');
     const commandsBeforeHelp = await page.evaluate('window.mapCommands.length');
-    await page.evaluate(`(() => {const link=document.querySelector('.table-hand a[href="/help#commodity-stone"]');link.addEventListener('click',event=>event.preventDefault(),{once:true});link.click();})()`);
+    await page.evaluate(`(() => {const link=document.querySelector('.table-hand button[data-help-topic="commodity-stone"]');link.addEventListener('click',event=>event.preventDefault(),{once:true});link.click();})()`);
+    await page.wait(`document.querySelector('.reference-dialog #commodity-stone .payout-box')`, 'Payout popup loads');
     assert.equal(await page.evaluate('window.mapCommands.length'), commandsBeforeHelp, 'Payout help never plays the card');
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Payout help preserves the prepared play');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Payout help preserves the prepared play');
 
+    await click('.reference-dialog .close-detail');
     await show({prompt: {messageId: 'prompt.purchase-shipping', players: [viewer]}, legalChoices: {commands: ['upgrade-ships', 'pass']},
         game: {stage: 'PURCHASE', activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'SHIPPING'},
             players: baseline.game.players.map(player => player.id === viewer ? {...player, ships: {fleet: 'GALLEY', level: 2}} : player),

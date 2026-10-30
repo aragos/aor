@@ -1,3 +1,4 @@
+import {DecisionAction} from './DecisionActions';
 import {useEffect, useRef, useState} from 'react';
 import type {Snapshot} from './api';
 import {t} from './messages';
@@ -35,9 +36,9 @@ export function UrbanAscendancyQueue({snapshot, busy, submit}: {
         <p>{advanceName('URBAN_ASCENDANCY')} · ${offer?.cost ?? 10}<br/>{t('controls.availableCash')}: ${player.cash}</p>
         {queued ? <>
             <p role="status">{t('urbanAscendancy.queued')}</p>
-            <button type="button" className="secondary" disabled={busy}
-                onClick={() => setQueuedFor(null)}>{t('urbanAscendancy.cancel')}</button>
-        </> : <button type="button" className="secondary" disabled={busy}
-            onClick={() => setQueuedFor(scope)}>{t('urbanAscendancy.buyOnTurn')}</button>}
+            <DecisionAction type="button" className="secondary urban-queue-action" disabled={busy}
+                onClick={() => setQueuedFor(null)}>{t('urbanAscendancy.cancel')}</DecisionAction>
+        </> : <DecisionAction type="button" className="secondary urban-queue-action" disabled={busy}
+            onClick={() => setQueuedFor(scope)}>{t('urbanAscendancy.buyOnTurn')}</DecisionAction>}
     </section>;
 }

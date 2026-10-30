@@ -52,14 +52,12 @@
 .commitment-preview > span { display: block; text-align: center; } .commitment-preview strong { font-size: 1.25rem; }
 .commitment-preview small { display: block; font-size: .75rem; color: #63765e; margin-top: .2rem; }
 .value-change { display: flex; justify-content: space-between; gap: .5rem; }
-.primary-expansion { width: 100%; margin-top: .7rem !important; font-weight: 700; }
 .partial-placement { margin-top: .8rem; }
 .map-orders details summary { font-size: .83rem; color: #356251; }
 .map-orders .consequence { font-size: .8rem; padding: .7rem; background: #f0ebd8; border-radius: 4px; }
 .map-pick-banner { margin: .5rem 1rem; } .map-pick-banner button { min-height: 40px; }
 @media (max-width: 700px) {
     .interactive-board { padding: 0; } .world-map { min-height: 310px; height: 43vh; max-height: 420px; }
-    .primary-expansion { position: sticky; bottom: .5rem; z-index: 2; box-shadow: 0 3px 12px #263d3330; min-height: 46px; }
 }
 
 .map-viewport { position: relative; }

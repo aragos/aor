@@ -1,10 +1,11 @@
+import {DecisionAction, DecisionForm} from './DecisionActions';
 import {useEffect, useState} from 'react';
 import type {CardChoiceView, Snapshot} from './api';
 import {LabelMessage, PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {advanceName, label} from './labels';
 import {t} from './messages';
 import {HelpLink} from './HelpLink';
-import {UnplayedLeaders} from './TablePanels';
+import {Commodity, UnplayedLeaders} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
@@ -26,7 +27,7 @@ interface Props {
 function choiceLabel(snapshot: Snapshot, choice: CardChoiceView) {
     if (choice.kind === 'PLAYER') return <PlayerLabel snapshot={snapshot} id={choice.value ?? ''}/>;
     if (choice.kind === 'PROVINCE') return <ProvinceLabel snapshot={snapshot} id={choice.value ?? ''}/>;
-    if (choice.kind === 'COMMODITY') return label(choice.value?.toUpperCase() ?? '', 'commodity');
+    if (choice.kind === 'COMMODITY') return <Commodity commodity={choice.value?.toUpperCase() ?? ''}/>;
     if (choice.kind === 'CATEGORY') return choice.value ? label(choice.value.toUpperCase(), 'category') : t('table.noCategory');
     if (choice.kind === 'AREA') return `${t('board.area')} ${choice.value?.toUpperCase()}`;
     return t('action.playCard');
@@ -85,7 +86,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
             {discount.condition && <p>{label(discount.condition)}</p>}
         </details>)}
         {inspection && offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
-        {action && offer?.playable && <form onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
+        {action && offer?.playable && <DecisionForm onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
             <CardPlayEffects snapshot={snapshot} definition={definition} choice={resolutionChoice}
                 commodities={offer.commodities} targets={targets}
                 protection={needsProtection && validProtection ? amount : null}/>
@@ -123,8 +124,8 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
             </p>)}
             <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
             {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
-            <div className="card-confirmation"><button disabled={busy || !actionable}>{t('action.playCard')}</button></div>
-        </form>}
+            <DecisionAction type="submit" className="card-confirmation play-card-action" disabled={busy || !actionable}>{t('action.playCard')}</DecisionAction>
+        </DecisionForm>}
     </section>;
 }
 
@@ -151,6 +152,6 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
         {inspection && <p>{t('advance.owners')}: <PlayerLabels snapshot={snapshot} ids={snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.id)}/></p>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
-        {action && offer && <div className="card-confirmation"><button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button></div>}
+        {action && offer && <DecisionAction className="card-confirmation buy-advance-action" disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</DecisionAction>}
     </section>;
 }

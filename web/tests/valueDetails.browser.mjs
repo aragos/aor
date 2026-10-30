@@ -30,7 +30,7 @@ export async function checkLiveCommodityValues(page, web, baseline) {
     const original = await show(viewer, 'COLOURED');
     await page.evaluate(`document.querySelector('[data-hand-card="live-stone"]').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-decision')`), null, 'Commodity card values stay on the card');
-    assert.equal(await page.evaluate(`document.querySelector('.table-hand a[href="/help#commodity-stone"]').target`), '_blank');
+    assert.equal(await page.evaluate(`document.querySelector('.table-hand button[data-help-topic="commodity-stone"]').getAttribute('aria-haspopup')`), 'dialog');
     assert.equal(await page.evaluate(`document.querySelector('.hand-card .owner-payout').title`), original + ': $2');
     const newOwner = await show(other.id, 'WHITE');
     for (const selector of ['.hand-card .owner-payout', '[data-commodity="STONE"] .owner-payout']) {

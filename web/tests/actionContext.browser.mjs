@@ -45,7 +45,7 @@ export async function checkActionContext(page, web, baseline) {
     await show({...fixture, prompt: {messageId: 'prompt.cathedral', players: [viewer]}, legalChoices: {commands: ['cathedral', 'pass'], bidMax: null},
         game: {...fixture.game, activity: {...fixture.game.activity, choice: 'cathedral', decisionPlayer: viewer}}});
     assert.equal(await page.evaluate(`!!document.querySelector('.action-cash')`), false, 'Cathedral does not spend cash');
-    await click('.decision-panel .action-buttons button');
+    await click('.decision-actions .simple-action');
     await show({...fixture, events: [...fixture.events, {...event, id: 'local-cathedral'}]});
     await page.wait(`document.querySelector('.competition-notice')`, 'local Cathedral explicitly shows its result');
     await show({...fixture});
@@ -65,7 +65,7 @@ export async function checkActionContext(page, web, baseline) {
     await show({...fixture, prompt: {messageId: 'prompt.cathedral', players: [viewer]},
         legalChoices: {commands: ['cathedral', 'pass'], bidMax: null},
         game: {...fixture.game, turnNumber: baseline.game.turnNumber, activity: {...fixture.game.activity, choice: 'cathedral', decisionPlayer: viewer}}});
-    await click('.decision-panel .action-buttons button');
+    await click('.decision-actions .simple-action');
     await show({...fixture, events: [...fixture.events, {...event, id: 'late-result'}], game: {...fixture.game, stage: 'INCOME'}});
     assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'An outcome arriving with phase completion creates no expired popup');
     await show({...fixture, game: {...fixture.game, stage: 'EXPANSION'}});
@@ -74,7 +74,7 @@ export async function checkActionContext(page, web, baseline) {
     await show({...fixture, legalChoices: {commands: ['pass'], bidMax: null}, game: {...fixture.game, stage: 'PLAY_CARDS',
         activeWar: {initiator: viewer, opponent: other.id, startedTurn: baseline.game.turnNumber, ties: 0},
         activity: {...fixture.game.activity, choice: 'war-preparation'}}});
-    await click('.decision-toolbar .pass-action');
+    await click('.decision-actions .pass-action');
     const war = {...event, id: 'local-war', kind: 'WAR_RESULT', competition: null,
         war: {initiator: viewer, opponent: other.id, winner: other.id, totals: {[viewer]: 2, [other.id]: 5}, requiredTransfers: 3}};
     await show({...fixture, events: [...fixture.events, war]});
@@ -88,7 +88,7 @@ export async function checkActionContext(page, web, baseline) {
     const cardEvent = {...event, id: 'history-commodity', kind: 'PLAY_CARD', card: 'stone-1', competition: null};
     await show({events: [cardEvent], game: {commodityPayouts: [payout]}});
     const beforeCommands = await page.evaluate('window.mapCommands.length');
-    assert.equal(await page.evaluate(`document.querySelector('.event-card a[href="/help#commodity-stone"]').target`), '_blank', 'Historical commodities link to their payout track');
+    assert.equal(await page.evaluate(`document.querySelector('.event-card button[data-help-topic="commodity-stone"]').getAttribute('aria-haspopup')`), 'dialog', 'Historical commodities link to their payout track');
     assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-value')`), null);
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeCommands);
 
@@ -101,14 +101,14 @@ export async function checkActionContext(page, web, baseline) {
     await page.wait(`document.querySelector('[data-map-province="jerusalem"].eligible')`, 'draft map picker');
     await page.evaluate(`document.querySelector('[data-map-province="jerusalem"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     await click('.event-card');
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Activity inspection preserves a prepared card target');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Activity inspection preserves a prepared card target');
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /Area VI/);
     await click('.card-inspection-dialog .close-detail');
     assert.equal(await page.evaluate(`!!document.querySelector('.card-inspection-dialog[open]')`), false);
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Closing inspection preserves the prepared target');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Closing inspection preserves the prepared target');
     await click('[data-hand-card="draft"]');
     assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'The active card has one action context, without an automatic duplicate inspector');
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Reselecting the active card preserves its target');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false, 'Reselecting the active card preserves its target');
 
     const hand = Array.from({length: 12}, (_, index) => ({reference: `drag-${index}`, definition: card.definition}));
     await show({events: [], game: {hand, cardOffers: []}});

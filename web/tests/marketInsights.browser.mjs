@@ -33,11 +33,11 @@ export async function checkMarketInsights(page, web, baseline) {
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="fur"] .adjustment-badge.SHORTAGE').textContent`), /Shortage.*×2/i);
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="fur"] .adjustment-badge.SURPLUS').textContent`), /Surplus.*×1/i);
     await page.evaluate(`document.querySelector('#tab-markets').click(); document.querySelector('.market-tile[data-commodity="FUR"]').open = true`);
-    assert.equal(await page.evaluate(`document.querySelector('.market-tile a[href="/help#commodity-fur"]').target`), '_blank', 'Full market boxes open as reference');
+    assert.equal(await page.evaluate(`document.querySelector('.market-tile button[data-help-topic="commodity-fur"]').getAttribute('aria-haspopup')`), 'dialog', 'Full market boxes open as reference');
     assert.equal(await page.evaluate(`document.querySelector('.market-tile .payout-box')`), null, 'Static boxes leave the game view');
     await page.evaluate(`document.querySelector('[data-hand-card="fur"]').click()`);
-    await page.wait(`document.querySelector('.table-hand a[href="/help#commodity-fur"]')`, 'Selected commodity reference');
-    assert.equal(await page.evaluate(`document.querySelector('.table-hand a[href="/help#commodity-fur"]').target`), '_blank');
+    await page.wait(`document.querySelector('.table-hand button[data-help-topic="commodity-fur"]')`, 'Selected commodity reference');
+    assert.equal(await page.evaluate(`document.querySelector('.table-hand button[data-help-topic="commodity-fur"]').getAttribute('aria-haspopup')`), 'dialog');
     assert.match(await page.evaluate(`document.querySelector('.hand-card .adjustment-badge.SHORTAGE').textContent`), /Shortage/i);
     assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-decision')`), null, 'Commodity cards do not create an inspection box');
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
