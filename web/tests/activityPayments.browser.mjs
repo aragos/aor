@@ -140,8 +140,8 @@ export async function checkActivityPayments(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('${reliefSelector}').innerHTML`), reliefHtml,
         'Later activity and player state do not rewrite a misery receipt');
     await page.evaluate(`document.querySelector('[data-event-id="deferred-misery"] .event-card').click()`);
-    await page.wait(`document.querySelector('.inspection-panel .card-event-text')`, 'Deferred misery cause opens its card in game');
-    assert.match(await page.evaluate(`document.querySelector('.inspection-panel .card-decision h2').textContent`), /Crusades/);
+    await page.wait(`document.querySelector('.card-inspection-dialog .card-event-text')`, 'Deferred misery cause opens its card in game');
+    assert.match(await page.evaluate(`document.querySelector('.card-inspection-dialog .card-decision h2').textContent`), /Crusades/);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
     console.log('Passed: named immutable cash receipts, consistent signed payments, inset activity control, responsive text clearance and polling continuity.');
 }

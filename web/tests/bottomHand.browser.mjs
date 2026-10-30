@@ -6,18 +6,18 @@ import {createGame, open} from './browser-support.mjs';
 export async function assertBottomHandVisible(page, label) {
     const geometry = await page.evaluate(`(() => {
         const hand = document.querySelector('.table-hand');
-        const heading = hand.querySelector('.hand-heading');
         const cards = hand.querySelector('.hand-cards');
         const bounds = hand.getBoundingClientRect();
-        const title = heading.getBoundingClientRect();
+        const contents = cards.getBoundingClientRect();
         const decision = document.querySelector('.decision-panel').getBoundingClientRect();
-        const point = {x: title.left + Math.min(35, title.width / 2), y: title.top + title.height / 2};
+        const point = {x: contents.left + Math.min(30, contents.width / 2), y: contents.top + Math.min(18, contents.height / 2)};
         const hit = document.elementFromPoint(point.x, point.y);
         return {
             viewport: {width: innerWidth, height: innerHeight},
             hand: {left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom, height: bounds.height},
             cards: {height: cards.clientHeight, width: cards.clientWidth},
-            headingReachable: !!hit?.closest('.table-hand'),
+            handReachable: !!hit?.closest('.table-hand'),
+            modalOpen: !!document.querySelector('.card-inspection-dialog:modal'),
             decisionOverlaps: Math.min(bounds.right, decision.right) > Math.max(bounds.left, decision.left) + 1 &&
                 Math.min(bounds.bottom, decision.bottom) > Math.max(bounds.top, decision.top) + 1,
             pageOverflow: document.documentElement.scrollWidth > innerWidth,
@@ -27,7 +27,7 @@ export async function assertBottomHandVisible(page, label) {
     assert(hand.left >= -1 && hand.right <= viewport.width + 1 && hand.top >= -1 &&
         hand.bottom <= viewport.height + 1 && hand.height > 50, `${label}: hand is in the viewport: ${JSON.stringify(geometry)}`);
     assert(cards.height > 20 && cards.width > 100, `${label}: cards have usable space`);
-    assert.equal(geometry.headingReachable, true, `${label}: hand heading is unobstructed`);
+    assert(geometry.handReachable || geometry.modalOpen, `${label}: hand remains reachable except while its reference popup is modal`);
     assert.equal(geometry.decisionOverlaps, false, `${label}: hand and decision reserve separate space`);
     assert.equal(geometry.pageOverflow, false, `${label}: no horizontal page overflow`);
 }
@@ -68,6 +68,9 @@ async function assertEffectReachable(page, selector, label) {
 }
 
 export async function checkBottomHand(page, web, baseline) {
+    let progress = 'initializing';
+    const mark = step => {progress = step; console.log('Bottom hand: ' + step);};
+    try {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
     await page.wait(`typeof window.setMapSnapshot === 'function'`, 'bottom hand harness');
     const viewer = baseline.viewerId;
@@ -116,6 +119,8 @@ export async function checkBottomHand(page, web, baseline) {
     let revision = 26000;
     let fixture;
     async function show(choice, stage, changes = {}, actor = viewer) {
+        await page.send('Page.bringToFront');
+        await page.evaluate(`document.querySelector('.card-inspection-dialog[open] .close-detail')?.click()`);
         fixture = {...baseline, revision: ++revision, events: [], pendingBid: null, submitted: [],
             prompt: {messageId: `prompt.${choice}`, players: [actor]},
             legalChoices: {commands: ['pass'], bidMax: null, bidMin: null},
@@ -132,6 +137,7 @@ export async function checkBottomHand(page, web, baseline) {
     for (const [width, height, mobile] of [[1440, 980, false], [1280, 800, false], [390, 844, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         const viewport = `${width}×${height}`;
+        mark(viewport + ' commodity and layout');
         const capture = async situation => {
             if (process.env.AOR_BROWSER_ARTIFACTS && width !== 1440) {
                 await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-bottom-hand-${width}-${situation}.png`));
@@ -140,10 +146,19 @@ export async function checkBottomHand(page, web, baseline) {
         await show('play-cards', 'PLAY_CARDS', {game: {cardOffers: [commodityOffer, targetOffer]},
             legalChoices: {commands: ['play bottom-commodity commodity cloth', 'play bottom-commodity commodity wine', 'play bottom-target province jerusalem', 'pass']}});
         assert.equal(await page.evaluate(`document.querySelectorAll('.player-summary').length`), baseline.game.players.length);
+        assert.equal(await page.evaluate(`document.querySelector('.hand-heading, .hand-title')`), null, 'The hand has no redundant visible heading or card count');
+        assert.equal(await page.evaluate(`!!document.querySelector('.hand-toggle')`), mobile, 'Expand is shown only when the four-card hand needs more room');
+        const cardHeights = await page.evaluate(`[...document.querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect().height)`);
+        assert(Math.max(...cardHeights)-Math.min(...cardHeights)>10, 'Short card summaries do not stretch to the tallest card');
+        if (!mobile) {
+            const columns=await page.evaluate(`(() => {const hand=document.querySelector('.table-hand').getBoundingClientRect();const map=document.querySelector('.workspace-main').getBoundingClientRect();const activity=document.querySelector('.table-activity').getBoundingClientRect();return {handLeft:hand.left,handRight:hand.right,mapLeft:map.left,mapRight:map.right,handBottom:hand.bottom,activityBottom:activity.bottom,activityHeight:activity.height};})()`);
+            assert(Math.abs(columns.handLeft-columns.mapLeft)<1 && Math.abs(columns.handRight-columns.mapRight)<1, 'The desktop hand aligns with the map column');
+            assert(columns.activityBottom>=columns.handBottom-1 && columns.activityHeight>100, 'Activity uses the sidebar alongside the hand');
+        }
         await assertBottomHandVisible(page, `${viewport} commodity choice`);
         assert.equal(await page.evaluate(`document.querySelector('[data-eligible-card], .decision-cards')`), null, 'The hand is the only playable-card list');
         await click('[data-hand-card="bottom-commodity"]');
-        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel')`), null, 'Commodity selection needs no inspector');
+        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'Commodity selection needs no inspector');
         assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .card-decision').length`), 1, 'One selected-card action context');
         await page.evaluate(`document.querySelector('.card-decision .target-choices button:last-child').click()`);
         assert.match(await page.evaluate(`document.querySelector('.decision-panel .cash-preview').textContent`), /\$80 → \$100/);
@@ -152,42 +167,66 @@ export async function checkBottomHand(page, web, baseline) {
         await assertEffectReachable(page, '.decision-panel .cash-preview', `${viewport} commodity consequence`);
         await capture('commodity');
 
+        mark(viewport + ' event selection and effects');
         await click('[data-hand-card="bottom-target"]');
         await page.wait(`document.querySelector('[data-map-province="jerusalem"].eligible')`, 'Hand-selected event activates targets');
         await target();
-        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel')`), null, 'Selected event does not also open an inspector');
+        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'Selected event does not also open an inspector');
         assert.match(await page.evaluate(`document.querySelector('.decision-heading h2').textContent`), /Crusades/);
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision h2')`), null, 'The selected card has one title in the decision heading');
-        assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-effect-detail').open`), false, 'Full event rules start collapsed beside the action');
-        await click('.decision-panel .card-effect-detail > summary');
-        assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /Area VI/);
-        await click('.decision-panel .card-effect-detail > summary');
+        assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-effect-detail')`), null, 'Selected effects do not require opening a rules disclosure');
+        assert.equal(await page.evaluate(`document.querySelector('.card-play-effects .card-event-text').checkVisibility()`), true, 'The selected event spells out its effects');
+        assert.match(await page.evaluate(`document.querySelector('.card-play-effects').textContent`), /Area VI.*Jerusalem/s);
         assert.match(await page.evaluate(`document.querySelector('.misery-preview').textContent`), /20.*30/);
         await assertControlReachable(page, '.decision-panel .card-decision .card-confirmation > button', `${viewport} event targeting`);
         await assertEffectReachable(page, `.decision-panel [data-misery-preview-player="${viewer}"]`, `${viewport} event consequence`);
         await capture('target');
         const commandCount = await page.evaluate('window.mapCommands.length');
-        await click('.hand-toggle');
-        assert.equal(await page.evaluate(`document.querySelector('.hand-toggle').getAttribute('aria-expanded')`), 'true');
-        await assertBottomHandVisible(page, `${viewport} expanded hand`);
-        await click('.hand-toggle');
+        if (await page.evaluate(`!!document.querySelector('.hand-toggle')`)) {
+            await click('.hand-toggle');
+            assert.equal(await page.evaluate(`document.querySelector('.hand-toggle').getAttribute('aria-expanded')`), 'true');
+            await assertBottomHandVisible(page, `${viewport} expanded hand`);
+            await click('.hand-toggle');
+        }
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Expanding the hand preserves the event target');
         assert.equal(await page.evaluate('window.mapCommands.length'), commandCount, 'Expanding the hand cannot submit');
 
+        mark(viewport + ' purchase and popup');
         await show('purchase-advances', 'PURCHASE', {game: {
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, choice: 'purchase-advances', purchaseStep: 'ADVANCES'},
             advanceOffers: [{advance: advance.id, price: 30, unavailableReason: null}],
         }, legalChoices: {commands: [`buy-advance ${advance.letter}`, 'pass']}});
         await click(`[data-advance="${advance.id}"]`);
-        await click('[data-hand-card="bottom-leader"]');
-        assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .card-decision')`), true, 'Held leader remains inspectable during purchase');
+        await page.evaluate(`(() => {const card=document.querySelector('[data-hand-card="bottom-leader"]');card.focus();card.click();})()`);
+        assert.equal(await page.evaluate(`!!document.querySelector('.card-inspection-dialog .card-decision')`), true, 'Held leader remains inspectable during purchase');
         assert.equal(await page.evaluate(`!!document.querySelector('.decision-panel .advance-decision')`), true, 'Card inspection preserves the prepared purchase');
         await assertBottomHandVisible(page, `${viewport} advance purchase`);
-        await click('.inspection-panel .close-detail');
+        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog').matches(':modal')`), true, 'Card reference opens a modal popup');
+        const preparedPurchase = await page.evaluate(`document.querySelector('.decision-panel .advance-decision').textContent`);
+        mark(viewport + ' popup polling');
+        const referencePoll = {...fixture, revision: ++revision};
+        await page.evaluate(`window.setMapSnapshot(${JSON.stringify(referencePoll)})`);
+        await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'Reference survives polling');
+        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog').open`), true);
+        mark(viewport + ' popup Escape');
+        await page.send('Page.bringToFront');
+        await page.send('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27,nativeVirtualKeyCode:27});
+        await page.send('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27,nativeVirtualKeyCode:27});
+        await page.wait(`!document.querySelector('.card-inspection-dialog[open]')`, 'Escape dismisses card popup');
+        assert.equal(await page.evaluate(`document.activeElement?.dataset.handCard`), 'bottom-leader', 'Popup restores focus to its source card');
+        assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision').textContent`), preparedPurchase, 'Popup polling and dismissal preserve the purchase draft');
+        await page.evaluate(`(() => {const card=document.querySelector('[data-hand-card="bottom-leader"]');card.focus();card.click();})()`);
+        mark(viewport + ' popup backdrop');
+        await page.wait(`document.querySelector('.card-inspection-dialog:modal')`, 'Reference reopens without replacing the action');
+        await page.send('Input.dispatchMouseEvent',{type:'mousePressed',x:2,y:2,button:'left',clickCount:1});
+        await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:2,y:2,button:'left',clickCount:1});
+        await page.wait(`!document.querySelector('.card-inspection-dialog[open]')`, 'Backdrop dismisses card popup');
+        assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision').textContent`), preparedPurchase, 'Backdrop dismissal leaves the purchase draft intact');
         await assertControlReachable(page, '.decision-panel .advance-decision .card-confirmation > button', `${viewport} purchase confirmation`);
         assert.equal(await page.evaluate(`document.querySelector('.held-leader-note, [data-held-card], .waiting-hand-summary')`), null, 'No mirrored held-card reminders accompany another decision');
         await capture('purchase');
 
+        mark(viewport + ' expansion');
         await show('expand', 'EXPANSION', {game: {expansionOffers: [{destination: 'rome', primaryAction: 'PLACE', requiredTokens: 2,
             availablePool: 8, resultingPool: 6, establishesMarker: true, uncertain: false, blockers: [], partialPlacements: [],
             shipping: null, incomeBefore: 15, incomeAfter: 18, reachable: true}]},
@@ -195,11 +234,12 @@ export async function checkBottomHand(page, web, baseline) {
         await page.evaluate(`document.querySelector('[data-map-province="rome"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
         const draft = await page.evaluate(`document.querySelector('.map-orders').textContent`);
         await click('[data-hand-card="bottom-target"]');
-        await click('.inspection-panel .close-detail');
+        await click('.card-inspection-dialog .close-detail');
         assert.equal(await page.evaluate(`document.querySelector('.map-orders').textContent`), draft, 'Consulting a held event preserves the prepared placement');
         await assertControlReachable(page, '.primary-expansion', `${viewport} expansion`);
         await capture('expansion');
 
+        mark(viewport + ' waiting and tools');
         await show('expand', 'EXPANSION', {legalChoices: {commands: []}}, other);
         await assertBottomHandVisible(page, `${viewport} waiting`);
         await capture('waiting');
@@ -207,6 +247,7 @@ export async function checkBottomHand(page, web, baseline) {
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form')`), null, 'Waiting inspection cannot prepare a card play');
         await assertBottomHandVisible(page, `${viewport} waiting inspection`);
         if (process.env.AOR_BROWSER_ARTIFACTS) await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-bottom-hand-${width}.png`), width, height, mobile);
+        await click('.card-inspection-dialog .close-detail');
 
         for (const selector of ['.table-effects', '.table-configuration', '.command-dock']) {
             await assertControlReachable(page, `${selector} > summary`, `${viewport} auxiliary expander ${selector}`);
@@ -222,13 +263,23 @@ export async function checkBottomHand(page, web, baseline) {
         }
     }
 
+    for (const [width,height,mobile] of [[1280,800,false],[390,844,true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});
+        await show('expand','EXPANSION',{game:{hand:[hand[3]],burdenReferences:[]},legalChoices:{commands:[]}},other);
+        await page.wait(`document.querySelector('.table-hand[data-overflow="false"]')`, 'A small hand fits without expansion');
+        assert.equal(await page.evaluate(`document.querySelector('.hand-toggle')`),null,'A fitting hand has no Expand button');
+        assert(await page.evaluate(`document.querySelector('.table-hand').getBoundingClientRect().height<150`),'A short one-card hand follows its content height');
+        await assertBottomHandVisible(page,`${width} short natural hand`);
+    }
+
+    mark('small-hand expansion visibility passed; dense payout and expanded tools');
     const densePayouts = commonGame.commodityPayouts.map(payout => ({...payout,
         owners: commonGame.players.map(player => ({player: player.id, provinces: [player.capital],
             marketCount: 1, effectiveBox: 1, payout: 5, industryBonus: 0})),
     }));
     for (const [width, height, mobile] of [[1280, 800, false], [390, 844, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
-        await show('expand', 'EXPANSION', {game: {commodityPayouts: densePayouts}, legalChoices: {commands: []}}, other);
+        await show('expand', 'EXPANSION', {game: {commodityPayouts: densePayouts, hand: [...hand, ...hand.map((card,index)=>({...card,reference:`dense-extra-${index}`}))]}, legalChoices: {commands: []}}, other);
         await page.evaluate(`document.querySelector('[data-hand-card="bottom-commodity"]').focus()`);
         await assertBottomHandVisible(page, `${width} dense dual-commodity summary`);
         const titleVisible = await page.evaluate(`(() => {
@@ -272,6 +323,7 @@ export async function checkBottomHand(page, web, baseline) {
     }
 
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
+    mark('finite discard/trade and large-hand keyboard/polling');
     for (const action of ['discard-card', 'offer-card']) {
         const commands = [`${action} bottom-commodity`, `${action} bottom-target`];
         await show(action === 'discard-card' ? 'buy-card' : 'offer-card', action === 'discard-card' ? 'BUY_CARD' : 'PLAY_CARDS',
@@ -307,10 +359,19 @@ export async function checkBottomHand(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.table-hand.hand-expanded [data-hand-card]').length`), 14, 'Expanded hand exposes the same fourteen cards');
     assert.equal(await page.evaluate(`document.querySelectorAll('.table-hand').length`), 1, 'Expansion does not create a duplicate hand');
     const count = await page.evaluate('window.mapCommands.length');
-    await click('[data-hand-card="large-0"]');
+    await click('[data-hand-card="large-1"]');
+    await page.wait(`document.querySelector('.card-inspection-dialog:modal')`, 'Expanded event opens its reference popup');
     assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Expanded reference selection cannot submit an order');
     await assertBottomHandVisible(page, 'Large expanded hand');
+    await click('.card-inspection-dialog .close-detail');
     console.log('Passed: persistent bottom hand across card, target, purchase, expansion and waiting flows; reserved phone geometry, auxiliary tools with expanded hand/player details, single action contexts, six-owner commodity detail, finite selection reopening and polling scroll continuity.');
+    } catch (error) {
+        console.error('Bottom hand failed during: ' + progress);
+        if (process.env.AOR_BROWSER_ARTIFACTS) {
+            await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-bottom-hand-failure.png')).catch(captureError => console.error('Failure capture: ' + captureError.message));
+        }
+        throw error;
+    }
 }
 
 if (process.argv[1]?.endsWith('/bottomHand.browser.mjs')) {

@@ -10,6 +10,7 @@ import {TableIcon} from './TableIcon';
 import {FinalScores, TurnEffects} from './FullGamePanels';
 import {AdvanceTiles, Emblem, PlayerOverview, Markets} from './TablePanels';
 import {Hand} from './Hand';
+import {CardInspectionDialog} from './CardInspectionDialog';
 import {AdvanceDecision, CardDecision} from './ObjectDecisions';
 import {BoardMap} from './map/BoardMap';
 import {useMapSelection} from './map/MapSelection';
@@ -89,7 +90,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         ? snapshot.game.cardInspections?.find(card => card.definition.id === cardReference)?.definition
         : snapshot.game.hand.find(card => card.reference === cardReference)?.definition;
     const inspectedCard = cardDefinition?.kind === 'commodity' ? '' : cardReference;
-    const hasInspection = !!(inspectedCard || inspectedAdvance);
     const closeInspection = () => setInspection({kind: 'closed'});
     const spending = !inactive && ((snapshot.legalChoices.bidMax != null && me.misery !== null) || canAct && (!!advanceAction || buyingAdvances ||
         snapshot.game.activity?.purchaseStep === 'RELIEF' || !!snapshot.game.shippingOffer ||
@@ -142,9 +142,8 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 </div>
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={snapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
-                {hasInspection && <section className="inspection-panel" aria-label={t('table.inspection')}>
-                    {inspectedCard ? <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
-                        : <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>}
+                {inspectedAdvance && !inspectedCard && <section className="inspection-panel" aria-label={t('table.inspection')}>
+                    <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
                 </section>}
             </div>
             <div className="workspace-side">
@@ -190,8 +189,11 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             </aside>
             <Activity snapshot={snapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}/>
             </div>
+            <Hand snapshot={snapshot} busy={busy}/>
         </div>
-        <Hand snapshot={snapshot} busy={busy}/>
+        {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>
+            <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
+        </CardInspectionDialog>}
         <div className="table-tools">
             <details className="table-effects"><summary>{t('game.thisTurn')}
                 {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.initiator}/> / <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.opponent}/></span>}

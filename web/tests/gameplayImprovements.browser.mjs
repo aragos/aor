@@ -34,7 +34,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
         await click('[data-hand-card="target"]');
         await page.wait(`document.querySelector('#tab-map[aria-selected=true]') && document.querySelector('[data-map-province="${province}"].eligible')`, `${id} activates its map target`);
         assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /.+/, 'Event descriptions accompany card actions');
-        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href^="/help#card-"]')`), null);
+        assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog a[href^="/help#card-"]')`), null);
         assert.equal(await page.evaluate(`document.querySelector('.map-pick-banner').textContent`), 'Pick a target');
         const count = await page.evaluate('window.mapCommands.length');
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
@@ -123,7 +123,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
                 choices: [{kind: 'COMMODITY', value: 'stone', command: 'play stone commodity stone', cashChanges}],
                 provinceTargets: [], requiredTargetCount: null, protectionMax: null}]}});
     await click('[data-hand-card="stone"]');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel')`), null, 'A commodity has no inspection box');
+    assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'A commodity has no inspection box');
     assert.equal(await page.evaluate(`!!document.querySelector('.cash-preview .identity-label svg')`), true, 'Commodity cash previews retain the capital symbol');
     assert.match(await page.evaluate(`document.querySelector('.cash-preview').textContent`), /\$40 → \$42/);
     assert.equal(await page.evaluate(`document.querySelector('.table-hand a[href="/help#commodity-stone"]').textContent`), '?');

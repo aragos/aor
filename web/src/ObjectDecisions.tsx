@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import type {CardChoiceView, Snapshot} from './api';
-import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
+import {LabelMessage, PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {advanceName, label} from './labels';
 import {t} from './messages';
 import {HelpLink} from './HelpLink';
@@ -8,6 +8,7 @@ import {UnplayedLeaders} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
+import {CardPlayEffects} from './CardPlayEffects';
 import {AdvanceBenefits} from './AdvanceBenefits';
 import {LeaderCredit} from './LeaderCredit';
 import {AdvancePrice} from './AdvancePrice';
@@ -64,18 +65,18 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
     const areaChoices = finiteChoices.filter(candidate => candidate.kind === 'AREA');
     const inspection = mode !== 'action';
     const action = mode !== 'inspection';
-    const misery = selectedChoice ?? (noChoice ? finiteChoices[0] : undefined);
-    const miseryChanges = misery?.miseryChanges ?? offer?.miseryChanges ?? [];
-    const uncertainPlayers = misery?.miseryUncertainPlayers ?? offer?.miseryUncertainPlayers ?? [];
-    const chooseMiseryTarget = !misery && !miseryChanges.length && !uncertainPlayers.length &&
+    const resolutionChoice = selectedChoice ?? (noChoice ? finiteChoices[0] : undefined);
+    const miseryChanges = resolutionChoice?.miseryChanges ?? offer?.miseryChanges ?? [];
+    const uncertainPlayers = resolutionChoice?.miseryUncertainPlayers ?? offer?.miseryUncertainPlayers ?? [];
+    const cashChanges = !needsProtection || validProtection && amount === 0
+        ? resolutionChoice?.cashChanges ?? [] : [];
+    const chooseMiseryTarget = !resolutionChoice && !miseryChanges.length && !uncertainPlayers.length &&
         finiteChoices.some(candidate => (candidate.miseryChanges?.length ?? 0) > 0 || (candidate.miseryUncertainPlayers?.length ?? 0) > 0);
     return <section className="object-decision card-decision" aria-labelledby={inspection ? undefined : 'decision-title'}>
         {inspection && <><button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>
             <h2>{t(definition.messageId)}</h2><CardRecurrence definition={definition}/>
             <CardEventText definition={definition}/></>}
-        {!inspection && definition.kind === 'event' && <details className="card-effect-detail">
-            <summary>{t('card.effectDetails')}</summary><CardEventText definition={definition}/>
-        </details>}
+        {action && offer?.playable && definition.kind === 'leader' && <p className="card-play-credit-context">{t('card.leaderEffect')}</p>}
         {(info?.leaderDiscounts ?? offer?.leaderDiscounts)?.map(discount => <details key={discount.advance} className="leader-discount-detail">
             <summary>{advanceName(discount.advance)} <LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/></summary>
             <dl className="detail-list"><div><dt>{t('table.printedDiscount')}</dt><dd>${discount.printedAmount}</dd></div>
@@ -85,6 +86,9 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
         </details>)}
         {inspection && offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
         {action && offer?.playable && <form onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
+            <CardPlayEffects snapshot={snapshot} definition={definition} choice={resolutionChoice}
+                commodities={offer.commodities} targets={targets}
+                protection={needsProtection && validProtection ? amount : null}/>
             {!noChoice && finiteChoices.length > 0 && <fieldset className="target-choices"><legend>{t('controls.cardChoice')}</legend>
                 {finiteChoices.map(candidate => <button type="button" key={candidate.command} className="secondary"
                     aria-pressed={candidate.command === choice} onClick={() => { setChoice(candidate.command ?? ''); setProtection(''); }}>
@@ -112,7 +116,11 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
             <InvalidChoice invalid={!!(choice && !selectedChoice) || invalidTargets} clear={() => {setChoice(''); selection.clear();}}/>
-            {(!needsProtection || amount === 0 ? misery?.cashChanges : [])?.map(change => <p className="cash-preview" key={change.player}><PlayerLabel snapshot={snapshot} id={change.player}/> · {t('game.cash')}: ${change.before} → ${change.after}</p>)}
+            {cashChanges.map(change => <p className="cash-preview" key={change.player}>
+                <LabelMessage text={t(change.after >= change.before ? 'card.receivesCash' : 'card.losesCash', {amount: Math.abs(change.after - change.before)})}
+                    values={{player: <PlayerLabel snapshot={snapshot} id={change.player}/>}}/>
+                {' · '}{t('game.cash')}: ${change.before} → ${change.after}
+            </p>)}
             <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
             {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
             <div className="card-confirmation"><button disabled={busy || !actionable}>{t('action.playCard')}</button></div>
