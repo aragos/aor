@@ -24,7 +24,7 @@ export async function checkRequestRecovery(page, web, baseline) {
     await page.wait(`document.querySelector('.decision-panel .success')?.textContent.includes('request completed')`, 'late private receipt confirms the original request');
     assert.match(await page.evaluate(`document.querySelector('.private-draft-status').textContent`), /Saved privately: 7/);
     await page.fill('#bid', '9');
-    assert.match(await page.evaluate(`document.querySelector('.private-draft-status').textContent`), /Unsaved draft: 9/);
+    assert.match(await page.evaluate(`document.querySelector('.private-draft-status').textContent`), /Not submitted: 9/);
     assert.equal(await page.evaluate('window.uiCommands.length'), 1);
     console.log('Passed: unknown write recovery, resumed reads, no automatic replay, late receipt reconciliation and saved-versus-unsaved private feedback.');
 }

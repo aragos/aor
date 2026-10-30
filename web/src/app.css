@@ -294,7 +294,8 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 
 .recurring-badge { display: inline-flex; align-items: center; gap: .2rem; font-size: .7rem; color: #47634d; background: #e8efdf; border-radius: 3px; padding: .1rem .3rem; margin-bottom: .25rem; }
 .player-stats { flex-wrap: wrap; row-gap: .3rem; }
-.help-link.inline-help { min-width: 24px; min-height: 24px; font-size: .7rem; }
+.help-link.inline-help { position: relative; min-width: 12px; min-height: 14px; width: 12px; height: 14px; border: 0; border-radius: 0; background: transparent; font-size: .65rem; align-self: flex-start; vertical-align: super; }
+.help-link.inline-help::after { content: ""; position: absolute; inset: -7px -6px; }
 .replacement-token-context p { margin: .4rem 0; font-size: .85rem; }
 .replacement-province { padding: .55rem 0; border-bottom: 1px solid #c7d1c1; }
 .replacement-province h4 { margin: 0 0 .35rem; }
@@ -303,7 +304,14 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .object-control {position: relative; display: flex; flex-direction: column;}
 .object-control > .hand-card, .object-control > .advance-tile {height: 100%;}
-.inspect-object {font-size: .75rem; padding: .25rem .5rem;}
 
 .hand-cards > .object-control {flex: 0 0 200px;}
 .object-control > .hand-card {flex: 1 1 auto;}
+
+.object-control > .card-track-links { position: absolute; top: .3rem; right: .3rem; display: flex; gap: .4rem; }
+
+.identity-label { display: inline-flex; align-items: center; gap: .2rem; vertical-align: baseline; }
+.identity-label > svg { flex: none; }
+
+.hand-card.commodity h3 { padding-right: 3.5rem; }
+.card-track-links .help-link { width: auto; gap: 2px; }

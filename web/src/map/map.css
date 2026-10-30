@@ -24,9 +24,6 @@
 .satellite-key::before, .coast-key::before { content: ''; width: 20px; height: 18px; border: 1px solid #8d9e94; border-radius: 3px; }
 .satellite-key::before { background: radial-gradient(#879481 1px, transparent 1px) 0 0 / 6px 6px #e0e4d9; }
 .coast-key::before { background: #d2efed; border-color: #56929c; }
-.province-inspector { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; border-top: 1px solid #d3d9cc; margin-top: 1rem; padding-top: 1rem; }
-.province-inspector h3 { margin: 0 0 .4rem; font-size: 1rem; }
-.province-inspector p { margin: .5rem 0; }
 .map-facts { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; }
 .map-orders form { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
 .map-orders label { max-width: 140px; margin: 0; font-size: .8rem; }
@@ -41,7 +38,6 @@
 @media (max-width: 600px) {
     .interactive-board { padding: .8rem; }
     .world-map { min-height: 420px; height: 65vh; }
-    .province-inspector { grid-template-columns: 1fr; }
     .map-players small { display: none; }
 }
 /* Selection details share the decision panel beside the board. */
@@ -49,10 +45,6 @@
 .map-zoom { gap: .25rem; } .map-zoom button { padding: .55rem .75rem; }
 .map-viewport { border: 0; border-radius: 0; }
 .world-map { height: min(65vh, 750px); min-height: 460px; }
-.province-inspector { display: block; padding: 0; margin: 0 0 1rem; border: 0; }
-.province-inspector h2 { margin-bottom: .8rem; font-size: 1.6rem; }
-.province-inspector p { font-size: .85rem; }
-.province-inspector .map-facts { font-size: .8rem; color: #617267; }
 .map-orders form { display: block; } .map-orders form label { max-width: none; }
 .map-orders form select { width: 100%; margin: .5rem 0; }
 .map-orders form button { margin-top: .6rem; width: 100%; }
@@ -77,6 +69,4 @@
 }
 
 .map-viewport { position: relative; }
-.dense-map-detail { padding: .7rem 1rem; background: var(--surface); border-top: 1px solid var(--resource-border); font-size: .9rem; }
-.dense-map-detail p { margin: .3rem 0; }
 .map-zoom { position: absolute; top: .75rem; right: .75rem; z-index: 2; flex-wrap: nowrap; padding: .3rem; border-radius: 7px; background: #fcfcf5ed; box-shadow: 0 2px 10px #142a3133; }

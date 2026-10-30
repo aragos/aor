@@ -33,7 +33,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
 
     await show({...blocked, availablePool: 0, blockers: ['INSUFFICIENT_EXPANSION_TOKENS']});
     assert.match(await page.evaluate('document.querySelector(".province-actions [data-expansion-blocker]").textContent'),
-        /commitment needs.*expansion pool has 0/i);
+        /Needs.*tokens.*have 0/i);
     assert.equal(await page.evaluate('document.querySelector(".province-actions .primary-expansion")'), null,
         'A filtered destination has an explanation without a placement control');
     assert.equal(await page.evaluate('document.querySelector(' +
@@ -42,7 +42,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
 
     await show({...blocked, blockers: ['SHIPPING_CAPACITY_EXCEEDED'],
         shipping: {required: 4, used: 2, capacity: 2}});
-    assert.match(await page.evaluate('document.querySelector(".province-inspector [data-expansion-blocker]").textContent'),
+    assert.match(await page.evaluate('document.querySelector(".province-actions [data-expansion-blocker]").textContent'),
         /shipment needs 4.*already shipped 2.*capacity is 2/i);
     assert.equal(await page.evaluate('document.querySelector(".province-actions button")'), null);
 
@@ -50,7 +50,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
     assert(china);
     await show({...blocked, destination: 'china', reachable: false,
         blockers: ['PROVINCE_ACCESS_DENIED'], missingAccess: ['OCEAN_NAVIGATION']}, true);
-    assert.match(await page.evaluate('document.querySelector(".province-inspector [data-expansion-blocker]").textContent'),
+    assert.match(await page.evaluate('document.querySelector(".province-actions [data-expansion-blocker]").textContent'),
         /Missing access: Ocean Navigation/);
     assert.equal(await page.evaluate('document.querySelector(".province-actions .primary-expansion")'), null);
 
@@ -58,8 +58,9 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
         blockers: ['INSUFFICIENT_EXPANSION_TOKENS'], missingAccess: [],
         partialPlacements: [{tokens: 1, resultingPool: 1}, {tokens: 2, resultingPool: 0}]};
     await show(partial, true);
-    assert.match(await page.evaluate('document.querySelector(".province-inspector .expansion-availability").textContent'),
-        /smaller legal placement/i);
+    assert.match(await page.evaluate('document.querySelector(".province-actions .expansion-availability").textContent'),
+        /Needs 4 tokens; you have 2/i);
+    assert.match(await page.evaluate('document.querySelector(".province-actions .consequence").textContent'), /marker requires 4/);
     assert.equal(await page.evaluate('document.querySelector(".primary-expansion").disabled'), false);
     await page.evaluate('document.querySelector(".primary-expansion").click()');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'place 2 ' + province);

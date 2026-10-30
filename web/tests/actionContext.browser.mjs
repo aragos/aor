@@ -82,23 +82,18 @@ export async function checkActionContext(page, web, baseline) {
     await show({...fixture, events: fixture.events.filter(event => event.id !== war.id)});
     await page.wait(`!document.querySelector('.war-notice')`, 'History restoration removes its obsolete War receipt');
 
-    const commodity = baseline.game.cardInspections.find(card => card.definition.id === 'stone-1');
     const payout = {commodity: 'STONE', adjustments: ['SHORTAGE'], owners: [
         {player: viewer, provinces: ['venice'], marketCount: 1, effectiveBox: 2, payout: 4, industryBonus: 0},
     ]};
     const cardEvent = {...event, id: 'history-commodity', kind: 'PLAY_CARD', card: 'stone-1', competition: null};
     await show({events: [cardEvent], game: {commodityPayouts: [payout]}});
     const beforeCommands = await page.evaluate('window.mapCommands.length');
-    await click('.event-card');
-    await page.wait(`document.querySelector('.inspection-panel .card-value')`, 'historical commodity opens in game');
-    assert.match(await page.evaluate(`document.querySelector('.inspection-panel').textContent`), /Stone.*Shortage.*\$4/s);
-    assert.equal(await page.evaluate('location.pathname'), '/tests/map-harness.html');
-    await show({...fixture, game: {...fixture.game, commodityPayouts: [{...payout, adjustments: ['SURPLUS'], owners: [{...payout.owners[0], payout: 2}]}]}});
-    assert.match(await page.evaluate(`document.querySelector('.inspection-panel').textContent`), /Surplus.*\$2/s, 'Historical commodity uses current payout projections');
+    assert.equal(await page.evaluate(`document.querySelector('.event-card a[href="/help#commodity-stone"]').target`), '_blank', 'Historical commodities link to their payout track');
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .card-value')`), null);
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeCommands);
 
     const card = {reference: 'draft', definition: {id: 'the-crusades', kind: 'event', messageId: 'card.the-crusades', shape: 'CIRCLE'}};
-    await show({events: [cardEvent], prompt: {messageId: 'prompt.play-cards', players: [viewer]},
+    await show({events: [{...cardEvent, card: 'the-crusades'}], prompt: {messageId: 'prompt.play-cards', players: [viewer]},
         legalChoices: {commands: ['play draft province jerusalem', 'pass'], bidMax: null}, game: {stage: 'PLAY_CARDS', hand: [card],
             cardOffers: [{reference: 'draft', playable: true, blockers: [], commodities: [], leaderDiscounts: [],
                 choices: [{kind: 'PROVINCE', value: 'jerusalem', command: 'play draft province jerusalem'}], provinceTargets: [], requiredTargetCount: null, protectionMax: null}]}});
@@ -115,7 +110,7 @@ export async function checkActionContext(page, web, baseline) {
     await click('.inspection-panel .close-detail');
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Closing the active card description preserves its action too');
 
-    const hand = Array.from({length: 12}, (_, index) => ({reference: `drag-${index}`, definition: commodity.definition}));
+    const hand = Array.from({length: 12}, (_, index) => ({reference: `drag-${index}`, definition: card.definition}));
     await show({events: [], game: {hand, cardOffers: []}});
     await page.wait(`document.querySelector('.hand-cards[data-draggable="true"]')`, 'overflowing hand is draggable');
     await page.evaluate(`document.querySelector('.hand-cards').scrollIntoView({block:'center'})`);

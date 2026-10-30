@@ -60,7 +60,7 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
     assert.equal(await page.evaluate(`window.mapCommands.length`), 0);
 
     await page.send('Page.navigate', {url: web + '/help#cards'});
-    await page.wait(`document.querySelector('#card-famine .recurring-badge')`, 'recurring reference labels');
+    await page.wait(`document.querySelector('#card-charlemagne')`, 'recurring reference labels');
     const reference = await page.evaluate(`document.querySelector('#cards').textContent`);
     assert(!/\b(circle|square)\b/i.test(reference), 'Card reference uses behavior rather than shape vocabulary');
     assert.equal(await page.evaluate(`document.querySelectorAll('#cards article .eyebrow').length`), 0);

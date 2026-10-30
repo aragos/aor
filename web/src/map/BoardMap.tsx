@@ -101,7 +101,6 @@ export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
     const geometry: Geometry = snapshot.game.rules.map === 'EUROPEAN' ? europeanGeometryData : geometryData;
-    const [inspectOnly, setInspectOnly] = useState(false);
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
     const [tabProvince, setTabProvince] = useState('');
@@ -137,7 +136,6 @@ export function BoardMap({snapshot, busy}: {
     const cardDraft = snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advanceDraft = catalog?.advances.some(advance => advance.id === selectedAdvance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`));
     const chooseArea = (area: string) => {
-        if (inspectOnly) {setInspection({kind: 'closed'}); setSelectedArea(area); return;}
         setInspection(null);
         setSelected('');
         setSelectedArea(area);
@@ -151,7 +149,6 @@ export function BoardMap({snapshot, busy}: {
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
     };
     const choose = (id: string) => {
-        if (inspectOnly) {setInspection({kind: 'province', id}); return;}
         if (picker?.kind === 'area') {
             const area = definitions.get(id)?.area;
             if (area) chooseArea(area);
@@ -272,11 +269,6 @@ export function BoardMap({snapshot, busy}: {
     ].filter(item => highlightPriority(item.state) > 0)
         .sort((first, second) => highlightPriority(first.state) - highlightPriority(second.state) || Number(first.inspected) - Number(second.inspected));
     const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
-    const inspectedPieces = occupancy.get(inspectedProvince);
-    const groupCount = inspectedPieces?.marker ? 1 : inspectedPieces?.tokens.reduce((count, tokens) =>
-        count + Number(tokens.coloured > 0) + Number(tokens.white > 0), 0) ?? 0;
-    const inspectedLayout = geometry.provinces[inspectedProvince]?.pieces[String(groupCount)];
-    const denseInspection = inspectedLayout && (inspectedLayout.crowded || inspectedLayout.size * mapWidth / view.w < 14);
     // Keep the sea texture sparse at Fit, practical zoom, and narrow screen widths.
     const seaHatchScale = mapWidth ? view.w / mapWidth : 1;
     return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
@@ -286,7 +278,6 @@ export function BoardMap({snapshot, busy}: {
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
                 <button type="button" className="secondary" onClick={() => setView(bounds)}>{t('board.fit')}</button>
-                <button type="button" className="secondary" aria-pressed={inspectOnly} onClick={() => setInspectOnly(current => !current)}>{t('table.inspection')}</button>
                 <HelpLink topic="map-legend" label={t('board.mapKey')}/>
             </div>
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
@@ -420,10 +411,6 @@ export function BoardMap({snapshot, busy}: {
                 <path d={geometry.frame} fill="none" stroke="#84958b" strokeWidth={2} pointerEvents="none"/>
             </svg>
         </div>
-        {denseInspection && <div className="dense-map-detail" data-dense-province={inspectedProvince}>
-            <strong>{provinceName(inspectedProvince)}</strong>
-            <p>{occupancyDescription(snapshot, inspectedPieces)}</p>
-        </div>}
 
     </section>;
 }

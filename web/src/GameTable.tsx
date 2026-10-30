@@ -1,6 +1,7 @@
 import {useEffect, useLayoutEffect, useState} from 'react';
 import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
-import {label, playerName, provinceName} from './labels';
+import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
+import {label, playerName} from './labels';
 import {t} from './messages';
 import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
@@ -11,7 +12,7 @@ import {AdvanceTiles, Emblem, Hand, PlayerOverview, Markets} from './TablePanels
 import {AdvanceDecision, CardDecision} from './ObjectDecisions';
 import {BoardMap} from './map/BoardMap';
 import {useMapSelection} from './map/MapSelection';
-import {ProvinceActions, ProvinceInspector} from './map/ProvinceInspector';
+import {ProvinceActions} from './map/ProvinceInspector';
 import {decisionIdentity} from './decision';
 import {DiagnosticMessage} from './DiagnosticMessage';
 import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
@@ -58,7 +59,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     }, [inspection, setInspection, snapshot.game.hand]);
     async function submit(command: string) {
         const accepted = await resolveCommand(command);
-        if (accepted && (command === 'pass' || command.startsWith('play '))) {
+        if (accepted && /^(pass$|play |place |move-marker )/.test(command)) {
             resetSelection();
         }
         return accepted;
@@ -76,12 +77,13 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     const finished = snapshot.game.stage === 'FINISHED';
     const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
-    const inspectedCard = inspection?.kind === 'card' || inspection?.kind === 'history-card' ? inspection.id : !inspection ? selectedCard : '';
+    const cardReference = inspection?.kind === 'card' || inspection?.kind === 'history-card' ? inspection.id : !inspection ? selectedCard : '';
     const inspectedAdvance = inspection?.kind === 'advance' ? inspection.id : !inspection ? selectedAdvance : '';
-    const inspectedProvince = inspection?.kind === 'province'
-        ? snapshot.game.catalog?.provinces.find(candidate => candidate.id === inspection.id)
-        : !inspection && !picker ? province : undefined;
-    const hasInspection = !!(inspectedCard || inspectedAdvance || inspectedProvince);
+    const cardDefinition = inspection?.kind === 'history-card'
+        ? snapshot.game.cardInspections?.find(card => card.definition.id === cardReference)?.definition
+        : snapshot.game.hand.find(card => card.reference === cardReference)?.definition;
+    const inspectedCard = cardDefinition?.kind === 'commodity' ? '' : cardReference;
+    const hasInspection = !!(inspectedCard || inspectedAdvance);
     const closeInspection = () => setInspection({kind: 'closed'});
     const cardAction = selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
@@ -136,18 +138,17 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
                 {hasInspection && <section className="inspection-panel" aria-label={t('table.inspection')}>
                     {inspectedCard ? <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
-                        : inspectedAdvance ? <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
-                        : inspectedProvince && <ProvinceInspector snapshot={snapshot} province={inspectedProvince} select={id => setInspection({kind: 'province', id})}/>}
+                        : <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>}
                 </section>}
             </div>
             <div className="workspace-side">
             <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
                 <div className="decision-heading"><p className="eyebrow">{finished ? t('game.finished') : canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>
-                    {!canAct && snapshot.prompt && <strong>{snapshot.prompt.players.map(id => playerName(snapshot, id)).join(', ')}</strong>}
+                    {!canAct && snapshot.prompt && <strong><PlayerLabels snapshot={snapshot} ids={snapshot.prompt.players}/></strong>}
                     <h2 aria-live="polite" aria-atomic="true">{decision}</h2>
-                    <span className="mobile-selected">{selectedName ? t(selectedName) : selectedAdvance ? label(selectedAdvance, 'advance') : province ? provinceName(province.id) : ''}</span>
+                    <span className="mobile-selected">{selectedName ? t(selectedName) : selectedAdvance ? label(selectedAdvance, 'advance') : province ? <ProvinceLabel snapshot={snapshot} id={province.id}/> : ''}</span>
                     {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed} aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>{t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}</button>}
-                    {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: {playerName(snapshot, snapshot.game.activity.actor)}</p>}
+                    {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                 </div>
                 {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status" aria-label={`${playerName(snapshot, expansionPlayer.id)} · ${t('table.remainingPoolTokens')}: ${expansionPlayer.poolTokens}`}>
                     <Emblem player={expansionPlayer} size={30}/>
@@ -156,7 +157,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 </div>}
                 {expansionPlayer && military.length > 0 && <section className="military-summary"><strong>{t('table.militaryAdvantage')}</strong>
                     {snapshot.game.players.filter(player => military.some(play => play.player === player.id)).map(player => <p key={player.id}>
-                        <Emblem player={player} size={15}/> {playerName(snapshot, player.id)}: {military.filter(play => play.player === player.id).map(play => label(play.event, 'event')).join(', ')}
+                        <PlayerLabel snapshot={snapshot} id={player.id}/>: {military.filter(play => play.player === player.id).map(play => label(play.event, 'event')).join(', ')}
                     </p>)}
                     <small>{t('table.militaryMatchups')}</small>
                 </section>}
@@ -179,7 +180,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         </div>
         <Hand snapshot={snapshot}/>
         <details className="table-effects"><summary>{t('game.thisTurn')}
-            {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: {playerName(snapshot, snapshot.game.activeWar.initiator)} / {playerName(snapshot, snapshot.game.activeWar.opponent)}</span>}
+            {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.initiator}/> / <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.opponent}/></span>}
             {snapshot.game.effects.papalCategory && <span className="effect-badge">{t('game.forbiddenCategory')}: {label(snapshot.game.effects.papalCategory, 'category')}</span>}
         </summary><TurnEffects snapshot={snapshot}/></details>
         {snapshot.game.endingTriggered && snapshot.game.stage !== 'FINISHED' && <p className="ending-notice">{t('game.endingNotice')}</p>}

@@ -80,7 +80,8 @@ above highlights; apply the same priority across provinces and areas.
 
 Fit names, market badges, markers and token groups on land first, then within their own province's
 coastal footprint. Avoid internal shorelines and foreign borders whenever space permits. Keep labels
-and pieces apart, compact crowded groups, and preserve owner, age and count information in inspection.
+and pieces apart, compact crowded groups, and preserve owner, age and count information in accessible
+labels and at readable zoom levels.
 Constrained labels and exceptionally dense groups may need overlap; record these exceptions in
 geometry metadata and verify them explicitly. Do not create a new game connection to make room.
 
@@ -94,9 +95,9 @@ and background clicks preserve an active action draft.
 Keep zoom in, zoom out and Fit floating over the board. Always show support arrows; omit a visibility
 toggle. Support modifier-scroll, trackpad pinch, two-finger touch pinch and dragging, centered on the
 gesture and constrained to board bounds.
-Ordinary scrolling navigates the page. Keep map text unselectable during gestures. The province
-inspector provides structured occupancy, neighbors, sea contacts and support details outside the
-action panel; the duplicate board-details table is removed. Omit map search and navigation menus.
+Ordinary scrolling navigates the page. Keep map text unselectable during gestures. The map shows
+occupancy, neighbors, sea contacts and support highlights without an inspection panel. Costs and
+placement limits belong beside the action. Omit map search and navigation menus.
 
 ## Data and verification
 
@@ -129,11 +130,9 @@ reduced boards, gestures and order submission. See [README](../README.md) for bu
 Dense groups use joint label/piece placement: nearby label positions are compared before accepting
 shared space. This removed the twelve-group label collisions in North and South America without
 changing province or area geometry. When sharing remains unavoidable, the map keeps every piece
-and defers the name/market badge to inspection, rather than painting text over occupants. The
-province's accessible name retains its identity, market and complete occupancy. At small rendered
-piece sizes, selecting a province also opens a readable occupancy line beside the map; the decision
-sheet retains separate owner, established/new age and count rows. Fit is an overview; inspect or
-zoom for dense counts. The larger Danish province removes Copenhagen's constrained label and
+and retains the name/market in accessible labels, rather than painting text over occupants. Each
+province's accessible name includes its identity, market and complete occupancy. Zoom to read dense
+pieces; do not add an occupancy section below the map. Fit is an overview; zoom for dense counts. The larger Danish province removes Copenhagen's constrained label and
 dense-group sharing exceptions. Toulouse and Constantinople retain constrained geometry metadata;
 the user accepted their current labels on 2026-10-29.
 

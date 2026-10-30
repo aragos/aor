@@ -39,14 +39,17 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   pending action, retain the local amount as an unsaved draft, and keep withdrawn amounts private.
 - Keep the AoR header compact and identify the assigned capital in the page title. Show the actor,
   decision and relevant resources; keep inspection separate from action forms and preserve drafts
-  while inspecting other objects. Show available cash alongside spending decisions; omit a permanent
-  resource section. Keep hand cards compact, allow dragging as well as scrolling, and include each
+  while inspecting other objects. Use the object itself rather than separate Inspect controls;
+  keep province inspection on the map. Clear the province after accepted token/marker placement,
+  retaining correctable work after rejection. Show available cash alongside spending decisions; omit
+  a permanent resource section. Keep hand cards compact, allow dragging as well as scrolling, and include each
   player's advance count in their summary. Expanded advances follow printed category and letter order.
   Show written cash in expanded player details and keep income in the summary. Put the live deck
   count beside the epoch, with no duplicate count in turn effects.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
-  commits them. Prefer visible finite choices and playable cards beside Pass.
+  commits them. Ask “Pick a target” or “Pick N targets” during card targeting. Prefer visible finite
+  choices and playable cards beside Pass.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup
@@ -54,11 +57,15 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   explicitly show a dismissible outcome to the player whose submitted action just resolved it.
   Losses use red result styling. Competition notices and pending result requests expire when their
   expansion ends; later polling or a new expansion must not restore them.
+  Explain a partial placement’s marker requirement and limiting resource beside the action.
   Selecting an unavailable province explains its authoritative blocker without offering an invalid
   action. Preserve legal smaller placements and keep missing access requirements specific.
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
   adjustments. Keep event and advance descriptions in the game, with current commodity payouts and
-  leader credits in card inspections. Identify whether each leader discount includes Written Record.
+  leader credits in leader inspections. Commodity cards retain live payouts on the card and small
+  question links to full payout tracks, without an inspection box. Every visible capital name
+  includes its symbol, including cash/misery previews. Shipping upgrades show current → new shipping.
+  Identify whether each leader discount includes Written Record.
   Keep full payout boxes, legends, variant descriptions and printed tracks on public `/help`, linked
   contextually in a new tab. Show matching unplayed leader counts for epochs I–III beside each
   advance, with the public-information meaning above.
@@ -67,10 +74,11 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   show prices for blocked advances, and retain printed costs when no live quote exists. Card plays
   and advance purchases preview every affected player's misery boxes; identify outcomes that still
   depend on decisions or dice as uncertain.
-- Keep Help focused on reference and detailed undo policies; omit the game-flow walkthrough and
-  consolidate shared rules. Color every misery box by track position: lower steps are less severe,
+- Keep Help focused on printed data lookup, variants and non-obvious app behavior, including undo;
+  omit general game rules and the game-flow walkthrough. Remove redundant or technical play text.
+  Color every misery box by track position: lower steps are less severe,
   progressing from green through amber to red and finally dark Chaos. Keep numeric labels.
-  Link track help through small question icons beside misery and shipping values. Card displays
+  Link track help through footnote-sized question icons beside misery and shipping values. Card displays
   use a Recurring badge when applicable, with no shape vocabulary or redundant type heading.
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
   explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft

@@ -51,9 +51,9 @@ export async function checkReferenceUx(page, web, baseline) {
     const colorful = await page.evaluate(`fetch(document.querySelector('link[rel=icon]').href).then(response=>response.text())`);
     assert(colorful.includes('#205c4b') && colorful.includes('#f5ce62'),'Turn favicon uses the colorful shield and money bag');
 
-    await page.send('Page.navigate', {url:web+'/help#card-the-crusades'});
-    await page.wait(`document.querySelector('#card-the-crusades .card-event-text')`, 'Public card reference loads without a player token');
-    assert.match(await page.evaluate(`document.querySelector('#card-the-crusades').textContent`),/Area VI/);
+    await page.send('Page.navigate', {url:web+'/help#commodity-stone'});
+    await page.wait(`document.querySelector('#commodity-stone .payout-box')`, 'Public card reference loads without a player token');
+    assert.equal(await page.evaluate(`document.querySelector('.reference-page .card-event-text, .reference-page .advance-benefits, #commodity-cards')`), null, 'Help omits general game rules');
     assert.equal(await page.evaluate(`document.title`),'AoR · Help');
     assert.equal(await page.evaluate(`document.querySelectorAll('#commodities .payout-box').length`),120);
     assert.equal(await page.evaluate(`document.querySelectorAll('#advances article').length`),26);

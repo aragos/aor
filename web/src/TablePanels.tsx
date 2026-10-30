@@ -1,4 +1,5 @@
 import type {CommodityPayoutView, PlayerView, PublicCatalog, Snapshot} from './api';
+import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {TableIcon} from './TableIcon';
@@ -63,9 +64,8 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
                     if (event.target instanceof Element && event.target.closest('a')) return;
-                    if (eligible) {event.preventDefault(); if (swap) setSelectedAction(swap); else playerPicker?.pick(player.id);}
+                    if (eligible) { if (swap) setSelectedAction(swap); else playerPicker?.pick(player.id);}
                 }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
-                    {eligible && <button type="button" className="secondary inspect-object" onClick={event => {event.preventDefault(); event.stopPropagation(); const details = event.currentTarget.closest('details'); if (details) details.open = !details.open;}}>{t('table.inspection')}</button>}
                     <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>
                         {player.capital && <span className="player-person" title={player.name}>{person}</span>}</span>
                         <small>{player.id === snapshot.viewerId ? t('table.you') : order.includes(player.id) ? String(order.indexOf(player.id) + 1).padStart(2, '0') : ''}</small></span>
@@ -81,10 +81,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                     </span>}
                     {eligible && <span className="target-status">{t(picked ? 'table.selectedTarget' : 'table.legalTarget')}</span>}
                     {!finished && <span className="player-status">{status}</span>}
-                </summary>{eligible && <button type="button" className="secondary inspect-object" onClick={event => {
-                    const details = event.currentTarget.closest('details');
-                    if (details) details.open = true;
-                }}>{t('table.inspectObject', {name: playerName(snapshot, player.id)})}</button>}<PlayerDetails player={player} catalog={snapshot.game.catalog}/>
+                </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
             </details>;
         })}
     </section>;
@@ -110,7 +107,7 @@ export function CommodityAdjustments({payout}: {payout: CommodityPayoutView}) {
 
 export function PayoutReference({snapshot, payout}: {snapshot: Snapshot; payout: CommodityPayoutView}) {
     if (!snapshot.game.catalog) return null;
-    return <HelpLink topic={`commodity-${payout.commodity.toLowerCase()}`} label={t('table.fullPayouts')} compact={false}/>;
+    return <HelpLink topic={`commodity-${payout.commodity.toLowerCase()}`} label={t('table.fullPayouts')} inline/>;
 }
 
 export function CommodityValueNote({snapshot}: {snapshot: Snapshot}) {
@@ -135,9 +132,9 @@ export function Markets({snapshot}: {snapshot: Snapshot}) {
                 <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/></summary>
             <div className="market-detail">{snapshot.legalChoices.commands.filter(command => command.startsWith(`cancel-adjustment ${payout.commodity.toLowerCase()} `) ||
                 (payout.commodity === 'IVORY' && command.startsWith('cancel-adjustment gold '))).map(command => <button type="button" className="secondary" key={command} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{t('action.cancel')} {label(command.split(' ')[2].toUpperCase(), 'adjustment')}</button>)}{payout.owners.map(owner => <div key={owner.player}>
-                <strong>{playerName(snapshot, owner.player)} · ${owner.payout}</strong>
+                <strong><PlayerLabel snapshot={snapshot} id={owner.player}/> · ${owner.payout}</strong>
                 <p>{t('table.markets')}: {owner.marketCount} · {t('table.payoutBox')}: {owner.effectiveBox}</p>
-                <p>{owner.provinces.map(provinceName).join(', ')}</p>
+                <p>{owner.provinces.map((id, index) => <span key={id}>{index > 0 && ', '}<ProvinceLabel snapshot={snapshot} id={id}/></span>)}</p>
                 {owner.industryBonus > 0 && <p>{advanceName('industry')}: +{owner.industryBonus} {t('table.payoutBox')}</p>}
             </div>)}{payout.owners.length === 0 && <p>{t('table.noOwners')}</p>}
                 <PayoutReference snapshot={snapshot} payout={payout}/>
@@ -176,7 +173,8 @@ export function Hand({snapshot}: {snapshot: Snapshot}) {
                 {offer?.leaderDiscounts.map(discount => <span className="leader-discount" key={discount.advance}>
                     <span>{advanceName(discount.advance)}</span><LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/>
                 </span>)}
-            </button><button type="button" className="secondary inspect-object" onClick={() => setInspection({kind: 'card', id: card.reference})}>{t('table.inspectObject', {name: t(card.definition.messageId)})}</button></div>;
+            </button><span className="card-track-links">{(offer?.commodities ?? snapshot.game.cardInspections?.find(info => info.definition.id === card.definition.id)?.commodities ?? []).map(commodity =>
+                <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`} inline icon={<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><CommodityIcon commodity={commodity}/></svg>}/>)}</span></div>;
         })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div>
     </section>;
 }
@@ -208,7 +206,7 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                     <UnplayedLeaders snapshot={snapshot} advance={advance.id}/>
                     {available && <small className="advance-available">{t('table.available')}</small>}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}
-                </button><button type="button" className="secondary inspect-object" onClick={() => setInspection({kind: 'advance', id: advance.id})}>{t('table.inspectObject', {name: advanceName(advance.id)})}</button></div>;
+                </button></div>;
             })}</div>
         </div>)}
     </section>;
@@ -224,17 +222,16 @@ export function PlayedLeaders({snapshot}: {snapshot: Snapshot}) {
         const claim = finiteDecisions(snapshot).find(offer => offer.kind === 'patronage' && offer.subject.id === leaderReference(leader.leader));
         return <article key={leader.leader} className={inBox ? 'leader-in-box' : 'leader-exposed'} data-played-leader={leader.leader}>
             <span className="leader-role">{inBox ? t('table.inTheBox') : label(leader.role, 'leaderRole')}</span>
-            <strong>{label(leader.leader, 'leader')}</strong>
+            <button type="button" className="map-link" onClick={() => setInspection({kind: 'history-card', id: leaderReference(leader.leader)})}>{label(leader.leader, 'leader')}</button>
             {claim && <button type="button" className="secondary" aria-pressed={selectedAction === claim.command} onClick={() => setSelectedAction(claim.command)}>{t('action.patronize')}</button>}
-            <button type="button" className="secondary inspect-object" onClick={() => setInspection({kind: 'history-card', id: leaderReference(leader.leader)})}>{t('table.inspection')}</button>
-            <p className="small">{playerName(snapshot, leader.owner)}</p>
+            <p className="small"><PlayerLabel snapshot={snapshot} id={leader.owner}/></p>
             {credits && <><p className="leader-credits-label">{t(credits.usable ? 'table.yourLeaderCredits' : 'table.leaderCredits')}</p>
                 {credits.discounts.map(discount => <div className="leader-discount" key={discount.advance}>
                     <span>{advanceName(discount.advance)}</span><LeaderCredit amount={credits.usable ? discount.effectiveDiscount : discount.conditionalAmount}
                         writtenRecordBonus={discount.writtenRecordBonus} includesWrittenRecord={credits.usable}/>
                 </div>)}</>}
             {leader.role === 'EXPOSED' && <p className="small">{t('game.protection')}: ${leader.protectionCash}</p>}
-            {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: {leader.patronageClaimants.map(id => playerName(snapshot, id)).join(', ')}</p>}
+            {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: <PlayerLabels snapshot={snapshot} ids={leader.patronageClaimants}/></p>}
         </article>;
     })}</section>;
 }

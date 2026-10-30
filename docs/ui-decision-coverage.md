@@ -24,7 +24,7 @@ Historical long runs and separate history-editor evidence remain identified belo
 | Draw Card | `cancel-adjustment`, `pass`; priced adjustment buttons/confirmation | Shared Gold/Ivory choices cost $10 once; core/service tests cover shared types, stacked markers, singleton queues after commodity consumption, canonical history and restart. Browser checks one joint offer/confirmation and the remaining singleton label. |
 | Buy Card | `buy-card`, `discard-card`, `pass`; optional hand actions | Purchase/discard fixtures; gameplay fixture queues Urban Ascendancy while waiting and proves one legal-turn submission without polling repeats |
 | Card rounds / Final Card Play / War preparation | `play`, `pass`; hand and contextual form | Dual commodity, protection, targets, final-play and War-preparation fixtures |
-| Commodity choice | `play … commodity`; choices and current payouts | Canonical dual-choice fixture; market fixture checks external payout-reference links and adjustment badges on hand/selected card |
+| Commodity choice | `play … commodity`; choices and current payouts | Canonical dual-choice fixture; market fixture checks direct payout-track links and adjustment badges on the hand card, without a commodity inspector |
 | Player / area / province / category | `play … player/area/province/category`; finite choices and map | Canonical target fixtures; area-label selection is draft-only; StrictMode fixtures activate Crusades/Rebellion map targets; a live-engine Crusades regression fails before the lifecycle fix and commits a map-selected province after it |
 | Pirates/Vikings | `play … provinces`; map and required target count | Gameplay fixture activates map; rapid-pick cap, invalid target, clear/correct and canonical-play fixtures |
 | Leader | `play … protect`; protection payment | Invalid blank/negative/over-max values blocked; valid canonical payment; service activity labels protection/rebate |
@@ -33,7 +33,7 @@ Historical long runs and separate history-editor evidence remain identified belo
 | Immediate Master Art | `discard-card`, `pass`; optional private discard | Select/confirm fixture; engine resumes same purchase activity |
 | Stabilization | `stabilize cash/misery`; cost and destination box | Gameplay fixture displays destination; core preview/execution equality; live cash-payment baseline |
 | Relief | `relieve-misery`, `pass`; spaces, cost and blocker | Disabled unaffordable choices and enabled Pass; core retains tier-based step including zero misery. Activity tests cover cash plus pooled current-turn MR, prior spending, cross-turn reset and Enlightenment rounding; browser receipt shows the cash expense once. |
-| Expansion | `place`, `attack`, `reduce-marker`, `buy-expansion-card`, `pass`; province action | Live satellite/partial/full commitments remain covered. Core retains candidate filtering; full inspection evaluations explain omitted pool/shipping destinations, missing access and existing control. Browser checks explanations, no invalid controls/highlights, and retained legal partial placement. |
+| Expansion | `place`, `attack`, `reduce-marker`, `buy-expansion-card`, `pass`; province action | Live satellite/partial/full commitments remain covered. Core retains candidate filtering; full domain evaluations explain omitted pool/shipping destinations, missing access and existing control. Browser checks explanations, no invalid controls/highlights, and retained legal partial placement. |
 | Cathedral | `cathedral`, `pass`; interruption form | Canonical decision fixture and competition rules tests |
 | Civil War | `civil-war-loss cash/tokens`; actual payable costs after capital replacement | Core verifies rounding, cash caps and both executions. Live browser exhausts stock, replaces the capital from pool, checks both costs/balances and commits the displayed token loss. |
 | Event replacement | `replace-event-tokens none/<provinces>`; all chooser's provinces confirmed together | Core and live service verify current player order, grouping, shared pool budget, ownership, atomic selection, stale revisions and replay. Browser checks all rows, pool limits, review, polling/draft boundaries, empty choice and phone layout; live Civil War exercises the canonical command through real offers. |
@@ -55,12 +55,12 @@ handlers do not make those rules selectable in current game creation.
 | Compact table and inspection | Desktop/phone checks cover compact AoR/capital title, live epoch/deck count, recurring-only card badges and removed type headers. Expanded players show written cash without duplicate income; advances remain category/letter ordered. Track icons open dedicated anchors without choosing a card target; long fleets fit. Service tests keep written cash public and unchanged by pending purchases until reveal. |
 | Activity and results | Immutable entry-time identities; one rendering per action; bounded default-open activity with an inset icon toggle and no count. Browser cases retain named cash/misery receipts, New World attribution and clickable deferred card causes. Core/service coverage audits every misery owner and retains actual endpoints across automatic bookkeeping, clamping, Chaos, append and reload without private card disclosure. Live competition notices expire at expansion end and stay cleared next turn; Cathedral, late outcomes, dismissal and history restoration remain covered. |
 | Expansion resources | Market fixture checks each player's white markers including zero; contextual fixture identifies the acting pool. Core tests retain dark-token reach beneath a white marker, remove it on competition loss/capture, prevent resurrection and normalize at income. Both map graphs, reach tests and geometry validators exclude direct Smyrna–Taurus contact while retaining valid shipping via Adalia. Military tests own actual advantage rules. |
-| Markets and leaders | Reference links expose all 120 payout boxes and 26 advance descriptions. App polling updates hand, inspection and markets after white-marker ownership changes/reclamation. Core/server tests exercise real competition before Income, zero values, Industry/adjustments, token/Chaos exclusions and unchanged colored-only actual payments/Famine. Leader labels identify Written Record; public counts and inspection catalogs retain hidden-card privacy. |
+| Markets and leaders | Reference links expose all 120 payout boxes and 26 advance data entries. App polling updates hand and markets after white-marker ownership changes/reclamation. Core/server tests exercise real competition before Income, zero values, Industry/adjustments, token/Chaos exclusions and unchanged colored-only actual payments/Famine. Leader labels identify Written Record; public counts and inspection catalogs retain hidden-card privacy. |
 | Hand and spending context | Pointer dragging, outside-release cancellation, activation after dragging, contextual cash, inline descriptions, compact density and advance counts remain covered. Price fixtures show concise tile totals, optional named advance/IR/leader details, printed fallbacks and blocked estimates on desktop/phone. Core/serialization tests preserve exact charges, prior-turn source eligibility and purchase rejection despite visible estimates. |
 | Misery consequences and automatic receipts | Card fixtures show all affected players, Chaos and target changes without commitment. Core/serialization tests cover Famine, Civil War, Crusades marker exhaustion, hidden-hand invariance and explicit War uncertainty. Holy Indulgence activity includes token-only pool/stock movements, separates the triggering action and excludes unrelated Chaos returns. |
 | Draft lifetimes | Full-App polling/workspace/viewport preservation, rejection, stale refresh without retries, quote supersession and changed-owner fixtures. Activity inspection and closing either an explicit or implicit inspector preserve a prepared card target. Stable nested identity resets same-player/same-prompt replacement drafts. |
-| Feasible expansion | Pool/shipping regressions omit destinations with no valid commitment; peaceful partial placement remains. Marker-stock/access blockers are still explainable in inspection. |
-| Board and reductions | Live 3–6-player drawing, continental hit targets, mixed owners/ages, all twelve owner/age groups per province and combined rendered label/piece bounds. Dense provinces retain zoom/inspection fallback. |
+| Feasible expansion | Pool/shipping regressions omit destinations with no valid commitment; peaceful partial placement remains. Marker-stock/access blockers are explained beside the selected action. |
+| Board and reductions | Live 3–6-player drawing, continental hit targets, mixed owners/ages, all twelve owner/age groups per province and combined rendered label/piece bounds. Dense provinces retain all owner/age/count groups, accessible occupancy labels and zoom. |
 | Reviewed topology | Catalog/shipping/geometry/browser checks cover separate standard Aegean/Central seas and European merger, Crete/Smyrna contacts, Belgrade/Durazzo, Danish/Baltic exclusions/support and British/Channel coasts. Core tests verify Fez's exact sea contacts; regenerated standard/European geometry passes validation, including more than 20 SVG units of Western Mediterranean frontage. The [connection inventory](connection-inventory.md) owns the graph. |
 | Sea emphasis | Full connected-sea highlighting is distinct from coastal bands, retains screen-size hatch/perimeter during zoom, changes with province inspection and clears with area/background selection. Desktop/zoom/phone baseline screenshots were reviewed. |
 | Dense labels | Copenhagen's earlier exception was removed. The user accepted Toulouse/Constantinople labels on 2026-10-29; their constrained geometry metadata remains descriptive. |
@@ -125,3 +125,59 @@ is owned by requirements, UI design, engine and command documentation.
 Human screen-reader, physical-phone, browser zoom and composited/SVG contrast work, hosted identity
 and backup restoration, and production capacity measurements remain in follow-ups. No automated
 result here certifies those manual or hosted checks.
+
+## October 30 clarity verification
+
+`npm run build --workspace web`, all 40 web unit tests, `formatKotlin` followed by
+`checkKotlinFormat`, and the complete browser suite passed. The browser run reused the installed
+local server distribution; this change does not alter Kotlin/domain behavior. No Kotlin sources
+changed after formatting.
+
+The production-StrictMode fixtures check singular/plural map requests, absent Inspect/card-rules/
+province/commodity inspection controls, direct commodity payout links, footnote-sized player help,
+capital symbols in commodity cash previews, action-local partial-placement limits and current → new
+shipping. Existing rejected-placement/polling assertions retain the draft. Live satellite, partial
+and full marker placements now explicitly assert deselection after acceptance. Public Help retains
+all 120 payout boxes, printed advance data, tracks, variants and app/undo explanations without event
+or advance rule paragraphs. Map tests verify sea/neighbor/support highlights and accessible dense
+occupancy directly, instead of requiring a province text panel.
+
+Reviewed the generated desktop player view, compact dual-commodity hand and phone map view: player
+help is visually subordinate, dual payout links identify their commodities with symbols, and province
+inspection adds no section below the map. The phone Help capture also retains a single-column data
+reference. Browser geometry checks establish fit; these visual observations do not replace the
+separately outstanding physical-phone, screen-reader and contrast reviews.
+
+## October 30 game-table clarity postmortem
+
+**What escaped.** Separate Inspect buttons/mode and province/commodity panels duplicated existing
+objects. Help repeated game rules; copy exposed implementation vocabulary. Target prompts did not
+request an action, some capital labels lost their silhouettes, upgrades omitted the starting value,
+and accepted placement retained an obsolete destination. Partial-placement limits were split
+between inspection and the action. Small contextual links were tested as present, not as footnotes.
+
+**Why.** This was partly a specification error, not simply failure to follow the principle.
+UI rule 4 prescribed a dedicated inspection surface for every object. The alignment proposal's T5
+explicitly recommended a small inspection control or explicit mode, and the table contract required
+both. That converted “reference must preserve a draft” into “add inspection UI.” Compactness and
+local consequences remained general aspirations without a test for whether another panel or sentence
+was necessary. Draft-lifetime checks emphasized preservation, phase changes and card play; they did
+not require clearing a successful placement within the same expansion. “Reuse symbols” did not
+specify every rendered capital mention, so string-only previews bypassed the existing emblem.
+Help's old contract explicitly allowed expanded rules.
+
+**Why tests did not catch it.** Browser tests required the now-unwanted province inspector, card-rules
+link and commodity inspector. They established functional availability and calculation/lifecycle
+correctness for their scenarios, not necessity or information hierarchy. Track-link tests checked
+anchors and target safety without checking visual size. Screenshot capture alone did not supply
+recorded human evidence of clarity. The principle-alignment completion statement therefore claimed
+more UX confidence than this evidence justified.
+
+**Prevention.** The owning requirements and UI contracts now specify object-based access, a single
+home for each fact, action-local limits/current → new previews, capital silhouettes, placement cleanup,
+and lookup/app-focused Help. The UI review gate asks what can be deleted, checks a neighboring flow,
+and separates accepted, rejected and unchanged-polling behavior. Browser checks must assert both the
+absence of redundant surfaces and the retained path: direct help links, map connections, live payouts,
+selection/confirmation and rejected-draft retention. Visual observations remain separate from automated
+geometry and DOM assertions. This is a reusable review method, not a claim that all future states are
+covered by today's test cases.
