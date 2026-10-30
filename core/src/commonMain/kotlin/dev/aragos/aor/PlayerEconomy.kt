@@ -86,13 +86,8 @@ object PlayerEconomy {
         player: PlayerState,
         spaces: Int,
         currentTurn: Int,
-        rules: RuleOptions = RuleOptions(),
     ): MiseryReliefQuote {
         player.requireActive()
-        checkRule(
-            rules.miseryRelief == MiseryReliefRule.PURCHASED,
-            ViolationCode.INVALID_MISERY_RELIEF,
-        )
         val usage = currentReliefUsage(player, currentTurn)
         val remainingSpaces = minOf(player.advances.tierCount - usage.spaces, player.misery.ordinal)
         checkRule(spaces in 1..remainingSpaces, ViolationCode.INVALID_MISERY_RELIEF)
@@ -123,10 +118,13 @@ object PlayerEconomy {
         player: PlayerState,
         spaces: Int,
         currentTurn: Int,
-        rules: RuleOptions = RuleOptions(),
     ): EconomyResult {
-        val quote = reliefQuote(player, spaces, currentTurn, rules)
-        checkRule(player.cash >= quote.cashCost, ViolationCode.INSUFFICIENT_CASH)
+        val quote = reliefQuote(player, spaces, currentTurn)
+        checkRule(
+            player.cash >= quote.cashCost,
+            ViolationCode.INSUFFICIENT_CASH,
+            parameters = mapOf("required" to quote.cashCost, "available" to player.cash),
+        )
         val previous = currentReliefUsage(player, currentTurn)
         return EconomyResult.forPlayer(
             player.copy(
@@ -151,7 +149,6 @@ object PlayerEconomy {
         player: PlayerState,
         initialPlayerCount: Int,
         boardMarkerCount: Int,
-        rules: RuleOptions = RuleOptions(),
     ): IncomeQuote {
         player.requireActive()
         require(boardMarkerCount in 0..25) { "Income requires zero through 25 dominated markets." }
@@ -167,17 +164,7 @@ object PlayerEconomy {
                 } else {
                     0
                 },
-            newWorldRelief =
-                if (
-                    player.advances.owns(
-                        when (rules.incomeRelief) {
-                            IncomeReliefRule.NEW_WORLD -> AdvanceId.NEW_WORLD
-                            IncomeReliefRule.ENLIGHTENMENT -> AdvanceId.ENLIGHTENMENT
-                        }
-                    )
-                )
-                    1
-                else 0,
+            newWorldRelief = if (player.advances.owns(AdvanceId.NEW_WORLD)) 1 else 0,
         )
     }
 
@@ -185,9 +172,8 @@ object PlayerEconomy {
         player: PlayerState,
         initialPlayerCount: Int,
         boardMarkerCount: Int,
-        rules: RuleOptions = RuleOptions(),
     ): EconomyResult {
-        val quote = incomeQuote(player, initialPlayerCount, boardMarkerCount, rules)
+        val quote = incomeQuote(player, initialPlayerCount, boardMarkerCount)
         val cash = player.cash.toLong() + quote.totalCashGain
         require(cash <= Int.MAX_VALUE) { "Income cannot exceed the supported cash amount." }
         return EconomyResult.forPlayer(

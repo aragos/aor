@@ -49,15 +49,11 @@ data class CatalogConfiguration(
     }
 
     val satelliteSupports: Set<SatelliteSupport> by lazy {
-        (map.satelliteSupports +
-                if (rules.stGallSupport) {
-                    setOf(SatelliteSupport(ProvinceId("st-gall"), ProvinceId("nuremberg")))
-                } else {
-                    emptySet()
-                })
-            .filterTo(mutableSetOf()) { support ->
+        map.satelliteSupports
+            .filter { support ->
                 support.satellite in provinceIds && support.market in provinceIds
             }
+            .toSet()
     }
 
     val seaCoasts: Set<SeaCoastConnection> by lazy {

@@ -4,8 +4,6 @@ package dev.aragos.aor
 enum class ShufflePurpose {
     INITIAL_DECK,
     NEXT_EPOCH,
-    SETUP_RETURNS,
-    SETUP_RESERVES,
 }
 
 /** A suspended operation resumes only after an exact permutation has been recorded. */
@@ -18,14 +16,11 @@ data class ShuffleRequest(
  * Physical-card locations outside player hands and the ordered draw pile.
  *
  * [nextDraw] allocates occurrence references independently of physical identities and deck size.
- * [setupReturns] contains secret returned cards until all seats have submitted their selections.
  * [movedToFirstDeck] excludes the additional Timber from its printed epoch's later deck.
  */
 data class DeckHistory(
     val discarded: List<String> = emptyList(),
     val removed: List<String> = emptyList(),
-    val setupReserves: List<String> = emptyList(),
-    val setupReturns: Map<PlayerId, HandCard> = emptyMap(),
     val movedToFirstDeck: Set<String> = emptySet(),
     val nextDraw: Int = 1,
     val pendingShuffle: ShuffleRequest? = null,
@@ -86,14 +81,6 @@ internal fun GameState.applyShuffle(cards: List<String>): GameState {
                 deck = cards.toList(),
                 deckHistory = history.copy(discarded = emptyList()),
             )
-        ShufflePurpose.SETUP_RETURNS ->
-            copy(
-                stage = Stage.BIDDING,
-                deck = cards.toList(),
-                deckHistory = history.copy(setupReturns = emptyMap()),
-            )
-        ShufflePurpose.SETUP_RESERVES ->
-            copy(deck = cards.toList(), deckHistory = history.copy(setupReserves = emptyList()))
     }
 }
 

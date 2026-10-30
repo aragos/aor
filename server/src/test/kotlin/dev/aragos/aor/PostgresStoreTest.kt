@@ -17,7 +17,13 @@ class PostgresStoreTest {
             val reader = fixture.reopened(NoPostgresRandom)
             assertThat(reader.get(game.gameId, token(game, 0)).pendingBid).isEqualTo(12)
 
-            writer.submit(game.gameId, token(game, 0), 2, "bid-capital 17")
+            writer.submit(
+                game.gameId,
+                token(game, 0),
+                2,
+                "bid-capital 17",
+                writer.get(game.gameId, token(game, 0)).submissionVersion,
+            )
             val updated = reader.get(game.gameId, token(game, 0))
 
             assertThat(updated.pendingBid).isEqualTo(17)

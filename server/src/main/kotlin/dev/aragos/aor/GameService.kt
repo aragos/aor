@@ -5,8 +5,12 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
 
-class ServiceFailure(val status: Int, val code: String, val entryIndex: Int? = null) :
-    Exception(code)
+class ServiceFailure(
+    val status: Int,
+    val code: String,
+    val entryIndex: Int? = null,
+    val diagnostic: RuleDiagnostic? = null,
+) : Exception(code)
 
 data class PlayerLink(val id: PlayerId, val name: String, val path: String)
 
@@ -32,8 +36,12 @@ data class GameSnapshot(
     val submitted: List<PlayerId>,
     /** The viewer's unrevealed capital bid or signed token-purchase amount, when submitted. */
     val pendingBid: Int?,
-    /** Only this viewer's unrevealed setup return; other seats see submission status only. */
-    val pendingReturn: String?,
+    /** Only the viewer's private-write receipt; unrelated seats never change this precondition. */
+    val submissionVersion: String?,
+    /**
+     * Bounded reconciliation receipts for this owner only; an absent ID leaves the outcome unknown.
+     */
+    val submissionReceipts: List<String>,
     val history: List<String>,
     val events: List<HistoryEventView>,
     val undo: UndoView,
@@ -145,8 +153,14 @@ class GameService(
 
     fun get(id: String, token: String): GameSnapshot = get(id, GameAccess.SeatToken(token))
 
-    fun submit(id: String, token: String, expectedRevision: Int, text: String): GameSnapshot =
-        submit(id, GameAccess.SeatToken(token), expectedRevision, text)
+    fun submit(
+        id: String,
+        token: String,
+        expectedRevision: Int,
+        text: String,
+        expectedSubmissionVersion: String? = null,
+    ): GameSnapshot =
+        submit(id, GameAccess.SeatToken(token), expectedRevision, text, expectedSubmissionVersion)
 
     fun quoteTokenPurchase(
         id: String,
@@ -196,6 +210,8 @@ class GameService(
         access: GameAccess,
         expectedRevision: Int,
         text: String,
+        expectedSubmissionVersion: String? = null,
+        operationId: String? = null,
     ): GameSnapshot {
         val stored =
             store.update(id) { current ->
@@ -204,27 +220,85 @@ class GameService(
                 if (current.revision != expectedRevision) {
                     throw ServiceFailure(409, "STALE_REVISION")
                 }
-                try {
-                    when {
-                        text.trim() == "withdraw-bid" -> driver.withdrawBid(current, player)
-                        text.trim() == "undo" -> HistoryEdits.undo(current, player)
-                        text.trim().startsWith("undo ") ->
-                            HistoryEdits.undo(
-                                current,
-                                player,
-                                text.trim().substringAfter(' ').toIntOrNull()
-                                    ?: throw ServiceFailure(400, "INVALID_HISTORY_EDIT"),
-                            )
-                        text.trim().startsWith("set-undo-policy ") ->
-                            HistoryEdits.configure(
-                                current,
-                                player,
-                                UndoPolicy.parse(text.trim().substringAfter(' ')),
-                            )
-                        else -> driver.submit(stored = current, player = player, text = text)
+                val administrative =
+                    text.trim().let { command ->
+                        command == "withdraw-bid" ||
+                            command == "undo" ||
+                            command.startsWith("undo ") ||
+                            command.startsWith("set-undo-policy ")
                     }
+                val command =
+                    if (administrative) null
+                    else TextCodec.parseAction(text, current.state(), actor = player).command
+                val privateWrite =
+                    text.trim() == "withdraw-bid" ||
+                        command is Command.BidCapital ||
+                        command is Command.BuyTokens
+                if (
+                    privateWrite && expectedSubmissionVersion != current.submissionVersions[player]
+                ) {
+                    throw ServiceFailure(409, "STALE_SUBMISSION")
+                }
+                if (operationId != null && !operationId.matches(GameDocuments.GAME_ID_PATTERN)) {
+                    throw ServiceFailure(400, "INVALID_REQUEST")
+                }
+                if (
+                    privateWrite &&
+                        operationId != null &&
+                        operationId in current.submissionReceipts[player].orEmpty()
+                ) {
+                    throw ServiceFailure(409, "OPERATION_ALREADY_COMPLETED")
+                }
+                try {
+                    val next =
+                        when {
+                            text.trim() == "withdraw-bid" -> driver.withdrawBid(current, player)
+                            text.trim() == "undo" -> HistoryEdits.undo(current, player)
+                            text.trim().startsWith("undo ") ->
+                                HistoryEdits.undo(
+                                    current,
+                                    player,
+                                    text.trim().substringAfter(' ').toIntOrNull()
+                                        ?: throw ServiceFailure(400, "INVALID_HISTORY_EDIT"),
+                                )
+                            text.trim().startsWith("set-undo-policy ") ->
+                                HistoryEdits.configure(
+                                    current,
+                                    player,
+                                    UndoPolicy.parse(text.trim().substringAfter(' ')),
+                                )
+                            else ->
+                                driver.submit(
+                                    current,
+                                    player,
+                                    requireNotNull(command) {
+                                        "An engine submission requires its parsed command."
+                                    },
+                                )
+                        }
+                    if (privateWrite) {
+                        next.copy(
+                            submissionVersions =
+                                if (next.revision == current.revision)
+                                    next.submissionVersions +
+                                        (player to UUID.randomUUID().toString())
+                                else next.submissionVersions,
+                            submissionReceipts =
+                                if (operationId != null)
+                                    next.submissionReceipts +
+                                        (player to
+                                            (current.submissionReceipts[player].orEmpty() +
+                                                    operationId)
+                                                .takeLast(16))
+                                else next.submissionReceipts,
+                        )
+                    } else next
                 } catch (failure: CardRuleViolation) {
-                    throw ServiceFailure(422, "CARD_${failure.code.name}")
+                    throw ServiceFailure(
+                        422,
+                        failure.diagnostic.code,
+                        diagnostic = failure.diagnostic,
+                    )
                 }
             }
         return snapshot(stored = stored, player = authenticate(stored, access))
@@ -259,7 +333,8 @@ class GameService(
             stored.copy(
                 revisions = stored.revisions.take(revision - stored.baseRevision),
                 pendingBids = emptyMap(),
-                pendingReturns = emptyMap(),
+                submissionVersions = emptyMap(),
+                submissionReceipts = emptyMap(),
             ),
             player,
         )
@@ -280,8 +355,7 @@ class GameService(
                         messageId = "prompt.${current.choice}",
                         players =
                             current.players.filterNot { participant ->
-                                participant in stored.pendingBids ||
-                                    participant in stored.pendingReturns
+                                participant in stored.pendingBids
                             },
                     )
                 else -> null
@@ -317,6 +391,9 @@ class GameService(
                             tokenPurchaseOffers = emptyList(),
                             shippingOffer = null,
                             reliefOffers = emptyList(),
+                            patronageOffers = emptyList(),
+                            adjustmentOffers = emptyList(),
+                            cardPurchaseOffer = null,
                         )
                     }
                 },
@@ -333,10 +410,11 @@ class GameService(
                 },
             submitted =
                 state.playerIds.filter { participant ->
-                    participant in stored.pendingBids || participant in stored.pendingReturns
+                    participant in stored.pendingBids
                 },
             pendingBid = stored.pendingBids[player],
-            pendingReturn = stored.pendingReturns[player],
+            submissionVersion = stored.submissionVersions[player],
+            submissionReceipts = stored.submissionReceipts[player].orEmpty(),
             history = history.lines,
             events = history.events,
             undo =
@@ -359,9 +437,9 @@ class GameService(
                     stored.status,
                     player,
                     stored.pendingBids[player],
-                    stored.pendingReturns[player],
+                    stored.submissionVersions[player],
+                    stored.submissionReceipts[player].orEmpty(),
                     stored.pendingBids.keys.sortedBy(PlayerId::value),
-                    stored.pendingReturns.keys.sortedBy(PlayerId::value),
                 )
                 .joinToString("|")
         val etag = '"' + digest(visibleVersion) + '"'

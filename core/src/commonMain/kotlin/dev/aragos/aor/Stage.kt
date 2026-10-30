@@ -5,8 +5,6 @@ enum class Stage {
     SHUFFLE,
     /** Starting-card distribution before capital bidding, using [SystemNeed.Draw]. */
     INITIAL_DRAW,
-    /** Simultaneous private selections in the deal-three, keep-two setup. */
-    SETUP_RETURN,
     BIDDING,
     CAPITAL_TIE,
     CAPITAL_CHOICE,
@@ -33,11 +31,6 @@ enum class Stage {
                     choice = "configure",
                 )
             SHUFFLE -> null
-            SETUP_RETURN ->
-                Prompt.MultiPlayer(
-                    state.playerIds.filterNot(state.deckHistory.setupReturns::containsKey),
-                    "return-card",
-                )
             BIDDING ->
                 Prompt.MultiPlayer(
                     players =
@@ -95,7 +88,6 @@ enum class Stage {
                 } else {
                     LegalChoices()
                 }
-            SETUP_RETURN -> LegalChoices(SetupDeal.returnChoices(state, player))
             BIDDING ->
                 if (state.playerState(player).capitalBid == null) {
                     LegalChoices(commands = listOf("bid-capital"), bidMin = 0, bidMax = 40)

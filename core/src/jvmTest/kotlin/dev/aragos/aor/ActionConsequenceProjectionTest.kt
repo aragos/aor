@@ -9,6 +9,57 @@ class ActionConsequenceProjectionTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun alchemistsGoldCashQuoteMatchesItsActualVictimBalance() {
+        val before = state(card = "alchemists-gold")
+        val choice =
+            before.viewForPlayer(p1).cardOffers.single().choices.first {
+                it.kind == CardChoiceKind.PLAYER
+            }
+        val command =
+            requireNotNull(choice.command) { "A finite offered card choice requires its command." }
+
+        val after = TextCodec.parseCommand(command).applyTo(before, p1)
+
+        assertThat(choice.cashChanges).isNotEmpty()
+        for (change in choice.cashChanges) {
+            assertThat(change.before).isEqualTo(before.playerState(change.player).cash)
+            assertThat(change.after).isEqualTo(after.playerState(change.player).cash)
+        }
+    }
+
+    @Test
+    fun patronageQuoteIncludesBothActualPaymentEndpoints() {
+        val before =
+            state(advances = listOf(AdvanceId.PATRONAGE))
+                .copy(
+                    effects =
+                        CardTurnEffects(
+                            leaders =
+                                listOf(
+                                    CardLeaderInPlay(
+                                        LeaderId.ANDREAS_VESALIUS,
+                                        p3,
+                                        CardLeaderRole.DISPLAY,
+                                    ),
+                                    CardLeaderInPlay(
+                                        LeaderId.CHARLEMAGNE,
+                                        p2,
+                                        CardLeaderRole.EXPOSED,
+                                        protectionCash = 7,
+                                    ),
+                                )
+                        )
+                )
+        val offer = before.viewForPlayer(p1).patronageOffers.single()
+
+        val after = TextCodec.parseCommand(offer.command).applyTo(before, p1)
+
+        assertThat(offer.cost).isEqualTo(7)
+        assertThat(offer.payerCashAfter).isEqualTo(after.playerState(p1).cash)
+        assertThat(offer.recipientCashAfter).isEqualTo(after.playerState(p2).cash)
+    }
+
+    @Test
     fun expansionCardQuoteUsesTheSharedPhasePurchaseCount() {
         val before =
             state()

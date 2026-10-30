@@ -6,12 +6,26 @@ import kotlin.test.assertFailsWith
 
 class TextCodecTest {
     @Test
+    fun retiredSyntaxIsRejectedBeforeItCanBecomeAReplayEntry() {
+        for (text in
+            listOf(
+                "return-card hand-1",
+                "written-record",
+                "written-record p2",
+                "adjust-market grain shortage",
+            )) {
+            val failure =
+                kotlin.test.assertFailsWith<RuleViolation> { TextCodec.parseCommand(text) }
+            assertThat(failure.code).isEqualTo(ViolationCode.INVALID_COMMAND)
+        }
+    }
+
+    @Test
     fun playerCommandsHaveCanonicalText() {
         for (text in
             listOf(
                 "set-option map standard",
                 "set-option initial-card commodity-only",
-                "return-card hand-3",
                 "set-option deck-modification disabled",
                 "set-option deck-modification enabled",
                 "start",

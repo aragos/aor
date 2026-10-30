@@ -27,7 +27,6 @@ data class PurchaseContext(
     val currentTurn: Int,
     val papalDecree: AdvanceCategory? = null,
     val leaderDiscounts: List<AuthorizedLeaderDiscount> = emptyList(),
-    val rules: RuleOptions = RuleOptions(),
 ) {
     init {
         require(
@@ -101,18 +100,11 @@ object AdvancePurchases {
         context: PurchaseContext,
     ): AdvanceMiseryQuote {
         val purchase = AdvanceData.definition(advance).purchaseMisery
-        val acquired = player.advances.acquire(advance, context.currentTurn)
-        val completion =
-            if (context.rules.miseryRelief == MiseryReliefRule.CATEGORY_COMPLETION) {
-                acquired.completionRelief - player.advances.completionRelief
-            } else {
-                0
-            }
         return AdvanceMiseryQuote(
             before = player.misery,
-            after = MiseryRules.shift(player.misery, purchase - completion),
+            after = MiseryRules.shift(player.misery, purchase),
             purchaseSpaces = purchase,
-            completionRelief = completion,
+            completionRelief = 0,
         )
     }
 
@@ -165,7 +157,7 @@ object AdvancePurchases {
             } else {
                 0
             }
-        val writtenRecord = LeaderRules.writtenRecordBonus(player.advances.owned, context.rules)
+        val writtenRecord = LeaderRules.writtenRecordBonus(player.advances.owned)
         val misery = miseryQuote(player, advance, context)
         return AdvanceQuote(
             advance = advance,
@@ -238,7 +230,12 @@ object ShippingPurchases {
         )
         val next =
             nextUpgrade(player.ships) ?: throw RuleViolation(ViolationCode.SHIP_UPGRADE_UNAVAILABLE)
-        checkRule(player.cash >= EconomyTables.shipUpgradeCost, ViolationCode.INSUFFICIENT_CASH)
+        checkRule(
+            player.cash >= EconomyTables.shipUpgradeCost,
+            ViolationCode.INSUFFICIENT_CASH,
+            parameters =
+                mapOf("required" to EconomyTables.shipUpgradeCost, "available" to player.cash),
+        )
         return EconomyResult.forPlayer(
             player.copy(
                 cash = player.cash - EconomyTables.shipUpgradeCost,

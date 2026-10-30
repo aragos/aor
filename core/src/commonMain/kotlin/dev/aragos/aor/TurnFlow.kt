@@ -63,8 +63,6 @@ data class TurnFlow(
     val boughtCards: Set<PlayerId> = emptySet(),
     val discardedCards: Set<PlayerId> = emptySet(),
     val cancelComplete: Boolean = false,
-    val marketAdjustmentComplete: Boolean = false,
-    val writtenRecordUsed: Set<PlayerId> = emptySet(),
     val renaissanceUsed: Set<PlayerId> = emptySet(),
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
     val expansionCards: Set<PlayerId> = emptySet(),
@@ -89,17 +87,16 @@ internal data class RenaissanceDecision(override val player: PlayerId) : TurnDec
     override val choice: String
         get() = "renaissance"
 
+    fun targets(state: GameState): List<PlayerId> =
+        state.turnOrder.filter { target ->
+            kotlin.math.abs(state.turnOrder.indexOf(player) - state.turnOrder.indexOf(target)) ==
+                1 &&
+                !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE) &&
+                state.playerState(target).misery != MiseryStep.CHAOS
+        }
+
     override fun choices(state: GameState): List<String> =
-        listOf("pass") +
-            state.turnOrder
-                .filter { target ->
-                    kotlin.math.abs(
-                        state.turnOrder.indexOf(player) - state.turnOrder.indexOf(target)
-                    ) == 1 &&
-                        !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE) &&
-                        state.playerState(target).misery != MiseryStep.CHAOS
-                }
-                .map { target -> "swap-order $target" }
+        listOf("pass") + targets(state).map { target -> "swap-order $target" }
 }
 
 internal data object ShortageDecision : TurnDecision.Roll {

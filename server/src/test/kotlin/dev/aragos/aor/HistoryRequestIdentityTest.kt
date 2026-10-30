@@ -49,5 +49,5 @@ class HistoryRequestIdentityTest {
             flow = TurnFlow(actor = p1, decisions = listOf(decision)),
         )
 
-    private fun key(state: GameState) = HistoryEdits.requestKey(state, mutableMapOf())
+    private fun key(state: GameState) = OutcomeIdentity.requestKey(state, mutableMapOf())
 }

@@ -9,6 +9,21 @@ class PhaseOpeningOrderTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun emptyRenaissanceWindowsSkipDirectlyToTheNextRealInput() {
+        val initial =
+            game(Stage.EXPANSION)
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .withAdvances(p2, AdvanceId.RENAISSANCE)
+                .withAdvances(p3, AdvanceId.RENAISSANCE)
+
+        val opened = initial.normalise()
+
+        assertThat(opened.flow.decisions).isEmpty()
+        assertThat(opened.flow.phaseBookkeepingApplied).isTrue()
+        assertThat(opened.prompts()).containsExactly(Prompt.SinglePlayer(p1, "expand"))
+    }
+
+    @Test
     fun renaissancePrecedesHolyIndulgenceDebtsAndTheirChaosElimination() {
         val pending =
             game(Stage.EXPANSION)

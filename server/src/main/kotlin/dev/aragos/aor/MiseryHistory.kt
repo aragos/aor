@@ -30,12 +30,11 @@ internal object MiseryHistory {
         after: GameState,
         entry: Entry? = null,
         playedCard: String? = null,
-        automatic: HistoryEventKind? = null,
     ): List<HistoryMiseryChangeView> =
         before.playerIds.mapNotNull { player ->
             val previous = before.playerState(player).misery
             val current = after.playerState(player).misery
-            val reasons = reasons(before, entry, playedCard, automatic, player)
+            val reasons = reasons(before, entry, playedCard, player)
             val canceling = reasons.size > 1 && reasons.sumOf { it.spaces ?: 0 } == 0
             if (previous == current && !canceling) return@mapNotNull null
             HistoryMiseryChangeView(
@@ -51,30 +50,8 @@ internal object MiseryHistory {
         before: GameState,
         entry: Entry?,
         playedCard: String?,
-        automatic: HistoryEventKind?,
         player: PlayerId,
     ): List<HistoryMiseryReasonView> {
-        when (automatic) {
-            HistoryEventKind.INCOME ->
-                return listOf(
-                    HistoryMiseryReasonView(
-                        HistoryMiseryReason.INCOME_RELIEF,
-                        advance =
-                            when (before.rules.incomeRelief) {
-                                IncomeReliefRule.NEW_WORLD -> AdvanceId.NEW_WORLD
-                                IncomeReliefRule.ENLIGHTENMENT -> AdvanceId.ENLIGHTENMENT
-                            },
-                    )
-                )
-            HistoryEventKind.HOLY_INDULGENCE ->
-                return listOf(
-                    HistoryMiseryReasonView(
-                        HistoryMiseryReason.HOLY_INDULGENCE,
-                        advance = AdvanceId.HOLY_INDULGENCE,
-                    )
-                )
-            else -> Unit
-        }
         if (entry is GameOutcome.Roll) {
             return when (entry.kind) {
                 GameRollKind.WAR -> cardReason(EventId.WAR.cardId)
@@ -112,7 +89,7 @@ internal object MiseryHistory {
             AdvancePurchases.miseryQuote(
                 before.playerState(player),
                 advance,
-                PurchaseContext(turn, rules = before.rules),
+                PurchaseContext(turn),
             )
         return listOfNotNull(
             HistoryMiseryReasonView(

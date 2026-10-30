@@ -20,6 +20,7 @@ data class MiseryChangeView(
 internal data class CardMiseryPreview(
     val changes: List<MiseryChangeView> = emptyList(),
     val uncertainPlayers: List<PlayerId> = emptyList(),
+    val cashChanges: List<CashChangeView> = emptyList(),
 ) {
     companion object {
         fun from(context: CardContext, resolution: CardResolution): CardMiseryPreview {
@@ -43,6 +44,7 @@ internal data class CardMiseryPreview(
                 } else {
                     emptyList()
                 },
+                CardCashPreview.from(context, resolution),
             )
         }
     }

@@ -7,7 +7,6 @@ enum class HistoryEventKind {
     BUY_TOKENS,
     TOKEN_PURCHASES,
     CHOOSE_TURN_POSITION,
-    RETURN_CARD,
     PASS,
     SWAP_ORDER,
     BUY_CARD,
@@ -26,10 +25,8 @@ enum class HistoryEventKind {
     BUY_EXPANSION_CARD,
     CATHEDRAL,
     WINDMILL,
-    WRITTEN_RECORD,
     OFFER_CARD,
     PLAY_CARD,
-    ADJUST_MARKET,
     CIVIL_WAR_LOSS,
     REPLACE_EVENT_TOKEN,
     CEDE_WAR,
@@ -202,44 +199,76 @@ internal object HistoryEvents {
         after: GameState,
         entry: Entry,
         viewer: PlayerId,
+        resolved: GameTransition = before.transition(entry),
     ): List<HistoryEventView> = buildList {
-        val bookkeeping = bookkeepingKind(before, after)
-        // Separate the deterministic action from automatic phase receipts, including Chaos cleanup.
-        val applied = if (bookkeeping != null) entry.applyTo(before) else after
-        val projected = projectDirect(id, before, applied, entry, viewer)
-        if (projected != null) add(projected)
-        val changes =
-            if (bookkeeping != null) cashChanges(applied, after)
-            else projected?.cashChanges ?: cashChanges(before, after)
-        val misery =
-            if (bookkeeping != null) MiseryHistory.changes(applied, after, automatic = bookkeeping)
-            else projected?.miseryChanges ?: MiseryHistory.changes(before, after, entry)
-        val tokens =
-            if (bookkeeping == HistoryEventKind.HOLY_INDULGENCE) tokenChanges(applied, after)
-            else emptyList()
-        if (
-            (projected == null || bookkeeping != null) &&
-                (changes.isNotEmpty() || misery.isNotEmpty() || tokens.isNotEmpty())
-        ) {
-            val kind =
-                bookkeeping
-                    ?: if (after.stage == Stage.EXPANSION) {
-                        HistoryEventKind.HOLY_INDULGENCE
-                    } else {
-                        HistoryEventKind.INCOME
-                    }
-            add(
-                HistoryEventView(
-                    if (projected == null) id else "$id:${kind.name.lowercase()}",
-                    kind,
-                    null,
-                    before.turnNumber,
-                    after.stage,
-                    cashChanges = changes,
-                    miseryChanges = misery,
-                    tokenChanges = tokens,
-                )
+        val automatic = resolved.receipts
+        val projected =
+            projectDirect(
+                id,
+                before,
+                if (automatic.isEmpty()) after else resolved.applied,
+                entry,
+                viewer,
             )
+        if (projected != null) add(projected)
+        for (receipt in automatic) {
+            val kind =
+                when (receipt.cause) {
+                    AutomaticCause.INCOME -> HistoryEventKind.INCOME
+                    AutomaticCause.HOLY_INDULGENCE -> HistoryEventKind.HOLY_INDULGENCE
+                }
+            val cash =
+                receipt.resources.mapNotNull { endpoints ->
+                    HistoryCashChangeView(
+                            endpoints.player,
+                            endpoints.cashAfter - endpoints.cashBefore,
+                        )
+                        .takeIf { it.amount != 0 }
+                }
+            val misery =
+                receipt.resources.mapNotNull { endpoints ->
+                    if (endpoints.miseryBefore == endpoints.miseryAfter) null
+                    else {
+                        val reason =
+                            when (receipt.cause) {
+                                AutomaticCause.INCOME -> HistoryMiseryReason.INCOME_RELIEF
+                                AutomaticCause.HOLY_INDULGENCE ->
+                                    HistoryMiseryReason.HOLY_INDULGENCE
+                            }
+                        HistoryMiseryChangeView(
+                            endpoints.player,
+                            endpoints.miseryAfter.ordinal - endpoints.miseryBefore.ordinal,
+                            endpoints.miseryBefore.value,
+                            endpoints.miseryAfter.value,
+                            listOf(HistoryMiseryReasonView(reason, advance = receipt.advance)),
+                        )
+                    }
+                }
+            val tokens =
+                if (receipt.cause == AutomaticCause.HOLY_INDULGENCE)
+                    receipt.resources.mapNotNull { endpoints ->
+                        HistoryTokenChangeView(
+                                endpoints.player,
+                                endpoints.poolAfter - endpoints.poolBefore,
+                                endpoints.stockAfter - endpoints.stockBefore,
+                            )
+                            .takeIf { it.poolDelta != 0 || it.stockDelta != 0 }
+                    }
+                else emptyList()
+            if (cash.isNotEmpty() || misery.isNotEmpty() || tokens.isNotEmpty()) {
+                add(
+                    HistoryEventView(
+                        if (projected == null) id else "$id:${kind.name.lowercase()}",
+                        kind,
+                        null,
+                        before.turnNumber,
+                        receipt.stage,
+                        cashChanges = cash,
+                        miseryChanges = misery,
+                        tokenChanges = tokens,
+                    )
+                )
+            }
         }
         fun transition(kind: HistoryEventKind, amount: Int? = null) =
             HistoryEventView(
@@ -269,8 +298,7 @@ internal object HistoryEvents {
         entry: Entry,
         viewer: PlayerId,
     ): HistoryEventView? {
-        val applied = if (bookkeepingKind(before, after) != null) entry.applyTo(before) else after
-        return projectDirect(id, before, applied, entry, viewer)
+        return projectDirect(id, before, after, entry, viewer)
     }
 
     private fun projectDirect(
@@ -306,28 +334,6 @@ internal object HistoryEvents {
                 }
         )
     }
-
-    private fun bookkeepingKind(before: GameState, after: GameState): HistoryEventKind? {
-        if (!after.flow.phaseBookkeepingApplied) return null
-        if (before.stage == after.stage && before.flow.phaseBookkeepingApplied) return null
-        return when (after.stage) {
-            Stage.INCOME -> HistoryEventKind.INCOME
-            Stage.EXPANSION -> HistoryEventKind.HOLY_INDULGENCE
-            else -> null
-        }
-    }
-
-    private fun tokenChanges(before: GameState, after: GameState): List<HistoryTokenChangeView> =
-        before.playerIds.mapNotNull { player ->
-            val previous = before.playerState(player)
-            val current = after.playerState(player)
-            HistoryTokenChangeView(
-                    player,
-                    current.poolTokens - previous.poolTokens,
-                    current.stockTokens - previous.stockTokens,
-                )
-                .takeIf { it.poolDelta != 0 || it.stockDelta != 0 }
-        }
 
     private fun cashChanges(before: GameState, after: GameState): List<HistoryCashChangeView> =
         before.playerIds.mapNotNull { player ->
@@ -455,14 +461,6 @@ internal object HistoryEvents {
             is Command.BuyTokens -> event(HistoryEventKind.BUY_TOKENS).copy(amount = command.amount)
             is Command.ChooseTurnPosition ->
                 event(HistoryEventKind.CHOOSE_TURN_POSITION).copy(amount = command.slot)
-            is SetupCommand.ReturnCard ->
-                event(HistoryEventKind.RETURN_CARD)
-                    .copy(
-                        card =
-                            if (entry.actor == viewer)
-                                cardId(before, entry.actor, command.reference)
-                            else null
-                    )
             TurnCommand.Pass -> null
             is TurnCommand.SwapOrder ->
                 event(HistoryEventKind.SWAP_ORDER).copy(target = command.target)
@@ -511,8 +509,6 @@ internal object HistoryEvents {
             BoardCommand.BuyExpansionCard -> event(HistoryEventKind.BUY_EXPANSION_CARD)
             BoardCommand.Cathedral -> event(HistoryEventKind.CATHEDRAL)
             BoardCommand.Windmill -> event(HistoryEventKind.WINDMILL)
-            is BoardCommand.WrittenRecord ->
-                event(HistoryEventKind.WRITTEN_RECORD).copy(target = command.victim)
             is BoardCommand.OfferCard ->
                 event(HistoryEventKind.OFFER_CARD)
                     .copy(
@@ -523,12 +519,6 @@ internal object HistoryEvents {
                     )
             is CardCommand.PlayCard ->
                 playedCard(event(HistoryEventKind.PLAY_CARD), before, after, entry.actor, command)
-            is CardCommand.AdjustMarket ->
-                event(HistoryEventKind.ADJUST_MARKET)
-                    .copy(
-                        commodity = command.commodity,
-                        detail = command.adjustment?.name ?: "NEUTRAL",
-                    )
             is CardCommand.ChooseCivilWarLoss ->
                 event(HistoryEventKind.CIVIL_WAR_LOSS).copy(detail = command.loss.name)
             is CardCommand.ReplaceEventTokens ->
@@ -586,7 +576,7 @@ internal object HistoryEvents {
     ): HistoryReliefPaymentView {
         val turn = checkNotNull(before.turnNumber) { "A recorded relief purchase requires a turn." }
         val player = before.playerState(actor)
-        val quote = PlayerEconomy.reliefQuote(player, spaces, turn, before.rules)
+        val quote = PlayerEconomy.reliefQuote(player, spaces, turn)
         val previousUsage = player.miseryReliefUsage?.takeIf { it.turnNumber == turn }
         val sources =
             player.advances.acquisitions

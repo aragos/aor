@@ -102,7 +102,7 @@ cancellation, abandonment and purge; these are not player commands.
 
 | Command | Who and when; effect |
 | --- | --- |
-| `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization or ends Relief. In Expansion it returns unused pool tokens and ends the activity. Zero-cost stabilization and relief without a legal purchase advance automatically. It cannot skip positive-cost stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
+| `pass` | Current actor; completes cancellation in Draw Card, the actor's Buy Card or Play Cards activity, or an optional Renaissance decision. During Purchase it advances Shipping → Advances → Stabilization or ends Relief. In Expansion it returns unused pool tokens and ends the activity. Zero-cost stabilization advances automatically. Relief remains visible for tier owners even when blocked; it advances automatically only without a tier. It cannot skip positive-cost stabilization or another required decision. Final Card Play permits passing only after every playable card is gone. |
 | `cancel-adjustment <commodity> <adjustment>` | First player before the ordinary draws; removes an existing marker for its commodity's base dollar cost. Gold/Ivory removes one matching marker from each for $10 once. When both carry the selected adjustment, the offered command uses `gold`; any remaining singleton uses its own commodity. |
 | `buy-card` | Urban Ascendancy owner in Buy Card; once per turn, costs $10 and requests a draw. |
 | `discard-card <reference>` | Master Art owner in Buy Card; discards one owned card without effect, once per turn. Independent of buying a card; either order is accepted. |
@@ -179,7 +179,7 @@ before resuming the same purchase activity. This does not consume a later Buy Ca
 
 | Entry | Request and value ordering |
 | --- | --- |
-| `!shuffle <card-id> ...` | Exact permutation of the current authority request: initial deck, next epoch plus eligible discards, setup returns, or delayed reserve reinsertion. Never a player command. |
+| `!shuffle <card-id> ...` | Exact permutation of the current authority request: initial deck or next epoch plus eligible discards. Never a player command. |
 | `!draw <player> <reference> <card-id>` | Delivers the requested top card and reference, both during setup and later draws. |
 | `!roll capital-tie <player>=<die> ...` | One attributed die for each player in the current highest unresolved capital tie. Canonical text orders the player ids; tied subgroups request another roll. |
 | `!roll competition <die> <die> <die>` | Competition dice in white, black, green order. |
@@ -198,3 +198,19 @@ ownership, draw reference and deck top. Replay consumes recorded outcomes and ge
 Shuffles and private draws/transfers are redacted for unauthorized viewers; a public history view
 is not a complete authority replay log. Storage revisions contain deltas that must be accumulated.
 The current development format has no legacy command or outcome migration.
+
+Administrative replacement validates the same logical authority requests as ordinary history edits:
+participants, destination, turn, War context and occurrence must match, as well as the outcome bytes.
+A successful candidate replay alone cannot prove that equal dice belong to the original contest.
+Unsupported source versions are exportable, but replacement rejects unprovable event continuity.
+
+The supported language excludes `return-card`, `written-record` and `adjust-market`. These retired
+mechanics cannot be selected through any supported option. A canonical empty Renaissance pass from
+rules version 2 is not a version-3 command history; see [compatibility](engine.md#transition-receipts-and-compatibility).
+
+Command writes may include a canonical UUID `operationId` and the viewer's `expectedSubmissionVersion`.
+The public `expectedRevision` remains mandatory. Private save/replacement/withdrawal compares the
+owner receipt atomically and returns `STALE_SUBMISSION` on a mismatch. Private operation IDs retain
+only the most recent sixteen acknowledgements per owner, without amounts; the viewer can reconcile
+a lost response after later changes. An absent old receipt leaves the outcome unknown. Receipts are
+not command-log entries, and timeouts never authorize automatic resubmission.

@@ -91,10 +91,7 @@ internal object GameDirectory {
                 seat != null &&
                 when (prompt) {
                     is Prompt.SinglePlayer -> prompt.player == seat
-                    is Prompt.MultiPlayer ->
-                        seat in prompt.players &&
-                            seat !in game.pendingBids &&
-                            seat !in game.pendingReturns
+                    is Prompt.MultiPlayer -> seat in prompt.players && seat !in game.pendingBids
                     else -> false
                 }
         val status =

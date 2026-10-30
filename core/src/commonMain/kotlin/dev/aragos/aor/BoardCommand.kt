@@ -48,14 +48,6 @@ sealed interface BoardCommand : Command {
             BoardGame.windmill(state, actor)
     }
 
-    data class WrittenRecord(val victim: PlayerId? = null) : BoardCommand {
-        override fun toText(): String =
-            if (victim == null) "written-record" else "written-record $victim"
-
-        override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            BoardGame.writtenRecord(state, actor, victim)
-    }
-
     data class OfferCard(val reference: String) : BoardCommand {
         override fun toText(): String = "offer-card $reference"
 
@@ -94,10 +86,6 @@ sealed interface BoardCommand : Command {
                     "buy-expansion-card" -> noArguments(arguments, BuyExpansionCard)
                     "cathedral" -> noArguments(arguments, Cathedral)
                     "windmill" -> noArguments(arguments, Windmill)
-                    "written-record" -> {
-                        checkRule(arguments.size <= 1, ViolationCode.INVALID_COMMAND)
-                        WrittenRecord(arguments.singleOrNull()?.let(::PlayerId))
-                    }
                     else -> null
                 }
             } catch (failure: IllegalArgumentException) {

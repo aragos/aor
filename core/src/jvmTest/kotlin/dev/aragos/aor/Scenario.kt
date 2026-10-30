@@ -88,8 +88,6 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
             val actor = prompt.players.first()
             val command =
                 when (state.stage) {
-                    Stage.SETUP_RETURN ->
-                        "return-card ${state.playerState(actor).hand.first().reference}"
                     Stage.BIDDING ->
                         "bid-capital ${state.playerIds.size - state.playerIds.indexOf(actor)}"
                     else -> "buy-tokens ${state.playerIds.indexOf(actor)}"

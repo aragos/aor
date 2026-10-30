@@ -4,7 +4,6 @@ enum class ViolationCode(val description: String) {
     UNPLAYED_FINAL_CARDS("Play every non-burden card before passing Final Card Play."),
     STABILIZATION_REQUIRED("Pay stabilization in cash or misery before continuing."),
     INVALID_CARD_PURCHASE("This player cannot buy another card in this phase."),
-    INVALID_SETUP_RETURN("Choose one held card to return during improved setup."),
     INVALID_CARD_DISCARD("Master Art permits one held card to be discarded in Buy Card."),
     INVALID_ADJUSTMENT("Choose a shortage or surplus marker currently on this commodity."),
     UNKNOWN_PROVINCE("The province is not available in this game."),
@@ -49,14 +48,20 @@ enum class ViolationCode(val description: String) {
 class RuleViolation(
     val code: ViolationCode,
     val entityIds: List<String> = emptyList(),
-) : Exception(code.description)
+    val parameters: Map<String, Int> = emptyMap(),
+    val entities: List<RuleEntityReference> = emptyList(),
+) : Exception(code.description), DomainRejection {
+    override val diagnostic: RuleDiagnostic
+        get() = RuleDiagnostic(code.name, entityIds, entities, parameters)
+}
 
 internal fun checkRule(
     valid: Boolean,
     code: ViolationCode,
     entities: List<String> = emptyList(),
+    parameters: Map<String, Int> = emptyMap(),
 ) {
     if (!valid) {
-        throw RuleViolation(code = code, entityIds = entities)
+        throw RuleViolation(code = code, entityIds = entities, parameters = parameters)
     }
 }

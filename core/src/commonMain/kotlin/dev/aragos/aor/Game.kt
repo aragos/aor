@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-const val RULES_VERSION = "ah1996-three-epoch-2"
+const val RULES_VERSION = "ah1996-three-epoch-3"
 const val DATA_VERSION = "ah1996-catalog-13"
 
 /**
@@ -171,8 +171,13 @@ data class GameState(
     fun viewForPlayer(player: PlayerId): GameView =
         GameView.forPlayer(state = this, viewer = playerState(player))
 
-    fun step(entry: Entry): GameState {
-        val next = entry.applyTo(this).normalise().copy(entryCount = entryCount + 1)
+    fun step(entry: Entry): GameState = transition(entry).state
+
+    /** Receipts are derived during replay and are never persisted as a second game truth. */
+    fun transition(entry: Entry): GameTransition {
+        val receipts = mutableListOf<EffectReceipt>()
+        val applied = entry.applyTo(this)
+        val next = TurnEngine.normalise(applied, receipts::add).copy(entryCount = entryCount + 1)
         val changed =
             next.stage != stage || next.flow.actor != flow.actor || next.turnNumber != turnNumber
         val decisionChanged =
@@ -180,10 +185,12 @@ data class GameState(
                 next.flow.purchaseStep != flow.purchaseStep ||
                 next.flow.decisions != flow.decisions ||
                 next.decisionPrompt() != decisionPrompt()
-        return next.copy(
-            activityStart = if (changed) entryCount + 1 else activityStart,
-            decisionStart = if (decisionChanged) entryCount + 1 else decisionStart,
-        )
+        val resolved =
+            next.copy(
+                activityStart = if (changed) entryCount + 1 else activityStart,
+                decisionStart = if (decisionChanged) entryCount + 1 else decisionStart,
+            )
+        return GameTransition(resolved, applied, receipts.toList())
     }
 
     /** Private batch readiness changes eligibility without replacing the shared decision. */

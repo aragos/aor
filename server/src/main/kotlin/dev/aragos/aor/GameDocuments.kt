@@ -57,8 +57,6 @@ internal object GameDocuments {
         require(credentialNode.isObject) {
             "Credentials must be an object keyed by player identifier."
         }
-        val returnNode = root.field("pendingReturns")
-        require(returnNode.isObject) { "Pending returns must be keyed by player identifier." }
         val pendingNode = root.field("pendingBids")
         require(pendingNode.isObject) {
             "Pending bids must be an object keyed by player identifier."
@@ -110,10 +108,20 @@ internal object GameDocuments {
             baseRevision = root.field("baseRevision").integer(),
             previousArchive =
                 root.field("previousArchive").let { if (it.isNull) null else it.string() },
-            pendingReturns =
-                returnNode.properties().associate { (player, reference) ->
-                    PlayerId(player) to reference.string()
-                },
+            submissionReceipts =
+                root["submissionReceipts"]
+                    ?.properties()
+                    ?.associate { (player, receipts) ->
+                        PlayerId(player) to receipts.array().map(JsonNode::string)
+                    }
+                    .orEmpty(),
+            submissionVersions =
+                root["submissionVersions"]
+                    ?.properties()
+                    ?.associate { (player, version) ->
+                        PlayerId(player) to version.string()
+                    }
+                    .orEmpty(),
             pendingBids =
                 pendingNode.properties().associate { (player, bid) ->
                     PlayerId(player) to bid.integer()
@@ -158,6 +166,22 @@ internal object GameDocuments {
             "A game must have an initial configuration revision."
         }
         val state = validateRevisions(game)
+        require(
+            players.containsAll(game.submissionVersions.keys) &&
+                game.submissionVersions.values.all { it.matches(GAME_ID_PATTERN) }
+        ) {
+            "Private submission receipts require registered owners and opaque UUID values."
+        }
+        require(
+            players.containsAll(game.submissionReceipts.keys) &&
+                game.submissionReceipts.values.all { receipts ->
+                    receipts.size <= 16 &&
+                        receipts.distinct().size == receipts.size &&
+                        receipts.all(GAME_ID_PATTERN::matches)
+                }
+        ) {
+            "Private operation receipts retain at most sixteen distinct canonical UUIDs per owner."
+        }
         if (game.pendingBids.isNotEmpty()) {
             val participants =
                 (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
@@ -167,21 +191,6 @@ internal object GameDocuments {
             ) {
                 "Pending private decisions must form an incomplete batch of the " +
                     "current participants."
-            }
-        }
-        if (game.pendingReturns.isNotEmpty()) {
-            val participants =
-                (state.prompts().singleOrNull() as? Prompt.MultiPlayer)?.players.orEmpty()
-            require(
-                state.stage == Stage.SETUP_RETURN &&
-                    participants.containsAll(game.pendingReturns.keys) &&
-                    game.pendingReturns.size < participants.size &&
-                    game.pendingBids.isEmpty()
-            ) {
-                "Pending setup returns must be an incomplete batch in the setup-return phase."
-            }
-            game.pendingReturns.forEach { (player, reference) ->
-                state.step(Entry.Action(player, SetupCommand.ReturnCard(reference)))
             }
         }
         game.pendingBids.forEach { (player, amount) ->
@@ -218,7 +227,6 @@ internal object GameDocuments {
                 game.copy(
                     revisions = game.revisions.take(index),
                     pendingBids = emptyMap(),
-                    pendingReturns = emptyMap(),
                 )
             when {
                 index == 0 && game.baseRevision > 0 -> {
@@ -353,14 +361,6 @@ internal object GameDocuments {
                 }
                 validateSealedActions(state, actions) { command -> command is Command.BuyTokens }
             }
-            "reveal-setup-returns" -> {
-                require(state.stage == Stage.SETUP_RETURN) {
-                    "Setup returns can only reveal during improved setup."
-                }
-                validateSealedActions(state, actions) { command ->
-                    command is SetupCommand.ReturnCard
-                }
-            }
             else -> validateCommandActions(state, revision, actions, entries, index)
         }
     }
@@ -373,11 +373,7 @@ internal object GameDocuments {
         index: Int,
     ) {
         val command = TextCodec.parseCommand(revision.command)
-        require(
-            command !is Command.BidCapital &&
-                command !is Command.BuyTokens &&
-                command !is SetupCommand.ReturnCard
-        ) {
+        require(command !is Command.BidCapital && command !is Command.BuyTokens) {
             "private decisions must be committed together under their reveal marker."
         }
         require(revision.command == command.toText()) {

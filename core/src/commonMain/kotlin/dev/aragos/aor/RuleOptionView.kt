@@ -3,7 +3,7 @@ package dev.aragos.aor
 /** Public functional configuration; values use the same canonical encoding as setup commands. */
 data class RuleOptionView(val key: String, val value: String, val choices: List<String>) {
     companion object {
-        internal fun from(rules: RuleOptions): List<RuleOptionView> =
+        fun from(rules: RuleOptions): List<RuleOptionView> =
             rules.configurationCommands().map { command ->
                 val choices =
                     when (command.key) {

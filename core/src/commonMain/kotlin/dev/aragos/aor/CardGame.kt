@@ -151,9 +151,6 @@ object CardGame {
 
     /** The ordinary pass command doubles as declining the optional pre-reroll military window. */
     fun passDecision(state: GameState, actor: PlayerId): GameState? {
-        VariantInteractions.passDecision(state, actor)?.let {
-            return it
-        }
         val decision =
             state.flow.decisions.lastOrNull() as? CardDecision.WarPreparation ?: return null
         checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
@@ -420,7 +417,7 @@ object CardGame {
                     .copy(voids = state.voids.copy(crusades = true))
                     .replacePlayer(
                         state.playerState(resolution.player).let { owner ->
-                            owner.copy(cash = owner.cash + 10)
+                            owner.copy(cash = owner.cash + CardRules.MONGOL_CASH)
                         }
                     )
             is CardResolution.ReligiousStrife -> {

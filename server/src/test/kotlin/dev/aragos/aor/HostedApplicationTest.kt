@@ -367,7 +367,7 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
-    fun olderEngineFilesCanBeExportedAndExplicitlyUpgraded() = withHosted {
+    fun incompatibleEngineFilesRemainExportableButCannotRebindOutcomes() = withHosted {
         val game = startedGame()
         val root = json.readTree(store.document(game.gameId)) as ObjectNode
         root.put("fileVersion", 4)
@@ -375,17 +375,20 @@ class HostedApplicationTest(private val postgres: Boolean) {
         replaceDocument(game.gameId, root)
         val old = hosted.administration.log(game.gameId)
 
-        val upgraded =
-            hosted.administration.replaceLog(
-                game.gameId,
-                AccountId("admin"),
-                old.revision,
-                old.entries,
-            )
+        val failure =
+            assertFailsWith<ServiceFailure> {
+                hosted.administration.replaceLog(
+                    game.gameId,
+                    AccountId("admin"),
+                    old.revision,
+                    old.entries,
+                )
+            }
 
         assertThat(old.fileVersion).isEqualTo(4)
-        assertThat(upgraded.fileVersion).isEqualTo(5)
-        assertThat(store.read(game.gameId).state().stage).isEqualTo(Stage.BIDDING)
+        assertThat(failure.code).isEqualTo("HISTORY_IDENTITY_UNVERIFIABLE")
+        assertThat(hosted.administration.log(game.gameId)).isEqualTo(old)
+        assertThat(store.archives(game.gameId)).isEmpty()
     }
 
     @Test

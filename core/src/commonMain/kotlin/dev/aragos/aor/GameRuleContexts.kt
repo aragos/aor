@@ -40,9 +40,9 @@ internal fun GameState.cardContext(): CardContext =
         finalCardPlay = stage == Stage.FINAL_CARD_PLAY,
         turn = currentTurn(),
         epoch = currentEpoch,
-        rules = rules,
         tokenProvinces =
             board.pieces.filterValues { pieces -> pieces is ProvincePieces.Tokens }.keys,
+        map = rules.map,
         provinces = catalog.provinces.associateBy(ProvinceDefinition::id),
     )
 
@@ -61,19 +61,4 @@ internal fun GameState.purchaseContext(actor: PlayerId): PurchaseContext =
                     )
                 }
             },
-        rules = rules,
     )
-
-internal fun GameState.patronageChoices(actor: PlayerId): List<String> {
-    val player = playerState(actor)
-    if (!player.advances.owns(AdvanceId.PATRONAGE)) return emptyList()
-    val context = cardContext()
-    return effects.leaders.mapNotNull { played ->
-        try {
-            LeaderRules.claim(context, actor, played.leader)
-            "patronize ${played.leader.cardId}"
-        } catch (_: CardRuleViolation) {
-            null
-        }
-    }
-}
