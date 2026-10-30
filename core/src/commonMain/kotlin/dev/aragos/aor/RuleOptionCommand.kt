@@ -28,18 +28,18 @@ data class RuleOptionCommand(val key: String, val value: String) : Command {
                 )
             "immediate-master-art-discard" -> rules.copy(immediateMasterArtDiscard = enabled())
             "map" -> rules.copy(map = option(MapRule.entries, MapRule::commandValue))
-            else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION, listOf(key, value))
+            else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION)
         }
 
     private fun <T> option(choices: List<T>, commandValue: (T) -> String): T =
         choices.singleOrNull { choice -> commandValue(choice) == value }
-            ?: throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION, listOf(key, value))
+            ?: throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION)
 
     private fun enabled(): Boolean =
         when (value) {
             "enabled" -> true
             "disabled" -> false
-            else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION, listOf(key, value))
+            else -> throw RuleViolation(ViolationCode.UNSUPPORTED_OPTION)
         }
 
     companion object {

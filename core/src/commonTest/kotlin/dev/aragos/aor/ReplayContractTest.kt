@@ -2,11 +2,28 @@ package dev.aragos.aor
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /** Shared corpus is executed on JVM and JavaScript; no client replay is implied. */
 class ReplayContractTest {
     private val players = (1..3).map { Player(PlayerId("p$it"), "Player $it") }
     private val header = GameHeader(players, players.first().id)
+
+    @Test
+    fun invalidOptionFragmentsAreNeverTrustedEntityReferences() {
+        for (command in
+            listOf(
+                "set-option venice standard",
+                "set-option map venice",
+                "set-option deck-modification venice",
+            )) {
+            val failure = assertFailsWith<RuleViolation> { TextCodec.parseCommand(command) }
+
+            assertEquals("UNSUPPORTED_OPTION", failure.diagnostic.code)
+            assertEquals(emptyList(), failure.diagnostic.entityIds)
+            assertEquals(emptyList(), failure.diagnostic.entities)
+        }
+    }
 
     @Test
     fun canonicalCommandsRoundTripOnEveryTarget() {
