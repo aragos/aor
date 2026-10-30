@@ -56,6 +56,12 @@ leaders and private discards, and exclusion after public play even when turn eff
 comprehensive browser run also passes (`aor-browser-artifacts-T6SFud`), including live card targeting,
 competition lifetimes, withdrawal/reload, sealed purchases, hosted flows and both maps.
 
+Remote verification of `2bd9e38` passed Kotlin, server, catalog, web, audit and container checks, but
+its browser polling assertion captured a map camera before the resize from closing player details
+completed. The focused correction waits for the camera to match the rendered viewport before taking
+its baseline, then waits for the polled revision and compares both the exact camera and viewport size.
+The focused table suite passes (`aor-browser-artifacts-QzqZdQ`), as do the web build and 53 unit tests.
+
 ## Decision inventory
 
 | Prompt / state | Canonical actions and visual path | Evidence |

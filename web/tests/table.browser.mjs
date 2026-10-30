@@ -48,7 +48,6 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#misery-track"]').target`), '_blank', 'Misery track opens outside the game');
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer a[href="/help#shipping-track"]').textContent`), '?', 'Shipping help sits beside its value');
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track')`), null, 'Static tracks leave the game view');
-    await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
     const offer = fixture.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && offer.blockers.length === 0);
     assert(offer, 'Live fixture must expose a legal marker establishment');
     await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
@@ -58,10 +57,27 @@ export async function checkTable(page, web, baseline) {
     assert(selected.includes(String(offer.requiredTokens)), 'Marker commitment is shown');
     assert.equal(await page.evaluate(`document.querySelector('.pool-summary [data-pool-after]').textContent`),
         String(offer.resultingPool), 'Remaining pool is shown in the shared summary');
-    const viewBox = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
+    // Closing details resizes the map. Wait for its observer before taking the polling baseline.
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
+    const mapFrame = async () => {
+        await page.wait(`(() => {
+            const map = document.querySelector('.world-map');
+            const [, , width, height] = map.getAttribute('viewBox').split(' ').map(Number);
+            const rect = map.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 &&
+                Math.abs(width / height - rect.width / rect.height) < .00001;
+        })()`, 'map camera matches the rendered viewport');
+        return page.evaluate(`(() => {
+            const map = document.querySelector('.world-map');
+            const rect = map.getBoundingClientRect();
+            return {viewBox: map.getAttribute('viewBox'), width: rect.width, height: rect.height};
+        })()`);
+    };
+    const beforePoll = await mapFrame();
     await show({revision: fixture.revision + 1});
+    await page.wait(`document.querySelector('.command-dock > summary small').textContent.trim() === 'Revision ${fixture.revision}'`, 'polled revision rendered');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').getAttribute('aria-pressed')`), 'true', 'Selection survives polling');
-    assert.equal(await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`), viewBox, 'Viewport survives polling');
+    assert.deepEqual(await mapFrame(), beforePoll, 'Viewport size and camera survive polling');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Polling never submits a draft');
 
     const shippingLimited = {...offer, requiredTokens:4, availablePool:8, resultingPool:null,

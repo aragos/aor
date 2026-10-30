@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
+import {checkTable} from './table.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkBottomHand} from './bottomHand.browser.mjs';
 import {checkBidWithdrawal} from './purchaseClarity.browser.mjs';
@@ -144,6 +145,7 @@ if (process.argv[1]?.endsWith('/tableConsistency.browser.mjs')) {
             await game.send(actor, command);
         }
         assert(baseline);
+        await checkTable(page, web, baseline);
         await checkTableConsistency(page, web, baseline);
         await checkMarketInsights(page, web, baseline);
         await checkBottomHand(page, web, baseline);
