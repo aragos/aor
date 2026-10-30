@@ -90,7 +90,7 @@ export async function checkLiveCivilWar(page, web) {
     await page.evaluate(`document.querySelector('[data-hand-card="${card.reference}"]').click()`);
     await page.wait(`document.querySelector('[data-player="${player.id}"].eligible-target')`, 'Civil War target picker');
     await page.evaluate(`document.querySelector('[data-player="${player.id}"] > summary').click()`);
-    await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').click()`);
     await page.wait(`document.querySelector('[data-replacement-province="${me.capital}"]')`, 'live capital replacement');
     const pending = await game.snapshot(player);
     assert.deepEqual(pending.game.replacementToken.provinces, [me.capital]);

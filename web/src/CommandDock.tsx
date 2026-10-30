@@ -34,7 +34,6 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
                 <button disabled={busy || !command.trim()}>{t('controls.send')}</button></div>
             <div className="choices"><code>{snapshot.legalChoices.commands.join(' · ')}</code></div>
         </form>}
-        <div className="command-private-hand">{snapshot.game.hand.map(card => <span key={card.reference}><code>{card.reference}</code> {t(card.definition.messageId)}</span>)}</div>
         {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${undoPolicy}`)} <HelpLink topic={`undo-${undoPolicy}`} label="Undo policy details"/></p>}
         {editHistory && snapshot.undo && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory} format={format}/>}
         <h3>{t('game.history')}</h3>

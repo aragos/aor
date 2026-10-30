@@ -94,8 +94,11 @@ and background clicks preserve an active action draft.
 
 Keep zoom in, zoom out and Fit floating over the board. Always show support arrows; omit a visibility
 toggle. Support modifier-scroll, trackpad pinch, two-finger touch pinch and dragging, centered on the
-gesture and constrained to board bounds.
-Ordinary scrolling navigates the page. Keep map text unselectable during gestures. The map shows
+gesture and constrained to board bounds. Fit the map within the workspace space reserved beside the
+action and above the hand, preserving its proportions with centered letterboxing. Resizing that space
+must preserve the prepared action and map view; zoom anchors, dragging and texture spacing follow the
+rendered scale in both dimensions.
+Ordinary scrolling navigates the surrounding scroll area. Keep map text unselectable during gestures. The map shows
 occupancy, neighbors, sea contacts and support highlights without an inspection panel. Costs and
 placement limits belong beside the action. Omit map search and navigation menus.
 

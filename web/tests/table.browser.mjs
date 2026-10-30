@@ -236,7 +236,13 @@ export async function checkDecisionFamilies(page, web, baseline) {
     for (const [choice, command, stage] of finite) {
         await show(choice, [command], {}, stage);
         const count = await page.evaluate('window.uiCommands.length');
-        await page.evaluate(`document.querySelector('.game-actions .action-buttons button.secondary').click()`);
+        const selector = /^(discard-card|offer-card) /.test(command)
+            ? `[data-hand-card="${hand.reference}"]`
+            : '.game-actions .action-buttons button.secondary';
+        await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+        if (/^(discard-card|offer-card) /.test(command)) {
+            assert.equal(await page.evaluate(`document.querySelector('.game-actions .action-buttons button.secondary')`), null, 'Card choices have one home in the hand');
+        }
         await page.wait(`document.querySelector('.selected-action button:not([disabled])')`, choice + ' selected');
         assert.equal(await page.evaluate('window.uiCommands.length'), count, `${choice} selection cannot submit`);
         await page.evaluate(`document.querySelector('.selected-action button').click()`);
@@ -306,7 +312,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
             await page.evaluate(`document.querySelector('.card-decision .target-choices button:not(.map-picker)').click()`);
         }
         assert.equal(await page.evaluate('window.uiCommands.length'),before,kind+' selection cannot submit');
-        await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+        await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`,kind+' canonical play');
     }
     const advance = baseline.game.catalog.advances[0];
@@ -316,8 +322,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
     }, 'PURCHASE');
     await page.evaluate(`document.querySelector('#tab-advances').click()`);
     await page.evaluate(`[...document.querySelectorAll('.advance-tile')].find(tile=>tile.querySelector('.advance-letter').textContent===${JSON.stringify(advance.letter)}).click()`);
-    await page.wait(`document.querySelector('.advance-decision button:not(.close-detail):not([disabled])')`, 'affordable advance decision');
-    await page.evaluate(`document.querySelector('.advance-decision button:not(.close-detail)').click()`);
+    await page.wait(`document.querySelector('.advance-decision .card-confirmation > button:not([disabled])')`, 'affordable advance decision');
+    await page.evaluate(`document.querySelector('.advance-decision .card-confirmation > button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'buy-advance ${advance.letter}'`, 'advance purchase canonical command');
     await show('purchase-advances', [`buy-advance ${advance.letter}`], {
         advanceOffers:[{advance:advance.id,price:10,unavailableReason:'MISSING_ADVANCE_PREREQUISITE'}],
@@ -325,7 +331,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.evaluate(`[...document.querySelectorAll('.advance-tile')].find(tile=>tile.querySelector('.advance-letter').textContent===${JSON.stringify(advance.letter)}).click()`);
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision')`), null, 'Blocked advance inspection leaves the decision flow alone');
     assert.match(await page.evaluate(`document.querySelector('.inspection-panel .advance-decision .blocker').textContent`), /prerequisite/i);
-    await page.evaluate(`document.querySelector('.advance-decision .close-detail').click()`);
+    await page.evaluate(`document.querySelector('.inspection-panel .advance-decision .close-detail').click()`);
     const dualReference = 'fixture-dual';
     await show('play-cards', [`play ${dualReference} commodity cloth`, `play ${dualReference} commodity wine`], {
         hand: [{reference:dualReference,definition:{id:'cloth-wine',kind:'commodity',messageId:'card.cloth-wine',shape:'CIRCLE'}}],
@@ -349,7 +355,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
     const beforeChoice = await page.evaluate('window.uiCommands.length');
     await page.evaluate(`document.querySelector('.card-decision .target-choices button').click()`);
     assert.equal(await page.evaluate('window.uiCommands.length'), beforeChoice, 'Commodity selection prepares draft');
-    await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'play ${dualReference} commodity cloth'`, 'dual commodity play');
 
     // Protection is an explicit amount choice. Invalid drafts must not fall back to a bare play.
@@ -364,13 +370,13 @@ export async function checkDecisionFamilies(page, web, baseline) {
     await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
     await page.wait(`document.querySelector('.card-decision input[type=number]')`, 'leader protection');
     assert.equal(await page.evaluate(`document.querySelector('.card-decision input[type=number]').value`), '0', 'Protection starts at zero');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false, 'Default protection is ready to play');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false, 'Default protection is ready to play');
     for (const amount of ['', '-1', '6']) {
         await page.fill('.card-decision input[type=number]', amount);
-        assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), true, `Invalid protection ${amount} cannot become a bare play`);
+        assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), true, `Invalid protection ${amount} cannot become a bare play`);
     }
     await page.fill('.card-decision input[type=number]', '3');
-    await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
     await page.wait(`window.uiCommands.at(-1)?.command === 'play ${reference} protect 3'`, 'valid protection submission');
     for (const [stage, prompt, id, kind] of [['FINAL_CARD_PLAY','final-card-play','grain','commodity'], ['PLAY_CARDS','prepare-war','gunpowder','event']]) {
         const cardReference = `fixture-${prompt}`;
@@ -380,8 +386,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
             cardOffers:[{reference:cardReference,playable:true,blockers:[],choices:[{kind:'NONE',value:null,command}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}],
         }, stage);
         await page.evaluate(`document.querySelector('[data-hand-card="${cardReference}"]').click()`);
-        await page.wait(`document.querySelector('.card-decision form > button:last-child:not([disabled])')`, prompt+' card draft');
-        await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+        await page.wait(`document.querySelector('.card-decision .card-confirmation > button:not([disabled])')`, prompt+' card draft');
+        await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`, prompt+' canonical play');
     }
     console.log('Passed: immediate discard, Civil War, replacement, Renaissance, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');

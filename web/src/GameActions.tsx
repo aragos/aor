@@ -13,7 +13,7 @@ interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: stri
 const simpleActions = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
-    const {setSelectedCard, setSelected, setSelectedAdvance, setInspection, selectedAction, setSelectedAction} = useMapSelection();
+    const {selectedAction, setSelectedAction} = useMapSelection();
     const [relief, setRelief] = useState('');
     const player = snapshot.game.players.find(candidate => candidate.id === snapshot.viewerId);
     if (!player) return null;
@@ -55,13 +55,8 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         <div className="action-buttons">{commands.filter(command => simpleActions.includes(command)).map(command => <button key={command} disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}
             {command === 'buy-expansion-card' && <> · {snapshot.game.expansionCardCost ?? '—'} {t('table.tokens')}</>}
             {command === 'stabilize misery' && <> · <span className="misery-transition"><MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/> → <MiseryBox value={snapshot.game.stabilizationMisery} track={snapshot.game.catalog?.miseryTrack}/></span></>}</button>)}
-            {finite.filter(command => !command.startsWith('reduce-marker ')).map(command => <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}
+            {finite.filter(command => !/^(reduce-marker|discard-card|offer-card) /.test(command)).map(command => <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{finiteLabel(command)}</button>)}
         </div>
-        {['PLAY_CARDS', 'FINAL_CARD_PLAY'].includes(snapshot.game.stage) && <div className="decision-cards">{snapshot.game.cardOffers.filter(offer => offer.playable).map(offer => {
-            const card = snapshot.game.hand.find(card => card.reference === offer.reference);
-            return card && <button type="button" className="secondary eligible-card" key={offer.reference} data-eligible-card={offer.reference}
-                disabled={busy} onClick={() => {setSelectedAction(''); setInspection(null); setSelectedCard(offer.reference); setSelected(''); setSelectedAdvance('');}}>{t(card.definition.messageId)}</button>;
-        })}</div>}
         {finite.some(command => command.startsWith('reduce-marker ')) && <details className="marker-reduction"><summary>{t('action.reduceMarker')}</summary>
             <div className="action-buttons">{finite.filter(command => command.startsWith('reduce-marker ')).map(command =>
                 <button type="button" className="secondary" key={command} disabled={busy} aria-pressed={selectedAction === command}

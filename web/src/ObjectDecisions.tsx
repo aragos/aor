@@ -69,18 +69,20 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
     const uncertainPlayers = misery?.miseryUncertainPlayers ?? offer?.miseryUncertainPlayers ?? [];
     const chooseMiseryTarget = !misery && !miseryChanges.length && !uncertainPlayers.length &&
         finiteChoices.some(candidate => (candidate.miseryChanges?.length ?? 0) > 0 || (candidate.miseryUncertainPlayers?.length ?? 0) > 0);
-    return <section className="object-decision card-decision">
-        {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>}
-        <h2>{t(definition.messageId)}</h2><CardRecurrence definition={definition}/>
-        <CardEventText definition={definition}/>
-        {inspection && <>
+    return <section className="object-decision card-decision" aria-labelledby={inspection ? undefined : 'decision-title'}>
+        {inspection && <><button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedCard(''))}>×</button>
+            <h2>{t(definition.messageId)}</h2><CardRecurrence definition={definition}/>
+            <CardEventText definition={definition}/></>}
+        {!inspection && definition.kind === 'event' && <details className="card-effect-detail">
+            <summary>{t('card.effectDetails')}</summary><CardEventText definition={definition}/>
+        </details>}
         {(info?.leaderDiscounts ?? offer?.leaderDiscounts)?.map(discount => <details key={discount.advance} className="leader-discount-detail">
             <summary>{advanceName(discount.advance)} <LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/></summary>
             <dl className="detail-list"><div><dt>{t('table.printedDiscount')}</dt><dd>${discount.printedAmount}</dd></div>
                 <div><dt>{advanceName('written-record')}</dt><dd>${discount.writtenRecordBonus}</dd></div>
                 <div><dt>{t('table.conditionalDiscount')}</dt><dd>${discount.conditionalAmount}</dd></div></dl>
             {discount.condition && <p>{label(discount.condition)}</p>}
-        </details>)}</>}
+        </details>)}
         {inspection && offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
         {action && offer?.playable && <form onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
             {!noChoice && finiteChoices.length > 0 && <fieldset className="target-choices"><legend>{t('controls.cardChoice')}</legend>
@@ -113,7 +115,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
             {(!needsProtection || amount === 0 ? misery?.cashChanges : [])?.map(change => <p className="cash-preview" key={change.player}><PlayerLabel snapshot={snapshot} id={change.player}/> · {t('game.cash')}: ${change.before} → ${change.after}</p>)}
             <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
             {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
-            <button disabled={busy || !actionable}>{t('action.playCard')}</button>
+            <div className="card-confirmation"><button disabled={busy || !actionable}>{t('action.playCard')}</button></div>
         </form>}
     </section>;
 }
@@ -128,9 +130,9 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const inspection = mode !== 'action';
     const action = mode !== 'inspection';
-    return <section className="object-decision advance-decision">
-        {inspection && <button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>}
-        {inspection && <p className="eyebrow">{label(advance.category, 'category')}</p>}<h2>{advanceName(advance.id)}</h2>
+    return <section className="object-decision advance-decision" aria-labelledby={inspection ? undefined : 'decision-title'}>
+        {inspection && <><button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>
+            <p className="eyebrow">{label(advance.category, 'category')}</p><h2>{advanceName(advance.id)}</h2></>}
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
         {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label={t('reference.printedValues')} compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
@@ -141,6 +143,6 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
         {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
         {inspection && <p>{t('advance.owners')}: <PlayerLabels snapshot={snapshot} ids={snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.id)}/></p>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
-        {action && offer && <button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button>}
+        {action && offer && <div className="card-confirmation"><button disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</button></div>}
     </section>;
 }

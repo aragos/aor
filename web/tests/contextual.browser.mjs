@@ -115,8 +115,8 @@ export async function checkContextualUx(page, web, baseline) {
             cardOffers:[{reference,playable:true,blockers:[],choices:[{kind:'COMMODITY',value:'fur',command:`play ${reference} commodity fur`}],commodities:['FUR'],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click(`[data-hand-card="${reference}"]`);
     assert.equal(await page.evaluate(`!!document.querySelector('.card-decision .target-choices')`), false, 'Single commodity needs no extra choice');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false);
-    await click('.card-decision form > button:last-child');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false);
+    await click('.card-decision .card-confirmation > button');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play ${reference} commodity fur`);
     assert.equal(await page.evaluate(`!!document.querySelector('.card-decision')`), false, 'Card play clears detail');
 
@@ -148,14 +148,15 @@ export async function checkContextualUx(page, web, baseline) {
         game:{stage:'PLAY_CARDS',hand:[{reference:'target',definition:{id:'civil-war',kind:'event',messageId:'card.civil-war',shape:'SQUARE'}}],
             cardOffers:[{reference:'target',playable:true,blockers:[],choices:[{kind:'PLAYER',value:other.id,command:`play target player ${other.id}`}],commodities:[],leaderDiscounts:[],provinceTargets:[],requiredTargetCount:null,protectionMax:null}]}});
     await click('[data-hand-card="target"]');
-    assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'Hand keeps dynamic game information');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-hand-card="target"] .card-event-text')`), false, 'The compact hand omits full event paragraphs');
+    assert.match(await page.evaluate(`document.querySelector('[data-hand-card="target"] .hand-card-summary').textContent`), /.+/, 'The held event has a concise effect summary');
     assert.equal(await page.evaluate(`document.querySelector('.inspection-panel a[href^="/help#card-"]')`), null, 'Card inspection omits the redundant rules link');
     await page.wait(`document.querySelector('[data-player="${other.id}"].eligible-target')`, 'legal player target highlighted');
     const count = await page.evaluate('window.mapCommands.length');
     await click(`[data-player="${other.id}"] > summary`);
     assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Capital target selection only prepares draft');
     assert.equal(await page.evaluate(`document.querySelector('[data-player="${other.id}"].picked-target') !== null`), true);
-    await click('.card-decision form > button:last-child');
+    await click('.card-decision .card-confirmation > button');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `play target player ${other.id}`);
     assert.equal(await page.evaluate(`!!document.querySelector('.eligible-target')`), false);
 
@@ -188,8 +189,8 @@ export async function checkContextualUx(page, web, baseline) {
         const paths=area.querySelectorAll(':scope > path');
         return paths.length===1 && paths[0].hasAttribute('clip-path');
     })`), true, 'Each area border stays within its exact member footprint without a separating halo');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false);
-    await click('.card-decision .close-detail');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false);
+    await click('.decision-heading [data-close-action]');
 
     await show({game:{hand:[{reference:'area-target',definition:{id:'black-death',kind:'event',messageId:'card.black-death',shape:'CIRCLE'}}],
         cardOffers:[{reference:'area-target',playable:true,blockers:[],choices:[
@@ -202,8 +203,8 @@ export async function checkContextualUx(page, web, baseline) {
     await click('[data-map-area-label="VIII"]');
     assert.equal(await page.evaluate('window.mapCommands.length'), beforeAreaTarget, 'Area target click only edits the draft');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'true');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), false);
-    await click('.card-decision form > button:last-child');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), false);
+    await click('.card-decision .card-confirmation > button');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play area-target area viii');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="VIII"]').getAttribute('aria-pressed')`), 'false', 'Playing an area card clears the area selection');
 

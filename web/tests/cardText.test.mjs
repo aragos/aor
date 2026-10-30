@@ -18,6 +18,15 @@ test('every catalog event has readable effect text', () => {
     for (const id of eventIds) assert(en[`card.${id}.effect`]?.length > 30, `Missing event text for ${id}`);
 });
 
+test('every catalog event has a concise hand summary', () => {
+    const eventIds = [...catalog.split('enum class EventId')[1].split('enum class LeaderId')[0].matchAll(/\("([a-z-]+)"\)/g)].map(match => match[1]);
+    for (const id of eventIds) {
+        const summary = en[`card.${id}.summary`];
+        assert(summary?.trim(), `Missing hand summary for ${id}`);
+        assert.notEqual(summary, en[`card.${id}.effect`], `Hand summary repeats full rules for ${id}`);
+    }
+});
+
 test('every supported advance has readable reference text', async () => {
     const source = await readFile(new URL('../../core/src/commonMain/kotlin/dev/aragos/aor/Advances.kt', import.meta.url), 'utf8');
     const ids = [...source.split('enum class AdvanceId')[1].split('enum class AdvanceCategory')[0].matchAll(/\s+([A-Z_]+)\('/g)].map(match=>match[1]);
