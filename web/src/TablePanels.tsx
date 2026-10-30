@@ -73,12 +73,14 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')} inline/></span>
                         <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')} inline/></span></span>
-                    {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
+                    <span className="player-status-row">
+                        {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
+                        {!finished && <span className="player-status">{status}</span>}
+                    </span>
                     {snapshot.game.stage === 'EXPANSION' && <span className="player-white-markers" aria-label={`${t('table.whiteMarkers')}: ${whiteMarkers}`}>
                         <b>{whiteMarkers}</b><small>{t('table.whiteMarkers')}</small>
                     </span>}
                     {eligible && <span className="target-status">{t(picked ? 'table.selectedTarget' : 'table.legalTarget')}</span>}
-                    {!finished && <span className="player-status">{status}</span>}
                 </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
             </details>;
         })}

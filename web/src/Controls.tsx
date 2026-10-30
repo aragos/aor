@@ -79,12 +79,6 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             </div>
             <p className="private-draft-status" role="status">{t(snapshot.pendingBid !== null && bid === String(snapshot.pendingBid) ? 'controls.savedPrivately' : 'controls.unsavedDraft', {amount: bid})}</p>
             {snapshot.pendingBid !== null && <p className="pending-submission">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
-            {snapshot.legalChoices.commands.includes('withdraw-bid') && <button type="button"
-                className="secondary withdraw-bid" disabled={busy}
-                onClick={() => { void submit('withdraw-bid'); }}>
-                {t(isTokenPurchase ? 'controls.withdrawPurchase' : 'controls.withdrawBid')}
-            </button>}
-
             {isTokenPurchase && <div id="purchase-preview" className="purchase-preview" aria-live="polite">
                 {quoted ? <dl className="resources">
                     <div><dt>{t('controls.purchaseCost')}</dt><dd>${quoted.cost}</dd></div>

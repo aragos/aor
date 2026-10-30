@@ -518,6 +518,12 @@ class GameCatalogTest {
     }
 
     @Test
+    fun levantSupportsAcre() {
+        assertThat(BoardConnectionData.satelliteSupports)
+            .contains(SatelliteSupport(ProvinceId("levant"), ProvinceId("acre")))
+    }
+
+    @Test
     fun stGallDoesNotGainTheUnprintedNurembergSupport() {
         assertThat(BoardConnectionData.satelliteSupports)
             .doesNotContain(SatelliteSupport(ProvinceId("st-gall"), ProvinceId("nuremberg")))

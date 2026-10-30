@@ -39,7 +39,7 @@ export function PlayerLabels({snapshot, ids, separator = ', '}: {
 
 /** Keep translated sentence order while allowing names to retain their symbols. */
 export function LabelMessage({text, values}: {text: string; values: Record<string, ReactNode>}) {
-    return <>{text.split(/(\{[^}]+\})/).map((part, index) => <Fragment key={index}>
+    return <span className="label-message">{text.split(/(\{[^}]+\})/).map((part, index) => <Fragment key={index}>
         {part.startsWith('{') ? values[part.slice(1, -1)] ?? part : part}
-    </Fragment>)}</>;
+    </Fragment>)}</span>;
 }

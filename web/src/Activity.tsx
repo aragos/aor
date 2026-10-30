@@ -108,7 +108,7 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
         </span>}
         {cashChanges?.map(change => <CashPayment key={change.player} event={event} player={change.player} amount={change.amount}/>)}
         {event.miseryChanges?.map(change => <span className="event-misery-change" key={change.player}>
-            {change.player !== event.actor && <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>}
+            {(change.player !== event.actor || event.miseryChanges.length > 1) && <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>}
             <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}
             <span>(<MiseryBox value={change.fromValue} track={track?.miseryTrack}/> → <MiseryBox value={change.toValue} track={track?.miseryTrack}/>)</span>
             {change.reasons?.map((reason, index) => <span className="event-detail" key={index}>

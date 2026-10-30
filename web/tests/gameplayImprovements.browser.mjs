@@ -83,7 +83,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'RELIEF'}}});
     assert.equal(await page.evaluate(`document.querySelector('#relief-spaces button').disabled`), true);
     assert.match(await page.evaluate(`document.querySelector('.game-actions .guided-form .blocker').textContent`), /afford/i);
-    assert.equal(await page.evaluate(`document.querySelector('.game-actions .action-buttons button').disabled`), false, 'Unaffordable relief retains Pass');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-toolbar .pass-action').disabled`), false, 'Unaffordable relief retains Pass');
 
     const order = [other.id, viewer, ...baseline.game.turnOrder.filter(id => id !== viewer && id !== other.id)];
     const players = baseline.game.players.map(player => player.id === viewer ? {...player, cash: 20, advances: [...player.advances, 'URBAN_ASCENDANCY']} : player);

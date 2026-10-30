@@ -38,7 +38,7 @@ try {
     await page.click('Canonical IDs');
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(actor.id+': place 1 '+target));
     await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
-    await page.click('Undo last action');
+    await page.click('Undo');
     await page.wait(`document.querySelector('.command-dock pre').textContent.includes('undo ')`,'audited undo');
     assert.equal((await game.snapshot(actor)).game.board.some(province=>province.id===target),false);
     assert.equal(await page.evaluate(`document.querySelector('.province-inspector')`),null,'Undo clears old map context');

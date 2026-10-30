@@ -6,7 +6,7 @@ import {TableIcon} from '../TableIcon';
 import {PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {ChoiceButtons} from '../DecisionControls';
-import {provinceOrders} from './mapOrders';
+import {maximumPartialPlacement, provinceOrders} from './mapOrders';
 
 export function neighbors(connections: PublicCatalog['landBorders'], province: string): string[] {
     return connections.flatMap(edge => edge.first === province ? [edge.second] : edge.second === province ? [edge.first] : []);
@@ -55,12 +55,8 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     const offer = snapshot.game.expansionOffers.find(candidate => candidate.destination === province.id);
     const inspection = snapshot.game.expansionInspections?.find(candidate => candidate.destination === province.id) ?? offer;
     const primary = offer && offer.primaryAction !== 'INSPECT';
-    const remainingPlacement = primary && offer.resultingPool === null
-        ? offer.partialPlacements.reduce<typeof offer.partialPlacements[number] | undefined>(
-            (maximum, choice) => !maximum || choice.tokens > maximum.tokens ? choice : maximum, undefined)
-        : undefined;
+    const remainingPlacement = maximumPartialPlacement(offer);
     const requiredTokens = remainingPlacement?.tokens ?? offer?.requiredTokens;
-    const resultingPool = remainingPlacement?.resultingPool ?? offer?.resultingPool;
     const establishesMarker = !!offer?.establishesMarker && !remainingPlacement;
     const uncertain = !!offer?.uncertain && !remainingPlacement;
     const available = primary && (!!remainingPlacement || (offer.blockers.length === 0 && offer.resultingPool !== null));
@@ -76,12 +72,10 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     }
     return <div className="province-actions" aria-label={t('table.selectedProvince')}>
         <div>
-            <p className="eyebrow">{remainingPlacement ? t('table.remainingTokens') : primary ? uncertain ? t('table.compete') : province.satellite ? t('action.place') : t('table.establishMarker') : t('table.province')}</p>
             <h2><ProvinceLabel snapshot={snapshot} id={province.id}/></h2>
         </div>
         <div className="map-orders">
             {primary && hasPlacement && <>
-                <div className="pool-change" aria-label={t('game.pool')}><span>{t('table.poolTokens')}</span><strong>{offer.availablePool} <span>→</span> {resultingPool ?? '—'}</strong></div>
                 <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
                     <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={establishesMarker ? undefined : requiredTokens}/></svg>
                         <small>{establishesMarker ? t(uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>

@@ -36,7 +36,12 @@ internal object MiseryHistory {
             val current = after.playerState(player).misery
             val reasons = reasons(before, entry, playedCard, player)
             val canceling = reasons.size > 1 && reasons.sumOf { it.spaces ?: 0 } == 0
-            if (previous == current && !canceling) return@mapNotNull null
+            val groupMiseryEffect =
+                entry is Entry.Action &&
+                    entry.command is CardCommand.PlayCard &&
+                    previous != MiseryStep.CHAOS &&
+                    playedCard in groupMiseryCards
+            if (previous == current && !canceling && !groupMiseryEffect) return@mapNotNull null
             HistoryMiseryChangeView(
                 player,
                 current.ordinal - previous.ordinal,
@@ -45,6 +50,14 @@ internal object MiseryHistory {
                 reasons,
             )
         }
+
+    private val groupMiseryCards =
+        setOf(
+            EventId.FAMINE.cardId,
+            EventId.MYSTICISM_ABOUNDS.cardId,
+            EventId.REVOLUTIONARY_UPRISINGS.cardId,
+            EventId.RELIGIOUS_STRIFE.cardId,
+        )
 
     private fun reasons(
         before: GameState,

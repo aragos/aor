@@ -164,6 +164,51 @@ class MiseryHistoryTest {
     }
 
     @Test
+    fun revolutionaryUprisingsRecordsEveryActivePlayersMiseryIncludingNoChange() {
+        val base = game(Stage.PLAY_CARDS)
+        val initial =
+            base.copy(
+                players =
+                    base.players +
+                        (alice to
+                            base
+                                .playerState(alice)
+                                .copy(
+                                    hand =
+                                        listOf(
+                                            HandCard(
+                                                "hand-1",
+                                                CardData.definition("revolutionary-uprisings"),
+                                            )
+                                        ),
+                                    advances =
+                                        PlayerAdvances(
+                                            listOf(AdvanceAcquisition(AdvanceId.CARAVAN, 1))
+                                        ),
+                                )) +
+                        (carol to base.playerState(carol).copy(misery = MiseryStep.CHAOS))
+            )
+        val entry = Entry.Action(alice, CardCommand.PlayCard("hand-1", CardChoice.None))
+        val after = initial.step(entry)
+
+        val event = HistoryEvents.project("9:0", initial, after, entry, bob)
+
+        val reason =
+            listOf(
+                HistoryMiseryReasonView(
+                    HistoryMiseryReason.CARD_EFFECT,
+                    card = "revolutionary-uprisings",
+                )
+            )
+        assertThat(event?.miseryChanges)
+            .containsExactly(
+                HistoryMiseryChangeView(alice, 1, 0, 10, reason),
+                HistoryMiseryChangeView(bob, 0, 0, 0, reason),
+            )
+        assertThat(event?.participants?.map(HistoryParticipantView::id)).containsAtLeast(alice, bob)
+    }
+
+    @Test
     fun everyImmediateMiseryEventNamesItsPublicPlayedCardWithoutPrivateReferences() {
         val events =
             listOf(

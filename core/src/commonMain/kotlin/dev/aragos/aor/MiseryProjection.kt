@@ -37,7 +37,15 @@ internal data class CardMiseryPreview(
             return CardMiseryPreview(
                 spaces.mapNotNull { (player, movement) ->
                     val before = context.player(player).misery
-                    MiseryChangeView.between(player, before, MiseryRules.shift(before, movement))
+                    val after = MiseryRules.shift(before, movement)
+                    if (
+                        resolution is CardResolution.MiseryEvent ||
+                            resolution is CardResolution.ReligiousStrife
+                    ) {
+                        MiseryChangeView(player, before.value, after.value)
+                    } else {
+                        MiseryChangeView.between(player, before, after)
+                    }
                 },
                 if (resolution is CardResolution.WarBattle) {
                     listOf(resolution.war.initiator, resolution.war.opponent)

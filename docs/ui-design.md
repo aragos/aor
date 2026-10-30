@@ -67,7 +67,11 @@ choice and understand its result through visual controls and commands, on deskto
   Written cash is the public balance recorded at the latest simultaneous token-purchase reveal,
   initially $40; subsequent income/expenses and unrevealed bids do not alter that record.
   Show the advance count in the collapsed player box, with an accessible label.
-  Group expanded advances by printed category, then printed letter; omit empty categories.
+  Group expanded advances by printed category, then printed letter; omit empty categories. Put status
+  and available pool tokens on one wrapping row.
+- Pass and Undo share a compact toolbar at the top right of the action panel, including while
+  reviewing a selected object. Undo withdraws a pending capital bid or token purchase until reveal;
+  its accessible name and tooltip identify that operation. After reveal it follows the chosen undo policy.
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
   readiness while retaining the amount in the local input; reloading must not restore a withdrawn
   submission. Committed history and resource balances change only on reveal.
@@ -97,7 +101,8 @@ choice and understand its result through visual controls and commands, on deskto
   that context. Show the selected card's effect directly, then its chosen target/commodity and projected
   consequences beside confirmation. Cash changes identify who receives or loses money; leader credits
   say they become available after play. Preserve uncertainty where decisions or dice remain unresolved.
-  Card faces and inspections omit type headers. Mark recurring cards with a shared badge rather
+  Card faces and inspections omit type headers. Selection and playability use pressed state and
+  borders, without redundant “Selected” or “Playable” labels. Mark recurring cards with a shared badge rather
   than naming their printed shape; the public reference explains the recycling behavior.
 - The viewer's hand occupies the bottom of the map/workspace column during play, purchases,
   expansion and waiting. Its desktop width matches that column; the action/activity sidebar extends
@@ -125,6 +130,8 @@ choice and understand its result through visual controls and commands, on deskto
   Maintain separate full inspection evaluations so selecting an omitted destination still explains
   pool/shipping limits, missing access, no route or existing control. Candidate highlights and
   enabled controls use feasible commitments, including legal partial placements.
+- Expansion uses one compact pool summary with current → projected balances while reviewing a
+  placement. Keep commitment, outcome and income beside confirmation; omit repeated action headings.
 - Expansion summaries show each player's white markers and active military cards with matchup
   caveats. Omit the military box entirely when nobody has one. Competition and War outcomes live in
   activity. A submitted action that resolves one also opens a dismissible result for its player;
@@ -150,6 +157,8 @@ choice and understand its result through visual controls and commands, on deskto
   prior-turn printed credits only; blocked quotes keep their reason and cannot authorize purchase.
   Show printed costs for owned advances or when no running-game quote exists. Detailed quotes
   retain the final price floor.
+  Group misery events preview every active player, including unchanged boxes and protected players,
+  and record those results in activity at play time.
   Preview printed misery boxes for each affected player when playing a card or buying an advance;
   selected targets update that preview without committing. Mark dice-dependent outcomes as uncertain.
 - Available cash appears with spending decisions, including blocked purchases, rather than a

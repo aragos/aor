@@ -67,7 +67,7 @@ function choose(state) {
     return commands[0];
 }
 
-const simple = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
+const simple = ['buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 function finite(commands) {
     return commands.filter(command => !simple.includes(command) &&
         ['swap-order ', 'cancel-adjustment ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
@@ -118,6 +118,7 @@ async function perform(state, command) {
         await page.evaluate(`(() => {const button = [...document.querySelectorAll('.advance-tile')].find(button => button.querySelector('.advance-letter')?.textContent === ${JSON.stringify(argument)}); if (!button) throw Error('Missing advance tile'); button.click();})()`);
         return click('.advance-decision .card-confirmation > button');
     }
+    if (command === 'pass') return click('.decision-toolbar .pass-action');
     if (simple.includes(command)) {
         const offered = state.legalChoices.commands.filter(choice => simple.includes(choice));
         return click('.game-actions > .action-buttons > button:not(.secondary)', offered.indexOf(command));
@@ -174,8 +175,12 @@ try {
         const pending = simultaneous && state.prompt.players.length > 1;
         const expectedRevision = state.revision + (pending ? 0 : 1);
         await perform(state, command);
+        const privateBid = /^(bid-capital|buy-tokens) /.test(command);
+        const savedStatus = privateBid
+            ? `document.querySelector('.private-draft-status')?.textContent === ${JSON.stringify('Saved privately: ' + command.split(' ')[1])}`
+            : `document.querySelector('.save-status')?.textContent === 'Saved'`;
         const accepted = pending
-            ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Submitted' && document.querySelector('.save-status')?.textContent === 'Saved'`
+            ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Submitted' && (${savedStatus})`
             : `document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + expectedRevision)}`;
         await page.wait(`(${accepted}) || document.querySelector('.decision-panel .error')`, `accepted visual action ${command}`);
         const error = await page.evaluate('document.querySelector(".decision-panel .error")?.textContent ?? null');

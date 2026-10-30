@@ -10,7 +10,7 @@ import {MiseryBox} from './MiseryBox';
 
 interface ActionProps {snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>}
 
-const simpleActions = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'cathedral', 'stabilize cash', 'stabilize misery'];
+const simpleActions = ['buy-card', 'buy-expansion-card', 'windmill', 'cathedral', 'stabilize cash', 'stabilize misery'];
 
 export function GameActions({snapshot, busy, submit}: ActionProps) {
     const {selectedAction, setSelectedAction} = useMapSelection();
