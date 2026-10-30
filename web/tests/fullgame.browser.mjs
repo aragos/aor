@@ -70,7 +70,7 @@ function choose(state) {
 const simple = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 function finite(commands) {
     return commands.filter(command => !simple.includes(command) &&
-        ['swap-order ', 'cancel-adjustment ', 'discard-card ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'offer-card ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
+        ['swap-order ', 'cancel-adjustment ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
 }
 
 async function playCard(state, command) {
@@ -95,7 +95,7 @@ async function playCard(state, command) {
         const automatic = choices.length === 1 && ['NONE', 'COMMODITY'].includes(choices[0].kind);
         if (!automatic) await click('.card-decision .target-choices > button:not(.map-picker)', index);
     }
-    await click('.card-decision form > button:last-child');
+    await click('.card-decision .card-confirmation > button');
 }
 
 async function perform(state, command) {
@@ -116,11 +116,15 @@ async function perform(state, command) {
         const id = state.game.catalog.advances[index]?.id;
         assert(id, `Advance letter ${argument} is in catalog`);
         await page.evaluate(`(() => {const button = [...document.querySelectorAll('.advance-tile')].find(button => button.querySelector('.advance-letter')?.textContent === ${JSON.stringify(argument)}); if (!button) throw Error('Missing advance tile'); button.click();})()`);
-        return click('.advance-decision > button:last-child');
+        return click('.advance-decision .card-confirmation > button');
     }
     if (simple.includes(command)) {
         const offered = state.legalChoices.commands.filter(choice => simple.includes(choice));
         return click('.game-actions > .action-buttons > button:not(.secondary)', offered.indexOf(command));
+    }
+    if (verb === 'discard-card' || verb === 'offer-card') {
+        await click(`[data-hand-card="${argument}"]`);
+        return click('.game-actions .selected-action button');
     }
     const choices = finite(state.legalChoices.commands);
     if (choices.includes(command)) {
@@ -180,7 +184,9 @@ try {
         assert.equal(latest.revision, expectedRevision, 'Submitted decisions wait for reveal; ordinary controls commit exactly once');
         if (pending) {
             assert(latest.submitted.includes(actor.id), 'Private submission has a submitted readiness indicator');
-            else assert.equal(latest.pendingBid, Number(command.split(' ')[1]));
+            if (command.startsWith('bid-capital ') || command.startsWith('buy-tokens ')) {
+                assert.equal(latest.pendingBid, Number(command.split(' ')[1]));
+            }
         } else {
             const expected = `${actor.id}: ${command}`;
             assert(latest.history.slice(state.history.length).some(line => line === expected || line.startsWith(expected + ' [')), `Control committed its exact canonical action: ${command}`);

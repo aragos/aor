@@ -2,6 +2,7 @@ import {checkRequestRecovery} from './requestRecovery.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkActivityPayments} from './activityPayments.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
+import {assertBottomHandVisible, checkBottomHand} from './bottomHand.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkActionContext} from './actionContext.browser.mjs';
 import {checkLiveCompetitionLifecycle} from './competitionLifecycle.browser.mjs';
@@ -420,10 +421,23 @@ await page.send('Page.navigate', {url: web + actor.path});
     await pick(screenshotOffer.destination);
     await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     assert.equal(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'No mobile overflow');
+    await assertBottomHandVisible(page, 'Live phone expansion');
     await page.evaluate(`document.querySelector('.primary-expansion').scrollIntoView({block:'nearest'})`);
     assert.equal(await page.evaluate(`(() => {const button=document.querySelector('.primary-expansion');const rect=button.getBoundingClientRect();return rect.top>=0 && rect.bottom<=innerHeight && document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)===button;})()`), true, 'Phone marker submit is reachable and unobstructed');
-    assert.equal(await page.evaluate(`(() => {const map=document.querySelector('.world-map').getBoundingClientRect();const sheet=document.querySelector('.decision-panel').getBoundingClientRect();const top=Math.max(0,map.top), bottom=Math.min(sheet.top,innerHeight,map.bottom);if(bottom-top<80)return false;const element=document.elementFromPoint(Math.max(10,map.left+map.width/2),(top+bottom)/2);return !!element?.closest('.world-map');})()`), true, 'Phone board stays visible and unobstructed above decision sheet');
     await page.viewportScreenshot(join(artifacts, 'aor-phone-viewport.png'));
+    const phoneBoard = await page.evaluate(`(() => {
+        const bounds = selector => {
+            const rect = document.querySelector(selector)?.getBoundingClientRect();
+            return rect ? {left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height} : null;
+        };
+        const map = bounds('.world-map'), decision = bounds('.decision-panel');
+        const top = Math.max(0,map.top), bottom = Math.min(decision.top,innerHeight,map.bottom);
+        const hit = document.elementFromPoint(Math.max(10,map.left+map.width/2),(top+bottom)/2);
+        return {visible:bottom-top>=60 && !!hit?.closest('.world-map'), visibleHeight:bottom-top,
+            map,decision,hand:bounds('.table-hand'),workspace:bounds('.workspace-main'),side:bounds('.workspace-side'),
+            hit:hit?.tagName + '.' + (hit?.getAttribute('class') ?? ''),viewport:{width:innerWidth,height:innerHeight}};
+    })()`);
+    assert.equal(phoneBoard.visible, true, `Phone board stays visible and unobstructed above the reserved action area: ${JSON.stringify(phoneBoard)}`);
     await page.send('Emulation.setPageScaleFactor', {pageScaleFactor:2});
     assert.equal(await page.evaluate('visualViewport.scale'), 2, 'Phone pinch zoom is 200%');
     await page.evaluate(`document.querySelector('.primary-expansion').scrollIntoView({block:'nearest',inline:'nearest'})`);
@@ -434,6 +448,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.evaluate(`document.querySelector('.sheet-toggle').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'false', 'Phone sheet minimizes');
     assert.equal(await page.evaluate(`document.querySelector('.pool-summary').checkVisibility()`), true, 'Active pool remains visible when the phone decision sheet is collapsed');
+    await assertBottomHandVisible(page, 'Collapsed phone decision');
     await page.send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
     assert.equal(await page.evaluate(`matchMedia('(prefers-reduced-motion: reduce)').matches`), true);
     const touchPoint = await page.evaluate(`(() => {const control = document.querySelector('[aria-label="Zoom in"]'); control.scrollIntoView({block:'center'}); const rect=control.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
@@ -469,6 +484,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkReferenceUx(page, web, after);
     await checkGameplayImprovements(page, web, after);
     await checkActionContext(page, web, after);
+    await checkBottomHand(page, web, after);
     await checkPurchaseClarity(page, web, after);
     await checkLiveCommodityValues(page, web, after);
     await checkClearAdvancePrices(page, web, after);
@@ -533,14 +549,14 @@ await page.send('Page.navigate', {url: web + actor.path});
         pirateTargets:{requiredCount:2,eligibleProvinces:['genoa','rome']},
         cardOffers:pirateFixture.game.cardOffers.map(offer=>({...offer,provinceTargets:['genoa','rome']}))}});
     await page.wait(`document.querySelector('.card-decision .clear-targets')`, 'lost pirate target explained');
-    assert.equal(await page.evaluate(`document.querySelector('.card-decision form > button:last-child').disabled`), true, 'Lost target disables card submission');
+    assert.equal(await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').disabled`), true, 'Lost target disables card submission');
     await page.evaluate(`document.querySelector('.card-decision .clear-targets').click()`);
     assert.equal(await page.evaluate('window.mapCommands.length'), 0, 'Clearing invalid targets never submits');
     await pick('genoa'); await pick('rome');
-    await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
+    await page.evaluate(`document.querySelector('.card-decision .card-confirmation > button').click()`);
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play hand-pirates provinces genoa rome');
 
-    await page.evaluate(`document.querySelector('.card-decision .close-detail')?.click()`);
+    await page.evaluate(`document.querySelector('.decision-heading [data-close-action]')?.click()`);
     await show({legalChoices: {commands: ['cede-war']}, game: {warCession: {winner: 'p2', requiredCount: 2,
         eligibleProvinces: ['genoa', 'china', 'india'], overseasCapacity: 1}}});
     await page.wait(`document.querySelector('.eligible-shade') && document.querySelector('#tab-map[aria-selected=true]')`, 'war cession targets activate automatically');

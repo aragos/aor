@@ -8,10 +8,8 @@ import {MiseryBox} from './MiseryBox';
 import {CommodityIcon, PlayerPiece} from './map/MapSymbols';
 import {useMapSelection} from './map/MapSelection';
 import {LeaderCredit} from './LeaderCredit';
-import {useDragScroll} from './useDragScroll';
 import {AdvancePrice} from './AdvancePrice';
 import {finiteDecisions, leaderReference} from './decisionOffers';
-import {CardRecurrence} from './CardRecurrence';
 
 export function Emblem({player, size = 20}: {player: Pick<PlayerView, 'capital'>; size?: number}) {
     return <svg width={size} height={size} viewBox="-28 -28 56 56" aria-hidden="true">
@@ -140,42 +138,6 @@ export function Markets({snapshot}: {snapshot: Snapshot}) {
                 <PayoutReference snapshot={snapshot} payout={payout}/>
             </div>
         </details>)}</div>
-    </section>;
-}
-
-export function Hand({snapshot}: {snapshot: Snapshot}) {
-    const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker, setInspection, selectedAction, setSelectedAction} = useMapSelection();
-    const drag = useDragScroll(snapshot.game.hand.map(card => card.reference).join('|'));
-    return <section className="table-hand" aria-label={t('game.hand')}>
-        <div className="hand-heading"><p className="eyebrow">{t('game.hand')}</p><strong>{snapshot.game.hand.length} {t('game.cards').toLowerCase()}</strong></div>
-        <div className="hand-cards" {...drag}>{snapshot.game.hand.map(card => {
-            const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
-            const finite = finiteDecisions(snapshot).find(offer => offer.subject.kind === 'card' && offer.subject.id === card.reference)?.command;
-            return <div className="object-control" key={card.reference}><button type="button" data-hand-card={card.reference}
-                aria-pressed={selectedCard === card.reference || (!!finite && selectedAction === finite)} className={`hand-card ${card.definition.kind}`}
-                onClick={() => {
-                    if (finite) {setSelectedAction(finite); return;}
-                    if (!offer?.playable) {
-                        setInspection({kind: 'card', id: card.reference});
-                        return;
-                    }
-                    setSelectedAction(''); setInspection(null); setSelectedCard(card.reference); setSelected(''); setSelectedAdvance('');
-                    if (selectedCard !== card.reference) setPicker(null);
-                }}>
-                <h3>{t(card.definition.messageId)}</h3><CardRecurrence definition={card.definition}/>
-                {snapshot.game.burdenReferences.includes(card.reference) && <span className="burden-badge">{t('game.burden')}</span>}
-                {offer?.commodities.map(commodity => {
-                    const payout = snapshot.game.commodityPayouts.find(candidate => candidate.commodity === commodity);
-                    return <span className="card-commodity" key={commodity}><Commodity commodity={commodity}/>{payout && <>
-                        <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/>
-                    </>}</span>;
-                })}
-                {offer?.leaderDiscounts.map(discount => <span className="leader-discount" key={discount.advance}>
-                    <span>{advanceName(discount.advance)}</span><LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/>
-                </span>)}
-            </button><span className="card-track-links">{(offer?.commodities ?? snapshot.game.cardInspections?.find(info => info.definition.id === card.definition.id)?.commodities ?? []).map(commodity =>
-                <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`} inline icon={<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><CommodityIcon commodity={commodity}/></svg>}/>)}</span></div>;
-        })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div>
     </section>;
 }
 

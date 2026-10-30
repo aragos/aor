@@ -101,14 +101,14 @@ export async function checkActionContext(page, web, baseline) {
     await page.wait(`document.querySelector('[data-map-province="jerusalem"].eligible')`, 'draft map picker');
     await page.evaluate(`document.querySelector('[data-map-province="jerusalem"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     await click('.event-card');
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Activity inspection preserves a prepared card target');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Activity inspection preserves a prepared card target');
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .card-event-text').textContent`), /Area VI/);
     await click('.inspection-panel .close-detail');
     assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel')`), false);
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Closing inspection preserves the prepared target');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Closing inspection preserves the prepared target');
     await click('[data-hand-card="draft"]');
-    await click('.inspection-panel .close-detail');
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Closing the active card description preserves its action too');
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel')`), null, 'The active card has one action context, without an automatic duplicate inspector');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Reselecting the active card preserves its target');
 
     const hand = Array.from({length: 12}, (_, index) => ({reference: `drag-${index}`, definition: card.definition}));
     await show({events: [], game: {hand, cardOffers: []}});

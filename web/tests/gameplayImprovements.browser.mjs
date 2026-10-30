@@ -43,11 +43,11 @@ export async function checkGameplayImprovements(page, web, baseline) {
             await click('#tab-advances');
             await click('.advance-tile');
             assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .advance-decision')`), true);
-            assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Advance inspection preserves the prepared card target');
+            assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Advance inspection preserves the prepared card target');
             await click('#tab-map');
             assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="rome"].eligible')`), true, 'Inspection keeps the active map picker');
         }
-        await click('.decision-panel .card-decision form > button:last-child');
+        await click('.decision-panel .card-decision .card-confirmation > button');
         assert.equal(await page.evaluate('window.mapCommands.at(-1)'), command);
         assert.equal(await page.evaluate(`document.querySelector('.card-decision')`), null, 'Successful card play closes both surfaces');
     }
@@ -63,7 +63,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     for (const province of ['genoa', 'rome']) {
         await page.evaluate(`document.querySelector('[data-map-province="${province}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     }
-    await click('.decision-panel .card-decision form > button:last-child');
+    await click('.decision-panel .card-decision .card-confirmation > button');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play pirates provinces genoa rome');
 
     await show({prompt: {messageId: 'prompt.cancel-adjustment', players: [viewer]},
@@ -130,7 +130,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     const commandsBeforeHelp = await page.evaluate('window.mapCommands.length');
     await page.evaluate(`(() => {const link=document.querySelector('.table-hand a[href="/help#commodity-stone"]');link.addEventListener('click',event=>event.preventDefault(),{once:true});link.click();})()`);
     assert.equal(await page.evaluate('window.mapCommands.length'), commandsBeforeHelp, 'Payout help never plays the card');
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision form > button:last-child').disabled`), false, 'Payout help preserves the prepared play');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision .card-confirmation > button').disabled`), false, 'Payout help preserves the prepared play');
 
     await show({prompt: {messageId: 'prompt.purchase-shipping', players: [viewer]}, legalChoices: {commands: ['upgrade-ships', 'pass']},
         game: {stage: 'PURCHASE', activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, purchaseStep: 'SHIPPING'},

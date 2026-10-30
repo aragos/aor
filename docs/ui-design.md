@@ -16,7 +16,9 @@ choice and understand its result through visual controls and commands, on deskto
    an explicit decision for players with an advance tier, with its explanation and Pass.
 3. **Organize attention around action.** Show actor, request and relevant resources together. Open
    the relevant workspace once per decision boundary; polling must not repeatedly redirect it.
-   Interruptions name the required responder and the activity that resumes.
+   Interruptions name the required responder and the activity that resumes. Keep the private hand
+   visible beside every decision through its reserved bottom area, without repeating held-card
+   reminders in the workspace or action pane.
 4. **Use the game objects as controls.** Click cards, advances and players for their relevant detail
    or choice; do not add a parallel Inspect button or map mode. Province connections are shown by
    map highlights, without a second province panel. Commodity cards show current payouts and a
@@ -28,11 +30,12 @@ choice and understand its result through visual controls and commands, on deskto
    its action context; accepted token/marker placement clears its province and amount. Rejection retains
    correctable input. Mark invalid choices and prevent stale submission. A preauthorized queued action submits once only when legal, never retries a failure.
 6. **Explain consequences locally.** Show costs, modifiers, remaining resources and deterministic
-   effects beside the action before commitment. Upgrades show current → new values. Partial
-   placement explains the marker requirement and limiting resource beside its placement action,
-   rather than in inspection. Map pickers ask “Pick a target” or “Pick N targets.” Distinguish current,
-   projected, conditional and uncertain values;
-   discounts, final prices and cash receipts are different quantities. Offer feasible alternatives.
+   effects beside the action before commitment. Keep the chosen cash and misery endpoints beside
+   confirmation, with full event rules available in an optional disclosure. Upgrades show current →
+   new values. Partial placement explains the marker requirement and limiting resource beside its
+   placement action, rather than in inspection. Map pickers ask “Pick a target” or “Pick N targets.”
+   Distinguish current, projected, conditional and uncertain values; discounts, final prices and
+   cash receipts are different quantities. Offer feasible alternatives.
 7. **Use consistent identity and emphasis.** Capital names identify powers; before assignment use
    public handles in hosted games, retained in player overviews. Reuse symbols, owner silhouettes,
    quantities and terms. Every visible capital name carries its board silhouette, including previews,
@@ -85,9 +88,28 @@ choice and understand its result through visual controls and commands, on deskto
   answers and immutable randomness; creation and history controls link to that explanation.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
-  the action button confirms it. Playable cards also appear beside Pass.
+  the action button confirms it. Select playable cards from the persistent hand, without another
+  card list beside Pass. The selected card's choices and consequences have one action context;
+  selection does not also open an automatic duplicate inspector. Name the selected object once in
+  that context. Full event rules are optional detail; the chosen cash and misery effects stay beside
+  confirmation rather than repeating the full rules or burying the outcome below them.
   Card faces and inspections omit type headers. Mark recurring cards with a shared badge rather
   than naming their printed shape; the public reference explains the recycling behavior.
+- The viewer's hand occupies a reserved bottom area during play, purchases, expansion and waiting.
+  Bound workspace, action and activity scrolling so long content cannot push the hand offscreen.
+  Narrow layouts place the action review and reachable confirmation above the same hand area;
+  neither it nor the hand overlays map targets. Commands, turn effects and configuration remain
+  reachable without displacing the hand.
+  Compact cards show current commodity owner payouts and adjustments, relevant leader credits and
+  concise event effects. Keep unavailable cards readable, with selection opening their blocker or
+  reference while preserving the active draft. Expand the same hand surface for large hands;
+  selecting a playable card returns it to compact form. Keep card order stable and preserve hand
+  scroll through polling and inspection. Keyboard focus brings an offscreen card into view without
+  scrolling the whole table.
+  Other panes do not summarize hand contents, remind the player of held leaders or mark advances
+  with potential held-card credits. Existing public unplayed-leader counts, played leaders and
+  applied purchase discounts describe distinct public or action facts. Render held-card identities
+  only from the viewer's projected hand, never by reconstructing holdings from the reference catalog.
 - Full-market placement is primary when legal. Otherwise use the largest engine-offered partial
   placement and label it **Place maximum possible tokens**. Omit destinations with no feasible
   pool/shipping commitment. Keep marker reduction collapsed and competition commitments exact.
@@ -111,7 +133,8 @@ choice and understand its result through visual controls and commands, on deskto
 - Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
   and private discards stay counted; this cannot promise remaining drawable cards.
 - Leader totals explicitly include the viewer's Written Record bonus, or identify the displayed
-  credit as preceding Written Record. Played leaders retain their play-time enhancement.
+  credit as preceding Written Record. Compact hand credits may share one Written Record note per
+  card when it applies to every listed total. Played leaders retain their play-time enhancement.
 - Advance tiles show a price and concise credit total. An optional inspection disclosure names
   each contributing advance, Institutional Research and leaders, including Written Record. Use
   prior-turn printed credits only; blocked quotes keep their reason and cannot authorize purchase.
@@ -121,8 +144,9 @@ choice and understand its result through visual controls and commands, on deskto
   selected targets update that preview without committing. Mark dice-dependent outcomes as uncertain.
 - Available cash appears with spending decisions, including blocked purchases, rather than a
   permanent resource section. Buying a card with pool tokens shows its token cost. Compact hands
-  support mouse/pen dragging, scrollbars, native
-  touch scrolling and keyboard activation; dragging cannot select a card or send an order.
+  support mouse/pen dragging, scrollbars, native touch scrolling and keyboard activation; dragging
+  cannot select a card or send an order. Expanded and compact hands share their card selection and
+  reference behavior, without remounting the active action form.
 - Cancellation choices and confirmation show cost. Stabilization shows current → resulting misery
   boxes, including Chaos, on its payment button. Relief remains visible for an advance tier even
   when blocked, with Pass.
@@ -176,7 +200,9 @@ choice and understand its result through visual controls and commands, on deskto
 - A decision owns its expansion destination and partial amount independently of inspection. Background
   clicks close connection highlights without discarding that draft. Use existing object controls
   and native player disclosures, without separate inspection buttons or an Inspection mode. Finite
-  hand discard/trade, Patronage, order swap and market cancellation controls prepare the same command as their component controls and share one selection state.
+  hand discard/trade decisions use the hand as their card selector, with confirmation beside the
+  current decision. Patronage, order swap and market cancellation controls prepare the same command
+  as their component controls and share one selection state.
 - Every finite group has an accessible question. Map pressed state follows exact draft membership,
   including multiple targets, rather than the most recently inspected province. The map uses a roving
   province tab stop, arrow traversal and focus panning at zoom; Tab can leave the map for confirmation.

@@ -42,14 +42,30 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   while inspecting other objects. Use the object itself rather than separate Inspect controls;
   keep province inspection on the map. Clear the province after accepted token/marker placement,
   retaining correctable work after rejection. Show available cash alongside spending decisions; omit
-  a permanent resource section. Keep hand cards compact, allow dragging as well as scrolling, and include each
-  player's advance count in their summary. Expanded advances follow printed category and letter order.
+  a permanent resource section. Include each player's advance count in their summary. Expanded
+  advances follow printed category and letter order.
   Show written cash in expanded player details and keep income in the summary. Put the live deck
   count beside the epoch, with no duplicate count in turn effects.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Ask “Pick a target” or “Pick N targets” during card targeting. Prefer visible finite
-  choices and playable cards beside Pass.
+  choices; select held cards from the hand rather than a second list beside Pass.
+- Keep the viewer's hand in a reserved bottom area during card play, other decisions and waiting.
+  Workspace, action and activity scrolling must not push it below the viewport or cover it. On
+  narrow screens, coordinate the action review and confirmation above the hand rather than overlaying
+  separate fixed panels. Keep Commands, turn effects and configuration reachable.
+  Card summaries show current commodity payouts and adjustments, relevant leader credits and concise
+  event effects. Keep unavailable cards readable and explain their blockers when selected. Show held
+  cards only from the viewer's projected hand; reference catalogs cannot reveal another player's hand.
+  Play, discard and trade use this same hand selection surface, with separate explicit confirmation.
+  A selected card has one action context for its choices and consequences. Other panes do not repeat
+  hand contents, held-leader reminders or potential-credit badges; public leader availability, played
+  leaders and actual purchase discounts remain distinct facts.
+  Support mouse/pen dragging, scrollbars, native touch scrolling and keyboard access to every card;
+  dragging cannot select or play one. Expand the same hand for large hands without replacing action
+  drafts. Selecting a playable card returns to the compact hand. Preserve valid card selection,
+  targets, amounts and hand scroll through inspection, polling and rejection; accepted actions and
+  changed decisions clear obsolete drafts.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup

@@ -99,7 +99,7 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
             if (activated.current !== focusRevision) {
                 activated.current = focusRevision;
                 setWorkspace('map');
-                requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}));
+                requestAnimationFrame(() => document.getElementById('workspace-map')?.scrollTo({top: 0}));
             }
         }
     }, [disabled, eligible.length, focusRevision, kind, setPicker, setWorkspace]);
