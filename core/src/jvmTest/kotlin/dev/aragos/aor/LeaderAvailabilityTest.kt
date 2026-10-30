@@ -9,22 +9,30 @@ class LeaderAvailabilityTest {
     private val p3 = PlayerId("p3")
 
     @Test
-    fun matchingLeadersIncludeAllPrintedEpochs() {
+    fun matchingLeaderIdentitiesIncludeAllPrintedEpochs() {
         val availability = state().viewForPlayer(p1).unplayedAdvanceLeaders
         val writtenRecord = availability.single { it.advance == AdvanceId.WRITTEN_RECORD }
 
         assertThat(availability).hasSize(26)
         assertThat(writtenRecord.epochs)
             .containsExactly(
-                LeaderEpochCountView(epoch = 1, count = 3),
-                LeaderEpochCountView(epoch = 2, count = 0),
-                LeaderEpochCountView(epoch = 3, count = 0),
+                LeaderEpochView(
+                    epoch = 1,
+                    leaders =
+                        listOf(
+                            LeaderId.DIONYSUS_EXIGUUS,
+                            LeaderId.RASHID_AD_DIN,
+                            LeaderId.ST_BENEDICT,
+                        ),
+                ),
+                LeaderEpochView(epoch = 2, leaders = emptyList()),
+                LeaderEpochView(epoch = 3, leaders = emptyList()),
             )
             .inOrder()
     }
 
     @Test
-    fun playingALeaderReducesItsAdvancesUnplayedCounts() {
+    fun playingALeaderReducesItsAdvancesUnplayedAvailability() {
         val before = state()
 
         val after = CardGame.play(before, p1, "hand-1", CardChoice.None)
@@ -38,7 +46,8 @@ class LeaderAvailabilityTest {
                     }
                     .epochs
                     .first()
-                    .count
+                    .leaders
+                    .size
             )
             .isEqualTo(0)
         assertThat(
@@ -50,7 +59,8 @@ class LeaderAvailabilityTest {
                     }
                     .epochs
                     .first()
-                    .count
+                    .leaders
+                    .size
             )
             .isEqualTo(3)
     }
@@ -70,13 +80,14 @@ class LeaderAvailabilityTest {
                     }
                     .epochs
                     .first()
-                    .count
+                    .leaders
+                    .size
             )
             .isEqualTo(0)
     }
 
     @Test
-    fun privatelyDiscardingALeaderDoesNotExposeItsIdentityThroughCounts() {
+    fun privatelyDiscardingALeaderDoesNotExposeItsIdentityThroughAvailability() {
         val before = state().copy(stage = Stage.BUY_CARD)
         val owner = before.playerState(p1)
         val discardable =
@@ -99,7 +110,7 @@ class LeaderAvailabilityTest {
     }
 
     @Test
-    fun movingAnUnplayedLeaderBetweenPrivateLocationsDoesNotChangeCounts() {
+    fun movingAnUnplayedLeaderBetweenPrivateLocationsDoesNotChangeAvailability() {
         val held = state()
         val owner = held.playerState(p1)
         val inDeck =

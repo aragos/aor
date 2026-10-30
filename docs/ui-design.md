@@ -43,6 +43,7 @@ choice and understand its result through visual controls and commands, on deskto
    public handles in hosted games, retained in player overviews. Reuse symbols, owner silhouettes,
    quantities and terms. Every visible capital name carries its board silhouette, including previews,
    choices, reference lists and recorded activity. Text-only titles and accessible names retain names.
+   Align capital symbols, names and surrounding sentence text vertically, including commodity receipts.
    Dice state their colors. Wins/losses have text and green/red styling; color alone conveys nothing.
 8. **Keep summaries compact.** Give each fact a predictable home, with decision-relevant state at
    rest and full tracks/breakdowns in optional detail. Remove repeated structure before shrinking
@@ -70,8 +71,10 @@ choice and understand its result through visual controls and commands, on deskto
   Group expanded advances by printed category, then printed letter; omit empty categories. Put status
   and available pool tokens on one wrapping row.
 - Pass and Undo share a compact toolbar at the top right of the action panel, including while
-  reviewing a selected object. Undo withdraws a pending capital bid or token purchase until reveal;
-  its accessible name and tooltip identify that operation. After reveal it follows the chosen undo policy.
+  reviewing a selected object. Pass uses a prominent filled button to the left of the secondary Undo
+  button; keep them together on one row. Undo withdraws a pending capital bid or token purchase until
+  reveal; its accessible name and tooltip identify that operation. After reveal it follows the chosen
+  undo policy.
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
   readiness while retaining the amount in the local input; reloading must not restore a withdrawn
   submission. Committed history and resource balances change only on reveal.
@@ -111,8 +114,9 @@ choice and understand its result through visual controls and commands, on deskto
   Narrow layouts place the action review and reachable confirmation above the same hand area;
   neither it nor the hand overlays map targets. Commands, turn effects and configuration remain
   reachable without displacing the hand. Omit a visible private-hand title and count; retain an
-  accessible name for the hand. Cards use their natural content height rather than stretching to an
-  arbitrary tall row, capped only when needed to leave room for the workspace and actions.
+  accessible name for the hand. Cards share the smallest equal height that fits the tallest card
+  content, capped only when needed to leave room for the workspace and actions. Short hands shrink
+  to their content; expanded rows retain equal card heights.
   Compact cards show current commodity owner payouts and adjustments, relevant leader credits and
   concise event effects. Keep unavailable cards readable, with selection opening their blocker or
   reference while preserving the active draft. Show Expand only when cards or their contents need
@@ -121,7 +125,7 @@ choice and understand its result through visual controls and commands, on deskto
   scroll through polling and inspection. Keyboard focus brings an offscreen card into view without
   scrolling the whole table.
   Other panes do not summarize hand contents, remind the player of held leaders or mark advances
-  with potential held-card credits. Existing public unplayed-leader counts, played leaders and
+  with potential held-card credits. Public unplayed-leader indicators, played leaders and
   applied purchase discounts describe distinct public or action facts. Render held-card identities
   only from the viewer's projected hand, never by reconstructing holdings from the reference catalog.
 - Full-market placement is primary when legal. Otherwise use the largest engine-offered partial
@@ -147,8 +151,10 @@ choice and understand its result through visual controls and commands, on deskto
   Live values update on accepted polling snapshots after competitions, counting all current circle
   markers, including white ones. Remove the defeated owner immediately; ignore square tokens and
   Chaos. These are forecasts using current adjustments, not a change to actual colored-only payouts.
-- Advances show matching leaders not publicly played, grouped by printed epoch. Held/future cards
-  and private discards stay counted; this cannot promise remaining drawable cards.
+- Advances show one clickable circle per matching leader not publicly played, with its printed epoch
+  inside. Each circle opens that leader’s reference popup, preserving the prepared action and restoring
+  focus on close. Keep circles separate from the advance selection button. Held/future cards and
+  private discards stay included; this cannot promise remaining drawable cards.
 - Leader totals explicitly include the viewer's Written Record bonus, or identify the displayed
   credit as preceding Written Record. Compact hand credits may share one Written Record note per
   card when it applies to every listed total. Played leaders retain their play-time enhancement.

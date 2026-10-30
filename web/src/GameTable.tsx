@@ -159,7 +159,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <div className={`decision-header ${objectAction ? 'object-header' : ''}`}>
                     <div className="decision-toolbar">
                         {!inactive && canAct && snapshot.legalChoices.commands.includes('pass') && <button type="button"
-                            className="secondary pass-action" disabled={busy} onClick={() => { void submit('pass'); }}>{t('action.pass')}</button>}
+                            className="pass-action" disabled={busy} onClick={() => { void submit('pass'); }}>{t('action.pass')}</button>}
                         {!inactive && (withdrawing || snapshot.undo?.available) && <button type="button"
                             className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
                             title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}

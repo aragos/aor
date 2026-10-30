@@ -149,7 +149,7 @@ export async function checkBottomHand(page, web, baseline) {
         assert.equal(await page.evaluate(`document.querySelector('.hand-heading, .hand-title')`), null, 'The hand has no redundant visible heading or card count');
         assert.equal(await page.evaluate(`!!document.querySelector('.hand-toggle')`), mobile, 'Expand is shown only when the four-card hand needs more room');
         const cardHeights = await page.evaluate(`[...document.querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect().height)`);
-        assert(Math.max(...cardHeights)-Math.min(...cardHeights)>10, 'Short card summaries do not stretch to the tallest card');
+        assert(Math.max(...cardHeights)-Math.min(...cardHeights)<1, 'Compact cards share the height required by the tallest content');
         if (!mobile) {
             const columns=await page.evaluate(`(() => {const hand=document.querySelector('.table-hand').getBoundingClientRect();const map=document.querySelector('.workspace-main').getBoundingClientRect();const activity=document.querySelector('.table-activity').getBoundingClientRect();return {handLeft:hand.left,handRight:hand.right,mapLeft:map.left,mapRight:map.right,handBottom:hand.bottom,activityBottom:activity.bottom,activityHeight:activity.height};})()`);
             assert(Math.abs(columns.handLeft-columns.mapLeft)<1 && Math.abs(columns.handRight-columns.mapRight)<1, 'The desktop hand aligns with the map column');
@@ -304,6 +304,8 @@ export async function checkBottomHand(page, web, baseline) {
             }).map(owner => ({text:owner.textContent,owner:dimensions(owner.getBoundingClientRect()),card:dimensions(bounds)}));
         })()`);
         assert.deepEqual(clipping, [], 'Expanded dual-commodity payouts fit their card without clipping amounts');
+        const expandedHeights = await page.evaluate(`[...document.querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect().height)`);
+        assert(Math.max(...expandedHeights)-Math.min(...expandedHeights)<1, 'Expanded cards share equal heights across rows');
         await assertBottomHandVisible(page, `${width} expanded dual-commodity values`);
 
         await assertControlReachable(page, '.player-summary.is-viewer > summary', `${width} expanded hand and player details`);

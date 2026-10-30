@@ -8,7 +8,7 @@ package dev.aragos.aor
  */
 data class AdvanceLeaderAvailabilityView(
     val advance: AdvanceId,
-    val epochs: List<LeaderEpochCountView>,
+    val epochs: List<LeaderEpochView>,
 ) {
     companion object {
         internal fun from(state: GameState): List<AdvanceLeaderAvailabilityView> {
@@ -20,9 +20,11 @@ data class AdvanceLeaderAvailabilityView(
                 AdvanceLeaderAvailabilityView(
                     advance,
                     Epoch.entries.map { epoch ->
-                        LeaderEpochCountView(
+                        LeaderEpochView(
                             epoch.number,
-                            leaders.count { CardData.definition(it.id.cardId).epoch == epoch },
+                            leaders
+                                .filter { CardData.definition(it.id.cardId).epoch == epoch }
+                                .map { it.id },
                         )
                     },
                 )
@@ -31,5 +33,5 @@ data class AdvanceLeaderAvailabilityView(
     }
 }
 
-/** Number of unplayed matching leaders in the printed deck for [epoch], numbered 1 through 3. */
-data class LeaderEpochCountView(val epoch: Int, val count: Int)
+/** Publicly unplayed matching leaders in printed [epoch], numbered 1 through 3. */
+data class LeaderEpochView(val epoch: Int, val leaders: List<LeaderId>)

@@ -45,6 +45,17 @@ now include the label part, measured bounds and coordinates. The final comprehen
 run passed (`aor-browser-artifacts-XoIFpO`). Pool review asserts the exact projected balance in the
 shared summary rather than searching the removed panel for an incidental matching number.
 
+The later 2026-10-30 card-height and action-emphasis revision passes 894 core JVM tests, 333 server
+checks (one existing skip), Kotlin/JS compilation, Kotlin formatting, the web build and 53 web unit
+tests. Focused browser captures in `aor-browser-artifacts-hQ1oi1` verify equal content-sized cards in
+compact and expanded hands, unclipped six-owner payouts, prominent Pass before Undo on desktop and
+phone, and vertically centered commodity receipt text. Live projected leader identities produce one
+clickable epoch circle per unplayed leader; browser checks verify the correct popup, Escape, restored
+focus and preservation of the prepared commodity play. Core checks retain inclusion of held/future
+leaders and private discards, and exclusion after public play even when turn effects expire. The final
+comprehensive browser run also passes (`aor-browser-artifacts-T6SFud`), including live card targeting,
+competition lifetimes, withdrawal/reload, sealed purchases, hosted flows and both maps.
+
 ## Decision inventory
 
 | Prompt / state | Canonical actions and visual path | Evidence |

@@ -94,7 +94,9 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
         const observer = new ResizeObserver(measure);
         observer.observe(section);
         observer.observe(container);
-        [...container.children].forEach(card => {
+        const layout = container.querySelector('.hand-card-layout');
+        if (layout) observer.observe(layout);
+        [...container.querySelectorAll('.object-control')].forEach(card => {
             observer.observe(card);
             const button = card.querySelector('[data-hand-card]');
             if (button) observer.observe(button);
@@ -130,7 +132,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
         <div id="hand-cards" className="hand-cards" {...drag} onFocusCapture={event => {
             const card = event.target.closest('.object-control');
             if (card && drag.ref.current) revealCard(drag.ref.current, card);
-        }}>{snapshot.game.hand.map(card => {
+        }}><div className="hand-card-layout">{snapshot.game.hand.map(card => {
             const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
             const info = snapshot.game.cardInspections?.find(candidate => candidate.definition.id === card.definition.id);
             const commodities = offer?.commodities ?? info?.commodities ?? [];
@@ -200,6 +202,6 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                             <CommodityIcon commodity={commodity}/>
                         </svg>}/>)}</span>
             </div>;
-        })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div>
+        })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div></div>
     </section>;
 }

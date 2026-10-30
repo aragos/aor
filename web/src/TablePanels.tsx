@@ -116,10 +116,21 @@ export function CommodityValueNote({snapshot}: {snapshot: Snapshot}) {
 }
 
 export function UnplayedLeaders({snapshot, advance}: {snapshot: Snapshot; advance: string}) {
+    const {setInspection} = useMapSelection();
     const availability = snapshot.game.unplayedAdvanceLeaders?.find(candidate => candidate.advance === advance);
-    if (!availability) return null;
+    if (!availability?.epochs.some(epoch => epoch.leaders.length)) return null;
     return <span className="unplayed-leaders" title={t('table.unplayedLeadersHint')}>
-        {t('table.unplayedLeaders')} · {availability.epochs.map(epoch => `${['I', 'II', 'III'][epoch.epoch - 1]}: ${epoch.count}`).join(' · ')}
+        <span>{t('table.unplayedLeaders')}</span>
+        {availability.epochs.flatMap(epoch => epoch.leaders.map(leader => {
+            const name = label(leader, 'leader');
+            const printedEpoch = ['I', 'II', 'III'][epoch.epoch - 1];
+            return <button type="button" className="unplayed-leader" key={leader}
+                data-unplayed-leader={leader} title={`${name} · ${t('game.epoch')} ${printedEpoch}`}
+                aria-label={`${name} · ${t('game.epoch')} ${printedEpoch}`}
+                onClick={() => setInspection({kind: 'history-card', id: leaderReference(leader)})}>
+                {printedEpoch}
+            </button>;
+        }))}
     </span>;
 }
 
@@ -156,7 +167,7 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                 const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === advance.id);
                 const owned = me?.advances.includes(advance.id);
                 const available = offer?.unavailableReason === null && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
-                return <div className="object-control" key={advance.id}><button type="button" data-advance={advance.id} className={`advance-tile ${owned ? 'owned' : ''} ${available ? 'available' : ''} ${offer?.leaderDiscounts?.length ? 'discounted' : ''}`} key={advance.id}
+                return <div className={`object-control advance-control ${owned ? 'owned' : ''} ${available ? 'available' : ''}`} key={advance.id}><button type="button" data-advance={advance.id} className={`advance-tile ${owned ? 'owned' : ''} ${available ? 'available' : ''} ${offer?.leaderDiscounts?.length ? 'discounted' : ''}`} key={advance.id}
                     aria-pressed={selectedAdvance === advance.id} onClick={() => {
                         if (!available) {
                             setInspection({kind: 'advance', id: advance.id});
@@ -167,10 +178,9 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                     <span className="advance-letter">{advance.letter}</span><strong>{advanceName(advance.id)}</strong>
                     <AdvancePrice offer={offer} printedCost={advance.cost} compact/>
                     {owned && <small className="advance-owned">{t('table.owned')}</small>}
-                    <UnplayedLeaders snapshot={snapshot} advance={advance.id}/>
                     {available && <small className="advance-available">{t('table.available')}</small>}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}
-                </button></div>;
+                </button><UnplayedLeaders snapshot={snapshot} advance={advance.id}/></div>;
             })}</div>
         </div>)}
     </section>;

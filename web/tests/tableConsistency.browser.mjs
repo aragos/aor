@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
+import {checkMarketInsights} from './marketInsights.browser.mjs';
+import {checkBottomHand} from './bottomHand.browser.mjs';
 import {checkBidWithdrawal} from './purchaseClarity.browser.mjs';
 
 export async function checkTableConsistency(page, web, baseline) {
@@ -24,6 +26,15 @@ export async function checkTableConsistency(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-pool-after]').textContent`), String(offer.resultingPool));
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .pass-action, .decision-panel .undo-action').length`), 2);
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-content .pass-action, .decision-content .undo-action').length`), 0);
+    const assertToolbar = async () => assert.equal(await page.evaluate(`(() => {
+        const pass=document.querySelector('.decision-toolbar .pass-action');
+        const undo=document.querySelector('.decision-toolbar .undo-action');
+        const p=pass.getBoundingClientRect(), u=undo.getBoundingClientRect();
+        return p.right<=u.left && Math.abs((p.top+p.bottom)/2-(u.top+u.bottom)/2)<1 &&
+            !pass.classList.contains('secondary') && p.height>=38 &&
+            getComputedStyle(pass).backgroundColor!==getComputedStyle(undo).backgroundColor;
+    })()`), true, 'Pass is prominent and stays to the left of Undo on one row');
+    await assertToolbar();
     assert.equal(await page.evaluate(`(() => {
         const row=document.querySelector('.player-summary.is-viewer .player-status-row');
         const pool=row.querySelector('.player-pool').getBoundingClientRect();
@@ -33,6 +44,7 @@ export async function checkTableConsistency(page, web, baseline) {
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-compact-expansion.png'), 1440, 1000);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-compact-expansion-phone.png'), 390, 844, true);
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+    await assertToolbar();
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .pool-summary').length`), 1);
     assert.equal(await page.evaluate(`(() => {
         const heading=document.querySelector('.decision-heading').getBoundingClientRect();
@@ -85,19 +97,26 @@ export async function checkTableConsistency(page, web, baseline) {
         });
     })()`), true, 'Before and After sentences center as complete units');
     const stone = baseline.game.cardInspections.find(card => card.definition.id === 'stone-1').definition;
-    await show({prompt: {messageId: 'prompt.play-cards', players: [viewer]}, legalChoices: {commands: ['play stone commodity stone', 'pass']},
+    await show({prompt: {messageId: 'prompt.play-cards', players: [viewer]}, undo: {...baseline.undo, available: true},
+        legalChoices: {commands: ['play stone commodity stone', 'pass']},
         game: {stage: 'PLAY_CARDS', hand: [{reference: 'stone', definition: stone}], cardOffers: [{...cardOffer,
             reference: 'stone', commodities: ['STONE'], miseryChanges: [], choices: [{kind: 'COMMODITY', value: 'stone',
                 command: 'play stone commodity stone', cashChanges: [{player: viewer, before: 40, after: 42}]}]}]}});
     await click('[data-hand-card="stone"]');
-    assert.equal(await page.evaluate(`(() => {
-        const message=document.querySelector('.cash-preview .label-message');
-        const icon=message.querySelector('svg').getBoundingClientRect();
-        const text=[...message.childNodes].find(node=>node.nodeType===Node.TEXT_NODE && node.textContent.includes('receives'));
-        const range=document.createRange(); range.selectNodeContents(text);
-        const rect=range.getBoundingClientRect();
-        return Math.abs((icon.top+icon.bottom)/2-(rect.top+rect.bottom)/2)<3;
-    })()`), true, 'Capital symbols and receipt text align vertically in ordinary sentences');
+    for (const [width, height, mobile] of [[1440, 1000, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        await assertToolbar();
+        assert.equal(await page.evaluate(`(() => {
+            const message=document.querySelector('.cash-preview .label-message');
+            const icon=message.querySelector('svg').getBoundingClientRect();
+            const text=[...message.querySelectorAll('.label-message-text')].find(node=>node.textContent.includes('receives'));
+            const range=document.createRange(); range.selectNodeContents(text);
+            const rect=range.getBoundingClientRect();
+            return Math.abs((icon.top+icon.bottom)/2-(rect.top+rect.bottom)/2)<2;
+        })()`), true, 'Capital symbols and commodity receipt text align on desktop and phone');
+        await page.evaluate(`document.querySelector('.cash-preview').scrollIntoView({block: 'center'})`);
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-commodity-receipt-${width}.png`));
+    }
     console.log('Passed: compact expansion pool, shared status row, action toolbar, unlabeled card state, per-player group misery and centered turn-order buttons.');
 }
 
@@ -126,6 +145,8 @@ if (process.argv[1]?.endsWith('/tableConsistency.browser.mjs')) {
         }
         assert(baseline);
         await checkTableConsistency(page, web, baseline);
+        await checkMarketInsights(page, web, baseline);
+        await checkBottomHand(page, web, baseline);
     } finally {
         page.ws.close();
         await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);

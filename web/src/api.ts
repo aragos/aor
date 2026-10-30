@@ -144,7 +144,7 @@ export interface Snapshot {
         scores: ScoreView[]; adjustments: Record<string, ('SHORTAGE' | 'SURPLUS')[]>;
         effects: CardTurnEffects; activeWar: {initiator: string; opponent: string; startedTurn: number; ties: number} | null;
         playedLeaderDiscounts: {leader: string; usable: boolean; discounts: LeaderDiscountView[]}[];
-        unplayedAdvanceLeaders?: {advance: string; epochs: {epoch: number; count: number}[]}[];
+        unplayedAdvanceLeaders?: {advance: string; epochs: {epoch: number; leaders: string[]}[]}[];
         pirateTargets: {requiredCount: number; eligibleProvinces: string[]} | null;
         markerPlacement: {player: string; destination: string} | null;
         replacementToken?: {player: string; provinces: string[]; event: string; poolTokens: number;
