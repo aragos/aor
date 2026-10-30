@@ -15,6 +15,8 @@ recorded outcomes support deterministic replay, restart and scoped, audited hist
 - [Deployment](docs/deployment.md) and [follow-ups](docs/follow-ups.md): hosting, administration and launch prerequisites.
 - [UI principles](docs/ui-design.md), [map design](docs/map-design.md),
   [decision coverage](docs/ui-decision-coverage.md) and [UX review](docs/ux-next-steps.md): interaction and evidence.
+- [Principles alignment proposal](docs/principles-alignment-proposal.md): project-wide review and
+  proposed improvements to decisions, engine boundaries and game management.
 - [Data inventory](docs/data-inventory.md), [card inventory](docs/card-inventory.md) and
   [rule coverage](docs/rule-coverage.md): catalog sources and verification.
 - [European map authoring](docs/european-map.md): alternate-board definitions and validation.

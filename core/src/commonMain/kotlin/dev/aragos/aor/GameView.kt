@@ -94,6 +94,9 @@ data class GameView(
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
     val reliefOffers: List<ReliefOfferView> = emptyList(),
+    val patronageOffers: List<PatronageOfferView> = emptyList(),
+    val adjustmentOffers: List<AdjustmentCancellationOffer> = emptyList(),
+    val cardPurchaseOffer: CardPurchaseOfferView? = null,
     val stabilizationCost: Long? = null,
     /** Printed misery box after paying stabilization in misery; null means Chaos. */
     val stabilizationMisery: Int? = null,
@@ -184,7 +187,11 @@ data class GameView(
                     } else null,
                 voids = state.voids,
                 advanceOffers = advanceOffers(state, viewer),
-                reliefOffers = reliefOffers(state, viewer),
+                patronageOffers = PatronageOfferView.from(state, viewer.player.id),
+                adjustmentOffers = AdjustmentCancellation.offers(state, viewer.player.id),
+                reliefOffers = ReliefOfferView.from(state, viewer),
+                cardPurchaseOffer =
+                    CardPurchases.offer(state, viewer).takeIf { state.stage == Stage.BUY_CARD },
                 stabilizationCost =
                     if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
                 stabilizationMisery =
@@ -251,28 +258,6 @@ data class GameView(
                 )
             }
         }
-
-        private fun reliefOffers(state: GameState, viewer: PlayerState): List<ReliefOfferView> {
-            val turn = state.turnNumber ?: return emptyList()
-            if (
-                viewer.misery == MiseryStep.CHAOS ||
-                    state.rules.miseryRelief != MiseryReliefRule.PURCHASED
-            )
-                return emptyList()
-            return (1..viewer.advances.tierCount).mapNotNull { spaces ->
-                try {
-                    val quote = PlayerEconomy.reliefQuote(viewer, spaces, turn, state.rules)
-                    ReliefOfferView(
-                        spaces,
-                        quote.cashCost,
-                        quote.ratingSpent,
-                        viewer.cash >= quote.cashCost,
-                    )
-                } catch (_: RuleViolation) {
-                    null
-                }
-            }
-        }
     }
 }
 
@@ -322,7 +307,33 @@ data class ReliefOfferView(
     val cashCost: Int,
     val ratingSpent: Int,
     val affordable: Boolean,
-)
+    val cashAfter: Int,
+    val miseryBefore: Int?,
+    val miseryAfter: Int?,
+) {
+    companion object {
+        internal fun from(state: GameState, viewer: PlayerState): List<ReliefOfferView> {
+            val turn = state.turnNumber ?: return emptyList()
+            if (viewer.misery == MiseryStep.CHAOS) return emptyList()
+            return (1..viewer.advances.tierCount).mapNotNull { spaces ->
+                try {
+                    val quote = PlayerEconomy.reliefQuote(viewer, spaces, turn)
+                    ReliefOfferView(
+                        spaces,
+                        quote.cashCost,
+                        quote.ratingSpent,
+                        viewer.cash >= quote.cashCost,
+                        viewer.cash - quote.cashCost,
+                        viewer.misery.value,
+                        quote.target.value,
+                    )
+                } catch (_: RuleViolation) {
+                    null
+                }
+            }
+        }
+    }
+}
 
 /** Public board occupancy; the static catalog supplies labels and empty provinces. */
 data class ProvinceView(

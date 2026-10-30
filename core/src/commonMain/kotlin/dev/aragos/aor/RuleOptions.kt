@@ -7,34 +7,6 @@ data class RuleOptions(
     val immediateMasterArtDiscard: Boolean = false,
     val map: MapRule = MapRule.STANDARD,
 ) {
-    // Baseline mechanics are fixed; these are not configurable game variants.
-    val setup: SetupRule
-        get() = SetupRule.STANDARD
-
-    val commerce: CommerceRule
-        get() = CommerceRule.AH1996
-
-    val windWatermill: WindWatermillRule
-        get() = WindWatermillRule.TAKEOVER_TRADE
-
-    val writtenRecord: WrittenRecordRule
-        get() = WrittenRecordRule.LEADER_BONUS
-
-    val incomeRelief: IncomeReliefRule
-        get() = IncomeReliefRule.NEW_WORLD
-
-    val credits: CreditRule
-        get() = CreditRule.AH1996
-
-    val miseryRelief: MiseryReliefRule
-        get() = MiseryReliefRule.PURCHASED
-
-    val patronage: PatronageRule
-        get() = PatronageRule.PROTECTION_MONEY
-
-    val stGallSupport: Boolean
-        get() = false
-
     /** Physical cards assigned to an epoch before recycled discards are added. */
     fun cardsForEpoch(epoch: Epoch): List<String> {
         val printed = CardData.forEpoch(epoch).map(CardDefinition::id)
@@ -73,11 +45,6 @@ enum class MapRule(val commandValue: String) {
             }
 }
 
-enum class SetupRule(val commandValue: String) {
-    STANDARD("standard"),
-    IMPROVED("improved"),
-}
-
 enum class InitialCardRule(val commandValue: String) {
     ANY("any"),
     NO_CRUSADES("no-crusades"),
@@ -91,41 +58,6 @@ enum class InitialCardRule(val commandValue: String) {
             NO_EVENTS -> card.kind != CardKind.EVENT
             COMMODITY_ONLY -> card.kind == CardKind.COMMODITY
         }
-}
-
-enum class CommerceRule(val commandValue: String) {
-    AH1996("ah1996"),
-    SECOND_EDITION("second-edition"),
-}
-
-enum class WindWatermillRule(val commandValue: String) {
-    TAKEOVER_TRADE("takeover-trade"),
-    MARKET_ADJUSTMENT("market-adjustment"),
-}
-
-enum class WrittenRecordRule(val commandValue: String) {
-    LEADER_BONUS("leader-bonus"),
-    TAKEOVER_TRADE("takeover-trade"),
-}
-
-enum class IncomeReliefRule(val commandValue: String) {
-    NEW_WORLD("new-world"),
-    ENLIGHTENMENT("enlightenment"),
-}
-
-enum class CreditRule(val commandValue: String) {
-    AH1996("ah1996"),
-    SECOND_EDITION("second-edition"),
-}
-
-enum class MiseryReliefRule(val commandValue: String) {
-    PURCHASED("purchased"),
-    CATEGORY_COMPLETION("category-completion"),
-}
-
-enum class PatronageRule(val commandValue: String) {
-    PROTECTION_MONEY("protection-money"),
-    THREE_BOX_DISPLAY("three-box-display"),
 }
 
 private fun Boolean.commandValue(): String = if (this) "enabled" else "disabled"

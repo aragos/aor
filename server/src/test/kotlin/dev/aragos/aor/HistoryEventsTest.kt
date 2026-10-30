@@ -101,14 +101,6 @@ class HistoryEventsTest {
     }
 
     @Test
-    fun setupReturnRemainsPrivate() {
-        val event = project(Entry.Action(owner, SetupCommand.ReturnCard(card.reference)), observer)
-
-        assertThat(event?.card).isNull()
-        assertThat(event?.kind).isEqualTo(HistoryEventKind.RETURN_CARD)
-    }
-
-    @Test
     fun establishingAMarkerHasItsOwnEvent() {
         val province = ProvinceId("valencia")
         val entry = Entry.Action(owner, BoardCommand.Place(2, province))
@@ -153,7 +145,17 @@ class HistoryEventsTest {
     fun continuedActionsDoNotCreateActivityEntries() {
         val entry = Entry.Action(owner, TurnCommand.Pass)
 
-        assertThat(HistoryEvents.projectAll("3:0", before, before, entry, observer)).isEmpty()
+        assertThat(
+                HistoryEvents.projectAll(
+                    "3:0",
+                    before,
+                    before,
+                    entry,
+                    observer,
+                    GameTransition(before, before, emptyList()),
+                )
+            )
+            .isEmpty()
     }
 
     @Test
@@ -161,7 +163,14 @@ class HistoryEventsTest {
         val after = before.copy(currentEpoch = Epoch.TWO, deck = listOf("stone-1"))
 
         val events =
-            HistoryEvents.projectAll("4:0", before, after, Entry.Shuffle(after.deck), observer)
+            HistoryEvents.projectAll(
+                "4:0",
+                before,
+                after,
+                Entry.Shuffle(after.deck),
+                observer,
+                GameTransition(after, after, emptyList()),
+            )
 
         assertThat(events.map(HistoryEventView::kind)).containsExactly(HistoryEventKind.NEXT_EPOCH)
         assertThat(events.single().amount).isEqualTo(2)
@@ -175,7 +184,15 @@ class HistoryEventsTest {
         val after = initial.copy(endingTriggered = true)
         val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
 
-        val events = HistoryEvents.projectAll("4:1", initial, after, entry, observer)
+        val events =
+            HistoryEvents.projectAll(
+                "4:1",
+                initial,
+                after,
+                entry,
+                observer,
+                GameTransition(after, after, emptyList()),
+            )
 
         assertThat(events.map(HistoryEventView::kind))
             .containsExactly(HistoryEventKind.DRAW_CARD, HistoryEventKind.ENDING_TRIGGERED)
@@ -188,7 +205,15 @@ class HistoryEventsTest {
         val initial = before.copy(stage = Stage.DRAW_CARD, endingTriggered = true)
         val entry = GameOutcome.Draw(owner, card.reference, card.definition.id)
 
-        val events = HistoryEvents.projectAll("4:2", initial, initial, entry, observer)
+        val events =
+            HistoryEvents.projectAll(
+                "4:2",
+                initial,
+                initial,
+                entry,
+                observer,
+                GameTransition(initial, initial, emptyList()),
+            )
 
         assertThat(events.map(HistoryEventView::kind)).containsExactly(HistoryEventKind.DRAW_CARD)
     }
@@ -205,6 +230,7 @@ class HistoryEventsTest {
                 after,
                 Entry.Action(owner, TurnCommand.Pass),
                 observer,
+                GameTransition(after, after, emptyList()),
             )
 
         assertThat(events.map(HistoryEventView::kind))
@@ -225,6 +251,31 @@ class HistoryEventsTest {
                 after,
                 Entry.Action(owner, TurnCommand.Pass),
                 observer,
+                GameTransition(
+                    after,
+                    before,
+                    listOf(
+                        EffectReceipt(
+                            AutomaticCause.INCOME,
+                            after.stage,
+                            after.turnNumber,
+                            listOf(
+                                ResourceEndpoints(
+                                    owner,
+                                    40,
+                                    58,
+                                    0,
+                                    0,
+                                    36,
+                                    36,
+                                    before.playerState(owner).misery,
+                                    after.playerState(owner).misery,
+                                )
+                            ),
+                            AdvanceId.NEW_WORLD,
+                        )
+                    ),
+                ),
             )
 
         assertThat(events.single().kind).isEqualTo(HistoryEventKind.INCOME)

@@ -15,6 +15,10 @@ type Inspection = {kind: 'card' | 'history-card' | 'advance' | 'province'; id: s
 const MapSelection = createContext<{
     workspace: 'map' | 'markets' | 'advances';
     setWorkspace: Dispatch<SetStateAction<'map' | 'markets' | 'advances'>>;
+    partial: string;
+    setPartial: Dispatch<SetStateAction<string>>;
+    selectedAction: string;
+    setSelectedAction: (command: string) => void;
     selected: string;
     setSelected: Dispatch<SetStateAction<string>>;
     selectedArea: string;
@@ -31,7 +35,7 @@ const MapSelection = createContext<{
     focusRevision: number;
     inspection: Inspection;
     setInspection: Dispatch<SetStateAction<Inspection>>;
-}>({workspace: 'map', setWorkspace: () => undefined, selected: '', setSelected: () => undefined, selectedArea: '', setSelectedArea: () => undefined, selectedCard: '', setSelectedCard: () => undefined,
+}>({partial: '', setPartial: () => undefined, selectedAction: '', setSelectedAction: () => undefined, workspace: 'map', setWorkspace: () => undefined, selected: '', setSelected: () => undefined, selectedArea: '', setSelectedArea: () => undefined, selectedCard: '', setSelectedCard: () => undefined,
     selectedAdvance: '', setSelectedAdvance: () => undefined, picker: null, setPicker: () => undefined,
     playerPicker: null, setPlayerPicker: () => undefined, resetSelection: () => undefined, focusRevision: 0,
     inspection: null, setInspection: () => undefined});
@@ -40,21 +44,31 @@ export function MapSelectionProvider({children}: {children: ReactNode}) {
     const [picker, setPicker] = useState<Picker | null>(null);
     const [playerPicker, setPlayerPicker] = useState<Picker | null>(null);
     const [workspace, setWorkspace] = useState<'map' | 'markets' | 'advances'>('map');
+    const [partial, setPartial] = useState('');
+    const [selectedAction, storeSelectedAction] = useState('');
     const [selected, setSelected] = useState('');
     const [selectedArea, setSelectedArea] = useState('');
     const [selectedCard, setSelectedCard] = useState('');
     const [selectedAdvance, setSelectedAdvance] = useState('');
     const [focusRevision, setFocusRevision] = useState(0);
     const [inspection, setInspection] = useState<Inspection>(null);
+    const setSelectedAction = useCallback((command: string) => {
+        storeSelectedAction(command);
+        if (command) {
+            setSelected(''); setSelectedCard(''); setSelectedAdvance(''); setPicker(null);
+        }
+    }, []);
     const resetSelection = useCallback(() => {
+        setPartial(''); setSelectedAction('');
         setSelected(''); setSelectedArea(''); setSelectedCard(''); setSelectedAdvance('');
         setPicker(null); setPlayerPicker(null); setFocusRevision(revision => revision + 1);
         setInspection(null);
     }, []);
+    useEffect(() => setPartial(''), [selected]);
     useEffect(() => {
         if (selected || selectedCard || selectedAdvance) setSelectedArea('');
     }, [selected, selectedCard, selectedAdvance]);
-    return <MapSelection.Provider value={{picker, setPicker, playerPicker, setPlayerPicker, workspace, setWorkspace, selected, setSelected, selectedArea, setSelectedArea, selectedCard,
+    return <MapSelection.Provider value={{partial, setPartial, selectedAction, setSelectedAction, picker, setPicker, playerPicker, setPlayerPicker, workspace, setWorkspace, selected, setSelected, selectedArea, setSelectedArea, selectedCard,
         setSelectedCard, selectedAdvance, setSelectedAdvance, resetSelection, focusRevision,
         inspection, setInspection}}>{children}</MapSelection.Provider>;
 }

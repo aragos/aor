@@ -10,6 +10,9 @@ function signedIn() {
     return {user};
 }
 
+state.refresh = () => {for (const listener of listeners) listener(auth.currentUser);};
+state.switchUser = uid => {auth.currentUser = {...user, uid}; state.refresh();};
+
 state.finishPopup = code => {
     const popup = state.popup;
     state.popup = null;

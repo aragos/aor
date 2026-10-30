@@ -104,6 +104,7 @@ fun Application.module(
                     "cards" to CardData.all,
                     "leaders" to LeaderData.definitions,
                     "rules" to RuleOptions(),
+                    "ruleOptions" to RuleOptionView.from(RuleOptions()),
                 )
             )
         }
@@ -227,7 +228,12 @@ fun Application.module(
         post("/api/games/{id}/commands") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("expectedRevision", "command")
+                body.fieldsOnly(
+                    "expectedRevision",
+                    "command",
+                    "expectedSubmissionVersion",
+                    "operationId",
+                )
                 val command = body.field("command").string()
                 if (command.length > 200 || command.contains('\n') || command.contains('\r')) {
                     throw ServiceFailure(400, "INVALID_REQUEST")
@@ -239,6 +245,8 @@ fun Application.module(
                             call.gameAccess(hosted),
                             body.field("expectedRevision").integer(),
                             command,
+                            body["expectedSubmissionVersion"]?.takeUnless { it.isNull }?.string(),
+                            body["operationId"]?.takeUnless { it.isNull }?.string(),
                         )
                     }
                 call.respondJson(result)
@@ -297,12 +305,19 @@ internal suspend fun ApplicationCall.api(block: suspend () -> Unit) {
         block()
     } catch (error: RuleViolation) {
         respondJson(
-            mapOf("code" to error.code.name, "entityIds" to error.entityIds),
+            error.diagnostic,
             HttpStatusCode.UnprocessableEntity,
         )
     } catch (error: ServiceFailure) {
         respondJson(
-            mapOf("code" to error.code, "entryIndex" to error.entryIndex),
+            mapOf(
+                "code" to error.code,
+                "entryIndex" to error.entryIndex,
+                "entityIds" to error.diagnostic?.entityIds.orEmpty(),
+                "entities" to error.diagnostic?.entities.orEmpty(),
+                "parameters" to error.diagnostic?.parameters.orEmpty(),
+                "diagnostic" to error.diagnostic,
+            ),
             HttpStatusCode.fromValue(error.status),
         )
     } catch (_: IllegalArgumentException) {

@@ -89,7 +89,7 @@ export async function createGame(count, options = {}) {
         const state = await snapshot(link);
         const response = await fetch(api + '/api/games/' + created.gameId + '/commands', {method: 'POST',
             headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + link.token},
-            body: JSON.stringify({expectedRevision: state.revision, command})});
+            body: JSON.stringify({expectedRevision: state.revision, expectedSubmissionVersion: state.submissionVersion, command})});
         assert(response.ok, `Engine rejected fixture command ${command}: ${await response.clone().text()}`);
         return response.json();
     }

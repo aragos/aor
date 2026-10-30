@@ -47,7 +47,7 @@ function CreateGame() {
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
             <p className="muted small">{t('create.threeEpochs')}</p>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
-            <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons id="undo-policy" value={undoPolicy} onChange={setUndoPolicy} disabled={busy}
+            <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} id="undo-policy" value={undoPolicy} onChange={setUndoPolicy} disabled={busy}
                 choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {error && <ErrorMessage code={error}/>}
             <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>
@@ -66,9 +66,14 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const etag = useRef<string>();
     const acceptedSnapshot = useRef<string>();
     const activityAt = useRef(0);
+    const uncertainOperation = useRef<string | null>(null);
     const path = `/api/games/${id}`;
 
     function acceptSnapshot(next: Snapshot) {
+        if (uncertainOperation.current && next.submissionReceipts?.includes(uncertainOperation.current)) {
+            setActionError(new ApiError('OUTCOME_CONFIRMED'));
+            uncertainOperation.current = null;
+        }
         const content = JSON.stringify(next);
         if (content !== acceptedSnapshot.current) activityAt.current = Date.now();
         acceptedSnapshot.current = content;
@@ -91,7 +96,11 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
                     setConnectionError('');
                 }
             }, onError: failure => {
-                if (active && readSequence === sequence.current) setConnectionError(errorCode(failure));
+                if (active && readSequence === sequence.current) {
+                    const code = errorCode(failure);
+                    if (['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code)) setSnapshot(null);
+                    setConnectionError(code);
+                }
             }});
         return () => {active = false; stop(); setTurnFavicon(false);};
     }, [path, token, pollInterval]);
@@ -100,15 +109,19 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         if (!snapshot || busyRef.current) return false;
         busyRef.current = true; ++sequence.current;
         etag.current = undefined;
+        const operationId = crypto.randomUUID();
+        uncertainOperation.current = null;
         setBusy(true); setActionError(null); setSaved(false);
         try {
-            acceptSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...operation}));
+            acceptSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(endpoint === 'commands' ? {operationId} : {}), ...operation}));
             activityAt.current = Date.now();
             setConnectionError(''); setSaved(true); return true;
         } catch (failure) {
             const code = errorCode(failure);
+            if (['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code)) setSnapshot(null);
             setActionError(failure instanceof ApiError ? failure : new ApiError(code));
-            if (code === 'STALE_REVISION') {
+            if (code === 'OUTCOME_UNKNOWN') uncertainOperation.current = operationId;
+            if (['STALE_REVISION', 'STALE_SUBMISSION', 'OUTCOME_UNKNOWN'].includes(code)) {
                 try {
                     const refreshed = await requestSnapshot(path, token);
                     if (refreshed.snapshot) acceptSnapshot(refreshed.snapshot);
@@ -120,8 +133,8 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 
     if (!snapshot) return <main className="landing panel"><h1>{t('app.title')}</h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
     return <MapSelectionProvider><GameTable snapshot={snapshot} busy={busy} saved={saved}
-        submit={command => mutate('commands', {command})} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines})} connectionError={connectionError} actionError={actionError}
-        quotePurchase={amount => request<PurchaseQuote>(`${path}/quote-token-purchase`, token, {expectedRevision: snapshot.revision, amount})}/></MapSelectionProvider>;
+        submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null})} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines})} connectionError={connectionError} actionError={actionError}
+        quotePurchase={amount => request<PurchaseQuote>(`${path}/quote-token-purchase`, token, {expectedRevision: snapshot.revision, amount}, undefined, {readOnly: true})}/></MapSelectionProvider>;
 }
 
 export function App() {

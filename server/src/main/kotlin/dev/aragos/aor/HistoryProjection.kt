@@ -17,7 +17,8 @@ internal object HistoryProjection {
             for (recorded in stored.effectiveEntries()) {
                 val entry = TextCodec.parse(recorded.text)
                 add(line(state, entry, viewer))
-                val after = state.step(entry)
+                val transition = state.transition(entry)
+                val after = transition.state
                 val purchase = (entry as? Entry.Action)?.command as? Command.BuyTokens
                 if (entry is Entry.Action && purchase != null) {
                     val previous =
@@ -27,7 +28,7 @@ internal object HistoryProjection {
                     val batch =
                         previous.copy(amounts = previous.amounts + (entry.actor to purchase.amount))
                     if (batch.revealed(after)) {
-                        val paid = entry.applyTo(state)
+                        val paid = transition.applied
                         events.add(
                             HistoryEvents.tokenPurchases(
                                 batch.firstEntryId,
@@ -41,13 +42,27 @@ internal object HistoryProjection {
                         tokenBatch = batch
                     }
                     events.addAll(
-                        HistoryEvents.projectAll(recorded.id, state, after, entry, viewer)
+                        HistoryEvents.projectAll(
+                                recorded.id,
+                                state,
+                                after,
+                                entry,
+                                viewer,
+                                transition,
+                            )
                             .filterNot { event -> event.kind == HistoryEventKind.BUY_TOKENS }
                     )
                 } else {
                     tokenBatch = null
                     events.addAll(
-                        HistoryEvents.projectAll(recorded.id, state, after, entry, viewer)
+                        HistoryEvents.projectAll(
+                            recorded.id,
+                            state,
+                            after,
+                            entry,
+                            viewer,
+                            transition,
+                        )
                     )
                 }
                 state = after
@@ -109,8 +124,6 @@ internal object HistoryProjection {
     private fun action(before: GameState, entry: Entry.Action, viewer: PlayerId): String {
         val command = entry.command
         return when {
-            entry.actor != viewer && command is SetupCommand.ReturnCard ->
-                "${entry.actor}: return-card <hidden>"
             entry.actor != viewer && command is TurnCommand.DiscardCard ->
                 "${entry.actor}: discard-card <hidden>"
             command is BoardCommand.OfferCard && viewer !in BoardGame.tradeParticipants(before) ->

@@ -19,6 +19,73 @@ class BidWithdrawalTest(private val postgres: Boolean) {
     }
 
     @Test
+    fun lostPrivateWriteResponseCanBeReconciledAfterALaterReplacementAndRestart() =
+        WithdrawalFixture(postgres).use { fixture ->
+            val reviewed = fixture.snapshot(0)
+            val operationId = "550e8400-e29b-41d4-a716-446655440000"
+            fixture.service.submit(
+                fixture.game.gameId,
+                fixture.access(0),
+                reviewed.revision,
+                "bid-capital 12",
+                reviewed.submissionVersion,
+                operationId,
+            )
+            fixture.submit(0, "bid-capital 17")
+
+            val restored = fixture.restarted(0)
+
+            assertThat(restored.submissionReceipts).contains(operationId)
+            assertThat(restored.pendingBid).isEqualTo(17)
+            assertThat(fixture.snapshot(1).submissionReceipts).isEmpty()
+        }
+
+    @Test
+    fun staleSameSeatWritesCannotReplaceOrWithdrawNewerPrivateWork() =
+        WithdrawalFixture(postgres).use { fixture ->
+            fixture.submit(0, "bid-capital 12")
+            val reviewed = fixture.snapshot(0)
+            fixture.submit(0, "bid-capital 17")
+            val writer = fixture.independentWriter()
+            for (command in listOf("withdraw-bid", "bid-capital 9")) {
+                val failure =
+                    assertFailsWith<ServiceFailure> {
+                        writer.submit(
+                            fixture.game.gameId,
+                            fixture.access(0),
+                            reviewed.revision,
+                            command,
+                            reviewed.submissionVersion,
+                        )
+                    }
+                assertThat(failure.code).isEqualTo("STALE_SUBMISSION")
+            }
+            assertThat(fixture.restarted(0).pendingBid).isEqualTo(17)
+        }
+
+    @Test
+    fun returningToTheSameAmountStillInvalidatesAnEarlierReceipt() =
+        WithdrawalFixture(postgres).use { fixture ->
+            fixture.submit(0, "bid-capital 12")
+            val reviewed = fixture.snapshot(0)
+            fixture.submit(0, "bid-capital 17")
+            fixture.submit(0, "bid-capital 12")
+            assertThat(fixture.snapshot(0).submissionVersion)
+                .isNotEqualTo(reviewed.submissionVersion)
+        }
+
+    @Test
+    fun privateReplacementIsInvisibleToOtherViewersIncludingTheirReadValidators() =
+        WithdrawalFixture(postgres).use { fixture ->
+            fixture.submit(0, "bid-capital 12")
+            val before = fixture.service.read(fixture.game.gameId, fixture.access(1), null)
+            fixture.submit(0, "bid-capital 17")
+            val after = fixture.service.read(fixture.game.gameId, fixture.access(1), before.etag)
+            assertThat(after.etag).isEqualTo(before.etag)
+            assertThat(after.snapshot).isNull()
+        }
+
+    @Test
     fun capitalWithdrawalSurvivesRestartAndReopensOnlyTheCallersDecision() =
         WithdrawalFixture(postgres).use { fixture ->
             fixture.submit(0, "bid-capital 17")
@@ -263,7 +330,14 @@ private class WithdrawalFixture(postgres: Boolean) : AutoCloseable {
         player: Int,
         text: String,
         expectedRevision: Int = snapshot(player).revision,
-    ): GameSnapshot = service.submit(game.gameId, access(player), expectedRevision, text)
+    ): GameSnapshot =
+        service.submit(
+            game.gameId,
+            access(player),
+            expectedRevision,
+            text,
+            snapshot(player).submissionVersion,
+        )
 
     fun restarted(player: Int): GameSnapshot =
         (sql?.reopened(NoWithdrawalRandom)

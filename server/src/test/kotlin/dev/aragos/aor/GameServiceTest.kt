@@ -53,7 +53,15 @@ class GameServiceTest {
         val game = create(service)
         service.submit(game.gameId, token(game, 0), 2, "bid-capital 10")
 
-        val replaced = service.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
+        val reviewed = service.get(game.gameId, token(game, 0))
+        val replaced =
+            service.submit(
+                game.gameId,
+                token(game, 0),
+                2,
+                "bid-capital 12",
+                reviewed.submissionVersion,
+            )
         val restarted = createGameService(directory, NoRandom).get(game.gameId, token(game, 0))
 
         assertThat(replaced.revision).isEqualTo(2)

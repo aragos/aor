@@ -1,3 +1,4 @@
+import {checkRequestRecovery} from './requestRecovery.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkActivityPayments} from './activityPayments.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
@@ -364,6 +365,14 @@ await page.send('Page.navigate', {url: web + actor.path});
     await pick(market.destination);
     await page.evaluate(`document.querySelector('.partial-placement').open = true`);
     await page.evaluate(`document.querySelector('#partial-count button').click()`);
+    await page.evaluate(`document.querySelector('.map-zoom button[aria-pressed]').click()`);
+    const inspectProvince = after.game.catalog.provinces.find(province => province.id !== market.destination).id;
+    await pick(inspectProvince);
+    await page.evaluate(`document.querySelector('.world-map > rect').dispatchEvent(new MouseEvent('click', {bubbles:true}))`);
+    await page.evaluate(`document.querySelector('.map-zoom button[aria-pressed]').click()`);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    assert.equal(await page.evaluate(`document.querySelector('#partial-count button[aria-pressed=true]')?.textContent`), '1', 'Independent inspection, closing and polling preserve the live partial placement');
+
     assert.equal((await page.snapshot()).revision, after.revision, 'Partial amount selection cannot submit');
     await page.evaluate(`document.querySelector('.partial-placement form > button').click()`);
     await page.wait(`document.querySelector('.primary-expansion')?.textContent.includes('${market.requiredTokens - 1}')`, 'remaining marker commitment after partial occupation');
@@ -375,6 +384,32 @@ await page.send('Page.navigate', {url: web + actor.path});
     after = await page.snapshot();
     assert.equal(after.game.board.find(province => province.id === market.destination).marker.owner, after.viewerId);
     console.log('Passed: live satellite placement, partial-market draft and remaining marker establishment.');
+    await page.reload();
+    await page.wait(`document.querySelector('.world-map')`, 'fresh live keyboard traversal');
+    const key = async key => {
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key});
+        await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key});
+    };
+    for (let step = 0; step < 100 && !await page.evaluate(`!!document.activeElement?.dataset?.mapProvince`); step++) await key('Tab');
+    const focusedProvince = await page.evaluate(`document.activeElement?.dataset?.mapProvince`);
+    assert(focusedProvince, 'Sequential Tab navigation enters the map without directly focusing a target');
+    assert.equal(await page.evaluate(`document.querySelectorAll('[data-map-province][tabindex="0"]').length`), 1);
+    await key('ArrowRight');
+    assert.notEqual(await page.evaluate(`document.activeElement?.dataset?.mapProvince`), focusedProvince);
+    await page.evaluate(`document.querySelector('[aria-label="Zoom in"]').click()`);
+    await key('End');
+    assert.equal(await page.evaluate(`(() => {
+        const id = document.activeElement.dataset.mapProvince;
+        const [x,y] = ${JSON.stringify(Object.fromEntries(Object.entries(boardGeometry.provinces).map(([id, shape]) => [id, shape.label])))}[id];
+        const [vx,vy,w,h] = document.querySelector('.world-map').getAttribute('viewBox').split(' ').map(Number);
+        return x >= vx && x <= vx+w && y >= vy && y <= vy+h;
+    })()`), true, 'Arrow traversal pans a zoomed map to its focused province');
+    await key('Tab'); await key('Tab');
+    assert.equal(await page.evaluate(`!!document.activeElement?.closest('.world-map')`), false, 'Tab leaves the two roving map groups');
+    for (let step = 0; step < 25 && !await page.evaluate(`!!document.activeElement?.closest('.decision-panel')`); step++) await key('Tab');
+    assert.equal(await page.evaluate(`!!document.activeElement?.closest('.decision-panel')`), true, 'The decision remains reachable through real sequential navigation');
+    console.log('Passed: sequential keyboard entry, roving province traversal, zoomed focus panning and exit to the decision panel.');
+
     assert.equal(await page.evaluate(`document.querySelector('.map-toolbar input[type=search]')`), null, 'Map search menu removed');
     await page.evaluate(`document.querySelector('[aria-label="Zoom in"]').click()`);
     const zoomed = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
@@ -431,6 +466,7 @@ await page.send('Page.navigate', {url: web + actor.path});
 
     await checkTable(page, web, after);
     await checkFinished(page, web, after);
+    await checkRequestRecovery(page, web, after);
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);
     await checkReferenceUx(page, web, after);

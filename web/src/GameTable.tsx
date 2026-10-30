@@ -171,7 +171,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 {!inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
                 {!inactive && <UrbanAscendancyQueue snapshot={snapshot} busy={busy} submit={submit}/>}
                 {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
-                <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved ? t('status.saved') : '\u00a0'}</p>
+                <p className="save-status" aria-live="polite">{busy ? t('status.working') : saved && !['BIDDING', 'TOKEN_PURCHASE'].includes(snapshot.game.stage) ? t('status.saved') : '\u00a0'}</p>
                 </div>
             </aside>
             <Activity snapshot={snapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}/>

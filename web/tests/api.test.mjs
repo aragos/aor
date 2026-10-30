@@ -10,11 +10,12 @@ const {ApiError,request,requestSnapshot,setAuthentication} = await import('data:
 test('rejections retain diagnostic objects and reject malformed arguments', async () => {
     const original = globalThis.fetch;
     try {
-        globalThis.fetch = async () => new Response(JSON.stringify({code:'UNREACHABLE_PROVINCE',entityIds:['acre',7,null]}),{status:422});
+        globalThis.fetch = async () => new Response(JSON.stringify({code:'UNREACHABLE_PROVINCE',entityIds:['acre',7,null],parameters:{required:5,available:'untrusted',bad:{}}}),{status:422});
         await assert.rejects(request('/api/games/test'),error=>{
             assert(error instanceof ApiError);
             assert.equal(error.code,'UNREACHABLE_PROVINCE');
             assert.deepEqual(error.entityIds,['acre']);
+            assert.deepEqual(error.parameters,{required:5});
             return true;
         });
     } finally {globalThis.fetch=original;}
@@ -92,5 +93,50 @@ test('canceling an obsolete read aborts its fetch', async () => {
 
         await rejected;
         assert.equal(requestSignal.aborted, true);
+    } finally {globalThis.fetch = original;}
+});
+
+for (const phase of ['authentication', 'fetch', 'body']) {
+    test(`a mutation stalled in ${phase} has an unknown outcome and is never replayed`, {timeout: 1000}, async context => {
+        const original = globalThis.fetch;
+        context.mock.timers.enable({apis: ['setTimeout']});
+        let writes = 0, bodyStarted;
+        const started = new Promise(resolve => {bodyStarted = resolve;});
+        try {
+            setAuthentication(phase === 'authentication' ? async () => new Promise(() => {}) : undefined);
+            globalThis.fetch = async () => {
+                writes++;
+                if (phase === 'fetch') {bodyStarted(); return new Promise(() => {});}
+                return {ok: true, json: () => {bodyStarted(); return new Promise(() => {});}};
+            };
+            const rejected = assert.rejects(request('/commands', undefined, {command: 'pass'}), error => error.code === 'OUTCOME_UNKNOWN');
+            if (phase !== 'authentication') await started;
+            context.mock.timers.tick(15000);
+            await rejected;
+            assert.equal(writes, phase === 'authentication' ? 0 : 1);
+            context.mock.timers.tick(60000);
+            assert.equal(writes, phase === 'authentication' ? 0 : 1);
+        } finally {globalThis.fetch = original; setAuthentication();}
+    });
+}
+
+test('a canceled directory read cannot publish a late response', async () => {
+    const original = globalThis.fetch;
+    let reply;
+    try {
+        globalThis.fetch = async () => new Promise(resolve => {reply = resolve;});
+        const controller = new AbortController();
+        const rejected = assert.rejects(request('/api/games', 'token', undefined, controller.signal), error => error.code === 'NETWORK');
+        controller.abort();
+        reply(new Response('{"games":["obsolete"]}'));
+        await rejected;
+    } finally {globalThis.fetch = original;}
+});
+
+test('a failed POST quote remains a read failure rather than an uncertain mutation', async () => {
+    const original = globalThis.fetch;
+    try {
+        globalThis.fetch = async () => {throw new Error('offline');};
+        await assert.rejects(request('/quote', 'token', {amount: 7}, undefined, {readOnly: true}), error => error.code === 'NETWORK');
     } finally {globalThis.fetch = original;}
 });

@@ -22,6 +22,7 @@ data class CardChoiceView(
     val command: String?,
     val miseryChanges: List<MiseryChangeView> = emptyList(),
     val miseryUncertainPlayers: List<PlayerId> = emptyList(),
+    val cashChanges: List<CashChangeView> = emptyList(),
 )
 
 /** Viewer-specific credit; authorization to use a played leader is projected separately. */
@@ -37,11 +38,10 @@ data class LeaderDiscountView(
         internal fun forLeader(
             leader: LeaderId,
             advances: Set<AdvanceId>,
-            rules: RuleOptions,
             crusadesPlayed: Boolean,
             mongolEnhanced: Boolean,
         ): List<LeaderDiscountView> {
-            val bonus = LeaderRules.writtenRecordBonus(advances, rules)
+            val bonus = LeaderRules.writtenRecordBonus(advances)
             return LeaderData.definition(leader).discounts.map { discount ->
                 val amount = discount.amountFor(crusadesPlayed, mongolEnhanced)
                 LeaderDiscountView(
@@ -75,7 +75,6 @@ data class PlayedLeaderDiscountView(
                     LeaderDiscountView.forLeader(
                         played.leader,
                         viewer.advances.owned,
-                        state.rules,
                         state.effects.crusadesPlayed,
                         played.mongolEnhanced,
                     ),
@@ -167,7 +166,6 @@ internal object CardProjection {
             if (
                 spec is CardEffectSpec.Leader &&
                     legal.isNotEmpty() &&
-                    state.rules.patronage == PatronageRule.PROTECTION_MONEY &&
                     context.effects.leaders.isNotEmpty()
             ) {
                 val played = LeaderRules.play(context, viewer.player.id, spec.leader)
@@ -181,6 +179,7 @@ internal object CardProjection {
                         .copy(
                             miseryChanges = preview.changes,
                             miseryUncertainPlayers = preview.uncertainPlayers,
+                            cashChanges = preview.cashChanges,
                         )
                 } +
                 listOfNotNull(
@@ -242,7 +241,6 @@ internal object CardProjection {
         return LeaderDiscountView.forLeader(
             spec.leader,
             viewer.advances.owned,
-            state.rules,
             state.effects.crusadesPlayed,
             state.voids.crusades,
         )

@@ -121,17 +121,6 @@ sealed interface CardCommand : Command {
         }
     }
 
-    data class AdjustMarket(
-        val commodity: Commodity,
-        val adjustment: CommodityAdjustment?,
-    ) : CardCommand {
-        override fun toText(): String =
-            "adjust-market ${commodity.name.lowercase()} ${adjustment?.name?.lowercase() ?: "neutral"}"
-
-        override fun applyTo(state: GameState, actor: PlayerId): GameState =
-            VariantInteractions.adjustMarket(state, actor, commodity, adjustment)
-    }
-
     data class ChooseCivilWarLoss(val loss: CivilWarLossChoice) : CardCommand {
         override fun toText(): String =
             "civil-war-loss ${if (loss == CivilWarLossChoice.CASH) "cash" else "tokens"}"
@@ -192,14 +181,6 @@ sealed interface CardCommand : Command {
             try {
                 when (name) {
                     "play" -> PlayCard.parse(arguments)
-                    "adjust-market" -> {
-                        size(arguments, 2)
-                        AdjustMarket(
-                            Commodity.valueOf(arguments[0].uppercase()),
-                            if (arguments[1] == "neutral") null
-                            else CommodityAdjustment.valueOf(arguments[1].uppercase()),
-                        )
-                    }
                     "civil-war-loss" -> {
                         size(arguments, 1)
                         ChooseCivilWarLoss(

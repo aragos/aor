@@ -17,6 +17,9 @@ This file retains operational checks and deferred work.
 - If preserving an existing file deployment, stop it, retain a private backup, import its current-format
   directory into an empty database, and verify player views and archives before switching traffic.
 - Enable GitHub's required `verify` check, Dependabot security alerts and optional patch auto-merge.
+  The branch-protection API returned HTTP 403 on 2026-10-30: this private repository's plan requires
+  GitHub Pro or a public repository to enable that feature. CI success is checked directly for the
+  promoted commits; it must not be described as enforced branch protection.
   Supply the Render CI credentials if weekly runtime refreshes are wanted. Set billing alerts and
   document the private backup retention period.
 
@@ -26,6 +29,21 @@ This file retains operational checks and deferred work.
 
 ## Later maintenance
 
-Some unreachable retired-rule handlers remain internally. Remove them incrementally with focused
-behavioral evidence; preserve baseline mechanics and the supported variants. Strategy controllers
-and private plans remain deferred.
+Strategy controllers and private plans remain deferred. Version-2 histories require an explicit,
+validated mapping before a version-3 upgrade; do not remove the administrative continuity rejection
+or add an automatic legacy decoder to make an old file appear current.
+
+## Principles-alignment operational evidence still required
+
+The local automated checks do not establish hosted Firebase identity continuity, a full private
+PostgreSQL backup restore, or physical-device accessibility. Deployment/isolated-database locations
+and existing human review records were requested during implementation. Until those runs are recorded,
+these remain launch gates, separate from green GitHub checks.
+
+Restore the complete backup (accounts, permissions, memberships, pending secrets, closed games,
+immutable history, exact archives and audit receipts) into an isolated database. Reconnect through
+the original provider, record revision/schema, scenarios, timing and results without private contents,
+and rehearse a single-writer cutover. Failed validation prevents cutover. Agree and record retention.
+Measure a representative six-player conflict-heavy late game; the earlier low-conflict benchmark is
+not a production capacity measurement. Complete screen-reader, physical-phone, browser zoom and
+SVG/composited contrast review and record the actual tools/devices and findings.

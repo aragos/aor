@@ -117,7 +117,6 @@ class GameAdministration(
                                 at = clock.millis(),
                             ),
                     pendingBids = emptyMap(),
-                    pendingReturns = emptyMap(),
                 )
             }
         return GameDirectory.summary(changed, actor)
@@ -182,6 +181,14 @@ class GameAdministration(
             throw ServiceFailure(422, "HISTORY_RANDOMNESS_CHANGED")
         }
         val header = replayUpgradedLog(original.field("header"), entries).header
+        val sourceHeader = original.field("header")
+        if (
+            sourceHeader.field("rulesVersion").string() != header.rulesVersion ||
+                sourceHeader.field("dataVersion").string() != header.dataVersion
+        ) {
+            throw ServiceFailure(422, "HISTORY_IDENTITY_UNVERIFIABLE")
+        }
+        OutcomeIdentity.validate(header, oldEntries, entries)
         val policy =
             original["undoPolicy"]?.takeIf { it.isTextual }?.let { UndoPolicy.valueOf(it.asText()) }
                 ?: UndoPolicy.REGULAR_TURN

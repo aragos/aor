@@ -54,8 +54,6 @@ class VariantGameCompletionTest {
                         state.deck +
                         state.deckHistory.discarded +
                         state.deckHistory.removed +
-                        state.deckHistory.setupReserves +
-                        state.deckHistory.setupReturns.values.map { card -> card.definition.id } +
                         CardData.all
                             .filter { card ->
                                 card.epoch.number > state.currentEpoch.number &&

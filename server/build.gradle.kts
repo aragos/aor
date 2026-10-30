@@ -83,3 +83,11 @@ dependencies {
     testImplementation(enforcedPlatform(libs.postgres.binaries))
     testRuntimeOnly(libs.postgres.darwin.arm)
 }
+
+// The generated browser catalog is verified against this domain export in CI.
+tasks.register<JavaExec>("exportRuleOptions") {
+    group = "verification"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("dev.aragos.aor.RuleOptionsExportKt")
+    args(providers.gradleProperty("ruleOptionsOutput").get())
+}

@@ -78,6 +78,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
                     {bidSubmitLabel(snapshot)}
                 </button>
             </div>
+            <p className="private-draft-status" role="status">{t(snapshot.pendingBid !== null && bid === String(snapshot.pendingBid) ? 'controls.savedPrivately' : 'controls.unsavedDraft', {amount: bid})}</p>
             {snapshot.pendingBid !== null && <p className="pending-submission">{t(isTokenPurchase ? 'controls.pendingPurchase' : 'controls.pending')}: {isTokenPurchase ? snapshot.pendingBid : `$${snapshot.pendingBid}`}</p>}
             {snapshot.legalChoices.commands.includes('withdraw-bid') && <button type="button"
                 className="secondary withdraw-bid" disabled={busy}
@@ -100,10 +101,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? snapshot.game.provisionalTieOrder.map(nameFor).join(' → ') : t('controls.noPositions')}</p>
             {turnChoices.length > 0 && <div className="capital-choices">{turnChoices.map(choice => <button type="button" className="secondary" key={choice} disabled={busy} aria-pressed={position === choice} onClick={() => setPosition(choice)}>{positionLabel(Number(choice.split(' ')[1]))}</button>)}<button disabled={busy || !turnChoices.includes(position)} onClick={() => { void submit(position); }}>{t('table.confirm')}</button></div>}
         </div>}
-        {stage === 'SETUP_RETURN' && snapshot.pendingReturn && <p className="pending-submission" role="status">
-            {t('controls.pendingReturn', {card: t(snapshot.game.hand.find(card => card.reference === snapshot.pendingReturn)?.definition.messageId ?? '')})}
-        </p>}
-        {(canAct || stage === 'SETUP_RETURN') && <GameActions snapshot={snapshot} busy={busy} submit={submit}/>}
+        {canAct && <GameActions snapshot={snapshot} busy={busy} submit={submit}/>}
 
     </>;
 }

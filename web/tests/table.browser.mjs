@@ -226,13 +226,10 @@ export async function checkDecisionFamilies(page, web, baseline) {
         return snapshot;
     }
     const finite = [
-        ['return-card', `return-card ${hand.reference}`, 'SETUP_RETURN'],
         ['immediate-master-art-discard', `discard-card ${hand.reference}`, 'PURCHASE'],
         ['buy-card', `discard-card ${hand.reference}`, 'BUY_CARD'],
         ['civil-war-loss', 'civil-war-loss cash'],
         ['renaissance', `swap-order ${other}`],
-        ['written-record', `written-record ${other}`],
-        ['adjust-market', 'adjust-market grain shortage'],
         ['offer-card', `offer-card ${hand.reference}`],
         ['purchase-advances', 'patronize leonardo-da-vinci', 'PURCHASE'],
     ];
@@ -387,5 +384,5 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.evaluate(`document.querySelector('.card-decision form > button:last-child').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`, prompt+' canonical play');
     }
-    console.log('Passed: setup return, immediate discard, Civil War, replacement, Renaissance, Written Record, market variant, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');
+    console.log('Passed: immediate discard, Civil War, replacement, Renaissance, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');
 }

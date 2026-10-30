@@ -28,8 +28,10 @@ data class StoredGame(
     val revisions: List<Revision>,
     /** Unrevealed amounts for the current capital-bid or token-purchase batch. */
     val pendingBids: Map<PlayerId, Int> = emptyMap(),
-    /** Unrevealed hand references selected during improved setup. */
-    val pendingReturns: Map<PlayerId, String> = emptyMap(),
+    /** Opaque per-seat receipts; changed by each successful private write, including withdrawal. */
+    val submissionVersions: Map<PlayerId, String> = emptyMap(),
+    /** Recent acknowledged private-write IDs per owner; no amounts or other seats are exposed. */
+    val submissionReceipts: Map<PlayerId, List<String>> = emptyMap(),
     /** Managed account UID per seat. Registered games have no transferable seat credentials. */
     val memberships: Map<PlayerId, String> = emptyMap(),
     /** Creation time in milliseconds since the Unix epoch. */
@@ -184,16 +186,6 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                     createCommand = Command::BuyTokens,
                     withPending = { pending -> stored.copy(pendingBids = pending) },
                 )
-            is SetupCommand.ReturnCard ->
-                submitSealedDecision(
-                    state = state,
-                    player = player,
-                    value = command.reference,
-                    pendingValues = stored.pendingReturns,
-                    revealCommand = "reveal-setup-returns",
-                    createCommand = SetupCommand::ReturnCard,
-                    withPending = { pending -> stored.copy(pendingReturns = pending) },
-                )
             else ->
                 commit(
                     stored = stored,
@@ -259,7 +251,7 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 command = command,
                 entries = entries.map(TextCodec::print),
             )
-        return stored.copy(revisions = stored.revisions + revision)
+        return stored.copy(revisions = stored.revisions + revision, submissionVersions = emptyMap())
     }
 
     private fun resolveOutcomes(state: GameState): List<Entry> = buildList {
@@ -307,15 +299,12 @@ internal fun requireCompletedTransaction(state: GameState) {
     ) {
         "private bids may enter history only as a complete, revealed batch."
     }
-    require(state.stage != Stage.SETUP_RETURN || state.deckHistory.setupReturns.isEmpty()) {
-        "Setup returns may enter history only as a complete private batch."
-    }
     require(
         state.stage != Stage.TOKEN_PURCHASE ||
             state.players.values
                 .filter { player -> player.misery != MiseryStep.CHAOS }
                 .all { player -> player.tokenPurchase == null }
     ) {
-        "private token purchases may enter history only as a complete, revealed batch."
+        "Private token purchases may enter history only as a complete, revealed batch."
     }
 }

@@ -4,8 +4,10 @@ const backgroundPollIntervalMs = 30000;
 const recentActivityWindowMs = 120000;
 
 /** Own one cancellable read and one timer, including across page visibility and resume events. */
-export function startPolling({intervalMs, poll, onError, paused, activityAt}: {
+export function startPolling({intervalMs, poll, onError, paused, activityAt, backgroundIntervalMs}: {
     intervalMs: number;
+    /** Directory reads retain their approved cadence even in a recently visited tab. */
+    backgroundIntervalMs?: number;
     poll: (signal: AbortSignal) => Promise<void>;
     onError: (failure: unknown) => void;
     paused: () => boolean;
@@ -21,7 +23,7 @@ export function startPolling({intervalMs, poll, onError, paused, activityAt}: {
     function schedule() {
         clearTimeout(timer);
         const recent = Date.now() - Math.max(engagementAt, activityAt?.() ?? 0) < recentActivityWindowMs;
-        const backgroundInterval = recent ? recentBackgroundPollIntervalMs : backgroundPollIntervalMs;
+        const backgroundInterval = backgroundIntervalMs ?? (recent ? recentBackgroundPollIntervalMs : backgroundPollIntervalMs);
         timer = setTimeout(() => {void run();}, document.hidden ? backgroundInterval : intervalMs);
     }
     async function run() {

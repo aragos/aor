@@ -19,19 +19,8 @@ data class CardLeaderInPlay(
     val patronageClaimants: Set<PlayerId> = emptySet(),
     /** Snapshot at play: Mongol Armies must precede Marco Polo to enhance either credit. */
     val mongolEnhanced: Boolean = false,
-    /** Printed alternate display box, or null for unprotected leaders. */
-    val displayBox: Int? = null,
 ) {
     init {
-        require(displayBox == null || displayBox in 1..3) {
-            "An alternate leader display box must be one, two or three."
-        }
-        require(displayBox == null || protectionCash == 0) {
-            "Alternate leader display boxes cannot hold protection cash."
-        }
-        require(displayBox == null || patronageClaimants.size < displayBox) {
-            "A leader cannot exceed its display box's Patronage claim capacity."
-        }
         require(protectionCash >= 0) { "Leader protection cash cannot be negative." }
         require(owner !in patronageClaimants) {
             "A leader's owner does not make a Patronage claim."
@@ -135,12 +124,6 @@ object LeaderRules {
         protectionCash: Int = 0,
     ): CardResolution.LeaderPlay {
         val player = context.player(actor)
-        val alternateDisplay = context.rules.patronage == PatronageRule.THREE_BOX_DISPLAY
-        cardRule(
-            !alternateDisplay || protectionCash == 0,
-            CardRuleCode.INVALID_CHOICE,
-            "The three-box display does not use protection money.",
-        )
         cardRule(
             protectionCash >= 0,
             CardRuleCode.INVALID_CHOICE,
@@ -187,10 +170,6 @@ object LeaderRules {
                 role,
                 protectionCash,
                 mongolEnhanced = leader == LeaderId.MARCO_POLO && context.voids.crusades,
-                displayBox =
-                    if (alternateDisplay)
-                        (context.effects.leaders.size + 1).takeIf { box -> box <= 3 }
-                    else null,
             )
         return CardResolution.LeaderPlay(
             played,
@@ -216,19 +195,12 @@ object LeaderRules {
             CardRuleCode.INVALID_LEADER_CLAIM,
             "Only another player's exposed, not previously claimed leader is available to Patronage.",
         )
-        val capacity =
-            if (context.rules.patronage == PatronageRule.THREE_BOX_DISPLAY) {
-                eligible.displayBox?.minus(1) ?: Int.MAX_VALUE
-            } else Int.MAX_VALUE
-        cardRule(
-            eligible.patronageClaimants.size < capacity,
-            CardRuleCode.INVALID_LEADER_CLAIM,
-            "This leader's display box has no remaining Patronage claims.",
-        )
         cardRule(
             buyer.cash >= eligible.protectionCash,
             CardRuleCode.INSUFFICIENT_CASH,
             "The claimant must pay the leader's protection amount to its owner.",
+            parameters = mapOf("required" to eligible.protectionCash, "available" to buyer.cash),
+            entities = listOf(RuleEntityReference(RuleEntityKind.PLAYER, eligible.owner.value)),
         )
         val claimed = eligible.copy(patronageClaimants = eligible.patronageClaimants + actor)
         return PatronageClaim(
@@ -247,7 +219,7 @@ object LeaderRules {
 
     /** Credits stack across owned and claimed leaders; Written Record adds ten per used credit. */
     fun discount(context: CardContext, buyer: PlayerId, advance: AdvanceId): Int {
-        val writtenRecordBonus = writtenRecordBonus(context.player(buyer).advances, context.rules)
+        val writtenRecordBonus = writtenRecordBonus(context.player(buyer).advances)
         return context.effects.leaders
             .filter { leader ->
                 leader.owner == buyer || buyer in leader.patronageClaimants
@@ -264,11 +236,8 @@ object LeaderRules {
     }
 
     /** Shared bonus for both authorized purchases and potential hand-card credit. */
-    fun writtenRecordBonus(advances: Set<AdvanceId>, rules: RuleOptions): Int =
-        if (
-            rules.writtenRecord == WrittenRecordRule.LEADER_BONUS &&
-                AdvanceId.WRITTEN_RECORD in advances
-        ) {
+    fun writtenRecordBonus(advances: Set<AdvanceId>): Int =
+        if (AdvanceId.WRITTEN_RECORD in advances) {
             10
         } else {
             0

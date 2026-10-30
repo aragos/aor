@@ -299,3 +299,11 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .replacement-province { padding: .55rem 0; border-bottom: 1px solid #c7d1c1; }
 .replacement-province h4 { margin: 0 0 .35rem; }
 .replacement-review ul { margin: .4rem 0; padding-left: 1.25rem; }
+
+fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
+.object-control {position: relative; display: flex; flex-direction: column;}
+.object-control > .hand-card, .object-control > .advance-tile {height: 100%;}
+.inspect-object {font-size: .75rem; padding: .25rem .5rem;}
+
+.hand-cards > .object-control {flex: 0 0 200px;}
+.object-control > .hand-card {flex: 1 1 auto;}

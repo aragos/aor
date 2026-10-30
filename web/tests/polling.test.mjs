@@ -245,3 +245,16 @@ test('a StrictMode cleanup and setup leave exactly one active polling loop', asy
 
     assert.equal(reads, 3);
 });
+
+test('directory background cadence stays thirty seconds after a recent visit', async context => {
+    const environment = browser(context);
+    let reads = 0;
+    environment.start({intervalMs: 30000, backgroundIntervalMs: 30000, paused: () => false,
+        poll: async () => {reads++;}, onError: assert.fail});
+    await settle();
+    context.mock.timers.tick(29999);
+    assert.equal(reads, 1);
+    context.mock.timers.tick(1);
+    await settle();
+    assert.equal(reads, 2);
+});

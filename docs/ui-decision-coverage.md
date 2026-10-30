@@ -99,3 +99,29 @@ AOR_BROWSER_SUITE=fullgame.browser.mjs AOR_BROWSER_TIMEOUT_MS=1800000 npm run te
 
 It uses private-seat tabs and visual controls, checks actions against read-only snapshots, and writes
 a trace/result screenshot. Record actual visited stages and keep historical and current runs separate.
+
+## Principles alignment evidence (2026-10-30)
+
+The original proposal is a historical review, not a second acceptance contract. Implemented behavior
+is owned by requirements, UI design, engine and command documentation.
+
+- Real API/browser placement checks prepare a partial placement, inspect another province, close
+  inspection, poll, and commit the original amount. The fixture uses an actual engine offer in StrictMode.
+- Hosted component tests substitute only the Firebase boundary. They verify same-account session
+  refresh preserves the mounted table/draft, identity change clears the table, and superseded session
+  results cannot restore the former account. These are local lifecycle evidence, not hosted-provider evidence.
+- Queue/edit, finite-family presentation and fabricated interruption fixtures prove local selection
+  behavior. Retired setup-return, Written Record trade and manual-adjustment fixtures were removed;
+  they are not evidence for supported play. Live competition, Civil War and token-purchase suites
+  continue to establish reachable decision paths separately.
+- JVM and Node execute the common codec/opening/replay/ordering corpus. Completion histories check
+  resource conservation after each accepted entry. Conflict replay counts a pending competition's
+  reserved tokens once. The independent topology validator checks both resolved catalogs in CI.
+- Administrative replacement has a reachable alternate-contest counterexample: both candidate logs
+  replay with equal dice bytes, but rebinding them to another contest is rejected without an archive
+  or active-file change. File and PostgreSQL private-write regressions cover stale replacement and
+  withdrawal, restart, independent writers and observer-equivalent responses.
+
+Human screen-reader, physical-phone, browser zoom and composited/SVG contrast work, hosted identity
+and backup restoration, and production capacity measurements remain in follow-ups. No automated
+result here certifies those manual or hosted checks.

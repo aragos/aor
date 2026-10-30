@@ -58,14 +58,8 @@ sealed interface TurnCommand : Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             val frame = state.flow.decisions.lastOrNull() as? RenaissanceDecision
             checkRule(frame?.player == actor, ViolationCode.WRONG_PLAYER)
-            val index = state.turnOrder.indexOf(actor)
-            val other = state.turnOrder.indexOf(target)
-            checkRule(
-                kotlin.math.abs(index - other) == 1 &&
-                    !state.playerState(target).advances.owns(AdvanceId.RENAISSANCE) &&
-                    state.playerState(target).misery != MiseryStep.CHAOS,
-                ViolationCode.INVALID_TURN_POSITION,
-            )
+            val decision = requireNotNull(frame) { "A swap requires its Renaissance decision." }
+            checkRule(target in decision.targets(state), ViolationCode.INVALID_TURN_POSITION)
             val order =
                 state.turnOrder.map { id ->
                     if (id == actor) target else if (id == target) actor else id
@@ -88,18 +82,10 @@ sealed interface TurnCommand : Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             state.requireActor(actor, Stage.BUY_CARD)
             val player = state.playerState(actor)
-            checkRule(
-                player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
-                    actor !in state.flow.boughtCards &&
-                    (state.deck.isNotEmpty() || state.currentEpoch != Epoch.THREE),
-                ViolationCode.INVALID_CARD_PURCHASE,
-            )
-            checkRule(
-                player.cash >= EconomyTables.cardPurchaseCost,
-                ViolationCode.INSUFFICIENT_CASH,
-            )
+            val offer = CardPurchases.offer(state, player)
+            offer.blockers.firstOrNull()?.let { throw RuleViolation(it) }
             return state
-                .replacePlayer(player.copy(cash = player.cash - EconomyTables.cardPurchaseCost))
+                .replacePlayer(player.copy(cash = offer.cashAfter))
                 .copy(flow = state.flow.copy(boughtCards = state.flow.boughtCards + actor))
                 .queueDraw(actor)
         }
@@ -145,37 +131,18 @@ sealed interface TurnCommand : Command {
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             state.requireActor(actor, Stage.DRAW_CARD)
-            checkRule(
-                !state.flow.cancelComplete && actor == state.turnOrder.first(),
-                ViolationCode.WRONG_PLAYER,
-            )
-            val markers = state.adjustments[commodity].orEmpty()
-            checkRule(
-                adjustment in markers,
-                ViolationCode.INVALID_ADJUSTMENT,
-            )
-            val cost =
-                CommodityData.definitions
-                    .single { definition -> definition.id == commodity }
-                    .baseValue
+            val quote = AdjustmentCancellation.quote(state, actor, commodity, adjustment)
             val player = state.playerState(actor)
-            checkRule(player.cash >= cost, ViolationCode.INSUFFICIENT_CASH)
-            val affected =
-                if (commodity == Commodity.GOLD || commodity == Commodity.IVORY) {
-                    setOf(Commodity.GOLD, Commodity.IVORY)
-                } else {
-                    setOf(commodity)
-                }
             val updated =
                 state.adjustments.mapValues { (id, previous) ->
-                    if (id in affected) {
+                    if (id in quote.commodities) {
                         previous.toMutableList().apply { remove(adjustment) }.toList()
                     } else {
                         previous
                     }
                 }
             return state
-                .replacePlayer(player.copy(cash = player.cash - cost))
+                .replacePlayer(player.copy(cash = quote.cashAfter))
                 .copy(adjustments = updated)
         }
     }
@@ -247,7 +214,6 @@ sealed interface TurnCommand : Command {
                         state.playerState(actor),
                         spaces,
                         state.currentTurn(),
-                        state.rules,
                     )
                     .player
             )

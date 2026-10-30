@@ -18,6 +18,7 @@ export interface CardChoiceView {
     kind: 'NONE' | 'COMMODITY' | 'PLAYER' | 'PROVINCE' | 'PROVINCES' | 'AREA' | 'CATEGORY' | 'PROTECTION';
     value: string | null; command: string | null;
     miseryChanges?: MiseryChangeView[]; miseryUncertainPlayers?: string[];
+    cashChanges?: {player: string; before: number; after: number}[];
 }
 export interface MiseryChangeView {player: string; fromValue: number | null; toValue: number | null}
 export interface AppliedLeaderDiscount {
@@ -92,7 +93,7 @@ export interface ScoreView {
     total: number | null; winner: boolean;
 }
 export interface CardTurnEffects {
-    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; displayBox: number | null; protectionCash: number; patronageClaimants: string[]}[];
+    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; protectionCash: number; patronageClaimants: string[]}[];
     enlightenedRulers: string[]; military: {player: string; event: string}[];
     papalCategory: string | null; crusadesPlayed: boolean;
 }
@@ -103,10 +104,10 @@ export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
 export interface HistoryEventView {
     participants?: {id: string; name: string; capital: string | null}[];
     id: string; kind: 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
-        'RETURN_CARD' | 'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' | 'TOKEN_PURCHASES' |
+        'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' | 'TOKEN_PURCHASES' |
         'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
-        'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' | 'WRITTEN_RECORD' |
-        'OFFER_CARD' | 'PLAY_CARD' | 'ADJUST_MARKET' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
+        'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' |
+        'OFFER_CARD' | 'PLAY_CARD' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
         'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL' |
         'NEXT_EPOCH' | 'ENDING_TRIGGERED' | 'GAME_FINISHED' | 'INCOME' | 'HOLY_INDULGENCE';
     actor: string | null; target: string | null; turnNumber: number | null; stage: string;
@@ -133,7 +134,7 @@ export interface Snapshot {
     gameId: string; revision: number; viewerId: string; creatorId: string;
     status?: 'ACTIVE' | 'CANCELLED' | 'ABANDONED'; accountId?: string | null;
     game: {stage: string; currentEpoch: number;
-        rules: {patronage: 'PROTECTION_MONEY' | 'THREE_BOX_DISPLAY'; [key: string]: string | boolean};
+        rules: {[key: string]: string | boolean};
         ruleOptions: {key: string; value: string; choices: string[]}[]; rebuiltMarkerBonus: RebuiltMarkerBonus; players: PlayerView[];
         hand: {reference: string; definition: CardDefinition}[];
         capitalOrder: string[]; revealedBids: Record<string, number>;
@@ -154,7 +155,10 @@ export interface Snapshot {
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
         advanceOffers: AdvanceOfferView[];
-        reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean}[];
+        patronageOffers?: {command: string; payer: string; recipient: string; cost: number; payerCashAfter: number; recipientCashAfter: number}[];
+        adjustmentOffers?: {command: string; commodities: string[]; cost: number; cashAfter: number}[];
+        cardPurchaseOffer?: {cost: number; cashAfter: number; blockers: string[]} | null;
+        reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean; cashAfter?: number; miseryBefore?: number | null; miseryAfter?: number | null}[];
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
         expansionOffers: ExpansionOfferView[]; expansionInspections?: ExpansionOfferView[];
@@ -164,7 +168,7 @@ export interface Snapshot {
         expansionCardCost?: number | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
-    submitted: string[]; pendingBid: number | null; pendingReturn: string | null; history: string[];
+    submissionVersion?: string | null; submissionReceipts?: string[]; submitted: string[]; pendingBid: number | null; history: string[];
     events: HistoryEventView[];
     undo: {policy: 'COMPETITIVE' | 'REGULAR_TURN' | 'FRIENDLY_TURN' | 'FRIENDLY_GAME'; available: boolean;
         fromEntry: number | null; entryCount: number; editRevision: number;
@@ -178,7 +182,7 @@ export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABA
 export interface GameSummary {id: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean}
 export interface GamePage {games: GameSummary[]; nextCursor: string | null}
 export class ApiError extends Error {
-    constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null) { super(code); }
+    constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null, public parameters: Record<string, number> = {}, public causeCode: string | null = null) { super(code); }
 }
 let authentication: (() => Promise<string | undefined>) | undefined;
 export function setAuthentication(provider?: () => Promise<string | undefined>) { authentication = provider; }
@@ -200,15 +204,15 @@ async function responseJson<T>(response: Response): Promise<T> {
     let result;
     try { result = await response.json(); } catch { throw new ApiError('SERVER'); }
     if (!response.ok) throw new ApiError(typeof result?.code === 'string' ? result.code : 'SERVER',
-        Array.isArray(result?.entityIds) ? result.entityIds.filter((id: unknown): id is string => typeof id === 'string') : [],
-        Number.isInteger(result?.entryIndex) ? result.entryIndex : null);
+        [...(Array.isArray(result?.entityIds) ? result.entityIds.filter((id: unknown): id is string => typeof id === 'string') : []),
+            ...(Array.isArray(result?.entities) ? result.entities.flatMap((entity: {kind?: unknown; id?: unknown}) => entity && ['PLAYER', 'PROVINCE', 'ADVANCE', 'COMMODITY'].includes(String(entity.kind)) && typeof entity.id === 'string' ? [entity.id] : []) : [])],
+        Number.isInteger(result?.entryIndex) ? result.entryIndex : null,
+        Object.fromEntries(Object.entries(result?.parameters ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]))),
+        typeof result?.diagnostic?.code === 'string' ? result.diagnostic.code : null);
     return result as T;
 }
-export async function request<T>(path: string, token?: string, body?: unknown): Promise<T> {
-    return responseJson<T>(await fetchResponse(path, token, body));
-}
-/** Bound the complete read, including authentication and response body; a 304 retains the view. */
-export async function requestSnapshot(path: string, token?: string, etag?: string, signal?: AbortSignal) {
+/** A deadline covers credentials, transport and body; abort never proves a write was rejected. */
+async function bounded<T>(operation: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
     const controller = new AbortController();
     const cancel = () => controller.abort();
     signal?.addEventListener('abort', cancel, {once: true});
@@ -220,14 +224,28 @@ export async function requestSnapshot(path: string, token?: string, etag?: strin
             if (controller.signal.aborted) fail();
             else controller.signal.addEventListener('abort', fail, {once: true});
         });
-        return await Promise.race([aborted, (async () => {
-            const response = await fetchResponse(path, token, undefined, etag, controller.signal);
-            return {etag: response.headers.get('ETag') ?? undefined,
-                snapshot: response.status === 304 ? null : await responseJson<Snapshot>(response)};
-        })()]);
+        return await Promise.race([aborted, operation(controller.signal)]);
     } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', cancel);
     }
+}
+export async function request<T>(path: string, token?: string, body?: unknown, signal?: AbortSignal, options: {readOnly?: boolean} = {}): Promise<T> {
+    try {
+        return await bounded(async current => responseJson<T>(await fetchResponse(path, token, body, undefined, current)), signal);
+    } catch (failure) {
+        if (body !== undefined && !options.readOnly && failure instanceof ApiError && ['NETWORK', 'SERVER'].includes(failure.code)) {
+            throw new ApiError('OUTCOME_UNKNOWN');
+        }
+        throw failure;
+    }
+}
+/** A 304 retains the authorized view. Obsolete reads cannot publish after cancellation. */
+export async function requestSnapshot(path: string, token?: string, etag?: string, signal?: AbortSignal) {
+    return bounded(async current => {
+        const response = await fetchResponse(path, token, undefined, etag, current);
+        return {etag: response.headers.get('ETag') ?? undefined,
+            snapshot: response.status === 304 ? null : await responseJson<Snapshot>(response)};
+    }, signal);
 }
 export function errorCode(error: unknown): string { return error instanceof ApiError ? error.code : 'SERVER'; }

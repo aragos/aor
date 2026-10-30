@@ -1,10 +1,10 @@
-import {useEffect, useState} from 'react';
 import type {ExpansionOfferView, ProvinceDefinition, PublicCatalog, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
 import {TableIcon} from '../TableIcon';
 import {Commodity} from '../TablePanels';
 import {PlayerPiece} from './MapSymbols';
+import {useMapSelection} from './MapSelection';
 import {ChoiceButtons} from '../DecisionControls';
 import {provinceOrders} from './mapOrders';
 
@@ -49,8 +49,7 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     snapshot: Snapshot; province: ProvinceDefinition; busy: boolean;
     submit: (command: string) => Promise<boolean>;
 }) {
-    const [partial, setPartial] = useState('');
-    useEffect(() => setPartial(''), [province.id]);
+    const {partial, setPartial} = useMapSelection();
     const catalog = snapshot.game.catalog;
     if (!catalog) return null;
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
@@ -96,8 +95,8 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
                 </button>
                 {offer.partialPlacements.length > 0 && <details className="partial-placement"><summary>{t('table.placeFewer')}</summary>
                     <form onSubmit={event => { event.preventDefault(); if (partialOffer) void submit(`place ${partialOffer.tokens} ${province.id}`); }}>
-                        <label htmlFor="partial-count">{t('controls.tokenCount')}</label>
-                        <ChoiceButtons id="partial-count" value={partial} onChange={setPartial} disabled={busy}
+                        <p>{t('controls.tokenCount')}</p>
+                        <ChoiceButtons label={t('controls.tokenCount')} id="partial-count" value={partial} onChange={setPartial} disabled={busy}
                             choices={offer.partialPlacements.map(choice => ({value: String(choice.tokens), label: String(choice.tokens)}))}/>
                         {partial && !partialOffer && <p className="blocker" role="status">{t('table.invalidatedChoice')}</p>}
                         {partialOffer && <p>{t('game.pool')}: {offer.availablePool} → {partialOffer.resultingPool}</p>}

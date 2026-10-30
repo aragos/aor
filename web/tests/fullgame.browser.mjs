@@ -70,7 +70,7 @@ function choose(state) {
 const simple = ['pass', 'buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 function finite(commands) {
     return commands.filter(command => !simple.includes(command) &&
-        ['written-record ', 'swap-order ', 'cancel-adjustment ', 'return-card ', 'adjust-market ', 'discard-card ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'offer-card ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
+        ['swap-order ', 'cancel-adjustment ', 'discard-card ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'offer-card ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
 }
 
 async function playCard(state, command) {
@@ -180,7 +180,6 @@ try {
         assert.equal(latest.revision, expectedRevision, 'Submitted decisions wait for reveal; ordinary controls commit exactly once');
         if (pending) {
             assert(latest.submitted.includes(actor.id), 'Private submission has a submitted readiness indicator');
-            if (command.startsWith('return-card ')) assert.equal(latest.pendingReturn, command.split(' ')[1]);
             else assert.equal(latest.pendingBid, Number(command.split(' ')[1]));
         } else {
             const expected = `${actor.id}: ${command}`;

@@ -118,6 +118,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
                 onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
             <InvalidChoice invalid={!!(choice && !selectedChoice) || invalidTargets} clear={() => {setChoice(''); selection.clear();}}/>
+            {(!needsProtection || amount === 0 ? misery?.cashChanges : [])?.map(change => <p className="cash-preview" key={change.player}>{playerName(snapshot, change.player)} · {t('game.cash')}: ${change.before} → ${change.after}</p>)}
             <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
             {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
             <button disabled={busy || !actionable}>{t('action.playCard')}</button>

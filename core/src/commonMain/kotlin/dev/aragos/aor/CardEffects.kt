@@ -18,11 +18,25 @@ enum class CardRuleCode {
     INSUFFICIENT_REPLACEMENT_TOKENS,
 }
 
-class CardRuleViolation(val code: CardRuleCode, val explanation: String) : Exception(explanation)
+class CardRuleViolation(
+    val code: CardRuleCode,
+    val explanation: String,
+    val parameters: Map<String, Int> = emptyMap(),
+    val entities: List<RuleEntityReference> = emptyList(),
+) : Exception(explanation), DomainRejection {
+    override val diagnostic: RuleDiagnostic
+        get() = RuleDiagnostic("CARD_${code.name}", entities = entities, parameters = parameters)
+}
 
-internal fun cardRule(valid: Boolean, code: CardRuleCode, explanation: String) {
+internal fun cardRule(
+    valid: Boolean,
+    code: CardRuleCode,
+    explanation: String,
+    parameters: Map<String, Int> = emptyMap(),
+    entities: List<RuleEntityReference> = emptyList(),
+) {
     if (!valid) {
-        throw CardRuleViolation(code, explanation)
+        throw CardRuleViolation(code, explanation, parameters, entities)
     }
 }
 
@@ -78,11 +92,11 @@ data class CardContext(
     val finalCardPlay: Boolean = false,
     val turn: Int = 1,
     val epoch: Epoch = Epoch.ONE,
-    val rules: RuleOptions = RuleOptions(),
     /** Provinces containing square tokens, returned to stock before Black Death reductions. */
     val tokenProvinces: Set<ProvinceId> = emptySet(),
+    val map: MapRule = MapRule.STANDARD,
     val provinces: Map<ProvinceId, ProvinceDefinition> =
-        rules.map.definition.provinces
+        map.definition.provinces
             .filter { province ->
                 province.area == null || province.area.minimumPlayers <= players.size
             }
@@ -240,6 +254,8 @@ sealed interface CardResolution {
 }
 
 object CardRules {
+    internal const val MONGOL_CASH = 10
+
     /** Track spaces gained by the victim when Civil War is played. */
     internal const val CIVIL_WAR_MISERY_SPACES = 1
 

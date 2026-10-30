@@ -41,9 +41,7 @@ class GameCompletionTest {
             completed.players.values.flatMap(PlayerState::hand).map { card -> card.definition.id } +
                 completed.deck +
                 completed.deckHistory.discarded +
-                completed.deckHistory.removed +
-                completed.deckHistory.setupReserves +
-                completed.deckHistory.setupReturns.values.map { card -> card.definition.id }
+                completed.deckHistory.removed
 
         assertThat(locations).containsExactlyElementsIn(CardData.all.map(CardDefinition::id))
     }

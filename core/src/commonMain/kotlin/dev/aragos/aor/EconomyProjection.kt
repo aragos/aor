@@ -20,7 +20,6 @@ data class IncomeView(
                     player,
                     state.playerIds.size,
                     board.markerCount(player.player.id),
-                    state.rules,
                 )
             return IncomeView(
                 quote.income,

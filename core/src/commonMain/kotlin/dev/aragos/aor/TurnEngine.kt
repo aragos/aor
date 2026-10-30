@@ -49,34 +49,9 @@ internal object TurnEngine {
             else -> emptyList()
         }
 
-    private fun adjustmentChoices(state: GameState, actor: PlayerId): List<String> {
-        if (actor != state.turnOrder.first()) return listOf("pass")
-        val cash = state.playerState(actor).cash
-        return listOf("pass") +
-            state.adjustments.flatMap { (commodity, markers) ->
-                // Gold names the shared cancellation; an unmatched Ivory marker remains legal.
-                val offeredMarkers =
-                    if (commodity == Commodity.IVORY) {
-                        markers.filterNot { it in state.adjustments[Commodity.GOLD].orEmpty() }
-                    } else {
-                        markers
-                    }
-                adjustmentChoices(commodity, offeredMarkers, cash)
-            }
-    }
-
-    private fun adjustmentChoices(
-        commodity: Commodity,
-        markers: List<CommodityAdjustment>,
-        cash: Int,
-    ): List<String> {
-        val cost =
-            CommodityData.definitions.single { definition -> definition.id == commodity }.baseValue
-        if (cost > cash) return emptyList()
-        return markers.distinct().map { adjustment ->
-            "cancel-adjustment ${commodity.name.lowercase()} ${adjustment.name.lowercase()}"
-        }
-    }
+    private fun adjustmentChoices(state: GameState, actor: PlayerId): List<String> =
+        listOf("pass") +
+            AdjustmentCancellation.offers(state, actor).map(AdjustmentCancellationOffer::command)
 
     private fun buyCardChoices(state: GameState, player: PlayerState): List<String> =
         listOfNotNull("pass", "buy-card".takeIf { canBuyCard(state, player) }) +
@@ -88,10 +63,7 @@ internal object TurnEngine {
     }
 
     private fun canBuyCard(state: GameState, player: PlayerState): Boolean =
-        player.advances.owns(AdvanceId.URBAN_ASCENDANCY) &&
-            player.player.id !in state.flow.boughtCards &&
-            player.cash >= EconomyTables.cardPurchaseCost &&
-            state.canDrawCards()
+        CardPurchases.offer(state, player).blockers.isEmpty()
 
     private fun canDiscardCard(state: GameState, player: PlayerState): Boolean =
         player.advances.owns(AdvanceId.MASTER_ART) &&
@@ -115,9 +87,12 @@ internal object TurnEngine {
 
     private fun shippingChoices(state: GameState, player: PlayerState): List<String> {
         val canUpgrade =
-            player.cash >= EconomyTables.shipUpgradeCost &&
-                player.lastShipUpgradeTurn != state.currentTurn() &&
-                ShippingPurchases.nextUpgrade(player.ships) != null
+            try {
+                ShippingPurchases.upgrade(player, state.currentTurn())
+                true
+            } catch (_: RuleViolation) {
+                false
+            }
         return listOfNotNull("pass", "upgrade-ships".takeIf { canUpgrade })
     }
 
@@ -138,21 +113,13 @@ internal object TurnEngine {
                 }
             }
         return listOf("pass") +
-            state.patronageChoices(actor) +
+            PatronageOfferView.from(state, actor).map(PatronageOfferView::command) +
             affordable.map { advance -> "buy-advance ${advance.letter}" }
     }
 
     private fun reliefChoices(state: GameState, player: PlayerState): List<String> {
-        val affordable =
-            (1..player.advances.tierCount).filter { spaces ->
-                try {
-                    PlayerEconomy.reliefQuote(player, spaces, state.currentTurn(), state.rules)
-                        .cashCost <= player.cash
-                } catch (_: RuleViolation) {
-                    false
-                }
-            }
-        return listOf("pass") + affordable.map { spaces -> "relieve-misery $spaces" }
+        val affordable = ReliefOfferView.from(state, player).filter(ReliefOfferView::affordable)
+        return listOf("pass") + affordable.map { offer -> "relieve-misery ${offer.spaces}" }
     }
 
     /** Keep relief visible whenever the player has a tier, including unaffordable offers. */
@@ -161,13 +128,12 @@ internal object TurnEngine {
             state.flow.purchaseStep == PurchaseStep.STABILIZATION &&
                 PlayerEconomy.stabilizationCost(player) == 0L ->
                 state.copy(flow = state.flow.copy(purchaseStep = PurchaseStep.RELIEF))
-            state.flow.purchaseStep == PurchaseStep.RELIEF &&
-                (state.rules.miseryRelief != MiseryReliefRule.PURCHASED ||
-                    player.advances.tierCount == 0) -> finishActor(state)
+            state.flow.purchaseStep == PurchaseStep.RELIEF && player.advances.tierCount == 0 ->
+                finishActor(state)
             else -> null
         }
 
-    fun normalise(initial: GameState): GameState {
+    fun normalise(initial: GameState, receipt: (EffectReceipt) -> Unit = {}): GameState {
         var state = initial
         if (
             state.turnNumber != null &&
@@ -188,6 +154,11 @@ internal object TurnEngine {
         }
         repeat(1000) {
             if (state.pendingShuffle() != null) return state
+            val decision = state.flow.decisions.lastOrNull()
+            if (decision is RenaissanceDecision && decision.targets(state).isEmpty()) {
+                state = state.popDecision()
+                return@repeat
+            }
             if (
                 !state.stage.isTurnPhase ||
                     state.stage == Stage.FINISHED ||
@@ -197,10 +168,18 @@ internal object TurnEngine {
             }
             if (!state.flow.phaseStarted) {
                 state = beginPhase(state)
-                if (state.flow.decisions.isNotEmpty()) return state
+                if (state.flow.decisions.isNotEmpty()) return@repeat
             }
             if (!state.flow.phaseBookkeepingApplied) {
+                val before = state
                 state = applyPhaseBookkeeping(state)
+                val cause =
+                    when (before.stage) {
+                        Stage.INCOME -> AutomaticCause.INCOME
+                        Stage.EXPANSION -> AutomaticCause.HOLY_INDULGENCE
+                        else -> null
+                    }
+                if (cause != null) receipt(EffectReceipt.between(cause, before, state))
             }
             val actor = state.flow.actor
             if (state.stage == Stage.INCOME) {
@@ -214,11 +193,7 @@ internal object TurnEngine {
             }
             if (state.playerState(actor).misery == MiseryStep.CHAOS) {
                 if (state.stage == Stage.DRAW_CARD && state.flow.cursor == 0) {
-                    state =
-                        VariantInteractions.openMarketAdjustment(
-                            state.copy(flow = state.flow.copy(cancelComplete = true))
-                        )
-                    if (state.flow.decisions.isNotEmpty()) return state
+                    state = state.copy(flow = state.flow.copy(cancelComplete = true))
                 }
                 state = finishActor(state)
                 return@repeat
@@ -231,8 +206,6 @@ internal object TurnEngine {
                         }
                         state = state.copy(flow = state.flow.copy(cancelComplete = true))
                     }
-                    state = VariantInteractions.openMarketAdjustment(state)
-                    if (state.flow.decisions.isNotEmpty()) return state
                     if (actor !in state.flow.drawn) {
                         state =
                             state
@@ -319,7 +292,6 @@ internal object TurnEngine {
                                 player,
                                 state.playerIds.size,
                                 state.board.markerCount(id),
-                                rules = state.rules,
                             )
                             .player
                     }
@@ -342,7 +314,7 @@ internal object TurnEngine {
 
     private fun nextPhase(state: GameState): GameState =
         when (state.stage) {
-            Stage.DRAW_CARD -> SetupDeal.afterRegularDraw(state, open(state, Stage.BUY_CARD))
+            Stage.DRAW_CARD -> open(state, Stage.BUY_CARD)
             Stage.BUY_CARD -> open(state, Stage.PLAY_CARDS)
             Stage.PLAY_CARDS -> open(state, Stage.PURCHASE)
             Stage.PURCHASE -> open(state, Stage.EXPANSION)

@@ -36,7 +36,11 @@ class SupportedGameCompletionTest {
         for (playerCount in 3..6) {
             val completed = completedGame(playerCount)
 
-            assertThat(replay(completed.state.header, completed.lines)).isEqualTo(completed.state)
+            val replayed =
+                completed.lines.fold(GameState(completed.state.header)) { state, line ->
+                    state.step(TextCodec.parse(line)).also(::assertResourceConservation)
+                }
+            assertThat(replayed).isEqualTo(completed.state)
         }
     }
 

@@ -18,16 +18,12 @@ test('every catalog event has readable effect text', () => {
     for (const id of eventIds) assert(en[`card.${id}.effect`]?.length > 30, `Missing event text for ${id}`);
 });
 
-test('every advance and configured effect variant has readable reference text', async () => {
+test('every supported advance has readable reference text', async () => {
     const source = await readFile(new URL('../../core/src/commonMain/kotlin/dev/aragos/aor/Advances.kt', import.meta.url), 'utf8');
     const ids = [...source.split('enum class AdvanceId')[1].split('enum class AdvanceCategory')[0].matchAll(/\s+([A-Z_]+)\('/g)].map(match=>match[1]);
     assert.equal(ids.length,26);
-    const variants = {PATRONAGE:['PROTECTION_MONEY','THREE_BOX_DISPLAY'],WIND_WATERMILL:['TAKEOVER_TRADE','MARKET_ADJUSTMENT'],WRITTEN_RECORD:['LEADER_BONUS','TAKEOVER_TRADE']};
     for (const id of ids) {
-        for (const suffix of variants[id] ?? ['']) {
-            const key = `advance.${id}.effect${suffix ? '.'+suffix : ''}`;
-            assert(en[key]?.length>20,`Missing advance text: ${key}`);
-        }
+        assert(en[`advance.${id}.effect`]?.length > 20, `Missing supported advance text: ${id}`);
     }
 });
 

@@ -372,6 +372,7 @@ private data class TurnFixture(
             token(player),
             view(player).revision,
             text,
+            view(player).submissionVersion,
         )
 
     fun restart(): TurnFixture = copy(service = createGameService(directory, NoTurnRandom))

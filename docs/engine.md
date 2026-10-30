@@ -97,7 +97,7 @@ Use the detailed rules as the single source of mechanics. Frames must retain the
 | Order of Play | Begin every turn, including turn 1, with signed token purchases, stock caps and tie choices. Assign printed boxes for the starting player count. Order and pool apply to the current turn.       | §5.1              |
 | Draw/Buy Card | Cancellation precedes draws; Master Art's discard does not require Urban Ascendancy's purchase.                                                                                                  | §5.2–5.3          |
 | Play Cards    | One ordinary round per player; War re-rolls at following players' round starts. Distinguish Leader Display and Patronage eligibility; clean up leaders/protection money after Purchase.          | §5.4, §11.4       |
-| Purchase      | Ship upgrade → advances → stabilization → relief per player. Skip zero-cost stabilization and relief without a legal purchase. New prerequisites/abilities apply immediately; category credits exclude this phase's purchases; MR uses this turn's purchases.      | §5.5, §7.3, §10.2 |
+| Purchase      | Ship upgrade → advances → stabilization → relief per player. Skip zero-cost stabilization. Keep Relief for every tier owner, including blocked or empty offers; skip it only without a tier. New prerequisites/abilities apply immediately; category credits exclude this phase's purchases; MR uses this turn's purchases.      | §5.5, §7.3, §10.2 |
 | Expansion     | Civil War order change → Renaissance opportunity after that change → Holy Indulgence → placement. Track shared token-card price, per-player limit and qualifying new markers.                    | §5.6, §10.3       |
 | Income        | Flip, income, New World, Interest & Profit, then shortages/surpluses and majority effects. Do not double income or stack identical markers on one payout.                                        | §5.7              |
 | Deck          | Advance epochs only on a draw request from an empty pile; recycle discarded circle cards, never cards still held. Final exhaustion prevents every further draw.                                  | §11.1             |
@@ -237,3 +237,19 @@ and reach/combat functions from flow so they can be tested directly.
   and projections without modifying the live log or consuming live randomness.
 
 Service/controller/revision and localization checks belong to [design §8](design.md#8-verification).
+
+## Transition receipts and compatibility
+
+`GameState.transition` returns the directly applied state, normalized state and deterministic
+public automatic-effect receipts. Income and Holy Indulgence own their resource endpoints and named
+advance sources in the engine. Replay derives these receipts; commands and authority outcomes remain
+the sole stored truth. The service groups and authorizes them without recognizing phase-opening
+heuristics or reapplying the triggering action.
+
+Rules version `ah1996-three-epoch-3` skips publicly empty Renaissance windows when they become active.
+Targets are shared by readiness, choices and execution and are reevaluated after each prior window.
+Version 2 logs can contain passes for those empty windows; they must not be silently read under version
+3, where a pass could answer another phase. Incompatible headers remain exportable but administrative
+replacement rejects them with `HISTORY_IDENTITY_UNVERIFIABLE` until an explicit validated event mapping
+is supplied. There is no automatic legacy decoder. Retired return-card, Written Record trade and manual
+market-adjustment syntax are rejected by the command parser; no supported version-3 game can emit them.
