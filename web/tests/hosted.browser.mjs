@@ -14,6 +14,8 @@ export async function checkHosted(page, web, artifacts) {
     const sessions = [];
     let account = null;
     let emailVerified = true;
+    let holdSession = false;
+    let releaseSession;
     const registrations = [];
     const intercept = async event => {
         const {method, params} = JSON.parse(event.data);
@@ -29,7 +31,8 @@ export async function checkHosted(page, web, artifacts) {
                 assert.equal(params.request.headers.Authorization, 'Bearer firebase-id-token');
                 if (path === '/api/me') {
                     sessions.push(params.request.headers.Authorization);
-                    body = JSON.stringify({id: 'google-player', emailVerified, account});
+                    body = JSON.stringify({id: account?.id ?? 'google-player', emailVerified, account});
+                    if (holdSession) {holdSession = false; await new Promise(resolve => {releaseSession = resolve;});}
                 } else if (path === '/api/players/register') {
                     const registration = JSON.parse(params.request.postData);
                     registrations.push(registration);
@@ -134,6 +137,15 @@ export async function checkHosted(page, web, artifacts) {
             assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls a').getAttribute('href')`), '/');
             assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls').textContent.includes('@alice')`), true);
             assert.equal(await page.evaluate(`document.querySelector('.private-seat-link')`), null, 'Hosted games use accounts');
+            await page.fill('#bid', '19');
+            await page.evaluate(`void (window.retainedGame = document.querySelector('.game-table'))`);
+            const sessionCount = sessions.length;
+            await page.evaluate(`window.firebaseTest.refresh()`);
+            await page.wait(`document.querySelector('#bid')?.value === '19'`, 'Same-account refresh retains the bid');
+            await page.wait(`document.querySelector('.game-table') === window.retainedGame`, 'Mounted table survives refreshed credentials');
+            for (let attempt = 0; attempt < 50 && sessions.length === sessionCount; attempt++) await new Promise(resolve => setTimeout(resolve, 20));
+            assert(sessions.length > sessionCount, 'Refresh actually requested a new session');
+            assert.equal(await page.evaluate(`document.querySelector('.game-table') === window.retainedGame && document.querySelector('#bid').value === '19'`), true);
             await page.screenshot(join(artifacts, 'hosted-game-header.png'), 1280, 900);
             assert(await page.evaluate(`document.querySelector('.game-header').getBoundingClientRect().height < 100`), 'Desktop account and game overview remain compact');
             await page.screenshot(join(artifacts, 'hosted-game-header-mobile.png'), 390, 844, true);
@@ -141,6 +153,26 @@ export async function checkHosted(page, web, artifacts) {
             await page.click('Sign out');
             await page.wait(`document.querySelector('.google-sign-in')`, 'In-game sign out');
             await page.send('Emulation.clearDeviceMetricsOverride');
+        }, `/games/${gameId}`);
+        await check('Identity changes clear drafts and ignore older session responses', async () => {
+            account = registeredAccount;
+            await page.click('Sign in with Google');
+            await page.evaluate(`window.firebaseTest.finishPopup()`);
+            await page.wait(`document.querySelector('#bid')`, 'First account table');
+            await page.fill('#bid', '23');
+            await page.evaluate(`void (window.firstAccountTable = document.querySelector('.game-table'))`);
+            holdSession = true;
+            await page.evaluate(`window.firebaseTest.refresh()`);
+            for (let attempt = 0; attempt < 100 && !releaseSession; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
+            assert(releaseSession, 'Hold the first identity session refresh');
+            account = {...registeredAccount, id: 'other-player', handle: 'bobby'};
+            await page.evaluate(`window.firebaseTest.switchUser('other-player')`);
+            await page.wait(`document.querySelector('.game-header .account-controls')?.textContent.includes('@bobby')`, 'Second account table');
+            assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '0');
+            assert.equal(await page.evaluate(`document.querySelector('.game-table') === window.firstAccountTable`), false);
+            releaseSession(); releaseSession = undefined;
+            await new Promise(resolve => setTimeout(resolve, 150));
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls').textContent.includes('@bobby') && document.querySelector('#bid').value === '0'`), true, 'An old response cannot restore the former session or draft');
         }, `/games/${gameId}`);
         await check('Google users can sign out', async () => {
             await page.click('Sign in with Google');

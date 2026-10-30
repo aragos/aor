@@ -1,5 +1,5 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import type {PointerEvent as ReactPointerEvent} from 'react';
+import type {KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
@@ -101,8 +101,11 @@ export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
     const geometry: Geometry = snapshot.game.rules.map === 'EUROPEAN' ? europeanGeometryData : geometryData;
+    const [inspectOnly, setInspectOnly] = useState(false);
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
+    const [tabProvince, setTabProvince] = useState('');
+    const [tabArea, setTabArea] = useState('');
     const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? [], geometry), [snapshot.game.catalog, geometry]);
     const [view, setView] = useState(bounds);
     useEffect(() => setView(current => clampView(current, bounds)), [bounds.w, bounds.h]);
@@ -118,7 +121,7 @@ export function BoardMap({snapshot, busy}: {
     const gesture = useRef<{x: number; y: number; distance: number; view: MapView} | null>(null);
     const suppressClick = useRef(false);
     const {picker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
-        selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection} = useMapSelection();
+        selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection, selectedAction} = useMapSelection();
     useLayoutEffect(() => {
         setHovered(''); setFocused('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
@@ -127,13 +130,14 @@ export function BoardMap({snapshot, busy}: {
     const catalog = snapshot.game.catalog;
     const definitions = useMemo(() => new Map(catalog?.provinces.map(province => [province.id, province])), [catalog]);
     const occupancy = useMemo(() => new Map(snapshot.game.board.map(pieces => [pieces.id, pieces])), [snapshot.game.board]);
-    const inspectedProvince = inspection?.kind === 'province' ? inspection.id : selected;
+    const inspectedProvince = inspection?.kind === 'province' ? inspection.id : inspection ? '' : selected;
     const landNeighbors = new Set(neighbors(catalog?.landBorders ?? [], inspectedProvince));
     const coastNeighbors = new Set(neighbors(catalog?.coastalConnections ?? [], inspectedProvince));
     const selectedSeas = new Set(catalog?.seaCoasts.filter(coast => coast.province === inspectedProvince).map(coast => coast.sea));
     const cardDraft = snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advanceDraft = catalog?.advances.some(advance => advance.id === selectedAdvance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`));
     const chooseArea = (area: string) => {
+        if (inspectOnly) {setInspection({kind: 'closed'}); setSelectedArea(area); return;}
         setInspection(null);
         setSelected('');
         setSelectedArea(area);
@@ -141,17 +145,19 @@ export function BoardMap({snapshot, busy}: {
         if (!busy && picker?.kind === 'area' && picker.eligible.includes(area)) picker.pick(area);
     };
     const clearInspection = () => {
-        setInspection(null);
-        setSelected(''); setSelectedArea(''); setHovered(''); setFocused('');
+        setInspection({kind: 'closed'});
+        setSelectedArea('');
+        setHovered(''); setFocused('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
     };
     const choose = (id: string) => {
+        if (inspectOnly) {setInspection({kind: 'province', id}); return;}
         if (picker?.kind === 'area') {
             const area = definitions.get(id)?.area;
             if (area) chooseArea(area);
             return;
         }
-        if (!picker && (cardDraft || advanceDraft)) {
+        if (!picker && (cardDraft || advanceDraft || !!selectedAction)) {
             setInspection({kind: 'province', id});
             return;
         }
@@ -163,6 +169,16 @@ export function BoardMap({snapshot, busy}: {
         if (!picker && window.matchMedia('(max-width: 700px)').matches) {
             requestAnimationFrame(() => document.getElementById('interactive-board')?.scrollIntoView({block: 'start'}));
         }
+    };
+    const reveal = ([x, y]: number[]) => setView(current =>
+        x < current.x + 50 || x > current.x + current.w - 50 || y < current.y + 50 || y > current.y + current.h - 50
+            ? clampView({...current, x: x - current.w / 2, y: y - current.h / 2}, bounds) : current);
+    const traverse = (event: ReactKeyboardEvent<SVGGElement>, id: string, ids: string[], attribute: string) => {
+        if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const offset = ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1;
+        const next = event.key === 'Home' ? ids[0] : event.key === 'End' ? ids[ids.length - 1] : ids[(ids.indexOf(id) + offset + ids.length) % ids.length];
+        svg.current?.querySelector<SVGGElement>(`[${attribute}="${next}"]`)?.focus();
     };
     const zoomView = (current: MapView, factor: number, clientX?: number, clientY?: number) => {
         const rect = svg.current?.getBoundingClientRect();
@@ -226,13 +242,13 @@ export function BoardMap({snapshot, busy}: {
         reachable: picker ? (picker.kind === 'area'
             ? picker.eligible.includes(definitions.get(id)?.area ?? '')
             : picker.eligible.includes(id)) : expansionHighlight && definitions.has(id) ? reachable.has(id) : undefined,
-        selected: id === inspectedProvince || (picker?.kind !== 'area' && (picker?.selected.includes(id) ?? false)),
+        selected: picker ? picker.kind !== 'area' && picker.selected.includes(id) : id === selected,
         eligible: picker ? (picker.kind === 'area' ? picker.eligible.includes(definitions.get(id)?.area ?? '') : picker.eligible.includes(id)) : legalDestinations.has(id),
         neighbor: landNeighbors.has(id) || coastNeighbors.has(id),
-        emphasized: hovered === id || focused === id,
+        emphasized: hovered === id || focused === id || id === inspectedProvince,
     });
     const highlightArea = (area: string) => ({
-        selected: area === selectedArea || (picker?.kind === 'area' && picker.selected.includes(area)),
+        selected: picker?.kind === 'area' ? picker.selected.includes(area) : area === selectedArea,
         eligible: picker?.kind === 'area' && picker.eligible.includes(area),
         neighbor: false,
         emphasized: hovered === `area:${area}` || focused === `area:${area}`,
@@ -270,6 +286,7 @@ export function BoardMap({snapshot, busy}: {
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
                 <button type="button" className="secondary" onClick={() => setView(bounds)}>{t('board.fit')}</button>
+                <button type="button" className="secondary" aria-pressed={inspectOnly} onClick={() => setInspectOnly(current => !current)}>{t('table.inspection')}</button>
                 <HelpLink topic="map-legend" label={t('board.mapKey')}/>
             </div>
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
@@ -327,13 +344,18 @@ export function BoardMap({snapshot, busy}: {
                         const picked = picker?.selected.includes(id);
                         const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : legalDestinations.has(id);
                         return <g key={id} data-map-province={id} role={definition ? 'button' : undefined}
-                            tabIndex={definition ? 0 : undefined} aria-pressed={definition ? id === inspectedProvince : undefined}
+                            tabIndex={definition ? id === (tabProvince || catalog.provinces[0]?.id) ? 0 : -1 : undefined}
+                            aria-pressed={definition ? picker ? picker.selected.includes(id) : id === selected : undefined}
                             aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}
                             className={`map-province ${definition ? 'active' : 'inactive'} ${expansionHighlight && definition ? reachable.has(id) ? 'expansion-reachable' : 'expansion-unreachable' : ''} ${picked ? 'picked' : ''} ${eligible ? 'eligible' : ''}`}
                             onPointerEnter={() => {if (definition) setHovered(id);}} onPointerLeave={() => setHovered('')}
-                            onFocus={() => setFocused(id)} onBlur={() => setFocused('')}
+                            onFocus={() => {
+                                setFocused(id); setTabProvince(id);
+                                reveal(shape.label);
+                            }} onBlur={() => setFocused('')}
                             onClick={() => {if (definition && !suppressClick.current) choose(id);}} onKeyDown={event => {
-                                if (definition && (event.key === 'Enter' || event.key === ' ')) {event.preventDefault(); suppressClick.current = false; choose(id);}
+                                if (definition) traverse(event, id, catalog.provinces.map(province => province.id), 'data-map-province');
+                                if (definition && (event.key === 'Enter'  || event.key === ' ')) {event.preventDefault(); suppressClick.current = false; choose(id);}
                             }}>
                             <title>{provinceName(id)}{definition ? '' : ` · ${t('board.notUsed')}`}</title>
                             <path className="province-shape" d={shape.path}
@@ -372,13 +394,13 @@ export function BoardMap({snapshot, busy}: {
                     </g>
                     {catalog.provinces.map(province => <ProvinceLabel key={province.id} province={province} pieces={occupancy.get(province.id)} snapshot={snapshot} geometry={geometry}
                         dimmed={!!emphasizedArea && province.area !== emphasizedArea}/>)}
-                    {areaEntries.map(([area, shape]) => <g key={area} data-map-area-label={area} className="map-area-label" role="button" tabIndex={0}
+                    {areaEntries.map(([area, shape]) => <g key={area} data-map-area-label={area} className="map-area-label" role="button" tabIndex={area === (tabArea || areaEntries[0]?.[0]) ? 0 : -1}
                         aria-label={`${t('board.area')} ${area}${areaAccess[area].length ? `, ${t('board.requires', {advances: areaAccess[area].map(requirement => label(requirement)).join(', ')})}` : ''}`} aria-pressed={highlightArea(area).selected}
                         opacity={activeAreas.has(area) ? 1 : .4}
                         onPointerEnter={() => setHovered(`area:${area}`)} onPointerLeave={() => setHovered('')}
-                        onFocus={() => setFocused(`area:${area}`)} onBlur={() => setFocused('')}
+                        onFocus={() => {setFocused(`area:${area}`); setTabArea(area); reveal(shape.label);}} onBlur={() => setFocused('')}
                         onClick={() => {if (!suppressClick.current) chooseArea(area);}}
-                        onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); suppressClick.current = false; chooseArea(area);}}}>
+                        onKeyDown={event => {traverse(event, area, areaEntries.map(([id]) => id), 'data-map-area-label'); if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); suppressClick.current = false; chooseArea(area);}}}>
                         <title>{`${t('board.area')} ${area}${areaAccess[area].length ? ` · ${areaAccess[area].map(requirement => label(requirement)).join(', ')}` : ''}`}</title>
                         <rect x={shape.label[0] - 65} y={shape.label[1] - 55} width={130} height={110} fill="transparent"/>
                         <rect className="area-label-bg" x={shape.label[0] - 44} y={shape.label[1] - 28} width={88} height={56} rx={8}

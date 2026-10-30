@@ -38,7 +38,7 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
         {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${undoPolicy}`)} <HelpLink topic={`undo-${undoPolicy}`} label="Undo policy details"/></p>}
         {editHistory && snapshot.undo && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory} format={format}/>}
         <h3>{t('game.history')}</h3>
-        <p>{t('history.identifiers')}</p><ChoiceButtons id="history-identifiers" value={identifiers} onChange={setIdentifiers}
+        <p>{t('history.identifiers')}</p><ChoiceButtons label={t('history.identifiers')} id="history-identifiers" value={identifiers} onChange={setIdentifiers}
             choices={(['capitals', 'names', 'ids'] as const).map(value => ({value, label: t(`history.identifiers.${value}`)}))}/>
         <pre>{snapshot.history.map(format).join('\n')}</pre>
     </details>;

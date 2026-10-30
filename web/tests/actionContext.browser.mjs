@@ -137,7 +137,7 @@ export async function checkActionContext(page, web, baseline) {
     await page.send('Input.dispatchMouseEvent', {type: 'mouseMoved', x: bounds.x - 100, y: bounds.y, buttons: 0});
     assert.equal(await page.evaluate(`document.querySelector('.hand-cards').scrollLeft`), scrolled, 'Releasing outside the hand cannot leave a drag armed');
     await page.evaluate(`document.querySelector('[data-hand-card="drag-2"]').focus(); document.querySelector('[data-hand-card="drag-2"]').click()`);
-    assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="drag-2"]').getAttribute('aria-pressed')`), 'true', 'Keyboard/programmatic card activation still works after dragging');
+    assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .card-decision')`), true, 'Keyboard/programmatic card inspection still works after dragging');
 
     const advance = baseline.game.catalog.advances.find(candidate => candidate.id === 'NATIONALISM');
     await show({prompt: {messageId: 'prompt.purchase-advances', players: [viewer]}, legalChoices: {commands: [`buy-advance ${advance.letter}`, 'pass'], bidMax: null},

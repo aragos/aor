@@ -99,6 +99,15 @@ export async function checkGameplayImprovements(page, web, baseline) {
     await show({prompt: {messageId: 'prompt.buy-card', players: [viewer]}, legalChoices: {commands: ['buy-card', 'pass']},
         game: {...waiting, activity: {...waiting.activity, actor: viewer, decisionPlayer: viewer}}});
     assert.equal(await page.evaluate('window.mapCommands.length'), count + 1, 'Polling cannot repeat a queued purchase');
+    // History replacement invalidates preauthorization even when game, viewer and turn stay equal.
+    await show({prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
+    await click('.urban-ascendancy-queue button');
+    const afterFirstQueue = await page.evaluate('window.mapCommands.length');
+    await show({undo: {...baseline.undo, editRevision: (baseline.undo?.editRevision ?? 0) + 1},
+        prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
+    await show({prompt: {messageId: 'prompt.buy-card', players: [viewer]}, legalChoices: {commands: ['buy-card', 'pass']},
+        game: {...waiting, activity: {...waiting.activity, actor: viewer, decisionPlayer: viewer}}});
+    assert.equal(await page.evaluate('window.mapCommands.length'), afterFirstQueue, 'An edited history requires fresh purchase authorization');
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .province-inspector, .decision-panel .province-details').length`), 0);
     assert(me.capital && (await page.evaluate('document.title')).toLowerCase().includes(me.capital), 'Page title identifies the capital');
     console.log('Passed: compact capital title, separate inspections, automatic Crusades/Rebellion/Pirates map targeting, priced actions, relief blockers and queued Urban Ascendancy purchase.');
