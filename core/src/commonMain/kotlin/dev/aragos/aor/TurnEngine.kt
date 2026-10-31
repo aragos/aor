@@ -145,14 +145,14 @@ internal object TurnEngine {
                 flow = state.flow.copy(actor = null, decisions = emptyList()),
             )
         }
-        if (
-            state.stage == Stage.TOKEN_PURCHASE &&
-                !state.flow.phaseStarted &&
-                state.turnOrder.isNotEmpty()
-        ) {
-            state = beginPhase(state)
-        }
         repeat(1000) {
+            if (
+                state.stage == Stage.TOKEN_PURCHASE &&
+                    !state.flow.phaseStarted &&
+                    state.turnOrder.isNotEmpty()
+            ) {
+                state = beginPhase(state)
+            }
             if (state.pendingShuffle() != null) return state
             val decision = state.flow.decisions.lastOrNull()
             if (decision is RenaissanceDecision && decision.targets(state).isEmpty()) {

@@ -266,6 +266,12 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.wait(`window.uiCommands.length === ${count + 1}`, choice + ' confirmed');
         assert.equal(await page.evaluate('window.uiCommands.at(-1).command'), command);
     }
+    const quotesBeforeRenaissance = await page.evaluate('window.uiQuoteRequests.length');
+    await show('renaissance', ['pass', `swap-order ${other}`], {}, 'TOKEN_PURCHASE');
+    assert.equal(await page.evaluate(`document.querySelector('#bid')`), null,
+        'Renaissance precedes token purchase controls');
+    assert.equal(await page.evaluate('window.uiQuoteRequests.length'), quotesBeforeRenaissance,
+        'Renaissance does not request unavailable token quotes');
     await show('replace-event-token', ['replace-event-tokens none'], {
         replacementToken: {player: viewer, provinces: ['rome', 'florence'], event: 'BLACK_DEATH',
             poolTokens: 1, poolCost: 1, maxReplacements: 1, stockTokens: 0, misery: 0, civilWarLossPending: false},

@@ -43,7 +43,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     const turnChoices = snapshot.legalChoices.commands.filter(choice => choice.startsWith('choose-turn-position '));
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
     const isTokenPurchase = stage === 'TOKEN_PURCHASE';
-    const eligiblePurchase = isTokenPurchase && me.misery !== null;
+    const eligiblePurchase = isTokenPurchase && me.misery !== null && snapshot.legalChoices.commands.includes('buy-tokens');
     const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
     const amount = Number(bid);
     const validPurchase = bid.trim() !== '' && Number.isInteger(amount) && Math.abs(amount) <= me.cash;
@@ -71,7 +71,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     return <>
         {eligiblePurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
         {eligiblePurchase && quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
-        {(stage === 'BIDDING' || isTokenPurchase) && me.misery !== null && <DecisionForm onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
+        {((stage === 'BIDDING' && me.misery !== null) || eligiblePurchase) && <DecisionForm onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
             <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-preview' : undefined} required/>
                 <DecisionAction type="submit" className="bid-action" disabled={busy || (isTokenPurchase && (!validPurchase || !quoted))}>
