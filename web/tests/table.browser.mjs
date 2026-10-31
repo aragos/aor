@@ -12,10 +12,17 @@ export async function checkFinished(page, web, baseline) {
     await page.wait(`document.querySelectorAll('.final-scores tbody tr').length === ${baseline.game.players.length}`, 'visible final scores');
     assert.equal(await page.evaluate(`document.querySelectorAll('.header-stage .waiting-status, .player-summary .player-status').length`), 0, 'Completed game has no waiting indicators');
     assert.equal(await page.evaluate(`document.querySelector('.decision-heading .eyebrow').textContent`), 'Game complete');
-    assert.equal(await page.evaluate(`!!(document.querySelector('.final-scores').compareDocumentPosition(document.querySelector('.table-workspace')) & Node.DOCUMENT_POSITION_FOLLOWING)`), true, 'Results precede the inspection workspace');
+    assert.equal(await page.evaluate(`document.querySelector('.final-scores-dialog').open`), true, 'Final scores open as a modal');
+    await page.evaluate(`document.querySelector('.final-scores-dialog .close-detail').click()`);
+    await page.wait(`!document.querySelector('.final-scores-dialog')`, 'dismiss scores');
+    await page.evaluate(`document.querySelector('.final-scores-toggle').focus(); document.querySelector('.final-scores-toggle').click()`);
+    await page.wait(`document.querySelector('.final-scores-dialog')?.open`, 'reopen scores');
+    await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await page.wait(`!document.querySelector('.final-scores-dialog')`, 'Escape dismisses scores');
+    assert.equal(await page.evaluate(`document.activeElement.matches('.final-scores-toggle')`), true, 'Scores return focus to the opener');
     assert.equal(await page.evaluate(`document.querySelector('.game-actions button:not([disabled])')`), null, 'Finished game offers no further decisions');
     assert.equal(await page.evaluate(`window.uiCommands.length`), 0);
-    console.log('Passed: completed-game results precede inspection and waiting indicators disappear.');
+    console.log('Passed: completed-game results open in a reusable popup and waiting indicators disappear.');
 }
 
 // Run through App, including its polling and canonical submission path. Snapshot fields and quote

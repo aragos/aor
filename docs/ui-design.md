@@ -274,3 +274,15 @@ Before accepting a UI change, review a normal turn at desktop and phone widths i
 Apply these questions to the changed flow and one neighboring flow (for example commodity and event
 cards, full and partial placement, or shipping and advance purchase). A positive “feature exists”
 assertion is insufficient: verify the unwanted duplicate is absent and the remaining path still works.
+
+- Advance details show prerequisites and the printed dollar relief rating beside the effect; explain
+  that relief applies to purchases this turn. Master Art discard decisions explicitly direct the
+  responder to select from the persistent hand. Finite action buttons toggle their draft off; a clear
+  selection control is available beside the consequence review. Marker reduction shows authoritative
+  pool, stock and income endpoints and explains lost commodity control before confirmation.
+- The header owns the compact final-turn status. Final scores open once when the game ends in a
+  dismissible modal, with a header control to reopen them. Escape and close restore focus and leave
+  the board available for inspection. Show “Resumes” only for an actual single-player interruption.
+- Activity records public position changes with entry-time capital identities and before/after
+  positions. Automatic Civil War movement appears when Expansion starts, separately from the
+  original card play and any subsequent Renaissance swap.

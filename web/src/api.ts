@@ -109,11 +109,12 @@ export interface HistoryEventView {
         'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' |
         'OFFER_CARD' | 'PLAY_CARD' | 'CIVIL_WAR_LOSS' | 'REPLACE_EVENT_TOKEN' |
         'CEDE_WAR' | 'FORGO_MARKER' | 'MOVE_MARKER' | 'PATRONIZE' | 'DRAW_CARD' | 'TRADE_CARD' | 'ROLL' |
-        'NEXT_EPOCH' | 'ENDING_TRIGGERED' | 'GAME_FINISHED' | 'INCOME' | 'HOLY_INDULGENCE';
+        'NEXT_EPOCH' | 'ENDING_TRIGGERED' | 'GAME_FINISHED' | 'INCOME' | 'HOLY_INDULGENCE' | 'ORDER_CHANGED';
     actor: string | null; target: string | null; turnNumber: number | null; stage: string;
     provinces: string[]; card: string | null; commodity: string | null; advance: string | null;
     amount: number | null; detail: string | null;
     dice: {player: string | null; value: number; color: 'WHITE' | 'BLACK' | 'GREEN'}[];
+    positionChanges?: {player: string; before: number; after: number}[];
     cashChanges: {player: string; amount: number}[];
     miseryChanges: {player: string; spaces: number; fromValue: number | null; toValue: number | null;
         reasons?: {kind: 'ADVANCE_PURCHASE' | 'CATEGORY_COMPLETION' | 'STABILIZATION' | 'PURCHASED_RELIEF' |
@@ -161,6 +162,8 @@ export interface Snapshot {
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean; cashAfter?: number; miseryBefore?: number | null; miseryAfter?: number | null}[];
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
+        markerReductionOffers?: {command: string; province: string; poolBefore: number; poolAfter: number;
+            stockBefore: number; stockAfter: number; incomeBefore: number | null; incomeAfter: number | null}[];
         expansionOffers: ExpansionOfferView[]; expansionInspections?: ExpansionOfferView[];
         commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         cardInspections: CardInspectionView[];

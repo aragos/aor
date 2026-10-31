@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label} from './labels';
@@ -34,11 +34,18 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
 }) {
     const [commandsOpen, setCommandsOpen] = useState(false);
+    const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
+    const finished = snapshot.game.stage === 'FINISHED';
+    useEffect(() => setScoresOpen(finished), [finished]);
     const [sheetCollapsed, setSheetCollapsed] = useState(false);
     const {result, dismiss: dismissResult, submit: resolveCommand} = useActionResult(snapshot, sendCommand);
     const {selected, selectedArea, selectedCard, setSelectedCard, selectedAdvance, setSelectedAdvance,
         picker, workspace, setWorkspace, resetSelection, inspection, setInspection, selectedAction} = useMapSelection();
     const decisionKey = decisionIdentity(snapshot);
+    const decisionScroll = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        if (selectedAction && decisionScroll.current) decisionScroll.current.scrollTop = 0;
+    }, [selectedAction]);
     // Reset before new forms activate their automatic target pickers.
     useLayoutEffect(() => {
         resetSelection();
@@ -79,12 +86,12 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     if (!me) return null;
     const expansionPlayer = expansion ? snapshot.game.players.find(player => player.id === snapshot.game.activity?.actor) : undefined;
     const military = snapshot.game.effects.military;
-    const finished = snapshot.game.stage === 'FINISHED';
     const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
     const province = snapshot.game.catalog?.provinces.find(candidate => candidate.id === selected);
     const expansionOffer = expanding && !picker
         ? snapshot.game.expansionOffers.find(offer => offer.destination === selected && offer.primaryAction !== 'INSPECT') : undefined;
-    const poolAfter = maximumPartialPlacement(expansionOffer)?.resultingPool ?? expansionOffer?.resultingPool;
+    const reductionOffer = snapshot.game.markerReductionOffers?.find(offer => offer.command === selectedAction);
+    const poolAfter = reductionOffer?.poolAfter ?? maximumPartialPlacement(expansionOffer)?.resultingPool ?? expansionOffer?.resultingPool;
     const cardAction = selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
     const advanceAction = advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
@@ -114,19 +121,19 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><div><h1>{t('app.title')}</h1>
-                    <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
+                    <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
                 <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
                 {!snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                     <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                         href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
                 </details>}
+                {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
                 <AccountControls/>
                 <HelpLink label="AoR help"/>
             </header>
             <PlayerOverview snapshot={snapshot}/>
             {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
             {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
-            <FinalScores snapshot={snapshot}/>
         </div>
         <div className="table-workspace">
             <div className="workspace-main">
@@ -179,10 +186,10 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                         </button>}
                         {objectAction && <button type="button" className="close-detail" data-close-action aria-label={t('table.close')}
                             onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
-                        {snapshot.game.activity?.actor && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
+                        {snapshot.game.activity?.actor && snapshot.game.activity.decisionPlayer && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                     </div>
                 </div>
-                <div className="decision-scroll">
+                <div className="decision-scroll" ref={decisionScroll}>
                 {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status">
                     <PlayerLabel snapshot={snapshot} id={expansionPlayer.id}/>
                     <span>{t('table.poolTokens')}</span><strong><TableIcon kind="token"/><span data-pool-current>{expansionPlayer.poolTokens}</span>
@@ -212,6 +219,10 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             </ActionSidebar>
             <Hand snapshot={snapshot} busy={busy}/>
         </div>
+        {scoresOpen && finished && <CardInspectionDialog label={t('game.finalScores')} close={() => setScoresOpen(false)} className="final-scores-dialog">
+            <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setScoresOpen(false)}>×</button>
+            <FinalScores snapshot={snapshot}/>
+        </CardInspectionDialog>}
         {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>
             <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
         </CardInspectionDialog>}
@@ -220,7 +231,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.initiator}/> / <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.opponent}/></span>}
                 {snapshot.game.effects.papalCategory && <span className="effect-badge">{t('game.forbiddenCategory')}: {label(snapshot.game.effects.papalCategory, 'category')}</span>}
             </summary><TurnEffects snapshot={snapshot}/></details>
-            {snapshot.game.endingTriggered && snapshot.game.stage !== 'FINISHED' && <p className="ending-notice">{t('game.endingNotice')}</p>}
             <details className="table-configuration"><summary>{t('table.configuration')}</summary>
                 <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}><dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd></div>)}
     </dl>

@@ -1,3 +1,4 @@
+import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
 import {checkActionButtons} from './actionButtons.browser.mjs';
 import {checkRequestRecovery} from './requestRecovery.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
@@ -498,6 +499,7 @@ await page.send('Page.navigate', {url: web + actor.path});
 
     await checkTable(page, web, after);
     await checkFinished(page, web, after);
+    await checkDecisionClarity(page, web, after);
     await checkRequestRecovery(page, web, after);
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);
@@ -604,6 +606,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkLiveCardMap(page,web);
     await checkLiveCompetitionLifecycle(page,web);
     await checkLiveCivilWar(page,web);
+    await checkLiveMarkerReduction(page,web);
     await checkBidWithdrawal(page,web);
     await checkTokenPurchaseRound(page,web);
 } finally {

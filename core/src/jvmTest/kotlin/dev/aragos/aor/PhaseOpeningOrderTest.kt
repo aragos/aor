@@ -54,16 +54,8 @@ class PhaseOpeningOrderTest {
     }
 
     @Test
-    fun incomeIsNotPaidUntilItsRenaissanceWindowCloses() {
-        val pending = game(Stage.INCOME).withAdvances(p1, AdvanceId.RENAISSANCE).normalise()
-
-        assertThat(pending.playerState(p1).cash).isEqualTo(40)
-        assertThat(pending.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
-    }
-
-    @Test
-    fun incomeAndTheWhitePieceFlipOccurOnceAfterRenaissance() {
-        val pending =
+    fun incomeAndTheWhitePieceFlipOccurWithoutRenaissance() {
+        val paid =
             game(Stage.INCOME)
                 .withAdvances(p1, AdvanceId.RENAISSANCE)
                 .copy(
@@ -72,36 +64,34 @@ class PhaseOpeningOrderTest {
                 )
                 .normalise()
 
-        val paid = pending.step(TextCodec.parse("p1: pass")).normalise()
-
         assertThat(paid.playerState(p1).cash).isEqualTo(58)
         assertThat(paid.board.pieces[ProvinceId("venice")])
             .isEqualTo(ProvincePieces.Marker(p1, PieceSide.COLOURED))
         assertThat(paid.prompts())
             .containsExactly(Prompt.System(SystemNeed.GameRoll(GameRollKind.SHORTAGE, 3)))
+        assertThat(paid.normalise()).isEqualTo(paid)
     }
 
     @Test
-    fun finishingIncomeOpensRenaissanceBeforeAnyTokenPurchase() {
-        val initial = finalShortage().withAdvances(p1, AdvanceId.RENAISSANCE)
-
-        val opened = initial.step(TextCodec.parse("!roll shortage 6 6 6"))
+    fun finishingIncomeOffersSimultaneousTokenPurchasesWithoutRenaissance() {
+        val opened =
+            finalShortage()
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .step(TextCodec.parse("!roll shortage 6 6 6"))
 
         assertThat(opened.stage).isEqualTo(Stage.TOKEN_PURCHASE)
         assertThat(opened.turnNumber).isEqualTo(3)
-        assertThat(opened.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
-        assertThat(opened.legalChoices(p2).commands).isEmpty()
-        assertThat(TokenPurchaseProjection.offers(opened, opened.playerState(p2))).isEmpty()
+        assertThat(opened.prompts())
+            .containsExactly(Prompt.MultiPlayer(listOf(p1, p2, p3), "buy-tokens"))
+        assertThat(TokenPurchaseProjection.offers(opened, opened.playerState(p2))).isNotEmpty()
     }
 
     @Test
-    fun tokenPurchasesRevealAfterTheNewTurnsRenaissanceWindowCloses() {
+    fun tokenPurchasesRevealWithoutAWindowInDrawCard() {
         val purchasing =
             finalShortage()
                 .withAdvances(p1, AdvanceId.RENAISSANCE)
                 .step(TextCodec.parse("!roll shortage 6 6 6"))
-                .step(TextCodec.parse("p1: pass"))
-
         val revealed =
             listOf("p1: buy-tokens 3", "p2: buy-tokens 2", "p3: buy-tokens 1").fold(purchasing) {
                 state,
@@ -110,23 +100,38 @@ class PhaseOpeningOrderTest {
             }
 
         assertThat(revealed.stage).isEqualTo(Stage.DRAW_CARD)
+        assertThat(revealed.flow.decisions.none { it is RenaissanceDecision }).isTrue()
         assertThat(revealed.players.values.map(PlayerState::poolTokens)).containsExactly(3, 2, 1)
         assertThat(revealed.players.values.map(PlayerState::cash)).containsExactly(37, 38, 39)
     }
 
     @Test
-    fun finishingIncomeSkipsRenaissanceWindowsWithoutEligibleNeighbours() {
-        val initial =
-            finalShortage()
+    fun renaissanceOpensInEveryPhaseWhereOrderMatters() {
+        val phases =
+            listOf(
+                Stage.BUY_CARD,
+                Stage.PLAY_CARDS,
+                Stage.PURCHASE,
+                Stage.EXPANSION,
+                Stage.FINAL_CARD_PLAY,
+            )
+        for (phase in phases) {
+            val opened = game(phase).withAdvances(p1, AdvanceId.RENAISSANCE).normalise()
+            assertThat(opened.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
+        }
+    }
+
+    @Test
+    fun civilWarChangesOrderBeforeOfferingRenaissance() {
+        val opened =
+            game(Stage.EXPANSION)
                 .withAdvances(p1, AdvanceId.RENAISSANCE)
-                .withAdvances(p2, AdvanceId.RENAISSANCE)
-                .withAdvances(p3, AdvanceId.RENAISSANCE)
+                .copy(effects = CardTurnEffects(civilWarVictims = listOf(p1)))
+                .normalise()
 
-        val opened = initial.step(TextCodec.parse("!roll shortage 6 6 6"))
-
-        assertThat(opened.prompts())
-            .containsExactly(Prompt.MultiPlayer(listOf(p1, p2, p3), "buy-tokens"))
-        assertThat(opened.normalise()).isEqualTo(opened)
+        assertThat(opened.turnOrder).containsExactly(p2, p3, p1).inOrder()
+        assertThat(opened.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
+        assertThat(opened.legalChoices(p1).commands).contains("swap-order p3")
     }
 
     private fun finalShortage(): GameState =

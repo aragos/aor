@@ -41,6 +41,7 @@ enum class HistoryEventKind {
     GAME_FINISHED,
     INCOME,
     HOLY_INDULGENCE,
+    ORDER_CHANGED,
 }
 
 enum class HistoryDieColor {
@@ -70,6 +71,9 @@ data class HistoryCashChangeView(val player: PlayerId, val amount: Int)
 
 /** Signed changes to a player's own pool and stock; never a physical transfer between players. */
 data class HistoryTokenChangeView(val player: PlayerId, val poolDelta: Int, val stockDelta: Int)
+
+/** One-based positions recorded when a public order change takes effect. */
+data class HistoryPositionChangeView(val player: PlayerId, val before: Int, val after: Int)
 
 /** A revealed signed bid, its cash expense, and the actual stock-funded token allocation. */
 data class HistoryTokenPurchaseView(
@@ -144,6 +148,7 @@ data class HistoryEventView(
     val cashChanges: List<HistoryCashChangeView> = emptyList(),
     val miseryChanges: List<HistoryMiseryChangeView> = emptyList(),
     val tokenChanges: List<HistoryTokenChangeView> = emptyList(),
+    val positionChanges: List<HistoryPositionChangeView> = emptyList(),
     val tokenPurchases: List<HistoryTokenPurchaseView> = emptyList(),
     val reliefPayment: HistoryReliefPaymentView? = null,
     val drawReason: CardDrawReason? = null,
@@ -188,6 +193,7 @@ internal object HistoryEvents {
                         }
                     },
                 tokenPurchases = purchases,
+                positionChanges = positionChanges(before.turnOrder, after.turnOrder),
             )
             .withParticipants(before)
     }
@@ -212,10 +218,26 @@ internal object HistoryEvents {
             )
         if (projected != null) add(projected)
         for (receipt in automatic) {
+            if (receipt.cause == AutomaticCause.CIVIL_WAR) {
+                add(
+                    HistoryEventView(
+                        id = "$id:civil_war_order",
+                        kind = HistoryEventKind.ORDER_CHANGED,
+                        actor = null,
+                        turnNumber = receipt.turnNumber,
+                        stage = receipt.stage,
+                        card = "civil-war",
+                        positionChanges = positionChanges(receipt.orderBefore, receipt.orderAfter),
+                    )
+                )
+                continue
+            }
             val kind =
                 when (receipt.cause) {
                     AutomaticCause.INCOME -> HistoryEventKind.INCOME
                     AutomaticCause.HOLY_INDULGENCE -> HistoryEventKind.HOLY_INDULGENCE
+                    AutomaticCause.CIVIL_WAR ->
+                        error("Civil War order receipt was already handled.")
                 }
             val cash =
                 receipt.resources.mapNotNull { endpoints ->
@@ -231,6 +253,8 @@ internal object HistoryEvents {
                     else {
                         val reason =
                             when (receipt.cause) {
+                                AutomaticCause.CIVIL_WAR ->
+                                    error("Civil War has no resource receipt.")
                                 AutomaticCause.INCOME -> HistoryMiseryReason.INCOME_RELIEF
                                 AutomaticCause.HOLY_INDULGENCE ->
                                     HistoryMiseryReason.HOLY_INDULGENCE
@@ -312,6 +336,7 @@ internal object HistoryEvents {
             ?.let { event ->
                 event.copy(
                     cashChanges = cashChanges(before, after),
+                    positionChanges = positionChanges(before.turnOrder, after.turnOrder),
                     miseryChanges =
                         MiseryHistory.changes(before, after, entry, playedCard = event.card),
                 )
@@ -325,6 +350,7 @@ internal object HistoryEvents {
                 cashChanges.map(HistoryCashChangeView::player) +
                 miseryChanges.map(HistoryMiseryChangeView::player) +
                 tokenChanges.map(HistoryTokenChangeView::player) +
+                positionChanges.map(HistoryPositionChangeView::player) +
                 tokenPurchases.map(HistoryTokenPurchaseView::player)
         return copy(
             participants =
@@ -333,6 +359,15 @@ internal object HistoryEvents {
                     HistoryParticipantView(id, player.player.name, player.capital)
                 }
         )
+    }
+
+    private fun positionChanges(
+        before: List<PlayerId>,
+        after: List<PlayerId>,
+    ): List<HistoryPositionChangeView> = before.mapIndexedNotNull { index, player ->
+        val next = after.indexOf(player)
+        if (next < 0 || next == index) null
+        else HistoryPositionChangeView(player, index + 1, next + 1)
     }
 
     private fun cashChanges(before: GameState, after: GameState): List<HistoryCashChangeView> =

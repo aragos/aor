@@ -621,6 +621,38 @@ class BoardGameTest {
     }
 
     @Test
+    fun markerReductionPreviewMatchesStockFundedConsequences() {
+        val state = expansion(BoardState().placeMarker(id("venice"), p1).board)
+        val offer = state.viewForPlayer(p1).markerReductionOffers.single()
+
+        val reduced = state.act(offer.command)
+
+        assertThat(offer.province).isEqualTo(id("venice"))
+        assertThat(offer.poolAfter).isEqualTo(reduced.playerState(p1).poolTokens)
+        assertThat(offer.stockAfter).isEqualTo(reduced.playerState(p1).stockTokens)
+        assertThat(offer.stockBefore - offer.stockAfter).isEqualTo(1)
+        assertThat(offer.incomeBefore).isGreaterThan(offer.incomeAfter)
+        assertThat(offer.incomeAfter)
+            .isEqualTo(reduced.viewForPlayer(p1).players.first().income?.ordinary)
+        assertThat(state.viewForPlayer(p2).markerReductionOffers).isEmpty()
+    }
+
+    @Test
+    fun markerReductionPreviewUsesPoolWhenStockIsEmpty() {
+        val state =
+            expansion(BoardState().placeMarker(id("venice"), p1).board).updatePlayer(p1) { player ->
+                player.copy(stockTokens = 0, poolTokens = 36)
+            }
+        val offer = state.viewForPlayer(p1).markerReductionOffers.single()
+
+        val reduced = state.act(offer.command)
+
+        assertThat(offer.poolBefore - offer.poolAfter).isEqualTo(1)
+        assertThat(offer.poolAfter).isEqualTo(reduced.playerState(p1).poolTokens)
+        assertThat(offer.stockAfter).isEqualTo(0)
+    }
+
+    @Test
     fun aWhiteMarkerCannotBeReducedToCreateANewColouredBase() {
         val state = expansion(BoardState().placeMarker(id("rome"), p1, PieceSide.WHITE).board)
 
