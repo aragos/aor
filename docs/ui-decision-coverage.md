@@ -264,3 +264,15 @@ absence of redundant surfaces and the retained path: direct help links, map conn
 selection/confirmation and rejected-draft retention. Visual observations remain separate from automated
 geometry and DOM assertions. This is a reusable review method, not a claim that all future states are
 covered by today's test cases.
+
+
+### Decision clarity and phase ordering
+
+The decision-clarity browser fixtures cover expanded advance prerequisites and dollar relief, an
+explicit Master Art hand-discard request with toggle cleanup, final-turn status in the header without
+banners, single-player interruption ownership, and War winner vertical alignment. Completed-game
+fixtures verify automatic modal scores, close/reopen, Escape and focus return. The live marker-reduction
+flow checks authoritative income/token endpoints against the committed result, polling preservation,
+click-to-unselect, clear selection and successful cleanup. Core tests cover stock/pool-funded reduction,
+all five Renaissance phases, immediate Income and simultaneous token purchase. Server tests cover
+Civil War automatic position receipts, direct Renaissance positions, entry identities and no-op omission.

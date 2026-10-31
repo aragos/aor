@@ -146,13 +146,6 @@ internal object TurnEngine {
             )
         }
         repeat(1000) {
-            if (
-                state.stage == Stage.TOKEN_PURCHASE &&
-                    !state.flow.phaseStarted &&
-                    state.turnOrder.isNotEmpty()
-            ) {
-                state = beginPhase(state)
-            }
             if (state.pendingShuffle() != null) return state
             val decision = state.flow.decisions.lastOrNull()
             if (decision is RenaissanceDecision && decision.targets(state).isEmpty()) {
@@ -167,7 +160,11 @@ internal object TurnEngine {
                 return state
             }
             if (!state.flow.phaseStarted) {
+                val before = state
                 state = beginPhase(state)
+                if (before.turnOrder != state.turnOrder) {
+                    receipt(EffectReceipt.between(AutomaticCause.CIVIL_WAR, before, state))
+                }
                 if (state.flow.decisions.isNotEmpty()) return@repeat
             }
             if (!state.flow.phaseBookkeepingApplied) {
@@ -259,9 +256,19 @@ internal object TurnEngine {
                         purchaseStep = PurchaseStep.SHIPPING,
                     )
             )
+        val orderMatters =
+            state.stage in
+                setOf(
+                    Stage.BUY_CARD,
+                    Stage.PLAY_CARDS,
+                    Stage.PURCHASE,
+                    Stage.EXPANSION,
+                    Stage.FINAL_CARD_PLAY,
+                )
         val candidates =
             state.turnOrder.filter { id ->
-                state.playerState(id).misery != MiseryStep.CHAOS &&
+                orderMatters &&
+                    state.playerState(id).misery != MiseryStep.CHAOS &&
                     state.playerState(id).advances.owns(AdvanceId.RENAISSANCE) &&
                     id !in state.flow.renaissanceUsed
             }

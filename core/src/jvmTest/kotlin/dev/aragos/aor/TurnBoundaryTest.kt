@@ -2,7 +2,6 @@ package dev.aragos.aor
 
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
 
 class TurnBoundaryTest {
     private val ids = (1..3).map { number -> PlayerId("p$number") }
@@ -95,18 +94,17 @@ class TurnBoundaryTest {
     }
 
     @Test
-    fun renaissanceOffersAWindowBeforeSealedBidsInLaterTurns() {
+    fun renaissanceDoesNotBlockSimultaneousTokenPurchases() {
         val state =
             game()
                 .withAdvance(p1, AdvanceId.RENAISSANCE)
                 .copy(stage = Stage.TOKEN_PURCHASE, flow = TurnFlow())
                 .normalise()
-        assertThat(state.prompts().single()).isEqualTo(Prompt.SinglePlayer(p1, "renaissance"))
-        assertThat(
-                assertFailsWith<RuleViolation> { state.step(TextCodec.parse("p1: buy-tokens 1")) }
-                    .code
-            )
-            .isEqualTo(ViolationCode.WRONG_PHASE)
+
+        assertThat(state.prompts().single()).isInstanceOf(Prompt.MultiPlayer::class.java)
+        assertThat(state.legalChoices(p1).commands).contains("buy-tokens")
+        assertThat(state.step(TextCodec.parse("p1: buy-tokens 1")).playerState(p1).tokenPurchase)
+            .isEqualTo(1)
     }
 
     private fun game(): GameState {

@@ -102,6 +102,7 @@ data class GameView(
     val stabilizationMisery: Int? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    val markerReductionOffers: List<MarkerReductionOfferView> = emptyList(),
     /** Destination diagnostics include pool/shipping failures omitted from [expansionOffers]. */
     val expansionInspections: List<ExpansionOfferView> = emptyList(),
     /** Missing printed access advances for this viewer; independent of phase, routes, and ships. */
@@ -199,6 +200,7 @@ data class GameView(
                         .value,
                 burdenReferences = burdenReferences(state, viewer),
                 expansionOffers = ExpansionProjection.offers(expansionInspections),
+                markerReductionOffers = ExpansionProjection.reductions(state, viewer),
                 expansionInspections = expansionInspections,
                 commodityPayouts = CommodityPayoutView.from(state),
                 cardOffers = CardProjection.offers(state, viewer),

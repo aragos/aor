@@ -35,7 +35,40 @@ data class ExpansionOfferView(
     val missingAccess: List<AccessRequirement> = emptyList(),
 )
 
+/** Consequences from the same mutation used by the voluntary marker-reduction command. */
+data class MarkerReductionOfferView(
+    val command: String,
+    val province: ProvinceId,
+    val poolBefore: Int,
+    val poolAfter: Int,
+    val stockBefore: Int,
+    val stockAfter: Int,
+    val incomeBefore: Int?,
+    val incomeAfter: Int?,
+)
+
 internal object ExpansionProjection {
+    fun reductions(state: GameState, viewer: PlayerState): List<MarkerReductionOfferView> =
+        state
+            .legalChoices(viewer.player.id)
+            .commands
+            .filter { command -> command.startsWith("reduce-marker ") }
+            .map { command ->
+                val province = ProvinceId(command.substringAfter("reduce-marker "))
+                val after = BoardGame.reduceMarker(state, viewer.player.id, province)
+                val reduced = after.playerState(viewer.player.id)
+                MarkerReductionOfferView(
+                    command,
+                    province,
+                    viewer.poolTokens,
+                    reduced.poolTokens,
+                    viewer.stockTokens,
+                    reduced.stockTokens,
+                    IncomeView.from(state, viewer)?.ordinary,
+                    IncomeView.from(after, reduced)?.ordinary,
+                )
+            }
+
     /** All current destination evaluations, including failures excluded from candidate offers. */
     fun inspections(state: GameState, viewer: PlayerState): List<ExpansionOfferView> {
         if (

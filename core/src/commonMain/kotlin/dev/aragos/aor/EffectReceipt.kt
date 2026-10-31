@@ -4,6 +4,7 @@ package dev.aragos.aor
 enum class AutomaticCause {
     INCOME,
     HOLY_INDULGENCE,
+    CIVIL_WAR,
 }
 
 /** Actual endpoints preserve clamps and offsetting direct/automatic resource movements. */
@@ -24,7 +25,9 @@ data class EffectReceipt(
     val stage: Stage,
     val turnNumber: Int?,
     val resources: List<ResourceEndpoints>,
-    val advance: AdvanceId,
+    val advance: AdvanceId?,
+    val orderBefore: List<PlayerId> = emptyList(),
+    val orderAfter: List<PlayerId> = emptyList(),
 ) {
     companion object {
         internal fun between(
@@ -57,8 +60,13 @@ data class EffectReceipt(
                                 previous.misery != current.misery
                         }
                 },
-                if (cause == AutomaticCause.INCOME) AdvanceId.NEW_WORLD
-                else AdvanceId.HOLY_INDULGENCE,
+                when (cause) {
+                    AutomaticCause.INCOME -> AdvanceId.NEW_WORLD
+                    AutomaticCause.HOLY_INDULGENCE -> AdvanceId.HOLY_INDULGENCE
+                    AutomaticCause.CIVIL_WAR -> null
+                },
+                before.turnOrder,
+                after.turnOrder,
             )
     }
 }

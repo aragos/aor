@@ -28,7 +28,7 @@ class MiseryHistoryTest {
     }
 
     @Test
-    fun closingRenaissanceRecordsTheDeferredIncomeReliefExactlyOnce() {
+    fun renaissanceOwnerReceivesIncomeReliefWithoutAnIncomeWindow() {
         val base = incomeBoundary(MiseryStep.TEN)
         val player = base.playerState(alice)
         val initial =
@@ -41,16 +41,13 @@ class MiseryHistoryTest {
                             ))
             )
         val opening = Entry.Action(carol, TurnCommand.Pass)
-        val waiting = initial.step(opening)
-        val closing = Entry.Action(alice, TurnCommand.Pass)
-        val after = waiting.step(closing)
+        val after = initial.step(opening)
 
-        val beforeChoice = HistoryEvents.projectAll("8:0", initial, waiting, opening, bob)
-        val afterChoice = HistoryEvents.projectAll("8:1", waiting, after, closing, bob)
+        val events = HistoryEvents.projectAll("8:0", initial, after, opening, bob)
 
-        assertThat(beforeChoice.flatMap(HistoryEventView::miseryChanges)).isEmpty()
-        assertThat(afterChoice.single().kind).isEqualTo(HistoryEventKind.INCOME)
-        assertThat(afterChoice.single().miseryChanges).containsExactly(newWorldRelief())
+        assertThat(events.single().kind).isEqualTo(HistoryEventKind.INCOME)
+        assertThat(events.single().miseryChanges).containsExactly(newWorldRelief())
+        assertThat(after.prompts().single()).isInstanceOf(Prompt.System::class.java)
     }
 
     @Test

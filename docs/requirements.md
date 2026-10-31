@@ -155,8 +155,12 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   transaction as the public revision. A stale same-seat write conflicts; another seat's private write
   does not. Saving and returning to an earlier amount still changes the receipt. Distinguish the saved
   private value from an unsaved browser draft, including after withdrawal.
-- Skip publicly empty Renaissance windows at activation, using the same target calculation as swaps.
-  Treat the resulting replay continuation change as an explicit rules-version boundary.
+- Offer Renaissance only in Buy Card, Play Cards, Purchase, Expansion and Final Card Play. Skip
+  publicly empty windows at activation, using the same target calculation as swaps. Treat changed
+  replay continuation as an explicit rules-version boundary.
+- Explain Master Art discard through the hand, show prerequisites and dollar relief in advance details,
+  preview marker reduction consequences with a clear selection control, and record public order
+  movements with their causes. Keep the ending status in the header and final scores in a reusable popup.
 - Use a colorful shield favicon for outstanding player decisions and grayscale while waiting.
   The game-list favicon checks all of the current player’s games regardless of filter or page.
   Hidden game tabs poll more often after recent game activity or engagement, return to occasional

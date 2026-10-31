@@ -118,6 +118,10 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
                 {reason.spaces != null && (change.reasons?.length ?? 0) > 1 && ` (${t('activity.ruleContribution', {spaces: signedAmount(reason.spaces)})})`}
             </span>)}
         </span>)}
+        {event.positionChanges?.map(change => <span className="event-position-change" key={change.player}>
+            <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>
+            <span>{t('activity.positionChange', {before: change.before, after: change.after})}</span>
+        </span>)}
         {event.tokenChanges?.map(change => <span className="event-token-change" key={change.player}>
             <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>{' '}
             <strong>{t('activity.tokenPool', {amount: signedAmount(change.poolDelta)})}</strong>

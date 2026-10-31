@@ -253,3 +253,11 @@ Version 2 logs can contain passes for those empty windows; they must not be sile
 replacement rejects them with `HISTORY_IDENTITY_UNVERIFIABLE` until an explicit validated event mapping
 is supplied. There is no automatic legacy decoder. Retired return-card, Written Record trade and manual
 market-adjustment syntax are rejected by the command parser; no supported version-3 game can emit them.
+
+
+Rules version `ah1996-three-epoch-4` opens Renaissance only for Buy Card, Play Cards, Purchase,
+Expansion and Final Card Play. Token purchase, Draw Card and Income proceed without those windows.
+Version-3 passes in removed windows are incompatible; older games remain exportable and require their
+matching engine or an explicit validated upgrade. Automatic Civil War position changes are replay
+receipts at Expansion opening, before Renaissance, with entry-time before/after positions for each
+affected power. Direct order changes carry their own positions.

@@ -310,8 +310,9 @@ external backup tool needs access; the Blueprint blocks external database connec
 Test recovery before launch, and retain backups beyond the Hobby three-day window if desired.
 A restore loses subsequent moves; a restored database and the old database must not both accept play.
 
-Before deploying rules version `ah1996-three-epoch-3`, retain a complete private backup. Version-2
-histories with empty Renaissance passes cannot be interpreted safely by simply changing their header.
+Before deploying rules version `ah1996-three-epoch-4`, retain a complete private backup. Versions 2
+and 3 may contain Renaissance passes for windows that no longer exist; simply changing their header
+cannot interpret them safely.
 The current server lists incompatible games as unavailable and permits administrative export; it
 rejects unproved upgrades. Finish such games with their matching engine or supply an explicit validated
 upgrade implementation. The release branch and green CI do not substitute for the hosted recovery and

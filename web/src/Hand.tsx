@@ -157,7 +157,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                     onClick={() => {
                         if (finite) {
                             setInspection(null);
-                            setSelectedAction(finite.command);
+                            setSelectedAction(selectedAction === finite.command ? '' : finite.command);
                             setHandExpanded(false);
                             return;
                         }

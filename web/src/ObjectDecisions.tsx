@@ -143,6 +143,8 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspected
         {inspection && <><button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>
             <p className="eyebrow">{label(advance.category, 'category')}</p><h2>{advanceName(advance.id)}</h2></>}
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
+        <p className="advance-prerequisites">{t('advance.prerequisites')}: {advance.prerequisites.map(advanceName).join(', ') || t('reference.none')}</p>
+        <p className="advance-relief">{t('advance.reliefRating', {amount: advance.miseryRelief})}</p>
         {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label={t('reference.printedValues')} compact={false}/>
             <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
         <AdvancePrice offer={offer} printedCost={advance.cost}/>
