@@ -102,7 +102,7 @@ async function perform(state, command) {
     const [verb, argument] = command.split(' ');
     if (verb === 'bid-capital' || verb === 'buy-tokens') {
         await page.fill('#bid', argument);
-        return click('.decision-panel form:has(#bid) button');
+        return click('.decision-actions .bid-action');
     }
     if (verb === 'choose-capital' || verb === 'choose-turn-position') {
         const options = state.legalChoices.commands.filter(choice => choice.startsWith(verb + ' '));
