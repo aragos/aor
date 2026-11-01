@@ -11,10 +11,11 @@ interface Picker {
 }
 
 type Inspection = {kind: 'card' | 'history-card' | 'advance' | 'province'; id: string} | {kind: 'closed'} | null;
+export type Workspace = 'map' | 'markets' | 'advances' | 'activity';
 
 const MapSelection = createContext<{
-    workspace: 'map' | 'markets' | 'advances';
-    setWorkspace: Dispatch<SetStateAction<'map' | 'markets' | 'advances'>>;
+    workspace: Workspace;
+    setWorkspace: Dispatch<SetStateAction<Workspace>>;
     partial: string;
     setPartial: Dispatch<SetStateAction<string>>;
     selectedAction: string;
@@ -43,7 +44,7 @@ const MapSelection = createContext<{
 export function MapSelectionProvider({children}: {children: ReactNode}) {
     const [picker, setPicker] = useState<Picker | null>(null);
     const [playerPicker, setPlayerPicker] = useState<Picker | null>(null);
-    const [workspace, setWorkspace] = useState<'map' | 'markets' | 'advances'>('map');
+    const [workspace, setWorkspace] = useState<Workspace>('map');
     const [partial, setPartial] = useState('');
     const [selectedAction, storeSelectedAction] = useState('');
     const [selected, setSelected] = useState('');

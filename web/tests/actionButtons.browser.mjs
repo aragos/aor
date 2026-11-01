@@ -50,7 +50,7 @@ export async function checkActionButtons(page, web, baseline) {
     };
     for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true], [320, 740, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
-        console.log('Action footer:', width, 'card review and activity resizing');
+        console.log('Action footer:', width, 'card review and activity navigation');
         await show();
         await click('[data-hand-card="footer-stone"]');
         await page.wait(`document.querySelector('.decision-actions .play-card-action')`, 'Selected card action reaches the footer');
@@ -68,40 +68,14 @@ export async function checkActionButtons(page, web, baseline) {
         const beforeScroll = frame.footer;
         await page.evaluate(`document.querySelector('.decision-scroll').scrollTop=100000`);
         assert.deepEqual((await geometry()).footer, beforeScroll, 'Scrolling the action review cannot move the footer');
-        const logHeight = () => page.evaluate(`document.querySelector('.table-activity').getBoundingClientRect().height`);
-        const separatorValue = () => page.evaluate(`Number(document.querySelector('.activity-resizer').getAttribute('aria-valuenow'))`);
-        await page.evaluate(`document.querySelector('.activity-resizer').focus()`);
-        await page.send('Input.dispatchKeyEvent', {type:'keyDown',key:'Home',code:'Home'});
-        await page.wait(`document.querySelector('.activity-resizer').getAttribute('aria-valuenow') === '48'`, 'Keyboard minimizes the open activity area');
-        const minimum = await logHeight();
-        await page.send('Input.dispatchKeyEvent', {type:'keyDown',key:'End',code:'End'});
-        await page.wait(`document.querySelector('.activity-resizer').getAttribute('aria-valuenow') === document.querySelector('.activity-resizer').getAttribute('aria-valuemax')`, 'Keyboard enlarges activity within its limit');
-        assert((await logHeight()) >= minimum);
-        await pinned(`${width} resized activity`);
-        await page.send('Input.dispatchKeyEvent', {type:'keyDown',key:'Home',code:'Home'});
-        await page.wait(`document.querySelector('.activity-resizer').getAttribute('aria-valuenow') === '48'`, 'Activity is at its minimum before dragging');
-        await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-        const point = await page.evaluate(`(() => {const r=document.querySelector('.activity-resizer').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()`);
-        await page.send('Input.dispatchMouseEvent', {type:'mousePressed',...point,button:'left',buttons:1,clickCount:1});
-        await page.send('Input.dispatchMouseEvent', {type:'mouseMoved',x:point.x,y:point.y-30,button:'left',buttons:1});
-        await page.evaluate('new Promise(resolve => requestAnimationFrame(resolve))');
-        await page.send('Input.dispatchMouseEvent', {type:'mouseReleased',x:point.x,y:point.y-30,button:'left',buttons:0,clickCount:1});
-        let resized = await separatorValue();
-        assert(resized > 48, `${width}: dragging enlarges the activity log: ${JSON.stringify({resized, point, geometry: await geometry()})}`);
-        if (mobile) {
-            const touch = await page.evaluate(`(() => {const r=document.querySelector('.activity-resizer').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,id:1};})()`);
-            await page.send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[touch]});
-            await page.send('Input.dispatchTouchEvent', {type:'touchMove',touchPoints:[{...touch,y:touch.y+16}]});
-            await page.send('Input.dispatchTouchEvent', {type:'touchEnd',touchPoints:[]});
-            await page.wait(`Number(document.querySelector('.activity-resizer').getAttribute('aria-valuenow')) < ${resized}`, 'Touch drag reduces the open activity area');
-            resized = await separatorValue();
-        }
+        await click('#tab-activity');
+        await page.wait(`document.querySelector('.activity-list').checkVisibility()`, 'Activity opens in its workspace tab');
+        assert.deepEqual((await geometry()).footer, beforeScroll, 'Activity cannot reduce the action footer space');
+        await pinned(`${width} activity tab`);
         await show();
-        assert.equal(await separatorValue(), resized, 'Polling preserves the chosen activity size');
-        await click('.activity-toggle');
-        assert.equal(await page.evaluate(`document.querySelector('.activity-resizer')`), null, 'Minimized log omits the resize handle');
-        await click('.activity-toggle');
-        assert.equal(await separatorValue(), resized, 'Reopening restores the chosen activity size');
+        assert.equal(await page.evaluate(`document.querySelector('#tab-activity').getAttribute('aria-selected')`), 'true', 'Polling preserves the selected Activity tab');
+        await click('#tab-map');
+        assert.equal(await page.evaluate(`document.querySelector('.activity-resizer, .activity-toggle')`), null, 'The action sidebar has no activity split controls');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-action-footer-${width}.png`));
 
         const placement = baseline.game.expansionOffers.find(offer => offer.partialPlacements.length > 0);
@@ -159,5 +133,5 @@ export async function checkActionButtons(page, web, baseline) {
     await page.send('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
     await page.wait(`window.mapCommands.at(-1) === 'bid-capital 7'`, 'Enter submits the form through its pinned action');
     assert.equal(await page.evaluate('window.mapCommands.length'), before+1);
-    console.log('Passed: pinned and joined action footer, full long labels, separate multi-action controls, native form validation/Enter, and pointer/touch/keyboard activity resizing with polling/minimize preservation.');
+    console.log('Passed: pinned and joined action footer, full long labels, separate multi-action controls, native form validation/Enter, and activity navigation without changing action space.');
 }

@@ -127,10 +127,10 @@ export async function checkTable(page, web, baseline) {
     await page.wait(`window.uiCommands.length === 2 && !document.querySelector('.primary-expansion').disabled`, 'stale response refresh completed');
     assert.equal(await page.evaluate('window.uiCommands.at(-1).expectedRevision'), oldRevision, 'Stale submission uses rendered revision');
     assert.equal(await page.evaluate('window.uiCommands.length'), 2, 'Refresh never automatically retries rejected intent');
-    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-expanded')`), 'true',
-        'Activity is visible by default');
-    await page.evaluate(`document.querySelector('.activity-toggle').click()`);
-    await page.wait(`document.querySelector('.activity-toggle').getAttribute('aria-expanded') === 'false'`, 'activity explicitly collapsed');
+    assert.equal(await page.evaluate(`document.querySelector('#tab-activity').textContent`), 'Activity', 'Activity has a dedicated workspace tab');
+    await page.evaluate(`document.querySelector('#tab-activity').click()`);
+    await page.wait(`document.querySelector('.activity-list').checkVisibility()`, 'Activity tab opens');
+    await page.evaluate(`document.querySelector('#tab-map').click()`);
     const nextEvent = {...baseline.events.at(-1),id:'fixture-activity-1',kind:'BUY_CARD',actor:baseline.viewerId,
         card:null,provinces:[],dice:[],amount:null,detail:null,drawReason:null,protectionCash:null,leaderRebate:null,
         marketRoll:null,cashChanges:[{player:baseline.viewerId,amount:-10}],
@@ -138,7 +138,7 @@ export async function checkTable(page, web, baseline) {
     const events = [...baseline.events,nextEvent];
     await show({...baseline, revision:fixture.revision+1,events});
     assert.equal(await page.evaluate(`document.querySelector('.activity-list').checkVisibility()`), false, 'Closed activity remains hidden during polling');
-    await page.evaluate(`document.querySelector('.activity-toggle').click()`);
+    await page.evaluate(`document.querySelector('#tab-activity').click()`);
     await page.wait(`document.querySelector('.activity-list').checkVisibility()`, 'activity reopened');
     await page.evaluate(`document.querySelector('.command-dock > summary').focus()`);
     const updatedEvents=[...events,{...nextEvent,id:'fixture-activity-2'}];

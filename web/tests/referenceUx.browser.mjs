@@ -18,6 +18,7 @@ export async function checkReferenceUx(page, web, baseline) {
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'reference fixture');
     }
     await show();
+    await page.evaluate(`document.querySelector('#tab-activity').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.game-header .commands-toggle')`),null);
     assert.equal(await page.evaluate(`document.querySelector('.military-summary')`),null);
     assert.equal(await page.evaluate(`document.querySelector('.commodity-legend, .track-reference')`),null);
@@ -35,9 +36,19 @@ export async function checkReferenceUx(page, web, baseline) {
     await show({game:{effects:{...baseline.game.effects,military:[{player:other.id,event:'ARMOR'}]}}});
     assert.match(await page.evaluate(`document.querySelector('.military-summary').textContent`),/Armor/);
     await show({events:Array.from({length:100},(_,index)=>({...event,id:`long-${index}`}))});
-    assert.equal(await page.evaluate(`document.querySelector('.table-activity').getBoundingClientRect().height <= document.querySelector('.workspace-side').getBoundingClientRect().height`),true,'Activity has a bounded height');
-    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').textContent.trim()`),'','Activity control is icon only');
-    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-label')`),'Hide activity');
+    const logBounds = await page.evaluate(`(() => {
+        const bounds = selector => {
+            const rect = document.querySelector(selector).getBoundingClientRect();
+            return {left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,height:rect.height};
+        };
+        return {log:bounds('.table-activity'),tabs:bounds('.workspace-tabs'),hand:bounds('.table-hand')};
+    })()`);
+    assert(logBounds.log.height > 0 && logBounds.log.top >= logBounds.tabs.bottom - 1 &&
+        logBounds.log.bottom <= logBounds.hand.top + 1 &&
+        Math.abs(logBounds.log.left - logBounds.hand.left) < 1 &&
+        Math.abs(logBounds.log.right - logBounds.hand.right) < 1,
+    'Activity fits between workspace tabs and the aligned hand: ' + JSON.stringify(logBounds));
+    assert.equal(await page.evaluate(`document.querySelector('.activity-toggle, .activity-resizer')`),null,'Activity has no sidebar split controls');
     assert.equal(await page.evaluate(`document.querySelector('.activity-list').scrollHeight > document.querySelector('.activity-list').clientHeight`),true,'All entries remain reachable through scrolling');
     assert.equal(await page.evaluate(`document.querySelectorAll('.activity-list [data-event-id]').length`),100);
 

@@ -1,4 +1,3 @@
-import {useId} from 'react';
 import type {ReactNode} from 'react';
 import {ResultNotice} from './DecisionControls';
 import type {HistoryEventView, Snapshot, WarOutcomeView} from './api';
@@ -169,25 +168,26 @@ export function ActionResultNotice({event, snapshot, onDismiss}: {
     </ResultNotice>;
 }
 
-export function Activity({snapshot, onInspectCard, open, setOpen}: {
+export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTogglePin}: {
     snapshot: Snapshot; onInspectCard: (cardId: string) => void;
-    open: boolean; setOpen: (open: boolean) => void;
+    active: boolean; pinned: boolean; canPin: boolean; onTogglePin: () => void;
 }) {
     const events = snapshot.events.filter(event => event.kind !== 'PASS');
-    const contentId = useId();
-    const toggleLabel = t(open ? 'table.hideActivity' : 'table.showActivity');
-    return <section className="table-activity" data-open={open} aria-label={t('table.activity')}>
-        <button type="button" className="secondary activity-toggle" title={toggleLabel}
-            aria-label={toggleLabel} aria-expanded={open} aria-controls={contentId}
-            onClick={() => setOpen(!open)}>
+    const pinLabel = t(pinned ? 'table.unpinActivity' : 'table.pinActivity');
+    return <section id="workspace-activity" className="table-activity" hidden={!active && !pinned}
+        role={pinned ? 'region' : 'tabpanel'} aria-label={pinned ? t('table.activity') : undefined}
+        aria-labelledby={pinned ? undefined : 'tab-activity'}>
+        {canPin && <button type="button" className="secondary activity-pin" title={pinLabel}
+            aria-label={pinLabel} onClick={onTogglePin}>
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <path d="M3 4h10M3 8h10M3 12h6"/>
-                <path d={open ? 'm11 17 3-3 3 3' : 'm11 14 3 3 3-3'}/>
+                <rect x="2" y="3" width="16" height="14" rx="1"/>
+                <path d="M7 3v14"/>
+                <path d={pinned ? 'm11 7 3 3-3 3' : 'm14 7-3 3 3 3'}/>
             </svg>
-        </button>
-        <div id={contentId} className="activity-body" hidden={!open}>
+        </button>}
+        <div className="activity-body">
             {events.length === 0 && <p>{t('table.noActivity')}</p>}
-            <ol className="activity-list">{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
+            <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
                 <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
                 <EventContent event={event} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections} onInspectCard={onInspectCard}/>
             </li>)}</ol>

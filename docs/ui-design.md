@@ -17,7 +17,7 @@ choice and understand its result through visual controls and commands, on deskto
 3. **Organize attention around action.** Show actor, request and relevant resources together. Open
    the relevant workspace once per decision boundary; polling must not repeatedly redirect it.
    Interruptions name the required responder and the activity that resumes. Keep the private hand
-   visible below the workspace column, leaving the sidebar's height available for action and activity,
+   visible below the workspace column, leaving the sidebar's full height available for actions,
    without repeating held-card reminders in the workspace or action pane.
 4. **Use the game objects as controls.** Click cards, advances and players for their relevant detail
    or choice; do not add a parallel Inspect button or map mode. Province connections are shown by
@@ -55,9 +55,8 @@ choice and understand its result through visual controls and commands, on deskto
    (variants, previews, navigation and undo), not general game rules already available elsewhere.
 9. **Show consequential feedback.** Distinguish accepted, rejected, waiting and private-submission
    states. Keep results until dismissed or their scope ends; dismissing results never deletes
-   history. Activity opens by default, explains effects and excludes continuation noise. Keep its
-   minimized control pinned to the bottom of its allotted area. Announce
-   updates without taking focus or erasing unrelated feedback.
+   history. Activity explains effects and excludes continuation noise in its own workspace tab or
+   optional left block. Announce updates without taking focus or erasing unrelated feedback.
 10. **Verify complete accessible flows.** Keyboard, touch and pointer actions need meaningful names,
     visible focus and readable contrast. Support six players, large hands, zoom, reduced motion and
     narrow screens. Keep the commit action reachable while inspecting and scrolling.
@@ -80,10 +79,12 @@ choice and understand its result through visual controls and commands, on deskto
   buttons. Selected finite actions identify their operation and cost on the footer button.
   Undo withdraws an unrevealed capital bid or token purchase, retaining the local amount; after
   reveal it follows the selected policy. Its accessible name identifies the current operation.
-- Open activity has a draggable divider shared with the action area. Pointer, touch and keyboard
-  resizing preserve the chosen split through polling and minimize/reopen. Bound resizing to keep
-  actions reachable; Arrow Up/Down resize, Home/End select the limits, and double-click resets.
-  Minimized activity stays at the bottom of its area.
+- Activity shares workspace navigation with Map, Markets and Advances. Selecting it preserves the
+  action form, prepared targets, hand and log scroll position. At viewport widths of at least
+  1400px, an accessible pin control moves the same log into a separate left block; unpinning returns
+  to the Activity tab. Render the log once, outside the action sidebar. Polling and temporary
+  narrowing preserve the pin preference; narrower screens use the Activity tab. Tab changes and
+  pinning must not reset valid drafts or activity scroll. Help explains this navigation.
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
   readiness while retaining the amount in the local input; reloading must not restore a withdrawn
   submission. Committed history and resource balances change only on reveal.
@@ -119,7 +120,7 @@ choice and understand its result through visual controls and commands, on deskto
   borders, without redundant “Selected” or “Playable” labels. Mark recurring cards with a shared badge rather
   than naming their printed shape; the public reference explains the recycling behavior.
 - The viewer's hand occupies the bottom of the map/workspace column during play, purchases,
-  expansion and waiting. Its desktop width matches that column; the action/activity sidebar extends
+  expansion and waiting. Its desktop width matches that column; the action sidebar extends
   down beside it. Bound workspace, action and activity scrolling so long content cannot push the hand
   offscreen.
   Narrow layouts place the action review and reachable confirmation above the same hand area;
@@ -202,8 +203,8 @@ choice and understand its result through visual controls and commands, on deskto
   balances, using the same rounded calculation as execution.
 - Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
   to remain open, clears on expiry or a history edit and submits once when offered; it does not auto-pass Master Art.
-- Activity opens in its own sidebar outside the action panel, visible before scrolling on desktop.
-  An accessible icon toggles the panel, inset while open; omit its header and count. It explains draw reasons,
+- Activity occupies its workspace tab or optional left block, with bounded scrolling and no count.
+  Keep its pin control clear of receipt text. It explains draw reasons,
   epoch/end triggers, protection money, leader rebates, related cash/misery
   changes and shortage/surplus dice. All displayed dice identify their colors. Show an action only
   once and cap the box height with scrolling. Player names and emblems are those at entry time,
