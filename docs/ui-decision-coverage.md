@@ -12,6 +12,18 @@ first reproduced the lifecycle failure, then committed a map-selected province a
 Historical long runs and separate history-editor evidence remain identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
 
+The main-view polish passes integrated core JVM, Kotlin/JS, server and Kotlin formatting checks,
+the web build, all 55 web unit tests and the comprehensive browser suite
+(`aor-browser-artifacts-cOCtoR`). Live bidding shows every commodity from setup with no premature
+owner forecasts, four named icon tabs and link-free game options. Desktop/phone captures verify
+readable, reachable bottom disclosures. File and PostgreSQL directory tests identify simultaneous
+and single-player actors while excluding submitted and inactive seats; portal fixtures verify
+individual handle emphasis and accessible action status. Map checks distinguish transient focus,
+deliberate selection and background dismissal: closing inspection clears the border while keeping
+the placement draft, temporary card popups preserve active selection, and later popups cannot
+resurrect a dismissed border. Successful placement cleanup remains covered separately from polling
+and rejected submissions.
+
 The 2026-11-01 header/help polish passes the web build, all 53 web unit tests and focused
 browser checks (`aor-browser-artifacts-1vnMIH`). Live bidding verifies that real wheel events
 preserve the numeric draft and focus, while arrow keys, native bounds validation and Enter

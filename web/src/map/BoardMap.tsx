@@ -98,6 +98,8 @@ export function BoardMap({snapshot, busy}: {
     const geometry: Geometry = snapshot.game.rules.map === 'EUROPEAN' ? europeanGeometryData : geometryData;
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
+    // Background dismissal hides the border while retaining the action's province draft.
+    const [dismissedProvince, setDismissedProvince] = useState('');
     const [tabProvince, setTabProvince] = useState('');
     const [tabArea, setTabArea] = useState('');
     const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? [], geometry), [snapshot.game.catalog, geometry]);
@@ -130,7 +132,7 @@ export function BoardMap({snapshot, busy}: {
     const {picker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
         selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection, selectedAction} = useMapSelection();
     useLayoutEffect(() => {
-        setHovered(''); setFocused('');
+        setHovered(''); setFocused(''); setDismissedProvince('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
     }, [focusRevision]);
     const prefix = useId().replace(/:/g, '');
@@ -151,6 +153,7 @@ export function BoardMap({snapshot, busy}: {
         if (!busy && picker?.kind === 'area' && picker.eligible.includes(area)) picker.pick(area);
     };
     const clearInspection = () => {
+        setDismissedProvince(selected);
         setInspection({kind: 'closed'});
         setSelectedArea('');
         setHovered(''); setFocused('');
@@ -167,6 +170,7 @@ export function BoardMap({snapshot, busy}: {
             return;
         }
         setInspection(null);
+        setDismissedProvince('');
         setSelectedArea('');
         setSelected(id);
         if (!picker) { setSelectedCard(''); setSelectedAdvance(''); }
@@ -255,7 +259,8 @@ export function BoardMap({snapshot, busy}: {
         reachable: picker ? (picker.kind === 'area'
             ? picker.eligible.includes(definitions.get(id)?.area ?? '')
             : picker.eligible.includes(id)) : expansionHighlight && definitions.has(id) ? reachable.has(id) : undefined,
-        selected: picker ? picker.kind !== 'area' && picker.selected.includes(id) : id === selected,
+        selected: picker ? picker.kind !== 'area' && picker.selected.includes(id)
+            : id === selected && id !== dismissedProvince,
         eligible: picker ? (picker.kind === 'area' ? picker.eligible.includes(definitions.get(id)?.area ?? '') : picker.eligible.includes(id)) : legalDestinations.has(id),
         neighbor: landNeighbors.has(id) || coastNeighbors.has(id),
         emphasized: hovered === id || focused === id || id === inspectedProvince,
@@ -353,7 +358,7 @@ export function BoardMap({snapshot, busy}: {
                         const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : legalDestinations.has(id);
                         return <g key={id} data-map-province={id} role={definition ? 'button' : undefined}
                             tabIndex={definition ? id === (tabProvince || catalog.provinces[0]?.id) ? 0 : -1 : undefined}
-                            aria-pressed={definition ? picker ? picker.selected.includes(id) : id === selected : undefined}
+                            aria-pressed={definition ? highlight(id).selected : undefined}
                             aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}
                             className={`map-province ${definition ? 'active' : 'inactive'} ${expansionHighlight && definition ? reachable.has(id) ? 'expansion-reachable' : 'expansion-unreachable' : ''} ${picked ? 'picked' : ''} ${eligible ? 'eligible' : ''}`}
                             onPointerEnter={() => {if (definition) setHovered(id);}} onPointerLeave={() => setHovered('')}

@@ -22,6 +22,8 @@ data class GameSummary(
     val players: List<Player>,
     val myMove: Boolean,
     val name: GameName = GameName.DEFAULT,
+    /** Seats still required by the public prompt, excluding unrevealed submissions. */
+    val actionPlayers: List<PlayerId> = emptyList(),
 )
 
 data class GamePage(val games: List<GameSummary>, val nextCursor: String?)

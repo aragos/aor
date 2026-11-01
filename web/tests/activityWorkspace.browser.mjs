@@ -85,6 +85,7 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await page.wait(`!document.querySelector('.card-inspection-dialog')`, 'Activity inspection closes');
     assert.equal(await page.evaluate(`document.activeElement.matches('.event-card')`), true, 'Closing inspection returns focus to its activity card');
     assert.equal(await selected(), 'true', 'Inspection and polling preserve the prepared placement');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${offer.destination}"][data-highlight-priority="4"]')`), true, 'Temporary card inspection preserves the prepared province border');
     await page.evaluate(`document.querySelector('.activity-list').scrollTop=220`);
     await viewport(1440, 980, false);
     await page.wait(`document.querySelector('.activity-pin')?.checkVisibility()`, 'Wide screens offer activity pinning');
@@ -148,6 +149,21 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await page.wait(`window.uiCommands.length===${before + 2} && !document.querySelector('.primary-expansion')`, 'Accepted placement clears its obsolete action context');
     assert.equal(await selected(), 'false', 'Successful cleanup remains separate from tab/polling preservation');
     assert.equal(await page.evaluate(`document.querySelector('#tab-activity').getAttribute('aria-selected')`), 'true', 'Submitting an action does not redirect Activity');
+    await click('#tab-map');
+    await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+    await page.wait(`document.querySelector('.primary-expansion:not([disabled])')`, 'Prepare another placement for inspection dismissal');
+    await page.evaluate(`document.querySelector('[data-map-terrain]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
+    assert.equal(await selected(), 'false', 'Background clicks dismiss the selected province indication');
+    await click('#tab-activity');
+    await page.evaluate(`document.querySelector('.activity-list').scrollTop=0; document.querySelector('.event-card').click()`);
+    await page.wait(`document.querySelector('.card-inspection-dialog[open]')`, 'Inspect a card after dismissing the province border');
+    await click('.card-inspection-dialog .close-detail');
+    assert.equal(await selected(), 'false', 'Closing a later popup does not resurrect the dismissed province border');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${offer.destination}"][data-highlight-priority="4"]')`), false);
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), draft, 'Dismissing the border and reading a popup preserve the placement draft');
+    await click('#tab-map');
+    await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+    assert.equal(await selected(), 'true', 'Explicitly selecting the same province restores its border');
     console.log('Passed: Activity workspace and optional left block, real-offer draft preservation, scrolling, card inspection, polling, responsive fallback, keyboard navigation and accepted/rejected cleanup.');
 }
 

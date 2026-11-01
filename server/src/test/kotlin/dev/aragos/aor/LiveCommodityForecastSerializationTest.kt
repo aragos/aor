@@ -9,6 +9,21 @@ class LiveCommodityForecastSerializationTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun initialSnapshotListsEveryCommodityWithoutForecastOwners() {
+        val players = listOf(Player(p1, "One"), Player(p2, "Two"), Player(p3, "Three"))
+        val initial = GameState(header = GameHeader(players, p1))
+
+        val view = json.readTree(json.writeValueAsString(initial.viewForPlayer(p1)))
+        val payouts = view.path("commodityPayouts").toList()
+
+        assertThat(payouts.map { payout -> payout.path("commodity").asText() })
+            .containsExactlyElementsIn(Commodity.entries.map(Commodity::name))
+            .inOrder()
+        assertThat(payouts.flatMap { payout -> payout.path("owners").toList() }).isEmpty()
+        assertThat(payouts.flatMap { payout -> payout.path("adjustments").toList() }).isEmpty()
+    }
+
+    @Test
     fun competitionSnapshotPublishesTheNewWhiteOwnerBeforeIncome() {
         val before = state()
         val oldView = json.readTree(json.writeValueAsString(before.viewForPlayer(p3)))

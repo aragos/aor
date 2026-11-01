@@ -11,6 +11,20 @@ class LiveCommodityForecastTest {
     private val florence = ProvinceId("florence")
 
     @Test
+    fun newGameListsEveryCommodityBeforeCapitalsAndTurnsExist() {
+        val players = listOf(Player(p1, "One"), Player(p2, "Two"), Player(p3, "Three"))
+        val initial = GameState(header = GameHeader(players, p1))
+
+        val payouts = initial.viewForPlayer(p1).commodityPayouts
+
+        assertThat(payouts.map(CommodityPayoutView::commodity))
+            .containsExactlyElementsIn(Commodity.entries)
+            .inOrder()
+        assertThat(payouts.flatMap(CommodityPayoutView::owners)).isEmpty()
+        assertThat(payouts.flatMap(CommodityPayoutView::adjustments)).isEmpty()
+    }
+
+    @Test
     fun winningCompetitionImmediatelyReplacesTheForecastOwnerBeforeIncome() {
         val before = state(BoardState().placeMarker(florence, p2).board)
 

@@ -13,6 +13,17 @@ export async function checkPortal(page, web) {
     assert.match(rows[1].text, /Mediterranean traders/);
     assert(rows.every(row => row.href.startsWith('/games/') && row.text.includes('@alice') && !row.text.includes('00000000') && !row.text.includes('Created')), 'Rows show handles and state without IDs or dates');
     assert.notEqual(rows[0].background, rows[1].background, 'Awaiting and waiting rows have different backgrounds');
+    const players = await page.evaluate(`[...document.querySelectorAll('.game-row')].map(row =>
+        [...row.querySelectorAll('.game-row-player')].map(player => ({
+            name: player.childNodes[0].textContent,
+            acting: player.classList.contains('needs-action'),
+            accessibleStatus: player.querySelector('.sr-only')?.textContent,
+            weight: getComputedStyle(player).fontWeight,
+        })))`);
+    assert.deepEqual(players.map(row => row.filter(player => player.acting).map(player => player.name)),
+        [['@alice', '@carol'], ['@bob']], 'Each row highlights all required players, including another player’s turn');
+    assert(players.flat().filter(player => player.acting).every(player => player.accessibleStatus.includes('Action required') && Number(player.weight) >= 700),
+        'Acting players have a visible emphasis and an accessible status');
     await page.evaluate(`document.querySelector('.game-row').focus()`);
     assert.equal(await page.evaluate(`document.activeElement === document.querySelector('.game-row')`), true, 'Game rows accept keyboard focus');
     await page.wait(`document.querySelector('link[rel=icon]')`, 'Game list favicon');
@@ -26,6 +37,7 @@ export async function checkPortal(page, web) {
     await page.click('Finished');
     await page.wait(`document.querySelector('.game-directory').textContent.includes('Finished')`, 'finished games');
     assert.equal(await page.evaluate(`document.querySelector('link[rel=icon]').href`), readyIcon, 'Finished filter does not hide a turn in another game');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.game-row-player.needs-action').length`), 0, 'Finished games highlight no players');
     await page.evaluate(`document.querySelector('.create-registered > summary').click()`);
     await page.fill('input[type=search]', 'bo');
     await page.wait(`document.querySelector('[aria-label="Matching players"]')?.textContent.includes('@bob')`, 'registered player directory search');

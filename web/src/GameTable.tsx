@@ -21,7 +21,6 @@ import {maximumPartialPlacement} from './map/mapOrders';
 import {decisionIdentity} from './decision';
 import {DiagnosticMessage} from './DiagnosticMessage';
 import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
-import {HelpLink} from './HelpLink';
 import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
@@ -175,7 +174,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                             const next = event.key === 'Home' ? tabs[0] : tabs[tabs.length - 1];
                             setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
                         }
-                    }}>{t(`table.${tab}`)}{tab === 'advances' && <small>{me.advances.length}</small>}</button>)}
+                    }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && <small>{me.advances.length}</small>}</button>)}
             </nav>
             <div className="workspace-main" hidden={workspace === 'activity'}>
                 <div id="workspace-map" role="tabpanel" aria-labelledby="tab-map" hidden={workspace !== 'map'}>
@@ -260,8 +259,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             <details className="table-configuration"><summary>{t('table.configuration')}</summary>
                 <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}><dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd></div>)}
     </dl>
-                <a href="/">{t('game.new')}</a>
-                <HelpLink topic="variants" label="Variant descriptions" compact={false}/>
             </details>
             <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory} open={commandsOpen} onToggle={setCommandsOpen}/>
         </div>

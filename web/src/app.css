@@ -57,6 +57,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .workspace-main { grid-area: workspace; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .workspace-main > [role="tabpanel"] { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .workspace-tabs { grid-area: tabs; min-width: 0; }
+.workspace-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
 .workspace-tabs { display: flex; align-items: stretch; min-height: 56px; gap: 1.25rem; padding: 0 1.5rem; border-bottom: 1px solid #d6ddcd; } .workspace-tabs button { background: transparent; color: #263f3d; border: none; border-radius: 0; padding: .9rem .2rem; font-weight: 700; } .workspace-tabs button[aria-selected=true] { border-bottom: 3px solid #346e61; } .workspace-tabs small { margin-left: .5rem; color: var(--muted); }
 .decision-panel { border-left: 1px solid #d7dece; background: #f8faf2; padding: 1rem; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; } .decision-heading h2 { font-size: 1.55rem; } .interrupt-owner { font-size: .8rem; background: #eef0de; padding: .5rem; }
 .pool-summary { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: .4rem .6rem; border: 1px solid var(--resource-border); border-radius: 5px; background: var(--resource-fill); padding: .5rem .65rem; margin: .2rem 0 .65rem; color: var(--resource); font-size: .85rem; flex-shrink: 0; } .pool-summary > strong { font-size: 1.25rem; }
@@ -97,7 +98,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .table-tools { display: flex; flex-wrap: wrap; flex: 0 1 auto; min-height: 36px; max-height: 35dvh; overflow-y: auto; background: #f1f2e9; }
 .table-tools > details { flex: 1; min-width: 0; padding: .15rem .8rem; margin: 0; }
 .table-tools > details[open] { flex-basis: 100%; }
-.table-tools > details > summary { font-size: .8rem; white-space: nowrap; }
+.table-tools > details > summary { font-size: .85rem; line-height: 1.5; padding-block: .35rem; overflow-wrap: anywhere; }
 .table-tools > .ending-notice { flex-basis: 100%; }
 .card-decision > .close-detail, .advance-decision > .close-detail { top: -.4rem; right: -.4rem; }
 .object-heading { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
@@ -150,6 +151,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 @media (max-width: 700px) { .table-activity { padding-inline: .75rem; } }
 .table-icon { display: inline-block; width: 18px; height: 18px; flex-shrink: 0; vertical-align: middle; }
 .player-money > span, .player-stats > span { display: inline-flex; align-items: center; gap: .3rem; }
+.game-row-player.needs-action { color: #205c4b; background: #d5e7c9; border-radius: 3px; padding: .1rem .2rem; font-weight: 700; text-decoration: underline; text-underline-offset: .15em; }
 .player-advance-category h5 { margin: .65rem 0 .25rem; color: #536456; font-size: .78rem; }
 .player-advance-category .plain-list { margin-block: .25rem; }
 .player-stats .table-icon { width: 15px; height: 15px; }
@@ -171,8 +173,9 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
     .player-stats { margin-top: .3rem; }
     .table-overview { max-height: 30%; }
     .table-workspace { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) minmax(0, auto) auto; grid-template-areas: "tabs" "workspace" "side" "hand"; }
-    .workspace-tabs { min-height: 44px; gap: .75rem; padding-inline: .75rem; }
-    .workspace-tabs button { padding-block: .65rem; }
+    .workspace-tabs { min-height: 44px; gap: .35rem; padding-inline: .5rem; justify-content: space-between; }
+    .workspace-tabs button { flex-direction: column; gap: .15rem; padding-block: .4rem; font-size: .75rem; position: relative; }
+    .workspace-tabs small { position: absolute; top: .1rem; right: .05rem; margin: 0; font-size: .65rem; }
     .workspace-side { height: 32dvh; max-height: 100%; }
     .workspace-side .decision-panel { padding: .65rem .8rem; }
     .decision-panel.has-context .decision-heading > .eyebrow { display: none; }

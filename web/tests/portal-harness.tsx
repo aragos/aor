@@ -16,6 +16,7 @@ const games: GameSummary[] = ['MY_MOVE', 'ONGOING', 'FINISHED'].map((status, ind
     name: ['Friday Renaissance', 'Mediterranean traders', 'Spring campaign'][index],
     status: status as GameSummary['status'], stage: index === 2 ? 'FINISHED' : 'EXPANSION',
     players: [me, bob, carol].map(player => ({id: player.id, name: `@${player.handle}`})), myMove: index === 0,
+    actionPlayers: index === 0 ? [me.id, carol.id] : index === 1 ? [bob.id] : [],
 }));
 window.portalRequests = [];
 window.portalHasTurn = true;

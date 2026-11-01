@@ -1,4 +1,5 @@
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
+import {checkMainView} from './mainView.browser.mjs';
 import {checkLiveMiseryRelief} from './miseryRelief.browser.mjs';
 import {checkGameNaming} from './gameNaming.browser.mjs';
 import {checkActionButtons} from './actionButtons.browser.mjs';
@@ -90,6 +91,7 @@ const game = await createGame(6);
 const page = await open(web + game.links[0].path);
 try {
 await page.wait(`document.querySelector('.game-table')`, 'configuration controls');
+await checkMainView(page);
 assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Start setup')`), false, 'Creation starts setup implicitly');
 await page.wait(`document.querySelector('#bid')`, 'capital bidding');
 await page.fill('#bid', '7');
