@@ -13,6 +13,7 @@ import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
 import {t} from './messages';
 import {useTurnFavicon} from './favicon';
 import {HelpLink} from './HelpLink';
+import {AppLogo} from './AppLogo';
 import {AccountContext, AccountControls} from './AccountControls';
 import {startPolling} from './polling';
 
@@ -80,7 +81,7 @@ function SignIn({auth}: {auth: Auth}) {
         catch (failure) {setError(message(failure));}
         finally {setBusy(false);}
     }
-    return <main className="landing panel"><p className="eyebrow">{t('app.subtitle')}</p><h1>{t('app.title')}</h1>
+    return <main className="landing panel"><p className="eyebrow">{t('app.subtitle')}</p><h1><AppLogo/></h1>
         <Problem value={error}/><p role="status">{notice}</p>
         <button type="button" className="google-sign-in" disabled={busy} aria-busy={busy} onClick={() => {void google();}}>
             <img src={googleSignInButton} alt="" width={198} height={44}/><span className="sr-only">{t('hosted.sign-in-with-google')}</span>
@@ -134,6 +135,7 @@ function VerifyEmail({user, refresh}: {user: User; refresh: () => Promise<void>}
 }
 
 function RegisteredGameForm({me}: {me: Account}) {
+    const [name, setName] = useState('');
     const [players, setPlayers] = useState<Account[]>([me]);
     const [query, setQuery] = useState('');
     const [matches, setMatches] = useState<Account[]>([]);
@@ -153,12 +155,14 @@ function RegisteredGameForm({me}: {me: Account}) {
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
         try {
-            const result = await request<CreatedGame>('/api/games', undefined, {players: players.map(player => player.id), options: variants, undoPolicy});
+            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), options: variants, undoPolicy});
             window.location.assign(`/games/${result.gameId}`);
         } catch (failure) {setError(message(failure)); setBusy(false);}
     }
     return <details className="panel create-registered"><summary>{t('hosted.create-a-game')}</summary>
         {!me.mayCreateGames ? <p>{t('hosted.an-administrator-must-approve-your')}</p> : <form onSubmit={create}>
+            <label htmlFor="game-name">{t('create.gameName')}</label>
+            <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
             <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-36-registered-players-including')}</p>
             <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>@{player.handle}</strong></span>
                 {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
@@ -245,7 +249,7 @@ function AdminPlayers() {
 
 function GameRow({game}: {game: GameSummary}) {
     return <><strong className="game-row-status">{t(`gameStatus.${game.status}`)}</strong>
-        <span className="game-row-players">{game.players.map(player => player.name).join(' · ')}</span>
+        <span className="game-row-description"><strong className="game-row-name">{game.name}</strong><span className="game-row-players">{game.players.map(player => player.name).join(' · ')}</span></span>
         <span className="game-row-stage">{game.stage && t(`stage.${game.stage}`)}</span></>;
 }
 
@@ -288,7 +292,7 @@ export function Dashboard({me}: {me: Account}) {
             download('aor-game-logs.json', {exportedAt: new Date().toISOString(), games});
         } catch (failure) {setError(message(failure));} finally {setBusy(false);}
     }
-    return <main className="portal"><header className="portal-header"><div><p className="eyebrow">{t('app.title')}</p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')} <HelpLink label="AoR help"/></h1></div><AccountControls showGames={false}/></header>
+    return <main className="portal"><header className="portal-header"><div><p className="eyebrow"><AppLogo/></p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')}</h1></div><AccountControls showGames={false}/></header>
         <RegisteredGameForm me={me}/>
         <section className="panel">
             {me.admin && <ChoiceButtons label={t('hosted.my-games')} value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}

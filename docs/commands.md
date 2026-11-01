@@ -92,7 +92,7 @@ requests. The server never supplies fresh random outcomes for an edit. A rejecti
 unchanged; `HISTORY_INVALID_ENTRY` includes a zero-based replacement `entryIndex`.
 
 `GET /api/games/{id}/revisions/{revision}` reads a prior committed revision with the viewer's usual
-private-information restrictions. Game file format 5 records normal deltas and explicit suffix
+private-information restrictions. Game file format 6 records normal deltas and explicit suffix
 replacements; displayed audit comments are not replayed as engine entries.
 Administrative checkpoints retain older revision files in archives. The separate authenticated
 [operational API](deployment.md#game-operations-and-programmatic-access) owns log upgrades,
@@ -111,7 +111,7 @@ cancellation, abandonment and purge; these are not player commands.
 | `buy-advance <advance>` | Advances purchase step; buys an affordable unowned advance with its prerequisites and applicable discounts. Repeat as permitted, then `pass`. |
 | `stabilize cash` | Positive-cost Stabilization step; pays the hand's stabilization cost in cash. |
 | `stabilize misery` | Positive-cost Stabilization step; takes the corresponding misery instead. |
-| `relieve-misery <spaces>` | Relief step; buys a positive number of spaces within available current-turn relief rating, advance-tier limit and cash. |
+| `relieve-misery <spaces>` | Relief step; buys the selected positive number of spaces within current-turn relief rating, advance-tier limit and cash, then finishes the player's purchasing turn. Unaffordable relief still requires an explicit `pass`. |
 
 `pass` always answers the current decision or completes the current optional activity. It never
 skips another player's response. Purchase steps retain their order even when no purchase is made.
@@ -122,7 +122,7 @@ skips another player's response. Purchase steps retain their order even when no 
 | --- | --- |
 | `place <amount> <province>` | Expansion actor; commits a positive number of pool tokens. An attack must commit exactly the calculated requirement, including existing attacker tokens; excess is rejected. |
 | `attack <province>` | Expansion actor; calculates and commits the exact additional attack tokens. |
-| `reduce-marker <province>` | Expansion actor; replaces an owned coloured marker with one coloured token. A voluntary rebuild never earns expansion-bonus credit. |
+| `reduce-marker <province>` | Expansion actor with all 25 domination markers in play; replaces an owned coloured marker with one coloured token from stock, or the pool if stock is empty. White markers count toward the deployed total but cannot be reduced. A voluntary rebuild never earns expansion-bonus credit. |
 | `buy-expansion-card` | Expansion actor; trades pool tokens for one card, at most once per player. Shared price starts at 3 tokens and rises by 3 per purchase this phase. |
 | `cathedral` | Eligible attacker or defender before competition dice; declares an automatic win against non-owners. Once per turn against each opponent; cannot defeat a Cathedral-owning defender or apply to War. `pass` declines. |
 | `windmill` | Player answering a Wind/Watermill opportunity; requests its selection die. `pass` declines. |

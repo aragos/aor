@@ -83,8 +83,8 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             {snapshot.game.shippingOffer.blockers.map(blocker => <p key={blocker} className="blocker">{t(`error.${blocker}`)}</p>)}
             <DecisionAction className="shipping-action" disabled={busy || !commands.includes('upgrade-ships') || snapshot.game.shippingOffer.blockers.length > 0} onClick={() => { void submit('upgrade-ships'); }}>{t('action.upgrade-ships')}</DecisionAction>
         </div>}
-        {snapshot.game.activity?.purchaseStep === 'RELIEF' && <DecisionForm className="guided-form" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
-            <p>{t('action.relieveMisery')}</p>
+        {snapshot.game.activity?.purchaseStep === 'RELIEF' && <DecisionForm className="guided-form relief-purchase" onSubmit={event => { event.preventDefault(); if (!busy && snapshot.game.reliefOffers.some(offer => String(offer.spaces) === relief && offer.affordable)) void submit(`relieve-misery ${relief}`); }}>
+            <p className="relief-rating-summary"><span>{t('controls.reliefRatingAvailable')}</span><strong>${snapshot.game.reliefRatingAvailable}</strong></p>
             <ChoiceButtons label={t('action.relieveMisery')} id="relief-spaces" value={relief} onChange={setRelief} disabled={busy}
                 choices={snapshot.game.reliefOffers.map(offer => ({value: String(offer.spaces), disabled: !offer.affordable,
                     label: `${offer.spaces} ${t('controls.spaces')} · $${offer.cashCost} · ${offer.ratingSpent} ${t('controls.mrUsed')}`}))}/>

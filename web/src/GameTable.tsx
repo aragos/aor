@@ -22,6 +22,7 @@ import {decisionIdentity} from './decision';
 import {DiagnosticMessage} from './DiagnosticMessage';
 import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
 import {HelpLink} from './HelpLink';
+import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
 import {useStoredSetting} from './preferences';
@@ -105,9 +106,9 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     const capital = me?.capital;
     const seatTitle = capital ? t(`capital.${capital}`) : me?.name;
     useEffect(() => {
-        document.title = seatTitle ? `AoR · ${seatTitle}` : 'AoR';
+        document.title = `AoR · ${snapshot.name}${seatTitle ? ` · ${seatTitle}` : ''}`;
         return () => { document.title = 'AoR'; };
-    }, [seatTitle]);
+    }, [seatTitle, snapshot.name]);
     if (!me) return null;
     const expansionPlayer = expansion ? snapshot.game.players.find(player => player.id === snapshot.game.activity?.actor) : undefined;
     const military = snapshot.game.effects.military;
@@ -145,7 +146,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <div className="table-overview">
             <header className="game-header">
-                <div className="game-brand"><div><h1>{t('app.title')}</h1>
+                <div className="game-brand"><h1><AppLogo/></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
                     <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
                 <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
                 {!snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
@@ -154,7 +155,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 </details>}
                 {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
                 <AccountControls/>
-                <HelpLink label="AoR help"/>
             </header>
             <PlayerOverview snapshot={snapshot}/>
             {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
@@ -225,11 +225,11 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                         {snapshot.game.players.filter(player => military.some(play => play.player === player.id)).map(player => <p key={player.id}>
                             <PlayerLabel snapshot={snapshot} id={player.id}/>: {military.filter(play => play.player === player.id).map(play => label(play.event, 'event')).join(', ')}
                         </p>)}
-                        <small>{t('table.militaryMatchups')}</small>
                     </section>}
                     <div id="decision-content" className="decision-content">
                     {result && <ActionResultNotice event={result} snapshot={snapshot} onDismiss={dismissResult}/>}
                     {spending && <p className="action-cash">{t('controls.availableCash')}: <strong>${me.cash}</strong></p>}
+                    {buyingAdvances && <p className="relief-rating-summary advance-relief-rating"><span>{t('controls.reliefRatingAvailable')}</span><strong>${snapshot.game.reliefRatingAvailable}</strong></p>}
                     {cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : province && !picker && <ProvinceActions key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit}/>}

@@ -429,8 +429,13 @@ stacking limits below.
     - When a player has tokens equal to the market number in a market with no other pieces, those tokens are replaced by
       one white domination marker, taken from the mat.
     - The tokens go back to **stock**.
-- **Voluntary swap.** A player may replace one of its domination markers with a token in order to reuse the marker
-  elsewhere. This may not be done to create "new" markers for the expansion bonus.
+- **Voluntary swap.** During its Expansion, a player with all **25 domination markers in play** may
+  replace one of its coloured markers with a coloured token in order to reuse the marker elsewhere.
+  White markers count toward the 25-marker supply but cannot themselves be voluntarily reduced.
+  The replacement token comes from stock, or from the expansion pool if stock is empty. After a
+  reduction, another is unavailable until all 25 markers are back in play. A voluntary rebuild never
+  counts as a new marker for the expansion bonus. Event-driven reductions are independent of this
+  voluntary-swap restriction.
 
 ### 6.6 Competition
 
@@ -542,9 +547,12 @@ at least the cost.
 - **How far.** Per turn, a player may move down up to one space per tier.
   The application shows this decision for players with a completed tier even when they cannot
   afford relief or are already at zero misery, explaining the limit and offering Pass.
+  Confirming a relief purchase finishes that player's purchasing turn, even if fewer than the
+  maximum spaces were selected. Players who cannot afford relief must explicitly Pass.
 - **Cost.**
     - Each space costs the difference between the two box values.
-    - The **MR** ratings of advances bought *this turn* are pooled and reduce the cost. Unused MR is lost.
+    - The **MR** ratings of advances bought *this turn* are pooled and reduce the cost. The purchase
+      decision shows the unused dollar amount available from these advances. Unused MR is lost.
     - **Enlightenment** halves the cost.
 
 ### 7.4 Misery triggers

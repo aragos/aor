@@ -6,11 +6,11 @@ import {t} from './messages';
 const ReferencePopup = lazy(() => import('./ReferencePopup'));
 
 /** Inspect reference material in place while retaining the prepared game action. */
-export function HelpLink({topic = '', label = 'Help', compact = true, inline = false, icon}: {
-    topic?: string; label?: string; compact?: boolean; inline?: boolean; icon?: ReactNode;
+export function HelpLink({topic = '', label = 'Help', compact = true, icon}: {
+    topic?: string; label?: string; compact?: boolean; icon?: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
-    return <><button type="button" className={compact ? `help-link${inline ? ' inline-help' : ''}` : 'reference-link'}
+    return <><button type="button" className={compact ? 'help-link' : 'reference-link'}
         data-help-topic={topic} aria-label={`Help: ${label}`} title={label} aria-haspopup="dialog"
         onClick={event => {event.preventDefault(); event.stopPropagation(); setOpen(true);}}>
         {compact ? <>{icon}?</> : label}

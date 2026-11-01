@@ -198,7 +198,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                 </button>
                 <span className="card-track-links">{commodities.map(commodity =>
                     <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`}
-                        label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`} inline
+                        label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`}
                         icon={<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
                             <CommodityIcon commodity={commodity}/>
                         </svg>}/>)}</span>

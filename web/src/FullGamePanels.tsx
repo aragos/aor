@@ -1,4 +1,3 @@
-import {PlayedLeaders} from './TablePanels';
 import type {Snapshot} from './api';
 import {PlayerLabel, PlayerLabels} from './IdentityLabel';
 import {label} from './labels';
@@ -20,18 +19,22 @@ export function FinalScores({snapshot}: {snapshot: Snapshot}) {
 
 export function TurnEffects({snapshot}: {snapshot: Snapshot}) {
     const effects = snapshot.game.effects;
-    const adjustments = Object.entries(snapshot.game.adjustments).filter(([, markers]) => markers.length > 0);
-    if (snapshot.game.turnNumber === null) return null;
-    return <section className="panel turn-effects" aria-labelledby="effects-title">
-        <h2 id="effects-title">{t('game.thisTurn')}</h2>
-        {adjustments.length > 0 && <ul className="plain-list">{adjustments.map(([commodity, markers]) => <li key={commodity}>
-            {label(commodity, 'commodity')}: {markers.map(marker => label(marker, 'adjustment')).join(', ')}
-        </li>)}</ul>}
-        {effects.papalCategory && <p>{t('game.forbiddenCategory')}: {label(effects.papalCategory, 'category')}</p>}
-        {effects.military.map(play => <p key={play.event}><PlayerLabel snapshot={snapshot} id={play.player}/>: {label(play.event, 'event')}</p>)}
-        {effects.enlightenedRulers.length > 0 && <p>{t('game.enlightenedRulers')}: <PlayerLabels snapshot={snapshot} ids={effects.enlightenedRulers}/></p>}
-        {snapshot.game.activeWar && <p>{t('game.activeWar')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.initiator}/> / <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.opponent}/> · {t('game.warTies')}: {snapshot.game.activeWar.ties}</p>}
-        <PlayedLeaders snapshot={snapshot}/>
-        {adjustments.length === 0 && effects.leaders.length === 0 && !effects.papalCategory && effects.military.length === 0 && effects.enlightenedRulers.length === 0 && !snapshot.game.activeWar && <p className="muted small">{t('game.noEffects')}</p>}
+    const war = snapshot.game.activeWar;
+    const hasEffects = effects.papalCategory || effects.military.length > 0 ||
+        effects.enlightenedRulers.length > 0 || war;
+    return <section className="turn-effects" aria-label={t('game.thisTurn')}>
+        {hasEffects ? <dl className="detail-list turn-effect-list">
+            {effects.papalCategory && <div><dt>{t('game.forbiddenCategory')}</dt>
+                <dd>{label(effects.papalCategory, 'category')}</dd></div>}
+            {effects.military.map(play => <div key={play.event}><dt><PlayerLabel snapshot={snapshot} id={play.player}/></dt>
+                <dd>{label(play.event, 'event')}</dd></div>)}
+            {effects.enlightenedRulers.length > 0 && <div><dt>{t('game.enlightenedRulers')}</dt>
+                <dd><PlayerLabels snapshot={snapshot} ids={effects.enlightenedRulers}/></dd></div>}
+            {war && <div className="turn-effect-war"><dt>{t('game.activeWar')}</dt><dd>
+                <span className="turn-war-participants"><PlayerLabel snapshot={snapshot} id={war.initiator}/>
+                    <span>/</span><PlayerLabel snapshot={snapshot} id={war.opponent}/></span>
+                <span>{t('game.warTies')}: {war.ties}</span>
+            </dd></div>}
+        </dl> : <p className="muted small">{t('game.noEffects')}</p>}
     </section>;
 }

@@ -32,7 +32,7 @@ export async function checkMarketInsights(page, web, baseline) {
     await show();
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="fur"] .adjustment-badge.SHORTAGE').textContent`), /Shortage.*×2/i);
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="fur"] .adjustment-badge.SURPLUS').textContent`), /Surplus.*×1/i);
-    await page.evaluate(`document.querySelector('#tab-markets').click(); document.querySelector('.market-tile[data-commodity="FUR"]').open = true`);
+    await page.evaluate(`document.querySelector('#tab-markets').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.market-tile button[data-help-topic="commodity-fur"]').getAttribute('aria-haspopup')`), 'dialog', 'Full market boxes open as reference');
     assert.equal(await page.evaluate(`document.querySelector('.market-tile .payout-box')`), null, 'Static boxes leave the game view');
     await page.evaluate(`document.querySelector('[data-hand-card="fur"]').click()`);
@@ -58,7 +58,7 @@ export async function checkMarketInsights(page, web, baseline) {
     await page.wait(`!document.querySelector('.card-inspection-dialog')`, 'Leader popup closes');
     assert.equal(await page.evaluate(`document.activeElement.dataset.unplayedLeader`), expected[0].leader, 'Popup returns keyboard focus to the circle');
     await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);
-    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.advance-decision .unplayed-leader')].map(button => ({leader: button.dataset.unplayedLeader, epoch: button.textContent.trim()}))`), expected);
+    assert.equal(await page.evaluate(`document.querySelector('.advance-decision .unplayed-leader')`), null, 'Advance inspection does not duplicate the tile leader links');
     await show({game: {stage: 'EXPANSION', board: [{id: 'florence', marker: {owner: viewer, side: 'WHITE'}, tokens: []}]}});
     assert.equal(await page.evaluate(`document.querySelector('[data-player="${viewer}"] .player-white-markers b').textContent`), '1');
     const other = baseline.game.players.find(player => player.id !== viewer);

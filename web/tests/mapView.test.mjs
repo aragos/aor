@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/map/mapView.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext}}).outputText;
-const {fitMapView, clampMapView, resizeMapView, zoomMapView} = await import(
+const {fitMapView, clampMapView, panMapView, resizeMapView, zoomMapView} = await import(
     'data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 const bounds = {x: 20, y: 30, w: 2400, h: 1800};
 
@@ -46,6 +46,27 @@ test('zooming out stops before either viewport dimension can reveal empty space'
     const view = zoomMapView({x: 900, y: 700, w: 500, h: 500 * 800 / 450}, bounds, viewport, 100);
     assert.equal(view.h, bounds.h);
     assertInside(view, viewport);
+});
+
+test('panning converts both CSS-pixel axes at the current zoom without changing scale', () => {
+    const viewport = {width: 1000, height: 500};
+    const view = {x: 400, y: 500, w: 1200, h: 600};
+    const panned = panMapView(view, bounds, viewport, {x: 100, y: -50});
+    assert.deepEqual(panned, {x: 520, y: 440, w: 1200, h: 600});
+    assertInside(panned, viewport);
+});
+
+test('extreme scrolling stops at each board corner without exposing empty space', () => {
+    const viewport = {width: 1000, height: 500};
+    const view = {x: 400, y: 500, w: 1200, h: 600};
+    for (const x of [-10000, 10000]) {
+        for (const y of [-10000, 10000]) {
+            const panned = panMapView(view, bounds, viewport, {x, y});
+            assertInside(panned, viewport);
+            assert.equal(panned.x, x < 0 ? bounds.x : bounds.x + bounds.w - panned.w);
+            assert.equal(panned.y, y < 0 ? bounds.y : bounds.y + bounds.h - panned.h);
+        }
+    }
 });
 
 test('resizing a zoomed map retains its center when the new frame fits', () => {

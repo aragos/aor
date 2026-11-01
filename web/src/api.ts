@@ -132,6 +132,7 @@ export interface HistoryEventView {
 }
 export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
 export interface Snapshot {
+    name: string;
     gameId: string; revision: number; viewerId: string; creatorId: string;
     status?: 'ACTIVE' | 'CANCELLED' | 'ABANDONED'; accountId?: string | null;
     game: {stage: string; currentEpoch: number;
@@ -160,6 +161,7 @@ export interface Snapshot {
         adjustmentOffers?: {command: string; commodities: string[]; cost: number; cashAfter: number}[];
         cardPurchaseOffer?: {cost: number; cashAfter: number; blockers: string[]} | null;
         reliefOffers: {spaces: number; cashCost: number; ratingSpent: number; affordable: boolean; cashAfter?: number; miseryBefore?: number | null; miseryAfter?: number | null}[];
+        reliefRatingAvailable: number;
         stabilizationCost: number | null; stabilizationMisery: number | null; burdenReferences: string[];
         lockedProvinces: string[];
         markerReductionOffers?: {command: string; province: string; poolBefore: number; poolAfter: number;
@@ -177,12 +179,12 @@ export interface Snapshot {
         fromEntry: number | null; entryCount: number; editRevision: number;
         actions: {entry: number; actor: string; text: string}[]};
 }
-export interface CreatedGame {gameId: string; registered?: boolean; links: {id: string; name: string; path: string}[]}
+export interface CreatedGame {gameId: string; name: string; registered?: boolean; links: {id: string; name: string; path: string}[]}
 export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Record<string, string> | null; pollIntervalMs: number}
 export interface Account {id: string; handle: string; mayCreateGames: boolean; admin: boolean}
 export interface Session {id: string; emailVerified: boolean; account: Account | null}
 export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABANDONED' | 'UNAVAILABLE';
-export interface GameSummary {id: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean}
+export interface GameSummary {id: string; name: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean}
 export interface GamePage {games: GameSummary[]; nextCursor: string | null}
 export class ApiError extends Error {
     constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null, public parameters: Record<string, number> = {}, public causeCode: string | null = null) { super(code); }

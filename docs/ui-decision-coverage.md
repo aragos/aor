@@ -12,6 +12,93 @@ first reproduced the lifecycle failure, then committed a map-selected province a
 Historical long runs and separate history-editor evidence remain identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
 
+The 2026-11-01 header/help polish passes the web build, all 53 web unit tests and focused
+browser checks (`aor-browser-artifacts-1vnMIH`). Live bidding verifies that real wheel events
+preserve the numeric draft and focus, while arrow keys, native bounds validation and Enter
+submission still work. Reviewed desktop/phone captures show the 40-pixel colored favicon in
+the header and shared footnote-style help markers. The map-variant description omits Fez,
+and the game-list heading omits its help marker. Existing reference, compact-table and portal
+flows also pass, including popup focus restoration and polling/draft preservation in StrictMode.
+
+The subsequent market simplification passes the web build, all 53 web unit tests and focused
+reference, market and compact-table browser checks (`aor-browser-artifacts-34dSkA`). Reviewed
+desktop/phone captures show no header Help button and direct payout help beside each commodity
+name. Market tiles no longer expand or expose their former detail controls. Keyboard opening,
+Escape and focus restoration work from the main boxes; contextual help retains prepared actions
+and polling drafts.
+
+The advance-inspection cleanup passes the web build, all 53 web unit tests and focused price,
+decision, purchase and market browser checks (`aor-browser-artifacts-80knOi`). All catalog advances
+show their category credit and next-turn timing, relief and prerequisites directly, without
+inspection foldouts or navigation links. Current price credits remain individually attributed,
+including leader/Written Record amounts; blocked inspections submit no purchase. Reviewed
+desktop/phone captures show aligned facts, a separate price column where space permits, and a
+phone inspection that uses the workspace area. Accessibility names, HTML contrast and preservation
+of a prepared card target also pass in StrictMode fixtures.
+
+The competition-panel refinement passes the web build, all 53 web unit tests and focused
+expansion diagnostics, action-footer and live competition browser checks
+(`aor-browser-artifacts-ZNXDqL`). Desktop/phone captures show destination shipping directly as
+current → projected use / capacity, with a compact phone pool row keeping shipping visible without
+scrolling. Fixtures cover finite and unlimited capacity, land-route omission, selected partial
+shipments through polling, and blocked destinations. The dice disclaimer and placement-details
+disclosure are absent. Live competition resolution still records its receipt and clears it at
+Expansion end while retaining activity history.
+
+The shared vertical-alignment review passes the web build, all 53 web unit tests and the
+comprehensive browser suite (`aor-browser-artifacts-w0In3Q`), including hosted/setup, both maps,
+all decision families, draft preservation and live competition flows. Measured inline capital
+names now share the surrounding text baseline in military rows, turn effects, active-war badges,
+card targets and winner announcements. Desktop, 390-pixel and 320-pixel fixtures also measure
+matching vertical centers for shipping/income rows and capital/handle pairs. The source review
+corrected cash/price headings, mobile decision headings, status dots, commitment quantities and
+relief receipts through their shared layout owners. Military summaries omit generic matchup help;
+footnote help markers retain their intentional raised position.
+
+Zero-valued number inputs now clear on focus through their controlled value owner. The web build,
+all 53 web unit tests and focused browser checks pass (`aor-browser-artifacts-lLcRvE`): real mouse,
+reverse-Tab and touch entry clear zero; typing and polling retain the new draft. Nonzero values,
+explicit zero entry, native validation, arrow keys, Enter submission and wheel protection remain
+covered. A StrictMode leader-protection fixture verifies the same behavior without committing play.
+
+The voluntary-reduction restriction passes the integrated core JVM, Kotlin/JS, server and Kotlin
+format checks, the web build and all 53 web unit tests. Core tests cover 24 versus 25 deployed
+markers, white markers counting toward supply without being reducible, other players' markers,
+stock/pool-funded replacement, loss of further offers after reduction and renewed eligibility
+after redeployment. Replay still excludes voluntary rebuilds from the expansion bonus. A rebuilt
+live-server browser check (`aor-browser-artifacts-05ibbB`) verifies absent reduction controls below
+capacity and a typed rejection of direct commands without board or history changes.
+
+Map scroll panning and the compact This turn disclosure pass the web build, all 55 web unit tests
+and focused browser checks (`aor-browser-artifacts-sdQoEQ`). A live offered placement survives wheel
+panning and polling, then commits normally. Pixel, line and page deltas retain zoom; extreme wheel
+and pointer movement remain within the same bounds. Modifier zoom and touch pinch still work, and
+standard/European desktop/phone framing and hidden-tab continuity pass. Reviewed captures show
+compact turn-effect rows without a second heading, played leaders or market adjustments; their
+existing Advances/Markets views remain intact. Disclosure polling and the empty state also pass.
+
+The relief-purchase refinement passes integrated core JVM, Kotlin/JS, server and Kotlin format
+checks, the web build and all 55 web unit tests. Projection tests cover current-turn acquisition
+ratings, prior spending, old-turn reset and viewer ownership; turn-flow tests cover buying fewer
+than the available spaces, rejection and explicit Pass. A live offered-action browser check
+(`aor-browser-artifacts-Hva9cu`) completes a tier through real advance purchases, verifies the
+available MR dollars, retains a selected purchase through polling, and confirms payment and
+progression with one recorded command. Unaffordable relief neither advances on rejection nor
+passes during polling; the player explicitly passes. Reviewed desktop/phone captures show a compact
+rating row beside the selected cash/misery consequences.
+
+Game naming and accumulated advance MR pass the integrated Kotlin checks, web build, all 55 web
+unit tests and focused browser checks (`aor-browser-artifacts-FW1Xy8`). Live advance purchases update
+the authoritative MR total, retain it while selecting an advance and preserve it through reloads.
+Creation checks cover required names, server rejection of blank names without losing the draft,
+trimmed Unicode names, durable header/tab display and long-name phone layout. StrictMode hosted
+fixtures show names in member/admin rows and send the creator's chosen name while preserving it
+after a failed creation. File and PostgreSQL service tests cover named creation, directory/snapshot
+projection and history replacement; restart and value-validation tests also pass. Current game
+documents use format 6, with the name kept in server metadata independently of engine history.
+The comprehensive browser suite also passes (`aor-browser-artifacts-t66C2C`), including hosted
+accounts, all creation flows, both maps, decision families and live gameplay lifecycles.
+
 The 2026-11-01 activity layout passes the web build, all 53 web unit tests, focused
 Activity/hand browser checks and the comprehensive browser suite (`aor-browser-artifacts-llbMBf`). Activity occupies its own workspace tab; a single live log can be
 pinned into a left block at widths of at least 1400px. Production-StrictMode fixtures use a live
@@ -117,7 +204,7 @@ replace the outstanding physical-device and screen-reader reviews.
 | Advances | `buy-advance`, `patronize`, `pass`; offers, claims and inspection | Browser quotes show printed/category/research/leader components and misery endpoints. Core tests match previews to actual payment, current-turn credit exclusion, unaffordable purchases, clamped relief and Chaos. Market/leader privacy evidence remains below. |
 | Immediate Master Art | `discard-card`, `pass`; optional private discard | Select/confirm fixture; engine resumes same purchase activity |
 | Stabilization | `stabilize cash/misery`; cost and destination box | Gameplay fixture displays destination; core preview/execution equality; live cash-payment baseline |
-| Relief | `relieve-misery`, `pass`; spaces, cost and blocker | Disabled unaffordable choices and enabled Pass; core retains tier-based step including zero misery. Activity tests cover cash plus pooled current-turn MR, prior spending, cross-turn reset and Enlightenment rounding; browser receipt shows the cash expense once. |
+| Relief | `relieve-misery`, `pass`; current-turn MR dollars, spaces, cost and blocker | Live tier completion shows available advance MR; selection survives polling and confirmed payment finishes purchasing in one command. Unaffordable offers require explicit Pass and reject direct purchase without advancing. Core retains the tier-based step including zero misery and verifies partial-allowance purchases still finish. Projection/activity tests cover viewer ownership, current-turn MR, prior spending, cross-turn reset and Enlightenment rounding; browser receipt shows the cash expense once. |
 | Expansion | `place`, `attack`, `reduce-marker`, `buy-expansion-card`, `pass`; province action | Live satellite/partial/full commitments remain covered. Core retains candidate filtering; full domain evaluations explain omitted pool/shipping destinations, missing access and existing control. Browser checks explanations, no invalid controls/highlights, and retained legal partial placement. |
 | Cathedral | `cathedral`, `pass`; interruption form | Canonical decision fixture and competition rules tests |
 | Civil War | `civil-war-loss cash/tokens`; actual payable costs after capital replacement | Core verifies rounding, cash caps and both executions. Live browser exhausts stock, replaces the capital from pool, checks both costs/balances and commits the displayed token loss. |

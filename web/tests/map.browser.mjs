@@ -1,4 +1,6 @@
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
+import {checkLiveMiseryRelief} from './miseryRelief.browser.mjs';
+import {checkGameNaming} from './gameNaming.browser.mjs';
 import {checkActionButtons} from './actionButtons.browser.mjs';
 import {checkRequestRecovery} from './requestRecovery.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
@@ -501,6 +503,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkTable(page, web, after);
     await checkFinished(page, web, after);
     await checkDecisionClarity(page, web, after);
+    await checkLiveMiseryRelief(page, web);
+    await checkGameNaming(page, web);
     await checkRequestRecovery(page, web, after);
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);

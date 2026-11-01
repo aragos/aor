@@ -14,6 +14,19 @@ export function neighbors(connections: PublicCatalog['landBorders'], province: s
     return connections.flatMap(edge => edge.first === province ? [edge.second] : edge.second === province ? [edge.first] : []);
 }
 
+function DestinationShipping({shipping, tokens = shipping?.required}: {
+    shipping: ExpansionOfferView['shipping']; tokens?: number;
+}) {
+    if (!shipping || tokens === undefined) return null;
+    return <p className="value-change destination-shipping">
+        <span><TableIcon kind="ship"/>{t('table.destinationShipping')}</span>
+        <strong aria-label={t('table.shippingProjection', {used: shipping.used, tokens,
+            after: shipping.used + tokens, capacity: shipping.capacity ?? '∞'})}>
+            {shipping.used} → {shipping.used + tokens} / {shipping.capacity ?? '∞'}
+        </strong>
+    </p>;
+}
+
 function ExpansionAvailability({offer, province}: {
     offer: ExpansionOfferView | undefined; province: ProvinceDefinition;
 }) {
@@ -64,26 +77,27 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
     const uncertain = !!offer?.uncertain && !remainingPlacement;
     const available = primary && (!!remainingPlacement || (offer.blockers.length === 0 && offer.resultingPool !== null));
     const partialOffer = offer?.partialPlacements.find(choice => String(choice.tokens) === partial);
+    const shippingTokens = partialOpen && partialOffer ? partialOffer.tokens
+        : remainingPlacement?.tokens ?? offer?.shipping?.required;
     const command = offer?.primaryAction === 'ATTACK' && !remainingPlacement ? `attack ${province.id}` : `place ${requiredTokens} ${province.id}`;
     const commands = provinceOrders(snapshot, province.id).filter(command => !command.startsWith('reduce-marker '));
     const hasPlacement = primary && (available || offer.partialPlacements.length > 0);
     if (!hasPlacement && commands.length === 0) {
         return inspection ? <section className="province-actions" aria-label={t('table.selectedProvince')}>
             <h2><ProvinceLabel snapshot={snapshot} id={province.id}/></h2>
+            <DestinationShipping shipping={inspection.shipping}/>
             <ExpansionAvailability offer={inspection} province={province}/>
         </section> : null;
     }
     return <div className="province-actions" aria-label={t('table.selectedProvince')}>
-        <div>
-            <h2><ProvinceLabel snapshot={snapshot} id={province.id}/></h2>
-        </div>
+        <h2><ProvinceLabel snapshot={snapshot} id={province.id}/></h2>
         <div className="map-orders">
             {primary && hasPlacement && <>
-                <div className="commitment-preview"><span><TableIcon kind="token"/> <strong>{requiredTokens}</strong><small>{t('table.poolTokens')}</small></span><span>→</span>
-                    <span><svg width="32" height="36" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={establishesMarker ? undefined : requiredTokens}/></svg>
+                <div className="commitment-preview"><span><span className="commitment-quantity"><TableIcon kind="token"/><strong>{requiredTokens}</strong></span><small>{t('table.poolTokens')}</small></span><span>→</span>
+                    <span><svg width="28" height="28" viewBox="-28 -28 56 56" aria-hidden="true"><PlayerPiece capital={me?.capital ?? null} fresh count={establishesMarker ? undefined : requiredTokens}/></svg>
                         <small>{establishesMarker ? t(uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
                 {!remainingPlacement && offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
-                {uncertain && <p className="consequence">{t('table.competitionOutcome')}</p>}
+                <DestinationShipping shipping={offer.shipping} tokens={shippingTokens}/>
                 {remainingPlacement && <><p className="consequence">{t('table.markerNeedsTokens', {count: offer.requiredTokens})}</p><ExpansionAvailability offer={offer} province={province}/></>}
                 {!remainingPlacement && offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
                 {!partialOpen && <DecisionAction className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>
@@ -99,13 +113,9 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
                         {partialOpen && <DecisionAction type="submit" className="partial-expansion" disabled={busy || !partialOffer}>{t('action.place')} · {partialOffer?.tokens ?? '—'} {t('table.tokens')}</DecisionAction>}
                     </DecisionForm>
                 </details>}
-                <details><summary>{t('table.placementDetails')}</summary>
-                    {offer.shipping && <dl className="detail-list"><div><dt>{t('table.destinationShipping')}</dt><dd>{offer.shipping.used} / {offer.shipping.capacity ?? '∞'}</dd></div><div><dt>{t('table.shippingRequired')}</dt><dd>{remainingPlacement?.tokens ?? offer.shipping.required}</dd></div></dl>}
-                    <p>{t('game.stockMarkers')}: {me?.stockMarkers}</p>
-                </details>
             </>}
-            <div className="action-buttons">{commands.map(command => <DecisionAction key={command} className="secondary"
-                disabled={busy} onClick={() => { void submit(command); }}>{label(command.split(' ')[0], 'action')}</DecisionAction>)}</div>
+            {commands.length > 0 && <div className="action-buttons">{commands.map(command => <DecisionAction key={command} className="secondary"
+                disabled={busy} onClick={() => { void submit(command); }}>{label(command.split(' ')[0], 'action')}</DecisionAction>)}</div>}
         </div>
     </div>;
 }

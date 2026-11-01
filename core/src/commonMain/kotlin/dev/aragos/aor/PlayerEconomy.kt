@@ -77,6 +77,15 @@ object PlayerEconomy {
         return EconomyResult.forPlayer(stabilized)
     }
 
+    /** Unused MR dollars from advances acquired in [currentTurn], before paying cash for relief. */
+    fun availableReliefRating(player: PlayerState, currentTurn: Int): Int {
+        val available =
+            player.advances.miseryReliefFor(currentTurn) -
+                currentReliefUsage(player, currentTurn).ratingSpent
+        require(available >= 0) { "Spent MR rating cannot exceed this turn's acquired rating." }
+        return available
+    }
+
     /**
      * Quote [spaces] against the player's live tiers and the unused MR of acquisitions this turn.
      * Enlightenment halves each box difference, rounding up, before MR pays the resulting price.
@@ -91,10 +100,7 @@ object PlayerEconomy {
         val usage = currentReliefUsage(player, currentTurn)
         val remainingSpaces = minOf(player.advances.tierCount - usage.spaces, player.misery.ordinal)
         checkRule(spaces in 1..remainingSpaces, ViolationCode.INVALID_MISERY_RELIEF)
-        val availableRating = player.advances.miseryReliefFor(currentTurn) - usage.ratingSpent
-        require(availableRating >= 0) {
-            "Spent MR rating cannot exceed this turn's acquired rating."
-        }
+        val availableRating = availableReliefRating(player, currentTurn)
         val enlightened = player.advances.owns(AdvanceId.ENLIGHTENMENT)
         val initial = ReliefCalculation(remainingRating = availableRating)
         val calculation =

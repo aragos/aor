@@ -162,6 +162,43 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
+    fun creatorChosenGameNameAppearsInCreationSnapshotsAndTheDirectory() = withHosted {
+        val response =
+            post(
+                "/api/games",
+                "alice",
+                mapOf(
+                    "name" to "  Friday Renaissance  ",
+                    "players" to listOf("alice", "bob", "carol"),
+                ),
+            )
+        val created = json.readTree(response.bodyAsText())
+        val snapshot =
+            json.readTree(get("/api/games/${created["gameId"].asText()}", "bob").bodyAsText())
+        val directory = json.readTree(get("/api/games", "alice").bodyAsText())
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.Created)
+        assertThat(created["name"].asText()).isEqualTo("Friday Renaissance")
+        assertThat(snapshot["name"].asText()).isEqualTo("Friday Renaissance")
+        assertThat(directory["games"].single()["name"].asText()).isEqualTo("Friday Renaissance")
+    }
+
+    @Test
+    fun creationRejectsAnEmptyGameNameWithoutSavingAGame() = withHosted {
+        val response =
+            post(
+                "/api/games",
+                "alice",
+                mapOf("name" to "   ", "players" to listOf("alice", "bob", "carol")),
+            )
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+        assertThat(json.readTree(response.bodyAsText())["code"].asText())
+            .isEqualTo("INVALID_GAME_NAME")
+        assertThat(store.ids()).isEmpty()
+    }
+
+    @Test
     fun creatorRoleDoesNotDependOnSeatOrder() = withHosted {
         val response =
             post("/api/games", "alice", mapOf("players" to listOf("bob", "alice", "carol")))
@@ -333,6 +370,25 @@ class HostedApplicationTest(private val postgres: Boolean) {
             .isEqualTo(original)
         assertThat(service.get(game.gameId, GameAccess.Account(AccountId("alice"))).pendingBid)
             .isEqualTo(9)
+    }
+
+    @Test
+    fun historyReplacementPreservesTheCreatorChosenGameName() = withHosted {
+        val name = GameName("Merchants on Friday")
+        val game =
+            hosted.create(
+                AccountIdentity(AccountId("alice"), true),
+                listOf("alice", "bob", "carol"),
+                RuleOptions(),
+                UndoPolicy.REGULAR_TURN,
+                name,
+            )
+        val entries = hosted.administration.log(game.gameId).entries
+
+        val replaced = hosted.administration.replaceLog(game.gameId, AccountId("admin"), 2, entries)
+
+        assertThat(replaced.name).isEqualTo(name)
+        assertThat(store.read(game.gameId).name).isEqualTo(name)
     }
 
     @Test

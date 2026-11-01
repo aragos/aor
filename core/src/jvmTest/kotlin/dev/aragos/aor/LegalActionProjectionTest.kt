@@ -142,6 +142,48 @@ class LegalActionProjectionTest {
         assertThat(stabilized.playerState(p1).misery.value).isEqualTo(preview)
     }
 
+    @Test
+    fun availableReliefRatingIncludesOnlyTheViewersCurrentTurnAcquisitions() {
+        val state = reliefRatingState()
+
+        assertThat(state.viewForPlayer(p1).reliefRatingAvailable).isEqualTo(15)
+        assertThat(state.viewForPlayer(PlayerId("p2")).reliefRatingAvailable).isEqualTo(0)
+    }
+
+    @Test
+    fun availableReliefRatingExcludesRatingAlreadySpentThisTurn() {
+        val state =
+            reliefRatingState().updatePlayer(p1) { player ->
+                player.copy(miseryReliefUsage = MiseryReliefUsage(2, spaces = 1, ratingSpent = 7))
+            }
+
+        assertThat(state.viewForPlayer(p1).reliefRatingAvailable).isEqualTo(8)
+    }
+
+    @Test
+    fun availableReliefRatingIgnoresPreviousTurnSpending() {
+        val state =
+            reliefRatingState().updatePlayer(p1) { player ->
+                player.copy(miseryReliefUsage = MiseryReliefUsage(1, spaces = 1, ratingSpent = 20))
+            }
+
+        assertThat(state.viewForPlayer(p1).reliefRatingAvailable).isEqualTo(15)
+    }
+
+    private fun reliefRatingState(): GameState =
+        purchasing(PurchaseStep.RELIEF, cash = 0).updatePlayer(p1) { player ->
+            player.copy(
+                advances =
+                    PlayerAdvances(
+                        listOf(
+                            AdvanceAcquisition(AdvanceId.HUMAN_BODY, 2),
+                            AdvanceAcquisition(AdvanceId.LAWS_OF_MATTER, 2),
+                            AdvanceAcquisition(AdvanceId.RENAISSANCE, 1),
+                        )
+                    )
+            )
+        }
+
     private fun purchasing(step: PurchaseStep, cash: Int): GameState {
         val players = (1..3).map { number -> Player(PlayerId("p$number"), "Player $number") }
         val header = GameHeader(players, p1)

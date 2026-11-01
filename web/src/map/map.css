@@ -48,10 +48,18 @@
 .map-orders form { display: block; } .map-orders form label { max-width: none; }
 .map-orders form select { width: 100%; margin: .5rem 0; }
 .map-orders form button { margin-top: .6rem; width: 100%; }
-.commitment-preview { display: flex; justify-content: space-between; align-items: center; border: 1px solid #d3dcc8; border-radius: 7px; padding: .5rem .65rem; margin-bottom: .6rem; background: #fffef9; }
-.commitment-preview > span { display: block; text-align: center; } .commitment-preview strong { font-size: 1.25rem; }
+.province-actions > h2 { font-size: 1.2rem; margin: 0 0 .65rem; }
+.commitment-preview { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .5rem; border: 1px solid #d3dcc8; border-radius: 7px; padding: .4rem .6rem; margin-bottom: .5rem; background: #fffef9; }
+.commitment-preview > span { text-align: center; } .commitment-preview strong { font-size: 1.25rem; }
+.commitment-quantity { display: inline-flex; align-items: center; gap: .3rem; }
 .commitment-preview small { display: block; font-size: .75rem; color: #63765e; margin-top: .2rem; }
-.value-change { display: flex; justify-content: space-between; gap: .5rem; }
+.value-change { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: .5rem 0; font-size: .85rem; }
+.value-change > span { display: inline-flex; align-items: center; gap: .3rem; }
+.value-change > strong { flex: none; font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) {
+    .decision-panel:has(.province-actions) .pool-summary { padding: .35rem .6rem; margin: 0 0 .45rem; }
+    .decision-panel:has(.province-actions) .pool-summary > .identity-label { flex-basis: auto; }
+}
 .partial-placement { margin-top: .8rem; }
 .map-orders details summary { font-size: .83rem; color: #356251; }
 .map-orders .consequence { font-size: .8rem; padding: .7rem; background: #f0ebd8; border-radius: 4px; }

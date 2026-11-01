@@ -33,7 +33,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 
 ## Player experience
 
-- Creation selects players, current variants and undo policy, then starts setup automatically.
+- Creation selects a creator-chosen game name, players, current variants and undo policy, then starts setup automatically.
   Preserve the fixed three-epoch format and the reviewed variant catalog.
 - Allow each player to withdraw their unrevealed capital bid or token purchase. Restore their
   pending action, retain the local amount as an unsaved draft, and keep withdrawn amounts private.
@@ -78,8 +78,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   changed decisions clear obsolete drafts.
 - Event and leader inspections open in a popup, including references from activity. Escape, closing
   and returning focus preserve the active action and its prepared choices. Advance inspection retains
-  its existing workspace surface; commodity cards retain their own live values and direct payout
-  reference links.
+  its existing workspace surface and directly shows category credit, relief, prerequisites and
+  itemized price without foldouts or non-help links; commodity cards retain their own live values
+  and direct payout reference links.
 - Keep Undo at the upper right and all final actions, including Pass, in a pinned action footer.
   Join exactly one action plus Pass with a divider while retaining complete labels, independent
   activation and native form behavior. Larger sets use separate buttons; keep draft choices by their
@@ -120,7 +121,10 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Link track help through footnote-sized question icons beside misery and shipping values. Card displays
   use a Recurring badge when applicable, with no shape vocabulary or redundant type heading.
 - Show the relief step to players with an advance tier even if unaffordable or no spaces remain;
-  explain the blocker and offer Pass. Permit an optional, cancelable Urban Ascendancy purchase draft
+  explain the blocker and offer Pass. Show the unused MR dollars from this turn's advance purchases.
+  Also show that running MR total during advance purchasing, updating it after each purchase.
+  A confirmed relief purchase also finishes purchasing; unaffordable relief requires explicit Pass.
+  Permit an optional, cancelable Urban Ascendancy purchase draft
   while waiting; submit once on the legal turn while that view remains open, with no failed retries.
   Resolve event replacements in current player order. Offer all of the chooser's affected provinces
   together, enforce their shared pool budget, and review the complete group before one confirmation.
@@ -182,7 +186,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 Use stable registered identities and unique public handles throughout hosted play; registration
 requires no separate display name. Live views of existing games use handles while recorded activity
 keeps its original identities. Account navigation shares the game overview bar. Each listed game is
-one clickable row, distinguished by pending-action status, without creation dates or visible IDs.
+one clickable row showing the creator-chosen game name and participants, distinguished by
+pending-action status, without creation dates or visible IDs. Require a name in the creation form;
+retain it in the game header and browser tab across reloads and history edits.
 Administrators control creation permission; members can filter their own ongoing, awaiting-move and
 finished games.
 Administrators may inspect games, cancel/abandon them, export logs, validate upgrades and purge by ID.

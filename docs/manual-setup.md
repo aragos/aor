@@ -100,7 +100,7 @@ newly created tables have already executed it.
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/games` | `{"players":["Alice","Bob","Carol"]}`; optional `options` and `undoPolicy` | Started game ID and private relative seat links; 201 |
+| `POST /api/games` | `{"name":"Friday Renaissance","players":["Alice","Bob","Carol"]}`; optional `options` and `undoPolicy`. Names are trimmed, single-line, 1–80 characters; omission defaults to `Age of Renaissance`. | Started game ID, name and private relative seat links; 201 |
 | `GET /api/games/{id}` | `Authorization: Bearer <token>` | Viewer-safe state, prompt, choices, history and revision |
 | `POST /api/games/{id}/commands` | Same authorization; `{"expectedRevision":6,"command":"buy-tokens 5"}` | Updated viewer-safe snapshot |
 | `GET /api/health` | None | `{"status":"ok"}` |

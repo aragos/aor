@@ -21,11 +21,12 @@ data class Revision(
 )
 
 data class StoredGame(
-    val fileVersion: Int = 5,
+    val fileVersion: Int = 6,
     val id: String,
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
     val revisions: List<Revision>,
+    val name: GameName = GameName.DEFAULT,
     /** Unrevealed amounts for the current capital-bid or token-purchase batch. */
     val pendingBids: Map<PlayerId, Int> = emptyMap(),
     /** Opaque per-seat receipts; changed by each successful private write, including withdrawal. */

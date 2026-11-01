@@ -94,6 +94,8 @@ data class GameView(
     val voids: CardVoids = CardVoids(),
     val advanceOffers: List<AdvanceOfferView> = emptyList(),
     val reliefOffers: List<ReliefOfferView> = emptyList(),
+    /** Unused MR dollars from this viewer's advance purchases in the current turn. */
+    val reliefRatingAvailable: Int = 0,
     val patronageOffers: List<PatronageOfferView> = emptyList(),
     val adjustmentOffers: List<AdjustmentCancellationOffer> = emptyList(),
     val cardPurchaseOffer: CardPurchaseOfferView? = null,
@@ -191,6 +193,10 @@ data class GameView(
                 patronageOffers = PatronageOfferView.from(state, viewer.player.id),
                 adjustmentOffers = AdjustmentCancellation.offers(state, viewer.player.id),
                 reliefOffers = ReliefOfferView.from(state, viewer),
+                reliefRatingAvailable =
+                    state.turnNumber?.let { turn ->
+                        PlayerEconomy.availableReliefRating(viewer, turn)
+                    } ?: 0,
                 cardPurchaseOffer =
                     CardPurchases.offer(state, viewer).takeIf { state.stage == Stage.BUY_CARD },
                 stabilizationCost =

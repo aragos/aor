@@ -37,6 +37,15 @@ export function resizeMapView(view: MapView, bounds: MapView, viewport: MapViewp
         y: view.y + (view.h - fitted.h) / 2}, bounds, viewport);
 }
 
+/** Move the camera by CSS-pixel deltas; positive values scroll toward the right/bottom edges. */
+export function panMapView(view: MapView, bounds: MapView, viewport: MapViewport,
+    delta: {x: number; y: number}): MapView {
+    const unitsPerPixel = view.w / viewport.width;
+    return clampMapView({...view,
+        x: view.x + delta.x * unitsPerPixel,
+        y: view.y + delta.y * unitsPerPixel}, bounds, viewport);
+}
+
 /** Zoom around a normalized viewport anchor; wheel, touch and button zoom share the same limits. */
 export function zoomMapView(view: MapView, bounds: MapView, viewport: MapViewport,
     factor: number, anchor = {x: .5, y: .5}): MapView {

@@ -1,16 +1,17 @@
+import {NumberInput} from './NumberInput';
 import {DecisionAction, DecisionForm} from './DecisionActions';
 import {useEffect, useState} from 'react';
 import type {CardChoiceView, Snapshot} from './api';
-import {LabelMessage, PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
+import {LabelMessage, PlayerLabel, ProvinceLabel} from './IdentityLabel';
 import {advanceName, label} from './labels';
 import {t} from './messages';
-import {HelpLink} from './HelpLink';
-import {Commodity, UnplayedLeaders} from './TablePanels';
+import {Commodity} from './TablePanels';
 import {MapPicker, PlayerPicker, useMapSelection} from './map/MapSelection';
 import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
 import {CardPlayEffects} from './CardPlayEffects';
 import {AdvanceBenefits} from './AdvanceBenefits';
+import {AdvanceInspection} from './AdvanceInspection';
 import {LeaderCredit} from './LeaderCredit';
 import {AdvancePrice} from './AdvancePrice';
 import {MiseryPreview} from './MiseryPreview';
@@ -113,8 +114,8 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
                     eligible={offer.provinceTargets.filter(target => selection.canPick(target))}
                     onPick={selection.pick}/>
             </fieldset>}
-            {needsProtection && <label>{t('game.protection')}<input type="number" min={0} max={offer?.protectionMax ?? 0} value={protection}
-                onChange={event => {setProtection(event.target.value); setChoice('');}}/></label>}
+            {needsProtection && <label>{t('game.protection')}<NumberInput min={0} max={offer?.protectionMax ?? 0} value={protection}
+                onValueChange={value => {setProtection(value); setChoice('');}}/></label>}
             {needsProtection && protection.trim() !== '' && !validProtection && <p className="blocker">{t('table.invalidProtection').replace('{max}', String(offer?.protectionMax))}</p>}
             <InvalidChoice invalid={!!(choice && !selectedChoice) || invalidTargets} clear={() => {setChoice(''); selection.clear();}}/>
             {cashChanges.map(change => <p className="cash-preview" key={change.player}>
@@ -129,31 +130,27 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
     </section>;
 }
 
-export function AdvanceDecision({snapshot, busy, submit, mode = 'all', inspectedId, closeInspection}: Props) {
+export function AdvanceDecision({snapshot, busy, submit, mode = 'action', inspectedId, closeInspection}: Omit<Props, 'mode'> & {
+    mode?: 'inspection' | 'action';
+}) {
     const {selectedAdvance, setSelectedAdvance} = useMapSelection();
     const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === (inspectedId ?? selectedAdvance));
     if (!advance) return null;
     const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === advance.id);
+    if (mode === 'inspection') return <AdvanceInspection snapshot={snapshot} advance={advance} offer={offer}
+        close={closeInspection ?? (() => setSelectedAdvance(''))}/>;
     const command = `buy-advance ${advance.letter}`;
     const available = offer && offer.unavailableReason === null && snapshot.legalChoices.commands.includes(command);
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
-    const inspection = mode !== 'action';
-    const action = mode !== 'inspection';
-    return <section className="object-decision advance-decision" aria-labelledby={inspection ? undefined : 'decision-title'}>
-        {inspection && <><button type="button" className="close-detail" aria-label={t('table.close')} onClick={closeInspection ?? (() => setSelectedAdvance(''))}>×</button>
-            <p className="eyebrow">{label(advance.category, 'category')}</p><h2>{advanceName(advance.id)}</h2></>}
+    return <section className="object-decision advance-decision" aria-labelledby="decision-title">
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
         <p className="advance-prerequisites">{t('advance.prerequisites')}: {advance.prerequisites.map(advanceName).join(', ') || t('reference.none')}</p>
         <p className="advance-relief">{t('advance.reliefRating', {amount: advance.miseryRelief})}</p>
-        {inspection && <><HelpLink topic={`advance-${advance.id.toLowerCase()}`} label={t('reference.printedValues')} compact={false}/>
-            <UnplayedLeaders snapshot={snapshot} advance={advance.id}/></>}
         <AdvancePrice offer={offer} printedCost={advance.cost}/>
         {offer?.price !== null && offer?.price !== undefined && <>
             <p className="small">{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
         </>}
-        {inspection && offer?.unavailableReason && <p className="blocker">{t(`error.${offer.unavailableReason}`)}</p>}
-        {inspection && <p>{t('advance.owners')}: <PlayerLabels snapshot={snapshot} ids={snapshot.game.players.filter(player => player.advances.includes(advance.id)).map(player => player.id)}/></p>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
-        {action && offer && <DecisionAction className="card-confirmation buy-advance-action" disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</DecisionAction>}
+        {offer && <DecisionAction className="card-confirmation buy-advance-action" disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</DecisionAction>}
     </section>;
 }

@@ -612,7 +612,6 @@ internal object HistoryEvents {
         val turn = checkNotNull(before.turnNumber) { "A recorded relief purchase requires a turn." }
         val player = before.playerState(actor)
         val quote = PlayerEconomy.reliefQuote(player, spaces, turn)
-        val previousUsage = player.miseryReliefUsage?.takeIf { it.turnNumber == turn }
         val sources =
             player.advances.acquisitions
                 .filter { it.turnNumber == turn }
@@ -623,8 +622,7 @@ internal object HistoryEvents {
         return HistoryReliefPaymentView(
             cashCost = quote.cashCost,
             ratingSpent = quote.ratingSpent,
-            ratingAvailableBefore =
-                player.advances.miseryReliefFor(turn) - (previousUsage?.ratingSpent ?: 0),
+            ratingAvailableBefore = PlayerEconomy.availableReliefRating(player, turn),
             ratingSources = sources,
         )
     }

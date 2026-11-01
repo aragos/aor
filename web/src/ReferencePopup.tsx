@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 import {request} from './api';
 import type {PublicCatalog} from './api';
-import {advanceName, label} from './labels';
+import {label} from './labels';
 import {t} from './messages';
 import {Commodity} from './TablePanels';
 import {AccessLock, PlayerPiece} from './map/MapSymbols';
@@ -33,7 +33,7 @@ export default function ReferencePopup({initialTopic, close}: {initialTopic: str
     const [reference, setReference] = useState<ReferenceData | null>(null);
     const [error, setError] = useState(false);
     const needsCatalog = topic === 'map-legend' || topic === 'commodities' ||
-        topic.startsWith('commodity-') || topic.startsWith('advance-') || topic.endsWith('-track');
+        topic.startsWith('commodity-') || topic.endsWith('-track');
     useEffect(() => {
         if (!needsCatalog) return;
         let active = true;
@@ -77,15 +77,6 @@ export default function ReferencePopup({initialTopic, close}: {initialTopic: str
                     <ol className="payout-boxes" aria-label={t('reference.payoutBoxes', {commodity: label(commodity.id, 'commodity')})}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
                 </article>)}
             </section>}
-            {topic.startsWith('advance-') && catalog?.advances.filter(advance =>
-                topic === `advance-${advance.id.toLowerCase()}`).map(advance => <section key={advance.id} id={`advance-${advance.id.toLowerCase()}`}>
-                <h2>{advance.letter} · {advanceName(advance.id)}</h2>
-                <dl className="detail-list">
-                    <div><dt>{t('reference.advanceCredit')}</dt><dd>${advance.credit}</dd></div>
-                    <div><dt>{t('reference.reliefRating')}</dt><dd>{advance.miseryRelief}</dd></div>
-                    <div><dt>{t('reference.prerequisites')}</dt><dd>{advance.prerequisites.map(advanceName).join(', ') || t('reference.none')}</dd></div>
-                </dl>
-            </section>)}
             {topic === 'misery-track' && <section id="misery-track"><h2>{t('reference.misery-track')}</h2>
             <ol className="reference-track misery-track" aria-label={t('reference.misery-track')}>{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}><MiseryBox value={value} track={catalog.miseryTrack}/></li>)}</ol>
             <p>{t('reference.colors-progress-from-green-through-amber')}</p>

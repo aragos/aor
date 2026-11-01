@@ -1,3 +1,4 @@
+import {NumberInput} from './NumberInput';
 import {useState} from 'react';
 import type {Snapshot} from './api';
 import {t} from './messages';
@@ -18,8 +19,8 @@ export function HistoryEditor({snapshot, busy, edit, format = (line: string) => 
     return <details className="history-editor"><summary>{t('history.edit')}</summary>
         <p>{t('history.editHelp')}</p>
         <label htmlFor="history-from">{t('history.fromEntry')}</label>
-        <input id="history-from" type="number" min={lower} max={snapshot.undo.entryCount - 1} value={from}
-            onChange={event => setFrom(event.target.value)}/>
+        <NumberInput id="history-from" min={lower} max={snapshot.undo.entryCount - 1} value={from}
+            onValueChange={setFrom}/>
         <button type="button" className="secondary" disabled={busy || !valid} onClick={() => {
             setText(snapshot.undo.actions.filter(action => action.entry >= position).map(action => `@${action.entry}`).join('\n'));
             setBase(snapshot.revision);

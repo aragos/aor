@@ -63,7 +63,10 @@ export async function checkReferenceUx(page, web, baseline) {
     assert(colorful.includes('#205c4b') && colorful.includes('#f5ce62'),'Turn favicon uses the colorful shield and money bag');
 
     const gameLocationBeforeHelp = await page.evaluate('location.href');
-    await page.evaluate(`document.querySelector('.game-header [data-help-topic=""]').click()`);
+    assert.equal(await page.evaluate(`document.querySelector('.game-header .help-link')`), null);
+    await page.evaluate(`document.querySelector('#tab-markets').click(); document.querySelector('.market-tile .help-link').click()`);
+    await page.wait(`document.querySelector('.reference-popup .payout-box')`, 'Commodity reference from the main market box');
+    await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);
     await page.wait(`document.querySelector('.reference-popup nav')`, 'Help topics popup');
     const choose = async name => {
         await page.evaluate(`[...document.querySelectorAll('.reference-popup nav button')].find(button => button.textContent === ${JSON.stringify(name)}).click()`);

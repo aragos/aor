@@ -4,6 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode
 
 /** Engine-derived listing projections may be indexed, and are never used to decide game actions. */
 internal object GameDirectory {
+    /** Retain a usable label when an unavailable document cannot be decoded for play. */
+    fun displayName(root: JsonNode): GameName = runCatching {
+        GameName(root.field("name").string())
+    }
+        .getOrDefault(GameName.DEFAULT)
+
     fun list(
         store: ManagedGameStore,
         viewer: AccountId,
@@ -79,6 +85,7 @@ internal object GameDirectory {
                     )
                 },
                 false,
+                displayName(root),
             )
         }
 
@@ -116,6 +123,7 @@ internal object GameDirectory {
                 )
             },
             myMove,
+            game.name,
         )
     }
 }

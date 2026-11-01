@@ -41,6 +41,19 @@ class GameServiceTest {
 
     private fun create(service: GameService) = service.create(listOf("Alice", "Bob", "Carol"))
 
+    @Test
+    fun creatorChosenNameSurvivesRestart() {
+        val directory = directory()
+        val service = createGameService(directory, FixedRandom())
+        val name = GameName("Friday Renaissance")
+        val game = service.create(listOf("Alice", "Bob", "Carol"), name = name)
+
+        val recovered = createGameService(directory, NoRandom).get(game.gameId, token(game, 0))
+
+        assertThat(game.name).isEqualTo(name)
+        assertThat(recovered.name).isEqualTo(name)
+    }
+
     @AfterTest
     fun clean() {
         directories.forEach { it.toFile().deleteRecursively() }
@@ -386,7 +399,7 @@ class GameServiceTest {
         for (contents in
             listOf(
                 "not json",
-                original.replace("\"fileVersion\":5", "\"fileVersion\":99"),
+                original.replace("\"fileVersion\":6", "\"fileVersion\":99"),
                 original.replace(RULES_VERSION, "future-rules"),
                 original.replace("set-option deck-modification disabled", "invented-command"),
             )) {

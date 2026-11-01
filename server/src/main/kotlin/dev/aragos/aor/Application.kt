@@ -122,7 +122,13 @@ fun Application.module(
         post("/api/games") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("players", "options", "undoPolicy")
+                body.fieldsOnly("players", "options", "undoPolicy", "name")
+                val name =
+                    try {
+                        body["name"]?.let { GameName.parse(it.string()) } ?: GameName.DEFAULT
+                    } catch (_: IllegalArgumentException) {
+                        throw ServiceFailure(400, "INVALID_GAME_NAME")
+                    }
                 val undoPolicy =
                     body["undoPolicy"]?.let { UndoPolicy.parse(it.string()) }
                         ?: UndoPolicy.REGULAR_TURN
@@ -142,9 +148,15 @@ fun Application.module(
                     withContext(Dispatchers.IO) {
                         val players = body.field("players").array().map(JsonNode::string)
                         if (hosted == null) {
-                            gameService.create(players, rules, undoPolicy)
+                            gameService.create(players, rules, undoPolicy, name)
                         } else {
-                            hosted.create(hosted.identity(call.token()), players, rules, undoPolicy)
+                            hosted.create(
+                                hosted.identity(call.token()),
+                                players,
+                                rules,
+                                undoPolicy,
+                                name,
+                            )
                         }
                     }
                 call.respondJson(result, HttpStatusCode.Created)

@@ -21,6 +21,7 @@ data class GameSummary(
     val stage: Stage?,
     val players: List<Player>,
     val myMove: Boolean,
+    val name: GameName = GameName.DEFAULT,
 )
 
 data class GamePage(val games: List<GameSummary>, val nextCursor: String?)
@@ -33,6 +34,7 @@ data class GameLog(
     val entries: List<String>,
     val archives: List<String>,
     val revisions: List<JsonNode>,
+    val name: GameName = GameName.DEFAULT,
 )
 
 data class LogPage(val games: List<GameLog>, val nextCursor: String?)
@@ -79,6 +81,7 @@ class GameAdministration(
             effectiveText(root),
             if (archive == null) store.archives(id) else emptyList(),
             root.field("revisions").array(),
+            GameDirectory.displayName(root),
         )
     }
 
@@ -197,6 +200,7 @@ class GameAdministration(
                 ?: GameStatus.ACTIVE
         return StoredGame(
             id = id,
+            name = GameName(original.field("name").string()),
             header = header,
             credentials =
                 original.field("credentials").properties().associate { (player, hash) ->

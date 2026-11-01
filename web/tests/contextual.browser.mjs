@@ -266,7 +266,12 @@ export async function checkMapGestures(page) {
     await page.wait(`Number(document.querySelector('.world-map').getAttribute('viewBox').split(' ')[2]) < ${fit[2]}`, 'modifier scroll zoom');
     const zoomed = await view();
     await page.send('Input.dispatchMouseEvent', {type:'mouseWheel',...center,deltaX:0,deltaY:-100});
-    assert.deepEqual(await view(), zoomed, 'Ordinary scrolling does not zoom');
+    await page.wait(`Number(document.querySelector('.world-map').getAttribute('viewBox').split(' ')[1]) < ${zoomed[1]}`, 'vertical wheel pan');
+    const vertical = await view();
+    assert.deepEqual(vertical.slice(2), zoomed.slice(2), 'Ordinary scrolling pans without zooming');
+    await page.send('Input.dispatchMouseEvent', {type:'mouseWheel',...center,deltaX:100,deltaY:0});
+    await page.wait(`Number(document.querySelector('.world-map').getAttribute('viewBox').split(' ')[0]) > ${vertical[0]}`, 'horizontal wheel pan');
+    assert.deepEqual((await view()).slice(2), zoomed.slice(2), 'Horizontal scrolling retains zoom');
     for (const direction of [-1,1]) {
         await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...center,button:'left',clickCount:1});
         await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:center.x+direction*12,y:center.y+direction*12,button:'left',buttons:1});
@@ -287,5 +292,5 @@ export async function checkMapGestures(page) {
     await page.wait(`Number(document.querySelector('.world-map').getAttribute('viewBox').split(' ')[2]) < ${fit[2]}`, 'two-finger pinch zoom');
     await page.send('Emulation.setTouchEmulationEnabled',{enabled:false});
     await page.click('Fit map');
-    console.log('Passed: modifier scroll, ordinary scrolling, bounded dragging and two-finger map pinch.');
+    console.log('Passed: modifier-scroll zoom, two-axis wheel panning, bounded dragging and two-finger map pinch.');
 }
