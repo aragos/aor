@@ -3,6 +3,7 @@ import {checkActionButtons} from './actionButtons.browser.mjs';
 import {checkRequestRecovery} from './requestRecovery.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkActivityPayments} from './activityPayments.browser.mjs';
+import {checkActivityWorkspace} from './activityWorkspace.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
 import {assertBottomHandVisible, checkBottomHand} from './bottomHand.browser.mjs';
 import {checkMapViewport} from './mapViewport.browser.mjs';
@@ -521,6 +522,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkGroupedReplacements(page, web, after);
     await checkExpansionDiagnostics(page, web, after);
     await checkActivityPayments(page, web, after);
+    await checkActivityWorkspace(page, web, after);
     await checkTokenContinuity(page, web, tokenFixture);
     await checkDecisionFamilies(page, web, after);
 

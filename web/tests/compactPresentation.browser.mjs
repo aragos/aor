@@ -78,12 +78,11 @@ export async function checkCompactPresentation(page, web, baseline) {
         await page.wait(`!document.querySelector('.reference-dialog')`, 'Reference Escape closes');
         assert.equal(await page.evaluate(`document.activeElement.dataset.helpTopic`), 'commodity-cloth', 'Reference restores focus');
         if (mobile) await click('.hand-toggle');
-        if (await page.evaluate(`document.querySelector('.activity-toggle').getAttribute('aria-expanded') === 'true'`)) await click('.activity-toggle');
-        assert.equal(await page.evaluate(`(() => {const activity=document.querySelector('.table-activity').getBoundingClientRect();const area=document.querySelector('.workspace-side').getBoundingClientRect();return Math.abs(activity.bottom-area.bottom)<1;})()`), true, 'Minimized activity stays at the bottom of its area');
+        assert.equal(await page.evaluate(`document.querySelector('.workspace-side .table-activity')`), null, 'The action sidebar has its own full height');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-compact-table-${width}.png`));
         await show({prompt: {messageId: 'prompt.play-cards', players: []}, legalChoices: {commands: []}});
         assert.equal(await page.evaluate(`document.querySelector('.pass-action')`), null);
         assert.deepEqual(await dimensions('.undo-action'), undoSize, 'Undo stays the same size when Pass is absent');
     }
-    console.log('Passed: name-only phone cards, expanded detail, floating player boxes without resize, fixed action buttons, pinned minimized activity, commodity symbols and reference popup draft/focus preservation.');
+    console.log('Passed: name-only phone cards, expanded detail, floating player boxes without resize, fixed action buttons, separate activity workspace, commodity symbols and reference popup draft/focus preservation.');
 }

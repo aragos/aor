@@ -52,7 +52,7 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   commits them. Ask “Pick a target” or “Pick N targets” during card targeting. Prefer visible finite
   choices; select held cards from the hand rather than a second list beside Pass.
 - Keep the viewer's hand beneath the map/workspace column during card play, other decisions and
-  waiting. On desktop, the action and activity sidebar extends beside the hand instead of surrendering
+  waiting. On desktop, the action sidebar extends beside the hand instead of surrendering
   its lower space to it. Workspace, action and activity scrolling must not push the hand below the
   viewport or cover it. On narrow screens, coordinate the action review and confirmation above the
   hand rather than overlaying separate fixed panels. Keep Commands, turn effects and configuration
@@ -84,9 +84,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Join exactly one action plus Pass with a divider while retaining complete labels, independent
   activation and native form behavior. Larger sets use separate buttons; keep draft choices by their
   inputs. Undo withdraws an unrevealed bid or token purchase while preserving the local draft; after
-  reveal it follows the chosen policy. Let players resize open activity with pointer, touch and
-  keyboard controls, preserving that split through polling and minimize/reopen. Keep minimized
-  activity at the bottom. Player boxes share a wrapping status/pool row. Expansion uses one current
+  reveal it follows the chosen policy. Keep the full action-sidebar height available for decisions.
+  Player boxes share a wrapping status/pool row. Expansion uses one current
   → projected pool balance. Center action labels and inline identities.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
@@ -128,7 +127,11 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Identify the event, recipient, pool cost and result; explain when no pool token remains and avoid
   implying another misery charge. Civil War's subsequent choice shows both actual cash and token
   losses and resulting balances, after capital replacement and rounding.
-- Open bounded, scrollable activity by default, with an icon to hide/show it and no header or count.
+- Offer bounded, scrollable Activity beside Map, Markets and Advances in workspace navigation.
+  At viewport widths of at least 1400px, allow pinning the same log into a separate left block;
+  unpinning returns to the Activity tab. Narrower screens use the tab while retaining the pin
+  preference for wider screens. Preserve valid action drafts and log scroll through navigation,
+  pinning and polling. Keep the hand and action confirmation reachable, render one log and omit a count.
   Show every action once. Preserve entry-time names and emblems as later history is appended;
   cards open the card-inspection popup without changing an action draft.
   Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
@@ -142,8 +145,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   signed bid, cash cost and actual tokens received. Unrevealed bids remain private and canonical
   command history remains unchanged. Gold/Ivory's shared adjustment has one priced cancellation
   choice; unpaired remaining markers retain individual choices.
-- Name every activity cash recipient or payer consistently, including the acting player. Inset the
-  open panel's close control. Commodity card/market values follow current circle ownership,
+- Name every activity cash recipient or payer consistently, including the acting player. Keep the
+  pin control clear of receipt text. Commodity card/market values follow current circle ownership,
   including white circles during Expansion; actual card payments retain the colored-marker rule.
 - Polling preserves valid work. Decision changes and accepted edits clear obsolete drafts. Rejections
   retain correctable input; stale requests refresh without automatic resubmission. Same-account

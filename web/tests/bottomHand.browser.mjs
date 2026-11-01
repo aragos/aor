@@ -28,7 +28,7 @@ export async function assertBottomHandVisible(page, label) {
         hand.bottom <= viewport.height + 1 && hand.height > 50, `${label}: hand is in the viewport: ${JSON.stringify(geometry)}`);
     assert(cards.height > 20 && cards.width > 100, `${label}: cards have usable space`);
     assert(geometry.handReachable || geometry.modalOpen, `${label}: hand remains reachable except while its reference popup is modal`);
-    assert.equal(geometry.decisionOverlaps, false, `${label}: hand and decision reserve separate space`);
+    assert.equal(geometry.decisionOverlaps, false, `${label}: hand and decision reserve separate space: ${JSON.stringify(geometry)}`);
     assert.equal(geometry.pageOverflow, false, `${label}: no horizontal page overflow`);
 }
 
@@ -151,9 +151,9 @@ export async function checkBottomHand(page, web, baseline) {
         const cardHeights = await page.evaluate(`[...document.querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect().height)`);
         assert(Math.max(...cardHeights)-Math.min(...cardHeights)<1, 'Compact cards share the height required by the tallest content');
         if (!mobile) {
-            const columns=await page.evaluate(`(() => {const hand=document.querySelector('.table-hand').getBoundingClientRect();const map=document.querySelector('.workspace-main').getBoundingClientRect();const activity=document.querySelector('.table-activity').getBoundingClientRect();return {handLeft:hand.left,handRight:hand.right,mapLeft:map.left,mapRight:map.right,handBottom:hand.bottom,activityBottom:activity.bottom,activityHeight:activity.height};})()`);
+            const columns=await page.evaluate(`(() => {const hand=document.querySelector('.table-hand').getBoundingClientRect();const map=document.querySelector('.workspace-main').getBoundingClientRect();const action=document.querySelector('.decision-panel').getBoundingClientRect();return {handLeft:hand.left,handRight:hand.right,mapLeft:map.left,mapRight:map.right,handBottom:hand.bottom,actionBottom:action.bottom,actionHeight:action.height};})()`);
             assert(Math.abs(columns.handLeft-columns.mapLeft)<1 && Math.abs(columns.handRight-columns.mapRight)<1, 'The desktop hand aligns with the map column');
-            assert(columns.activityBottom>=columns.handBottom-1 && columns.activityHeight>100, 'Activity uses the sidebar alongside the hand');
+            assert(columns.actionBottom>=columns.handBottom-1 && columns.actionHeight>100, 'Actions use the full sidebar alongside the hand');
         }
         await assertBottomHandVisible(page, `${viewport} commodity choice`);
         assert.equal(await page.evaluate(`document.querySelector('[data-eligible-card], .decision-cards')`), null, 'The hand is the only playable-card list');

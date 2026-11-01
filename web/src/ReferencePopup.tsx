@@ -68,7 +68,7 @@ export default function ReferencePopup({initialTopic, close}: {initialTopic: str
             <p>{t("reference.capital-color-and-silhouette-identify-the")}</p>
             <p>{t("reference.named-seas-are-distinct-from-coastal")}</p>
             <p>{t("reference.use-and-fit-modifier-scroll-trackpad")}</p>
-            <p>{t("reference.resizeActivity")}</p>
+            <p>{t("reference.activityLayout")}</p>
         </section>}
             {topic === 'commodities' && <section><h2>{t('reference.commodity-payout-boxes')}</h2><nav>{catalog?.commodities.map(commodity => <button type="button" className="secondary" key={commodity.id} onClick={() => setTopic(`commodity-${commodity.id.toLowerCase()}`)}><Commodity commodity={commodity.id}/></button>)}</nav></section>}
             {topic.startsWith('commodity-') && <section id="commodities"><h2>{t("reference.commodity-payout-boxes")}</h2><p>{t("reference.the-effective-box-is-established-markets")}</p>
