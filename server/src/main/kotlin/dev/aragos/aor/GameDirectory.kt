@@ -93,14 +93,17 @@ internal object GameDirectory {
         val state = game.state()
         val seat = game.memberships.entries.singleOrNull { it.value == viewer?.value }?.key
         val prompt = state.prompts().singleOrNull()
-        val myMove =
-            game.status == GameStatus.ACTIVE &&
-                seat != null &&
+        val actionPlayers =
+            if (game.status != GameStatus.ACTIVE) {
+                emptyList()
+            } else {
                 when (prompt) {
-                    is Prompt.SinglePlayer -> prompt.player == seat
-                    is Prompt.MultiPlayer -> seat in prompt.players && seat !in game.pendingBids
-                    else -> false
+                    is Prompt.SinglePlayer -> listOf(prompt.player)
+                    is Prompt.MultiPlayer -> prompt.players.filter { it !in game.pendingBids }
+                    else -> emptyList()
                 }
+            }
+        val myMove = seat != null && seat in actionPlayers
         val status =
             when {
                 game.status == GameStatus.CANCELLED -> GameListStatus.CANCELLED
@@ -124,6 +127,7 @@ internal object GameDirectory {
             },
             myMove,
             game.name,
+            actionPlayers,
         )
     }
 }

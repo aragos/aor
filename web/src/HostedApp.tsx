@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {Fragment, useEffect, useRef, useState} from 'react';
 import type {FormEvent, ReactNode} from 'react';
 import {initializeApp} from 'firebase/app';
 import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, onIdTokenChanged,
@@ -249,7 +249,10 @@ function AdminPlayers() {
 
 function GameRow({game}: {game: GameSummary}) {
     return <><strong className="game-row-status">{t(`gameStatus.${game.status}`)}</strong>
-        <span className="game-row-description"><strong className="game-row-name">{game.name}</strong><span className="game-row-players">{game.players.map(player => player.name).join(' · ')}</span></span>
+        <span className="game-row-description"><strong className="game-row-name">{game.name}</strong><span className="game-row-players">{game.players.map((player, index) => <Fragment key={player.id}>
+            {index > 0 && ' · '}<span className={game.actionPlayers.includes(player.id) ? 'game-row-player needs-action' : 'game-row-player'}>
+                {player.name}{game.actionPlayers.includes(player.id) && <span className="sr-only"> — {t('hosted.action-required')}</span>}
+            </span></Fragment>)}</span></span>
         <span className="game-row-stage">{game.stage && t(`stage.${game.stage}`)}</span></>;
 }
 

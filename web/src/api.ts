@@ -184,7 +184,7 @@ export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Re
 export interface Account {id: string; handle: string; mayCreateGames: boolean; admin: boolean}
 export interface Session {id: string; emailVerified: boolean; account: Account | null}
 export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABANDONED' | 'UNAVAILABLE';
-export interface GameSummary {id: string; name: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean}
+export interface GameSummary {id: string; name: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean; actionPlayers: string[]}
 export interface GamePage {games: GameSummary[]; nextCursor: string | null}
 export class ApiError extends Error {
     constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null, public parameters: Record<string, number> = {}, public causeCode: string | null = null) { super(code); }

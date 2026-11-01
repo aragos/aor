@@ -240,6 +240,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                 SELECT g.id, g.revision, g.document, p.needs_move,
                     (SELECT jsonb_object_agg(m.seat, m.account_id)
                         FROM game_players m WHERE m.game_id = g.id) AS memberships,
+                    (SELECT jsonb_agg(m.seat) FROM game_players m
+                        WHERE m.game_id = g.id AND m.needs_move) AS action_players,
                     CASE WHEN g.document->>'fileVersion' <> '6'
                         OR g.document->'header'->>'rulesVersion' <> ?
                         OR g.document->'header'->>'dataVersion' <> ? THEN 'UNAVAILABLE'
@@ -297,6 +299,18 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                                     },
                                     viewStatus == GameListStatus.MY_MOVE,
                                     GameDirectory.displayName(root),
+                                    if (viewStatus == GameListStatus.UNAVAILABLE) {
+                                        emptyList()
+                                    } else {
+                                        rows
+                                            .getString("action_players")
+                                            ?.let { actionPlayers ->
+                                                json.readTree(actionPlayers).map {
+                                                    PlayerId(it.asText())
+                                                }
+                                            }
+                                            .orEmpty()
+                                    },
                                 )
                             )
                         }
@@ -392,6 +406,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
     }
 
     private fun writePlayers(connection: Connection, game: StoredGame) {
+        val actionPlayers = GameDirectory.summary(game, null).actionPlayers
         connection
             .prepareStatement(
                 """
@@ -411,7 +426,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                     statement.setString(4, game.credentials[player.id])
                     statement.setBoolean(
                         5,
-                        account != null && GameDirectory.summary(game, AccountId(account)).myMove,
+                        player.id in actionPlayers,
                     )
                     statement.addBatch()
                 }

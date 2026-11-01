@@ -131,7 +131,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   Identify the event, recipient, pool cost and result; explain when no pool token remains and avoid
   implying another misery charge. Civil War's subsequent choice shows both actual cash and token
   losses and resulting balances, after capital replacement and rounding.
-- Offer bounded, scrollable Activity beside Map, Markets and Advances in workspace navigation.
+- Offer bounded, scrollable Activity beside Map, Commodities and Advances in workspace navigation.
+  Give each tab a distinct icon alongside its name. Populate Commodities from game creation;
+  owner payout forecasts begin with the first turn. In-game options show settings without links.
   At viewport widths of at least 1400px, allow pinning the same log into a separate left block;
   unpinning returns to the Activity tab. Narrower screens use the tab while retaining the pin
   preference for wider screens. Preserve valid action drafts and log scroll through navigation,

@@ -83,7 +83,8 @@ choice and understand its result through visual controls and commands, on deskto
   buttons. Selected finite actions identify their operation and cost on the footer button.
   Undo withdraws an unrevealed capital bid or token purchase, retaining the local amount; after
   reveal it follows the selected policy. Its accessible name identifies the current operation.
-- Activity shares workspace navigation with Map, Markets and Advances. Selecting it preserves the
+- Activity shares workspace navigation with Map, Commodities and Advances. Each tab pairs its name
+  with a distinct map, goods, book or activity icon. Selecting it preserves the
   action form, prepared targets, hand and log scroll position. At viewport widths of at least
   1400px, an accessible pin control moves the same log into a separate left block; unpinning returns
   to the Activity tab. Render the log once, outside the action sidebar. Polling and temporary
@@ -103,6 +104,8 @@ choice and understand its result through visual controls and commands, on deskto
   Failed creation preserves the name and player draft.
 - Hosted account, My games and sign-out controls share the game overview bar. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.
+  Highlight every player still required to act, including simultaneous prompts; omit submitted seats
+  and all action highlights for inactive games. Expose the status in accessible text as well as color.
   Omit creation dates, IDs and Open buttons. Administrative rows expand their operational controls;
   they do not grant access to another player's seat. Poll the list every 30 seconds while visible;
   omit a manual Refresh button and the question mark beside My games. Administrative changes refresh
@@ -113,7 +116,7 @@ choice and understand its result through visual controls and commands, on deskto
   remove duplicate deck counts from the turn-effects section.
   The This turn disclosure uses compact label/value rows for military, protection, Papal Decree
   and active War. Omit its repeated heading, played leaders and shortage/surplus entries; Advances
-  and Markets own those lookups. Show consequential summary badges only while the disclosure is
+  and Commodities own those lookups. Show consequential summary badges only while the disclosure is
   closed, and ignore the omitted entries when deciding whether this panel is empty.
   Commands remain in the bottom expander; omit their header button. Province connections remain
   on the map. Event and advance descriptions remain available in the game. Legends, variant
@@ -128,6 +131,8 @@ choice and understand its result through visual controls and commands, on deskto
   closing returns to the unchanged advance list.
   Document all undo scopes, activity boundaries, creator permissions, retained
   answers and immutable randomness; creation and history controls link to that explanation.
+  Game options lists the selected settings without navigation links. Keep the bottom disclosures'
+  labels readable and reachable on desktop and narrow screens, with wrapping text when needed.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
   the action button confirms it. Select playable cards from the persistent hand, without another
@@ -180,7 +185,9 @@ choice and understand its result through visual controls and commands, on deskto
   loading or polling another player's result does not create an action notice.
   Competition receipts and suspended requests belong to that turn's Expansion and expire when it
   ends, including outcomes first received with the phase transition. Keep the activity entry.
-- Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
+- Commodities lists every printed commodity from setup, before there are owner payout forecasts.
+  Live owner forecasts begin with the first turn.
+  Commodity cards show shortage/surplus badges. Commodities and selected commodity cards offer
   controls for full payout boxes in reference popups; keep current owner payouts and adjustments
   in the game. Market tiles put the payout-help question mark beside the commodity name, without
   expandable details or replacement controls for the removed breakdown. Commodity cards link

@@ -35,6 +35,10 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`!!document.querySelector('[data-area-lock="V"], [data-overseas-lock="FAR_EAST"]')`), false, 'Locks disappear when authoritative access unlocks the group');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-overseas-lock="NEW_WORLD"]')`), true);
     await show({...baseline});
+    await page.evaluate(`document.querySelector('[data-map-province="genoa"]').focus()`);
+    assert.equal(await page.evaluate(`document.querySelector('[data-province-outline="genoa"]').dataset.highlightPriority`), '3', 'Keyboard focus emphasizes the province border');
+    await page.evaluate(`document.querySelector('[aria-label="Zoom in"]').focus()`);
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="genoa"][data-highlight-priority="3"]')`), false, 'Leaving keyboard focus clears the transient province border');
     const beforeAreaInspection = await page.evaluate('window.mapCommands.length');
     await click('[data-map-area-label="IV"]');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-area-label="IV"]').getAttribute('aria-pressed')`), 'true');
@@ -50,10 +54,14 @@ export async function checkContextualUx(page, web, baseline) {
     await click('[data-map-area-label="IV"]');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Area inspection clears province sea emphasis');
     await click('[data-map-province="genoa"]');
+    await page.evaluate(`document.querySelector('[data-map-province="genoa"]').focus(); document.querySelector('[aria-label="Zoom in"]').focus()`);
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="genoa"][data-highlight-priority="4"]')`), true, 'Keyboard blur retains a deliberately selected province');
     await page.evaluate(`document.querySelector('[data-map-terrain]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Non-province land clears province inspection');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Clearing inspection clears the sea emphasis');
     assert.equal(await page.evaluate(`document.querySelectorAll('.sea-shape[fill^="url("]').length`), 0, 'Clearing inspection restores the ordinary sea fill');
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="genoa"][data-highlight-priority="4"]')`), false, 'Clearing inspection resets the selected province border');
+    assert.equal(await page.evaluate(`document.querySelector('[data-map-province="genoa"]').getAttribute('aria-pressed')`), 'false', 'The province no longer announces inspection selection');
     for (const province of ['genoa', 'rome']) {
         await click(`[data-map-province="${province}"]`);
         assert.equal(await page.evaluate(`document.querySelector('[data-map-layer="highlights"]').lastElementChild.dataset.provinceOutline`), province, 'Inspected province is above every neighboring border');
@@ -95,6 +103,9 @@ export async function checkContextualUx(page, web, baseline) {
     await click(`[data-map-province="${partial.destination}"]`);
     assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').disabled`), false);
     assert.match(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), /Place maximum possible tokens.*2/);
+    await page.evaluate(`document.querySelector('[data-sea="NORTH_SEA"] path').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
+    assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${partial.destination}"][data-highlight-priority="4"]')`), false, 'Closing inspection resets its border while retaining the action draft');
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').disabled`), false, 'Closing inspection preserves the prepared placement');
     await click('.primary-expansion');
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), `place 2 ${partial.destination}`);
     await click('.decision-actions .pass-action');

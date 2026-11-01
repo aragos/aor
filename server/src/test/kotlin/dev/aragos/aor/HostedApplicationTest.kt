@@ -246,6 +246,54 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
+    fun gameListingsIdentifyEveryPlayerStillMakingASimultaneousDecision() = withHosted {
+        val game = game()
+        command(game.gameId, "alice", 2, "bid-capital 5")
+
+        val listing = json.readTree(get("/api/games?status=all", "alice").bodyAsText())
+
+        assertThat(listing["games"].single()["actionPlayers"].map { it.asText() })
+            .containsExactly("p2", "p3")
+    }
+
+    @Test
+    fun gameListingsIdentifyThePlayerMakingASinglePlayerDecision() = withHosted {
+        val game = game()
+        command(game.gameId, "alice", 2, "bid-capital 5")
+        command(game.gameId, "bob", 2, "bid-capital 3")
+        command(game.gameId, "carol", 2, "bid-capital 1")
+
+        val listing = json.readTree(get("/api/games?status=all", "bob").bodyAsText())
+
+        assertThat(listing["games"].single()["actionPlayers"].map { it.asText() })
+            .containsExactly("p1")
+    }
+
+    @Test
+    fun inactiveGameListingsHaveNoPlayersAwaitingAction() = withHosted {
+        val game = game()
+        post(
+            "/api/admin/games/${game.gameId}/status",
+            "admin",
+            mapOf("expectedRevision" to 2, "action" to "cancel"),
+        )
+
+        val listing = json.readTree(get("/api/games?status=all", "alice").bodyAsText())
+
+        assertThat(listing["games"].single()["actionPlayers"].toList()).isEmpty()
+    }
+
+    @Test
+    fun administrativeListingsIdentifyActingLocalSeatsWithoutAccounts() = withHosted {
+        service.create(listOf("Local Alice", "Local Bob", "Local Carol"))
+
+        val listing = json.readTree(get("/api/admin/games?status=all", "admin").bodyAsText())
+
+        assertThat(listing["games"].single()["actionPlayers"].map { it.asText() })
+            .containsExactly("p1", "p2", "p3")
+    }
+
+    @Test
     fun nonAdminsCannotExportAllPrivateLogs() = withHosted {
         game()
 

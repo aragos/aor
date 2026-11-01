@@ -89,8 +89,8 @@ geometry metadata and verify them explicitly. Do not create a new game connectio
 
 Provinces and area badges support direct pointer and keyboard inspection and target selection.
 Coastal water selects the same province as land. A click prepares a draft; the explicit action button
-commits it. Sea or non-province background clicks clear inspection and focus; dragging preserves them
-and background clicks preserve an active action draft.
+commits it. Sea or non-province background clicks clear inspection, focus and the inspected border;
+dragging preserves them. Background clicks preserve an active action draft and picker selections.
 
 Keep zoom in, zoom out and Fit floating over the board. Always show support arrows; omit a visibility
 toggle. Support modifier-scroll, trackpad pinch, two-finger touch pinch and dragging, centered on the
