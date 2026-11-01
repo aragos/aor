@@ -64,6 +64,7 @@ internal object GameDocuments {
         return StoredGame(
             fileVersion = root.field("fileVersion").integer(),
             id = root.field("id").string(),
+            name = GameName(root.field("name").string()),
             header = header,
             credentials =
                 credentialNode.properties().associate { (player, credential) ->
@@ -130,7 +131,7 @@ internal object GameDocuments {
     }
 
     fun validate(game: StoredGame) {
-        require(game.fileVersion == 5) { "Only game file version 5 is supported." }
+        require(game.fileVersion == 6) { "Only game file version 6 is supported." }
         require(game.createdAt > 0) { "Game creation time must be positive Unix milliseconds." }
         require(
             game.baseRevision >= 0 && (game.previousArchive != null) == (game.baseRevision > 0)

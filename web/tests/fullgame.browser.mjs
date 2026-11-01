@@ -151,6 +151,7 @@ async function perform(state, command) {
 
 try {
     await page.wait('document.querySelector("#names")', 'visual game creation');
+    await page.fill('#game-name', 'Full game browser check');
     await page.fill('#names', 'Ada\nBruno\nClara');
     await click('.landing form > button:last-child');
     await page.wait('document.querySelectorAll(".seat-links a").length === 3', 'three private seat links');

@@ -134,6 +134,61 @@ class TurnFlowTest {
         assertThat(state.legalChoices(p1).commands).containsExactly("pass")
     }
 
+    @Test
+    fun reliefPurchaseFinishesPurchasingEvenWhenAnotherSpaceWouldBeAffordable() {
+        val advances =
+            listOf(
+                    AdvanceId.HUMAN_BODY,
+                    AdvanceId.HOLY_INDULGENCE,
+                    AdvanceId.WIND_WATERMILL,
+                    AdvanceId.PRINTED_WORD,
+                    AdvanceId.SEAWORTHY_VESSELS,
+                    AdvanceId.NATIONALISM,
+                )
+                .fold(oneTier()) { owned, advance -> owned.acquire(advance, 1) }
+        val initial = reliefPurchase(cash = 100, advances = advances)
+
+        val state = initial.play("p1: relieve-misery 1")
+
+        assertThat(state.playerState(p1).misery).isEqualTo(MiseryStep.TEN)
+        assertThat(state.playerState(p1).cash).isEqualTo(90)
+        assertThat(state.flow.actor).isEqualTo(p2)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
+    }
+
+    @Test
+    fun unaffordableReliefPurchaseIsRejected() {
+        val initial = reliefPurchase(cash = 0)
+
+        val failure = assertFailsWith<RuleViolation> { initial.play("p1: relieve-misery 1") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INSUFFICIENT_CASH)
+    }
+
+    @Test
+    fun passingUnaffordableReliefFinishesPurchasing() {
+        val initial = reliefPurchase(cash = 0)
+
+        val state = initial.play("p1: pass")
+
+        assertThat(state.playerState(p1)).isEqualTo(initial.playerState(p1))
+        assertThat(state.flow.actor).isEqualTo(p2)
+        assertThat(state.flow.purchaseStep).isEqualTo(PurchaseStep.SHIPPING)
+    }
+
+    private fun reliefPurchase(cash: Int, advances: PlayerAdvances = oneTier()): GameState =
+        purchase()
+            .copy(turnNumber = 2)
+            .updatePlayer(p1) { player ->
+                player.copy(
+                    cash = cash,
+                    hand = emptyList(),
+                    advances = advances,
+                    misery = MiseryStep.TWENTY,
+                )
+            }
+            .play("p1: pass", "p1: pass")
+
     private fun oneTier(): PlayerAdvances =
         PlayerAdvances(
             listOf(

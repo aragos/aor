@@ -52,7 +52,7 @@ class ExpansionReplayTest {
     @Test
     fun voluntaryRebuildWithIncludeDoesNotDrawABonusAndConservesTokens() {
         val state =
-            game(BoardState().placeMarker(id("venice"), p1).board, pool = 4)
+            game(markerSupplyBoard(owner = p1, count = 25), pool = 4)
                 .copy(rebuiltMarkerBonus = RebuiltMarkerBonus.INCLUDE)
 
         val ended =

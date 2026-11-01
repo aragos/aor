@@ -100,7 +100,10 @@ board, use the minimum height-cover zoom instead. Clamp both axes at every zoom,
 neither the view nor native viewport scrolling can expose space outside the board; omit letterboxing.
 Resizing must preserve the prepared action and retain the existing center/zoom where the new bounds
 allow it. Zoom anchors, dragging and texture spacing follow the rendered scale in both dimensions.
-Ordinary scrolling navigates the surrounding scroll area. Keep map text unselectable during gestures.
+Ordinary vertical and horizontal scrolling over the map pans at its rendered scale, within the
+same bounds as dragging. Shift-wheel also pans horizontally; modifier-scroll retains zoom.
+Normalize pixel, line and page wheel deltas. Scrolling outside the map retains the surrounding
+scroll area's behavior. Keep map text unselectable during gestures.
 The map shows occupancy, neighbors, sea contacts and support highlights without an inspection panel.
 Costs and placement limits belong beside the action. Omit map search and navigation menus.
 

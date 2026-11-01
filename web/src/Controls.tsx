@@ -1,3 +1,4 @@
+import {NumberInput} from './NumberInput';
 import {DecisionAction, DecisionForm} from './DecisionActions';
 import {useEffect, useRef, useState} from 'react';
 import type {Snapshot} from './api';
@@ -73,7 +74,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
         {eligiblePurchase && quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
         {((stage === 'BIDDING' && me.misery !== null) || eligiblePurchase) && <DecisionForm onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>
             <label htmlFor="bid">{t(isTokenPurchase ? 'controls.tokenPurchase' : 'controls.bid')}</label>
-            <div className="inline-form"><input id="bid" type="number" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onChange={event => setBid(event.target.value)} aria-describedby={isTokenPurchase ? 'purchase-preview' : undefined} required/>
+            <div className="inline-form"><NumberInput id="bid" min={snapshot.legalChoices.bidMin ?? 0} max={snapshot.legalChoices.bidMax ?? 40} step={1} value={bid} onValueChange={setBid} aria-describedby={isTokenPurchase ? 'purchase-preview' : undefined} required/>
                 <DecisionAction type="submit" className="bid-action" disabled={busy || (isTokenPurchase && (!validPurchase || !quoted))}>
                     {bidSubmitLabel(snapshot)}
                 </DecisionAction>

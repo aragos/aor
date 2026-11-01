@@ -44,13 +44,15 @@ choice and understand its result through visual controls and commands, on deskto
    quantities and terms. Every visible capital name carries its board silhouette, including previews,
    choices, reference lists and recorded activity. Text-only titles and accessible names retain names.
    Align capital symbols, names and surrounding sentence text vertically, including commodity receipts.
+   Capital names share the surrounding text baseline, with symbols centered independently. Center
+   paired resource labels and values, including icon rows; keep help footnotes intentionally raised.
    Dice state their colors. Wins/losses have text and green/red styling; color alone conveys nothing.
 8. **Keep summaries compact.** Give each fact a predictable home, with decision-relevant state at
    rest and full tracks/breakdowns in optional detail. Remove repeated structure before shrinking
    text. Every extra control, panel and sentence must help a player choose, understand an effect or
    find data. Remove wording already implied by controls and implementation terms such as “signed
-   whole number”; retain material exceptions in plain language. Track help in player boxes looks
-   like a footnote, with a larger invisible hit area. Localize ordinary play; command syntax and
+   whole number”; retain material exceptions in plain language. Help question marks look
+   like footnotes, with a larger invisible hit area. Localize ordinary play; command syntax and
    internal IDs belong in technical views. Help is for printed data and non-obvious app behavior
    (variants, previews, navigation and undo), not general game rules already available elsewhere.
 9. **Show consequential feedback.** Distinguish accepted, rejected, waiting and private-submission
@@ -74,7 +76,9 @@ choice and understand its result through visual controls and commands, on deskto
 - Undo stays at the upper right of the action panel, outside its scrolling review. All final actions,
   including Pass, occupy one pinned footer. Draft choices and inputs stay with their consequences;
   opening inspection or scrolling cannot move confirmation away. Keep native form validation and
-  Enter submission intact. One action plus Pass uses a joined two-button control with a single
+  Enter submission intact. Number inputs ignore mouse-wheel changes while retaining focus,
+  typing and arrow-key adjustment. Focusing a zero-valued number input clears it for immediate
+  entry; preserve nonzero drafts. One action plus Pass uses a joined two-button control with a single
   divider; both labels remain complete and independently accessible. Larger action sets use separate
   buttons. Selected finite actions identify their operation and cost on the footer button.
   Undo withdraws an unrevealed capital bid or token purchase, retaining the local amount; after
@@ -93,20 +97,36 @@ choice and understand its result through visual controls and commands, on deskto
   Compact player boxes put the handle beside the capital name and omit `@` there. Keep this identity
   on one row; long handles truncate visually, with the full identity available on hover and to
   assistive technology.
+- Require a creator-chosen, single-line game name of up to 80 characters in creation forms. Show it
+  beside the colored favicon in the game header, in the browser tab, and above participants in game
+  listings. Long names truncate within the available header/row width and retain their full text.
+  Failed creation preserves the name and player draft.
 - Hosted account, My games and sign-out controls share the game overview bar. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.
   Omit creation dates, IDs and Open buttons. Administrative rows expand their operational controls;
   they do not grant access to another player's seat. Poll the list every 30 seconds while visible;
-  omit a manual Refresh button. Administrative changes refresh the list immediately.
-- The header uses **AoR**; page titles include the assigned capital, or the player name during setup.
+  omit a manual Refresh button and the question mark beside My games. Administrative changes refresh
+  the list immediately.
+- The header uses a larger colored favicon; page titles include the assigned capital, or the player
+  name during setup. The header icon stays colored regardless of the browser tab's turn indicator.
   Include the current deck count with the epoch, for example **Epoch 2 (22 cards remaining)**;
   remove duplicate deck counts from the turn-effects section.
+  The This turn disclosure uses compact label/value rows for military, protection, Papal Decree
+  and active War. Omit its repeated heading, played leaders and shortage/surplus entries; Advances
+  and Markets own those lookups. Show consequential summary badges only while the disclosure is
+  closed, and ignore the omitted entries when deciding whether this panel is empty.
   Commands remain in the bottom expander; omit their header button. Province connections remain
   on the map. Event and advance descriptions remain available in the game. Legends, variant
   descriptions, payout boxes, printed tracks and app help open in contextual reference popups.
   Omit card and advance catalogs already available through game inspection, general game rules,
-  and the game-flow walkthrough. Keep a topic chooser in the main Help popup. Retain unique printed
-  advance credits, relief ratings and prerequisites in contextual popups from advance inspection. Document all undo scopes, activity boundaries, creator permissions, retained
+  and the game-flow walkthrough. Omit the header Help button; contextual reference popups retain
+  their topic chooser. Advance inspection shows effects, the credit given to other advances in
+  its category from the next turn, current-turn relief, prerequisites, owners and the current
+  price breakdown directly. Use compact, aligned rows and a second price column when space permits;
+  omit foldouts, printed-value links and duplicate leader-navigation controls in that inspection.
+  On phones, give the open inspection the workspace area and retain a reachable close control;
+  closing returns to the unchanged advance list.
+  Document all undo scopes, activity boundaries, creator permissions, retained
   answers and immutable randomness; creation and history controls link to that explanation.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
@@ -149,15 +169,22 @@ choice and understand its result through visual controls and commands, on deskto
   enabled controls use feasible commitments, including legal partial placements.
 - Expansion uses one compact pool summary with current → projected balances while reviewing a
   placement. Keep commitment, outcome and income beside confirmation; omit repeated action headings.
-- Expansion summaries show each player's white markers and active military cards with matchup
-  caveats. Omit the military box entirely when nobody has one. Competition and War outcomes live in
+  Competition omits the generic dice disclaimer. Whenever an offered route uses shipping, show
+  destination use as current → projected / capacity directly, including partial commitments and
+  blocked inspections. Omit the placement-details disclosure and stock-marker count.
+  Offer voluntary marker reduction only when all 25 of that player's markers are deployed, using
+  the engine's legal commands and previews. After freeing a marker, remove further reduction offers.
+- Expansion summaries show each player's white markers and active military cards. Omit generic
+  matchup help and omit the military box entirely when nobody has one. Competition and War outcomes live in
   activity. A submitted action that resolves one also opens a dismissible result for its player;
   loading or polling another player's result does not create an action notice.
   Competition receipts and suspended requests belong to that turn's Expansion and expire when it
   ends, including outcomes first received with the phase transition. Keep the activity entry.
 - Commodity cards show shortage/surplus badges. Markets and selected commodity cards offer
   controls for full payout boxes in reference popups; keep current owner payouts and adjustments
-  in the game. Commodity cards link directly to their payout tracks; other activity cards open
+  in the game. Market tiles put the payout-help question mark beside the commodity name, without
+  expandable details or replacement controls for the removed breakdown. Commodity cards link
+  directly to their payout tracks; other activity cards open
   the same card-inspection popup, even after leaving the hand, with viewer-specific leader credits.
   Opening, Escape/close and focus restoration preserve the active form, target picker and prepared
   values; inspection never replaces that form. Advance inspections retain their workspace surface.
@@ -187,7 +214,12 @@ choice and understand its result through visual controls and commands, on deskto
   reference behavior, without remounting the active action form.
 - Cancellation choices and confirmation show cost. Stabilization shows current → resulting misery
   boxes, including Chaos, on its payment button. Relief remains visible for an advance tier even
-  when blocked, with Pass.
+  when blocked, with Pass. Show authoritative unused MR dollars from this turn's advance purchases
+  beside the relief choices. Selecting spaces prepares a draft; confirming the purchase atomically
+  finishes the player's purchasing turn. An unaffordable purchase never advances the turn, and
+  players with only unaffordable offers must explicitly Pass.
+  During advance purchasing, show the same running MR total beside available cash, including
+  while an advance purchase is selected. Derive it from the authoritative current-turn acquisitions.
   Gold and Ivory offer one joint $10 cancellation for each shared adjustment type. If commodity
   play leaves only one side with that type, label the remaining choice as that commodity alone.
 - Misery boxes share a green-to-amber-to-red severity scale based on the authoritative track's

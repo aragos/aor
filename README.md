@@ -68,7 +68,7 @@ handles, membership access and managed PostgreSQL for all durable state. For SQL
 another provider, set `AOR_STORAGE=postgres` and secret `AOR_DATABASE_URL`. TLS defaults to
 `verify-full`; loopback development may use `?sslmode=disable`. See [deployment](docs/deployment.md).
 
-Current games use file format 5, rules `ah1996-three-epoch-2` and data `ah1996-catalog-13`.
+Current games use file format 6, rules `ah1996-three-epoch-4` and data `ah1996-catalog-13`.
 Creation records configuration in revision 1 and automatic setup/outcomes in revision 2. Ordinary
 revisions contain deltas. Earlier versions require explicit, validated administrative upgrades with
 an archived preceding file; the engine performs no automatic migration.

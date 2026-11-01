@@ -240,7 +240,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                 SELECT g.id, g.revision, g.document, p.needs_move,
                     (SELECT jsonb_object_agg(m.seat, m.account_id)
                         FROM game_players m WHERE m.game_id = g.id) AS memberships,
-                    CASE WHEN g.document->>'fileVersion' <> '5'
+                    CASE WHEN g.document->>'fileVersion' <> '6'
                         OR g.document->'header'->>'rulesVersion' <> ?
                         OR g.document->'header'->>'dataVersion' <> ? THEN 'UNAVAILABLE'
                         ELSE g.listing_status END AS base_status,
@@ -296,6 +296,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                                         )
                                     },
                                     viewStatus == GameListStatus.MY_MOVE,
+                                    GameDirectory.displayName(root),
                                 )
                             )
                         }

@@ -7,6 +7,7 @@ import {defaultVariants, validVariants, Variants} from './Variants';
 import {isUndoPolicy, useStoredSetting} from './preferences';
 import {ChoiceButtons} from './DecisionControls';
 import {HelpLink} from './HelpLink';
+import {AppLogo} from './AppLogo';
 import {GameTable} from './GameTable';
 import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
@@ -19,6 +20,7 @@ const HostedApp = lazy(() => import('./HostedApp'));
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
 
 function CreateGame() {
+    const [name, setName] = useState('');
     const [names, setNames] = useState('Alice\nBob\nCarol');
     const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
     const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants);
@@ -27,14 +29,15 @@ function CreateGame() {
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {players: names.split('\n'), options: variants, undoPolicy})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: names.split('\n'), options: variants, undoPolicy})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
     return <main className="landing panel">
         <p className="eyebrow">{t('app.subtitle')}</p>
-        <h1>{t('app.title')}</h1>
+        <h1><AppLogo/></h1>
         {created ? <>
+            <h2 className="created-game-name">{created.name}</h2>
             <h2>{t('links.title')}</h2><p className="muted">{t('links.description')}</p>
             <ul className="seat-links">{created.links.map(link => <li key={link.id}>
                 <strong>{link.name}</strong><a className="button" href={link.path} target="_blank" rel="noreferrer" aria-label={t('links.openFor').replace('{name}', link.name)}>{t('links.open')}</a>
@@ -42,6 +45,8 @@ function CreateGame() {
             <button className="secondary" onClick={() => setCreated(null)}>{t('links.new')}</button>
         </> : <form onSubmit={create}>
             <h2>{t('create.title')}</h2><p className="muted">{t('create.description')}</p>
+            <label htmlFor="game-name">{t('create.gameName')}</label>
+            <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
             <p className="muted small">{t('create.threeEpochs')}</p>
@@ -130,7 +135,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         } finally { busyRef.current = false; setBusy(false); }
     }
 
-    if (!snapshot) return <main className="landing panel"><h1>{t('app.title')}</h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
+    if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
     return <MapSelectionProvider><GameTable snapshot={snapshot} busy={busy} saved={saved}
         submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null})} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines})} connectionError={connectionError} actionError={actionError}
         quotePurchase={amount => request<PurchaseQuote>(`${path}/quote-token-purchase`, token, {expectedRevision: snapshot.revision, amount}, undefined, {readOnly: true})}/></MapSelectionProvider>;
@@ -143,9 +148,9 @@ export function App() {
         void request<ApplicationConfig>('/api/config').then(setConfig).catch(failure => setError(errorCode(failure)));
     }, []);
     const match = /^\/games\/([0-9a-f-]+)\/?$/.exec(window.location.pathname);
-    if (!config) return <main className="landing panel"><h1>{t('app.title')}</h1>{error ? <ErrorMessage code={error}/> : <p>{t('game.loading')}</p>}</main>;
+    if (!config) return <main className="landing panel"><h1><AppLogo/></h1>{error ? <ErrorMessage code={error}/> : <p>{t('game.loading')}</p>}</main>;
     if (config.authMode === 'firebase') return <Suspense fallback={<main className="landing panel"><p>{t('game.loading')}</p></main>}><HostedApp config={config} game={match ? <Game id={match[1]} pollInterval={config.pollIntervalMs}/> : null}/></Suspense>;
     if (!match) return <CreateGame/>;
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
-    return token ? <Game id={match[1]} token={token}/> : <main className="landing panel"><h1>{t('app.title')}</h1><p role="alert">{t('game.missingToken')}</p><a href="/">{t('game.new')}</a></main>;
+    return token ? <Game id={match[1]} token={token}/> : <main className="landing panel"><h1><AppLogo/></h1><p role="alert">{t('game.missingToken')}</p><a href="/">{t('game.new')}</a></main>;
 }

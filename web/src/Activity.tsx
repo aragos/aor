@@ -41,7 +41,7 @@ function CashPayment({event, player, amount, children}: {
 }
 
 function ActivityCard({cardId, onInspectCard, commodities = []}: {cardId: string; onInspectCard?: (cardId: string) => void; commodities?: string[]}) {
-    if (commodities.length) return <span className="event-card">▤ {label(cardId, 'event')}{commodities.map(commodity => <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`} inline/>)}</span>;
+    if (commodities.length) return <span className="event-card">▤ {label(cardId, 'event')}{commodities.map(commodity => <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`}/>)}</span>;
     return onInspectCard
         ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {label(cardId, 'event')}</button>
         : <span className="event-card">▤ {label(cardId, 'event')}</span>;

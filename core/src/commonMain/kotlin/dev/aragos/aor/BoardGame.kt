@@ -191,19 +191,15 @@ object BoardGame {
     }
 
     /**
-     * Only old coloured markers can be voluntarily reduced, preventing white expansion chaining.
+     * A player with all 25 markers deployed may reduce an old coloured marker to free one. White
+     * markers cannot be reduced, preventing expansion chaining.
      */
     fun reduceMarker(state: GameState, actor: PlayerId, province: ProvinceId): GameState {
         state.requireActor(actor, Stage.EXPANSION)
-        checkRule(
-            state.board.pieces[province] == ProvincePieces.Marker(actor, PieceSide.COLOURED),
-            ViolationCode.INVALID_BOARD_MUTATION,
-        )
+        markerReductionBlocker(state, actor, province)?.let { blocker ->
+            throw RuleViolation(blocker)
+        }
         val owner = state.playerState(actor)
-        checkRule(
-            owner.stockTokens > 0 || owner.poolTokens > 0,
-            ViolationCode.INVALID_BOARD_MUTATION,
-        )
         val change = state.board.replaceWithToken(province, actor)
         val changed =
             if (owner.stockTokens > 0) {
@@ -219,6 +215,25 @@ object BoardGame {
                     markerOrigins = changed.flow.markerOrigins - province,
                 )
         )
+    }
+
+    private fun markerReductionBlocker(
+        state: GameState,
+        actor: PlayerId,
+        province: ProvinceId,
+    ): ViolationCode? {
+        if (state.board.pieces[province] != ProvincePieces.Marker(actor, PieceSide.COLOURED)) {
+            return ViolationCode.INVALID_BOARD_MUTATION
+        }
+        if (state.board.markerCount(actor) < 25) {
+            return ViolationCode.MARKERS_STILL_AVAILABLE
+        }
+        val owner = state.playerState(actor)
+        return if (owner.stockTokens > 0 || owner.poolTokens > 0) {
+            null
+        } else {
+            ViolationCode.INVALID_BOARD_MUTATION
+        }
     }
 
     fun passDecision(state: GameState, actor: PlayerId): GameState? =
@@ -298,11 +313,7 @@ object BoardGame {
             add("pass")
             for (province in context.configuration.provinces) {
                 addAll(placementChoices(context, actor, province.id, player.poolTokens))
-                if (
-                    state.board.pieces[province.id] ==
-                        ProvincePieces.Marker(actor, PieceSide.COLOURED) &&
-                        (player.stockTokens > 0 || player.poolTokens > 0)
-                ) {
+                if (markerReductionBlocker(state, actor, province.id) == null) {
                     add("reduce-marker ${province.id}")
                 }
             }

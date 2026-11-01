@@ -7,7 +7,7 @@ import {HelpLink} from '../HelpLink';
 import {AccessLock, areaColors, CommodityIcon, commodityColors, PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
-import {clampMapView, fitMapView, resizeMapView, zoomMapView} from './mapView';
+import {clampMapView, fitMapView, panMapView, resizeMapView, zoomMapView} from './mapView';
 import type {MapView, MapViewport} from './mapView';
 import geometryData from './boardGeometry.json';
 import europeanGeometryData from './europeanBoardGeometry.json';
@@ -194,16 +194,25 @@ export function BoardMap({snapshot, busy}: {
         return zoomMapView(current, bounds, viewport, factor, {x: anchorX, y: anchorY});
     };
     const zoom = (factor: number) => setView(current => zoomView(current, factor));
-    const wheelZoom = useRef<(event: WheelEvent) => void>();
-    wheelZoom.current = event => {
-        if (!event.ctrlKey && !event.metaKey && !event.altKey) return;
+    const wheelGesture = useRef<(event: WheelEvent) => void>();
+    wheelGesture.current = event => {
+        const rect = svg.current?.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return;
         event.preventDefault();
-        const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 300 : 1);
-        setView(current => zoomView(current, Math.exp(pixels * .002), event.clientX, event.clientY));
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+            const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 300 : 1);
+            setView(current => zoomView(current, Math.exp(pixels * .002), event.clientX, event.clientY));
+            return;
+        }
+        const unit = event.deltaMode === 1 ? 16 : 1;
+        const x = event.deltaX * (event.deltaMode === 2 ? rect.width : unit);
+        const y = event.deltaY * (event.deltaMode === 2 ? rect.height : unit);
+        const delta = event.shiftKey && x === 0 ? {x: y, y: 0} : {x, y};
+        setView(current => panMapView(current, bounds, rect, delta));
     };
     useEffect(() => {
         const element = svg.current;
-        const wheel = (event: WheelEvent) => wheelZoom.current?.(event);
+        const wheel = (event: WheelEvent) => wheelGesture.current?.(event);
         element?.addEventListener('wheel', wheel, {passive: false});
         return () => element?.removeEventListener('wheel', wheel);
     }, [!!catalog]);
@@ -231,9 +240,7 @@ export function BoardMap({snapshot, busy}: {
         const rect = svg.current.getBoundingClientRect();
         const next = current.distance && start.distance
             ? zoomView(start.view, start.distance / current.distance, start.x, start.y) : start.view;
-        const unitsPerPixel = next.w / rect.width;
-        setView(clampMapView({...next, x: next.x - dx * unitsPerPixel,
-            y: next.y - dy * unitsPerPixel}, bounds, rect));
+        setView(panMapView(next, bounds, rect, {x: -dx, y: -dy}));
     };
     const pointerEnd = (event: ReactPointerEvent<SVGSVGElement>) => {
         pointers.current.delete(event.pointerId);

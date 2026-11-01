@@ -77,16 +77,16 @@ export async function checkClearAdvancePrices(page, web, baseline) {
     assert.equal(await page.evaluate(`!!document.querySelector('${tile} .price-breakdown, ${tile} .advance-discount')`), false, 'Tiles keep detailed credit rows out of the compact summary');
     assert.equal(await page.evaluate(`document.querySelector('[data-advance="OVERLAND_EAST"] .advance-price-compact strong').textContent`), '$40', 'Owned advances retain a printed cost');
     await page.evaluate(`document.querySelector('${tile}').click()`);
-    await page.wait(`document.querySelector('.inspection-panel .price-details')`, 'blocked advance remains inspectable');
-    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .price-details').open`), false, 'Detailed credits start collapsed');
+    await page.wait(`document.querySelector('.inspection-panel .price-breakdown')`, 'blocked advance remains inspectable');
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel details, .inspection-panel a, .inspection-panel .reference-link')`), null, 'Inspection has no foldouts or navigation links');
     assert.equal(await page.evaluate(`!!document.querySelector('.decision-panel .advance-decision')`), false, 'A price estimate does not authorize purchase');
-    await page.evaluate(`document.querySelector('.inspection-panel .price-details > summary').click()`);
     assert.match(await page.evaluate(`document.querySelector('[data-credit-advance="OVERLAND_EAST"]').textContent`), /Overland East−\$20/);
     const explanation = await page.evaluate(`document.querySelector('.inspection-panel .price-breakdown').textContent`);
-    assert.match(explanation, /Printed cost\$120.*Overland East−\$20.*Institutional Research−\$10.*Christopher Columbus.*−\$40.*Includes \$10 Written Record.*Price\$50/);
+    assert.match(explanation, /Printed cost\$120.*Overland East−\$20.*Institutional Research−\$10.*Christopher Columbus.*−\$40.*Includes \$10 Written Record/);
+    assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .price-total').textContent`), '$50');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-clear-advance-prices.png'), 1280, 900);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-clear-advance-prices-phone.png'), 390, 844, true);
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
     assert.equal(await page.evaluate(`window.mapCommands.length`), 0, 'Credit disclosure and blocked inspection submit nothing');
-    console.log('Passed: all advance prices, compact summaries, named advance credits, optional detail, blocked purchase safety and phone layout.');
+    console.log('Passed: all advance prices, compact summaries, visible named advance credits, blocked purchase safety and phone layout.');
 }

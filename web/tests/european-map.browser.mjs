@@ -9,6 +9,7 @@ export async function checkEuropeanMap(page, web) {
     await page.evaluate(`document.querySelector('#variant-map button:last-child').click()`);
     await page.reload();
     await page.wait(`document.querySelector('#variant-map button:last-child[aria-pressed=true]')`, 'European map preference survives reload');
+    await page.fill('#game-name', 'European traders');
     await page.fill('#names', 'Ada\nBruno\nClara\nDario\nEva\nFarid');
     await page.click('Create game');
     await page.wait(`document.querySelectorAll('.seat-links a').length === 6`, 'six European seats');

@@ -90,7 +90,9 @@ replays one effective revision. Requests name the expected revision; reject stal
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
 
-Game file format 5 stores ordinary revision entries as deltas. An edit records `replaceFrom`, the
+Game file format 6 stores the creator-chosen game name as intrinsic metadata, separate from engine
+state and immutable entry-time player identities. Ordinary revision entries are deltas. An edit
+records `replaceFrom`, the
 number of effective entries to retain, and a replacement suffix containing validated actions and
 unchanged recorded outcomes. Reconstruct history by applying each delta or suffix replacement in
 revision order. Earlier revisions are immutable. The creation revision records the undo policy;

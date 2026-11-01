@@ -9,6 +9,29 @@ class ActionPreviewSerializationTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun unusedCurrentTurnReliefRatingSerializesIndependentlyOfSpaceOffers() {
+        val initial = state()
+        val player =
+            initial
+                .playerState(p1)
+                .copy(
+                    advances =
+                        PlayerAdvances(
+                            listOf(
+                                AdvanceAcquisition(AdvanceId.HUMAN_BODY, 2),
+                                AdvanceAcquisition(AdvanceId.LAWS_OF_MATTER, 2),
+                            )
+                        )
+                )
+        val before = initial.copy(players = initial.players + (p1 to player))
+
+        val view = json.readTree(json.writeValueAsString(before.viewForPlayer(p1)))
+
+        assertThat(view.path("reliefRatingAvailable").asInt()).isEqualTo(15)
+        assertThat(view.path("reliefOffers").size()).isEqualTo(0)
+    }
+
+    @Test
     fun selectedCardTargetSerializesPrintedMiseryEndpointsAndChaos() {
         val initial = state()
         val before =

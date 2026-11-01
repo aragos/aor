@@ -9,6 +9,8 @@ export async function checkPortal(page, web) {
         text: item.textContent, background: getComputedStyle(item.firstElementChild).backgroundColor,
     }))`);
     assert(rows.every(row => row.tag === 'A' && row.children === 1 && row.buttons === 0), 'Each game is one native link covering its row');
+    assert.match(rows[0].text, /Friday Renaissance/);
+    assert.match(rows[1].text, /Mediterranean traders/);
     assert(rows.every(row => row.href.startsWith('/games/') && row.text.includes('@alice') && !row.text.includes('00000000') && !row.text.includes('Created')), 'Rows show handles and state without IDs or dates');
     assert.notEqual(rows[0].background, rows[1].background, 'Awaiting and waiting rows have different backgrounds');
     await page.evaluate(`document.querySelector('.game-row').focus()`);
@@ -51,5 +53,10 @@ export async function checkPortal(page, web) {
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'Portal fits a phone');
     await page.evaluate(`window.portalHasTurn=false; document.dispatchEvent(new Event('visibilitychange')); localStorage.removeItem('aor.setting.game-filter')`);
     await page.wait(`document.querySelector('link[rel=icon]').href !== ${JSON.stringify(readyIcon)}`, 'Game list becomes grayscale without awaiting games');
+    await page.fill('#game-name', 'Friday with friends');
+    await page.click('Create game');
+    await page.wait(`window.portalRequests.some(request => request.path === '/api/games' && request.body?.name === 'Friday with friends')`, 'registered creation submits chosen name');
+    await page.wait(`document.querySelector('.create-registered [role=alert]')`, 'creation failure surfaced');
+    assert.equal(await page.evaluate(`document.querySelector('#game-name').value`), 'Friday with friends', 'Failed registered creation preserves the game name');
     console.log('Passed: unique player handles, independent turn favicon, creation, filters, administration, lifecycle and approvals.');
 }

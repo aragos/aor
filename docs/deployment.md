@@ -134,7 +134,7 @@ upgrade game rules, commands or catalog versions. That remains the explicit log-
 
 ### Importing existing file data
 
-For current game file format 5, stop the file-backed server and keep a private copy of its complete
+For current game file format 6, stop the file-backed server and keep a private copy of its complete
 data directory. Configure the target database secrets and run:
 
 ```sh
@@ -281,11 +281,11 @@ full account-directory/disaster-recovery backup.
 
 4. Publication creates a full checkpoint at revision 43 and archives the complete preceding file
    under its revision/content SHA-256. Later revisions append deltas or scoped edit suffixes.
-   Credentials/memberships, creation time, lifecycle and undo policy stay with the game. Pending
+   The creator-chosen name, credentials/memberships, creation time, lifecycle and undo policy stay with the game. Pending
    unrevealed submissions are cleared and must be resubmitted. Admin identity/time/action appear
    in history. A failed replay or database write leaves the preceding game and archive set unchanged.
 
-Only game file format **5** and the current rules/data versions are decoded for ordinary play.
+Only game file format **6** and the current rules/data versions are decoded for ordinary play.
 Older files remain exportable to admins; there is no silent legacy decoder. An explicit validated
 upgrade reconstructs a current header and checkpoint. Historic revisions before a checkpoint remain
 in its archive and are inspected through admin exports rather than replayed with a mismatched engine.

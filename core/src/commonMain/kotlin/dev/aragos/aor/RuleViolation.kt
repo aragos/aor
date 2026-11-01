@@ -17,6 +17,7 @@ enum class ViolationCode(val description: String) {
     OVERSEAS_LIMIT_EXCEEDED("The fleet cannot occupy another overseas box."),
     CARAVAN_INTERMEDIATE_OCCUPIED("Win competition in the full intermediate province first."),
     NO_DOMINATION_MARKERS("The player's domination markers are all on the board."),
+    MARKERS_STILL_AVAILABLE("Voluntary reduction requires all 25 domination markers in play."),
     INVALID_COMPETITION("The province is not awaiting the specified competition."),
     INVALID_CATHEDRAL_USE("Cathedral cannot be used against these opponents."),
     INVALID_COMMAND("The command syntax is invalid."),

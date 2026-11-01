@@ -611,8 +611,7 @@ class BoardGameTest {
 
     @Test
     fun voluntaryReductionAndRebuildingNeverEarnsExpansionBonusCredit() {
-        val state =
-            expansion(BoardState().placeMarker(id("venice"), p1).board).act("reduce-marker venice")
+        val state = expansion(markerSupplyBoard(owner = p1, count = 25)).act("reduce-marker venice")
 
         val rebuilt = state.act("place 4 venice")
 
@@ -622,8 +621,9 @@ class BoardGameTest {
 
     @Test
     fun markerReductionPreviewMatchesStockFundedConsequences() {
-        val state = expansion(BoardState().placeMarker(id("venice"), p1).board)
-        val offer = state.viewForPlayer(p1).markerReductionOffers.single()
+        val state = expansion(markerSupplyBoard(owner = p1, count = 25))
+        val offer =
+            state.viewForPlayer(p1).markerReductionOffers.single { it.province == id("venice") }
 
         val reduced = state.act(offer.command)
 
@@ -631,6 +631,7 @@ class BoardGameTest {
         assertThat(offer.poolAfter).isEqualTo(reduced.playerState(p1).poolTokens)
         assertThat(offer.stockAfter).isEqualTo(reduced.playerState(p1).stockTokens)
         assertThat(offer.stockBefore - offer.stockAfter).isEqualTo(1)
+        assertThat(reduced.board.markerCount(p1)).isEqualTo(24)
         assertThat(offer.incomeBefore).isGreaterThan(offer.incomeAfter)
         assertThat(offer.incomeAfter)
             .isEqualTo(reduced.viewForPlayer(p1).players.first().income?.ordinary)
@@ -640,10 +641,11 @@ class BoardGameTest {
     @Test
     fun markerReductionPreviewUsesPoolWhenStockIsEmpty() {
         val state =
-            expansion(BoardState().placeMarker(id("venice"), p1).board).updatePlayer(p1) { player ->
+            expansion(markerSupplyBoard(owner = p1, count = 25)).updatePlayer(p1) { player ->
                 player.copy(stockTokens = 0, poolTokens = 36)
             }
-        val offer = state.viewForPlayer(p1).markerReductionOffers.single()
+        val offer =
+            state.viewForPlayer(p1).markerReductionOffers.single { it.province == id("venice") }
 
         val reduced = state.act(offer.command)
 
@@ -654,11 +656,95 @@ class BoardGameTest {
 
     @Test
     fun aWhiteMarkerCannotBeReducedToCreateANewColouredBase() {
-        val state = expansion(BoardState().placeMarker(id("rome"), p1, PieceSide.WHITE).board)
+        val board = markerSupplyBoard(owner = p1, count = 25)
+        val state = expansion(board.placeMarker(id("venice"), p1, PieceSide.WHITE).board)
 
-        val failure = assertFailsWith<RuleViolation> { state.act("reduce-marker rome") }
+        val failure = assertFailsWith<RuleViolation> { state.act("reduce-marker venice") }
 
         assertThat(failure.code).isEqualTo(ViolationCode.INVALID_BOARD_MUTATION)
+    }
+
+    @Test
+    fun voluntaryReductionIsRejectedWithOneMarkerStillAvailable() {
+        val state = expansion(markerSupplyBoard(owner = p1, count = 24))
+
+        val failure = assertFailsWith<RuleViolation> { state.act("reduce-marker venice") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.MARKERS_STILL_AVAILABLE)
+    }
+
+    @Test
+    fun voluntaryReductionIsNotOfferedWithOneMarkerStillAvailable() {
+        val state = expansion(markerSupplyBoard(owner = p1, count = 24))
+
+        assertThat(state.legalChoices(p1).commands.none { it.startsWith("reduce-marker ") })
+            .isTrue()
+        assertThat(state.viewForPlayer(p1).markerReductionOffers).isEmpty()
+    }
+
+    @Test
+    fun whiteMarkersCountTowardTheDeployedSupply() {
+        val original = markerSupplyBoard(owner = p1, count = 25)
+        val board =
+            original.pieces.keys
+                .filterNot { it == id("venice") }
+                .fold(original) { current, province ->
+                    current.placeMarker(province, p1, PieceSide.WHITE).board
+                }
+        val state = expansion(board)
+
+        val reduced = state.act("reduce-marker venice")
+
+        assertThat(reduced.board.markerCount(p1)).isEqualTo(24)
+        assertThat(reduced.board.pieces[id("venice")])
+            .isEqualTo(ProvincePieces.Tokens(persistentMapOf(p1 to TokenHolding(coloured = 1))))
+    }
+
+    @Test
+    fun anotherPlayersMarkerDoesNotCountTowardTheDeployedSupply() {
+        val original = markerSupplyBoard(owner = p1, count = 25)
+        val other = original.pieces.keys.first { it != id("venice") }
+        val state = expansion(original.transferMarker(other, p2).board)
+
+        val failure = assertFailsWith<RuleViolation> { state.act("reduce-marker venice") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.MARKERS_STILL_AVAILABLE)
+    }
+
+    @Test
+    fun reducingOneMarkerRemovesFurtherReductionOffers() {
+        val reduced =
+            expansion(markerSupplyBoard(owner = p1, count = 25)).act("reduce-marker venice")
+
+        val view = reduced.viewForPlayer(p1)
+
+        assertThat(reduced.legalChoices(p1).commands.none { it.startsWith("reduce-marker ") })
+            .isTrue()
+        assertThat(view.markerReductionOffers).isEmpty()
+    }
+
+    @Test
+    fun reducingAnotherMarkerIsRejectedAfterFreeingOne() {
+        val board = markerSupplyBoard(owner = p1, count = 25)
+        val other = board.pieces.keys.first { it != id("venice") }
+        val reduced = expansion(board).act("reduce-marker venice")
+
+        val failure = assertFailsWith<RuleViolation> { reduced.act("reduce-marker $other") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.MARKERS_STILL_AVAILABLE)
+    }
+
+    @Test
+    fun redeployingTheFreedMarkerAllowsAnotherVoluntaryReduction() {
+        val board = markerSupplyBoard(owner = p1, count = 25)
+        val other = board.pieces.keys.first { it != id("venice") }
+        val rebuilt = expansion(board).act("reduce-marker venice").act("place 4 venice")
+
+        val reduced = rebuilt.act("reduce-marker $other")
+
+        assertThat(reduced.board.markerCount(p1)).isEqualTo(24)
+        assertThat(reduced.board.pieces[other])
+            .isEqualTo(ProvincePieces.Tokens(persistentMapOf(p1 to TokenHolding(coloured = 1))))
     }
 
     @Test

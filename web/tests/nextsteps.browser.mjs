@@ -46,6 +46,7 @@ export async function checkSetupEvidence(page, web) {
     await page.send('Page.navigate', {url:web+'/'});
     await page.wait(`document.querySelector('#names') && document.querySelector('#variant-initial-card')`, 'players and variants share creation');
     await page.fill('#names','Ada\nBruno\nClara');
+    await page.fill('#game-name', 'Friday Renaissance');
     await page.evaluate(`document.querySelector('#variant-deck-modification button:last-child').click();
         document.querySelector('#variant-initial-card button:nth-child(3)').focus()`);
     await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
@@ -127,13 +128,10 @@ export async function checkDecisionEvidence(page, web, baseline) {
     for (const advance of baseline.game.catalog.advances) {
         await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);
         assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .advance-benefits')`), true, 'Advance benefits stay in the game');
-        await page.evaluate(`document.querySelector('.inspection-panel [data-help-topic="advance-${advance.id.toLowerCase()}"]').click()`);
-        await page.wait(`document.querySelector('.reference-dialog #advance-${advance.id.toLowerCase()}')`, 'Unique printed advance values');
-        const values = await page.evaluate(`[...document.querySelectorAll('.reference-dialog dd')].map(value => value.textContent)`);
-        assert.deepEqual(values.slice(0, 2), [`$${advance.credit}`, String(advance.miseryRelief)]);
-        assert.equal(values.length, 3, 'Reference keeps credit, relief rating and prerequisites only');
-        assert.equal(await page.evaluate(`document.querySelector('.reference-dialog .advance-benefits, .reference-dialog .advance-price')`), null, 'Advance effects and prices retain their existing game surfaces');
-        await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit dd').textContent`), `$${advance.credit} from next turn`);
+        assert.match(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit dt').textContent`), /Credit to other .* advances/);
+        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .advance-relief dd').textContent`), `$${advance.miseryRelief} this turn`);
+        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel details, .inspection-panel a, .inspection-panel .reference-link')`), null, 'Printed values and prices are visible without links or foldouts');
     }
     await checkAccessibleNames(page);
     await checkContrast(page,'advance-detail');

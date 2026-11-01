@@ -209,14 +209,16 @@ sealed interface TurnCommand : Command {
 
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             state.requirePurchaseStep(actor, PurchaseStep.RELIEF)
-            return state.replacePlayer(
-                PlayerEconomy.buyRelief(
-                        state.playerState(actor),
-                        spaces,
-                        state.currentTurn(),
-                    )
-                    .player
-            )
+            return state
+                .replacePlayer(
+                    PlayerEconomy.buyRelief(
+                            state.playerState(actor),
+                            spaces,
+                            state.currentTurn(),
+                        )
+                        .player
+                )
+                .finishActor()
         }
     }
 

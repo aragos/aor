@@ -76,40 +76,22 @@ export async function checkLiveMarkerReduction(page, web) {
         assert(command, `A setup command at ${state.game.stage}`);
         await game.send(actor, command);
     }
-    const offer = state.game.markerReductionOffers[0];
-    assert(offer, 'The live engine offers a colored capital marker reduction');
+    const player = state.game.players.find(player => player.id === actor.id);
+    assert(player.boardMarkers < 25, 'The live game still has unused domination markers');
+    assert.deepEqual(state.game.markerReductionOffers, []);
+    assert.equal(state.legalChoices.commands.some(command => command.startsWith('reduce-marker ')), false);
     await page.send('Page.navigate', {url: web + actor.path});
-    await page.wait(`document.querySelector('.marker-reduction')`, 'live reduction controls');
-    await page.evaluate(`document.querySelector('.marker-reduction').open = true`);
-    const select = `document.querySelector('.marker-reduction button').click()`;
-    await page.evaluate(select);
-    await page.wait(`document.querySelector('.reduction-preview')`, 'live reduction preview');
-    assert.match(await page.evaluate(`document.querySelector('.reduction-preview').textContent`),
-        new RegExp(`Income: \\$${offer.incomeBefore} → \\$${offer.incomeAfter}`));
-    assert.equal(await page.evaluate(`document.querySelector('[data-pool-after]').textContent`), String(offer.poolAfter));
-    await page.evaluate(select);
-    await page.wait(`!document.querySelector('.selected-action-confirmation')`, 'toggle off reduction');
-    await page.evaluate(select);
-    await page.evaluate(`document.querySelector('.clear-action').click()`);
-    await page.wait(`!document.querySelector('.selected-action-confirmation')`, 'clear reduction');
-    await page.evaluate(select);
-    const requests = await page.evaluate('document.querySelector(".reduction-preview").textContent');
-    await page.evaluate('new Promise(resolve => setTimeout(resolve, 1200))');
-    assert.equal(await page.evaluate('document.querySelector(".reduction-preview").textContent'), requests,
-        'Live polling preserves the prepared reduction');
-    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-reduction-review.png'), 1280, 900);
-    assert.equal(await page.evaluate(`(() => {
-        const income = document.querySelector('.reduction-income').getBoundingClientRect();
-        const review = document.querySelector('.decision-scroll').getBoundingClientRect();
-        return income.top >= review.top && income.bottom <= review.bottom;
-    })()`), true, 'Income consequences are visible beside confirmation without scrolling');
-    await page.evaluate(`document.querySelector('.selected-action-confirmation').click()`);
-    await page.wait(`!document.querySelector('.selected-action-confirmation')`, 'successful reduction clears its draft');
+    await page.wait(`document.querySelector('.pool-summary')`, 'live expansion controls');
+    assert.equal(await page.evaluate(`document.querySelector('.marker-reduction')`), null,
+        'Voluntary reduction stays hidden while markers remain available');
+    const response = await fetch(`${process.env.MAP_API_URL}/api/games/${game.created.gameId}/commands`, {
+        method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + actor.token},
+        body: JSON.stringify({expectedRevision: state.revision, command: `reduce-marker ${player.capital}`}),
+    });
+    assert.equal(response.status, 422, 'The server rejects an unoffered voluntary reduction');
+    assert.equal((await response.json()).code, 'MARKERS_STILL_AVAILABLE');
     const after = await game.snapshot(actor);
-    const player = after.game.players.find(player => player.id === actor.id);
-    assert.equal(player.poolTokens, offer.poolAfter);
-    assert.equal(player.stockTokens, offer.stockAfter);
-    assert.equal(player.income.ordinary, offer.incomeAfter);
-    assert.equal(after.game.board.find(province => province.id === offer.province).marker, null);
-    console.log('Passed: live marker reduction previews match committed endpoints; polling, toggle, clear and successful cleanup.');
+    assert.equal(after.revision, state.revision, 'Rejection does not append history');
+    assert.deepEqual(after.game.board, state.game.board, 'Rejection leaves all pieces in place');
+    console.log('Passed: live marker reduction is absent below 25 deployed markers; direct requests are rejected without changing board or history.');
 }

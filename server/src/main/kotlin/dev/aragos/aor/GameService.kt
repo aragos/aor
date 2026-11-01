@@ -18,6 +18,7 @@ data class CreatedGame(
     val gameId: String,
     val links: List<PlayerLink>,
     val registered: Boolean = false,
+    val name: GameName = GameName.DEFAULT,
 )
 
 data class PromptView(val messageId: String, val players: List<PlayerId>)
@@ -27,6 +28,7 @@ data class TokenPurchaseQuoteResponse(val revision: Int, val quote: TokenPurchas
 
 data class GameSnapshot(
     val gameId: String,
+    val name: GameName,
     val revision: Int,
     val viewerId: PlayerId,
     val creatorId: PlayerId,
@@ -64,6 +66,7 @@ class GameService(
         names: List<String>,
         rules: RuleOptions = RuleOptions(),
         undoPolicy: UndoPolicy = UndoPolicy.REGULAR_TURN,
+        name: GameName = GameName.DEFAULT,
     ): CreatedGame {
         val normalized = names.map(String::trim)
         if (normalized.map(String::lowercase).distinct().size != normalized.size) {
@@ -90,16 +93,19 @@ class GameService(
                     .encodeToString(ByteArray(32).also(credentialsRandom::nextBytes))
         }
         store.create(
-            driver.create(
-                id = id,
-                header = header,
-                credentials = tokens.mapValues { (_, token) -> digest(token) },
-                rules = rules,
-                undoPolicy = undoPolicy,
-            )
+            driver
+                .create(
+                    id = id,
+                    header = header,
+                    credentials = tokens.mapValues { (_, token) -> digest(token) },
+                    rules = rules,
+                    undoPolicy = undoPolicy,
+                )
+                .copy(name = name)
         )
         return CreatedGame(
             gameId = id,
+            name = name,
             links =
                 players.map { player ->
                     val token =
@@ -121,6 +127,7 @@ class GameService(
         creator: AccountId,
         rules: RuleOptions,
         policy: UndoPolicy,
+        name: GameName = GameName.DEFAULT,
     ): CreatedGame {
         if (
             players.size !in 3..6 ||
@@ -145,10 +152,18 @@ class GameService(
         store.create(
             driver
                 .create(id, header, emptyMap(), rules, policy)
-                .copy(memberships = seats.associate { (seat, account) -> seat to account.id.value })
+                .copy(
+                    name = name,
+                    memberships = seats.associate { (seat, account) -> seat to account.id.value },
+                )
         )
-        val name = header.players.single { it.id == creatorId }.name
-        return CreatedGame(id, listOf(PlayerLink(creatorId, name, "/games/$id")), registered = true)
+        val creatorName = header.players.single { it.id == creatorId }.name
+        return CreatedGame(
+            id,
+            listOf(PlayerLink(creatorId, creatorName, "/games/$id")),
+            registered = true,
+            name = name,
+        )
     }
 
     fun get(id: String, token: String): GameSnapshot = get(id, GameAccess.SeatToken(token))
@@ -362,6 +377,7 @@ class GameService(
             }
         return GameSnapshot(
             gameId = stored.id,
+            name = stored.name,
             revision = stored.revision,
             viewerId = player,
             creatorId = stored.header.creatorId,

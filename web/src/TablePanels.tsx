@@ -1,6 +1,6 @@
 import {useLayoutEffect, useRef} from 'react';
 import type {CommodityPayoutView, PlayerView, PublicCatalog, Snapshot} from './api';
-import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
+import {PlayerLabel, PlayerLabels} from './IdentityLabel';
 import {advanceName, label, playerName, provinceName} from './labels';
 import {t} from './messages';
 import {TableIcon} from './TableIcon';
@@ -108,9 +108,9 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span>
                         <span className="player-advance-count" title={t('game.advances')} aria-label={`${t('game.advances')}: ${player.advances.length}`}><TableIcon kind="advances"/> <b>{player.advances.length}</b></span></span>
-                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')} inline/></span>
+                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')}/></span>
                         <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
-                        <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')} inline/></span></span>
+                        <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')}/></span></span>
                     <span className="player-status-row">
                         {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
                         {!finished && <span className="player-status">{status}</span>}
@@ -143,11 +143,6 @@ export function CommodityAdjustments({payout}: {payout: CommodityPayoutView}) {
     })}</span>;
 }
 
-export function PayoutReference({snapshot, payout}: {snapshot: Snapshot; payout: CommodityPayoutView}) {
-    if (!snapshot.game.catalog) return null;
-    return <HelpLink topic={`commodity-${payout.commodity.toLowerCase()}`} label={t('table.fullPayouts')} inline/>;
-}
-
 export function CommodityValueNote({snapshot}: {snapshot: Snapshot}) {
     return snapshot.game.board.some(province => province.marker?.side === 'WHITE')
         ? <p className="small muted commodity-value-note">{t('table.currentCommodityControl')}</p> : null;
@@ -173,22 +168,14 @@ export function UnplayedLeaders({snapshot, advance}: {snapshot: Snapshot; advanc
 }
 
 export function Markets({snapshot}: {snapshot: Snapshot}) {
-    const {selectedAction, setSelectedAction} = useMapSelection();
     return <section className="markets-workspace" aria-label={t('table.markets')}>
         <CommodityValueNote snapshot={snapshot}/>
-        <div className="market-grid">{snapshot.game.commodityPayouts.map(payout => <details className="market-tile" data-commodity={payout.commodity} key={payout.commodity}>
-            <summary><Commodity commodity={payout.commodity}/>
-                <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/></summary>
-            <div className="market-detail">{snapshot.legalChoices.commands.filter(command => command.startsWith(`cancel-adjustment ${payout.commodity.toLowerCase()} `) ||
-                (payout.commodity === 'IVORY' && command.startsWith('cancel-adjustment gold '))).map(command => <button type="button" className="secondary" key={command} aria-pressed={selectedAction === command} onClick={() => setSelectedAction(command)}>{t('action.cancel')} {label(command.split(' ')[2].toUpperCase(), 'adjustment')}</button>)}{payout.owners.map(owner => <div key={owner.player}>
-                <strong><PlayerLabel snapshot={snapshot} id={owner.player}/> · ${owner.payout}</strong>
-                <p>{t('table.markets')}: {owner.marketCount} · {t('table.payoutBox')}: {owner.effectiveBox}</p>
-                <p>{owner.provinces.map((id, index) => <span key={id}>{index > 0 && ', '}<ProvinceLabel snapshot={snapshot} id={id}/></span>)}</p>
-                {owner.industryBonus > 0 && <p>{advanceName('industry')}: +{owner.industryBonus} {t('table.payoutBox')}</p>}
-            </div>)}{payout.owners.length === 0 && <p>{t('table.noOwners')}</p>}
-                <PayoutReference snapshot={snapshot} payout={payout}/>
-            </div>
-        </details>)}</div>
+        <div className="market-grid">{snapshot.game.commodityPayouts.map(payout => <article className="market-tile" data-commodity={payout.commodity} key={payout.commodity}>
+            <span className="market-name"><Commodity commodity={payout.commodity}/>
+                <HelpLink topic={`commodity-${payout.commodity.toLowerCase()}`}
+                    label={`${label(payout.commodity, 'commodity')} · ${t('table.fullPayouts')}`}/></span>
+            <CommodityAdjustments payout={payout}/><Payouts snapshot={snapshot} payout={payout}/>
+        </article>)}</div>
     </section>;
 }
 
