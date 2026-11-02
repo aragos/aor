@@ -117,7 +117,7 @@ export async function checkReferenceUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-detail .close-detail')`), null, 'Expanded player has no overlapping close button');
     await page.send('Page.navigate', {url:web+'/'});
     await page.wait(`document.querySelector('#variant-map')`, 'Variant help controls');
-    assert.equal(await page.evaluate(`document.querySelector('#variant-map button:first-child').textContent`),'Standard map');
+    assert.equal(await page.evaluate(`document.querySelector('#variant-map button:first-child').textContent`),'Original map');
     assert.equal(await page.evaluate(`document.querySelector('#variant-label-map [data-help-topic="variant-map"]').getAttribute('aria-haspopup')`),'dialog');
     const namesBefore = await page.evaluate(`document.querySelector('textarea').value`);
     await page.evaluate(`document.querySelector('#variant-label-map [data-help-topic="variant-map"]').click()`);
