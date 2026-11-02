@@ -6,7 +6,7 @@ RUN npm ci --ignore-scripts
 COPY web ./web
 RUN npm run build
 
-FROM eclipse-temurin:21-jdk-noble AS server
+FROM eclipse-temurin:23-jdk-noble AS server
 WORKDIR /build
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
@@ -15,7 +15,7 @@ COPY server ./server
 RUN ./gradlew --no-daemon -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8" \
     -Pkotlin.compiler.execution.strategy=in-process :server:installDist
 
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:23-jre-noble
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 aor && useradd --uid 10001 --gid 10001 --no-create-home aor
