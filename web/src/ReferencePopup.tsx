@@ -89,6 +89,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                     <li className="payout-box" key={markers} aria-label={t('reference.income-space', {markers, amount})}>
                         <span>{markers}</span><strong>${amount}</strong>
                     </li>)}</ol>
+                {catalog && <p>{t('reference.income-example', {markers: 3, amount: catalog.incomeTrack[3]})}</p>}
                 <p>{t('reference.income-modifiers')}</p>
             </section>}
             {topic === 'misery-track' && <section id="misery-track"><h2>{t('reference.misery-track')}</h2>

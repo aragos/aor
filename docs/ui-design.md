@@ -67,7 +67,9 @@ choice and understand its result through visual controls and commands, on deskto
 
 ## Current table contracts
 
-- Expanded player details float below their summary without changing the player strip or map height.
+- Player boxes share the smallest equal height that fits the tallest summary, including across
+  wrapped rows and in the phone Players workspace. They shrink together when status rows disappear.
+  Expanded player details float below their summary without changing the player strip or map height.
   They omit the repeated player name and show written cash, tokens, deployed markers, and owned
   advances. Toggle them through the summary, without an overlapping close button. Explicitly say when
   no advances are owned. Keep income only in the summary, with a question mark beside its symbol
@@ -80,7 +82,10 @@ choice and understand its result through visual controls and commands, on deskto
   and available pool tokens on one wrapping row.
 - Undo stays at the upper right of the action panel, outside its scrolling review. All final actions,
   including Pass, occupy one pinned footer. Draft choices and inputs stay with their consequences;
-  opening inspection or scrolling cannot move confirmation away. Keep native form validation and
+  the full-width turn-status box, heading and resource summaries scroll with the review. Long phone
+  action panes may use up to 55% of the viewport height; avoid reserving most of that space for fixed
+  headings or stacking three footer actions when two can share a row.
+  Opening inspection or scrolling cannot move confirmation away. Keep native form validation and
   Enter submission intact. Number inputs ignore mouse-wheel changes while retaining focus,
   typing and arrow-key adjustment. Focusing a zero-valued number input clears it for immediate
   entry; preserve nonzero drafts. One action plus Pass uses a joined two-button control with a single

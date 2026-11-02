@@ -84,7 +84,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
         const a = order.indexOf(first.id), b = order.indexOf(second.id);
         return (a < 0 ? Infinity : a) - (b < 0 ? Infinity : b);
     });
-    return <section className="player-overview" aria-label={t('game.table')}>
+    return <section className="player-overview" aria-label={t('game.table')}><div className="player-summary-grid">
         {players.map(player => {
             const active = snapshot.prompt?.players.includes(player.id);
             const submitted = snapshot.submitted.includes(player.id);
@@ -111,7 +111,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                             <HelpLink topic="turn-order" label={t('reference.turnOrder')}/></span>
                     </span>}
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
-                        <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/><HelpLink topic="income-track" label={t('reference.income-track')}/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span>
+                        <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b><HelpLink topic="income-track" label={t('reference.income-track')}/></span>
                         <span className="player-advance-count" title={t('game.advances')} aria-label={`${t('game.advances')}: ${player.advances.length}`}><TableIcon kind="advances"/> <b>{player.advances.length}</b></span></span>
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')}/></span>
                         <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
@@ -127,7 +127,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                 </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
             </details>;
         })}
-    </section>;
+    </div></section>;
 }
 
 export function Payouts({snapshot, payout}: {snapshot: Snapshot; payout: CommodityPayoutView}) {

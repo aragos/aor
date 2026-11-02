@@ -1,6 +1,7 @@
 import {checkTurnOrder} from './turnOrder.browser.mjs';
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
 import {checkMobileTable} from './mobileTable.browser.mjs';
+import {checkExpansionLayout} from './expansionLayout.browser.mjs';
 import {checkMainView} from './mainView.browser.mjs';
 import {checkLiveMiseryRelief} from './miseryRelief.browser.mjs';
 import {checkGameNaming} from './gameNaming.browser.mjs';
@@ -536,6 +537,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkMapViewport(page, web, after);
     await checkCommodityMap(page, web, after);
     await checkMobileTable(page, web, after);
+    await checkExpansionLayout(page, web, after);
     await checkPurchaseClarity(page, web, after);
     await checkSpectator(page, web, after);
     await checkLiveCommodityValues(page, web, after);

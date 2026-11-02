@@ -5,6 +5,21 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
+The 2026-11-02 expansion layout checks pass the web build, all 55 web unit tests and focused
+StrictMode browser checks (`aor-browser-artifacts-qHrmfY`). Six-player fixtures cover equal summary
+heights at desktop, wrapped-tablet and phone widths, shrinking after status/pool removal, and floating
+details that leave those heights unchanged. They verify matching status/pool widths and the active
+game's marker-to-income help, including its example. At 390×844 and 320×640, long military reviews
+scroll their headings away while Undo and confirmation stay pinned; expanded hands retain map and
+review space. Neighboring card/purchase flows, native validation/Enter, help navigation, polling and
+rejection also pass. A live 320×640 placement after scrolling verifies the pinned control, recorded
+marker, authoritative pool balance and accepted-draft cleanup. Reviewed desktop and phone captures show aligned
+player boxes, readable placement/income consequences and readable income reference boxes. These
+are emulated browser observations, not a physical-phone accessibility review.
+The isolated main integration repeats the web build, all 55 unit tests and the focused browser
+checks against the current main server (`aor-browser-artifacts-AlCGFx`), retaining the turn-order
+reference and other previously integrated features.
+
 The 2026-10-29 checks cover integrated core JVM, Kotlin/JS, server and formatting checks, web
 build/unit tests, and the comprehensive browser suite, including private-seat, hosted and live
 European-map flows. Presentation fixtures use production StrictMode. The live Crusades regression
