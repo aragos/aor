@@ -29,6 +29,11 @@ This file retains operational checks and deferred work.
 
 ## Later maintenance
 
+Investigate the HTTP I/O error boundary attempting a second response after headers are committed.
+The dependency-integration browser run and preceding main CI both logged this during navigation.
+Preserve storage-failure responses before commitment while allowing already-started responses to
+terminate without another JSON reply. The existing broad I/O catch masks the original exception.
+
 Strategy controllers and plans spanning future phases remain deferred. Version-2 histories require an explicit,
 validated mapping before a version-3 upgrade; do not remove the administrative continuity rejection
 or add an automatic legacy decoder to make an old file appear current.

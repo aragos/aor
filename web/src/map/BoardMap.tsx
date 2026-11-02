@@ -264,7 +264,7 @@ function LoadedBoardMap({snapshot, busy, geometry}: BoardMapProps & {geometry: G
     };
     const zoom = (factor: number) => setView(current => zoomView(current, factor));
     const fit = () => setView(fitMapView(bounds, mapSize ?? {width: bounds.w, height: bounds.h}));
-    const wheelGesture = useRef<(event: WheelEvent) => void>();
+    const wheelGesture = useRef<(event: WheelEvent) => void>(undefined);
     wheelGesture.current = event => {
         const rect = svg.current?.getBoundingClientRect();
         if (!rect || rect.width <= 0 || rect.height <= 0) return;

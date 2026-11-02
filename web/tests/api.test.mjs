@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFile} from 'node:fs/promises';
-import ts from 'typescript';
+import {transformWithOxc} from 'vite';
 
 const source = await readFile(new URL('../src/api.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2020}}).outputText;
+const {code: compiled} = await transformWithOxc(source, 'api.ts');
 const {ApiError,request,requestSnapshot,setAuthentication} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 
 test('rejections retain diagnostic objects and reject malformed arguments', async () => {

@@ -38,7 +38,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
     const [expanded, setExpanded] = useState(false);
     const [needsExpansion, setNeedsExpansion] = useState(false);
     const hand = useRef<HTMLElement>(null);
-    const measureOverflow = useRef<() => void>();
+    const measureOverflow = useRef<() => void>(undefined);
     const compactScroll = useRef(0);
     const expandedScroll = useRef(0);
     const previousExpanded = useRef(false);

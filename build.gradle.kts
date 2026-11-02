@@ -8,11 +8,12 @@ plugins {
     alias(libs.plugins.ktor) apply false
 }
 
-val kotlinFormatter by configurations.creating {
-    attributes {
-        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.SHADOWED))
+val kotlinFormatter =
+    configurations.create("kotlinFormatter") {
+        attributes {
+            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.SHADOWED))
+        }
     }
-}
 
 dependencies {
     kotlinFormatter(libs.ktfmt)

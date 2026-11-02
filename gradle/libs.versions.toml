@@ -1,8 +1,8 @@
 [versions]
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 ktor = "3.6.0"
-logback = "1.6.5"
-jackson = "2.21.1"
+logback = "1.6.6"
+jackson = "2.22.4"
 ktfmt = "0.64"
 truth = "1.4.5"
 collectionsImmutable = "0.5.2"
@@ -11,7 +11,7 @@ postgresql = "42.7.14"
 hikari = "7.1.0"
 flyway = "13.11.1"
 embeddedPostgres = "2.2.2"
-postgresBinaries = "18.3.0"
+postgresBinaries = "18.6.0"
 
 [libraries]
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }

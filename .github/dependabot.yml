@@ -15,6 +15,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Java 24 and Node 25 are EOL; leave supported major upgrades available.
+    ignore:
+      - dependency-name: eclipse-temurin
+        versions: ["~> 24.0"]
+      - dependency-name: node
+        versions: ["~> 25.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
