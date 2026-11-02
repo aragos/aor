@@ -223,6 +223,14 @@ choice and understand its result through visual controls and commands, on deskto
   loading or polling another player's result does not create an action notice.
   Competition receipts and suspended requests belong to that turn's Expansion and expire when it
   ends, including outcomes first received with the phase transition. Keep the activity entry.
+- Reference tracks highlight all players at their public current positions using capital silhouettes,
+  with the viewer outlined and shared positions retaining every marker. Income uses deployed markers;
+  commodity tracks use the current effective payout box, including zero and boxes beyond ten when
+  occupied. Misery includes Chaos and shipping includes no ships. Open popups follow accepted polling
+  without disturbing drafts. Commodity help shows the number newly introduced in each configured epoch
+  and public unplayed circulation since the last epoch shuffle. Include held cards and private discards;
+  exclude future epochs and public plays, restoring recycled cards on the next shuffle. A shared card
+  counts for each commodity it offers, regardless of which choice was played.
 - Commodities lists every printed commodity from setup, before there are owner payout forecasts.
   Live owner forecasts begin with the first turn.
   Commodity cards show shortage/surplus badges. Commodities and selected commodity cards offer

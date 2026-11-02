@@ -80,7 +80,7 @@ export async function checkReferenceUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup nav button').length`), 12);
     await choose('Stone');
     await page.wait(`document.querySelector('#commodity-stone .payout-box')`, 'Requested payout popup');
-    assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup .payout-box').length`), 10);
+    assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup .payout-box:not([data-track-box="0"])').length`), 10);
     assert.equal(await page.evaluate(`document.querySelector('.reference-popup .card-event-text, .reference-popup .advance-benefits, #advances, #card-charlemagne')`), null, 'Reference omits duplicated card and advance catalogs');
     assert.equal(await page.evaluate('location.href'), gameLocationBeforeHelp, 'Reference stays inside the game');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS,'aor-help-popup-desktop.png'),1280,900);

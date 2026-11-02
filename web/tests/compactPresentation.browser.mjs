@@ -75,7 +75,7 @@ export async function checkCompactPresentation(page, web, baseline) {
         assert.equal(await page.evaluate('document.title'), title, 'Help preserves the game title');
         await show({revision: revision + 1});
         assert.equal(await page.evaluate(`document.querySelector('.card-decision .target-choices [aria-pressed=true]').textContent`), choice, 'Reference polling preserves the commodity draft');
-        assert.equal(await page.evaluate(`document.querySelectorAll('.reference-dialog .payout-box').length`), 10, 'Only the requested commodity track is shown');
+        assert.equal(await page.evaluate(`document.querySelectorAll('.reference-dialog .payout-box:not([data-track-box="0"])').length`), 10, 'Only the requested commodity track is shown');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-reference-popup-${width}.png`));
         await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27});
         await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27});

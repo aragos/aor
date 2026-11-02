@@ -1,6 +1,6 @@
 import {useContext} from 'react';
 import type {PublicCatalog} from './api';
-import {ReferenceOrderContext} from './HelpLink';
+import {ReferenceGameContext} from './HelpLink';
 import {CapitalLabel} from './IdentityLabel';
 import {provinceName} from './labels';
 import {t} from './messages';
@@ -12,7 +12,7 @@ export function greenDieFaces(faces: number[]): string {
 }
 
 export function TurnOrderReference({catalog}: {catalog: PublicCatalog}) {
-    const current = useContext(ReferenceOrderContext);
+    const current = useContext(ReferenceGameContext);
     const resolved = !!current?.turnOrder.length;
     return <section id="turn-order">
         <h2>{t('reference.turnOrder')}</h2>

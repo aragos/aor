@@ -25,7 +25,7 @@ import type {QuotePlan, WritePlan} from './ActivityPlanner';
 import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
-import {ReferenceCatalogContext, ReferenceOrderContext} from './HelpLink';
+import {ReferenceCatalogContext, ReferenceGameContext} from './HelpLink';
 import {useStoredSetting} from './preferences';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
@@ -180,9 +180,10 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             open={commandsOpen} onToggle={setCommandsOpen}/>}
     </div>;
     return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
-        <ReferenceOrderContext.Provider value={{viewerId: snapshot.viewerId,
-            players: snapshot.game.players, turnOrder: snapshot.game.turnOrder,
-            orderBoxes: snapshot.game.orderBoxes}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
+        <ReferenceGameContext.Provider value={{viewerId: liveSnapshot.viewerId,
+            players: liveSnapshot.game.players, turnOrder: liveSnapshot.game.turnOrder,
+            orderBoxes: liveSnapshot.game.orderBoxes, commodityCards: liveSnapshot.game.commodityCards,
+            commodityPayouts: liveSnapshot.game.commodityPayouts}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
@@ -301,5 +302,5 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>
             <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
         </CardInspectionDialog>}
-    </main></ReferenceOrderContext.Provider></ReferenceCatalogContext.Provider>;
+    </main></ReferenceGameContext.Provider></ReferenceCatalogContext.Provider>;
 }

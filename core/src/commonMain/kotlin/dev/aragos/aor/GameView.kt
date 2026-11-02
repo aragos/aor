@@ -110,6 +110,7 @@ data class GameView(
     /** Missing printed access advances for this viewer; independent of phase, routes, and ships. */
     val lockedProvinces: Set<ProvinceId> = emptySet(),
     val commodityPayouts: List<CommodityPayoutView> = emptyList(),
+    val commodityCards: List<CommodityCardCountView> = emptyList(),
     val cardOffers: List<CardOfferView> = emptyList(),
     val cardInspections: List<CardInspectionView> = emptyList(),
     val tokenPurchaseOffers: List<TokenPurchaseOfferView> = emptyList(),
@@ -232,6 +233,7 @@ data class GameView(
                     viewer?.let { ExpansionProjection.reductions(state, it) }.orEmpty(),
                 expansionInspections = expansionInspections,
                 commodityPayouts = CommodityPayoutView.from(state),
+                commodityCards = CommodityCardCountView.from(state),
                 cardOffers = viewer?.let { CardProjection.offers(state, it) }.orEmpty(),
                 cardInspections = CardProjection.inspections(state, viewer),
                 tokenPurchaseOffers =
@@ -421,6 +423,8 @@ data class PublicCatalog(
     val orderTrack: List<OrderBoxView>,
     /** Recorded catalog identity also selects the matching browser geometry. */
     val dataVersion: String = DATA_VERSION,
+    /** Counts of newly introduced commodity cards for each configured epoch. */
+    val commodityCards: List<CommodityCardCountView> = emptyList(),
 ) {
     companion object {
         fun forPlayers(
@@ -452,6 +456,10 @@ data class PublicCatalog(
                     )
                 },
                 dataVersion = version.wireValue,
+                commodityCards =
+                    configuration.commodities.map { commodity ->
+                        CommodityCardCountView(commodity.id, commodity.cardsByEpoch(rules))
+                    },
             )
         }
     }

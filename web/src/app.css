@@ -385,10 +385,9 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .reference-popup article { margin-block: 1rem; }
 .reference-legend { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; }
 .reference-legend > span { display: inline-flex; gap: .5rem; align-items: center; }
-.reference-popup .payout-boxes { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.reference-popup .payout-boxes { grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); }
 .reference-popup .payout-box strong { font-size: .85rem; }
 @media (max-width: 700px) {
-    .reference-popup .payout-boxes { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .map-zoom { gap: .35rem; }
 }
 
@@ -557,3 +556,13 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .order-track .is-viewer { background: #edf2e7; }
 .order-track-player { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; font-size: .85rem; }
 .order-track-player small { font-weight: 400; color: #52644d; }
+
+.commodity-card-counts { display: flex; gap: 1.5rem; margin: .75rem 0; }
+.commodity-card-counts dt { font-size: .85rem; }
+.commodity-card-counts dd { margin: .2rem 0 0; font-weight: 700; }
+.reference-note { font-size: .85rem; color: #52644d; }
+.reference-track li.is-current { background: #e3edd9; border-color: #668659; }
+.reference-track-players { display: flex; flex-wrap: wrap; justify-content: center; gap: .15rem; margin-top: .2rem; }
+.reference-track-player { display: inline-flex; padding: 2px; border-radius: 4px; }
+.reference-track-player.is-viewer { outline: 1px solid #245c50; background: #fffef8; }
+.reference-track-player .identity-label { gap: 0; }

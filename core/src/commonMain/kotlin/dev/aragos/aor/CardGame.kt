@@ -177,6 +177,8 @@ object CardGame {
         val recorded =
             if (resolution is CardResolution.LeaderPlay) {
                 committed.copy(playedLeaders = committed.playedLeaders + resolution.leader.leader)
+            } else if (card.definition.kind == CardKind.COMMODITY) {
+                committed.copy(playedCommodities = committed.playedCommodities + card.definition.id)
             } else {
                 committed
             }
