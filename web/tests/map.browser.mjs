@@ -1,3 +1,4 @@
+import {checkTurnOrder} from './turnOrder.browser.mjs';
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
 import {checkMobileTable} from './mobileTable.browser.mjs';
 import {checkMainView} from './mainView.browser.mjs';
@@ -636,6 +637,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkLiveMarkerReduction(page,web);
     await checkBidWithdrawal(page,web);
     await checkTokenPurchaseRound(page,web);
+    await checkTurnOrder(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

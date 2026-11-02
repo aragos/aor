@@ -48,6 +48,7 @@ class ExpansionInspectionSerializationTest {
             header = GameHeader(players, p1),
             stage = Stage.EXPANSION,
             turnNumber = 2,
+            turnOrderSelection = TurnOrderSelection(players.map(Player::id)),
             flow = TurnFlow(actor = p1, phaseStarted = true),
             players =
                 players

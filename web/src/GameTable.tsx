@@ -24,7 +24,7 @@ import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
 import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
-import {ReferenceCatalogContext} from './HelpLink';
+import {ReferenceCatalogContext, ReferenceOrderContext} from './HelpLink';
 import {useStoredSetting} from './preferences';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
@@ -166,7 +166,10 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
             open={commandsOpen} onToggle={setCommandsOpen}/>}
     </div>;
-    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
+    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
+        <ReferenceOrderContext.Provider value={{viewerId: snapshot.viewerId,
+            players: snapshot.game.players, turnOrder: snapshot.game.turnOrder,
+            orderBoxes: snapshot.game.orderBoxes}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
@@ -286,5 +289,5 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>
             <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
         </CardInspectionDialog>}
-    </main></ReferenceCatalogContext.Provider>;
+    </main></ReferenceOrderContext.Provider></ReferenceCatalogContext.Provider>;
 }

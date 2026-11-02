@@ -193,6 +193,17 @@ choice and understand its result through visual controls and commands, on deskto
   Maintain separate full inspection evaluations so selecting an omitted destination still explains
   pool/shipping limits, missing access, no route or existing control. Candidate highlights and
   enabled controls use feasible commitments, including legal partial placements.
+- Turn-order reference is a printed-track lookup, linked by a visible **Turn order & green die**
+  control beside token purchases and unresolved ties, a footnote beside each resolved player box,
+  and the competition's green-die consequence. The shared topic stays in the reference chooser.
+  Pending order shows positions and boxes for the starting player count without capital assignments;
+  resolved order adds capital silhouettes, names and a distinct viewer row. Player summaries retain
+  position and printed box separately from **You**, and omit misleading capital-order position
+  numbers while this turn's order is unresolved. Live order changes update an open lookup.
+  Competition shows engine-projected winning green faces, including Proselytism and defender Chaos;
+  an empty set explicitly says green cannot win. The lookup explains the independent black/white
+  route to victory and tie modifiers without adding a general rules section. Opening or closing it
+  preserves bid and attack drafts; keyboard dismissal restores focus to a surviving trigger.
 - Expansion uses one compact pool summary with current → projected balances while reviewing a
   placement. Keep commitment, outcome and income beside confirmation; omit repeated action headings.
   Competition omits the generic dice disclaimer. Whenever an offered route uses shipping, show

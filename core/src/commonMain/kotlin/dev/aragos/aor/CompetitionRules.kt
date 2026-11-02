@@ -85,6 +85,19 @@ data class CompetitionResolution(
 )
 
 object CompetitionRules {
+    /** Green die faces that independently win a competition from this printed box (1 through 6). */
+    fun greenWinningRolls(orderBox: Int, proselytism: Boolean = false): List<Int> =
+        (1..6).filter { roll -> roll > orderBox || (proselytism && roll == orderBox) }
+
+    /** Chaos defenders disable the attacker's advance benefit, including green-die ties. */
+    fun proselytismApplies(
+        context: BoardRulesContext,
+        attacker: PlayerId,
+        defenders: Set<PlayerId>,
+    ): Boolean =
+        AdvanceId.PROSELYTISM in context.player(attacker).advances &&
+            defenders.none { defender -> context.player(defender).chaos }
+
     fun requirement(
         context: BoardRulesContext,
         attacker: PlayerId,
@@ -186,15 +199,12 @@ object CompetitionRules {
     ): CompetitionResolution {
         validatePending(context, plan)
         checkRule(orderBox in 1..6, ViolationCode.INVALID_OUTCOME)
-        val proselytism =
-            AdvanceId.PROSELYTISM in context.player(plan.player).advances &&
-                plan.defenders.none { defender -> context.player(defender).chaos }
+        val proselytism = proselytismApplies(context, plan.player, plan.defenders)
         val attackerWon =
             roll.black.value > roll.white.value ||
                 (roll.black.value == roll.white.value &&
                     plan.breakdown.offensiveMilitary.isNotEmpty()) ||
-                roll.green.value > orderBox ||
-                (proselytism && roll.green.value == orderBox)
+                roll.green.value in greenWinningRolls(orderBox, proselytism)
         return outcome(context, plan, attackerWon)
     }
 

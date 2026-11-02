@@ -26,6 +26,14 @@ export async function checkSpectator(page, web, baseline) {
         'Spectators have no private hand, seat controls, commands, undo, action form or own-player marker');
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-summary').length`), baseline.game.players.length,
         'All public player summaries remain visible');
+    if (baseline.game.turnOrder.length) {
+        await page.evaluate(`document.querySelector('.player-turn-order .help-link').click()`);
+        await page.wait(`document.querySelector('#turn-order .order-track')`, 'spectator turn-order reference');
+        assert.equal(await page.evaluate(`document.querySelectorAll('#turn-order .order-track-player').length`), baseline.game.players.length);
+        assert.equal(await page.evaluate(`document.querySelectorAll('#turn-order .is-viewer').length`), 0,
+            'Public turn-order reference has no own-player marker');
+        await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+    }
     const favicon = await page.evaluate(`document.querySelector('link[rel=icon]').href`);
     assert.match(await fetch(favicon).then(response => response.text()), /#777/, 'Spectator favicon remains grayscale');
     if (baseline.prompt) {

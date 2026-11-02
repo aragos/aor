@@ -172,6 +172,103 @@ class ExpansionInspectionProjectionTest {
             .isEmpty()
     }
 
+    @Test
+    fun competitionProjectsPrintedBoxRatherThanTurnPosition() {
+        val before = state(board = BoardState().placeMarker(florence, p2).board)
+
+        val offer = before.viewForPlayer(p1).expansionOffers.single { it.destination == florence }
+
+        assertThat(offer.greenDieWins).containsExactly(3, 4, 5, 6).inOrder()
+    }
+
+    @Test
+    fun proselytismAddsGreenTiesToTheCompetitionPreview() {
+        val before =
+            state(
+                advances = listOf(AdvanceId.PROSELYTISM),
+                board = BoardState().placeMarker(florence, p2).board,
+            )
+
+        val offer = before.viewForPlayer(p1).expansionOffers.single { it.destination == florence }
+
+        assertThat(offer.greenDieWins).containsExactly(2, 3, 4, 5, 6).inOrder()
+    }
+
+    @Test
+    fun aChaosDefenderRemovesProselytismFromTheCompetitionPreview() {
+        val initial =
+            state(
+                advances = listOf(AdvanceId.PROSELYTISM),
+                board = BoardState().placeMarker(florence, p2).board,
+            )
+        val before = initial.updatePlayer(p2) { player -> player.copy(misery = MiseryStep.CHAOS) }
+
+        val offer = before.viewForPlayer(p1).expansionOffers.single { it.destination == florence }
+
+        assertThat(offer.greenDieWins).containsExactly(3, 4, 5, 6).inOrder()
+    }
+
+    @Test
+    fun movingLastRemovesAllStandardGreenWinningFaces() {
+        val initial = state(board = BoardState().placeMarker(florence, p2).board)
+        val before = initial.copy(turnOrderSelection = TurnOrderSelection(listOf(p2, p3, p1)))
+
+        val offer = before.viewForPlayer(p1).expansionOffers.single { it.destination == florence }
+
+        assertThat(offer.greenDieWins).isEmpty()
+    }
+
+    @Test
+    fun peacefulPlacementsDoNotProjectCompetitionDice() {
+        val view = state().viewForPlayer(p1)
+
+        assertThat(view.expansionInspections.single { it.destination == florence }.greenDieWins)
+            .isNull()
+    }
+
+    @Test
+    fun projectedGreenFacesAgreeWithRecordedCompetitionOutcomes() {
+        for (proselytism in listOf(false, true)) {
+            for (chaos in listOf(false, true)) {
+                for (order in listOf(listOf(p1, p2, p3), listOf(p2, p1, p3), listOf(p2, p3, p1))) {
+                    val initial =
+                        state(
+                            advances =
+                                if (proselytism) listOf(AdvanceId.PROSELYTISM) else emptyList(),
+                            board = BoardState().placeMarker(florence, p2).board,
+                        )
+                    val before =
+                        initial.copy(turnOrderSelection = TurnOrderSelection(order)).updatePlayer(
+                            p2
+                        ) { player ->
+                            player.copy(
+                                misery = if (chaos) MiseryStep.CHAOS else MiseryStep.entries.first()
+                            )
+                        }
+                    val winningFaces =
+                        before
+                            .viewForPlayer(p1)
+                            .expansionOffers
+                            .single { it.destination == florence }
+                            .greenDieWins
+                            .orEmpty()
+                    for (green in 1..6) {
+                        val after =
+                            before
+                                .step(TextCodec.parse("p1: attack florence"))
+                                .step(TextCodec.parse("!roll competition 6 1 $green"))
+
+                        assertThat(
+                                after.board.pieces[florence] ==
+                                    ProvincePieces.Marker(p1, PieceSide.WHITE)
+                            )
+                            .isEqualTo(green in winningFaces)
+                    }
+                }
+            }
+        }
+    }
+
     private fun state(
         pool: Int = 20,
         ships: ShippingCapability = ShippingCapability.NONE,
