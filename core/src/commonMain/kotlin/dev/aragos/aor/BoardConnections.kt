@@ -234,7 +234,7 @@ object BoardConnectionData {
             coast("edinburgh", "shetland-islands", "armagh", "chester", "york")
             coast("armagh", "waterford", "chester", "wales")
             coast("waterford", "wales")
-            coast("chester", "wales")
+            coast("chester", "wales", "portsmouth")
             coast("wales", "cornwall")
             coast("cornwall", "portsmouth", "chester")
             coast("portsmouth", "london", "paris", "st-malo")

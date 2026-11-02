@@ -104,6 +104,19 @@ for neighbor in ["wales", "chester", "portsmouth"]:
 assert land["cornwall"].boundary.buffer(0.03).intersection(land["portsmouth"].boundary).length > 20, (
     "Portsmouth must remain Cornwall's only land neighbor."
 )
+bristol_channel = box(680, 575, 765, 655)
+for first, second in [
+    ("cornwall", "chester"),
+    ("chester", "portsmouth"),
+    ("cornwall", "portsmouth"),
+]:
+    shared_border = water[first].boundary.buffer(0.03).intersection(water[second].boundary)
+    assert shared_border.intersection(bristol_channel).length > 16, (
+        f"{first} and {second} must share a visible coastal border inside the Bristol Channel."
+    )
+assert land["chester"].boundary.buffer(0.03).intersection(land["portsmouth"].boundary).length > 20, (
+    "Widening the Bristol Channel must preserve the Chester–Portsmouth land crossing."
+)
 assert seas["BAY_OF_BISCAY"].boundary.buffer(0.03).intersection(water["edinburgh"].boundary).length >= 100, (
     "Edinburgh must share a broad, visible frontage with the Bay of Biscay."
 )

@@ -135,7 +135,7 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | edinburgh | shetland-islands, armagh, chester, york | N |
 | armagh | waterford, chester, wales | N; user correction 2026-10-27: Wales contact |
 | waterford | wales | N |
-| chester | wales | N |
+| chester | wales, portsmouth | N; user correction 2026-11-02: Portsmouth coastal contact |
 | wales | cornwall | N |
 | cornwall | portsmouth, chester | N; user correction 2026-11-02: Chester coastal contact |
 | portsmouth | london, paris, st-malo | N + Errata; user correction 2026-10-26 |

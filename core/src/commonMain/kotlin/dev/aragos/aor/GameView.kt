@@ -426,7 +426,7 @@ data class PublicCatalog(
         fun forPlayers(
             playerCount: Int,
             rules: RuleOptions = RuleOptions(),
-            version: CatalogVersion = CatalogVersion.CATALOG_14,
+            version: CatalogVersion = CatalogVersion.CATALOG_15,
         ): PublicCatalog {
             val configuration = CatalogConfiguration(playerCount, rules, version)
             return PublicCatalog(

@@ -58,6 +58,26 @@ class CornwallConnectionsTest {
     }
 
     @Test
+    fun chesterAndPortsmouthConnectInOneCoastalStepOnBothMaps() {
+        for (map in MapRule.entries) {
+            for ((base, destination) in
+                listOf("chester" to "portsmouth", "portsmouth" to "chester")) {
+                val context = context(map, base, ShippingCapability.GALLEY_2)
+                val origin = ProvinceId(base)
+                val target = ProvinceId(destination)
+
+                assertThat(ExpansionReach.routesTo(context, player, target))
+                    .contains(
+                        ExpansionRoute.Shipping(
+                            origin,
+                            listOf(ShippingSpace.Coast(origin), ShippingSpace.Coast(target)),
+                        )
+                    )
+            }
+        }
+    }
+
+    @Test
     fun catalog13RetainsEveryPreviousMapFactForReplayAndContinuedPlay() {
         for (map in MapRule.entries) {
             val current = CatalogConfiguration(6, RuleOptions(map = map)).map
@@ -71,7 +91,30 @@ class CornwallConnectionsTest {
                                 ProvinceConnection.of(ProvinceId("wales"), cornwall),
                         coastalConnections =
                             current.coastalConnections -
-                                ProvinceConnection.of(cornwall, ProvinceId("chester")),
+                                ProvinceConnection.of(cornwall, ProvinceId("chester")) -
+                                ProvinceConnection.of(
+                                    ProvinceId("chester"),
+                                    ProvinceId("portsmouth"),
+                                ),
+                    )
+                )
+        }
+    }
+
+    @Test
+    fun catalog14RetainsEveryPreviousMapFactForReplayAndContinuedPlay() {
+        for (map in MapRule.entries) {
+            val current = CatalogConfiguration(6, RuleOptions(map = map)).map
+
+            assertThat(CatalogVersion.CATALOG_14.mapDefinition(map))
+                .isEqualTo(
+                    current.copy(
+                        coastalConnections =
+                            current.coastalConnections -
+                                ProvinceConnection.of(
+                                    ProvinceId("chester"),
+                                    ProvinceId("portsmouth"),
+                                )
                     )
                 )
         }
@@ -100,7 +143,7 @@ class CornwallConnectionsTest {
         map: MapRule,
         base: String,
         ships: ShippingCapability = ShippingCapability.NONE,
-        version: CatalogVersion = CatalogVersion.CATALOG_14,
+        version: CatalogVersion = CatalogVersion.CATALOG_15,
     ): BoardRulesContext =
         BoardRulesContext(
             configuration = CatalogConfiguration(6, RuleOptions(map = map), version),

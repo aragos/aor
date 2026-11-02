@@ -85,6 +85,41 @@ class CatalogCompatibilityTest {
     }
 
     @Test
+    fun catalog14SavesReplayAndContinueWithTheirRecordedConnectionsAfterRestart() {
+        for (map in MapRule.entries) {
+            val directory = Files.createTempDirectory("aor-catalog14-")
+            try {
+                val before =
+                    legacyCornwallGame(
+                        map,
+                        version = CatalogVersion.CATALOG_14,
+                        route = listOf("portsmouth", "cornwall"),
+                    )
+                FileGameStore(directory).create(before)
+                val reopened = FileGameStore(directory)
+
+                val restored = reopened.read(before.id)
+                val continued = GameDriver(FixedRandom()).submit(restored, owner, "pass")
+                reopened.update(before.id) { continued }
+
+                assertThat(restored).isEqualTo(before)
+                assertThat(restored.state()).isEqualTo(before.state())
+                assertThat(restored.state().board.pieces[ProvinceId("cornwall")]).isNotNull()
+                assertThat(restored.state().catalog.coastalConnections)
+                    .doesNotContain(
+                        ProvinceConnection.of(ProvinceId("chester"), ProvinceId("portsmouth"))
+                    )
+                assertThat(continued.effectiveEntries().take(before.effectiveEntries().size))
+                    .isEqualTo(before.effectiveEntries())
+                assertThat(reopened.read(before.id).header).isEqualTo(before.header)
+                assertThat(reopened.read(before.id).state()).isEqualTo(continued.state())
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+    }
+
+    @Test
     fun formatSixCatalog13UpgradeRetainsItsMapAndCanContinueAfterRestart() {
         val directory = Files.createTempDirectory("aor-catalog13-upgrade-")
         try {
@@ -127,12 +162,15 @@ class CatalogCompatibilityTest {
         }
     }
 
-    private fun legacyGame(map: MapRule): StoredGame {
+    private fun legacyGame(
+        map: MapRule,
+        version: CatalogVersion = CatalogVersion.CATALOG_13,
+    ): StoredGame {
         val players = (1..6).map { Player(PlayerId("p$it"), "Player $it") }
         return GameDriver(FixedRandom())
             .create(
                 id = UUID.randomUUID().toString(),
-                header = GameHeader(players, owner, dataVersion = "ah1996-catalog-13"),
+                header = GameHeader(players, owner, dataVersion = version.wireValue),
                 credentials =
                     players
                         .mapIndexed { index, player ->
@@ -143,10 +181,14 @@ class CatalogCompatibilityTest {
             )
     }
 
-    /** Four rounds reach Cornwall through York, Chester and Wales, without ships or Portsmouth. */
-    private fun legacyCornwallGame(map: MapRule): StoredGame {
+    /** Follow recorded land connections to Cornwall without ships. */
+    private fun legacyCornwallGame(
+        map: MapRule,
+        version: CatalogVersion = CatalogVersion.CATALOG_13,
+        route: List<String> = listOf("york", "chester", "wales", "cornwall"),
+    ): StoredGame {
         val driver = GameDriver(FixedRandom())
-        var game = legacyGame(map)
+        var game = legacyGame(map, version)
         for (step in 1..400) {
             val state = game.state()
             if (state.board.pieces[ProvinceId("cornwall")] != null) return game
@@ -157,9 +199,7 @@ class CatalogCompatibilityTest {
                     is Prompt.System -> error("The fixture driver must resolve authority outcomes.")
                 }
             val choices = state.legalChoices(actor).commands
-            val destination =
-                listOf("york", "chester", "wales", "cornwall")
-                    .getOrNull((state.turnNumber ?: 0) - 1)
+            val destination = route.getOrNull((state.turnNumber ?: 0) - 1)
             val command =
                 when {
                     state.stage == Stage.BIDDING -> "bid-capital ${if (actor == owner) 6 else 0}"
@@ -176,6 +216,6 @@ class CatalogCompatibilityTest {
                 }
             game = driver.submit(game, actor, command)
         }
-        error("The legacy fixture must reach Cornwall in four rounds.")
+        error("The legacy fixture must reach Cornwall through its recorded land connections.")
     }
 }

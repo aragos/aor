@@ -6,7 +6,7 @@ export async function checkMapPresentation(page, web) {
     for (const map of ['standard', 'european']) {
         const game = await createGame(6, {options: {map}});
         const snapshot = await game.snapshot(game.links[0]);
-        assert.equal(snapshot.game.catalog.dataVersion, 'ah1996-catalog-14', 'New games use corrected Cornwall connections');
+        assert.equal(snapshot.game.catalog.dataVersion, 'ah1996-catalog-15', 'New games use the complete Bristol Channel coastal connections');
         const stone = snapshot.game.catalog.provinces.find(province => province.commodities.includes('STONE'));
         for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
             await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
@@ -15,6 +15,19 @@ export async function checkMapPresentation(page, web) {
             await page.wait(`typeof window.setMapSnapshot === 'function'`, 'map presentation harness');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
             await page.wait(`document.querySelector('[data-support="cagliari genoa"]')`, 'Cagliari support paths');
+            for (const [province, x, y] of [
+                ['chester', 720, 603], ['cornwall', 718, 619], ['portsmouth', 735, 610],
+            ]) {
+                assert.equal(await page.evaluate(`document.querySelector('[data-coastal-space="${province}"] > path')
+                    .isPointInFill(new DOMPoint(${x}, ${y}))`), true,
+                    `${province} owns visible coastal water inside the enlarged Bristol Channel`);
+                await page.evaluate(`document.querySelector('[data-coastal-space="${province}"] > path')
+                    .dispatchEvent(new MouseEvent('click', {bubbles: true}))`);
+                await page.wait(`document.querySelector('[data-map-province="${province}"][aria-pressed="true"]')`,
+                    `Inspect ${province} through its Bristol Channel water`);
+            }
+            await page.evaluate(`document.querySelector('.world-map')
+                .dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`);
             assert.equal(await page.evaluate(`document.querySelector('[data-locked-area="V"]') !== null`), true,
                 'Area V has a whole-area access shade');
             assert(snapshot.game.lockedProvinces.includes('iceland') && snapshot.game.lockedProvinces.includes('west-africa'),
@@ -133,14 +146,23 @@ export async function checkMapPresentation(page, web) {
             const legacyCatalog = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-13',
                 landBorders: [...snapshot.game.catalog.landBorders, {first: 'cornwall', second: 'wales'}],
                 coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
-                    ![edge.first, edge.second].includes('cornwall') || ![edge.first, edge.second].includes('chester'))};
+                    !(['cornwall', 'portsmouth'].some(province => [edge.first, edge.second].includes(province)) &&
+                        [edge.first, edge.second].includes('chester')))};
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1002,
                 game: {...snapshot.game, catalog: legacyCatalog}})})`);
             await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1002}"]')`, 'Saved catalog-13 game');
             assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                 cornwallPath, 'Existing games retain the drawing matching their recorded topology');
-            await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1003})})`);
-            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1003}"]')`, 'Current catalog game');
+            const catalog14 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-14',
+                coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
+                    !([edge.first, edge.second].includes('chester') && [edge.first, edge.second].includes('portsmouth')))};
+            await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1003,
+                game: {...snapshot.game, catalog: catalog14}})})`);
+            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1003}"]')`, 'Saved catalog-14 game');
+            assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
+                cornwallPath, 'Catalog-14 saves retain their narrower Bristol Channel');
+            await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1004})})`);
+            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1004}"]')`, 'Current catalog game');
             assert.equal(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                 cornwallPath, 'Returning to a current game restores the corrected water channel');
         }

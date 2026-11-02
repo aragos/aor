@@ -43,7 +43,9 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
   the Greenland Sea retained along its northern coast.
   Retain visible Bristol Channel water between Cornwall and Wales. Cornwall's only land neighbor
   is Portsmouth; its coastal water directly borders Wales, Chester and Portsmouth. Cornwall's
-  Chester support crosses their shared coastal-water boundary.
+  Chester support crosses their shared coastal-water boundary. Enlarge the Bristol Channel toward
+  Chester and Portsmouth so all three coastal regions share visible borders in that bay, including
+  Chester–Portsmouth. Preserve the Chester–Portsmouth and Cornwall–Portsmouth land crossings.
 - Belgrade reaches the Adriatic shore between Dubrovnik and Durazzo, sharing land and coastal
   borders with both and a coastal border with Bari. A visible strip of Belgrade separates
   Dubrovnik from Durazzo on land and water. The Adriatic name follows the narrow channel and
@@ -131,8 +133,8 @@ regeneration commands for the playable European variant.
 
 The browser selects checked-in `web/src/map/boardGeometry.json` or `europeanBoardGeometry.json`
 according to the game's recorded map option. Both are keyed by stable province IDs.
-Catalog-13 saves use the matching `catalog13BoardGeometry.json` or
-`catalog13EuropeanBoardGeometry.json` instead, preserving the topology they actually play.
+Catalog-13 and catalog-14 saves use the matching `catalog13*Geometry.json` or
+`catalog14*Geometry.json` assets instead, preserving the topology they actually play.
 The catalog owns connections, memberships and access; game state owns pieces and assigned capitals.
 Geometry does not determine eligibility or calculate game effects.
 
