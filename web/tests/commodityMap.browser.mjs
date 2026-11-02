@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame, open} from './browser-support.mjs';
+import {createGame, open, waitForMap} from './browser-support.mjs';
 
 export async function checkCommodityMap(page, web, baseline) {
     const info = baseline.game.cardInspections.find(card =>
@@ -21,9 +21,11 @@ export async function checkCommodityMap(page, web, baseline) {
         province.commodities.some(commodity => info.commodities.includes(commodity))).map(province => province.id).sort();
     assert(expected.length, 'The selected commodities have provinces on this board');
     async function show(changes = {}) {
-        await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...fixture, ...changes,
-            revision: ++revision, game: {...fixture.game, ...changes.game}})})`);
+        const current = {...fixture, ...changes, revision: ++revision,
+            game: {...fixture.game, ...changes.game}};
+        await page.evaluate(`window.setMapSnapshot(${JSON.stringify(current)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'commodity map fixture');
+        await waitForMap(page, current);
     }
     async function highlighted() {
         return page.evaluate(`[...document.querySelectorAll('[data-commodity-highlight]')].map(node => node.dataset.mapProvince).sort()`);

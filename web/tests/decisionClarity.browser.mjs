@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame} from './browser-support.mjs';
+import {createGame, waitForMap} from './browser-support.mjs';
 
 export async function checkDecisionClarity(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -13,6 +13,7 @@ export async function checkDecisionClarity(page, web, baseline) {
             game: {...baseline.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'clarity fixture');
+        await waitForMap(page, fixture);
         return fixture;
     }
     await show({prompt: {messageId: 'prompt.buy-tokens', players: [viewer, other]},

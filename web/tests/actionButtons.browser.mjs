@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
+import {waitForMap} from './browser-support.mjs';
 
 export async function checkActionButtons(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -21,6 +22,7 @@ export async function checkActionButtons(page, web, baseline) {
                 ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'action footer snapshot');
+        await waitForMap(page, fixture);
         await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);

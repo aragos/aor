@@ -72,7 +72,9 @@ another provider, set `AOR_STORAGE=postgres` and secret `AOR_DATABASE_URL`. TLS 
 `verify-full`; loopback development may use `?sslmode=disable`. See [deployment](docs/deployment.md).
 
 Current games use file format 7, rules `ah1996-three-epoch-4` and data `ah1996-catalog-15`.
-Existing catalog-13 and catalog-14 games retain their original catalogs and remain playable.
+Existing standard-map catalog-13 and catalog-14 games retain their original catalogs and remain
+playable. Map drawings download on demand for the recorded catalog and board; unused older European
+drawings are retired.
 The completed format-6 conversion is retired. Previously upgraded games retain their original
 revisions, outcomes, memberships, private submissions and historical upgrade archives.
 Creation records configuration in revision 1 and automatic setup/outcomes in revision 2. Ordinary
@@ -93,6 +95,21 @@ entry-time identities, and tab favicons indicate outstanding player decisions.
 
 ## Verify changes
 
+For a short feedback loop, run the web unit tests and the engine/server tests without complete-game
+HTTP acceptance. The full `:server:test` task below still includes that acceptance coverage:
+
+```sh
+npm test --workspace web
+npm run typecheck --workspace web
+./gradlew :core:jvmTest :server:fastTest checkKotlinFormat
+```
+
+Use Gradle's `--tests` filter for an individual test class or method, for example
+`./gradlew :server:fastTest --tests '*ApplicationTest'`. For one web unit test file, run
+`node --test web/tests/api.test.mjs` from the repository root.
+
+Before completing a change, run the affected checks, including full server acceptance:
+
 ```sh
 ./gradlew formatKotlin
 ./gradlew :core:jvmTest :core:compileKotlinJs :server:test checkKotlinFormat
@@ -105,6 +122,19 @@ The formatter is pinned ktfmt 0.64 in Kotlin language style. Build output is `we
 distribution is required. The browser runner owns an isolated server, Vite, Chrome profile and game
 data; it retains screenshots outside the repository. [Coverage](docs/ui-decision-coverage.md) records
 what the checks establish and remaining manual review.
+
+Run individual browser suites by filename, or batch several to share server, Vite and Chrome
+startup. Each suite gets clean browser storage; created games remain in the isolated test store
+until the batch ends:
+
+```sh
+npm run test:browser --workspace web -- history.browser.mjs
+npm run test:browser --workspace web -- map.browser.mjs history.browser.mjs
+```
+
+`AOR_BROWSER_SUITE` remains supported for a single suite. `AOR_BROWSER_TIMEOUT_MS` sets each suite's
+timeout; the default is five minutes. The runner builds the server incrementally unless
+`AOR_BROWSER_SERVER` supplies an existing executable. Gradle reuses its daemon for local runs.
 
 SQL tests use PostgreSQL 18: an isolated native cluster on Linux/macOS, or the disposable database
 in `AOR_TEST_DATABASE_URL`. Each fixture owns its schema; CI uses a service container. To run browser

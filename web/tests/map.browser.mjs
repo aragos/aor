@@ -1,4 +1,6 @@
 import {checkTurnOrder} from './turnOrder.browser.mjs';
+import {checkResponsiveLifecycle} from './responsiveLifecycle.browser.mjs';
+import {checkMapGeometry} from './mapGeometry.browser.mjs';
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
 import {checkMobileTable} from './mobileTable.browser.mjs';
 import {checkExpansionLayout} from './expansionLayout.browser.mjs';
@@ -42,7 +44,7 @@ import {readFile} from 'node:fs/promises';
 
 const artifacts = process.env.AOR_BROWSER_ARTIFACTS ?? '/private/tmp';
 import assert from 'node:assert/strict';
-import {open, createGame} from './browser-support.mjs';
+import {waitForMap, open, createGame} from './browser-support.mjs';
 import {checkTable, checkLiveTokenPurchase, checkTokenContinuity, checkDecisionFamilies, checkFinished} from './table.browser.mjs';
 
 const web = process.env.MAP_WEB_URL ?? 'http://127.0.0.1:5191';
@@ -566,6 +568,7 @@ await page.send('Page.navigate', {url: web + actor.path});
             game: {...after.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'fixture render');
+        await waitForMap(page, fixture);
         return fixture;
     }
     await show({game:{board:after.game.catalog.provinces.map(province=>({id:province.id,marker:null,
@@ -644,6 +647,8 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkTokenPurchaseRound(page,web);
     await checkParallelPlanning(page,web);
     await checkTurnOrder(page,web);
+    await checkResponsiveLifecycle(page,web);
+    await checkMapGeometry(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

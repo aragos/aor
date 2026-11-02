@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {waitForMap} from './browser-support.mjs';
 
 export async function checkExpansionDiagnostics(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -26,6 +27,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
             }};
         await page.evaluate('window.setMapSnapshot(' + JSON.stringify(fixture) + ')');
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'expansion diagnostic fixture');
+        await waitForMap(page, fixture);
         await page.evaluate('document.querySelector(' + JSON.stringify('[data-map-province="' + inspection.destination + '"]') +
             ').dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}))');
     }

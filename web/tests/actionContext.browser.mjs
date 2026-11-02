@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
+import {waitForMap} from './browser-support.mjs';
 
 export async function checkActionContext(page, web, baseline) {
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1100, height: 900, deviceScaleFactor: 1, mobile: false});
@@ -14,6 +15,7 @@ export async function checkActionContext(page, web, baseline) {
             game: {...baseline.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'action context fixture');
+        await waitForMap(page, fixture);
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
     const event = {...baseline.events.at(-1), id: 'old-result', kind: 'COMPETITION_RESULT', actor: viewer, turnNumber: baseline.game.turnNumber, stage: 'EXPANSION',

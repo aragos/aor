@@ -1,3 +1,4 @@
+import {waitForMap} from './browser-support.mjs';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 
@@ -28,6 +29,7 @@ export async function checkMarketInsights(page, web, baseline) {
         const snapshot = {...fixture, ...changes, revision: ++revision, game: {...fixture.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'market fixture render');
+        await waitForMap(page, snapshot);
     }
     await show();
     assert.match(await page.evaluate(`document.querySelector('[data-hand-card="fur"] .adjustment-badge.SHORTAGE').textContent`), /Shortage.*×2/i);

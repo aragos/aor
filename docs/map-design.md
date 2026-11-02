@@ -133,14 +133,17 @@ Costs and placement limits belong beside the action. Omit map search and navigat
 The [European map authoring guide](european-map.md) describes the derived catalog, report and
 regeneration commands for the playable European variant.
 
-The browser selects checked-in `web/src/map/boardGeometry.json` or `europeanBoardGeometry.json`
-according to the game's recorded map option. Both are keyed by stable province IDs.
-Catalog-13 and catalog-14 saves use the matching `catalog13*Geometry.json` or
-`catalog14*Geometry.json` assets instead, preserving the topology they actually play.
+The browser fetches only the checked-in geometry asset for the game's recorded catalog and map.
+Current games use `web/src/map/boardGeometry.json` or `europeanBoardGeometry.json`; supported
+catalog-13 and catalog-14 standard saves retain their matching `catalog13BoardGeometry.json` or
+`catalog14BoardGeometry.json` drawings. All are keyed by stable province IDs. Unused older European
+drawings have been removed. Unsupported combinations show an unavailable map rather than silently
+substituting a different topology. Geometry stays cached across polling; failed downloads can be
+retried without submitting an action.
 The Ligurian junction presentation is shared through `web/scripts/map_presentation.py`.
-After editing that junction, run `python web/scripts/polish-legacy-maps.py` to update both supported
-saved-game drawings as well; it copies the current Ligurian detail, checks that coastal and sea contacts remain unchanged and retains
-their original British topology, land, labels and piece positions.
+After editing that junction, run `python web/scripts/polish-legacy-maps.py` to update the retained
+saved-game drawings as well; it copies the current Ligurian detail, checks that coastal and sea
+contacts remain unchanged and retains their original British topology, land, labels and pieces.
 The catalog owns connections, memberships and access; game state owns pieces and assigned capitals.
 Geometry does not determine eligibility or calculate game effects.
 

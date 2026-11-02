@@ -11,11 +11,12 @@ export async function checkMapPresentation(page, web) {
         const timber = snapshot.game.catalog.provinces.find(province => province.commodities.includes('TIMBER'));
         for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
             await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+            const previousDocument = await page.evaluate('performance.timeOrigin');
             await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
             await page.send('Page.bringToFront');
-            await page.wait(`typeof window.setMapSnapshot === 'function'`, 'map presentation harness');
+            await page.wait(`performance.timeOrigin !== ${previousDocument} && typeof window.setMapSnapshot === 'function'`, 'new map presentation harness');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
-            await page.wait(`document.querySelector('[data-support="cagliari genoa"]')`, 'Cagliari support paths');
+            await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:${map.toUpperCase()}"] [data-support="cagliari genoa"]')`, 'Cagliari support paths');
             assert.equal(await page.evaluate(`document.querySelector('.table-configuration').textContent
                 .includes('${map === 'standard' ? 'Original map' : 'European map'}')`), true,
                 'Game options name the selected board');
@@ -184,36 +185,55 @@ export async function checkMapPresentation(page, web) {
             };
             await assertLigurianJunction();
             const cornwallPath = await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`);
-            const legacyCatalog = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-13',
-                landBorders: [...snapshot.game.catalog.landBorders, {first: 'cornwall', second: 'wales'}],
-                coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
-                    !(['cornwall', 'portsmouth'].some(province => [edge.first, edge.second].includes(province)) &&
-                        [edge.first, edge.second].includes('chester')))};
-            await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1002,
-                game: {...snapshot.game, catalog: legacyCatalog}})})`);
-            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1002}"]')`, 'Saved catalog-13 game');
-            await assertLigurianJunction();
-            assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
-                cornwallPath, 'Existing games retain the drawing matching their recorded topology');
-            const catalog14 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-14',
-                coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
-                    !([edge.first, edge.second].includes('chester') && [edge.first, edge.second].includes('portsmouth')))};
-            await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1003,
-                game: {...snapshot.game, catalog: catalog14}})})`);
-            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1003}"]')`, 'Saved catalog-14 game');
-            await assertLigurianJunction();
-            if (process.env.AOR_BROWSER_ARTIFACTS && width === 1440) {
-                await page.evaluate(`(() => {
-                    const map = document.querySelector('.world-map'), rect = map.getBoundingClientRect();
-                    const w = 650, h = w * rect.height / rect.width;
-                    map.setAttribute('viewBox', [1275 - w / 2, 1220 - h / 2, w, h].join(' '));
-                })()`);
-                await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-cagliari-catalog14-${map}.png`));
+            if (map === 'standard') {
+                const legacyCatalog = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-13',
+                    landBorders: [...snapshot.game.catalog.landBorders, {first: 'cornwall', second: 'wales'}],
+                    coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
+                        !(['cornwall', 'portsmouth'].some(province => [edge.first, edge.second].includes(province)) &&
+                            [edge.first, edge.second].includes('chester')))};
+                await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1002,
+                    game: {...snapshot.game, catalog: legacyCatalog}})})`);
+                await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-13:STANDARD"] .world-map')`, 'Saved catalog-13 drawing');
+                await assertLigurianJunction();
+                assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
+                    cornwallPath, 'Existing games retain the drawing matching their recorded topology');
+                const catalog14 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-14',
+                    coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
+                        !([edge.first, edge.second].includes('chester') && [edge.first, edge.second].includes('portsmouth')))};
+                await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1003,
+                    game: {...snapshot.game, catalog: catalog14}})})`);
+                await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-14:STANDARD"] .world-map')`, 'Saved catalog-14 drawing');
+                await assertLigurianJunction();
+                if (process.env.AOR_BROWSER_ARTIFACTS && width === 1440) {
+                    await page.evaluate(`(() => {
+                        const map = document.querySelector('.world-map'), rect = map.getBoundingClientRect();
+                        const w = 650, h = w * rect.height / rect.width;
+                        map.setAttribute('viewBox', [1275 - w / 2, 1220 - h / 2, w, h].join(' '));
+                    })()`);
+                    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-cagliari-catalog14-${map}.png`));
+                }
+                assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
+                    cornwallPath, 'Catalog-14 saves retain their narrower Bristol Channel');
+            } else {
+                for (const version of [13, 14]) {
+                    await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot,
+                        revision: snapshot.revision + 1000 + version,
+                        game: {...snapshot.game, catalog: {...snapshot.game.catalog,
+                            dataVersion: `ah1996-catalog-${version}`}}})})`);
+                    await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1000 + version}"]')`,
+                        `Unsupported catalog-${version} snapshot`);
+                    await page.wait(`document.querySelector('.map-load-status [role=alert]')`,
+                        `Unsupported catalog-${version} European drawing`);
+                    assert.match(await page.evaluate(`document.querySelector('.map-load-status [role=alert]').textContent`),
+                        /map is unavailable/, 'Unsupported combinations show an explicit diagnostic');
+                    assert.equal(await page.evaluate(`document.querySelector('.world-map')`), null,
+                        'An unsupported saved catalog never silently uses another drawing');
+                    assert.equal(await page.evaluate(`document.querySelector('.map-load-status button')`), null,
+                        'Unsupported drawings cannot be retried as temporary download failures');
+                }
             }
-            assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
-                cornwallPath, 'Catalog-14 saves retain their narrower Bristol Channel');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1004})})`);
-            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1004}"]')`, 'Current catalog game');
+            await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:${map.toUpperCase()}"] .world-map')`, 'Current catalog drawing');
             assert.equal(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                 cornwallPath, 'Returning to a current game restores the corrected water channel');
         }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createGame, open} from './browser-support.mjs';
+import {createGame, open, waitForMap} from './browser-support.mjs';
 import {assertBottomHandVisible} from './bottomHand.browser.mjs';
 
 export async function checkActivityWorkspace(page, web, baseline) {
@@ -28,6 +28,7 @@ export async function checkActivityWorkspace(page, web, baseline) {
         fixture = {...fixture, revision: fixture.revision + 1};
         await page.evaluate(`window.setUiSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('.command-dock > summary small')?.textContent.trim() === 'Revision ${fixture.revision}'`, 'Activity application polling');
+        await waitForMap(page, fixture);
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
     const settle = () => page.evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');

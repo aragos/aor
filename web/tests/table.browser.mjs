@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {waitForMap} from './browser-support.mjs';
 
 export async function checkFinished(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/ui-harness.html'});
@@ -39,6 +40,7 @@ export async function checkTable(page, web, baseline) {
     }
     await show();
     await page.wait(`document.querySelector('.game-table')`, 'compact game table');
+    await waitForMap(page, fixture);
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-overview').length > 0`), true);
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel').length`), 1, 'One home for active decision');
     assert.equal(await page.evaluate(`document.querySelectorAll('.expansion-form').length`), 0, 'Contextual flow replaces duplicate expansion form');

@@ -1,3 +1,4 @@
+import {waitForMap} from './browser-support.mjs';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 
@@ -24,6 +25,7 @@ export async function checkCompactPresentation(page, web, baseline) {
                 cardOffers: [offer], ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'compact fixture render');
+        await waitForMap(page, fixture);
         await page.send('Page.bringToFront');
         await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     }

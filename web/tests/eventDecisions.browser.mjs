@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame, open} from './browser-support.mjs';
+import {createGame, open, waitForMap} from './browser-support.mjs';
 
 export async function checkGroupedReplacements(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -18,6 +18,7 @@ export async function checkGroupedReplacements(page, web, baseline) {
     const show = async () => {
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${fixture.revision}"]')`, 'grouped replacement snapshot');
+        await waitForMap(page, fixture);
     };
     await show();
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-replacement-province]').length`), 3, 'Every province is offered together');

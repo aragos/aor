@@ -280,6 +280,13 @@ and plans; their public catalog selects the matching legacy drawing. No storage 
 or automatic rules conversion occurs when opening those saves. Unknown catalog versions remain
 unavailable. Explicit history replacement preserves the supported source catalog identity.
 
+The admin command-log replacement flow does not migrate a game's catalog: changing the exported
+header cannot switch versions. A catalog migration needs a dedicated validated operation that
+archives the source and preserves recorded history, identities, private state and concurrency
+checks. Until such an operation has been applied, legacy standard games retain their own geometry,
+downloaded only when needed. Unused catalog-13 and catalog-14 European drawing assets are retired;
+their removal does not rewrite stored catalog identities or engine rules.
+
 1. Export logs before an engine change and run `:server:verifyGameLogs` with the proposed engine.
    It reports every active log's compatibility without IO/randomness during replay or storage writes.
 2. If syntax/rules/data versions change, transform an exported game's `entries` deliberately.
