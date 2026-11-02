@@ -1,5 +1,6 @@
 package dev.aragos.aor
 
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import java.nio.file.Files
 import java.util.UUID
@@ -115,6 +116,49 @@ class CatalogCompatibilityTest {
             } finally {
                 directory.toFile().deleteRecursively()
             }
+        }
+    }
+
+    @Test
+    fun formatSixCatalog13UpgradeRetainsItsMapAndCanContinueAfterRestart() {
+        val directory = Files.createTempDirectory("aor-catalog13-upgrade-")
+        try {
+            val account = AccountId("catalog13-p1")
+            val original = legacyCornwallGame(MapRule.STANDARD)
+            val before =
+                original.copy(
+                    credentials = emptyMap(),
+                    memberships =
+                        original.header.players.associate { player ->
+                            player.id to "catalog13-${player.id.value}"
+                        },
+                )
+            val store = FileGameStore(directory)
+            store.create(before)
+            val source = json.readTree(store.document(before.id)) as ObjectNode
+            source.put("fileVersion", 6)
+            source.remove(listOf("plans", "planVersions", "planReceipts", "planExecutions"))
+            Files.writeString(directory.resolve("${before.id}.json"), source.toString())
+            val service = GameService(store, GameDriver(FixedRandom()))
+            val access = GameAccess.Account(account)
+            val quote = service.planningUpgrade(before.id, access)
+
+            service.planningUpgrade(before.id, access, quote.revision, quote.sourceHash)
+            val upgraded = FileGameStore(directory).read(before.id)
+            val continued = GameDriver(FixedRandom()).submit(upgraded, owner, "pass")
+            store.update(before.id) { continued }
+            val reopened = FileGameStore(directory).read(before.id)
+
+            assertThat(upgraded.header).isEqualTo(before.header)
+            assertThat(upgraded.state()).isEqualTo(before.state())
+            assertThat(upgraded.effectiveEntries()).isEqualTo(before.effectiveEntries())
+            assertThat(upgraded.revisions.dropLast(1)).isEqualTo(before.revisions)
+            assertThat(upgraded.credentials).isEqualTo(before.credentials)
+            assertThat(upgraded.memberships).isEqualTo(before.memberships)
+            assertThat(reopened.header.dataVersion).isEqualTo("ah1996-catalog-13")
+            assertThat(reopened.state()).isEqualTo(continued.state())
+        } finally {
+            directory.toFile().deleteRecursively()
         }
     }
 

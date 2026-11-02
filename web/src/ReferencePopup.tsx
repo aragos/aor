@@ -8,6 +8,7 @@ import {AccessLock, LockedAreaPattern, PlayerPiece, SatellitePattern} from './ma
 import {MiseryBox} from './MiseryBox';
 import ruleOptions from './ruleOptions.json';
 import {CardInspectionDialog} from './CardInspectionDialog';
+import {TurnOrderReference} from './TurnOrderReference';
 
 interface ReferenceData {catalog: PublicCatalog}
 let publicReference: Promise<ReferenceData> | undefined;
@@ -22,6 +23,7 @@ const topics = [
     ['variants', 'reference.variants'],
     ['map-legend', 'reference.map-key'],
     ['commodities', 'reference.payout-boxes'],
+    ['turn-order', 'reference.turnOrder'],
     ['income-track', 'reference.income-track'],
     ['misery-track', 'reference.misery-track'],
     ['shipping-track', 'reference.shipping'],
@@ -36,7 +38,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
     const [topic, setTopic] = useState(initialTopic);
     const [reference, setReference] = useState<ReferenceData | null>(null);
     const [error, setError] = useState(false);
-    const needsCatalog = topic === 'map-legend' || topic === 'commodities' ||
+    const needsCatalog = topic === 'map-legend' || topic === 'commodities' || topic === 'turn-order' ||
         topic.startsWith('commodity-') || topic.endsWith('-track');
     useEffect(() => {
         if (!needsCatalog || gameCatalog) return;
@@ -81,6 +83,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                     <ol className="payout-boxes" aria-label={t('reference.payoutBoxes', {commodity: label(commodity.id, 'commodity')})}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
                 </article>)}
             </section>}
+            {topic === 'turn-order' && catalog && <TurnOrderReference catalog={catalog}/>}
             {topic === 'income-track' && <section id="income-track"><h2>{t('reference.income-track')}</h2>
                 <p>{t('reference.income-markers')}</p>
                 <ol className="payout-boxes" aria-label={t('reference.income-track')}>{catalog?.incomeTrack.map((amount, markers) =>

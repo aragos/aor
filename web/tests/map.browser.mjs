@@ -1,3 +1,4 @@
+import {checkTurnOrder} from './turnOrder.browser.mjs';
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
 import {checkMobileTable} from './mobileTable.browser.mjs';
 import {checkExpansionLayout} from './expansionLayout.browser.mjs';
@@ -15,8 +16,8 @@ import {checkMapViewport} from './mapViewport.browser.mjs';
 import {checkInactiveAreas} from './inactiveAreas.browser.mjs';
 import {checkMapPresentation} from './mapPresentation.browser.mjs';
 import {checkCommodityMap} from './commodityMap.browser.mjs';
-import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkParallelPlanning} from './planning.browser.mjs';
+import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkCompactPresentation} from './compactPresentation.browser.mjs';
 import {checkTableConsistency} from './tableConsistency.browser.mjs';
 import {checkActionContext} from './actionContext.browser.mjs';
@@ -640,6 +641,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkBidWithdrawal(page,web);
     await checkTokenPurchaseRound(page,web);
     await checkParallelPlanning(page,web);
+    await checkTurnOrder(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

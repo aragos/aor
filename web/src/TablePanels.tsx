@@ -95,15 +95,21 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const eligible = playerPicker?.eligible.includes(player.id) || !!swap;
             const picked = playerPicker?.selected.includes(player.id) || (!!swap && selectedAction === swap);
             const person = (snapshot.accountId || snapshot.viewerId === null) ? player.name.replace(/^@/, '') : player.name;
+            const position = snapshot.game.turnOrder.indexOf(player.id) + 1;
+            const orderBox = snapshot.game.orderBoxes[player.id];
             const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
                     if (event.target instanceof Element && event.target.closest('button, a')) return;
                     if (eligible) { if (swap) setSelectedAction(selectedAction === swap ? '' : swap); else playerPicker?.pick(player.id);}
-                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}${status ? `, ${status}` : ''}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
+                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}${position > 0 && orderBox !== undefined ? `, ${t('order.position', {position})}, ${t('order.box', {box: orderBox})}` : ''}${status ? `, ${status}` : ''}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
                     <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>
                         {player.capital && <span className="player-person" title={player.name}>{person}</span>}</span>
-                        <small>{player.id === snapshot.viewerId ? t('table.you') : order.includes(player.id) ? String(order.indexOf(player.id) + 1).padStart(2, '0') : ''}</small></span>
+                        {player.id === snapshot.viewerId && <small>{t('table.you')}</small>}</span>
+                    {position > 0 && orderBox !== undefined && <span className="player-turn-order">
+                        <span>{t('order.position', {position})}</span><span>{t('order.box', {box: orderBox})}
+                            <HelpLink topic="turn-order" label={t('reference.turnOrder')}/></span>
+                    </span>}
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
                         <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b><HelpLink topic="income-track" label={t('reference.income-track')}/></span>
                         <span className="player-advance-count" title={t('game.advances')} aria-label={`${t('game.advances')}: ${player.advances.length}`}><TableIcon kind="advances"/> <b>{player.advances.length}</b></span></span>

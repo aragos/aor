@@ -101,6 +101,12 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   reveal it follows the chosen policy. Keep the full action-sidebar height available for decisions.
   Player boxes share a wrapping status/pool row. Expansion uses one current
   → projected pool balance. Center action labels and inline identities.
+- Make the printed turn-position → order-box → green-die mapping discoverable beside token
+  purchases, unresolved turn-order ties, player order boxes and competition previews. Before order
+  resolves, show the starting-player-count track without assigning capitals or predicting private
+  bids. Once resolved, show current capital assignments and identify the viewer. Show applicable
+  green-die winning faces beside an attack, including Proselytism and Chaos restrictions; distinguish
+  this alternative win condition from the black/white dice. Reference preserves valid action drafts.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup

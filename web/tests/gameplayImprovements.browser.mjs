@@ -115,5 +115,5 @@ export async function checkGameplayImprovements(page, web, baseline) {
             players: baseline.game.players.map(player => player.id === viewer ? {...player, ships: {fleet: 'GALLEY', level: 2}} : player),
             shippingOffer: {cost: 10, ships: {fleet: 'GALLEY', level: 4}, cashAfter: 30, blockers: []}}});
     assert.match(await page.evaluate(`document.querySelector('.game-actions .purchase-preview').textContent`), /Galley 2 → Galley 4/);
-    console.log('Passed: compact capital title, separate inspections, automatic Crusades/Rebellion/Pirates map targeting, priced actions, relief blockers and relief blockers.');
+    console.log('Passed: compact capital title, separate inspections, automatic Crusades/Rebellion/Pirates map targeting, priced actions and relief blockers.');
 }

@@ -6,6 +6,7 @@ export interface ExpansionOfferView {
     availablePool: number; resultingPool: number | null; establishesMarker: boolean; uncertain: boolean;
     blockers: string[]; partialPlacements: {tokens: number; resultingPool: number}[];
     missingAccess?: string[];
+    greenDieWins?: number[] | null;
     shipping: {used: number; capacity: number | null; required: number} | null;
     incomeBefore: number | null; incomeAfter: number | null;
     reachable: boolean;
@@ -84,6 +85,7 @@ export interface PublicCatalog {
     seaAreas: Record<string, string>;
     miseryTrack: (number | null)[];
     incomeTrack: number[];
+    orderTrack: {number: number; greenWins: number[]}[];
     shippingTrack: PlayerView['ships'][];
 }
 export interface ProvinceView {
