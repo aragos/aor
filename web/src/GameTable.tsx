@@ -1,7 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
-import {label} from './labels';
+import {label, purchasePassLabel} from './labels';
 import {t} from './messages';
 import {DecisionActions} from './DecisionActions';
 import {Controls} from './Controls';
@@ -38,6 +38,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
 }) {
+    const spectator = snapshot.viewerId === null;
     const [commandsOpen, setCommandsOpen] = useState(false);
     const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
     const finished = snapshot.game.stage === 'FINISHED';
@@ -92,7 +93,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             document.activeElement.matches('.hand-card, .advance-tile')) document.activeElement.blur();
     }, [decisionKey, resetSelection]);
     useEffect(() => setSheetCollapsed(false), [selected, selectedArea, selectedCard, selectedAdvance, selectedAction]);
-    const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
+    const canAct = snapshot.viewerId !== null && (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
     const expansion = snapshot.game.stage === 'EXPANSION';
     const expanding = canAct && expansion && snapshot.game.activity?.actor === snapshot.viewerId;
     useEffect(() => {
@@ -109,6 +110,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         if (inspection?.kind === 'card' && !snapshot.game.hand.some(card => card.reference === inspection.id)) setInspection(null);
     }, [inspection, setInspection, snapshot.game.hand]);
     async function submit(command: string) {
+        if (spectator) return false;
         const accepted = await resolveCommand(command);
         if (accepted && /^(pass$|play |place |move-marker )/.test(command)) {
             resetSelection();
@@ -117,12 +119,11 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     }
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const capital = me?.capital;
-    const seatTitle = capital ? t(`capital.${capital}`) : me?.name;
+    const seatTitle = spectator ? t('table.spectating') : capital ? t(`capital.${capital}`) : me?.name;
     useEffect(() => {
         document.title = `AoR · ${snapshot.name}${seatTitle ? ` · ${seatTitle}` : ''}`;
         return () => { document.title = 'AoR'; };
     }, [seatTitle, snapshot.name]);
-    if (!me) return null;
     const expansionPlayer = expansion ? snapshot.game.players.find(player => player.id === snapshot.game.activity?.actor) : undefined;
     const military = snapshot.game.effects.military;
     const inactive = snapshot.status === 'CANCELLED' || snapshot.status === 'ABANDONED';
@@ -131,9 +132,9 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         ? snapshot.game.expansionOffers.find(offer => offer.destination === selected && offer.primaryAction !== 'INSPECT') : undefined;
     const reductionOffer = snapshot.game.markerReductionOffers?.find(offer => offer.command === selectedAction);
     const poolAfter = reductionOffer?.poolAfter ?? maximumPartialPlacement(expansionOffer)?.resultingPool ?? expansionOffer?.resultingPool;
-    const cardAction = selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
+    const cardAction = !spectator && selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
-    const advanceAction = advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
+    const advanceAction = !spectator && advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
     const cardReference = inspection?.kind === 'card' || inspection?.kind === 'history-card' ? inspection.id
         : !inspection && !cardAction ? selectedCard : '';
     const inspectedAdvance = inspection?.kind === 'advance' ? inspection.id
@@ -143,7 +144,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         : snapshot.game.hand.find(card => card.reference === cardReference)?.definition;
     const inspectedCard = cardDefinition?.kind === 'commodity' ? '' : cardReference;
     const closeInspection = () => setInspection({kind: 'closed'});
-    const spending = !inactive && ((snapshot.legalChoices.bidMax != null && me.misery !== null) || canAct && (!!advanceAction || buyingAdvances ||
+    const spending = !!me && !inactive && ((snapshot.legalChoices.bidMax != null && me.misery !== null) || canAct && (!!advanceAction || buyingAdvances ||
         snapshot.game.activity?.purchaseStep === 'RELIEF' || !!snapshot.game.shippingOffer ||
         snapshot.legalChoices.commands.some(command => /^(buy-card|cancel-adjustment|stabilize cash|patronize)( |$)/.test(command)) ||
         (!!cardAction && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.protectionMax !== null))));
@@ -162,16 +163,16 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
         </details>
-        <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
-            open={commandsOpen} onToggle={setCommandsOpen}/>
+        {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
+            open={commandsOpen} onToggle={setCommandsOpen}/>}
     </div>;
-    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
+    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
                     <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
-                <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong></div>
-                {!snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
+                <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{spectator && <span className="spectator-status">{t('table.spectating')}</span>}</div>
+                {me && !snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                     <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                         href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
                 </details>}
@@ -202,7 +203,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                             const next = event.key === 'Home' ? tabs[0] : tabs[tabs.length - 1];
                             setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
                         }
-                    }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && <small>{me.advances.length}</small>}</button>)}
+                    }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && me && <small>{me.advances.length}</small>}</button>)}
             </nav>
             <div className="workspace-main" hidden={workspace === 'activity' || workspace === 'players'}>
                 <div id="workspace-map" role="tabpanel" aria-labelledby="tab-map" hidden={workspace !== 'map'}>
@@ -219,17 +220,18 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
             <Activity snapshot={snapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}
                 active={workspace === 'activity'} pinned={activityPinned} canPin={wideScreen} onTogglePin={toggleActivityPin}/>
             <div className="workspace-side">
-                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t('table.currentDecision')}>
-                    <DecisionActions pass={!inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
-                        <button type="button" className="pass-action" disabled={busy} onClick={() => { void submit('pass'); }}>{t('action.pass')}</button>}>
+                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
+                    <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
+                        <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{purchasePassLabel(snapshot)}</button>}>
                     <div className="decision-header">
                         <div className="decision-toolbar">
-                            {!inactive && (withdrawing || snapshot.undo?.available) && <button type="button"
+                            {!spectator && !inactive && (withdrawing || snapshot.undo?.available) && <button type="button"
                                 className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
                                 title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
                                 onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
                         </div>
                         <div className={`decision-heading ${objectAction ? 'object-heading' : ''}`}>
+                            {spectator && <p className="eyebrow">{t('table.publicInformationOnly')}</p>}
                             {finished && <p className="eyebrow">{t('game.finished')}</p>}
                             {!inactive && !finished && <div className={`decision-status ${canAct ? 'is-ready' : 'is-waiting'}`} role="status">
                                 <strong>{t(canAct ? 'table.yourMove' : 'prompt.waitingFor')}</strong>
@@ -260,13 +262,13 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     </section>}
                     <div id="decision-content" className="decision-content">
                     {result && <ActionResultNotice event={result} snapshot={snapshot} onDismiss={dismissResult}/>}
-                    {spending && <p className="action-cash">{t('controls.availableCash')}: <strong>${me.cash}</strong></p>}
+                    {spending && me && <p className="action-cash">{t('controls.availableCash')}: <strong>${me.cash}</strong></p>}
                     {buyingAdvances && <p className="relief-rating-summary advance-relief-rating"><span>{t('controls.reliefRatingAvailable')}</span><strong>${snapshot.game.reliefRatingAvailable}</strong></p>}
                     {cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : province && !picker && <ProvinceActions key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit}/>}
-                    {!inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
-                    {!inactive && <UrbanAscendancyQueue snapshot={snapshot} busy={busy} submit={submit}/>}
+                    {!spectator && !inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
+                    {!spectator && !inactive && <UrbanAscendancyQueue snapshot={snapshot} busy={busy} submit={submit}/>}
                     {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                     {(busy || saved && !['BIDDING', 'TOKEN_PURCHASE'].includes(snapshot.game.stage)) && <p className="save-status" aria-live="polite">{t(busy ? 'status.working' : 'status.saved')}</p>}
                     </div>
@@ -275,7 +277,7 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                     </DecisionActions>
                 </aside>
             </div>
-            <Hand snapshot={snapshot} busy={busy}/>
+            {!spectator && <Hand snapshot={snapshot} busy={busy}/>}
         </div>
         {scoresOpen && finished && <CardInspectionDialog label={t('game.finalScores')} close={() => setScoresOpen(false)} className="final-scores-dialog">
             <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setScoresOpen(false)}>×</button>

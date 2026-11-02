@@ -28,9 +28,9 @@ data class UndoView(
 
 /** Reject the whole proposed revision on any scope, dependency or randomness mismatch. */
 internal object HistoryEdits {
-    fun view(stored: StoredGame, player: PlayerId): UndoView {
+    fun view(stored: StoredGame, player: PlayerId?): UndoView {
         val entries = stored.effectiveEntries()
-        val lower = editableFrom(stored, player)
+        val lower = player?.let { editableFrom(stored, it) }
         var state = GameState(stored.header)
         val actions = buildList {
             entries.forEachIndexed { index, recorded ->
@@ -48,9 +48,10 @@ internal object HistoryEdits {
             }
         }
         val available =
-            actions.lastOrNull()?.let { action ->
-                runCatching { replacement(stored, player, action.entry, emptyList()) }.isSuccess
-            } ?: false
+            player != null &&
+                (actions.lastOrNull()?.let { action ->
+                    runCatching { replacement(stored, player, action.entry, emptyList()) }.isSuccess
+                } ?: false)
         return UndoView(
             stored.undoPolicy,
             available,

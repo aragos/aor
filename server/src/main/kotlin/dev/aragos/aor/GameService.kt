@@ -30,7 +30,8 @@ data class GameSnapshot(
     val gameId: String,
     val name: GameName,
     val revision: Int,
-    val viewerId: PlayerId,
+    /** Null for an authenticated spectator, who has no private seat or action permissions. */
+    val viewerId: PlayerId?,
     val creatorId: PlayerId,
     val game: GameView,
     val prompt: PromptView?,
@@ -199,7 +200,7 @@ class GameService(
 
     internal fun get(id: String, access: GameAccess): GameSnapshot {
         val stored = store.read(id)
-        return snapshot(stored = stored, player = authenticate(stored, access))
+        return snapshot(stored = stored, player = viewer(stored, access))
     }
 
     internal fun quoteTokenPurchase(
@@ -340,7 +341,7 @@ class GameService(
 
     internal fun getRevision(id: String, access: GameAccess, revision: Int): GameSnapshot {
         val stored = store.read(id)
-        val player = authenticate(stored, access)
+        val player = viewer(stored, access)
         if (revision !in (stored.baseRevision + 1)..stored.revision) {
             throw ServiceFailure(404, "REVISION_NOT_FOUND")
         }
@@ -355,7 +356,7 @@ class GameService(
         )
     }
 
-    private fun snapshot(stored: StoredGame, player: PlayerId): GameSnapshot {
+    private fun snapshot(stored: StoredGame, player: PlayerId?): GameSnapshot {
         val history = HistoryProjection.forPlayer(stored, player)
         val state = history.state
         val prompt =
@@ -382,7 +383,7 @@ class GameService(
             viewerId = player,
             creatorId = stored.header.creatorId,
             game =
-                state.viewForPlayer(player).let { original ->
+                (player?.let(state::viewForPlayer) ?: state.publicView()).let { original ->
                     val view =
                         original.copy(
                             players =
@@ -415,7 +416,7 @@ class GameService(
                 },
             prompt = prompt.takeIf { stored.status == GameStatus.ACTIVE },
             legalChoices =
-                if (stored.status == GameStatus.ACTIVE) {
+                if (player != null && stored.status == GameStatus.ACTIVE) {
                     state.legalChoices(player).let { choices ->
                         if (player in stored.pendingBids) {
                             choices.copy(commands = choices.commands + "withdraw-bid")
@@ -445,7 +446,7 @@ class GameService(
 
     internal fun read(id: String, access: GameAccess, ifNoneMatch: String?): GameRead {
         val stored = store.read(id)
-        val player = authenticate(stored, access)
+        val player = viewer(stored, access)
         val visibleVersion =
             listOf(
                     stored.id,
@@ -462,13 +463,18 @@ class GameService(
         return GameRead(etag, if (ifNoneMatch == etag) null else snapshot(stored, player))
     }
 
-    private fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
+    /**
+     * Account reads may observe public state; seat tokens continue to require their owning seat.
+     */
+    private fun viewer(stored: StoredGame, access: GameAccess): PlayerId? =
         when (access) {
             is GameAccess.Account ->
                 stored.memberships.entries.singleOrNull { it.value == access.id.value }?.key
-                    ?: throw ServiceFailure(403, "GAME_MEMBERSHIP_REQUIRED")
             is GameAccess.SeatToken -> authenticateSeat(stored, access.token)
         }
+
+    private fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
+        viewer(stored, access) ?: throw ServiceFailure(403, "GAME_MEMBERSHIP_REQUIRED")
 
     private fun authenticateSeat(stored: StoredGame, token: String): PlayerId {
         if (token.length !in 20..100) throw ServiceFailure(401, "UNAUTHORIZED")

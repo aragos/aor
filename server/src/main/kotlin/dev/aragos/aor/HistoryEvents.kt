@@ -204,7 +204,7 @@ internal object HistoryEvents {
         before: GameState,
         after: GameState,
         entry: Entry,
-        viewer: PlayerId,
+        viewer: PlayerId?,
         resolved: GameTransition = before.transition(entry),
     ): List<HistoryEventView> = buildList {
         val automatic = resolved.receipts
@@ -320,7 +320,7 @@ internal object HistoryEvents {
         before: GameState,
         after: GameState,
         entry: Entry,
-        viewer: PlayerId,
+        viewer: PlayerId?,
     ): HistoryEventView? {
         return projectDirect(id, before, after, entry, viewer)
     }
@@ -330,7 +330,7 @@ internal object HistoryEvents {
         before: GameState,
         after: GameState,
         entry: Entry,
-        viewer: PlayerId,
+        viewer: PlayerId?,
     ): HistoryEventView? =
         projectEntry(id, before, after, entry, viewer)
             ?.let { event ->
@@ -381,7 +381,7 @@ internal object HistoryEvents {
         before: GameState,
         after: GameState,
         entry: Entry,
-        viewer: PlayerId,
+        viewer: PlayerId?,
     ): HistoryEventView? {
         val actor =
             when (entry) {
@@ -481,7 +481,7 @@ internal object HistoryEvents {
         before: GameState,
         after: GameState,
         entry: Entry.Action,
-        viewer: PlayerId,
+        viewer: PlayerId?,
         event: (HistoryEventKind) -> HistoryEventView,
     ): HistoryEventView? =
         when (val command = entry.command) {
