@@ -21,9 +21,8 @@
 .map-area-label:focus .area-label-bg { stroke: #143e4e; stroke-width: 5; }
 .map-province.active { cursor: pointer; outline: none; }
 .map-province.inactive { opacity: .6; }
-.satellite-key::before, .coast-key::before { content: ''; width: 20px; height: 18px; border: 1px solid #8d9e94; border-radius: 3px; }
-.satellite-key::before { background: radial-gradient(#879481 1px, transparent 1px) 0 0 / 6px 6px #e0e4d9; }
-.coast-key::before { background: #d2efed; border-color: #56929c; }
+.province-commodity { cursor: pointer; outline: none; }
+.province-commodity:focus-visible .province-commodity-hit { stroke: #143e4e; stroke-width: 2; }
 .map-facts { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; }
 .map-orders form { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
 .map-orders label { max-width: 140px; margin: 0; font-size: .8rem; }

@@ -12,6 +12,29 @@ first reproduced the lifecycle failure, then committed a map-selected province a
 Historical long runs and separate history-editor evidence remain identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
 
+The 2026-11-02 map polish passes the web build, 55 web unit tests and both map geometry validators.
+Regeneration changes only Cagliari's two support paths on each board, retaining all graph, label,
+piece and area geometry. Focused StrictMode browser checks cover the shared satellite/map-key
+texture at Fit and zoom, both 48-unit support arrows and shipping-box explanations on both boards
+at desktop and phone widths (`aor-browser-artifacts-0k5bCg`). Commodity checks use real pointer clicks
+on Stone and individual overseas commodity icons, plus keyboard activation, polling, dismissal and
+card reinspection, preserving the prepared card action (`aor-browser-artifacts-73C7Wu`). Rendered
+desktop overview and phone shipping-help captures were inspected: satellites have visible dark dots
+on pale green beside solid gray Stone, and fleet explanations remain readable in the scrolling popup.
+The integrated browser run also passes live token/marker placement, accepted cleanup, rejected and
+polling draft preservation, map gestures and the three roving keyboard groups. It stops later at
+an unrelated Help test expecting 13 commodity-navigation buttons where 12 are rendered; the full
+suite is therefore not recorded as passing for this change.
+
+The arrow-tip/access follow-up passes the web build, 55 unit tests and focused presentation,
+support-arrow and commodity-map browser suites. SVG stroke hit tests find no shaft/halo at any
+arrow tip on either full board. Both boards retain catalogued arrow directions and visibility
+with 3–6 players. Desktop/phone fixtures verify whole-area and overseas hatching from live access
+projections, removal on unlock, partial-area shading and retained inspection through polling;
+commodity icons still accept real clicks without changing the prepared card action. Reviewed
+high-zoom arrow and desktop overview captures show clean tips and muted diagonal hatching, with
+commodity colors, pieces, labels and locks retained (`aor-browser-artifacts-Vsby8I`).
+
 The main-view polish passes integrated core JVM, Kotlin/JS, server and Kotlin formatting checks,
 the web build, all 55 web unit tests and the comprehensive browser suite
 (`aor-browser-artifacts-cOCtoR`). Live bidding shows every commodity from setup with no premature
@@ -244,7 +267,7 @@ handlers do not make those rules selectable in current game creation.
 | Misery consequences and automatic receipts | Card fixtures show all affected players, Chaos and target changes without commitment. Core/serialization tests cover Famine, Civil War, Crusades marker exhaustion, hidden-hand invariance and explicit War uncertainty. Holy Indulgence activity includes token-only pool/stock movements, separates the triggering action and excludes unrelated Chaos returns. |
 | Draft lifetimes | Full-App polling/workspace/viewport preservation, rejection, stale refresh without retries, quote supersession and changed-owner fixtures. Current focused checks keep a purchase draft through native card-popup polling, Escape dismissal with focus returned to the source card, and backdrop dismissal; placement survives card-popup inspection. Activity or unavailable-card inspection preserves a prepared card target, purchase or placement. Hand expansion preserves the active draft; selecting another discard/trade card reopens its minimized review. Live accepted play/placement clears obsolete selection separately from rejected/polling preservation. Stable nested identity resets same-player/same-prompt replacement drafts. |
 | Feasible expansion | Pool/shipping regressions omit destinations with no valid commitment; peaceful partial placement remains. Marker-stock/access blockers are explained beside the selected action. |
-| Board and reductions | Live 3–6-player drawing, continental hit targets, mixed owners/ages, all twelve owner/age groups per province and combined rendered label/piece bounds. Dense provinces retain all owner/age/count groups, accessible occupancy labels and zoom. |
+| Board and reductions | Live 3–6-player drawing, continental hit targets, mixed owners/ages, all twelve owner/age groups per province and combined rendered label/piece bounds. Dense provinces retain all owner/age/count groups, accessible occupancy labels and zoom. Focused StrictMode browser checks use live catalogs for both maps with 3–6 players at 1280- and 390-pixel widths: inactive area badges have no controls or tab stops, real pointer hover/click adds no area emphasis or selection, and active hover and keyboard traversal remain available. |
 | Reviewed topology | Catalog/shipping/geometry/browser checks cover separate standard Aegean/Central seas and European merger, Crete/Smyrna contacts, Belgrade/Durazzo, Danish/Baltic exclusions/support and British/Channel coasts. Core tests verify Fez's exact sea contacts; regenerated standard/European geometry passes validation, including more than 20 SVG units of Western Mediterranean frontage. The [connection inventory](connection-inventory.md) owns the graph. |
 | Sea emphasis | Full connected-sea highlighting is distinct from coastal bands, retains screen-size hatch/perimeter during zoom, changes with province inspection and clears with area/background selection. Desktop/zoom/phone baseline screenshots were reviewed. |
 | Dense labels | Copenhagen's earlier exception was removed. The user accepted Toulouse/Constantinople labels on 2026-10-29; their constrained geometry metadata remains descriptive. |

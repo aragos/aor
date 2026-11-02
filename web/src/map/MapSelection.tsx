@@ -10,7 +10,7 @@ interface Picker {
     pick: (province: string) => void;
 }
 
-type Inspection = {kind: 'card' | 'history-card' | 'advance' | 'province'; id: string} | {kind: 'closed'} | null;
+type Inspection = {kind: 'card' | 'history-card' | 'advance' | 'province' | 'commodity'; id: string} | {kind: 'closed'} | null;
 export type Workspace = 'map' | 'markets' | 'advances' | 'activity' | 'players';
 
 const MapSelection = createContext<{

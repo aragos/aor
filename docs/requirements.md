@@ -107,10 +107,14 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
   adjustments. Keep event and advance descriptions in the game, with current commodity payouts and
   leader credits in leader inspections. Commodity cards retain live payouts on the card and small
-  question links to full payout tracks, without an inspection box. Clicking a commodity card highlights
-  every matching province in play; ordinary selection cleanup removes the highlight. Every visible
-  capital name
-  includes its symbol, including cash/misery previews. Shipping upgrades show current → new shipping.
+  question links to full payout tracks, without an inspection box. Clicking a commodity card or a
+  province's commodity icon highlights matching provinces in play, preserving the prepared action;
+  ordinary selection cleanup removes the highlight. Satellites remain distinct from Stone at Fit
+  and zoom; support arrows retain clean tips at high zoom and Cagliari's remain visible. Distinguish
+  advance-locked geography with hatching that clears when access unlocks, preserving inspection.
+  Shipping help explains the meaning of each
+  fleet's numbered boxes. Every visible capital name includes its symbol, including cash/misery
+  previews. Shipping upgrades show current → new shipping.
   Identify whether each leader discount includes Written Record.
   Open full payout boxes, legends, variant descriptions, printed tracks and app help in contextual
   popups. Omit duplicate card/advance catalogs available in the game; retain unique printed credits,

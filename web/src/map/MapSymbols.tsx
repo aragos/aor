@@ -12,6 +12,40 @@ export const areaColors: Record<string, string> = {
     VI: '#577726', VII: '#586d73', VIII: '#78436f', FAR_EAST: '#42677c', NEW_WORLD: '#77523c',
 };
 
+/** Screen-sized stippling distinguishes satellites from solid commodity fills at any zoom. */
+export function SatellitePattern({id, scale = 1}: {id: string; scale?: number}) {
+    return <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse"
+        patternTransform={`scale(${scale})`}>
+        <rect width="7" height="7" fill="#dce7c6"/>
+        <circle cx="3.5" cy="3.5" r="1.15" fill="#657a4f"/>
+    </pattern>;
+}
+
+/** Missing access advances shade geography without replacing its commodity colors. */
+export function LockedAreaPattern({id, scale = 1}: {id: string; scale?: number}) {
+    return <pattern id={id} width="10" height="10" patternUnits="userSpaceOnUse"
+        patternTransform={`scale(${scale})`}>
+        <rect width="10" height="10" fill="#e9e5db" opacity={.45}/>
+        <path d="M-2 2L2 -2M0 10L10 0M8 12L12 8" fill="none"
+            stroke="#675d4f" strokeWidth={1.1} opacity={.35}/>
+    </pattern>;
+}
+
+/**
+ * Geometry exports a straight M…L… centerline. Stop visible strokes 10 SVG units before its tip,
+ * inside the arrowhead, while the unpainted centerline keeps the marker at the catalogued endpoint.
+ */
+export function SupportArrow({path, markerId}: {path: string; markerId: string}) {
+    const [start, end] = path.slice(1).split('L').map(point => point.split(' ').map(Number));
+    const inset = 10 / Math.hypot(end[0] - start[0], end[1] - start[1]);
+    const shaft = `M${start[0]} ${start[1]}L${end[0] + (start[0] - end[0]) * inset} ${end[1] + (start[1] - end[1]) * inset}`;
+    return <>
+        <path d={shaft} fill="none" stroke="#fffdf3" strokeWidth={7}/>
+        <path d={shaft} fill="none" stroke="#263d4b" strokeWidth={3.5}/>
+        <path d={path} fill="none" stroke="none" markerEnd={`url(#${markerId})`}/>
+    </>;
+}
+
 export function AccessLock({x = 0, y = 0, size = 24, color = '#315d70'}: {
     x?: number; y?: number; size?: number; color?: string;
 }) {

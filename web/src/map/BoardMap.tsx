@@ -4,7 +4,7 @@ import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
 import {HelpLink} from '../HelpLink';
-import {AccessLock, areaColors, CommodityIcon, commodityColors, PlayerPiece} from './MapSymbols';
+import {AccessLock, areaColors, CommodityIcon, commodityColors, LockedAreaPattern, PlayerPiece, SatellitePattern, SupportArrow} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
 import {clampMapView, fitMapView, panMapView, resizeMapView, zoomMapView} from './mapView';
@@ -54,16 +54,25 @@ function highlightPriority(state: {selected: boolean; emphasized: boolean; eligi
     return state.selected ? 4 : state.emphasized ? 3 : state.eligible ? 2 : state.neighbor ? 1 : 0;
 }
 
-function ProvinceLabel({province, pieces, snapshot, geometry, dimmed = false}: {
+function tokenGroups(pieces?: ProvinceView) {
+    return pieces?.tokens.flatMap(holding => [
+        ...(holding.coloured ? [{owner: holding.owner, count: holding.coloured, fresh: false}] : []),
+        ...(holding.white ? [{owner: holding.owner, count: holding.white, fresh: true}] : []),
+    ]) ?? [];
+}
+
+function ProvinceLabel({province, pieces, snapshot, geometry, dimmed = false, commodityTabStop,
+    onCommodityClick, onCommodityFocus, onCommodityKeyDown}: {
     province: ProvinceDefinition; pieces?: ProvinceView; snapshot: Snapshot; geometry: Geometry; dimmed?: boolean;
+    commodityTabStop: string;
+    onCommodityClick: (commodity: string) => void;
+    onCommodityFocus: (key: string, position: number[]) => void;
+    onCommodityKeyDown: (event: ReactKeyboardEvent<SVGGElement>, key: string, commodity: string) => void;
 }) {
     const {label: [x, y]} = geometry.provinces[province.id];
     const name = provinceName(province.id);
     const words = name.length > 14 ? name.split(' ') : [name];
-    const groups = pieces?.tokens.flatMap(holding => [
-        ...(holding.coloured ? [{owner: holding.owner, count: holding.coloured, fresh: false}] : []),
-        ...(holding.white ? [{owner: holding.owner, count: holding.white, fresh: true}] : []),
-    ]) ?? [];
+    const groups = tokenGroups(pieces);
     const layout = geometry.provinces[province.id].pieces[String(pieces?.marker ? 1 : groups.length)];
     const piecePosition = (index: number) => ({x: layout.points[index][0] - x, y: layout.points[index][1] - y});
     const width = 32 + province.commodities.length * 27;
@@ -77,7 +86,19 @@ function ProvinceLabel({province, pieces, snapshot, geometry, dimmed = false}: {
         <g className="market-label" data-capital-market={province.capital ? province.id : undefined}>
             <rect x={-width / 2} y={-12} width={width} height={33} rx={7} fill={province.capital ? '#263c3c' : '#fffdf5'} stroke="#b5b6a3" strokeWidth={.8}/>
             <text x={-width / 2 + 16} y={13} textAnchor="middle" fontSize={27} fontWeight={750} fill={province.capital ? '#fffdf5' : '#263c3c'}>{province.marketNumber}</text>
-            {province.commodities.map((commodity, index) => <CommodityIcon key={commodity} commodity={commodity} x={-width / 2 + 31 + index * 27} y={-8} size={25}/>)}
+            {province.commodities.map((commodity, index) => {
+                const key = `${province.id}:${commodity}`;
+                return <g key={commodity} data-map-commodity={key} className="province-commodity"
+                    transform={`translate(${-width / 2 + 31 + index * 27} -8)`} pointerEvents="all"
+                    role="button" tabIndex={key === commodityTabStop ? 0 : -1}
+                    aria-label={t('board.highlightCommodity', {commodity: label(commodity, 'commodity')})}
+                    onFocus={() => onCommodityFocus(key, geometry.provinces[province.id].label)}
+                    onClick={event => {event.stopPropagation(); onCommodityClick(commodity);}}
+                    onKeyDown={event => onCommodityKeyDown(event, key, commodity)}>
+                    <rect className="province-commodity-hit" x={-1} y={-4} width={27} height={33} rx={4} fill="transparent"/>
+                    <CommodityIcon commodity={commodity} size={25}/>
+                </g>;
+            })}
         </g></>}
         {pieces?.marker && <PlayerPiece {...piecePosition(0)} size={layout.size} fresh={pieces.marker.side === 'WHITE'}
             capital={snapshot.game.players.find(player => player.id === pieces.marker?.owner)?.capital ?? null}/>}
@@ -103,6 +124,7 @@ export function BoardMap({snapshot, busy}: {
     const [dismissedProvince, setDismissedProvince] = useState('');
     const [tabProvince, setTabProvince] = useState('');
     const [tabArea, setTabArea] = useState('');
+    const [tabCommodity, setTabCommodity] = useState('');
     const bounds = useMemo(() => mapBounds(snapshot.game.catalog?.provinces ?? [], geometry), [snapshot.game.catalog, geometry]);
     const [view, setView] = useState(bounds);
     const svg = useRef<SVGSVGElement>(null);
@@ -152,7 +174,8 @@ export function BoardMap({snapshot, busy}: {
     const commodityCard = referenceCard?.definition ?? heldCard?.definition;
     const commodityVisible = inspection?.kind === 'card' || inspection?.kind === 'history-card' ||
         (!inspection && !selectedArea);
-    const highlightedCommodities = commodityVisible && commodityCard?.kind === 'commodity'
+    const highlightedCommodities = inspection?.kind === 'commodity' ? [inspection.id]
+        : commodityVisible && commodityCard?.kind === 'commodity'
         ? referenceCard?.commodities
             ?? snapshot.game.cardInspections?.find(card => card.definition.id === commodityCard.id)?.commodities
             ?? snapshot.game.cardOffers.find(offer => offer.reference === cardReference)?.commodities ?? []
@@ -166,6 +189,11 @@ export function BoardMap({snapshot, busy}: {
         setSelectedArea(area);
         if (!picker && !cardDraft && !advanceDraft) { setSelectedCard(''); setSelectedAdvance(''); }
         if (!busy && picker?.kind === 'area' && picker.eligible.includes(area)) picker.pick(area);
+    };
+    const chooseCommodity = (commodity: string) => {
+        setInspection({kind: 'commodity', id: commodity});
+        setSelectedArea('');
+        setHovered(''); setFocused('');
     };
     const clearInspection = () => {
         setDismissedProvince(selected);
@@ -291,6 +319,16 @@ export function BoardMap({snapshot, busy}: {
     const emphasizedArea = selectedArea || (picker?.kind === 'area' ? picker.selected[0] : '') ||
         (hovered.startsWith('area:') ? hovered.slice(5) : '') || (focused.startsWith('area:') ? focused.slice(5) : '');
     const areaEntries = Object.entries(geometry.areas).sort(([first], [second]) => first.localeCompare(second));
+    const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
+    const activeAreaIds = areaEntries.map(([area]) => area).filter(area => activeAreas.has(area));
+    const tabAreaId = activeAreas.has(tabArea) ? tabArea : activeAreaIds[0];
+    const commodityKeys = catalog.provinces.flatMap(province => {
+        const pieces = occupancy.get(province.id);
+        const count = pieces?.marker ? 1 : tokenGroups(pieces).length;
+        return geometry.provinces[province.id].pieces[String(count)]?.crowded ? []
+            : province.commodities.map(commodity => `${province.id}:${commodity}`);
+    });
+    const commodityTabStop = commodityKeys.includes(tabCommodity) ? tabCommodity : commodityKeys[0];
     const lockedProvinces = new Set(snapshot.game.lockedProvinces);
     const areaAccess = Object.fromEntries(areaEntries.map(([area]) => {
         const members = catalog.provinces.filter(province => province.area === area);
@@ -306,9 +344,8 @@ export function BoardMap({snapshot, busy}: {
         ...areaEntries.map(([area, shape]) => ({id: area, kind: 'area', inspected: area === selectedArea, path: shape.path, state: highlightArea(area)})),
     ].filter(item => highlightPriority(item.state) > 0)
         .sort((first, second) => highlightPriority(first.state) - highlightPriority(second.state) || Number(first.inspected) - Number(second.inspected));
-    const activeAreas = new Set(catalog.provinces.map(province => province.area ?? province.overseas));
-    // Keep the sea texture sparse at Fit, practical zoom, and narrow screen widths.
-    const seaHatchScale = mapSize ? view.w / mapSize.width : 1;
+    // Keep sea hatching and satellite stippling legible at every map scale.
+    const textureScale = mapSize ? view.w / mapSize.width : 1;
     return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
         {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong></div>}
         <div className="map-viewport">
@@ -339,9 +376,10 @@ export function BoardMap({snapshot, busy}: {
                     {Object.entries(geometry.areas).map(([area, shape]) => <clipPath key={area} id={`${prefix}-area-${area}`}>
                         <path d={shape.path} clipRule="evenodd"/>
                     </clipPath>)}
-                    <pattern id={`${prefix}-satellite`} width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#e0e4d9"/><circle cx="4" cy="4" r=".8" fill="#879481"/></pattern>
+                    <SatellitePattern id={`${prefix}-satellite`} scale={textureScale}/>
+                    <LockedAreaPattern id={`${prefix}-locked-area`} scale={textureScale}/>
                     <pattern id={`${prefix}-connected-sea`} className="sea-connection-pattern" width="16" height="16"
-                        patternUnits="userSpaceOnUse" patternTransform={`scale(${seaHatchScale})`}>
+                        patternUnits="userSpaceOnUse" patternTransform={`scale(${textureScale})`}>
                         <rect className="sea-connection-water" width="16" height="16"/>
                         <path className="sea-connection-hatch" d="M0 16L16 0"/>
                     </pattern>
@@ -401,6 +439,13 @@ export function BoardMap({snapshot, busy}: {
                             {definition && <ProvinceHighlight path={shape.path} {...highlight(id)} outline={false}/>}
                         </g>;
                     })}
+                    <g className="map-access-shading" pointerEvents="none" aria-hidden="true" fill={`url(#${prefix}-locked-area)`}>
+                        {areaEntries.filter(([area]) => areaAccess[area].length > 0).map(([area, shape]) =>
+                            <path key={area} data-locked-area={area} d={shape.path}/>)}
+                        {catalog.provinces.filter(province => lockedProvinces.has(province.id) &&
+                            (!province.area || areaAccess[province.area].length === 0)).map(province =>
+                            <path key={province.id} data-locked-province={province.id} d={geometry.provinces[province.id].outline}/>)}
+                    </g>
                     {areaEntries.map(([area, shape]) => <g key={area} pointerEvents="none" opacity={activeAreas.has(area) ? 1 : .3} data-map-area={area}>
                         <path d={shape.path} fill="none" stroke={areaColors[area]} strokeWidth={8} strokeLinejoin="round"
                             clipPath={`url(#${prefix}-area-${area})`}/>
@@ -408,7 +453,7 @@ export function BoardMap({snapshot, busy}: {
                     {catalog.satelliteSupports.map(edge => {
                         const d = geometry.supports[`${edge.satellite} ${edge.market}`];
                         return <g key={`${edge.satellite}-${edge.market}`} data-support={`${edge.satellite} ${edge.market}`} pointerEvents="none">
-                            <path d={d} fill="none" stroke="#fffdf3" strokeWidth={7}/><path d={d} fill="none" stroke="#263d4b" strokeWidth={3.5} markerEnd={`url(#${prefix}-arrow)`}/>
+                            <SupportArrow path={d} markerId={`${prefix}-arrow`}/>
                         </g>;
                     })}
                     {emphasizedArea && <path data-area-dimming={emphasizedArea} d={`${geometry.frame}${geometry.areas[emphasizedArea].path}`}
@@ -430,14 +475,28 @@ export function BoardMap({snapshot, busy}: {
                         </g>)}
                     </g>
                     {catalog.provinces.map(province => <ProvinceLabel key={province.id} province={province} pieces={occupancy.get(province.id)} snapshot={snapshot} geometry={geometry}
-                        dimmed={!!emphasizedArea && province.area !== emphasizedArea}/>)}
-                    {areaEntries.map(([area, shape]) => <g key={area} data-map-area-label={area} className="map-area-label" role="button" tabIndex={area === (tabArea || areaEntries[0]?.[0]) ? 0 : -1}
-                        aria-label={`${t('board.area')} ${area}${areaAccess[area].length ? `, ${t('board.requires', {advances: areaAccess[area].map(requirement => label(requirement)).join(', ')})}` : ''}`} aria-pressed={highlightArea(area).selected}
+                        dimmed={!!emphasizedArea && province.area !== emphasizedArea}
+                        commodityTabStop={commodityTabStop}
+                        onCommodityClick={commodity => {if (!suppressClick.current) chooseCommodity(commodity);}}
+                        onCommodityFocus={(key, position) => {setTabCommodity(key); reveal(position);}}
+                        onCommodityKeyDown={(event, key, commodity) => {
+                            traverse(event, key, commodityKeys, 'data-map-commodity');
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault(); event.stopPropagation();
+                                suppressClick.current = false; chooseCommodity(commodity);
+                            }
+                        }}/>)}
+                    {areaEntries.map(([area, shape]) => <g key={area} data-map-area-label={area} className="map-area-label"
+                        pointerEvents={activeAreas.has(area) ? undefined : 'none'}
+                        role={activeAreas.has(area) ? 'button' : undefined}
+                        tabIndex={activeAreas.has(area) ? area === tabAreaId ? 0 : -1 : undefined}
+                        aria-label={`${t('board.area')} ${area}${areaAccess[area].length ? `, ${t('board.requires', {advances: areaAccess[area].map(requirement => label(requirement)).join(', ')})}` : ''}`}
+                        aria-pressed={activeAreas.has(area) ? highlightArea(area).selected : undefined}
                         opacity={activeAreas.has(area) ? 1 : .4}
                         onPointerEnter={() => setHovered(`area:${area}`)} onPointerLeave={() => setHovered('')}
                         onFocus={() => {setFocused(`area:${area}`); setTabArea(area); reveal(shape.label);}} onBlur={() => setFocused('')}
                         onClick={() => {if (!suppressClick.current) chooseArea(area);}}
-                        onKeyDown={event => {traverse(event, area, areaEntries.map(([id]) => id), 'data-map-area-label'); if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); suppressClick.current = false; chooseArea(area);}}}>
+                        onKeyDown={event => {traverse(event, area, activeAreaIds, 'data-map-area-label'); if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); suppressClick.current = false; chooseArea(area);}}}>
                         <title>{`${t('board.area')} ${area}${areaAccess[area].length ? ` · ${areaAccess[area].map(requirement => label(requirement)).join(', ')}` : ''}`}</title>
                         <rect x={shape.label[0] - 65} y={shape.label[1] - 55} width={130} height={110} fill="transparent"/>
                         <rect className="area-label-bg" x={shape.label[0] - 44} y={shape.label[1] - 28} width={88} height={56} rx={8}

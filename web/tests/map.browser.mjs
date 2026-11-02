@@ -11,6 +11,8 @@ import {checkActivityWorkspace} from './activityWorkspace.browser.mjs';
 import {checkLiveCardMap} from './cardMap.browser.mjs';
 import {assertBottomHandVisible, checkBottomHand} from './bottomHand.browser.mjs';
 import {checkMapViewport} from './mapViewport.browser.mjs';
+import {checkInactiveAreas} from './inactiveAreas.browser.mjs';
+import {checkMapPresentation} from './mapPresentation.browser.mjs';
 import {checkCommodityMap} from './commodityMap.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkCompactPresentation} from './compactPresentation.browser.mjs';
@@ -348,7 +350,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.screenshot(join(artifacts, 'aor-area-inspection.png'), 1440);
     // Hit the new continental extensions, away from labels, with real pointer input.
     for (const [province, x, y] of [
-        ['bergen', 1150, -20], ['kiev', 2450, 720], ['sarai', 2914, 565],
+        ['bergen', 1150, -20], ['kiev', 2450, 720], ['sarai', 2914, 610],
         ['cagliari', 1305, 1222], ['athens', 2040, 1456], ['bari', 1650, 1475.5],
         ['cairo', 2430, 2050], ['tripoli', 1510, 2000], ['west-africa', 130, 2020],
     ]) {
@@ -431,8 +433,10 @@ await page.send('Page.navigate', {url: web + actor.path});
         const [vx,vy,w,h] = document.querySelector('.world-map').getAttribute('viewBox').split(' ').map(Number);
         return x >= vx && x <= vx+w && y >= vy && y <= vy+h;
     })()`), true, 'Arrow traversal pans a zoomed map to its focused province');
+    await key('Tab');
+    assert.equal(await page.evaluate(`!!document.activeElement?.dataset?.mapCommodity`), true, 'Tab reaches commodity icons');
     await key('Tab'); await key('Tab');
-    assert.equal(await page.evaluate(`!!document.activeElement?.closest('.world-map')`), false, 'Tab leaves the two roving map groups');
+    assert.equal(await page.evaluate(`!!document.activeElement?.closest('.world-map')`), false, 'Tab leaves the three roving map groups');
     for (let step = 0; step < 25 && !await page.evaluate(`!!document.activeElement?.closest('.decision-panel')`); step++) await key('Tab');
     assert.equal(await page.evaluate(`!!document.activeElement?.closest('.decision-panel')`), true, 'The decision remains reachable through real sequential navigation');
     console.log('Passed: sequential keyboard entry, roving province traversal, zoomed focus panning and exit to the decision panel.');
@@ -510,6 +514,9 @@ await page.send('Page.navigate', {url: web + actor.path});
         assert.equal(await page.evaluate(`document.querySelectorAll('.map-province.inactive[tabindex]').length`), 0);
     }
 
+    await checkInactiveAreas(page, web);
+    await checkMapPresentation(page, web);
+    await page.send('Emulation.setDeviceMetricsOverride', {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
     await checkTable(page, web, after);
     await checkFinished(page, web, after);
     await checkDecisionClarity(page, web, after);

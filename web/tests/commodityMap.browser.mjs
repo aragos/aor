@@ -39,6 +39,46 @@ export async function checkCommodityMap(page, web, baseline) {
         assert.equal(await page.evaluate(`document.querySelectorAll('[data-commodity-highlight].inactive').length`), 0, 'Unused provinces remain unhighlighted');
         assert.equal(await page.evaluate(`document.querySelectorAll('.card-inspection-dialog').length`), 0, 'A commodity click needs no duplicate inspector');
         assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.map-zoom')).display === 'none'`), mobile, 'Map buttons are absent on mobile');
+        const draft = await page.evaluate(`document.querySelector('.decision-content .card-decision').textContent`);
+        const iconExamples = [
+            fixture.game.catalog.provinces.find(province => province.commodities.includes('STONE')),
+            fixture.game.catalog.provinces.find(province => province.commodities.length > 1),
+        ];
+        assert(iconExamples.every(Boolean), 'Fixture includes Stone and a multi-commodity province');
+        for (const province of iconExamples) {
+            for (const commodity of province.commodities) {
+                const selector = `[data-map-commodity="${province.id}:${commodity}"]`;
+                await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+                await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+                const point = await page.evaluate(`(() => {
+                    const icon = document.querySelector(${JSON.stringify(selector)});
+                    const point = new DOMPoint(12, 12).matrixTransform(icon.getScreenCTM());
+                    return {x: point.x, y: point.y};
+                })()`);
+                await page.send('Input.dispatchMouseEvent', {type: 'mousePressed', ...point, button: 'left', clickCount: 1});
+                await page.send('Input.dispatchMouseEvent', {type: 'mouseReleased', ...point, button: 'left', clickCount: 1});
+                const matching = fixture.game.catalog.provinces.filter(candidate => candidate.commodities.includes(commodity))
+                    .map(candidate => candidate.id).sort();
+                assert.deepEqual(await highlighted(), matching, 'A province icon highlights exactly its own commodity');
+                assert.equal(await page.evaluate(`document.querySelector('.decision-content .card-decision').textContent`), draft,
+                    'Commodity inspection preserves the prepared card action');
+                await show();
+                assert.deepEqual(await highlighted(), matching, 'Polling preserves province commodity inspection');
+            }
+        }
+        assert.equal(await page.evaluate(`document.querySelectorAll('[data-map-commodity][tabindex="0"]').length`), 1,
+            'All commodity icons share one roving tab stop');
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Home'});
+        const firstIcon = await page.evaluate('document.activeElement.dataset.mapCommodity');
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'ArrowRight'});
+        assert.notEqual(await page.evaluate('document.activeElement.dataset.mapCommodity'), firstIcon,
+            'Arrow keys traverse commodity icons');
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter'});
+        const keyboardCommodity = await page.evaluate(`document.activeElement.dataset.mapCommodity.split(':')[1]`);
+        assert.deepEqual(await highlighted(), fixture.game.catalog.provinces.filter(province => province.commodities.includes(keyboardCommodity))
+            .map(province => province.id).sort(), 'Keyboard activation highlights the focused commodity');
+        await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
+        assert.deepEqual(await highlighted(), expected, 'A card can replace the province commodity inspection');
         const beforeZoom = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
         await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '+', bubbles: true}))`);
         await page.wait(`document.querySelector('.world-map').getAttribute('viewBox') !== ${JSON.stringify(beforeZoom)}`, 'keyboard zoom without map buttons');

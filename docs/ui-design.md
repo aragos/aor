@@ -211,6 +211,7 @@ choice and understand its result through visual controls and commands, on deskto
   Commodity cards show shortage/surplus badges. Commodities and selected commodity cards offer
   controls for full payout boxes in reference popups; keep current owner payouts and adjustments
   in the game. Clicking a commodity card highlights every province in play of its commodity types;
+  a province's commodity icon applies the same inspection for just that commodity, preserving drafts.
   card replacement, deselection and normal selection cleanup remove obsolete highlights. Market
   tiles put the payout-help question mark beside the commodity name, without
   expandable details or replacement controls for the removed breakdown. Commodity cards link
@@ -307,7 +308,9 @@ choice and understand its result through visual controls and commands, on deskto
   as their component controls and share one selection state.
 - Every finite group has an accessible question. Map pressed state follows exact draft membership,
   including multiple targets, rather than the most recently inspected province. The map uses a roving
-  province tab stop, arrow traversal and focus panning at zoom; Tab can leave the map for confirmation.
+  tab stop for each of the province, commodity-icon and area groups, with arrow traversal and focus
+  panning at zoom;
+  Tab can leave the map for confirmation. Commodity-icon inspection preserves the prepared action.
 - Costs and deterministic cash/misery endpoints come from domain quotes. Private submission status
   compares the editable amount with the authoritative saved value; generic operation success cannot
   label an edited or withdrawn value as saved.

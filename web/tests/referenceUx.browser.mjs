@@ -91,6 +91,11 @@ export async function checkReferenceUx(page, web, baseline) {
         if (name === 'Income track') {
             assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'The topic chooser retains the active game income track');
         }
+        if (name === 'Shipping') {
+            const text = await page.evaluate(`document.querySelector('#shipping-track').textContent`);
+            assert.match(text, /coastal-water spaces.*each destination province per turn/);
+            assert.match(text, /overseas provinces.*not a token limit.*capacity is unlimited/);
+        }
     }
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     await page.evaluate(`document.querySelector('#tab-players')?.click(); document.querySelector('.player-summary.is-viewer .income-value .help-link').click()`);
