@@ -517,3 +517,14 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
     .decision-content > .game-actions { margin-block: .4rem; }
     .workspace-main .markets-workspace, .workspace-main .advances-workspace { padding: .8rem; }
 }
+
+.player-turn-order { display: flex; align-items: center; justify-content: space-between; gap: .4rem; margin-top: .35rem; color: #52644d; font-size: .72rem; }
+.player-turn-order > span { display: inline-flex; align-items: center; gap: .15rem; }
+.competition-green-die { display: flex; align-items: baseline; gap: .25rem; font-size: .85rem; }
+.order-track { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.order-track caption { text-align: left; color: #52644d; margin-bottom: .5rem; }
+.order-track th, .order-track td { padding: .5rem; text-align: left; border-bottom: 1px solid #d0d9c8; }
+.order-track thead { font-size: .82rem; }
+.order-track .is-viewer { background: #edf2e7; }
+.order-track-player { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; font-size: .85rem; }
+.order-track-player small { font-weight: 400; color: #52644d; }

@@ -387,6 +387,10 @@ data class PublicCatalog(
     val shippingTrack: List<ShippingCapability>,
     /** Base income in dollars, indexed by map markers, for the game's starting player count. */
     val incomeTrack: List<Int>,
+    /**
+     * Printed boxes and green-die results for the starting player count, before or after bidding.
+     */
+    val orderTrack: List<OrderBoxView>,
 ) {
     companion object {
         fun forPlayers(playerCount: Int, rules: RuleOptions = RuleOptions()): PublicCatalog {
@@ -407,6 +411,12 @@ data class PublicCatalog(
                 MiseryStep.entries,
                 ShippingCapability.entries,
                 EconomyTables.incomeFor(playerCount),
+                OrderBoxes.forPlayers(playerCount).map { box ->
+                    OrderBoxView(
+                        number = box,
+                        greenWins = CompetitionRules.greenWinningRolls(box),
+                    )
+                },
             )
         }
     }

@@ -8,6 +8,8 @@ import {TableIcon} from '../TableIcon';
 import {PlayerPiece} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {ChoiceButtons} from '../DecisionControls';
+import {HelpLink} from '../HelpLink';
+import {greenDieFaces} from '../TurnOrderReference';
 import {maximumPartialPlacement, provinceOrders} from './mapOrders';
 
 export function neighbors(connections: PublicCatalog['landBorders'], province: string): string[] {
@@ -98,6 +100,11 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
                         <small>{establishesMarker ? t(uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
                 {!remainingPlacement && offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
                 <DestinationShipping shipping={offer.shipping} tokens={shippingTokens}/>
+                {uncertain && offer.greenDieWins && <p className="competition-green-die">
+                    <span>{t(offer.greenDieWins.length ? 'order.greenWins' : 'order.greenCannotWin',
+                        {faces: greenDieFaces(offer.greenDieWins)})}</span>
+                    <HelpLink topic="turn-order" label={t('reference.turnOrder')}/>
+                </p>}
                 {remainingPlacement && <><p className="consequence">{t('table.markerNeedsTokens', {count: offer.requiredTokens})}</p><ExpansionAvailability offer={offer} province={province}/></>}
                 {!remainingPlacement && offer.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
                 {!partialOpen && <DecisionAction className="primary-expansion" disabled={busy || !available} onClick={() => { if (available) void submit(command); }}>

@@ -12,6 +12,25 @@ first reproduced the lifecycle failure, then committed a map-selected province a
 Historical long runs and separate history-editor evidence remain identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
 
+The 2026-11-02 turn-order reference adds focused StrictMode browser evidence
+(`aor-browser-artifacts-ZkHuVt`). Real game catalogs verify the distinct printed tracks for
+3–6 starting players. Live token bidding retains an unsaved amount through help and another
+player's polled submission; unresolved bids and ties assign no capitals. Resolved player boxes
+retain **You**, position and printed box separately. A changed-order fixture updates an open lookup,
+including the viewer row, without sending a command. Live competition help preserves the selected
+attack; confirmation still resolves it and the result expires at Expansion end while history remains.
+Core regressions compare projected green faces with recorded competition outcomes at every
+three-player box, with/without Proselytism and defender Chaos. The existing replay/storage checks
+cover continuity; this change adds public projections without changing saved records or commands.
+
+Rendered desktop and phone captures were reviewed separately: the three-column printed track fits
+without horizontal scrolling, capital names keep their silhouettes, and the viewer's row has both
+**You** and a background highlight. Pending order clearly explains how positions are established;
+the lookup keeps the black/white victory condition and tie exceptions beside the printed table.
+Keyboard Escape and closing restore focus; the neighboring income topic and reference chooser
+remain usable. The web build, 55 web unit tests, core JVM tests, Kotlin/JS compilation, server tests and Kotlin
+formatting check pass. The focused reference checks are also registered in the main browser suite.
+
 The 2026-11-02 map polish passes the web build, 55 web unit tests and both map geometry validators.
 Regeneration changes only Cagliari's two support paths on each board, retaining all graph, label,
 piece and area geometry. Focused StrictMode browser checks cover the shared satellite/map-key

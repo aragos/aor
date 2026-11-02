@@ -40,6 +40,16 @@ export async function checkLiveCompetitionLifecycle(page, web) {
     await page.wait(`document.querySelector('.pool-summary')`, 'live competition actor');
     await page.evaluate(`document.querySelector('[data-map-province="${target.destination}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     await page.wait(`document.querySelector('.primary-expansion:not([disabled])')`, 'live authoritative attack');
+    const greenPreview = await page.evaluate(`document.querySelector('.competition-green-die').textContent`);
+    const faces = target.greenDieWins;
+    assert(Array.isArray(faces), 'Live competition offers project the actual green-die results');
+    assert.match(greenPreview, faces.length ? /Green die wins on/ : /Green die cannot win/);
+    if (faces.length) assert(greenPreview.includes(faces.length === 1 ? String(faces[0]) : `${faces[0]}–${faces.at(-1)}`));
+    await page.evaluate(`document.querySelector('.competition-green-die .help-link').focus(); document.querySelector('.competition-green-die .help-link').click()`);
+    await page.wait(`document.querySelector('#turn-order .order-track')`, 'competition explains printed boxes');
+    await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+    assert.equal(await page.evaluate(`document.activeElement.matches('.competition-green-die .help-link')`), true);
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').disabled`), false, 'Reference preserves the live attack draft');
     await page.evaluate(`document.querySelector('.primary-expansion').click()`);
     await page.wait(`document.querySelector('.competition-notice')`, 'live competition result');
     const resolved = await game.snapshot(attacker);

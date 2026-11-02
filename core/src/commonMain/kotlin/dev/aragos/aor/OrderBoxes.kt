@@ -14,13 +14,21 @@ object OrderBoxes {
 
     /** Project an order whose player membership and uniqueness are owned by game state. */
     fun forOrder(order: List<PlayerId>): Map<PlayerId, Int> {
-        val boxes =
-            requireNotNull(byPlayerCount[order.size]) {
-                "Printed order boxes require three through six players."
-            }
-        return order.zip(boxes).toMap()
+        return order.zip(forPlayers(order.size)).toMap()
     }
+
+    /** Printed boxes in ascending turn position, available before bids establish an order. */
+    fun forPlayers(playerCount: Int): List<Int> =
+        requireNotNull(byPlayerCount[playerCount]) {
+            "Printed order boxes require three through six players."
+        }
 }
+
+/** Public printed track data; winning faces describe the green die alone, not total odds. */
+data class OrderBoxView(
+    val number: Int,
+    val greenWins: List<Int>,
+)
 
 @GameDataDsl
 private class OrderBoxBuilder {

@@ -2,6 +2,23 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'reference.turnOrder': 'Turn order & green die',
+    'order.position': 'Position {position}',
+    'order.box': 'Box {box}',
+    'order.current': 'Current order',
+    'order.pending': 'This turn’s order is pending.',
+    'order.pendingExplanation': 'Lower signed bids act earlier; ties are resolved after reveal. Your eventual position determines your printed box.',
+    'order.track': 'Printed track · {count} players',
+    'order.positionHeading': 'Position',
+    'order.boxHeading': 'Printed box',
+    'order.greenHeading': 'Green die wins on',
+    'order.none': 'No result',
+    'order.greenWins': 'Green die wins on {faces}',
+    'order.greenCannotWin': 'Green die cannot win from this box',
+    'order.explanation': 'During Expansion competition, the attacker wins if the green die exceeds their printed box number or the black die beats the white die. Earlier positions give the green die more winning results. The printed box can differ from the turn position.',
+    'order.proselytism': 'Proselytism also wins on green equal to the box, unless a defender is in Chaos. Applicable military advantage also wins on black equal to white.',
+    'order.changes': 'Renaissance swaps and Civil War movement can change these assignments before Expansion. Competition uses the current box.',
+
     'civilWar.loseCash': 'Lose ${cost} cash · cash after: ${after}',
     'civilWar.loseTokens': 'Lose {cost} expansion tokens · pool after: {after}',
     'error.CARD_INSUFFICIENT_REPLACEMENT_TOKENS': 'Your expansion pool cannot pay for all selected replacements.',
