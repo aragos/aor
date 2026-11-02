@@ -603,3 +603,32 @@ map edits. The broader map browser run did not pass: the live checkout run lost 
 reload, and the fixed snapshot stopped at the Sarai frame-selection assertion. These runs do not
 establish a green comprehensive map suite. The focused purchasing/table/help/hand evidence above
 is separate from that remaining map failure and from physical-device or screen-reader evidence.
+
+## Commodity quantities, live reference tracks and saved-game border polish
+
+The 2026-11-02 checks pass 942 core JVM tests, Kotlin/JS compilation, the server suite
+(403 cases, one skipped), Kotlin formatting, the production web build and 57 web unit tests.
+Commodity regressions cover shared cards, the modified deck, private locations/discards, epoch
+recycling and replay/continued play under every supported catalog. These are derived public views;
+no stored-game format or rules change is required. Existing file/PostgreSQL compatibility fixtures
+continue to pass.
+
+`helpTracks.browser.mjs` uses a live six-player catalog and a StrictMode position fixture to verify
+all players exactly once on each income, misery, shipping and commodity track, stacked markers,
+Chaos, no ships, zero ownership and payout boxes beyond ten. It checks changing positions and
+circulation while a popup stays open, preserved bid input, no submitted actions and popup width
+at 1440px and 390px. The neighboring live turn-order suite passes pending/resolved assignments,
+private bid polling, preserved bid/attack drafts, focus restoration and topic navigation. The
+existing reference suite passes its activity, topic chooser and contextual-help checks.
+
+The map presentation browser suite passes both maps at desktop and phone widths for catalogs
+13, 14 and 15. It verifies the shared Ligurian junction and absence of the former Genoa sliver,
+while retaining the distinct British drawings. `polish-legacy-maps.py` verifies that all four
+saved-game drawings retain exactly their preceding coastal and sea contacts.
+
+Reviewed screenshots in `/private/tmp/aor-help-final-review` show readable quantities and stacked
+capital symbols on desktop and phone, with the viewer outlined. The catalog-14 detail captures on
+both maps show the clean three-way junction and crossing support arrows without the former Genoa
+sliver or sea-facing notch. The turn-order/reference captures are in
+`/private/tmp/aor-help-neighbor-review`. These are emulated browser observations; they do not
+establish physical-device or screen-reader accessibility.

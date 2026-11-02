@@ -137,6 +137,10 @@ The browser selects checked-in `web/src/map/boardGeometry.json` or `europeanBoar
 according to the game's recorded map option. Both are keyed by stable province IDs.
 Catalog-13 and catalog-14 saves use the matching `catalog13*Geometry.json` or
 `catalog14*Geometry.json` assets instead, preserving the topology they actually play.
+The Ligurian junction presentation is shared through `web/scripts/map_presentation.py`.
+After editing that junction, run `python web/scripts/polish-legacy-maps.py` to update both supported
+saved-game drawings as well; it copies the current Ligurian detail, checks that coastal and sea contacts remain unchanged and retains
+their original British topology, land, labels and piece positions.
 The catalog owns connections, memberships and access; game state owns pieces and assigned capitals.
 Geometry does not determine eligibility or calculate game effects.
 

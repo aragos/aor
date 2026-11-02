@@ -129,6 +129,11 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   fleet's numbered boxes. Every visible capital name includes its symbol, including cash/misery
   previews. Shipping upgrades show current → new shipping.
   Identify whether each leader discount includes Written Record.
+  Commodity help includes new card counts for each configured epoch and the public number in
+  circulation not played since the latest epoch shuffle. Shared cards count for both choices;
+  future epochs and public plays are excluded, private discards stay included, and recycled cards
+  return after shuffling. Track lookups mark every player's live position with capital symbols,
+  including shared boxes, zero ownership, Chaos and no ships, and follow accepted polling updates.
   Open full payout boxes, legends, variant descriptions, printed tracks and app help in contextual
   popups. Omit duplicate card/advance catalogs available in the game; retain unique printed credits,
   relief ratings and prerequisites in contextual advance popups. Show one clickable printed-epoch

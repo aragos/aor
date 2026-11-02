@@ -2,16 +2,18 @@ import {createContext, lazy, Suspense, useContext, useState} from 'react';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {t} from './messages';
-import type {PlayerView, PublicCatalog} from './api';
+import type {PlayerView, PublicCatalog, Snapshot} from './api';
 
 export const ReferenceCatalogContext = createContext<PublicCatalog | null>(null);
 
-/** Only public identities and resolved assignments enter the live printed-track lookup. */
-export const ReferenceOrderContext = createContext<{
+/** Public live positions and card counts update open lookups without replacing action drafts. */
+export const ReferenceGameContext = createContext<{
     viewerId: string | null;
-    players: Pick<PlayerView, 'id' | 'name' | 'capital'>[];
+    players: Pick<PlayerView, 'id' | 'name' | 'capital' | 'boardMarkers' | 'misery' | 'ships'>[];
     turnOrder: string[];
     orderBoxes: Record<string, number>;
+    commodityCards: Snapshot['game']['commodityCards'];
+    commodityPayouts: Snapshot['game']['commodityPayouts'];
 } | null>(null);
 
 const ReferencePopup = lazy(() => import('./ReferencePopup'));

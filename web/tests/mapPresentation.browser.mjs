@@ -173,6 +173,16 @@ export async function checkMapPresentation(page, web) {
                 .map(path => path.dataset.lockedProvince).filter(id => ${JSON.stringify(remaining)}.includes(id)).sort()`),
                 remaining, 'Remaining locked provinces retain their own land and coastal shading');
             assert.deepEqual(await page.evaluate('window.mapCommands'), [], 'Map and help inspection never submits');
+            const assertLigurianJunction = async () => {
+                assert.equal(await page.evaluate(`document.querySelector('[data-coastal-space="genoa"] > path')
+                    .isPointInFill(new DOMPoint(1288.214, 1141.680))`), false,
+                    'The former hooked Genoa sliver is removed, including outside the junction sectors');
+                for (const province of ['marseilles', 'genoa', 'cagliari']) {
+                    assert.match(await page.evaluate(`document.querySelector('[data-coastal-space="${province}"] > path').getAttribute('d')`),
+                        /1254\.000 1152\.000/, `${province} uses the polished junction for this saved catalog`);
+                }
+            };
+            await assertLigurianJunction();
             const cornwallPath = await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`);
             const legacyCatalog = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-13',
                 landBorders: [...snapshot.game.catalog.landBorders, {first: 'cornwall', second: 'wales'}],
@@ -182,6 +192,7 @@ export async function checkMapPresentation(page, web) {
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1002,
                 game: {...snapshot.game, catalog: legacyCatalog}})})`);
             await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1002}"]')`, 'Saved catalog-13 game');
+            await assertLigurianJunction();
             assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                 cornwallPath, 'Existing games retain the drawing matching their recorded topology');
             const catalog14 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-14',
@@ -190,6 +201,15 @@ export async function checkMapPresentation(page, web) {
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1003,
                 game: {...snapshot.game, catalog: catalog14}})})`);
             await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1003}"]')`, 'Saved catalog-14 game');
+            await assertLigurianJunction();
+            if (process.env.AOR_BROWSER_ARTIFACTS && width === 1440) {
+                await page.evaluate(`(() => {
+                    const map = document.querySelector('.world-map'), rect = map.getBoundingClientRect();
+                    const w = 650, h = w * rect.height / rect.width;
+                    map.setAttribute('viewBox', [1275 - w / 2, 1220 - h / 2, w, h].join(' '));
+                })()`);
+                await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-cagliari-catalog14-${map}.png`));
+            }
             assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                 cornwallPath, 'Catalog-14 saves retain their narrower Bristol Channel');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1004})})`);

@@ -28,6 +28,23 @@ data class CommodityDefinition(
     val messageId: String
         get() = "commodity.${id.name.lowercase()}"
 
+    /** Cards introduced by each epoch, in epoch order; shared cards count for both choices. */
+    fun cardsByEpoch(rules: RuleOptions): List<Int> {
+        val matching = cardIds()
+        return Epoch.entries.map { epoch ->
+            rules.cardsForEpoch(epoch).count { card -> card in matching }
+        }
+    }
+
+    internal fun cardIds(): Set<String> =
+        CardData.all
+            .filter { card ->
+                val effect = CardEffectData.forCard(card.id) as? CardEffectSpec.CommodityChoices
+                effect?.choices?.contains(id) == true
+            }
+            .map(CardDefinition::id)
+            .toSet()
+
     val printedPayouts: List<Int>
         get() = (1..10).map { box -> baseValue * box * box }
 

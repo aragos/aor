@@ -1,14 +1,17 @@
-import {useEffect, useState} from 'react';
+import {useContext, useEffect, useState} from 'react';
 import {request} from './api';
 import type {PublicCatalog} from './api';
 import {label} from './labels';
 import {t} from './messages';
 import {Commodity} from './TablePanels';
+import {CommodityReference} from './CommodityReference';
 import {AccessLock, LockedAreaPattern, PlayerPiece, SatellitePattern} from './map/MapSymbols';
 import {MiseryBox} from './MiseryBox';
 import ruleOptions from './ruleOptions.json';
 import {CardInspectionDialog} from './CardInspectionDialog';
 import {TurnOrderReference} from './TurnOrderReference';
+import {ReferenceGameContext} from './HelpLink';
+import {ReferenceTrackPlayers} from './ReferenceTrackPlayers';
 
 interface ReferenceData {catalog: PublicCatalog}
 let publicReference: Promise<ReferenceData> | undefined;
@@ -35,6 +38,8 @@ const topics = [
 export default function ReferencePopup({initialTopic, close, catalog: gameCatalog}: {
     initialTopic: string; close: () => void; catalog?: PublicCatalog | null;
 }) {
+    const current = useContext(ReferenceGameContext);
+    const players = current?.players ?? [];
     const [topic, setTopic] = useState(initialTopic);
     const [reference, setReference] = useState<ReferenceData | null>(null);
     const [error, setError] = useState(false);
@@ -77,31 +82,29 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             <p>{t("reference.activityLayout")}</p>
         </section>}
             {topic === 'commodities' && <section><h2>{t('reference.commodity-payout-boxes')}</h2><nav>{catalog?.commodities.map(commodity => <button type="button" className="secondary" key={commodity.id} onClick={() => setTopic(`commodity-${commodity.id.toLowerCase()}`)}><Commodity commodity={commodity.id}/></button>)}</nav></section>}
-            {topic.startsWith('commodity-') && <section id="commodities"><h2>{t("reference.commodity-payout-boxes")}</h2><p>{t("reference.the-effective-box-is-established-markets")}</p>
-                {catalog?.commodities.filter(commodity => topic === `commodity-${commodity.id.toLowerCase()}`).map(commodity => <article id={`commodity-${commodity.id.toLowerCase()}`} key={commodity.id}>
-                    <h3><Commodity commodity={commodity.id}/></h3><p>{t("reference.base-value")}{commodity.baseValue}{t("reference.dice-total")}{commodity.diceTotal}</p>
-                    <ol className="payout-boxes" aria-label={t('reference.payoutBoxes', {commodity: label(commodity.id, 'commodity')})}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
-                </article>)}
-            </section>}
+            {topic.startsWith('commodity-') && catalog && <CommodityReference catalog={catalog} topic={topic}/>}
             {topic === 'turn-order' && catalog && <TurnOrderReference catalog={catalog}/>}
             {topic === 'income-track' && <section id="income-track"><h2>{t('reference.income-track')}</h2>
                 <p>{t('reference.income-markers')}</p>
                 <ol className="payout-boxes" aria-label={t('reference.income-track')}>{catalog?.incomeTrack.map((amount, markers) =>
-                    <li className="payout-box" key={markers} aria-label={t('reference.income-space', {markers, amount})}>
-                        <span>{markers}</span><strong>${amount}</strong>
+                    <li className={`payout-box${players.some(player => player.boardMarkers === markers) ? ' is-current' : ''}`} key={markers} data-track-box={markers}>
+                        <span aria-label={t('reference.income-space', {markers, amount})}>{markers}</span><strong>${amount}</strong>
+                        <ReferenceTrackPlayers players={players.filter(player => player.boardMarkers === markers)}/>
                     </li>)}</ol>
                 {catalog && <p>{t('reference.income-example', {markers: 3, amount: catalog.incomeTrack[3]})}</p>}
                 <p>{t('reference.income-modifiers')}</p>
             </section>}
             {topic === 'misery-track' && <section id="misery-track"><h2>{t('reference.misery-track')}</h2>
-            <ol className="reference-track misery-track" aria-label={t('reference.misery-track')}>{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}><MiseryBox value={value} track={catalog.miseryTrack}/></li>)}</ol>
+            <ol className="reference-track misery-track" aria-label={t('reference.misery-track')}>{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'} data-track-box={value ?? 'chaos'} className={players.some(player => player.misery === value) ? 'is-current' : ''}><MiseryBox value={value} track={catalog.miseryTrack}/><ReferenceTrackPlayers players={players.filter(player => player.misery === value)}/></li>)}</ol>
             <p>{t('reference.colors-progress-from-green-through-amber')}</p>
         </section>}
             {topic === 'shipping-track' && <section id="shipping-track"><h2>{t('reference.shipping')}</h2>
             <p>{t('reference.shipping-boxes')}</p>
             {[...new Set(catalog?.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet}><h3>{label(fleet, 'fleet')}</h3>
                 <p>{t(`reference.shipping-${fleet.toLowerCase()}`)}</p>
-                <ol className="reference-track">{catalog?.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}>{space.level}</li>)}</ol></div>)}
+                <ol className="reference-track">{catalog?.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level} data-track-fleet={fleet} data-track-box={space.level}
+                    className={players.some(player => player.ships.fleet === fleet && player.ships.level === space.level) ? 'is-current' : ''}>
+                    {space.level}<ReferenceTrackPlayers players={players.filter(player => player.ships.fleet === fleet && player.ships.level === space.level)}/></li>)}</ol></div>)}
             <p>{t('reference.shipping-commitments-and-available-capacity-are')}</p>
         </section>}
             {(topic === 'history' || topic.startsWith('undo-')) && <section id="history"><h2>{t("reference.undo-policies-55")}</h2>

@@ -75,9 +75,13 @@ export interface AdvanceDefinition {
     id: string; letter: string; category: string; cost: number; credit: number; miseryRelief: number;
     prerequisites: string[]; messageId: string; purchaseMisery: number;
 }
+export interface CommodityCardCountView {
+    commodity: string; epochs: number[]; unplayed: number | null;
+}
 export interface PublicCatalog {
     dataVersion: string;
     provinces: ProvinceDefinition[]; advances: AdvanceDefinition[];
+    commodityCards: CommodityCardCountView[];
     commodities: {id: string; baseValue: number; diceTotal: number; ownershipTrackBoxes: number; printedPayouts: number[]}[];
     landBorders: {first: string; second: string}[]; coastalConnections: {first: string; second: string}[];
     satelliteSupports: {satellite: string; market: string}[];
@@ -194,6 +198,7 @@ export interface Snapshot {
         markerReductionOffers?: {command: string; province: string; poolBefore: number; poolAfter: number;
             stockBefore: number; stockAfter: number; incomeBefore: number | null; incomeAfter: number | null}[];
         expansionOffers: ExpansionOfferView[]; expansionInspections?: ExpansionOfferView[];
+        commodityCards: CommodityCardCountView[];
         commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         cardInspections: CardInspectionView[];
         tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null;

@@ -28,6 +28,7 @@ import {checkClearAdvancePrices, checkLiveCommodityValues} from './valueDetails.
 import {checkAdvanceCategoryGroups, checkCapitalTieConsequences, checkSharedMarketCancellation, checkTokenPurchaseRound} from './roundSummaries.browser.mjs';
 import {checkCardAndPlayerDetails, checkReplacementContext} from './contextDetails.browser.mjs';
 import {checkExpansionDiagnostics} from './expansionDiagnostics.browser.mjs';
+import {checkHelpTracks} from './helpTracks.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkSpectator} from './spectator.browser.mjs';
@@ -528,6 +529,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkRequestRecovery(page, web, after);
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);
+    await checkHelpTracks(page, web);
     await checkReferenceUx(page, web, after);
     await checkActionButtons(page, web, after);
     await checkCompactPresentation(page, web, after);
