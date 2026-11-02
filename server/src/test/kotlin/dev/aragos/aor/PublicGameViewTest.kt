@@ -361,6 +361,67 @@ class PublicGameViewTest {
         assertThat(GameState(header).viewForPlayer(PlayerId("p1")).markerPlacement).isNull()
     }
 
+    @Test
+    fun publicViewsDoNotChangeWhenPrivateHandsChangeIdentity() {
+        val initial = turnState()
+        fun held(card: String): GameState =
+            initial.copy(
+                players =
+                    initial.players.mapValues { (_, player) ->
+                        player.copy(
+                            hand =
+                                listOf(
+                                    HandCard(
+                                        "private-${player.player.id}",
+                                        CardData.definition(card),
+                                    )
+                                )
+                        )
+                    }
+            )
+
+        val before = held("pirates-vikings").publicView()
+        val after = held("stone-1").publicView()
+
+        assertThat(after).isEqualTo(before)
+        assertThat(after.hand).isEmpty()
+        assertThat(after.cardOffers).isEmpty()
+        assertThat(after.pirateTargets).isNull()
+        assertThat(json.writeValueAsString(after)).doesNotContain("private-")
+    }
+
+    @Test
+    fun publicViewsRetainBoardAndReferencesWithoutSeatSpecificOffers() {
+        val initial = turnState()
+        val state =
+            initial.copy(
+                board = initial.board.placeMarker(ProvinceId("venice"), PlayerId("p1")).board
+            )
+
+        val view = state.publicView()
+
+        assertThat(view.board)
+            .containsExactly(
+                ProvinceView(ProvinceId("venice"), MarkerView(PlayerId("p1"), PieceSide.COLOURED))
+            )
+        assertThat(view.players).hasSize(3)
+        assertThat(view.catalog).isNotNull()
+        assertThat(view.cardInspections).isNotEmpty()
+        assertThat(view.advanceOffers).isEmpty()
+        assertThat(view.expansionOffers).isEmpty()
+        assertThat(view.expansionInspections).isEmpty()
+        assertThat(view.markerReductionOffers).isEmpty()
+        assertThat(view.reliefOffers).isEmpty()
+        assertThat(view.patronageOffers).isEmpty()
+        assertThat(view.adjustmentOffers).isEmpty()
+        assertThat(view.tokenPurchaseOffers).isEmpty()
+        assertThat(view.cardPurchaseOffer).isNull()
+        assertThat(view.shippingOffer).isNull()
+        assertThat(view.stabilizationCost).isNull()
+        assertThat(view.burdenReferences).isEmpty()
+        assertThat(view.lockedProvinces).isEmpty()
+    }
+
     private fun warSurrenderState(): GameState {
         val initial = turnState()
         val winner =

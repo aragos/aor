@@ -267,23 +267,36 @@ export function Dashboard({me}: {me: Account}) {
         },
     }), [me.id]);
     const [scope, setScope] = useState('mine');
-    const [filter, setFilter] = useStoredSetting('game-filter', 'ongoing', isGameFilter);
+    const [ownFilter, setOwnFilter] = useStoredSetting('game-filter', 'ongoing', isGameFilter);
+    const [browseFilter, setBrowseFilter] = useState('ongoing');
     const [page, setPage] = useState<GamePage>({games: [], nextCursor: null});
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     const [refresh, setRefresh] = useState(0);
     const [cursor, setCursor] = useState<string | null>(null);
-    const all = scope === 'all' && me.admin;
+    const all = scope === 'admin' && me.admin;
+    const selectedFilter = scope === 'mine' ? ownFilter : browseFilter;
+    const filter = selectedFilter === 'unavailable' && !all ? 'ongoing' : selectedFilter;
+    const scopes = ['mine', 'other', ...(me.admin ? ['admin'] : [])];
+    const scopeLabel = (value: string) => t(`hosted.${value === 'mine' ? 'own-games' : value === 'other' ? 'other-games' : 'administration'}`);
+    function selectScope(value: string) {
+        if (scope === value) return;
+        setScope(value); setCursor(null); setPage({games: [], nextCursor: null}); setError(''); setBusy(true);
+    }
+    function selectFilter(value: string) {
+        if (scope === 'mine') setOwnFilter(value); else setBrowseFilter(value);
+        setCursor(null);
+    }
     useEffect(() => startPolling({intervalMs: 30000, backgroundIntervalMs: 30000,
         paused: () => false, onError: failure => setError(message(failure)),
         poll: async signal => {
             setBusy(true);
             try {
-                const next = await request<GamePage>(`${all ? '/api/admin/games' : '/api/games'}?status=${encodeURIComponent(filter)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`, undefined, undefined, signal);
+                const next = await request<GamePage>(`${all ? '/api/admin/games' : '/api/games'}?scope=${scope === 'other' ? 'other' : 'own'}&status=${encodeURIComponent(filter)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`, undefined, undefined, signal);
                 if (!signal.aborted) {setPage(next); setError('');}
             } finally {if (!signal.aborted) setBusy(false);}
         },
-    }), [all, filter, cursor, refresh]);
+    }), [scope, all, filter, cursor, refresh]);
     async function exportAll() {
         setBusy(true); setError('');
         try {
@@ -295,21 +308,43 @@ export function Dashboard({me}: {me: Account}) {
             download('aor-game-logs.json', {exportedAt: new Date().toISOString(), games});
         } catch (failure) {setError(message(failure));} finally {setBusy(false);}
     }
-    return <main className="portal"><header className="portal-header"><div><p className="eyebrow"><AppLogo/></p><h1>{all ? t('hosted.all-games') : t('hosted.my-games')}</h1></div><AccountControls showGames={false}/></header>
+    return <main className="portal"><header className="portal-header"><div><p className="eyebrow"><AppLogo/></p><h1>{t('hosted.games')}</h1></div><AccountControls showGames={false}/></header>
+        <section className="panel games-panel">
+            <div className="game-list-toolbar">
+                <nav className="game-list-tabs" role="tablist" aria-label={t('hosted.games')}>
+                    {scopes.map(value => <button key={value} type="button" role="tab" id={`games-tab-${value}`}
+                        aria-selected={scope === value} aria-controls="games-list" tabIndex={scope === value ? 0 : -1}
+                        onClick={() => selectScope(value)} onKeyDown={event => {
+                            if (['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
+                                event.preventDefault();
+                                const next = event.key === 'Home' ? scopes[0] : event.key === 'End' ? scopes[scopes.length - 1]
+                                    : scopes[(scopes.indexOf(value) + (event.key === 'ArrowRight' ? 1 : scopes.length - 1)) % scopes.length];
+                                selectScope(next); document.getElementById(`games-tab-${next}`)?.focus();
+                            }
+                        }}>{scopeLabel(value)}</button>)}
+                </nav>
+                <label className="game-list-filter">{t('hosted.status-filter')}
+                    <select value={filter} onChange={event => selectFilter(event.target.value)}>
+                        {['ongoing', ...(scope === 'mine' ? ['my-move'] : []), 'finished', 'cancelled', 'abandoned', ...(all ? ['unavailable'] : []), 'all'].map(value =>
+                            <option key={value} value={value}>{t(`gameStatus.${value.replace(/-/g, '_').toUpperCase()}`)}</option>)}
+                    </select>
+                </label>
+            </div>
+            <div id="games-list" role="tabpanel" aria-labelledby={`games-tab-${scope}`} aria-busy={busy}>
+                {scope === 'other' && <p className="muted spectator-list-note">{t('hosted.spectator-list-note')}</p>}
+                {all && <div className="button-row"><button className="secondary" disabled={busy} onClick={() => {void exportAll();}}>{t('hosted.export-all-command-logs')}</button></div>}
+                <Problem value={error}/>{busy && !page.games.length && <p role="status">{t('hosted.loading')}</p>}
+                {!busy && !page.games.length && <p>{t('hosted.no-games-match-this-filter')}</p>}
+                <ul className="game-directory">{page.games.map(game => <li key={game.id}>
+                    {all ? <AdminGame game={game} refresh={() => setRefresh(value => value + 1)}/>
+                        : <a className={`game-row ${game.myMove ? 'needs-action' : 'waiting'}`} href={`/games/${game.id}`}><GameRow game={game}/></a>}
+                </li>)}</ul>
+                <div className="button-row">{cursor && <button className="secondary" disabled={busy} onClick={() => setCursor(null)}>{t('hosted.first-page')}</button>}
+                    {page.nextCursor && <button className="secondary" disabled={busy} onClick={() => setCursor(page.nextCursor)}>{t('hosted.next-page')}</button>}</div>
+            </div>
+        </section>
         <RegisteredGameForm me={me}/>
-        <section className="panel">
-            {me.admin && <ChoiceButtons label={t('hosted.my-games')} value={scope} onChange={value => {setScope(value); setCursor(null);}} choices={[{value: 'mine', label: t('hosted.my-games')}, {value: 'all', label: t('hosted.all-games')}]}/>}
-            <ChoiceButtons label={t('game.table')} value={filter} onChange={value => {setFilter(value); setCursor(null);}} choices={['ongoing', 'my-move', 'finished', 'cancelled', 'abandoned', ...(all ? ['unavailable'] : []), 'all'].map(value => ({value, label: t(`gameStatus.${value.replace(/-/g, '_').toUpperCase()}`)}))}/>
-            {me.admin && <div className="button-row"><button className="secondary" disabled={busy} onClick={() => {void exportAll();}}>{t('hosted.export-all-command-logs')}</button></div>}
-            <Problem value={error}/>{busy && <p role="status">{t('hosted.loading')}</p>}
-            {!busy && !page.games.length && <p>{t('hosted.no-games-match-this-filter')}</p>}
-            <ul className="game-directory">{page.games.map(game => <li key={game.id}>
-                {all ? <AdminGame game={game} refresh={() => setRefresh(value => value + 1)}/>
-                    : <a className={`game-row ${game.myMove ? 'needs-action' : 'waiting'}`} href={`/games/${game.id}`}><GameRow game={game}/></a>}
-            </li>)}</ul>
-            <div className="button-row">{cursor && <button className="secondary" disabled={busy} onClick={() => setCursor(null)}>{t('hosted.first-page')}</button>}
-                {page.nextCursor && <button className="secondary" disabled={busy} onClick={() => setCursor(page.nextCursor)}>{t('hosted.next-page')}</button>}</div>
-        </section>{me.admin && <AdminPlayers/>}
+        {all && <AdminPlayers/>}
     </main>;
 }
 

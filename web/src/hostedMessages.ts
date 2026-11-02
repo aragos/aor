@@ -1,5 +1,11 @@
 /** Account and operational copy uses the same message interface as gameplay. */
 export const hostedMessages: Record<string, string> = {
+    "hosted.games": "Games",
+    "hosted.own-games": "Own games",
+    "hosted.other-games": "Other games",
+    "hosted.administration": "Administration",
+    "hosted.status-filter": "Status",
+    "hosted.spectator-list-note": "Open a game to spectate. Only public information is shown.",
     "hosted.the-email-or-password-was": "The email or password was not accepted.",
     "hosted.an-account-already-uses-that": "An account already uses that email. Sign in or reset your password.",
     "hosted.enter-a-valid-email-address": "Enter a valid email address.",

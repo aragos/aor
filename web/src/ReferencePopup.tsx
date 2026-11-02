@@ -26,6 +26,7 @@ const topics = [
     ['misery-track', 'reference.misery-track'],
     ['shipping-track', 'reference.shipping'],
     ['history', 'reference.undo-policies'],
+    ['plans', 'plan.helpTitle'],
 ];
 
 /** Contextual public lookup leaves the live game, current draft and page title intact. */
@@ -86,6 +87,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                     <li className="payout-box" key={markers} aria-label={t('reference.income-space', {markers, amount})}>
                         <span>{markers}</span><strong>${amount}</strong>
                     </li>)}</ol>
+                {catalog && <p>{t('reference.income-example', {markers: 3, amount: catalog.incomeTrack[3]})}</p>}
                 <p>{t('reference.income-modifiers')}</p>
             </section>}
             {topic === 'misery-track' && <section id="misery-track"><h2>{t('reference.misery-track')}</h2>
@@ -123,6 +125,9 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             </ul>
             <p>{t("reference.undo-last-action-appears-in-the")}<code>@entry</code>{t("reference.references-retain-recorded-actions-accepted-edits")}</p>
         </section>}
+            {topic === 'plans' && <section id="plans"><h2>{t('plan.helpTitle')}</h2>
+                <p>{t('plan.helpSaving')}</p><p>{t('plan.helpAutomatic')}</p><p>{t('plan.helpBoundaries')}</p>
+            </section>}
         </div>
     </CardInspectionDialog>;
 }

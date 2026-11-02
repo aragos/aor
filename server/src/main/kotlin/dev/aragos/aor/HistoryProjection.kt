@@ -9,7 +9,7 @@ internal data class PlayerHistory(
 /** History follows the same private audiences as live hands, including both sides of a trade. */
 internal object HistoryProjection {
     /** Projects private history and the final state in the same replay of every revision delta. */
-    fun forPlayer(stored: StoredGame, viewer: PlayerId): PlayerHistory {
+    fun forPlayer(stored: StoredGame, viewer: PlayerId?): PlayerHistory {
         var state = GameState(stored.header)
         var tokenBatch: TokenPurchaseBatch? = null
         val events = mutableListOf<HistoryEventView>()
@@ -70,12 +70,13 @@ internal object HistoryProjection {
             stored.revisions
                 .filter {
                     it.replaceFrom != null ||
+                        it.storageArchive != null ||
                         it.adminAuthor != null ||
                         (it.id > 1 && it.undoPolicy != null)
                 }
                 .forEach { revision ->
                     add(
-                        "# revision ${revision.id} by ${revision.adminAuthor?.let { "admin:$it" } ?: revision.author}: ${revision.command}"
+                        "# revision ${revision.id} by ${revision.adminAuthor?.let { if (viewer == null) "administrator" else "admin:$it" } ?: revision.author}: ${revision.command}"
                     )
                 }
         }
@@ -102,7 +103,7 @@ internal object HistoryProjection {
         }
     }
 
-    fun line(before: GameState, entry: Entry, viewer: PlayerId): String =
+    fun line(before: GameState, entry: Entry, viewer: PlayerId?): String =
         when (entry) {
             is Entry.Shuffle -> "!shuffle <hidden>"
             is GameOutcome.Draw ->
@@ -121,7 +122,7 @@ internal object HistoryProjection {
             else -> entry.toText()
         }
 
-    private fun action(before: GameState, entry: Entry.Action, viewer: PlayerId): String {
+    private fun action(before: GameState, entry: Entry.Action, viewer: PlayerId?): String {
         val command = entry.command
         return when {
             entry.actor != viewer && command is TurnCommand.DiscardCard ->

@@ -13,6 +13,13 @@ enum class GameListStatus {
     UNAVAILABLE,
 }
 
+/** Listing membership is independent from administrative authority to inspect private logs. */
+enum class GameListScope {
+    OWN,
+    OTHER,
+    ALL,
+}
+
 data class GameSummary(
     val id: String,
     val createdAt: Long,
@@ -59,7 +66,7 @@ class GameAdministration(
 ) {
     fun list(
         viewer: AccountId,
-        admin: Boolean,
+        scope: GameListScope,
         filter: String?,
         after: String?,
         limit: Int,
@@ -67,7 +74,7 @@ class GameAdministration(
     ): GamePage {
         requireLimit(limit)
         requireCursor(after)
-        return store.listGames(viewer, admin, parseFilter(filter), after, limit, accounts)
+        return store.listGames(viewer, scope, parseFilter(filter), after, limit, accounts)
     }
 
     fun log(id: String, archive: String? = null): GameLog {
@@ -200,39 +207,50 @@ class GameAdministration(
         val status =
             original["status"]?.takeIf { it.isTextual }?.let { GameStatus.valueOf(it.asText()) }
                 ?: GameStatus.ACTIVE
-        return StoredGame(
-            id = id,
-            name = GameName(original.field("name").string()),
-            header = header,
-            credentials =
-                original.field("credentials").properties().associate { (player, hash) ->
-                    PlayerId(player) to hash.string()
-                },
-            memberships =
-                original["memberships"]
-                    ?.properties()
-                    ?.associate { (player, uid) -> PlayerId(player) to uid.string() }
-                    .orEmpty(),
-            createdAt =
-                original["createdAt"]?.takeIf(JsonNode::isIntegralNumber)?.longValue()
-                    ?: clock.millis(),
-            initialStatus = status,
-            baseRevision = expectedRevision,
-            previousArchive = reference,
-            revisions =
-                listOf(
-                    Revision(
-                        id = expectedRevision + 1,
-                        parent = expectedRevision,
-                        author = header.creatorId,
-                        command = "admin-replace-log",
-                        entries = entries,
-                        undoPolicy = policy,
-                        adminAuthor = actor.value,
-                        administrativeAction = AdministrativeAction.UPGRADE,
-                        at = clock.millis(),
-                    )
-                ),
+        val privatePlans =
+            if (original["fileVersion"]?.asInt() == 7) {
+                GameDocuments.read(id, original)
+            } else null
+        return ActivityPlans.disarm(
+            StoredGame(
+                id = id,
+                name = GameName(original.field("name").string()),
+                header = header,
+                credentials =
+                    original.field("credentials").properties().associate { (player, hash) ->
+                        PlayerId(player) to hash.string()
+                    },
+                memberships =
+                    original["memberships"]
+                        ?.properties()
+                        ?.associate { (player, uid) -> PlayerId(player) to uid.string() }
+                        .orEmpty(),
+                createdAt =
+                    original["createdAt"]?.takeIf(JsonNode::isIntegralNumber)?.longValue()
+                        ?: clock.millis(),
+                initialStatus = status,
+                baseRevision = expectedRevision,
+                previousArchive = reference,
+                plans = privatePlans?.plans.orEmpty(),
+                planVersions = privatePlans?.planVersions.orEmpty(),
+                planReceipts = privatePlans?.planReceipts.orEmpty(),
+                planExecutions = privatePlans?.planExecutions.orEmpty(),
+                revisions =
+                    listOf(
+                        Revision(
+                            id = expectedRevision + 1,
+                            parent = expectedRevision,
+                            author = header.creatorId,
+                            command = "admin-replace-log",
+                            entries = entries,
+                            undoPolicy = policy,
+                            adminAuthor = actor.value,
+                            administrativeAction = AdministrativeAction.UPGRADE,
+                            at = clock.millis(),
+                        )
+                    ),
+            ),
+            PlanPause.EDITED,
         )
     }
 

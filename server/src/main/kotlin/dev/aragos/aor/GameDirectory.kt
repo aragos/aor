@@ -13,7 +13,7 @@ internal object GameDirectory {
     fun list(
         store: ManagedGameStore,
         viewer: AccountId,
-        admin: Boolean,
+        scope: GameListScope,
         status: GameListStatus?,
         after: String?,
         limit: Int,
@@ -25,11 +25,13 @@ internal object GameDirectory {
                 .asSequence()
                 .mapNotNull { id ->
                     val root = json.readTree(store.document(id))
+                    val member =
+                        root["memberships"]?.properties()?.any {
+                            it.value.asText() == viewer.value
+                        } == true
                     if (
-                        !admin &&
-                            root["memberships"]?.properties()?.none {
-                                it.value.asText() == viewer.value
-                            } != false
+                        (scope == GameListScope.OWN && !member) ||
+                            (scope == GameListScope.OTHER && member)
                     ) {
                         return@mapNotNull null
                     }

@@ -18,7 +18,7 @@ export function setTurnFavicon(canAct: boolean) {
 }
 
 export function hasPlayerAction(snapshot: Snapshot): boolean {
-    return snapshot.status !== 'CANCELLED' && snapshot.status !== 'ABANDONED' &&
+    return snapshot.viewerId !== null && snapshot.status !== 'CANCELLED' && snapshot.status !== 'ABANDONED' &&
         snapshot.game.stage !== 'FINISHED' && (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
 }
 

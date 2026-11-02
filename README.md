@@ -17,6 +17,8 @@ recorded outcomes support deterministic replay, restart and scoped, audited hist
   [decision coverage](docs/ui-decision-coverage.md) and [UX review](docs/ux-next-steps.md): interaction and evidence.
 - [Principles alignment proposal](docs/principles-alignment-proposal.md): project-wide review and
   proposed improvements to decisions, engine boundaries and game management.
+- [Parallel purchasing proposal](docs/parallel-purchasing-proposal.md): private saved plans and
+  automatic execution in turn order, including card purchases, discards and ongoing-game upgrades.
 - [Data inventory](docs/data-inventory.md), [card inventory](docs/card-inventory.md) and
   [rule coverage](docs/rule-coverage.md): catalog sources and verification.
 - [European map authoring](docs/european-map.md): alternate-board definitions and validation.
@@ -51,7 +53,8 @@ The compact table shows **AoR**, and player page titles identify the assigned ca
 hand and contextual actions for play; inspectors have their own surface and preserve prepared
 choices. Markets and commodity cards offer optional full payout boxes. Activity opens by default
 and explains draws, dice, cash changes and epoch/end triggers. See the guides for expansion resources,
-public unplayed-leader counts and the optional Urban Ascendancy purchase draft.
+public unplayed-leader counts and private Purchase/Buy Card plans. Plans can be saved for review
+or explicitly authorized to execute on the legal turn, including while offline.
 
 The command input shares engine validation with forms. It accepts assigned capital prefixes and
 unambiguous card shorthand, such as `venice: play wine/cloth cloth`. Stored commands retain canonical
@@ -68,7 +71,9 @@ handles, membership access and managed PostgreSQL for all durable state. For SQL
 another provider, set `AOR_STORAGE=postgres` and secret `AOR_DATABASE_URL`. TLS defaults to
 `verify-full`; loopback development may use `?sslmode=disable`. See [deployment](docs/deployment.md).
 
-Current games use file format 6, rules `ah1996-three-epoch-4` and data `ah1996-catalog-13`.
+Current games use file format 7, rules `ah1996-three-epoch-4` and data `ah1996-catalog-13`.
+Creators can explicitly upgrade format-6 games from the game screen. The upgrade archives the
+source and retains all original revisions, outcomes, memberships and pending bids.
 Creation records configuration in revision 1 and automatic setup/outcomes in revision 2. Ordinary
 revisions contain deltas. Earlier versions require explicit, validated administrative upgrades with
 an archived preceding file; the engine performs no automatic migration.
@@ -108,5 +113,5 @@ checks against SQL from the repository root:
 AOR_BROWSER_SERVER="$PWD/web/scripts/postgres-browser-server.sh" npm run test:browser --workspace web
 ```
 
-Apply [AGENTS.md](AGENTS.md) for coding, branch and verification conventions. Bots and persistent
-private plans remain deferred.
+Apply [AGENTS.md](AGENTS.md) for coding, branch and verification conventions. Bots and general
+future-turn scripts remain deferred.

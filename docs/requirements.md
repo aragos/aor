@@ -28,8 +28,12 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
    retaining privately discarded leaders in the counts so no hidden identity is disclosed.
 5. Undo follows its four documented scopes. Setup and complete simultaneous batches are protected;
    another player's answer may be retained by reference, never supplied as a replacement.
-6. Support only current rules/data/file versions. Saved-game upgrades are explicit, validated and
-   auditable; schema maintenance cannot silently change game behavior.
+6. Every change must preserve playability of existing saved games or include an implemented,
+   documented and tested upgrade path to the newest version. Ordinary play may support only current
+   rules/data/file versions if explicit, validated and auditable upgrades cover affected games.
+   Preserve game continuity, recorded outcomes, history, identities, metadata, memberships and
+   pending private state. Verify representative pre-change saves load, replay and continue play,
+   directly or after upgrade; schema maintenance cannot silently change game behavior.
 
 ## Player experience
 
@@ -44,7 +48,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   while inspecting other objects. Use the object itself rather than separate Inspect controls;
   keep province inspection on the map. Clear the province after accepted token/marker placement,
   retaining correctable work after rejection. Show available cash alongside spending decisions; omit
-  a permanent resource section. Include each player's advance count in their summary. Expanded
+  a permanent resource section. Include each player's advance count in their summary. Player boxes
+  share the height of the tallest summary across all rows, without extra reserved space. Expanded
   advances follow printed category and letter order, with an explicit empty state when none are owned.
   Expanded player details omit the repeated name and close button; the summary toggles the floating
   detail without resizing the player strip or map. Show written cash in expanded player details and
@@ -59,6 +64,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   its lower space to it. Workspace, action and activity scrolling must not push the hand below the
   viewport or cover it. On narrow screens, coordinate the action review and confirmation above the
   hand rather than overlaying separate fixed panels. Keep short action panes sized to their content.
+  Let the turn-status box and headings scroll with long action reviews, retaining reachable Undo and
+  confirmation controls and usable review space on short phones, including with an expanded hand.
   On phones, use a left icon rail for workspaces and a dedicated Players tab instead of the player
   strip. Keep Commands and configuration in Players, without a bottom bar. Show Papal Decree as a
   banner in Advances; relevant actions own other turn effects. Omit the visible private-hand heading
@@ -136,8 +143,14 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   explain the blocker and offer Pass. Show the unused MR dollars from this turn's advance purchases.
   Also show that running MR total during advance purchasing, updating it after each purchase.
   A confirmed relief purchase also finishes purchasing; unaffordable relief requires explicit Pass.
-  Permit an optional, cancelable Urban Ascendancy purchase draft
-  while waiting; submit once on the legal turn while that view remains open, with no failed retries.
+  Allow parallel private preparation of Purchase and Buy Card activities. Save for review never
+  executes automatically and remains editable on the legal turn, including under Competitive undo.
+  Explicit automatic authorization survives browser closure and restart; cancellation wins only
+  before execution starts. Revalidate exact consequences and pause on changes, missing decisions
+  or draws. Shared plans support Urban Ascendancy and both Master Art discard opportunities, with
+  normal command, information and undo boundaries. Keep plans private and execute each segment once.
+  Upgrade current format-6 games explicitly to format 7, preserving effective history, entry IDs,
+  recorded outcomes, current prompts, metadata, membership and pending secrets with exact archives.
   Resolve event replacements in current player order. Offer all of the chooser's affected provinces
   together, enforce their shared pool budget, and review the complete group before one confirmation.
   Identify the event, recipient, pool cost and result; explain when no pool token remains and avoid
@@ -178,6 +191,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   transaction as the public revision. A stale same-seat write conflicts; another seat's private write
   does not. Saving and returning to an earlier amount still changes the receipt. Distinguish the saved
   private value from an unsaved browser draft, including after withdrawal.
+- Present shipping, advances, stabilization and misery relief as steps within Purchase, including
+  continuation buttons that identify the next step or finish purchasing.
 - Offer Renaissance only in Buy Card, Play Cards, Purchase, Expansion and Final Card Play. Skip
   publicly empty windows at activation, using the same target calculation as swaps. Treat changed
   replay continuation as an explicit rules-version boundary.
@@ -207,8 +222,13 @@ the user handle and sign-out control share the top bar with the game title and i
 one clickable row showing the creator-chosen game name and participants, distinguished by
 pending-action status, without creation dates or visible IDs. Require a name in the creation form;
 retain it in the game header and browser tab across reloads and history edits.
-Administrators control creation permission; members can filter their own ongoing, awaiting-move and
-finished games.
+Administrators control creation permission. Every registered user can switch between Own games and
+Other games, with a compact status filter. Own games includes ongoing, awaiting-move and finished games;
+Other games excludes the viewer’s memberships and opens a read-only spectator table. Spectators can
+inspect the public board, players, advances, commodities, activity and final scores. Spectator responses
+exclude private hands, unrevealed bids and token amounts, private commands and choices, saved-submission
+receipts, and history-edit or action permissions. Public inspection must never impersonate a seat.
+Spectating requires the same authenticated, verified and registered account as hosted play.
 Administrators may inspect games, cancel/abandon them, export logs, validate upgrades and purge by ID.
 These operations are authenticated, audited and distinct from player actions.
 
@@ -218,5 +238,5 @@ Prefer managed authentication/TLS and automated dependency checks and fresh depl
 
 [Follow-ups](follow-ups.md) own launch credentials, DNS and initial administrator decisions. Human
 screen-reader, physical-phone, browser-chrome zoom and composited/SVG contrast review remain separate
-from automated evidence. Toulouse and Constantinople's labels are accepted. Bots and persistent private plans
-remain deferred; the in-view Urban Ascendancy draft does not provide a general planning system.
+from automated evidence. Toulouse and Constantinople's labels are accepted. Bots and general plans
+spanning future phases remain deferred; private plans cover current Purchase and Buy Card activities.

@@ -271,9 +271,6 @@ def geography(province_ids=None):
         ]
     )
     land = land.difference(straits)
-    # Simplify the Bristol estuary at board scale so Wales and Cornwall retain
-    # their printed land border without disconnected pieces of either province.
-    land = land.union(LineString([project(-3.8, 51.6), project(-3.7, 51.1)]).buffer(14))
     # Non-playing interiors separate graph branches that share a real landmass.
     # Strait widths are exaggerated to keep the separate coastal spaces readable.
     neutral = unary_union(
@@ -317,7 +314,6 @@ def geography(province_ids=None):
     # Follow bays and peninsulas when a direct city-to-city chord crosses water.
     routes = {
         ("kongsberg", "malmo"): scandinavian_corridor[1:-1],
-        ("wales", "cornwall"): [(-3.7, 51.3)],
         ("amsterdam", "bruges"): [(4.3, 51.6)],
         ("barcelona", "valencia"): [(0.2, 40.8)],
         ("salonika", "athens"): [(22.4, 39.2)],
@@ -335,6 +331,15 @@ def geography(province_ids=None):
         .union(fixed_insets)
         .buffer(0)
     )
+    # Exaggerate the Bristol Channel into a bay between Cornwall, Chester and
+    # Portsmouth. Keep its head short of the Chester–Portsmouth land border's
+    # northern end and its southern shore clear of Cornwall–Portsmouth's crossing.
+    bristol_channel = Polygon([
+        (575, 620), (620, 620), (665, 625), (695, 612), (720, 589),
+        (749, 577), (754, 591), (738, 619), (704, 642), (650, 656),
+        (595, 650),
+    ])
+    land = land.difference(bristol_channel).buffer(0)
     frame = Polygon(
         [display_point(x, y) if x else (0, y) for x, y in frame.exterior.coords]
     )

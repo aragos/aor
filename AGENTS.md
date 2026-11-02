@@ -3,12 +3,40 @@
 Reusable Git, style, design, documentation, and testing preferences are maintained in the user's
 global Codex `AGENTS.md`. Apply that guidance alongside these project-specific contracts.
 
+## Development branches
+
+- Start each new development task on a new, focused feature branch before editing. Continue related
+  work on that task's branch; do not reuse an unrelated task's branch or develop directly on `main`,
+  `release`, or another shared integration branch.
+- Preserve existing uncommitted work when creating or switching branches. Use a separate worktree
+  when a new task needs isolation from ongoing changes.
+
+## Release workflow
+
+- A request to "release" authorizes the complete sequence: push `main` to its upstream, wait for
+  CI to pass for that exact commit, push the verified commit to the remote `release` branch, and
+  verify that Render successfully deploys it.
+- Fetch first and preserve remote changes. Promote the verified `main` commit to `release` without
+  force-pushing. If CI fails, fix the failure and verify the updated commit before promotion.
+- A release is complete only when Render reports the intended commit live and the deployed
+  application's `/api/health` and web entry point respond successfully. Report the commit and
+  verification results; if access prevents verification, report the release as unverified.
+- Verify saved-game compatibility or the required upgrade path before promoting to `release`.
+- See `docs/deployment.md` for hosting configuration and operational requirements.
+
 ## Domain and compatibility
 
 - Keep generic engine state, commands, prompts, and views independent of setup-specific rules.
 - Use typed diagnostics for rejected game actions.
-- During initial development, support only the current game file format. Do not add legacy decoding
-  or migration paths unless requested.
+- Every change must keep existing saved games playable or include an implemented, documented and
+  tested upgrade path to the newest version. This applies to rules, data, commands, replay, game
+  files and database changes; a version bump or an export-only fallback does not satisfy it.
+- Ordinary play may decode only current versions when explicit upgrades cover affected existing
+  games. Upgrades must preserve game continuity, recorded outcomes, history, identities, metadata,
+  memberships and pending private state, with validation, archives and optimistic concurrency.
+- For changes that can affect saved games, verify representative pre-change saves can load, replay
+  and continue play, directly or after upgrade. Include those regression checks with the change;
+  schema maintenance must not silently alter game behavior.
 - Use domain readiness instead of enumerating future stages.
 - Keep domain rules and rulings in `docs/rules.md`; preserve the reviewed catalog and explicit game
   options when making implementation changes.

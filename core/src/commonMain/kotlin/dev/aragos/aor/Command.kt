@@ -30,7 +30,11 @@ sealed interface Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
-            GameCatalog.requireResolvedFor(state.playerIds.size, state.rules)
+            GameCatalog.requireResolvedFor(
+                state.playerIds.size,
+                state.rules,
+                CatalogVersion.fromWire(state.header.dataVersion),
+            )
             return state.copy(stage = Stage.SHUFFLE)
         }
 

@@ -18,10 +18,12 @@ data class Revision(
     val administrativeAction: AdministrativeAction? = null,
     /** Administrative audit time, in Unix milliseconds; ordinary engine deltas use zero. */
     val at: Long = 0,
+    /** Exact source archive of a format-only upgrade; engine entries and their IDs stay intact. */
+    val storageArchive: String? = null,
 )
 
 data class StoredGame(
-    val fileVersion: Int = 6,
+    val fileVersion: Int = 7,
     val id: String,
     val header: GameHeader,
     val credentials: Map<PlayerId, String>,
@@ -33,6 +35,10 @@ data class StoredGame(
     val submissionVersions: Map<PlayerId, String> = emptyMap(),
     /** Recent acknowledged private-write IDs per owner; no amounts or other seats are exposed. */
     val submissionReceipts: Map<PlayerId, List<String>> = emptyMap(),
+    val plans: Map<PlayerId, SavedActivityPlan> = emptyMap(),
+    val planVersions: Map<PlayerId, String> = emptyMap(),
+    val planReceipts: Map<PlayerId, List<String>> = emptyMap(),
+    val planExecutions: Map<PlayerId, List<PlanExecution>> = emptyMap(),
     /** Managed account UID per seat. Registered games have no transferable seat credentials. */
     val memberships: Map<PlayerId, String> = emptyMap(),
     /** Creation time in milliseconds since the Unix epoch. */

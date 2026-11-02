@@ -68,7 +68,12 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
                     val account = hosted.account(hosted.identity(call.token()))
                     hosted.administration.list(
                         account.id,
-                        false,
+                        when (call.request.queryParameters["scope"]) {
+                            null,
+                            "own" -> GameListScope.OWN
+                            "other" -> GameListScope.OTHER
+                            else -> throw ServiceFailure(400, "INVALID_REQUEST")
+                        },
                         call.request.queryParameters["status"],
                         call.request.queryParameters["after"],
                         call.pageLimit(),
@@ -85,7 +90,7 @@ internal fun Route.hostedRoutes(hosted: HostedServices) {
                     val admin = hosted.requireAdmin(hosted.identity(call.token()))
                     hosted.administration.list(
                         admin.id,
-                        true,
+                        GameListScope.ALL,
                         call.request.queryParameters["status"],
                         call.request.queryParameters["after"],
                         call.pageLimit(),

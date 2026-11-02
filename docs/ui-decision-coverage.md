@@ -5,6 +5,18 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
+The 2026-11-02 expansion layout checks pass the web build, all 55 web unit tests and focused
+StrictMode browser checks (`aor-browser-artifacts-qHrmfY`). Six-player fixtures cover equal summary
+heights at desktop, wrapped-tablet and phone widths, shrinking after status/pool removal, and floating
+details that leave those heights unchanged. They verify matching status/pool widths and the active
+game's marker-to-income help, including its example. At 390×844 and 320×640, long military reviews
+scroll their headings away while Undo and confirmation stay pinned; expanded hands retain map and
+review space. Neighboring card/purchase flows, native validation/Enter, help navigation, polling and
+rejection also pass. A live 320×640 placement after scrolling verifies the pinned control, recorded
+marker, authoritative pool balance and accepted-draft cleanup. Reviewed desktop and phone captures show aligned
+player boxes, readable placement/income consequences and readable income reference boxes. These
+are emulated browser observations, not a physical-phone accessibility review.
+
 The 2026-10-29 checks cover integrated core JVM, Kotlin/JS, server and formatting checks, web
 build/unit tests, and the comprehensive browser suite, including private-seat, hosted and live
 European-map flows. Presentation fixtures use production StrictMode. The live Crusades regression
@@ -34,6 +46,33 @@ projections, removal on unlock, partial-area shading and retained inspection thr
 commodity icons still accept real clicks without changing the prepared card action. Reviewed
 high-zoom arrow and desktop overview captures show clean tips and muted diagonal hatching, with
 commodity colors, pieces, labels and locks retained (`aor-browser-artifacts-Vsby8I`).
+
+The November 2 Cornwall correction supersedes the earlier filled-estuary drawing. Integrated
+core JVM, Kotlin/JS, server and formatting checks pass, alongside the web build, 55 unit tests,
+both geometry validators and focused presentation, support-arrow, commodity-inspection and live
+European-map browser suites (`/private/tmp/aor-cornwall-final`). Catalog 14 gives Cornwall only
+Portsmouth on land and Wales, Chester and Portsmouth by coastal water. Validators check visible
+water separation, all three coastal frontages and the ordinary support-arrow envelope without a
+corner exception. Both full boards and reduced 3–6 player boards retain catalog parity.
+Catalog-13 saves replay a four-round Wales-to-Cornwall land move, survive file-store restart and
+continue play with unchanged history. Private bids and metadata survive restart; PostgreSQL lists
+registered catalog-13 games as playable. Browser fixtures switch between matching old/new drawings.
+Reviewed desktop overview and desktop/390-pixel Britain/inset captures show moderately contrasting
+sage-green satellite stippling, an open Bristol Channel and plain ivory insets. Regional/overseas
+shading, partial unlocks, polling-safe inspection and commodity-card draft preservation still pass;
+a live European placement survives reload. These are emulated-device observations.
+
+The further November 2 coastal correction widens the Bristol Channel toward Chester and
+Portsmouth. Catalog 15 includes Chester–Portsmouth by coast; all three pairwise coastal borders
+meet at one clear junction inside the bay, while existing land crossings remain. Both geometry
+validators pass exact catalog parity and the complete support-arrow envelope checks. Integrated
+core JVM/server tests, Kotlin/JS compilation, Kotlin formatting, the web build and 55 web unit
+tests pass. Focused presentation and support-arrow browser checks pass on both maps, including
+desktop/390-pixel coastal hit targets and inspection, saved catalog-13/catalog-14 drawings, and
+3–6-player support catalogs (`/private/tmp/aor-british-final-browser`). Reviewed Britain captures
+show the widened water and Cornwall–Chester support without spill into Portsmouth's coast.
+Catalog-14 saves replay a recorded Cornwall placement, survive restart and continue with their
+original connections and history; catalog-13 compatibility checks also pass.
 
 The main-view polish passes integrated core JVM, Kotlin/JS, server and Kotlin formatting checks,
 the web build, all 55 web unit tests and the comprehensive browser suite
@@ -229,7 +268,7 @@ replace the outstanding physical-device and screen-reader reviews.
 | Token purchase | `buy-tokens`, `withdraw-bid`; signed amount, stock and exact preview | Live negative/over-stock purchase, private replacement/withdrawal/reload and quotes; unchanged balances before reveal. A live round verifies no activity before reveal, then one receipt with all zero/negative/positive purchases and exact cash costs, preserved after later actions/reload. The 2026-10-30 Renaissance regression replays an isolated saved turn, resolves Renaissance before bidding, reveals the complete purchase batch and retains it on reload; a StrictMode fixture verifies no purchase form or quote requests during that window. Core tests cover Income-to-purchase opening and empty Renaissance windows. Service tests retain stock caps and stale/Chaos behavior. |
 | Turn-order tie | `choose-turn-position`; visible insertion slots | Confirmed slot fixture; service tie groups and restart |
 | Draw Card | `cancel-adjustment`, `pass`; priced adjustment buttons/confirmation | Shared Gold/Ivory choices cost $10 once; core/service tests cover shared types, stacked markers, singleton queues after commodity consumption, canonical history and restart. Browser checks one joint offer/confirmation and the remaining singleton label. |
-| Buy Card | `buy-card`, `discard-card`, `pass`; optional hand actions | Purchase/discard fixtures select cards from the hand and confirm separately, without a second card list. Gameplay fixture queues Urban Ascendancy while waiting and proves one legal-turn submission without polling repeats. |
+| Buy Card | `buy-card`, `discard-card`, `pass`; optional hand actions | Purchase/discard fixtures select cards from the hand and confirm separately, without a second card list. Private-plan service and live browser checks cover durable Urban Ascendancy authorization, cancellation, offline execution and stopping at draws. Core projections cover known Master Art discards and its separate immediate interruption. |
 | Card rounds / Final Card Play / War preparation | `play`, `pass`; persistent hand and contextual form | Dual commodity, protection, targets, final-play and War-preparation fixtures; selected-card actions have one title and no automatic duplicate inspector. Current focused checks show the full selected event effect directly, with its chosen target and projected consequences, without a collapsed rules disclosure. |
 | Commodity choice | `play … commodity`; choices and current payouts | Canonical dual-choice fixture; market fixture checks direct payout-track links and adjustment badges on the hand card, without a commodity inspector. Selected play identifies the commodity and its current-owner payouts; named cash receipts retain authoritative before/after values and capital symbols. Desktop/phone hit tests keep chosen cash effects above reachable confirmation. |
 | Player / area / province / category | `play … player/area/province/category`; finite choices and map | Canonical target fixtures; area-label selection is draft-only; StrictMode fixtures activate Crusades/Rebellion map targets. Live Crusades selects from the hand, prepares a map target without changing the revision, then commits the exact canonical command; hand geometry remains visible throughout. |
@@ -280,6 +319,9 @@ handlers do not make those rules selectable in current game creation.
 | Private-seat recovery | Viewer-specific saveable link, own credential only, saved private bids and reload. Service tests establish restart and secrecy; a restarted live browser session is separate evidence. |
 | Background turn status | A live two-tab regression changes turns through real server commands while the game tab remains hidden and checks ready/waiting favicon changes within five seconds without animation frames. Virtual-time checks prove a return to 30-second cadence after two quiet minutes, renewed activity after changed snapshots and successful mutations, and no renewal for 304s or identical 200s. A same-revision private-readiness change also renews activity. Deterministic tests cover recent/idle intervals, foreground cadence, mutation pauses, read/auth/body deadlines, cancellation, retries, visibility coalescing, lifecycle/network wakeups and StrictMode cleanup. Browser-managed freezing remains outside a polling guarantee. |
 | Hosted operation | Portal fixtures check unique handles without visible UIDs, single linked game rows, pending-action backgrounds, keyboard focus, phone reflow, creation, saved filters and administrative controls. Hosted authentication fixtures submit handle-only registration and verify a single account/My games/sign-out surface inside the game header on desktop and phone. Server tests cover handle uniqueness, live handle labels without history changes, and a V1-to-V2 PostgreSQL upgrade retaining account identity/permissions. Authentication, membership, game upgrades, purge and transactional behavior retain service coverage. Real Firebase delivery and Render deployment remain launch checks. |
+| Spectator access and directory | File/PostgreSQL HTTP tests exercise own/other filtering before pagination, authenticated public current/historical snapshots, hidden draw/trade/discard identities, unchanged public ETags for private bid replacements, and forbidden spectator commands/history edits/private quotes. Public projection tests swap hidden card identities without changing public output. StrictMode browser fixtures verify player/map/advance/leader inspection, retained inspection through polling, public activity, grayscale turn status and absence of private hand/action/undo/command controls. Portal fixtures verify Own games/Other games for regular accounts, separate administration, keyboard tabs, independent own filters/turn favicon, and a compact status select. |
+| Purchase grouping | Desktop/phone fixtures verify Purchase · Shipping/Advances/Stabilization/Misery relief headings and canonical Pass submission through named continuations. Paired action buttons keep continuation words intact. Live offers verify accumulated relief rating, preserved drafts through polling, rejected unaffordable relief retaining the decision, explicit finish, and successful relief atomically completing purchasing. |
+
 
 The current visual review inspected desktop commodity/target captures and an emulated-phone card
 popup. It confirmed the map-width hand, activity beside it, directly displayed selected effects and
@@ -462,3 +504,32 @@ North Africa and the Levant; occupied captures check normal markers and satellit
 arrow, and heads clear of names and markers. Artifacts are retained in
 `/var/folders/ns/q6zj8mz14ksd0kp97xrp1mrm0000gn/T/aor-browser-artifacts-5CJ2LF`.
 These are emulated-device observations; dense multi-owner groups still paint above arrows.
+
+
+## Private Purchase and Buy Card plans
+
+The 2026-11-02 isolated implementation checks pass core JVM tests, Kotlin/JS compilation, the full
+server suite and Kotlin formatting. File and real PostgreSQL cases cover private saves, stale owner
+receipts, exact consequence checks, cancellation, one execution with concurrent workers, restart,
+failed publication, history-edit disarming, consumed authorization, card-draw boundaries and creator
+format upgrades. Upgrade assertions retain original revisions/entry IDs, outcomes, pending bids and
+freshness receipts, with exact source archives and source-hash conflicts. Web build and all 55 web
+unit tests pass.
+
+`AOR_BROWSER_SUITE=planning.browser.mjs npm run test:browser` passes against a fixed source snapshot
+with production StrictMode. Live games establish saved-plan reload, cross-device conflicts (including
+an identical save racing an in-flight request), confirmed disarm before editing, cancellation,
+reconsideration on the legal turn under Competitive undo, offline automatic purchases and card draws.
+The same suite passes ordinary table polling/focus and viewport continuity, purchase previews,
+contextual help and persistent-hand checks at desktop and phone sizes. Planning help preserves its
+draft; private writes leave other seats' views unchanged. The server execution receipt links the
+owner's authorization operation/version and its base position to the committed revision range.
+Focused service regressions also verify cancellation after intervening public progress and an exact
+write acknowledgement that differs from a subsequent save included in automatic progression.
+Screenshots are retained in `aor-browser-artifacts-orcMT8`.
+
+Verification used `/private/tmp/aor-planning-verify-6fjvxeq_` to exclude hot reloads from concurrent
+map edits. The broader map browser run did not pass: the live checkout run lost focus during hot
+reload, and the fixed snapshot stopped at the Sarai frame-selection assertion. These runs do not
+establish a green comprehensive map suite. The focused purchasing/table/help/hand evidence above
+is separate from that remaining map failure and from physical-device or screen-reader evidence.

@@ -93,6 +93,30 @@ assert land["athens"].covers(
     Point(2040, 1456)
 ), "The northern Greek island must belong to Athens."
 assert land["bari"].covers(Point(1650, 1475.5)), "Bari must contain the toe of Italy."
+for neighbor in ["wales", "chester"]:
+    assert land["cornwall"].distance(land[neighbor]) >= 8, (
+        f"Visible coastal water must separate Cornwall from {neighbor}'s land."
+    )
+for neighbor in ["wales", "chester", "portsmouth"]:
+    assert water["cornwall"].boundary.buffer(0.03).intersection(water[neighbor].boundary).length > 12, (
+        f"Cornwall must share a visible coastal-water border with {neighbor}."
+    )
+assert land["cornwall"].boundary.buffer(0.03).intersection(land["portsmouth"].boundary).length > 20, (
+    "Portsmouth must remain Cornwall's only land neighbor."
+)
+bristol_channel = box(680, 575, 765, 655)
+for first, second in [
+    ("cornwall", "chester"),
+    ("chester", "portsmouth"),
+    ("cornwall", "portsmouth"),
+]:
+    shared_border = water[first].boundary.buffer(0.03).intersection(water[second].boundary)
+    assert shared_border.intersection(bristol_channel).length > 16, (
+        f"{first} and {second} must share a visible coastal border inside the Bristol Channel."
+    )
+assert land["chester"].boundary.buffer(0.03).intersection(land["portsmouth"].boundary).length > 20, (
+    "Widening the Bristol Channel must preserve the Chester–Portsmouth land crossing."
+)
 assert seas["BAY_OF_BISCAY"].boundary.buffer(0.03).intersection(water["edinburgh"].boundary).length >= 100, (
     "Edinburgh must share a broad, visible frontage with the Bay of Biscay."
 )
@@ -478,14 +502,11 @@ for edge, path in geometry["supports"].items():
         line.intersection(shape).length
         for key, shape in footprints.items() if key not in (source_id, target_id)
     )
-    # Cornwall and Chester meet at a corner on the European drawing; the standard
-    # drawing separates them by a sub-unit sliver at the Wales/Portsmouth junction.
-    corner_crossing = edge == "cornwall chester"
-    assert foreign_length < (0.5 if corner_crossing else 0.01), (
+    assert foreign_length < 0.01, (
         f"{edge}: support must not run through another province."
     )
     owned = footprints[source_id].union(footprints[target_id]).buffer(0.01)
-    assert envelope.difference(owned).area < (130 if corner_crossing else 4), (
+    assert envelope.difference(owned).area < 4, (
         f"{edge}: keep the arrowhead and halo within the supported pair's footprint."
     )
     assert all(not line.crosses(other) for other in support_lines.values()), (

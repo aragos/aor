@@ -151,7 +151,8 @@ function signedAmount(value: number): string {
     return `${value < 0 ? '−' : '+'}${Math.abs(value)}`;
 }
 
-function viewerOutcome(event: HistoryEventView, viewerId: string): string {
+function viewerOutcome(event: HistoryEventView, viewerId: string | null): string {
+    if (viewerId === null) return '';
     if (event.competition) {
         if (event.actor === viewerId) return event.competition.attackerWon ? ' won' : ' lost';
         if (event.competition.defenders.includes(viewerId)) {

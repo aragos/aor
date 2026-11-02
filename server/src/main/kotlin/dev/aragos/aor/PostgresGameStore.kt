@@ -130,15 +130,24 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             }
         val reference = "$expectedRevision-$hash.json"
         val replacement = transform(contents, reference)
+        val root = encoded(replacement)
         require(
             replacement.id == id &&
-                replacement.baseRevision == expectedRevision &&
                 replacement.revision == expectedRevision + 1 &&
-                replacement.previousArchive == reference
+                ((replacement.baseRevision == expectedRevision &&
+                    replacement.previousArchive == reference) ||
+                    (replacement.revisions.last().storageArchive == reference &&
+                        root["revisions"].toList().dropLast(1).map { revision ->
+                            revision.deepCopy<ObjectNode>().apply { remove("storageArchive") }
+                        } ==
+                            original["revisions"].map { revision ->
+                                revision.deepCopy<ObjectNode>().apply { remove("storageArchive") }
+                            } &&
+                        replacement.baseRevision == original["baseRevision"].asInt() &&
+                        root["previousArchive"] == original["previousArchive"]))
         ) {
             "A checkpoint must advance one revision and retain its preceding archive."
         }
-        val root = encoded(replacement)
         require(
             root["header"]["players"] == original["header"]["players"] &&
                 root["header"]["creatorId"] == original["header"]["creatorId"] &&
@@ -227,7 +236,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
      */
     override fun listGames(
         viewer: AccountId,
-        admin: Boolean,
+        scope: GameListScope,
         status: GameListStatus?,
         after: String?,
         limit: Int,
@@ -242,13 +251,14 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                         FROM game_players m WHERE m.game_id = g.id) AS memberships,
                     (SELECT jsonb_agg(m.seat) FROM game_players m
                         WHERE m.game_id = g.id AND m.needs_move) AS action_players,
-                    CASE WHEN g.document->>'fileVersion' <> '6'
+                    CASE WHEN g.document->>'fileVersion' <> '7'
                         OR g.document->'header'->>'rulesVersion' <> ?
-                        OR g.document->'header'->>'dataVersion' <> ? THEN 'UNAVAILABLE'
+                        OR NOT (g.document->'header'->>'dataVersion' = ANY (?)) THEN 'UNAVAILABLE'
                         ELSE g.listing_status END AS base_status,
                     g.stage
                 FROM games g LEFT JOIN game_players p ON p.game_id = g.id AND p.account_id = ?
-                WHERE (? OR p.account_id IS NOT NULL) AND (?::uuid IS NULL OR g.id > ?::uuid)
+                WHERE (? OR (p.account_id IS NOT NULL) = ?)
+                    AND (?::uuid IS NULL OR g.id > ?::uuid)
             )
             SELECT *, CASE WHEN base_status = 'ONGOING' AND needs_move
                 THEN 'MY_MOVE' ELSE base_status END AS viewer_status
@@ -261,15 +271,22 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         val games =
             connection.prepareStatement(sql).use { statement ->
                 statement.setString(1, RULES_VERSION)
-                statement.setString(2, DATA_VERSION)
+                statement.setArray(
+                    2,
+                    connection.createArrayOf(
+                        "text",
+                        CatalogVersion.entries.map(CatalogVersion::wireValue).toTypedArray(),
+                    ),
+                )
                 statement.setString(3, viewer.value)
-                statement.setBoolean(4, admin)
-                statement.setObject(5, cursor)
+                statement.setBoolean(4, scope == GameListScope.ALL)
+                statement.setBoolean(5, scope == GameListScope.OWN)
                 statement.setObject(6, cursor)
-                statement.setString(7, status?.name)
+                statement.setObject(7, cursor)
                 statement.setString(8, status?.name)
                 statement.setString(9, status?.name)
-                statement.setInt(10, limit + 1)
+                statement.setString(10, status?.name)
+                statement.setInt(11, limit + 1)
                 statement.executeQuery().use { rows ->
                     buildList {
                         while (rows.next()) {

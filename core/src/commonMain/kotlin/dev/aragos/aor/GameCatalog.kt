@@ -8,13 +8,14 @@ package dev.aragos.aor
 data class CatalogConfiguration(
     val playerCount: Int,
     val rules: RuleOptions = RuleOptions(),
+    val version: CatalogVersion = CatalogVersion.CATALOG_15,
 ) {
     init {
         require(playerCount in 3..6) { "Catalog configurations require three through six players." }
     }
 
     val map: BoardMapDefinition
-        get() = rules.map.definition
+        get() = version.mapDefinition(rules.map)
 
     val provinces: List<ProvinceDefinition> by lazy { map.availableFor(playerCount) }
 
@@ -80,8 +81,9 @@ object GameCatalog {
     fun requireResolvedFor(
         playerCount: Int,
         rules: RuleOptions = RuleOptions(),
+        version: CatalogVersion = CatalogVersion.CATALOG_15,
     ): CatalogConfiguration {
-        val configuration = validateFor(playerCount, rules)
+        val configuration = validateFor(playerCount, rules, version)
         require(configuration.unresolvedReferences.isEmpty()) {
             "Catalog references remain unresolved for $playerCount players: " +
                 configuration.unresolvedReferences.joinToString { issue -> issue.id }
@@ -92,8 +94,9 @@ object GameCatalog {
     fun validateFor(
         playerCount: Int,
         rules: RuleOptions = RuleOptions(),
+        version: CatalogVersion = CatalogVersion.CATALOG_15,
     ): CatalogConfiguration {
-        val configuration = CatalogConfiguration(playerCount, rules)
+        val configuration = CatalogConfiguration(playerCount, rules, version)
         val definitions = configuration.map.provinces
         require(definitions.map(ProvinceDefinition::id).distinct().size == definitions.size) {
             "Province identifiers must be unique across the board."

@@ -134,7 +134,16 @@ upgrade game rules, commands or catalog versions. That remains the explicit log-
 
 ### Importing existing file data
 
-For current game file format 6, stop the file-backed server and keep a private copy of its complete
+Format-6 games can be upgraded explicitly by their creators from the game screen. The planning
+upgrade performs a read-only validation first, then checks the exact source hash under the game
+lock, archives that source and appends a zero-entry audit revision. It retains original revision
+and entry identities, state, outcomes, accounts, seat credentials and pending private bids. It
+does not change rules/data versions. Keep a private backup and finish source inventory before
+cutover; run only the new application while converting, since old instances cannot read format 7.
+Upgrade format-6 file data before the current-format importer below. Unrelated historical formats
+still require their own validated engine upgrade.
+
+For current game file format 7, stop the file-backed server and keep a private copy of its complete
 data directory. Configure the target database secrets and run:
 
 ```sh
@@ -266,6 +275,14 @@ contain hidden card outcomes and must remain private. They are replay/upgrade ar
 full account-directory/disaster-recovery backup.
 
 ## Engine upgrades and recovery
+
+Catalogs `ah1996-catalog-13`, `ah1996-catalog-14` and `ah1996-catalog-15` are directly supported.
+New games use 15, which includes Cornwall's corrected connections and the Chester–Portsmouth
+coastal contact on both maps. Catalog-13 and catalog-14 files retain their
+recorded movement rules throughout replay and future play, including pending private submissions
+and plans; their public catalog selects the matching legacy drawing. No storage rewrite, archive
+or automatic rules conversion occurs when opening those saves. Unknown catalog versions remain
+unavailable. Explicit history replacement preserves the supported source catalog identity.
 
 1. Export logs before an engine change and run `:server:verifyGameLogs` with the proposed engine.
    It reports every active log's compatibility without IO/randomness during replay or storage writes.

@@ -217,7 +217,11 @@ class HostedApplicationTest(private val postgres: Boolean) {
 
         val response = get("/api/games/${game.gameId}", "admin")
 
-        assertThat(response.status).isEqualTo(HttpStatusCode.Forbidden)
+        assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+        val snapshot = json.readTree(response.bodyAsText())
+        assertThat(snapshot["viewerId"].isNull).isTrue()
+        assertThat(snapshot["game"]["hand"].toList()).isEmpty()
+        assertThat(snapshot["legalChoices"]["commands"].toList()).isEmpty()
     }
 
     @Test
@@ -243,6 +247,187 @@ class HostedApplicationTest(private val postgres: Boolean) {
         assertThat(bob["games"][0]["id"].asText()).isEqualTo(game.gameId)
         assertThat(bob["games"][0]["status"].asText()).isEqualTo("MY_MOVE")
         assertThat(outsider["games"].size()).isEqualTo(0)
+    }
+
+    @Test
+    fun otherGamesAreListedSeparatelyBeforePagination() = withHosted {
+        val first = game()
+        val second = game()
+        val own =
+            hosted.create(
+                AccountIdentity(AccountId("alice"), true),
+                listOf("alice", "bob", "outsider"),
+                RuleOptions(),
+                UndoPolicy.REGULAR_TURN,
+            )
+        val firstPage =
+            json.readTree(get("/api/games?scope=other&status=all&limit=1", "outsider").bodyAsText())
+        val cursor = firstPage["nextCursor"].asText()
+        val secondPage =
+            json.readTree(
+                get("/api/games?scope=other&status=all&limit=1&after=$cursor", "outsider")
+                    .bodyAsText()
+            )
+        val ownPage = json.readTree(get("/api/games?status=all", "outsider").bodyAsText())
+
+        assertThat((firstPage["games"] + secondPage["games"]).map { it["id"].asText() })
+            .containsExactly(first.gameId, second.gameId)
+        assertThat(secondPage["nextCursor"].isNull).isTrue()
+        assertThat(ownPage["games"].map { it["id"].asText() }).containsExactly(own.gameId)
+        assertThat(firstPage["games"].single()["myMove"].asBoolean()).isFalse()
+    }
+
+    @Test
+    fun otherGamesKeepPublicReadinessWithoutPrivateBidAmounts() = withHosted {
+        val game = game()
+        command(game.gameId, "alice", 2, "bid-capital 17")
+
+        val page =
+            json.readTree(get("/api/games?scope=other&status=ongoing", "outsider").bodyAsText())
+
+        val summary = page["games"].single()
+        assertThat(summary["id"].asText()).isEqualTo(game.gameId)
+        assertThat(summary["status"].asText()).isEqualTo("ONGOING")
+        assertThat(summary["actionPlayers"].map { it.asText() }).containsExactly("p2", "p3")
+        assertThat(summary.has("pendingBids")).isFalse()
+    }
+
+    @Test
+    fun listingRejectsAnUnrecognizedMembershipScope() = withHosted {
+        val response = get("/api/games?scope=all", "outsider")
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+    }
+
+    @Test
+    fun spectatorSnapshotsHidePrivateCardsBidsAndActionCapabilities() = withHosted {
+        val game = game()
+        command(game.gameId, "alice", 2, "bid-capital 17")
+
+        val response = get("/api/games/${game.gameId}", "outsider")
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+        val snapshot = json.readTree(response.bodyAsText())
+        assertThat(snapshot["viewerId"].isNull).isTrue()
+        assertThat(snapshot["accountId"].isNull).isTrue()
+        assertThat(snapshot["pendingBid"].isNull).isTrue()
+        assertThat(snapshot["submissionVersion"].isNull).isTrue()
+        assertThat(snapshot["submissionReceipts"].toList()).isEmpty()
+        assertThat(snapshot["game"]["hand"].toList()).isEmpty()
+        assertThat(snapshot["legalChoices"]["commands"].toList()).isEmpty()
+        assertThat(snapshot["undo"]["available"].asBoolean()).isFalse()
+        assertThat(snapshot["undo"]["actions"].toList()).isEmpty()
+        assertThat(snapshot["submitted"].map { it.asText() }).containsExactly("p1")
+        assertThat(
+                snapshot["events"]
+                    .filter { it["kind"].asText() == "DRAW_CARD" }
+                    .map { it["card"].isNull }
+            )
+            .containsExactly(true, true, true)
+        assertThat(
+                snapshot["history"]
+                    .filter { it.asText().startsWith("!draw ") }
+                    .map { it.asText().substringAfterLast(' ') }
+            )
+            .containsExactly("<hidden>", "<hidden>", "<hidden>")
+    }
+
+    @Test
+    fun spectatorAdministrativeHistoryDoesNotExposeAccountIdentifiers() = withHosted {
+        val game = game()
+        post(
+            "/api/admin/games/${game.gameId}/status",
+            "admin",
+            mapOf(
+                "expectedRevision" to 2,
+                "action" to "cancel",
+            ),
+        )
+
+        val snapshot = json.readTree(get("/api/games/${game.gameId}", "outsider").bodyAsText())
+
+        assertThat(snapshot["history"].toString()).contains("by administrator")
+        assertThat(snapshot["history"].toString()).doesNotContain("admin:admin")
+    }
+
+    @Test
+    fun spectatorHistoricalSnapshotsRetainPublicOnlyProjection() = withHosted {
+        val game = game()
+
+        val response = get("/api/games/${game.gameId}/revisions/2", "outsider")
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+        val snapshot = json.readTree(response.bodyAsText())
+        assertThat(snapshot["viewerId"].isNull).isTrue()
+        assertThat(snapshot["game"]["hand"].toList()).isEmpty()
+        assertThat(
+                snapshot["events"]
+                    .filter { it["kind"].asText() == "DRAW_CARD" }
+                    .map { it["card"].isNull }
+            )
+            .containsExactly(true, true, true)
+    }
+
+    @Test
+    fun spectatorReadsRequireARegisteredAuthenticatedAccount() = withHosted {
+        val game = game()
+
+        val unauthenticated = client.get("/api/games/${game.gameId}")
+        val unregistered = get("/api/games/${game.gameId}", "new-user")
+
+        assertThat(unauthenticated.status).isEqualTo(HttpStatusCode.Unauthorized)
+        assertThat(unregistered.status).isEqualTo(HttpStatusCode.Forbidden)
+    }
+
+    @Test
+    fun spectatorsCannotSubmitCommandsEditHistoryOrRequestPrivateQuotes() = withHosted {
+        val game = game()
+        val before = store.document(game.gameId)
+
+        val command = command(game.gameId, "outsider", 2, "bid-capital 9")
+        val history =
+            post(
+                "/api/games/${game.gameId}/history",
+                "outsider",
+                mapOf(
+                    "expectedRevision" to 2,
+                    "fromEntry" to 0,
+                    "lines" to emptyList<String>(),
+                ),
+            )
+        val quote =
+            post(
+                "/api/games/${game.gameId}/quote-token-purchase",
+                "outsider",
+                mapOf(
+                    "expectedRevision" to 2,
+                    "amount" to 9,
+                ),
+            )
+
+        assertThat(listOf(command, history, quote).map { it.status })
+            .containsExactly(
+                HttpStatusCode.Forbidden,
+                HttpStatusCode.Forbidden,
+                HttpStatusCode.Forbidden,
+            )
+        assertThat(store.document(game.gameId)).isEqualTo(before)
+    }
+
+    @Test
+    fun replacingPrivateBidsDoesNotInvalidateSpectatorSnapshots() = withHosted {
+        val game = game()
+        command(game.gameId, "alice", 2, "bid-capital 5")
+        val before = get("/api/games/${game.gameId}", "outsider")
+
+        command(game.gameId, "alice", 2, "bid-capital 19")
+        val response =
+            client.get("/api/games/${game.gameId}") {
+                bearerAuth("outsider")
+                header(HttpHeaders.IfNoneMatch, before.headers[HttpHeaders.ETag])
+            }
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.NotModified)
     }
 
     @Test

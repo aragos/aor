@@ -67,7 +67,9 @@ choice and understand its result through visual controls and commands, on deskto
 
 ## Current table contracts
 
-- Expanded player details float below their summary without changing the player strip or map height.
+- Player boxes share the smallest equal height that fits the tallest summary, including across
+  wrapped rows and in the phone Players workspace. They shrink together when status rows disappear.
+  Expanded player details float below their summary without changing the player strip or map height.
   They omit the repeated player name and show written cash, tokens, deployed markers, and owned
   advances. Toggle them through the summary, without an overlapping close button. Explicitly say when
   no advances are owned. Keep income only in the summary, with a question mark beside its symbol
@@ -80,7 +82,10 @@ choice and understand its result through visual controls and commands, on deskto
   and available pool tokens on one wrapping row.
 - Undo stays at the upper right of the action panel, outside its scrolling review. All final actions,
   including Pass, occupy one pinned footer. Draft choices and inputs stay with their consequences;
-  opening inspection or scrolling cannot move confirmation away. Keep native form validation and
+  the full-width turn-status box, heading and resource summaries scroll with the review. Long phone
+  action panes may use up to 55% of the viewport height; avoid reserving most of that space for fixed
+  headings or stacking three footer actions when two can share a row.
+  Opening inspection or scrolling cannot move confirmation away. Keep native form validation and
   Enter submission intact. Number inputs ignore mouse-wheel changes while retaining focus,
   typing and arrow-key adjustment. Focusing a zero-valued number input clears it for immediate
   entry; preserve nonzero drafts. One action plus Pass uses a joined two-button control with a single
@@ -111,6 +116,17 @@ choice and understand its result through visual controls and commands, on deskto
   beside the colored favicon in the game header, in the browser tab, and above participants in game
   listings. Long names truncate within the available header/row width and retain their full text.
   Failed creation preserves the name and player draft.
+- Purchase substeps identify their parent explicitly: Purchase · Shipping, Purchase · Advances,
+  Purchase · Stabilization and Purchase · Misery relief. A purchasing Pass names the next step or
+  finishing Purchase, while preserving the same canonical command and engine readiness.
+- The online directory prioritizes the game list, with Own games and Other games tabs for every
+  registered account and a compact labeled status select. Keep creation collapsed below the list;
+  administrative controls have their own tab. Own-game filters are retained independently of browsing
+  other games. Other games excludes memberships and offers public spectator links, without a My move
+  filter. Preserve the own-game turn indicator while browsing other games.
+  Spectator tables identify Spectating and Public information only, retain public object inspection
+  and activity, and omit the private hand, action forms, undo, command console and history editing.
+  Public player detail shows written cash; no private balance or card identity may be reconstructed.
 - The game icon is a named link to My games; omit a separate My games link. Hosted handle and sign-out
   controls share the top header row with the game title and icon, including on phones. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.
@@ -253,8 +269,15 @@ choice and understand its result through visual controls and commands, on deskto
   misery box; Civil War's earlier misery is already applied. Disable spending beyond the pool.
   After its capital replacement, Civil War shows the payable cash/token losses and remaining
   balances, using the same rounded calculation as execution.
-- Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
-  to remain open, clears on expiry or a history edit and submits once when offered; it does not auto-pass Master Art.
+- Purchase and Buy Card allow parallel preparation using the existing advances and hand. Label
+  preview actions “Add to plan”; keep the actual required actor visible and public player summaries
+  unchanged. Distinguish unsaved input, saved-for-review plans and explicit offline authorization.
+  Saving never buys, reserves resources or auto-passes. Review plans remain editable on the legal
+  turn; automatic plans expose cancellation before execution starts. Editing first confirms disarm.
+  Show exact planned payment recipients, balances and misery effects beside each action, with
+  hypothetical assumptions while waiting. A changed consequence or draw pauses for review; no
+  automatic discard follows a draw. Preserve local work through polling, navigation and inspection;
+  server saves survive reload and another device. History edits cancel previous authorization.
 - Activity occupies its workspace tab or optional left block, with bounded scrolling and no count.
   Keep its pin control clear of receipt text. It explains draw reasons,
   epoch/end triggers, protection money, leader rebates, related cash/misery

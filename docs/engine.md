@@ -1,8 +1,8 @@
 # Core Game Engine
 
 The pure engine implements [rules](rules.md). [Requirements](requirements.md) define acceptance;
-[design](design.md) owns application authorization, storage and implemented undo. Planning remains a
-future contract. Rules section references below refer to rules.md.
+[design](design.md) owns application authorization, storage, undo and private activity plans.
+Rules section references below refer to rules.md.
 
 Epoch count is fixed at three; the 26th-advance ending remains supported.
 The [coverage inventory](rule-coverage.md) maps rules to implementations and verification.
@@ -124,19 +124,24 @@ validation remains authoritative; visible effects must be applicable without lea
 
 ## 5. Planning
 
-Deferred contract; a private-plan projection API is not implemented.
+Purchase and Buy Card have a phase-scoped private-plan projection API. General future-turn
+planning remains deferred.
 
-A plan uses ordinary command objects/text plus a base revision and log position. Projection operates only on the
-viewing player's information; it never queries future live randomness or other players' hidden values.
+A plan uses ordinary canonical commands plus the intended decision name, so a Pass cannot be
+reinterpreted in a different step. Projection operates only on the viewing player's information;
+it replaces hidden deck positions and other hands with opaque placeholders preserving public counts.
+The live actor and live legal choices never change because another player prepares a plan.
 
 Apply the valid reachable prefix. Return a projected state, per-entry results and unresolved prompts/inputs. At a
 missing decision, hidden prerequisite or random request, preserve the state reached and mark dependent entries blocked
 with a cause. Mark entries invalid under known state with typed diagnostics; never pretend blocked entries executed.
 
-Incomplete commands may annotate intended targets and known costs without applying effects. Explicit hypothetical
-inputs can extend projections but must be marked as assumptions. This represents partial plans beyond the current
-turn without inventing opponents' choices. Projection never changes committed state. Private draft storage and
-explicit submission are in [design §6](design.md#6-private-plans).
+Waiting-player projections explicitly assume earlier actions leave relevant inputs unchanged.
+They simulate only the owner's activity and stop before normalizing the next actor. Return exact
+owner resources, public payment endpoints, advance price components, the resulting viewer-safe
+view, choices and a typed boundary/diagnostic. Unknown draws block the suffix. Projection never
+changes committed state. Private storage, authorization and execution belong to
+[design §6](design.md#6-private-plans).
 
 ## 6. Declarative data and effects
 
@@ -233,7 +238,7 @@ and reach/combat functions from flow so they can be tested directly.
   rejection must not generate randomness or change state.
 - **Information:** full and projected/redacted replay agree on public and viewing-player private state. Test private
   setup returns, discards, trades and shuffles; choices, explanations and diagnostics must not leak secrets.
-- **Planning (deferred):** partial, invalid, future and blocked commands return honest diagnostics
+- **Planning:** partial, invalid and blocked activity commands return honest diagnostics
   and projections without modifying the live log or consuming live randomness.
 
 Service/controller/revision and localization checks belong to [design §8](design.md#8-verification).

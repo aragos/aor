@@ -1,7 +1,7 @@
 import {lazy, Suspense, useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
 import {ApiError, errorCode, request, requestSnapshot} from './api';
-import type {ApplicationConfig, CreatedGame, Snapshot} from './api';
+import type {ApplicationConfig, CreatedGame, Snapshot, PlanningQuote} from './api';
 import {t} from './messages';
 import {defaultVariants, validVariants, Variants} from './Variants';
 import {isUndoPolicy, useStoredSetting} from './preferences';
@@ -74,7 +74,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const path = `/api/games/${id}`;
 
     function acceptSnapshot(next: Snapshot) {
-        if (uncertainOperation.current && next.submissionReceipts?.includes(uncertainOperation.current)) {
+        if (uncertainOperation.current && (next.submissionReceipts?.includes(uncertainOperation.current) || next.planning?.receipts.includes(uncertainOperation.current))) {
             setActionError(new ApiError('OUTCOME_CONFIRMED'));
             uncertainOperation.current = null;
         }
@@ -109,35 +109,52 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         return () => {active = false; stop(); setTurnFavicon(false);};
     }, [path, token, pollInterval]);
 
-    async function mutate(endpoint: string, operation: Record<string, unknown>): Promise<boolean> {
-        if (!snapshot || busyRef.current) return false;
+    async function mutate(endpoint: string, operation: Record<string, unknown>): Promise<Snapshot | null> {
+        if (!snapshot || snapshot.viewerId === null || busyRef.current) return null;
         busyRef.current = true; ++sequence.current;
         etag.current = undefined;
         const operationId = crypto.randomUUID();
         uncertainOperation.current = null;
         setBusy(true); setActionError(null); setSaved(false);
         try {
-            acceptSnapshot(await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(endpoint === 'commands' ? {operationId} : {}), ...operation}));
+            const accepted = await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(['commands', 'plans'].includes(endpoint) ? {operationId} : {}), ...operation});
+            acceptSnapshot(accepted);
             activityAt.current = Date.now();
-            setConnectionError(''); setSaved(true); return true;
+            setConnectionError(''); setSaved(true); return accepted;
         } catch (failure) {
             const code = errorCode(failure);
             if (['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code)) setSnapshot(null);
             setActionError(failure instanceof ApiError ? failure : new ApiError(code));
             if (code === 'OUTCOME_UNKNOWN') uncertainOperation.current = operationId;
-            if (['STALE_REVISION', 'STALE_SUBMISSION', 'OUTCOME_UNKNOWN'].includes(code)) {
+            if (['STALE_REVISION', 'STALE_SUBMISSION', 'STALE_PLAN', 'STALE_PLAN_PREVIEW', 'OUTCOME_UNKNOWN'].includes(code)) {
                 try {
                     const refreshed = await requestSnapshot(path, token);
                     if (refreshed.snapshot) acceptSnapshot(refreshed.snapshot);
                 } catch (refreshFailure) {setConnectionError(errorCode(refreshFailure));}
             }
-            return false;
+            return null;
         } finally { busyRef.current = false; setBusy(false); }
     }
 
-    if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}<a href="/">{t('game.new')}</a></main>;
+    async function upgradePlanning() {
+        if (busyRef.current) return;
+        busyRef.current = true; setBusy(true);
+        try {
+            const source = await request<{revision: number; sourceHash: string}>(`${path}/planning-upgrade`, token, {}, undefined, {readOnly: true});
+            await request(`${path}/planning-upgrade`, token, {expectedRevision: source.revision, sourceHash: source.sourceHash});
+            const next = await requestSnapshot(path, token);
+            if (next.snapshot) acceptSnapshot(next.snapshot);
+            setConnectionError('');
+        } catch (failure) {setConnectionError(errorCode(failure));}
+        finally {busyRef.current = false; setBusy(false);}
+    }
+    if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
+        {connectionError === 'PLANNING_UPGRADE_REQUIRED' && <button disabled={busy} onClick={() => {void upgradePlanning();}}>{t('plan.upgrade')}</button>}
+        <a href="/">{t('game.new')}</a></main>;
     return <MapSelectionProvider><GameTable snapshot={snapshot} busy={busy} saved={saved}
-        submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null})} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines})} connectionError={connectionError} actionError={actionError}
+        writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
+        quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
+        submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null}).then(Boolean)} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines}).then(Boolean)} connectionError={connectionError} actionError={actionError}
         quotePurchase={amount => request<PurchaseQuote>(`${path}/quote-token-purchase`, token, {expectedRevision: snapshot.revision, amount}, undefined, {readOnly: true})}/></MapSelectionProvider>;
 }
 

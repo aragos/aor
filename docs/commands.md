@@ -92,7 +92,7 @@ requests. The server never supplies fresh random outcomes for an edit. A rejecti
 unchanged; `HISTORY_INVALID_ENTRY` includes a zero-based replacement `entryIndex`.
 
 `GET /api/games/{id}/revisions/{revision}` reads a prior committed revision with the viewer's usual
-private-information restrictions. Game file format 6 records normal deltas and explicit suffix
+private-information restrictions. Game file format 7 records normal deltas and explicit suffix
 replacements; displayed audit comments are not replayed as engine entries.
 Administrative checkpoints retain older revision files in archives. The separate authenticated
 [operational API](deployment.md#game-operations-and-programmatic-access) owns log upgrades,
@@ -214,3 +214,37 @@ owner receipt atomically and returns `STALE_SUBMISSION` on a mismatch. Private o
 only the most recent sixteen acknowledgements per owner, without amounts; the viewer can reconcile
 a lost response after later changes. An absent old receipt leaves the outcome unknown. Receipts are
 not command-log entries, and timeouts never authorize automatic resubmission.
+
+## Private activity plans
+
+Plans use ordinary canonical commands with a `decision` binding, such as
+`{"decision":"purchase-advances","command":"buy-advance V"}`. They are private service data;
+saving, arming and canceling are not engine commands. `POST /api/games/{id}/plans/preview` takes
+`expectedRevision` and up to 100 `actions`, returning a viewer-safe preview and `previewToken`.
+
+`POST /api/games/{id}/plans` takes `expectedRevision`, `expectedVersion` (the owner's plan receipt,
+initially null), UUID `operationId`, and one operation:
+
+| Operation | Inputs and effect |
+| --- | --- |
+| `SAVE` | `actions`; save or replace an unarmed plan for review. No gameplay effect. |
+| `ARM` | `previewToken`; authorize the exact saved plan on its legal turn, including offline. |
+| `DISARM` | Cancel automatic execution and retain the saved actions. |
+| `DELETE` | Remove the saved plan and its authorization. |
+| `EXECUTE` | `previewToken`; validate and commit the saved segment now, only on the owner's turn. |
+
+Stale owner receipts return `STALE_PLAN`; changed previews return `STALE_PLAN_PREVIEW`.
+Disarm/deletion may name an earlier public revision if their owner receipt is still current;
+they only reduce authorization and cannot undo an already consumed plan. Other plan writes require
+the exact current public revision. Acknowledged
+operation IDs reconcile lost responses without replaying actions. Execution appends ordinary
+owner-authored command revisions, retaining public turn order and existing undo boundaries.
+A fresh write also returns `planWriteReceipt` with its operation ID and exact resulting owner
+version. Use that receipt to advance a local draft's base: automatic progression may return a
+newer snapshot that already includes another device's subsequent save. A reconciled duplicate
+operation returns current state without claiming a fresh write receipt.
+
+`POST /api/games/{id}/planning-upgrade` with an empty body dry-runs the format-6-to-7 upgrade for
+the authenticated creator. Repeat with its `revision` as `expectedRevision` and `sourceHash` to
+publish. The exact source is archived and a zero-entry `upgrade-planning` audit revision is
+appended. Existing engine entries, outcomes and private bids remain intact.

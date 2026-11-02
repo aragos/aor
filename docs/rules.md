@@ -1026,6 +1026,14 @@ and add Bari–Durazzo, Portsmouth–St Malo, and London–Bruges. Bari retains 
 with Naples. Corsica is part of Cagliari; the northern Greek island landmass is part of Athens;
 and Bari includes Italy's toe. Kamyshin connects by land to Sarai and Tana; Tana does not touch Poti.
 The [connection inventory](connection-inventory.md) records the complete reviewed graph.
+On 2026-11-02 the user corrected Cornwall: Portsmouth is its only land neighbor; Wales,
+Chester and Portsmouth are its direct coastal-water neighbors. The Bristol Channel separates
+Cornwall from Wales. This applies to both maps in catalog 14. Existing catalog-13 games retain
+their recorded topology, including the former Wales–Cornwall land connection, for replay and
+continued play; they are not silently converted to different movement rules.
+The further 2026-11-02 correction adds Chester–Portsmouth as a direct coastal-water connection
+in catalog 15 on both maps. Cornwall, Chester and Portsmouth each border the other two by coast;
+their existing land connections remain. Catalog-14 games also retain their recorded topology.
 On the standard board, Athens and Crete retain their shared coastal border. On 2026-10-27 the user corrected the sea
 transcription: the Aegean and Central Mediterranean are separate seas, both in Area VIII. Crete
 adjoins the Aegean, Central Mediterranean and Eastern Mediterranean. This supersedes the earlier

@@ -133,7 +133,11 @@ internal object TurnEngine {
             else -> null
         }
 
-    fun normalise(initial: GameState, receipt: (EffectReceipt) -> Unit = {}): GameState {
+    fun normalise(
+        initial: GameState,
+        receipt: (EffectReceipt) -> Unit = {},
+        planningActor: PlayerId? = null,
+    ): GameState {
         var state = initial
         if (
             state.turnNumber != null &&
@@ -146,6 +150,8 @@ internal object TurnEngine {
             )
         }
         repeat(1000) {
+            // A hypothetical activity must never inspect the next player's private choices.
+            if (planningActor != null && state.flow.actor != planningActor) return state
             if (state.pendingShuffle() != null) return state
             val decision = state.flow.decisions.lastOrNull()
             if (decision is RenaissanceDecision && decision.targets(state).isEmpty()) {

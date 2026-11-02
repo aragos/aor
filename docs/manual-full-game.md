@@ -21,10 +21,12 @@ while replay logs use canonical IDs. **Commands** exposes history and authorized
 | Expansion | `place 3 milan`, `attack florence`, `reduce-marker genoa`, `buy-expansion-card`, then `pass`. Unused pool tokens return to stock. |
 | Income | Automatic piece flips, income and two recorded shortage/surplus rolls; eligible majority draws resolve automatically. |
 
-While waiting in Buy Card, an eligible Urban Ascendancy owner can queue a $10 purchase. This is a
-private draft in the open player view, with Cancel available. It submits once when buying becomes
-legal, clears if the phase/turn or eligibility changes, and never retries a failed request. Closing
-or reloading loses it. It does not automatically pass a remaining Master Art choice.
+During Purchase or Buy Card, choose **Prepare a plan** to use the ordinary controls while waiting.
+**Add to plan** prepares each step without spending anything. **Save for review** keeps the plan
+privately on the server, including after reload, and waits for your confirmation on your turn.
+Edit it if earlier purchases change your strategy. **Execute automatically on my turn** authorizes
+offline execution; cancel it before execution starts to reconsider. Changed consequences and draws
+pause for review, so an automatic card purchase never automatically decides a later discard.
 
 Advance tiles/details show how many matching leaders in each printed epoch have not been publicly
 played. Counts include held cards, future decks and privately discarded leaders to preserve secrecy;
