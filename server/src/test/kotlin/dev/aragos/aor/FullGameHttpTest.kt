@@ -32,116 +32,129 @@ class FullGameHttpTest(private val postgres: Boolean, private val playerCount: I
         sql?.reopened(random) ?: createGameService(directory, random)
 
     @Test
-    fun ordinaryHttpCommandsReachFinalScoresAfterDeckExhaustion() =
-        completedGame { completed, _, _, _ ->
-            assertThat(completed["game"]["stage"].asText()).isEqualTo("FINISHED")
-            assertThat(completed["game"]["deckRemaining"].asInt()).isEqualTo(0)
-            assertThat(completed["game"]["currentEpoch"].asInt()).isEqualTo(3)
-            assertThat(completed["game"]["endingTriggered"].asBoolean()).isTrue()
-            assertThat(completed["game"]["scores"].size()).isEqualTo(playerCount)
-            assertThat(completed["game"]["scores"].any { score -> score["winner"].asBoolean() })
-                .isTrue()
-        }
-
-    @Test
-    fun completedHttpGameRecoversTheExactViewWithoutRequestingRandomness() =
+    fun completedHttpGameRecoversFinalScoresWithoutNewRandomness() =
         completedGame { completed, directory, id, token ->
             val recovered = service(directory, ReplayOnlyRandom).get(id, token)
 
+            assertThat(recovered.game.stage).isEqualTo(Stage.FINISHED)
+            assertThat(recovered.game.deckRemaining).isEqualTo(0)
+            assertThat(recovered.game.currentEpoch).isEqualTo(3)
+            assertThat(recovered.game.endingTriggered).isTrue()
+            assertThat(recovered.game.scores).hasSize(playerCount)
+            assertThat(recovered.game.scores.any { score -> score.winner }).isTrue()
             assertThat(json.readTree(json.writeValueAsString(recovered))).isEqualTo(completed)
         }
 
-    private fun completedGame(verify: (JsonNode, Path, String, String) -> Unit) = testApplication {
+    private fun completedGame(verify: (JsonNode, Path, String, String) -> Unit) {
         val directory = Files.createTempDirectory("aor-full-http-")
         try {
             if (postgres) sql = PostgresFixture()
-            application { module(service(directory, OrderedRandom)) }
-            val created =
-                json.readTree(
-                    client
-                        .post("/api/games") {
+            testApplication {
+                application { module(service(directory, OrderedRandom)) }
+                val created =
+                    json.readTree(
+                        client
+                            .post("/api/games") {
+                                contentType(ContentType.Application.Json)
+                                setBody(
+                                    json.writeValueAsString(
+                                        mapOf(
+                                            "players" to
+                                                listOf(
+                                                        "Alice",
+                                                        "Bob",
+                                                        "Carol",
+                                                        "Dave",
+                                                        "Eve",
+                                                        "Faye",
+                                                    )
+                                                    .take(playerCount)
+                                        )
+                                    )
+                                )
+                            }
+                            .bodyAsText()
+                    )
+                val id = created["gameId"].asText()
+                val tokens =
+                    created["links"].map { link -> link["path"].asText().substringAfter("token=") }
+                val url = "/api/games/$id"
+                suspend fun view(player: Int) =
+                    json.readTree(client.get(url) { bearerAuth(tokens[player]) }.bodyAsText())
+                suspend fun command(
+                    player: Int,
+                    text: String,
+                    before: JsonNode,
+                ): JsonNode {
+                    val response =
+                        client.post("$url/commands") {
+                            bearerAuth(tokens[player])
                             contentType(ContentType.Application.Json)
                             setBody(
                                 json.writeValueAsString(
                                     mapOf(
-                                        "players" to
-                                            listOf("Alice", "Bob", "Carol", "Dave", "Eve", "Faye")
-                                                .take(playerCount)
+                                        "expectedRevision" to before["revision"].asInt(),
+                                        "command" to text,
                                     )
                                 )
                             )
                         }
-                        .bodyAsText()
-                )
-            val id = created["gameId"].asText()
-            val tokens =
-                created["links"].map { link -> link["path"].asText().substringAfter("token=") }
-            val url = "/api/games/$id"
-            suspend fun view(player: Int) =
-                json.readTree(client.get(url) { bearerAuth(tokens[player]) }.bodyAsText())
-            suspend fun command(player: Int, text: String): JsonNode {
-                val before = view(player)
-                val response =
-                    client.post("$url/commands") {
-                        bearerAuth(tokens[player])
-                        contentType(ContentType.Application.Json)
-                        setBody(
-                            json.writeValueAsString(
-                                mapOf(
-                                    "expectedRevision" to before["revision"].asInt(),
-                                    "command" to text,
-                                )
-                            )
-                        )
+                    val body = response.bodyAsText()
+                    check(response.status == HttpStatusCode.OK) {
+                        "$text rejected at ${before["game"]["stage"]}: $body"
                     }
-                val body = response.bodyAsText()
-                check(response.status == HttpStatusCode.OK) {
-                    "$text rejected at ${before["game"]["stage"]}: $body"
+                    return json.readTree(body)
                 }
-                return json.readTree(body)
-            }
-            for (seat in 0 until playerCount) {
-                command(seat, "bid-capital ${playerCount - seat}")
-            }
-            listOf("venice", "genoa", "barcelona", "paris", "london", "hamburg")
-                .take(playerCount)
-                .forEachIndexed { seat, capital ->
-                    command(seat, "choose-capital $capital")
+                for (seat in 0 until playerCount) {
+                    command(seat, "bid-capital ${playerCount - seat}", view(seat))
                 }
-            var snapshot = view(0)
-            repeat(5000) {
-                if (snapshot["game"]["stage"].asText() == "FINISHED") {
-                    verify(view(0), directory, id, tokens[0])
-                    return@testApplication
-                }
-                val actor =
-                    snapshot["prompt"]["players"].first().asText().removePrefix("p").toInt() - 1
-                val current = view(actor)
-                val commands = current["legalChoices"]["commands"].map(JsonNode::asText)
-                val command =
-                    when {
-                        current["game"]["stage"].asText() == "TOKEN_PURCHASE" -> "buy-tokens $actor"
-                        commands.any { command -> command.startsWith("choose-turn-position ") } ->
-                            commands.first()
-                        commands.any { command -> command.startsWith("play ") } ->
-                            commands.first { command -> command.startsWith("play ") }
-                        "buy-card" in commands -> "buy-card"
-                        commands.any { command -> command.startsWith("buy-advance ") } ->
-                            commands.first { command -> command.startsWith("buy-advance ") }
-                        "stabilize cash" in commands -> {
-                            val cash = current["game"]["players"][actor]["cash"].asLong()
-                            if (current["game"]["stabilizationCost"].asLong() <= cash) {
-                                "stabilize cash"
-                            } else {
-                                "stabilize misery"
-                            }
+                listOf("venice", "genoa", "barcelona", "paris", "london", "hamburg")
+                    .take(playerCount)
+                    .forEachIndexed { seat, capital ->
+                        command(seat, "choose-capital $capital", view(seat))
+                    }
+                var snapshot = view(0)
+                repeat(5000) {
+                    if (snapshot["game"]["stage"].asText() == "FINISHED") {
+                        verify(view(0), directory, id, tokens[0])
+                        return@testApplication
+                    }
+                    val actor =
+                        snapshot["prompt"]["players"].first().asText().removePrefix("p").toInt() - 1
+                    val current =
+                        if (snapshot["viewerId"].asText() == "p${actor + 1}") {
+                            snapshot
+                        } else {
+                            view(actor)
                         }
-                        "pass" in commands -> "pass"
-                        else -> commands.first()
-                    }
-                snapshot = command(actor, command)
+                    val commands = current["legalChoices"]["commands"].map(JsonNode::asText)
+                    val command =
+                        when {
+                            current["game"]["stage"].asText() == "TOKEN_PURCHASE" ->
+                                "buy-tokens $actor"
+                            commands.any { command ->
+                                command.startsWith("choose-turn-position ")
+                            } -> commands.first()
+                            commands.any { command -> command.startsWith("play ") } ->
+                                commands.first { command -> command.startsWith("play ") }
+                            "buy-card" in commands -> "buy-card"
+                            commands.any { command -> command.startsWith("buy-advance ") } ->
+                                commands.first { command -> command.startsWith("buy-advance ") }
+                            "stabilize cash" in commands -> {
+                                val cash = current["game"]["players"][actor]["cash"].asLong()
+                                if (current["game"]["stabilizationCost"].asLong() <= cash) {
+                                    "stabilize cash"
+                                } else {
+                                    "stabilize misery"
+                                }
+                            }
+                            "pass" in commands -> "pass"
+                            else -> commands.first()
+                        }
+                    snapshot = command(actor, command, current)
+                }
+                error("The three-epoch deck sequence must reach final scores.")
             }
-            error("The three-epoch deck sequence must reach final scores.")
         } finally {
             sql?.close()
             directory.toFile().deleteRecursively()

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {waitForMap} from './browser-support.mjs';
 
 export async function checkGameplayImprovements(page, web, baseline) {
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -13,6 +14,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
             game: {...baseline.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'gameplay fixture');
+        await waitForMap(page, fixture);
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
     await show();

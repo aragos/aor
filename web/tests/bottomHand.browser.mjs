@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame, open} from './browser-support.mjs';
+import {waitForMap, createGame, open} from './browser-support.mjs';
 
 /** Check the rendered hand, including clipping and pointer access, rather than DOM presence. */
 export async function assertBottomHandVisible(page, label) {
@@ -130,6 +130,7 @@ export async function checkBottomHand(page, web, baseline) {
                 ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, `${choice} bottom hand fixture`);
+        await waitForMap(page, fixture);
         await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);

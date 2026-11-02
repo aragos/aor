@@ -47,6 +47,15 @@ fun registerKotlinFormatter(name: String, checkOnly: Boolean) =
         args("--kotlinlang-style")
         if (checkOnly) {
             args("--dry-run", "--set-exit-if-changed")
+            // JavaExec has no outputs by default, so an unchanged check otherwise runs ktfmt again.
+            val checked = layout.buildDirectory.file("kotlin-format/$name.checked")
+            outputs.file(checked)
+            doLast {
+                checked.get().asFile.apply {
+                    parentFile.mkdirs()
+                    writeText("")
+                }
+            }
         }
         argumentProviders.add(
             objects.newInstance<KotlinSourcesArguments>().apply { sources.from(kotlinSources) }

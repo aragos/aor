@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame, open} from './browser-support.mjs';
+import {createGame, open, waitForMap} from './browser-support.mjs';
 import {checkActionButtons} from './actionButtons.browser.mjs';
 import {checkMobileTable} from './mobileTable.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
@@ -22,6 +22,7 @@ export async function checkExpansionLayout(page, web, baseline) {
             game: {...baseline.game, players, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'Expansion layout fixture');
+        await waitForMap(page, fixture);
         await page.evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -141,6 +142,7 @@ if (process.argv[1]?.endsWith('/expansionLayout.browser.mjs')) {
         await page.send('Emulation.setDeviceMetricsOverride', {width: 320, height: 640, deviceScaleFactor: 1, mobile: true});
         await page.send('Page.navigate', {url: web + actor.path});
         await page.wait(`document.querySelector('.pool-summary')`, 'Live phone expansion');
+        await waitForMap(page, baseline);
         await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
         await page.wait(`document.querySelector('.primary-expansion:not([disabled])')`, 'Live marker commitment');
         await page.evaluate(`document.querySelector('.decision-scroll').scrollTop = 100000`);

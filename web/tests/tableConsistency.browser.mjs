@@ -1,7 +1,7 @@
 import {checkActionButtons} from './actionButtons.browser.mjs';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame, open} from './browser-support.mjs';
+import {waitForMap, createGame, open} from './browser-support.mjs';
 import {checkCompactPresentation} from './compactPresentation.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkTable} from './table.browser.mjs';
@@ -20,6 +20,7 @@ export async function checkTableConsistency(page, web, baseline) {
             game: {...baseline.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'table consistency fixture');
+        await waitForMap(page, fixture);
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
     const offer = baseline.game.expansionOffers.find(offer => offer.resultingPool !== null && offer.primaryAction !== 'INSPECT');

@@ -1,3 +1,4 @@
+import {waitForMap} from './browser-support.mjs';
 import assert from 'node:assert/strict';
 
 export async function checkContextualUx(page, web, baseline) {
@@ -9,6 +10,7 @@ export async function checkContextualUx(page, web, baseline) {
         fixture = {...fixture, ...changes, revision: ++revision, game: {...fixture.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'contextual fixture');
+        await waitForMap(page, fixture);
     }
     const viewer = baseline.viewerId;
     const other = baseline.game.players.find(player => player.id !== viewer);

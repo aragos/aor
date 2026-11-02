@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
+import {waitForMap} from './browser-support.mjs';
 
 // Server tests establish audience filtering. This fixture verifies the public table stays inspectable
 // without creating a player's private controls, in the same StrictMode harness as normal play.
@@ -19,6 +20,7 @@ export async function checkSpectator(page, web, baseline) {
             cardPurchaseOffer: null, adjustmentOffers: [], patronageOffers: []}};
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify(publicSnapshot)})`);
     await page.wait(`document.querySelector('.spectator-table')`, 'public spectator table');
+    await waitForMap(page, publicSnapshot);
     assert.match(await page.evaluate('document.title'), /Spectating/);
     assert.equal(await page.evaluate(`document.querySelector('.spectator-status').textContent`), 'Spectating');
     assert.match(await page.evaluate(`document.querySelector('[aria-label="Spectator view"]').textContent`), /Public information only/);

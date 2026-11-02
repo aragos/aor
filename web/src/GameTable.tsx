@@ -67,6 +67,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     useEffect(() => {
         const media = matchMedia(MOBILE_QUERY);
         const update = () => setMobile(media.matches);
+        update();
         media.addEventListener('change', update);
         return () => media.removeEventListener('change', update);
     }, []);

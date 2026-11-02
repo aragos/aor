@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {createGame, open} from './browser-support.mjs';
+import {waitForMap, createGame, open} from './browser-support.mjs';
 
 const artifacts = process.env.AOR_BROWSER_ARTIFACTS;
 
@@ -114,6 +114,7 @@ export async function checkDecisionEvidence(page, web, baseline) {
     const show = async () => {
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${fixture.revision}"]')`,'decision fixture');
+        await waitForMap(page, fixture);
     };
     await show();
     await page.evaluate(`document.querySelector('[data-replacement-province=rome] button:first-child').click()`);

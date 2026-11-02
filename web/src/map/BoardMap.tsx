@@ -9,25 +9,10 @@ import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
 import {clampMapView, fitMapView, panMapView, resizeMapView, zoomMapView} from './mapView';
 import type {MapView, MapViewport} from './mapView';
-import geometryData from './boardGeometry.json';
-import europeanGeometryData from './europeanBoardGeometry.json';
-import catalog13GeometryData from './catalog13BoardGeometry.json';
-import catalog13EuropeanGeometryData from './catalog13EuropeanBoardGeometry.json';
-import catalog14GeometryData from './catalog14BoardGeometry.json';
-import catalog14EuropeanGeometryData from './catalog14EuropeanBoardGeometry.json';
+import {mapGeometry} from './geometryAssets';
+import {geometryKey, UnsupportedMapGeometry} from './mapGeometry';
+import type {Geometry} from './mapGeometry';
 import './map.css';
-
-interface Geometry {
-    bounds: number[];
-    frame: string;
-    provinces: Record<string, {path: string; outline: string; label: number[]; area: string;
-        pieces: Record<string, {size: number; fit: string; crowded: boolean; points: number[][]}>}>;
-    coasts: Record<string, string>;
-    areas: Record<string, {path: string; label: number[]}>;
-    seas: Record<string, {path: string; label: number[]; labelAngle: number; color: string; area: string | null}>;
-    terrain: string;
-    supports: Record<string, string>;
-}
 
 /** Trim unused eastern provinces on smaller boards without changing the province geometry. */
 function mapBounds(provinces: ProvinceDefinition[], geometry: Geometry): MapView {
@@ -118,17 +103,43 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
     return pieces?.tokens.map(tokens => t('board.tokenOccupancy', {owner: owner(tokens.owner), old: tokens.coloured, fresh: tokens.white})).join('; ') || t('table.unoccupied');
 }
 
-export function BoardMap({snapshot, busy}: {
-    snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
-}) {
-    const catalogGeometries = {
-        'ah1996-catalog-13': {STANDARD: catalog13GeometryData, EUROPEAN: catalog13EuropeanGeometryData},
-        'ah1996-catalog-14': {STANDARD: catalog14GeometryData, EUROPEAN: catalog14EuropeanGeometryData},
-        'ah1996-catalog-15': {STANDARD: geometryData, EUROPEAN: europeanGeometryData},
-    };
-    const version = snapshot.game.catalog?.dataVersion as keyof typeof catalogGeometries;
-    const mapGeometries = catalogGeometries[version] ?? catalogGeometries['ah1996-catalog-15'];
-    const geometry: Geometry = mapGeometries[snapshot.game.rules.map === 'EUROPEAN' ? 'EUROPEAN' : 'STANDARD'];
+interface BoardMapProps {
+    snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
+    error?: string; status?: string;
+}
+
+type GeometryLoad = {key: string; geometry: Geometry} | {key: string; retryable: boolean} | null;
+
+export function BoardMap(props: BoardMapProps) {
+    const catalog = props.snapshot.game.catalog;
+    const key = catalog ? geometryKey(catalog.dataVersion, props.snapshot.game.rules.map) : null;
+    const [loaded, setLoaded] = useState<GeometryLoad>(null);
+    const [attempt, setAttempt] = useState(0);
+    useEffect(() => {
+        if (!key) return;
+        let active = true;
+        mapGeometry.load(key).then(geometry => {
+            if (active) setLoaded({key, geometry});
+        }, error => {
+            if (active) setLoaded({key, retryable: !(error instanceof UnsupportedMapGeometry)});
+        });
+        return () => {active = false;};
+    }, [key, attempt]);
+    if (!key) return null;
+    const geometry = mapGeometry.peek(key) ?? (loaded?.key === key && 'geometry' in loaded ? loaded.geometry : undefined);
+    if (geometry) return <LoadedBoardMap key={key} {...props} geometry={geometry}/>;
+    const failed = loaded?.key === key && 'retryable' in loaded ? loaded : null;
+    return <section className="interactive-board map-load-status" aria-label={t('board.world')}>
+        {failed ? <>
+            <p role="alert">{t(failed.retryable ? 'board.loadFailed' : 'board.unavailable')}</p>
+            {failed.retryable && <button type="button" className="secondary" onClick={() => {
+                setLoaded(null); setAttempt(current => current + 1);
+            }}>{t('board.retry')}</button>}
+        </> : <p role="status">{t('board.loading')}</p>}
+    </section>;
+}
+
+function LoadedBoardMap({snapshot, busy, geometry}: BoardMapProps & {geometry: Geometry}) {
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
     // Background dismissal hides the border while retaining the action's province draft.
@@ -361,7 +372,8 @@ export function BoardMap({snapshot, busy}: {
         .sort((first, second) => highlightPriority(first.state) - highlightPriority(second.state) || Number(first.inspected) - Number(second.inspected));
     // Keep sea hatching and satellite stippling legible at every map scale.
     const textureScale = mapSize ? view.w / mapSize.width : 1;
-    return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}>
+    return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}
+        data-map-geometry={geometryKey(catalog.dataVersion, snapshot.game.rules.map)}>
         {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong></div>}
         <div className="map-viewport">
             <div className="map-zoom" role="group" aria-label={t('board.zoom')}>

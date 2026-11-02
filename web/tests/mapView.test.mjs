@@ -1,12 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {readFile} from 'node:fs/promises';
-import ts from 'typescript';
-
-const source = await readFile(new URL('../src/map/mapView.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext}}).outputText;
-const {fitMapView, clampMapView, panMapView, resizeMapView, zoomMapView} = await import(
-    'data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+import {fitMapView, clampMapView, panMapView, resizeMapView, zoomMapView} from '../src/map/mapView.ts';
 const bounds = {x: 20, y: 30, w: 2400, h: 1800};
 
 function assertInside(view, viewport) {

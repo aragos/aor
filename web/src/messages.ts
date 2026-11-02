@@ -190,6 +190,8 @@ export const en: Record<string, string> = {
     'activity.cancelledOpposite': 'Cancels an opposite adjustment for {commodities}',
     'controls.applyOption': 'Apply {option}',
     'board.world': 'The world', 'board.zoom': 'Map zoom', 'board.zoomIn': 'Zoom in', 'board.zoomOut': 'Zoom out',
+    'board.loading': 'Opening the map…', 'board.loadFailed': 'The map could not be opened.',
+    'board.unavailable': 'This game’s map is unavailable.', 'board.retry': 'Try again',
     'board.fit': 'Fit map', 'board.interactiveMap': 'Interactive game map',
     'board.highlightCommodity': 'Highlight all {commodity} provinces',
     'board.mapKey': 'Map key', 'board.capital': 'Capital', 'board.advanceRequired': 'Advance required',

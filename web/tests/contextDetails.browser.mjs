@@ -1,3 +1,4 @@
+import {waitForMap} from './browser-support.mjs';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 
@@ -15,6 +16,7 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
         fixture = {...baseline, ...changes, revision: ++revision, game: {...baseline.game, ...changes.game}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
         await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'details fixture');
+        await waitForMap(page, fixture);
     }
     await show({game: {currentEpoch: 2, deckRemaining: 22,
         players: baseline.game.players.map(player => player.id === viewer ? {...player, cash: 75, writtenCash: 40,
