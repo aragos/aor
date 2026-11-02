@@ -134,7 +134,16 @@ upgrade game rules, commands or catalog versions. That remains the explicit log-
 
 ### Importing existing file data
 
-For current game file format 6, stop the file-backed server and keep a private copy of its complete
+Format-6 games can be upgraded explicitly by their creators from the game screen. The planning
+upgrade performs a read-only validation first, then checks the exact source hash under the game
+lock, archives that source and appends a zero-entry audit revision. It retains original revision
+and entry identities, state, outcomes, accounts, seat credentials and pending private bids. It
+does not change rules/data versions. Keep a private backup and finish source inventory before
+cutover; run only the new application while converting, since old instances cannot read format 7.
+Upgrade format-6 file data before the current-format importer below. Unrelated historical formats
+still require their own validated engine upgrade.
+
+For current game file format 7, stop the file-backed server and keep a private copy of its complete
 data directory. Configure the target database secrets and run:
 
 ```sh

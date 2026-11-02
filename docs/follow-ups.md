@@ -29,7 +29,7 @@ This file retains operational checks and deferred work.
 
 ## Later maintenance
 
-Strategy controllers and private plans remain deferred. Version-2 histories require an explicit,
+Strategy controllers and plans spanning future phases remain deferred. Version-2 histories require an explicit,
 validated mapping before a version-3 upgrade; do not remove the administrative continuity rejection
 or add an automatic legacy decoder to make an old file appear current.
 

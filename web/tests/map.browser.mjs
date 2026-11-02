@@ -16,6 +16,7 @@ import {checkMapViewport} from './mapViewport.browser.mjs';
 import {checkInactiveAreas} from './inactiveAreas.browser.mjs';
 import {checkMapPresentation} from './mapPresentation.browser.mjs';
 import {checkCommodityMap} from './commodityMap.browser.mjs';
+import {checkParallelPlanning} from './planning.browser.mjs';
 import {checkGameplayImprovements} from './gameplayImprovements.browser.mjs';
 import {checkCompactPresentation} from './compactPresentation.browser.mjs';
 import {checkTableConsistency} from './tableConsistency.browser.mjs';
@@ -639,6 +640,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkLiveMarkerReduction(page,web);
     await checkBidWithdrawal(page,web);
     await checkTokenPurchaseRound(page,web);
+    await checkParallelPlanning(page,web);
     await checkTurnOrder(page,web);
 } finally {
     page.ws.close();

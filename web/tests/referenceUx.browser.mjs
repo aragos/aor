@@ -71,6 +71,7 @@ export async function checkReferenceUx(page, web, baseline) {
     const choose = async name => {
         await page.evaluate(`[...document.querySelectorAll('.reference-popup nav button')].find(button => button.textContent === ${JSON.stringify(name)}).click()`);
     };
+    assert(await page.evaluate(`[...document.querySelectorAll('.reference-popup nav button')].some(button => button.textContent === 'Private plans')`));
     await choose('Payout boxes');
     await page.wait(`document.querySelector('.reference-popup .commodity-name')`, 'Public commodity catalog');
     assert.equal(await page.evaluate(`document.querySelectorAll('.reference-popup nav button').length`), 12);

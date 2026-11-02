@@ -286,7 +286,7 @@ replace the outstanding physical-device and screen-reader reviews.
 | Token purchase | `buy-tokens`, `withdraw-bid`; signed amount, stock and exact preview | Live negative/over-stock purchase, private replacement/withdrawal/reload and quotes; unchanged balances before reveal. A live round verifies no activity before reveal, then one receipt with all zero/negative/positive purchases and exact cash costs, preserved after later actions/reload. The 2026-10-30 Renaissance regression replays an isolated saved turn, resolves Renaissance before bidding, reveals the complete purchase batch and retains it on reload; a StrictMode fixture verifies no purchase form or quote requests during that window. Core tests cover Income-to-purchase opening and empty Renaissance windows. Service tests retain stock caps and stale/Chaos behavior. |
 | Turn-order tie | `choose-turn-position`; visible insertion slots | Confirmed slot fixture; service tie groups and restart |
 | Draw Card | `cancel-adjustment`, `pass`; priced adjustment buttons/confirmation | Shared Gold/Ivory choices cost $10 once; core/service tests cover shared types, stacked markers, singleton queues after commodity consumption, canonical history and restart. Browser checks one joint offer/confirmation and the remaining singleton label. |
-| Buy Card | `buy-card`, `discard-card`, `pass`; optional hand actions | Purchase/discard fixtures select cards from the hand and confirm separately, without a second card list. Gameplay fixture queues Urban Ascendancy while waiting and proves one legal-turn submission without polling repeats. |
+| Buy Card | `buy-card`, `discard-card`, `pass`; optional hand actions | Purchase/discard fixtures select cards from the hand and confirm separately, without a second card list. Private-plan service and live browser checks cover durable Urban Ascendancy authorization, cancellation, offline execution and stopping at draws. Core projections cover known Master Art discards and its separate immediate interruption. |
 | Card rounds / Final Card Play / War preparation | `play`, `pass`; persistent hand and contextual form | Dual commodity, protection, targets, final-play and War-preparation fixtures; selected-card actions have one title and no automatic duplicate inspector. Current focused checks show the full selected event effect directly, with its chosen target and projected consequences, without a collapsed rules disclosure. |
 | Commodity choice | `play … commodity`; choices and current payouts | Canonical dual-choice fixture; market fixture checks direct payout-track links and adjustment badges on the hand card, without a commodity inspector. Selected play identifies the commodity and its current-owner payouts; named cash receipts retain authoritative before/after values and capital symbols. Desktop/phone hit tests keep chosen cash effects above reachable confirmation. |
 | Player / area / province / category | `play … player/area/province/category`; finite choices and map | Canonical target fixtures; area-label selection is draft-only; StrictMode fixtures activate Crusades/Rebellion map targets. Live Crusades selects from the hand, prepares a map target without changing the revision, then commits the exact canonical command; hand geometry remains visible throughout. |
@@ -522,3 +522,37 @@ North Africa and the Levant; occupied captures check normal markers and satellit
 arrow, and heads clear of names and markers. Artifacts are retained in
 `/var/folders/ns/q6zj8mz14ksd0kp97xrp1mrm0000gn/T/aor-browser-artifacts-5CJ2LF`.
 These are emulated-device observations; dense multi-owner groups still paint above arrows.
+
+
+## Private Purchase and Buy Card plans
+
+The 2026-11-02 isolated implementation checks pass core JVM tests, Kotlin/JS compilation, the full
+server suite and Kotlin formatting. File and real PostgreSQL cases cover private saves, stale owner
+receipts, exact consequence checks, cancellation, one execution with concurrent workers, restart,
+failed publication, history-edit disarming, consumed authorization, card-draw boundaries and creator
+format upgrades. Upgrade assertions retain original revisions/entry IDs, outcomes, pending bids and
+freshness receipts, with exact source archives and source-hash conflicts. Web build and all 55 web
+unit tests pass.
+
+`AOR_BROWSER_SUITE=planning.browser.mjs npm run test:browser` passes against a fixed source snapshot
+with production StrictMode. Live games establish saved-plan reload, cross-device conflicts (including
+an identical save racing an in-flight request), confirmed disarm before editing, cancellation,
+reconsideration on the legal turn under Competitive undo, offline automatic purchases and card draws.
+The same suite passes ordinary table polling/focus and viewport continuity, purchase previews,
+contextual help and persistent-hand checks at desktop and phone sizes. Planning help preserves its
+draft; private writes leave other seats' views unchanged. The server execution receipt links the
+owner's authorization operation/version and its base position to the committed revision range.
+Focused service regressions also verify cancellation after intervening public progress and an exact
+write acknowledgement that differs from a subsequent save included in automatic progression.
+Screenshots are retained in `aor-browser-artifacts-orcMT8`.
+
+After integrating the current `main` catalog, turn-order references and mobile expansion layout,
+the same live planning/table/help/hand suite passes in the isolated
+`/private/tmp/aor-parallel-purchasing-merge` worktree. Its screenshots are retained in
+`aor-browser-artifacts-CT9OcM`. The production web build and all 55 web unit tests also pass.
+
+Verification used `/private/tmp/aor-planning-verify-6fjvxeq_` to exclude hot reloads from concurrent
+map edits. The broader map browser run did not pass: the live checkout run lost focus during hot
+reload, and the fixed snapshot stopped at the Sarai frame-selection assertion. These runs do not
+establish a green comprehensive map suite. The focused purchasing/table/help/hand evidence above
+is separate from that remaining map failure and from physical-device or screen-reader evidence.

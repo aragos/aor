@@ -130,15 +130,24 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             }
         val reference = "$expectedRevision-$hash.json"
         val replacement = transform(contents, reference)
+        val root = encoded(replacement)
         require(
             replacement.id == id &&
-                replacement.baseRevision == expectedRevision &&
                 replacement.revision == expectedRevision + 1 &&
-                replacement.previousArchive == reference
+                ((replacement.baseRevision == expectedRevision &&
+                    replacement.previousArchive == reference) ||
+                    (replacement.revisions.last().storageArchive == reference &&
+                        root["revisions"].toList().dropLast(1).map { revision ->
+                            revision.deepCopy<ObjectNode>().apply { remove("storageArchive") }
+                        } ==
+                            original["revisions"].map { revision ->
+                                revision.deepCopy<ObjectNode>().apply { remove("storageArchive") }
+                            } &&
+                        replacement.baseRevision == original["baseRevision"].asInt() &&
+                        root["previousArchive"] == original["previousArchive"]))
         ) {
             "A checkpoint must advance one revision and retain its preceding archive."
         }
-        val root = encoded(replacement)
         require(
             root["header"]["players"] == original["header"]["players"] &&
                 root["header"]["creatorId"] == original["header"]["creatorId"] &&
@@ -242,7 +251,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                         FROM game_players m WHERE m.game_id = g.id) AS memberships,
                     (SELECT jsonb_agg(m.seat) FROM game_players m
                         WHERE m.game_id = g.id AND m.needs_move) AS action_players,
-                    CASE WHEN g.document->>'fileVersion' <> '6'
+                    CASE WHEN g.document->>'fileVersion' <> '7'
                         OR g.document->'header'->>'rulesVersion' <> ?
                         OR NOT (g.document->'header'->>'dataVersion' = ANY (?)) THEN 'UNAVAILABLE'
                         ELSE g.listing_status END AS base_status,

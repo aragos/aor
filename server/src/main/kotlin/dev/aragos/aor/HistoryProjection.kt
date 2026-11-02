@@ -70,6 +70,7 @@ internal object HistoryProjection {
             stored.revisions
                 .filter {
                     it.replaceFrom != null ||
+                        it.storageArchive != null ||
                         it.adminAuthor != null ||
                         (it.id > 1 && it.undoPolicy != null)
                 }

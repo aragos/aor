@@ -1,6 +1,10 @@
 package dev.aragos.aor
 
 enum class ViolationCode(val description: String) {
+    PLAN_UNAVAILABLE(
+        "Planning is available only for your remaining Purchase or Buy Card activity."
+    ),
+    PLAN_DECISION_CHANGED("This planned action belongs to a different decision. Review the plan."),
     UNPLAYED_FINAL_CARDS("Play every non-burden card before passing Final Card Play."),
     STABILIZATION_REQUIRED("Pay stabilization in cash or misery before continuing."),
     INVALID_CARD_PURCHASE("This player cannot buy another card in this phase."),

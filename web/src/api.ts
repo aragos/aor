@@ -135,7 +135,28 @@ export interface HistoryEventView {
     war: WarOutcomeView | null;
 }
 export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
+export interface PlannedAction {decision: string; command: string}
+export type PlanOperation = 'SAVE' | 'ARM' | 'DISARM' | 'DELETE' | 'EXECUTE';
+export interface PlanPreview {
+    effects: {action: PlannedAction; before: {cash: number; misery: number | null; ships: PlayerView['ships']};
+        after: {cash: number; misery: number | null; ships: PlayerView['ships']}; cashChanges: {player: string; before: number; after: number}[];
+        advanceQuote: AdvanceQuote | null}[];
+    boundary: 'INCOMPLETE' | 'FINISHED' | 'INFORMATION' | 'INVALID';
+    diagnostic: {code: string} | null; game: Snapshot['game']; choices: Snapshot['legalChoices'];
+    decision: string | null; hypothetical: boolean;
+    invalidIndex?: number | null;
+}
+export interface PlanningQuote {revision: number; preview: PlanPreview; previewToken: string}
+export interface PlanningView {
+    available: boolean; version: string | null;
+    saved: {turnNumber: number; stage: string; actions: PlannedAction[]; armed: boolean; pause: string | null} | null;
+    preview: PlanPreview | null; previewToken: string | null; receipts: string[];
+    executions: {version: string; fromRevision: number; toRevision: number}[];
+    canArm: boolean; canExecute: boolean;
+}
 export interface Snapshot {
+    planning?: PlanningView | null;
+    planWriteReceipt?: {operationId: string; version: string} | null;
     name: string;
     gameId: string; revision: number; creatorId: string;
     /** Null for an authenticated spectator receiving only public information. */

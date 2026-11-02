@@ -245,6 +245,8 @@ class FileGameStore(
             val stored = GameDocuments.read(id, contents)
             remember(id, contents, stored)
             return stored
+        } catch (failure: ServiceFailure) {
+            throw failure
         } catch (_: Exception) {
             throw ServiceFailure(503, "STORAGE_UNAVAILABLE")
         }
