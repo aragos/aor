@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import type {PlannedAction, PlanningQuote, PlanOperation, Snapshot} from './api';
 import {errorCode} from './api';
 import {DecisionAction} from './DecisionActions';
-import {advanceName, label, purchasePassLabel} from './labels';
+import {advanceName, label} from './labels';
 import {PlayerLabel} from './IdentityLabel';
 import {MiseryBox} from './MiseryBox';
 import {HelpLink} from './HelpLink';
@@ -88,7 +88,6 @@ function actionName(action: PlannedAction, snapshot: Snapshot): string {
             const card = snapshot.game.hand.find(candidate => candidate.reference === argument);
             return `${t('action.discard')} · ${card ? t(card.definition.messageId) : t('plan.missingCard')}`;
         }
-        case 'pass': return purchasePassLabel({...snapshot, prompt: {messageId: `prompt.${action.decision}`, players: []}});
         case 'stabilize': return t(`action.stabilize ${argument}`);
         case 'relieve-misery': return `${t('action.relieveMisery')} · ${argument} ${t('controls.spaces')}`;
         case 'patronize': return `${t('action.patronize')} · ${t(`leader.${argument.toUpperCase().replace(/-/g, '_')}`)}`;
@@ -104,13 +103,17 @@ export function ActivityPlanner({snapshot, planner, busy}: {
     const saved = view.saved;
     const preview = planner.open ? planner.preview?.preview : view.preview;
     const actions = planner.open ? planner.actions : saved?.actions ?? [];
+    // Continuations still authorize execution; keep their original effect and removal indices.
+    const visibleActions = actions.map((action, index) => ({action, index}))
+        .filter(({action}) => action.command !== 'pass');
+    const invalidContinuation = preview?.invalidIndex != null &&
+        actions[preview.invalidIndex]?.command === 'pass';
     const ready = !busy && (!planner.open || !!planner.preview);
     return <section className="activity-planner" aria-label={t('plan.title')}>
         <h3>{t(planner.open ? 'plan.editing' : 'plan.title')} <HelpLink topic="plans" label={t('plan.helpTitle')}/></h3>
-        <p className="private-draft-status" role="status">{t(saved?.armed ? 'plan.armed' : planner.open && planner.dirty ? 'plan.unsaved' : saved ? 'plan.saved' : 'plan.introduction')}</p>
+        {(saved || planner.open && planner.dirty) && <p className="private-draft-status" role="status">{t(saved?.armed ? 'plan.armed' : planner.open && planner.dirty ? 'plan.unsaved' : 'plan.saved')}</p>}
         {saved?.pause && <p className="blocker" role="status">{t(`plan.pause.${saved.pause}`)}</p>}
-        {preview?.hypothetical && <p className="small">{t('plan.assumption')}</p>}
-        {actions.length > 0 && <ol className="plan-actions">{actions.map((action, index) => {
+        {visibleActions.length > 0 && <ol className="plan-actions">{visibleActions.map(({action, index}) => {
             const effect = preview?.effects[index];
             return <li key={`${index}:${action.command}`}>
                 <strong>{actionName(action, snapshot)}</strong>
@@ -126,10 +129,10 @@ export function ActivityPlanner({snapshot, planner, busy}: {
                     onClick={() => planner.removeFrom(index)} aria-label={`${t('plan.removeFrom')} · ${actionName(action, snapshot)}`}>{t('plan.removeFrom')}</button>}
             </li>;
         })}</ol>}
-        {preview?.diagnostic && preview.invalidIndex == null && <p className="blocker">{t(`error.${preview.diagnostic.code}`)}</p>}
-        {preview?.boundary === 'INFORMATION' && <p>{t('plan.drawBoundary')}</p>}
-        {preview?.boundary === 'FINISHED' && planner.open && <p>{t('plan.complete')}</p>}
-        {preview?.boundary === 'INCOMPLETE' && actions.length > 0 && <p>{t('plan.partial')}</p>}
+        {preview?.diagnostic && (preview.invalidIndex == null || invalidContinuation) && <p className="blocker">{t(`error.${preview.diagnostic.code}`)}
+            {planner.open && invalidContinuation && <button type="button" className="secondary" disabled={busy || saved?.armed}
+                onClick={() => planner.removeFrom(preview.invalidIndex!)}>{t('plan.removeFrom')}</button>}
+        </p>}
         {planner.error && <p className="error" role="alert">{t(`error.${planner.error}`)}</p>}
         {planner.conflict && <p className="blocker" role="status">{t('plan.changedElsewhere')}
             <button type="button" disabled={busy} onClick={() => {void planner.edit();}}>{t('plan.loadSaved')}</button></p>}
