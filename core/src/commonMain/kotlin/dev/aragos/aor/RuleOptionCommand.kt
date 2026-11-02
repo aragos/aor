@@ -14,7 +14,12 @@ data class RuleOptionCommand(val key: String, val value: String) : Command {
         val resolved = resolve(state.rules)
         return state.copy(
             rules = resolved,
-            board = state.board.copy(definition = resolved.map.definition),
+            board =
+                state.board.copy(
+                    definition =
+                        CatalogVersion.fromWire(state.header.dataVersion)
+                            .mapDefinition(resolved.map)
+                ),
         )
     }
 

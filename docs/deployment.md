@@ -267,6 +267,13 @@ full account-directory/disaster-recovery backup.
 
 ## Engine upgrades and recovery
 
+Catalogs `ah1996-catalog-13` and `ah1996-catalog-14` are both directly supported. New games use 14,
+which corrects Cornwall's land and coastal connections on both maps. Catalog-13 files retain their
+recorded movement rules throughout replay and future play, including pending private submissions;
+their public catalog selects the matching legacy drawing. No storage rewrite, archive
+or automatic rules conversion occurs when opening those saves. Unknown catalog versions remain
+unavailable. Explicit history replacement preserves the supported source catalog identity.
+
 1. Export logs before an engine change and run `:server:verifyGameLogs` with the proposed engine.
    It reports every active log's compatibility without IO/randomness during replay or storage writes.
 2. If syntax/rules/data versions change, transform an exported game's `entries` deliberately.
