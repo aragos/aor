@@ -43,11 +43,11 @@ export async function checkReferenceUx(page, web, baseline) {
         };
         return {log:bounds('.table-activity'),tabs:bounds('.workspace-tabs'),hand:bounds('.table-hand')};
     })()`);
-    assert(logBounds.log.height > 0 && logBounds.log.top >= logBounds.tabs.bottom - 1 &&
+    assert(logBounds.log.height > 0 && logBounds.log.top >= logBounds.tabs.top - 1 &&
         logBounds.log.bottom <= logBounds.hand.top + 1 &&
-        Math.abs(logBounds.log.left - logBounds.hand.left) < 1 &&
+        logBounds.log.left >= logBounds.tabs.right - 1 &&
         Math.abs(logBounds.log.right - logBounds.hand.right) < 1,
-    'Activity fits between workspace tabs and the aligned hand: ' + JSON.stringify(logBounds));
+    'Activity fits beside the phone navigation rail above the hand: ' + JSON.stringify(logBounds));
     assert.equal(await page.evaluate(`document.querySelector('.activity-toggle, .activity-resizer')`),null,'Activity has no sidebar split controls');
     assert.equal(await page.evaluate(`document.querySelector('.activity-list').scrollHeight > document.querySelector('.activity-list').clientHeight`),true,'All entries remain reachable through scrolling');
     assert.equal(await page.evaluate(`document.querySelectorAll('.activity-list [data-event-id]').length`),100);
@@ -102,7 +102,9 @@ export async function checkReferenceUx(page, web, baseline) {
     await page.wait(`document.querySelector('#income-track .payout-box')`, 'Income symbol opens its own track');
     assert.equal(await page.evaluate(`document.querySelectorAll('#income-track .payout-box').length`), 26, 'Every marker count from 0 to 25 has a base income');
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'Income reference uses the active game’s starting player count');
-    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /numbered tokens do not count.*White markers count too/);
+    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /Numbered tokens do not count.*White markers count too/);
+    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`),
+        new RegExp(`3 markers provide \\$${baseline.game.catalog.incomeTrack[3]} base income`));
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     await show({game: {players: baseline.game.players.map(player => player.id === viewer ? {...player, advances: []} : player)}});
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);

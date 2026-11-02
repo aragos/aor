@@ -226,13 +226,13 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
                         <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{purchasePassLabel(snapshot)}</button>}>
-                    <div className="decision-header">
-                        <div className="decision-toolbar">
-                            {!spectator && !inactive && (withdrawing || snapshot.undo?.available) && <button type="button"
-                                className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
-                                title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
-                                onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
-                        </div>
+                    <div className="decision-toolbar">
+                        {!spectator && !inactive && (withdrawing || snapshot.undo?.available) && <button type="button"
+                            className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
+                            title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
+                            onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
+                    </div>
+                    <div className="decision-scroll" ref={decisionScroll}>
                         <div className={`decision-heading ${objectAction ? 'object-heading' : ''}`}>
                             {spectator && <p className="eyebrow">{t('table.publicInformationOnly')}</p>}
                             {finished && <p className="eyebrow">{t('game.finished')}</p>}
@@ -251,8 +251,6 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                                 onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
                             {snapshot.game.activity?.actor && snapshot.game.activity.decisionPlayer && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                         </div>
-                    </div>
-                    <div className="decision-scroll" ref={decisionScroll}>
                     {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status">
                         <PlayerLabel snapshot={snapshot} id={expansionPlayer.id}/>
                         <span>{t('table.poolTokens')}</span><strong><TableIcon kind="token"/><span data-pool-current>{expansionPlayer.poolTokens}</span>
