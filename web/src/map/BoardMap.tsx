@@ -35,11 +35,12 @@ function mapBounds(provinces: ProvinceDefinition[], geometry: Geometry): MapView
 }
 
 /** Land and coastal water share one province's shading, selection, and target emphasis. */
-function ProvinceHighlight({path, reachable, selected, eligible, neighbor, emphasized, outline = true, className = 'province-highlight', strokeWidth}: {
+function ProvinceHighlight({path, reachable, selected, eligible, neighbor, emphasized, commodity, outline = true, className = 'province-highlight', strokeWidth}: {
     path: string; reachable?: boolean; selected: boolean; eligible: boolean;
-    neighbor: boolean; emphasized: boolean; outline?: boolean; className?: string; strokeWidth?: number;
+    neighbor: boolean; emphasized: boolean; commodity?: boolean; outline?: boolean; className?: string; strokeWidth?: number;
 }) {
     return <>
+        {commodity && !outline && <path className="commodity-shade" d={path} fill="#fffdf3" opacity={.4} pointerEvents="none"/>}
         {reachable !== undefined && <path className="reach-shade" d={path}
             fill={reachable ? '#ffffff' : '#142a31'} opacity={reachable ? .25 : .3} pointerEvents="none"/>}
         {outline && eligible && <path className="eligible-shade" d={path} fill="#1f83a6" opacity={selected ? .32 : .23} pointerEvents="none"/>}
@@ -144,6 +145,20 @@ export function BoardMap({snapshot, busy}: {
     const coastNeighbors = new Set(neighbors(catalog?.coastalConnections ?? [], inspectedProvince));
     const selectedSeas = new Set(catalog?.seaCoasts.filter(coast => coast.province === inspectedProvince).map(coast => coast.sea));
     const cardDraft = snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
+    const cardReference = inspection?.kind === 'card' ? inspection.id : selectedCard;
+    const heldCard = snapshot.game.hand.find(card => card.reference === cardReference);
+    const referenceCard = inspection?.kind === 'history-card'
+        ? snapshot.game.cardInspections?.find(card => card.definition.id === inspection.id) : undefined;
+    const commodityCard = referenceCard?.definition ?? heldCard?.definition;
+    const commodityVisible = inspection?.kind === 'card' || inspection?.kind === 'history-card' ||
+        (!inspection && !selectedArea);
+    const highlightedCommodities = commodityVisible && commodityCard?.kind === 'commodity'
+        ? referenceCard?.commodities
+            ?? snapshot.game.cardInspections?.find(card => card.definition.id === commodityCard.id)?.commodities
+            ?? snapshot.game.cardOffers.find(offer => offer.reference === cardReference)?.commodities ?? []
+        : [];
+    const commodityProvinces = new Set(catalog?.provinces.filter(province =>
+        province.commodities.some(commodity => highlightedCommodities.includes(commodity))).map(province => province.id));
     const advanceDraft = catalog?.advances.some(advance => advance.id === selectedAdvance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`));
     const chooseArea = (area: string) => {
         setInspection(null);
@@ -198,6 +213,7 @@ export function BoardMap({snapshot, busy}: {
         return zoomMapView(current, bounds, viewport, factor, {x: anchorX, y: anchorY});
     };
     const zoom = (factor: number) => setView(current => zoomView(current, factor));
+    const fit = () => setView(fitMapView(bounds, mapSize ?? {width: bounds.w, height: bounds.h}));
     const wheelGesture = useRef<(event: WheelEvent) => void>();
     wheelGesture.current = event => {
         const rect = svg.current?.getBoundingClientRect();
@@ -263,7 +279,8 @@ export function BoardMap({snapshot, busy}: {
             : id === selected && id !== dismissedProvince,
         eligible: picker ? (picker.kind === 'area' ? picker.eligible.includes(definitions.get(id)?.area ?? '') : picker.eligible.includes(id)) : legalDestinations.has(id),
         neighbor: landNeighbors.has(id) || coastNeighbors.has(id),
-        emphasized: hovered === id || focused === id || id === inspectedProvince,
+        emphasized: hovered === id || focused === id || id === inspectedProvince || commodityProvinces.has(id),
+        commodity: commodityProvinces.has(id),
     });
     const highlightArea = (area: string) => ({
         selected: picker?.kind === 'area' ? picker.selected.includes(area) : area === selectedArea,
@@ -298,12 +315,19 @@ export function BoardMap({snapshot, busy}: {
             <div className="map-zoom" role="group" aria-label={t('board.zoom')}>
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
-                <button type="button" className="secondary" onClick={() => setView(fitMapView(bounds,
-                    mapSize ?? {width: bounds.w, height: bounds.h}))}>{t('board.fit')}</button>
+                <button type="button" className="secondary" onClick={fit}>{t('board.fit')}</button>
                 <HelpLink topic="map-legend" label={t('board.mapKey')}/>
             </div>
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
-                data-map-bounds={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`}
+                data-map-bounds={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`} tabIndex={0}
+                onKeyDown={event => {
+                    if (['+', '=', '-', '0'].includes(event.key)) {
+                        event.preventDefault();
+                        if (event.key === '0') fit();
+                        else zoom(event.key === '-' ? 1.4 : .7);
+                    }
+                    if (event.key === 'Escape') clearInspection();
+                }}
                 onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd}
                 onPointerLeave={() => setHovered('')}
                 onClick={event => {
@@ -356,7 +380,7 @@ export function BoardMap({snapshot, busy}: {
                         const pieces = occupancy.get(id);
                         const picked = picker?.selected.includes(id);
                         const eligible = picker ? picker.kind === 'area' ? !!definition?.area && picker.eligible.includes(definition.area) : picker.eligible.includes(id) : legalDestinations.has(id);
-                        return <g key={id} data-map-province={id} role={definition ? 'button' : undefined}
+                        return <g key={id} data-map-province={id} data-commodity-highlight={commodityProvinces.has(id) ? highlightedCommodities.join(' ') : undefined} role={definition ? 'button' : undefined}
                             tabIndex={definition ? id === (tabProvince || catalog.provinces[0]?.id) ? 0 : -1 : undefined}
                             aria-pressed={definition ? highlight(id).selected : undefined}
                             aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}

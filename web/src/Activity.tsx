@@ -47,6 +47,23 @@ function ActivityCard({cardId, onInspectCard, commodities = []}: {cardId: string
         : <span className="event-card">▤ {label(cardId, 'event')}</span>;
 }
 
+/** Capital priority belongs to this recorded tie, independent of later rolls and assignments. */
+function CapitalTieConsequence({event}: {event: HistoryEventView}) {
+    if (event.kind !== 'ROLL' || event.detail !== 'CAPITAL_TIE') return null;
+    const values = [...new Set(event.dice.map(die => die.value))].sort((left, right) => right - left);
+    return <span className="event-detail capital-choice-order">
+        {t('activity.capitalChoiceOrder')}: {values.map((value, index) => {
+            const players = event.dice.filter(die => die.value === value)
+                .flatMap(die => die.player ? [eventPlayer(event, die.player)] : []);
+            return <span key={value}>
+                {index > 0 && ' → '}{players.map((player, playerIndex) => <span key={player.id}>
+                    {playerIndex > 0 && ' / '}<CapitalLabel capital={player.capital}>{eventName(event, player.id)}</CapitalLabel>
+                </span>)}{players.length > 1 && ` (${t('activity.capitalTieAgain')})`}
+            </span>;
+        })}
+    </span>;
+}
+
 function EventContent({event, track, onInspectCard, cardInspections}: {
     cardInspections?: Snapshot['game']['cardInspections'];
     event: HistoryEventView; track: Snapshot['game']['catalog']; onInspectCard?: (cardId: string) => void;
@@ -80,6 +97,7 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
                 {player && <Emblem player={player} size={13}/>}⚄ {t(`table.die.${color}`)} {die.value}
             </span>;
         })}
+        <CapitalTieConsequence event={event}/>
         {event.marketRoll && <span className="event-detail market-roll-meaning">
             {t('activity.marketRoll', {total: event.marketRoll.total,
                 commodities: event.marketRoll.commodities.map(commodity => label(commodity, 'commodity')).join(', '),

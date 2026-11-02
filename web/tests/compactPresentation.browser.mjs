@@ -44,6 +44,7 @@ export async function checkCompactPresentation(page, web, baseline) {
             await click('.hand-toggle');
         }
         console.log('Compact presentation:', width, 'player details');
+        if (mobile) await click('#tab-players');
         const overviewBefore = await dimensions('.table-overview');
         const mapBefore = await dimensions('.world-map');
         await click(`[data-player="${viewer}"] > summary`);
@@ -52,8 +53,11 @@ export async function checkCompactPresentation(page, web, baseline) {
         assert.deepEqual(await dimensions('.world-map'), mapBefore, 'Expanded details keep the map dimensions');
         assert.equal(await page.evaluate(`document.querySelector('[data-player="${viewer}"] .player-detail > h3')`), null, 'Player details omit the repeated name');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-floating-player-${width}.png`));
-        await click(`[data-player="${viewer}"] .player-detail .close-detail`);
+        assert.equal(await page.evaluate(`document.querySelector('[data-player="${viewer}"] .player-detail .close-detail')`), null, 'Expanded player text has no overlapping close button');
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27});
+        await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27});
         await page.wait(`!document.querySelector('.player-detail:popover-open')`, 'Player detail closes');
+        if (mobile) await click('#tab-map');
         console.log('Compact presentation:', width, 'commodity choice');
         await click('[data-hand-card="compact-choice"]');
         assert.deepEqual(await dimensions('.undo-action'), undoSize, 'Object review keeps Undo in its fixed toolbar');

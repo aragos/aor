@@ -11,7 +11,7 @@ interface Picker {
 }
 
 type Inspection = {kind: 'card' | 'history-card' | 'advance' | 'province'; id: string} | {kind: 'closed'} | null;
-export type Workspace = 'map' | 'markets' | 'advances' | 'activity';
+export type Workspace = 'map' | 'markets' | 'advances' | 'activity' | 'players';
 
 const MapSelection = createContext<{
     workspace: Workspace;

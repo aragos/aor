@@ -16,7 +16,9 @@ choice and understand its result through visual controls and commands, on deskto
    an explicit decision for players with an advance tier, with its explanation and Pass.
 3. **Organize attention around action.** Show actor, request and relevant resources together. Open
    the relevant workspace once per decision boundary; polling must not repeatedly redirect it.
-   Interruptions name the required responder and the activity that resumes. Keep the private hand
+   Waiting always has one prominent home in the action pane, naming all required responders; omit
+   waiting labels from player boxes and the header. Interruptions name the required responder and
+   the activity that resumes. Keep the private hand
    visible below the workspace column, leaving the sidebar's full height available for actions,
    without repeating held-card reminders in the workspace or action pane.
 4. **Use the game objects as controls.** Click cards, advances and players for their relevant detail
@@ -67,7 +69,10 @@ choice and understand its result through visual controls and commands, on deskto
 
 - Expanded player details float below their summary without changing the player strip or map height.
   They omit the repeated player name and show written cash, tokens, deployed markers, and owned
-  advances. Keep income only in the summary; omit undeployed-marker counts and misery-relief actions here.
+  advances. Toggle them through the summary, without an overlapping close button. Explicitly say when
+  no advances are owned. Keep income only in the summary, with a question mark beside its symbol
+  opening the complete income track and a brief explanation of deployed markers and income modifiers;
+  omit undeployed-marker counts and misery-relief actions here.
   Written cash is the public balance recorded at the latest simultaneous token-purchase reveal,
   initially $40; subsequent income/expenses and unrevealed bids do not alter that record.
   Show the advance count in the collapsed player box, with an accessible label.
@@ -84,12 +89,16 @@ choice and understand its result through visual controls and commands, on deskto
   Undo withdraws an unrevealed capital bid or token purchase, retaining the local amount; after
   reveal it follows the selected policy. Its accessible name identifies the current operation.
 - Activity shares workspace navigation with Map, Commodities and Advances. Each tab pairs its name
-  with a distinct map, goods, book or activity icon. Selecting it preserves the
+  with a distinct map, money bag, book or activity icon. On phones, use a left icon rail with accessible
+  tab names, a dedicated Players tab with a people icon, and no player strip above the map. Desktop
+  retains the player strip and named horizontal tabs. Selecting a workspace preserves the
   action form, prepared targets, hand and log scroll position. At viewport widths of at least
   1400px, an accessible pin control moves the same log into a separate left block; unpinning returns
   to the Activity tab. Render the log once, outside the action sidebar. Polling and temporary
   narrowing preserve the pin preference; narrower screens use the Activity tab. Tab changes and
-  pinning must not reset valid drafts or activity scroll. Help explains this navigation.
+  pinning must not reset valid drafts or activity scroll. Hide map-control buttons on phones, retaining
+  gestures and keyboard zoom, fit and inspection cleanup; desktop keeps its controls. Help explains
+  this navigation.
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
   readiness while retaining the amount in the local input; reloading must not restore a withdrawn
   submission. Committed history and resource balances change only on reveal.
@@ -102,7 +111,8 @@ choice and understand its result through visual controls and commands, on deskto
   beside the colored favicon in the game header, in the browser tab, and above participants in game
   listings. Long names truncate within the available header/row width and retain their full text.
   Failed creation preserves the name and player draft.
-- Hosted account, My games and sign-out controls share the game overview bar. Game listings use one
+- The game icon is a named link to My games; omit a separate My games link. Hosted handle and sign-out
+  controls share the top header row with the game title and icon, including on phones. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.
   Highlight every player still required to act, including simultaneous prompts; omit submitted seats
   and all action highlights for inactive games. Expose the status in accessible text as well as color.
@@ -113,12 +123,11 @@ choice and understand its result through visual controls and commands, on deskto
 - The header uses a larger colored favicon; page titles include the assigned capital, or the player
   name during setup. The header icon stays colored regardless of the browser tab's turn indicator.
   Include the current deck count with the epoch, for example **Epoch 2 (22 cards remaining)**;
-  remove duplicate deck counts from the turn-effects section.
-  The This turn disclosure uses compact label/value rows for military, protection, Papal Decree
-  and active War. Omit its repeated heading, played leaders and shortage/surplus entries; Advances
-  and Commodities own those lookups. Show consequential summary badges only while the disclosure is
-  closed, and ignore the omitted entries when deciding whether this panel is empty.
-  Commands remain in the bottom expander; omit their header button. Province connections remain
+  do not repeat that count elsewhere. Papal Decree appears as a banner in Advances. Omit the This
+  turn disclosure; keep military, protection and War facts with the actions they affect, and retain
+  leader and commodity lookups in their workspaces. On phones, Commands and Game options live in
+  Players without a bottom bar. Desktop retains their bottom disclosures; omit a header Commands
+  button. Province connections remain
   on the map. Event and advance descriptions remain available in the game. Legends, variant
   descriptions, payout boxes, printed tracks and app help open in contextual reference popups.
   Omit card and advance catalogs already available through game inspection, general game rules,
@@ -131,8 +140,8 @@ choice and understand its result through visual controls and commands, on deskto
   closing returns to the unchanged advance list.
   Document all undo scopes, activity boundaries, creator permissions, retained
   answers and immutable randomness; creation and history controls link to that explanation.
-  Game options lists the selected settings without navigation links. Keep the bottom disclosures'
-  labels readable and reachable on desktop and narrow screens, with wrapping text when needed.
+  Game options lists the selected settings without navigation links. Keep the auxiliary disclosures'
+  labels readable and reachable in their desktop or phone location, with wrapping text when needed.
 - Location decisions activate map targets immediately, including Crusades, Rebellion and
   Pirates/Vikings. Shade the whole province/coast or eligible area. A map click edits the draft;
   the action button confirms it. Select playable cards from the persistent hand, without another
@@ -149,7 +158,8 @@ choice and understand its result through visual controls and commands, on deskto
   down beside it. Bound workspace, action and activity scrolling so long content cannot push the hand
   offscreen.
   Narrow layouts place the action review and reachable confirmation above the same hand area;
-  neither it nor the hand overlays map targets. Commands, turn effects and configuration remain
+  neither it nor the hand overlays map targets. Size short action panes to their content, leaving
+  more room for the workspace. Commands and configuration remain
   reachable without displacing the hand. Omit a visible private-hand title and count; retain an
   accessible name for the hand. Cards share the smallest equal height that fits the tallest card
   content, capped only when needed to leave room for the workspace and actions. Short hands shrink
@@ -189,7 +199,9 @@ choice and understand its result through visual controls and commands, on deskto
   Live owner forecasts begin with the first turn.
   Commodity cards show shortage/surplus badges. Commodities and selected commodity cards offer
   controls for full payout boxes in reference popups; keep current owner payouts and adjustments
-  in the game. Market tiles put the payout-help question mark beside the commodity name, without
+  in the game. Clicking a commodity card highlights every province in play of its commodity types;
+  card replacement, deselection and normal selection cleanup remove obsolete highlights. Market
+  tiles put the payout-help question mark beside the commodity name, without
   expandable details or replacement controls for the removed breakdown. Commodity cards link
   directly to their payout tracks; other activity cards open
   the same card-inspection popup, even after leaving the hand, with viewer-specific leader credits.
@@ -246,7 +258,9 @@ choice and understand its result through visual controls and commands, on deskto
   Keep its pin control clear of receipt text. It explains draw reasons,
   epoch/end triggers, protection money, leader rebates, related cash/misery
   changes and shortage/surplus dice. All displayed dice identify their colors. Show an action only
-  once and cap the box height with scrolling. Player names and emblems are those at entry time,
+  once and cap the box height with scrolling. Capital-tie rolls show the resulting capital-choice
+  priority among the rolling players, marking equal-result groups that must roll again. Player names
+  and emblems are those at entry time,
   retained as later actions arrive. Record signed misery spaces and printed endpoints, including
   Chaos, so later state changes cannot rewrite the explanation. Name every misery cause, including
   New World income relief, debt payments and deferred War/Crusades effects. Record actual movement

@@ -134,7 +134,10 @@ export async function checkHosted(page, web, artifacts) {
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('.game-header .account-controls')`, 'Account controls in the game header');
             assert.equal(await page.evaluate(`document.querySelectorAll('.account-controls').length`), 1, 'One account navigation surface');
-            assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls a').getAttribute('href')`), '/');
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls a')`), null,
+                'The logo owns game-list navigation without an explicit My games link');
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('href')`), '/');
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('aria-label')`), 'My games');
             assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls').textContent.includes('@alice')`), true);
             assert.equal(await page.evaluate(`document.querySelector('.private-seat-link')`), null, 'Hosted games use accounts');
             await page.fill('#bid', '19');
@@ -150,6 +153,15 @@ export async function checkHosted(page, web, artifacts) {
             assert(await page.evaluate(`document.querySelector('.game-header').getBoundingClientRect().height < 100`), 'Desktop account and game overview remain compact');
             await page.screenshot(join(artifacts, 'hosted-game-header-mobile.png'), 390, 844, true);
             assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'Combined header fits a phone');
+            assert.equal(await page.evaluate(`(() => {
+                const brand = document.querySelector('.game-brand').getBoundingClientRect();
+                const account = document.querySelector('.game-header .account-controls').getBoundingClientRect();
+                const title = document.querySelector('.game-name').getBoundingClientRect();
+                const logo = document.querySelector('.games-home').getBoundingClientRect();
+                return brand.top < account.bottom && account.top < brand.bottom &&
+                    logo.right <= title.left && title.right <= account.left &&
+                    document.querySelector('.game-header .account-controls button').checkVisibility();
+            })()`), true, 'The logo, game title, user and sign out share the top phone header row without overlap');
             await page.click('Sign out');
             await page.wait(`document.querySelector('.google-sign-in')`, 'In-game sign out');
             await page.send('Emulation.clearDeviceMetricsOverride');

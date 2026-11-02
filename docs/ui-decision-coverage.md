@@ -386,3 +386,31 @@ flow checks authoritative income/token endpoints against the committed result, p
 click-to-unselect, clear selection and successful cleanup. Core tests cover stock/pool-funded reduction,
 all five Renaissance phases, immediate Income and simultaneous token purchase. Server tests cover
 Civil War automatic position receipts, direct Renaissance positions, entry identities and no-op omission.
+
+### November 1 mobile table and shared clarity
+
+Focused production-StrictMode fixtures verify the phone's five-tab vertical icon rail, Players
+workspace, reachable relocated tools, absent bottom bar/map controls, and content-sized waiting pane
+at 390 × 844 and 430 × 932; desktop retains its player strip and horizontal tabs. Hosted checks
+verify the named logo link and account/title geometry on the same phone header row. Inspected phone
+captures show a compact waiting pane and unobstructed left icons; map captures show the matching
+commodity provinces with full shading and outlines. These are emulated-phone observations.
+
+Commodity checks cover both halves of a dual card, in-play filtering, unavailable-card inspection,
+polling, ordinary province/area dismissal and reopening the same card after area selection without
+losing the action draft. Both-board viewport checks retain bounded dragging, keyboard zoom/fit and
+responsive framing. Income references use the active game's starting-player track, including after
+Chaos; expanded players explicitly show no advances and omit the overlapping close control.
+Capital-tie activity checks establish descending choice priority, remaining rerolls and unchanged
+entry-time identities after later capital assignments. Responsive tool checks retain the same mounted
+command input and its draft across desktop/phone transitions. The three-player phone fixture also
+opens Income through another help topic and verifies the correct game-specific track.
+
+`formatKotlin`, `checkKotlinFormat`, core JVM tests, JS compilation, server tests, all 55 web unit
+tests and the web production build pass. The complete browser suite passes, including live
+competition/Civil War, accepted and rejected draft cleanup, bids, hidden-tab polling, hosted
+account navigation and both maps. Final artifacts are retained in
+`/var/folders/ns/q6zj8mz14ksd0kp97xrp1mrm0000gn/T/aor-browser-artifacts-BZBkmF`.
+Reviewed the phone player-detail capture: the Players icon is selected, income help stays beside
+its symbol, the empty-advances message is explicit, and no close control overlaps the detail.
+Physical-phone and screen-reader checks remain separate.

@@ -76,3 +76,7 @@
 .game-table .map-pick-banner { flex: none; margin: .3rem .6rem; padding: .4rem .6rem; }
 .game-table .map-viewport { flex: 1; min-height: 0; }
 .game-table .world-map { height: 100%; min-height: 0; max-height: none; }
+
+@media (max-width: 700px) {
+    .map-zoom { display: none; }
+}

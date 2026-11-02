@@ -7,30 +7,37 @@ export async function checkMainView(page) {
     for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         await page.wait(`document.querySelector('.game-table').getBoundingClientRect().right <= innerWidth`, 'Table reflows');
-        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.workspace-tabs button')].map(button => button.textContent.trim())`),
-            ['Map', 'Commodities', 'Advances0', 'Activity']);
+        await page.wait(`document.querySelector('.workspace-tabs').getAttribute('aria-orientation') === '${mobile ? 'vertical' : 'horizontal'}'`, 'Workspace navigation reflows');
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.workspace-tabs button')].map(button => button.getAttribute('aria-label'))`),
+            ['Map', 'Commodities', 'Advances', 'Activity', ...(mobile ? ['Players'] : [])]);
+        assert.equal(await page.evaluate(`document.querySelector('.workspace-tabs').getAttribute('aria-orientation')`), mobile ? 'vertical' : 'horizontal');
         assert.equal(await page.evaluate(`(() => {
             const tabs=[...document.querySelectorAll('.workspace-tabs button')];
             return tabs.every((tab,index)=>{
                 const icon=tab.querySelector('svg[aria-hidden="true"]');
                 const rect=tab.getBoundingClientRect();
                 return icon?.getBoundingClientRect().width>0 && rect.left>=0 && rect.right<=innerWidth &&
-                    (index===0 || tabs[index-1].getBoundingClientRect().right<=rect.left);
+                    (index===0 || (${mobile}
+                        ? tabs[index-1].getBoundingClientRect().bottom<=rect.top
+                        : tabs[index-1].getBoundingClientRect().right<=rect.left));
             });
-        })()`), true, 'All four named tabs have visible icons and fit without overlapping');
+        })()`), true, 'Workspace icons fit without overlapping in their horizontal or vertical rail');
         await page.evaluate(`document.querySelector('#tab-markets').click()`);
         await page.wait(`document.querySelector('.market-tile')?.checkVisibility()`, 'Commodities populate during bidding');
         const initial = await page.snapshot();
         assert(initial.game.commodityPayouts.length > 0);
         assert.equal(await page.evaluate(`document.querySelectorAll('.market-tile').length`), initial.game.commodityPayouts.length);
         assert.equal(await page.evaluate(`document.querySelectorAll('.market-tile .owner-payout').length`), 0, 'Setup has no premature payout forecasts');
-        for (const selector of ['.table-effects', '.table-configuration', '.command-dock']) {
+        assert.equal(await page.evaluate(`document.querySelector('.table-effects')`), null, 'Turn information has no bottom disclosure');
+        if (mobile) await page.evaluate(`document.querySelector('#tab-players').click()`);
+        for (const selector of ['.table-configuration', '.command-dock']) {
+            await page.evaluate(`document.querySelector('${selector} > summary').scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'})`);
             assert.equal(await page.evaluate(`(() => {
                 const summary=document.querySelector('${selector} > summary');
                 const rect=summary.getBoundingClientRect();
                 const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
                 return rect.top>=0 && rect.bottom<=innerHeight && rect.height>=24 && summary.contains(hit);
-            })()`), true, 'Bottom foldout labels remain readable and reachable');
+            })()`), true, 'Game options and Commands remain readable and reachable');
         }
         await page.evaluate(`document.querySelector('.table-configuration > summary').click()`);
         await page.wait(`document.querySelector('.table-configuration').open`, 'Game options opens');
@@ -46,7 +53,7 @@ export async function checkMainView(page) {
     await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39});
     await page.wait(`document.activeElement.id==='tab-markets' && document.activeElement.getAttribute('aria-selected')==='true'`, 'Named icon tabs retain keyboard navigation');
     await page.evaluate(`document.querySelector('#tab-map').click()`);
-    console.log('Passed: named workspace icons, setup commodities, link-free options and reachable bottom foldouts on desktop and phone.');
+    console.log('Passed: accessible desktop tabs and phone icon rail with Players, setup commodities, link-free options and reachable game tools.');
 }
 
 if (process.argv[1]?.endsWith('/mainView.browser.mjs')) {

@@ -8,7 +8,7 @@ import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
 import {Activity, ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
-import {FinalScores, TurnEffects} from './FullGamePanels';
+import {FinalScores} from './FullGamePanels';
 import {AdvanceTiles, PlayerOverview, Markets} from './TablePanels';
 import {Hand} from './Hand';
 import {CardInspectionDialog} from './CardInspectionDialog';
@@ -24,12 +24,14 @@ import {UrbanAscendancyQueue} from './UrbanAscendancyQueue';
 import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
+import {ReferenceCatalogContext} from './HelpLink';
 import {useStoredSetting} from './preferences';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 
 const ACTIVITY_PIN_QUERY = '(min-width: 1400px)';
+const MOBILE_QUERY = '(max-width: 700px)';
 
 export function GameTable({snapshot, busy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
@@ -54,14 +56,26 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         media.addEventListener('change', update);
         return () => media.removeEventListener('change', update);
     }, []);
+    const [mobile, setMobile] = useState(() => matchMedia(MOBILE_QUERY).matches);
+    useEffect(() => {
+        const media = matchMedia(MOBILE_QUERY);
+        const update = () => setMobile(media.matches);
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
+    useEffect(() => {
+        if (!mobile && workspace === 'players') setWorkspace('map');
+    }, [mobile, setWorkspace, workspace]);
     const activityPinned = pinActivity && wideScreen;
     const previousWorkspace = useRef<Exclude<Workspace, 'activity'>>('map');
     useLayoutEffect(() => {
         if (workspace !== 'activity') previousWorkspace.current = workspace;
         else if (activityPinned) setWorkspace(previousWorkspace.current);
     }, [activityPinned, setWorkspace, workspace]);
-    const tabs: Workspace[] = activityPinned
-        ? ['map', 'markets', 'advances'] : ['map', 'markets', 'advances', 'activity'];
+    const tabs: Workspace[] = [
+        'map', 'markets', 'advances', ...(activityPinned ? [] : ['activity'] as const),
+        ...(mobile ? ['players'] as const : []),
+    ];
     function toggleActivityPin() {
         setPinActivity(!activityPinned);
         setWorkspace(activityPinned ? 'activity' : previousWorkspace.current);
@@ -142,31 +156,45 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
     const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
-    return <main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
+    const tools = <div className="table-tools">
+        <details className="table-configuration"><summary>{t('table.configuration')}</summary>
+            <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}>
+                <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
+            </div>)}</dl>
+        </details>
+        <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
+            open={commandsOpen} onToggle={setCommandsOpen}/>
+    </div>;
+    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''}`}>
         <div className="table-overview">
             <header className="game-header">
-                <div className="game-brand"><h1><AppLogo/></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
+                <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
                     <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
-                <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{!finished && <span className={canAct ? 'your-move' : 'waiting-status'}>{canAct ? t('table.yourMove') : t('game.waiting')}</span>}</div>
+                <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong></div>
                 {!snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                     <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                         href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
                 </details>}
                 {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
-                <AccountControls/>
+                <AccountControls showGames={false}/>
             </header>
-            <PlayerOverview snapshot={snapshot}/>
             {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
             {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
         </div>
         <div className="table-workspace" data-activity-pinned={activityPinned}>
-            <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')}>
+            <section id="workspace-players" className="players-workspace" hidden={mobile && workspace !== 'players'}
+                role={mobile ? 'tabpanel' : 'region'} aria-label={mobile ? undefined : t('table.players')}
+                aria-labelledby={mobile ? 'tab-players' : undefined}>
+                <PlayerOverview snapshot={snapshot}/>
+                {tools}
+            </section>
+            <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')} aria-orientation={mobile ? 'vertical' : 'horizontal'}>
                 {tabs.map(tab => <button type="button" key={tab} role="tab" id={`tab-${tab}`} aria-selected={workspace === tab}
                     tabIndex={workspace === tab ? 0 : -1}
-                    aria-controls={`workspace-${tab}`} onClick={() => setWorkspace(tab)} onKeyDown={event => {
-                        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                    title={t(`table.${tab}`)} aria-label={t(`table.${tab}`)} aria-controls={`workspace-${tab}`} onClick={() => setWorkspace(tab)} onKeyDown={event => {
+                        if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
                             event.preventDefault();
-                            const next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+                            const next = tabs[(tabs.indexOf(tab) + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : tabs.length - 1)) % tabs.length];
                             setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
                         }
                         if (event.key === 'Home' || event.key === 'End') {
@@ -176,12 +204,14 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                         }
                     }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && <small>{me.advances.length}</small>}</button>)}
             </nav>
-            <div className="workspace-main" hidden={workspace === 'activity'}>
+            <div className="workspace-main" hidden={workspace === 'activity' || workspace === 'players'}>
                 <div id="workspace-map" role="tabpanel" aria-labelledby="tab-map" hidden={workspace !== 'map'}>
                     <BoardMap snapshot={snapshot} busy={busy} submit={submit}/>
                 </div>
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={snapshot}/></div>
-                <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}><AdvanceTiles snapshot={snapshot}/></div>
+                <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}>{snapshot.game.effects.papalCategory && <p className="papal-decree-banner" role="status">
+                    <strong>{t('game.forbiddenCategory')}</strong>: {label(snapshot.game.effects.papalCategory, 'category')}
+                </p>}<AdvanceTiles snapshot={snapshot}/></div>
                 {inspectedAdvance && !inspectedCard && <section className="inspection-panel" aria-label={t('table.inspection')}>
                     <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
                 </section>}
@@ -200,8 +230,11 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
                                 onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
                         </div>
                         <div className={`decision-heading ${objectAction ? 'object-heading' : ''}`}>
-                            {!objectAction && <p className="eyebrow">{finished ? t('game.finished') : canAct ? t('table.yourMove') : t('prompt.waitingFor')}</p>}
-                            {!canAct && snapshot.prompt && <strong><PlayerLabels snapshot={snapshot} ids={snapshot.prompt.players}/></strong>}
+                            {finished && <p className="eyebrow">{t('game.finished')}</p>}
+                            {!inactive && !finished && <div className={`decision-status ${canAct ? 'is-ready' : 'is-waiting'}`} role="status">
+                                <strong>{t(canAct ? 'table.yourMove' : 'prompt.waitingFor')}</strong>
+                                {!canAct && snapshot.prompt && <PlayerLabels snapshot={snapshot} ids={snapshot.prompt.players}/>}
+                            </div>}
                             <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
                             {!objectAction && <span className="mobile-selected">{province ? <ProvinceLabel snapshot={snapshot} id={province.id}/> : ''}</span>}
                             {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed}
@@ -251,16 +284,5 @@ export function GameTable({snapshot, busy, saved, submit: sendCommand, connectio
         {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>
             <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
         </CardInspectionDialog>}
-        <div className="table-tools">
-            <details className="table-effects"><summary>{t('game.thisTurn')}
-                {snapshot.game.activeWar && <span className="effect-badge">{t('game.activeWar')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.initiator}/> / <PlayerLabel snapshot={snapshot} id={snapshot.game.activeWar.opponent}/></span>}
-                {snapshot.game.effects.papalCategory && <span className="effect-badge">{t('game.forbiddenCategory')}: {label(snapshot.game.effects.papalCategory, 'category')}</span>}
-            </summary><TurnEffects snapshot={snapshot}/></details>
-            <details className="table-configuration"><summary>{t('table.configuration')}</summary>
-                <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}><dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd></div>)}
-    </dl>
-            </details>
-            <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory} open={commandsOpen} onToggle={setCommandsOpen}/>
-        </div>
-    </main>;
+    </main></ReferenceCatalogContext.Provider>;
 }

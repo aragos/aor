@@ -38,15 +38,18 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Allow each player to withdraw their unrevealed capital bid or token purchase. Restore their
   pending action, retain the local amount as an unsaved draft, and keep withdrawn amounts private.
 - Keep the AoR header compact and identify the assigned capital in the page title. Show the actor,
-  decision and relevant resources; keep inspection separate from action forms and preserve drafts
+  decision and relevant resources in the action pane, including one consistent waiting status naming
+  the required players; omit waiting labels from the header and player boxes. Keep inspection separate
+  from action forms and preserve drafts
   while inspecting other objects. Use the object itself rather than separate Inspect controls;
   keep province inspection on the map. Clear the province after accepted token/marker placement,
   retaining correctable work after rejection. Show available cash alongside spending decisions; omit
   a permanent resource section. Include each player's advance count in their summary. Expanded
-  advances follow printed category and letter order.
-  Expanded player details omit the repeated name and float without resizing the player strip or map.
-  Show written cash in expanded player details and keep income in the summary. Put the live deck
-  count beside the epoch, with no duplicate count in turn effects.
+  advances follow printed category and letter order, with an explicit empty state when none are owned.
+  Expanded player details omit the repeated name and close button; the summary toggles the floating
+  detail without resizing the player strip or map. Show written cash in expanded player details and
+  keep income in the summary, with an income-symbol question mark for its track and marker explanation.
+  Put the live deck count beside the epoch.
 - Activate map targets immediately for location choices, including Crusades, Rebellion and
   Pirates/Vikings. Shade eligible land/coasts together. Map clicks prepare choices; confirmation
   commits them. Ask “Pick a target” or “Pick N targets” during card targeting. Prefer visible finite
@@ -55,8 +58,11 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   waiting. On desktop, the action sidebar extends beside the hand instead of surrendering
   its lower space to it. Workspace, action and activity scrolling must not push the hand below the
   viewport or cover it. On narrow screens, coordinate the action review and confirmation above the
-  hand rather than overlaying separate fixed panels. Keep Commands, turn effects and configuration
-  reachable. Omit the visible private-hand heading and card count. Size cards and the hand to their
+  hand rather than overlaying separate fixed panels. Keep short action panes sized to their content.
+  On phones, use a left icon rail for workspaces and a dedicated Players tab instead of the player
+  strip. Keep Commands and configuration in Players, without a bottom bar. Show Papal Decree as a
+  banner in Advances; relevant actions own other turn effects. Omit the visible private-hand heading
+  and card count. Size cards and the hand to their
   contents, with a height cap only when needed to retain usable workspace and actions. Compact narrow
   hands show card names only; expansion reveals their full content.
   Card summaries show current commodity payouts and adjustments, relevant leader credits and concise
@@ -101,7 +107,9 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Show costs at offer and confirmation, stabilization's current and resulting misery boxes, commodity
   adjustments. Keep event and advance descriptions in the game, with current commodity payouts and
   leader credits in leader inspections. Commodity cards retain live payouts on the card and small
-  question links to full payout tracks, without an inspection box. Every visible capital name
+  question links to full payout tracks, without an inspection box. Clicking a commodity card highlights
+  every matching province in play; ordinary selection cleanup removes the highlight. Every visible
+  capital name
   includes its symbol, including cash/misery previews. Shipping upgrades show current → new shipping.
   Identify whether each leader discount includes Written Record.
   Open full payout boxes, legends, variant descriptions, printed tracks and app help in contextual
@@ -132,7 +140,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   implying another misery charge. Civil War's subsequent choice shows both actual cash and token
   losses and resulting balances, after capital replacement and rounding.
 - Offer bounded, scrollable Activity beside Map, Commodities and Advances in workspace navigation.
-  Give each tab a distinct icon alongside its name. Populate Commodities from game creation;
+  Give each tab a distinct icon, using a money bag for Commodities; retain accessible names on the
+  phone icon rail. Populate Commodities from game creation;
   owner payout forecasts begin with the first turn. In-game options show settings without links.
   At viewport widths of at least 1400px, allow pinning the same log into a separate left block;
   unpinning returns to the Activity tab. Narrower screens use the tab while retaining the pin
@@ -140,7 +149,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   pinning and polling. Keep the hand and action confirmation reachable, render one log and omit a count.
   Show every action once. Preserve entry-time names and emblems as later history is appended;
   cards open the card-inspection popup without changing an action draft.
-  Explain epoch/end triggers, draw reasons, shortage/surplus rolls,
+  Explain capital-tie rolls' capital-choice order and remaining rerolls, epoch/end triggers, draw
+  reasons, shortage/surplus rolls,
   protection money, leader rebates and related cash/misery changes; label dice colors and omit
   continuation noise. Misery relief itemizes cash and current-turn relief rating; Holy Indulgence
   records pool/stock token movements even when no cash changes.
@@ -179,7 +189,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 - Start the map fitted to the width of its viewport and constrain dragging/zooming in both axes so
   the view cannot expose empty space outside the board. A viewport taller than the board's proportions
   uses the minimum height-cover view needed to avoid empty bands. Resizing preserves the prepared
-  action and bounds the resulting view.
+  action and bounds the resulting view. Hide map-control buttons on phones while retaining gesture
+  and keyboard zoom, fit and inspection cleanup; desktop keeps its controls.
 - Support keyboard, touch, narrow layouts, bounded map gestures, zoom and dense-piece inspection.
   Persist preferences and creation defaults in browser storage with an in-memory fallback.
 
@@ -187,7 +198,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 
 Use stable registered identities and unique public handles throughout hosted play; registration
 requires no separate display name. Live views of existing games use handles while recorded activity
-keeps its original identities. Account navigation shares the game overview bar. Each listed game is
+keeps its original identities. The game icon links to the games list without a separate My games link;
+the user handle and sign-out control share the top bar with the game title and icon. Each listed game is
 one clickable row showing the creator-chosen game name and participants, distinguished by
 pending-action status, without creation dates or visible IDs. Require a name in the creation form;
 retain it in the game header and browser tab across reloads and history edits.
