@@ -1,6 +1,5 @@
 package dev.aragos.aor
 
-import com.fasterxml.jackson.databind.node.ObjectNode
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -63,8 +62,6 @@ data class PlanningQuote(
     val preview: ActivityPlanPreview,
     val previewToken: String,
 )
-
-data class PlanningUpgradeQuote(val revision: Int, val sourceHash: String, val fileVersion: Int = 7)
 
 /** Authenticates players and projects the driver's state for the HTTP API. */
 class GameService(
@@ -615,58 +612,11 @@ class GameService(
                     val game = store.read(id)
                     if (game.plans.values.any(SavedActivityPlan::armed)) drainPlans(id)
                 } catch (failure: Exception) {
-                    if (failure !is ServiceFailure || failure.code != "PLANNING_UPGRADE_REQUIRED") {
-                        onFailure(id, failure)
-                    }
+                    onFailure(id, failure)
                 }
             }
             cursor = ids.lastOrNull()
         } while (cursor != null)
-    }
-
-    internal fun planningUpgrade(
-        id: String,
-        access: GameAccess,
-        expectedRevision: Int? = null,
-        sourceHash: String? = null,
-    ): PlanningUpgradeQuote {
-        val managed = store as? ManagedGameStore ?: throw ServiceFailure(422, "UPGRADE_UNAVAILABLE")
-        fun converted(contents: String): StoredGame {
-            val root =
-                json.readTree(contents) as? ObjectNode
-                    ?: throw ServiceFailure(422, "INVALID_UPGRADE")
-            if (root["fileVersion"]?.asInt() != 6) throw ServiceFailure(422, "INVALID_UPGRADE")
-            root.put("fileVersion", 7)
-            root.remove(listOf("plans", "planVersions", "planReceipts", "planExecutions"))
-            val game = GameDocuments.read(id, root)
-            if (authenticate(game, access) != game.header.creatorId) {
-                throw ServiceFailure(403, "UPGRADE_CREATOR_REQUIRED")
-            }
-            return game
-        }
-        val contents = managed.document(id)
-        val source = converted(contents)
-        val hash = planDigest(contents)
-        if (expectedRevision == null) return PlanningUpgradeQuote(source.revision, hash)
-        if (sourceHash != hash) throw ServiceFailure(409, "STALE_UPGRADE")
-        managed.checkpoint(id, expectedRevision) { locked, archive ->
-            if (planDigest(locked) != sourceHash) throw ServiceFailure(409, "STALE_UPGRADE")
-            val original = converted(locked)
-            original.copy(
-                revisions =
-                    original.revisions +
-                        Revision(
-                            id = original.revision + 1,
-                            parent = original.revision,
-                            author = original.header.creatorId,
-                            command = "upgrade-planning",
-                            entries = emptyList(),
-                            at = System.currentTimeMillis(),
-                            storageArchive = archive,
-                        )
-            )
-        }
-        return PlanningUpgradeQuote(expectedRevision + 1, hash)
     }
 
     /**

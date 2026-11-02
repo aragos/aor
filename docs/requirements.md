@@ -155,8 +155,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   before execution starts. Revalidate exact consequences and pause on changes, missing decisions
   or draws. Shared plans support Urban Ascendancy and both Master Art discard opportunities, with
   normal command, information and undo boundaries. Keep plans private and execute each segment once.
-  Upgrade current format-6 games explicitly to format 7, preserving effective history, entry IDs,
-  recorded outcomes, current prompts, metadata, membership and pending secrets with exact archives.
+  Keep previously upgraded format-7 games playable with their effective history, entry IDs,
+  recorded outcomes, prompts, metadata, membership, pending secrets and historical archives intact.
   Resolve event replacements in current player order. Offer all of the chooser's affected provinces
   together, enforce their shared pool budget, and review the complete group before one confirmation.
   Identify the event, recipient, pool cost and result; explain when no pool token remains and avoid

@@ -134,14 +134,8 @@ upgrade game rules, commands or catalog versions. That remains the explicit log-
 
 ### Importing existing file data
 
-Format-6 games can be upgraded explicitly by their creators from the game screen. The planning
-upgrade performs a read-only validation first, then checks the exact source hash under the game
-lock, archives that source and appends a zero-entry audit revision. It retains original revision
-and entry identities, state, outcomes, accounts, seat credentials and pending private bids. It
-does not change rules/data versions. Keep a private backup and finish source inventory before
-cutover; run only the new application while converting, since old instances cannot read format 7.
-Upgrade format-6 file data before the current-format importer below. Unrelated historical formats
-still require their own validated engine upgrade.
+The format-6-to-7 conversion is retired after the completed online cutover. Previously upgraded
+games retain their audit revisions and exact source archives; those archives remain exportable.
 
 For current game file format 7, stop the file-backed server and keep a private copy of its complete
 data directory. Configure the target database secrets and run:
@@ -304,7 +298,7 @@ unavailable. Explicit history replacement preserves the supported source catalog
    unrevealed submissions are cleared and must be resubmitted. Admin identity/time/action appear
    in history. A failed replay or database write leaves the preceding game and archive set unchanged.
 
-Only game file format **6** and the current rules/data versions are decoded for ordinary play.
+Only game file format **7** and the supported rules/catalog versions are decoded for ordinary play.
 Older files remain exportable to admins; there is no silent legacy decoder. An explicit validated
 upgrade reconstructs a current header and checkpoint. Historic revisions before a checkpoint remain
 in its archive and are inspected through admin exports rather than replayed with a mismatched engine.

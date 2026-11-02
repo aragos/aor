@@ -18,7 +18,9 @@ data class Revision(
     val administrativeAction: AdministrativeAction? = null,
     /** Administrative audit time, in Unix milliseconds; ordinary engine deltas use zero. */
     val at: Long = 0,
-    /** Exact source archive of a format-only upgrade; engine entries and their IDs stay intact. */
+    /**
+     * Historical format-upgrade archive; retained for replay and audit, never added to new games.
+     */
     val storageArchive: String? = null,
 )
 

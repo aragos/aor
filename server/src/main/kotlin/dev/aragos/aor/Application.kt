@@ -337,22 +337,6 @@ fun Application.module(
                 )
             }
         }
-        post("/api/games/{id}/planning-upgrade") {
-            call.api {
-                val body = call.body()
-                body.fieldsOnly("expectedRevision", "sourceHash")
-                call.respondJson(
-                    withContext(Dispatchers.IO) {
-                        gameService.planningUpgrade(
-                            call.parameters["id"]!!,
-                            call.gameAccess(hosted),
-                            body["expectedRevision"]?.integer(),
-                            body["sourceHash"]?.string(),
-                        )
-                    }
-                )
-            }
-        }
         System.getenv("AOR_WEB_DIR")?.let { directory ->
             val web = File(directory)
             require(File(web, "index.html").isFile) {

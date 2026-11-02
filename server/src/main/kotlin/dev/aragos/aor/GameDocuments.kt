@@ -7,9 +7,6 @@ internal object GameDocuments {
     fun read(id: String, contents: String): StoredGame = read(id, json.readTree(contents))
 
     fun read(id: String, root: JsonNode): StoredGame {
-        if (root["fileVersion"]?.asInt() == 6) {
-            throw ServiceFailure(409, "PLANNING_UPGRADE_REQUIRED")
-        }
         try {
             require(root.field("id").string() == id) { "Stored game ID must match its key." }
             val game = decode(root)
