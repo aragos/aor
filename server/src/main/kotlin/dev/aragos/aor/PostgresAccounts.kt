@@ -72,7 +72,7 @@ class PostgresAccountStore(private val database: PostgresDatabase) : AccountStor
             connection
                 .prepareStatement(
                     """
-                    SELECT * FROM accounts WHERE strpos(handle, ?) > 0
+                    SELECT * FROM accounts WHERE strpos(lower(handle), ?) > 0
                         OR id = ?
                     ORDER BY handle LIMIT ?
                     """

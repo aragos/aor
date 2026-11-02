@@ -115,10 +115,15 @@ export async function checkHosted(page, web, artifacts) {
             await page.wait(`document.querySelector('input[autocomplete=username]')`, 'Player registration');
             assert.equal(sessions.length, before + 1, 'Firebase ID token opens the server session');
             assert.equal(await page.evaluate(`document.querySelector('input[autocomplete=nickname]')`), null, 'Registration only asks for a handle');
-            await page.fill('input[autocomplete=username]', 'new-player');
+            await page.fill('input[autocomplete=username]', '123-player');
+            assert.equal(await page.evaluate(`document.querySelector('input[autocomplete=username]').checkValidity()`),
+                false, 'Handles must still start with a letter');
+            await page.fill('input[autocomplete=username]', 'New-Player');
+            assert.equal(await page.evaluate(`document.querySelector('input[autocomplete=username]').checkValidity()`),
+                true, 'Native handle validation accepts uppercase letters');
             await page.click('Register player');
-            await page.wait(`document.querySelector('.portal-header .account-controls')?.textContent.includes('@new-player')`, 'Handle-only registration opens the dashboard');
-            assert.deepEqual(registrations, [{handle: 'new-player'}]);
+            await page.wait(`document.querySelector('.portal-header .account-controls')?.textContent.includes('@New-Player')`, 'Handle-only registration opens the dashboard');
+            assert.deepEqual(registrations, [{handle: 'New-Player'}]);
         });
         const registeredAccount = {id: 'google-player', handle: 'alice', admin: false, mayCreateGames: false};
         await check('Registered Google users see their games', async () => {

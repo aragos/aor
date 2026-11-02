@@ -239,10 +239,12 @@ All hosted APIs use `Authorization: Bearer <Firebase ID token>`. `/api/config` i
 `/api/me` exposes the signed-in identity and registered player. Directory search (`/api/players?q=`)
 requires registration, returns at most 20 matches, and does not expose email addresses.
 `POST /api/players/register` accepts only `{"handle":"unique-handle"}`. Public account responses
-contain the handle and effective permissions, with no display name. Handles are canonical lowercase,
-3–24 letters/digits/hyphens, starting with a letter. PostgreSQL migration V2 removes the display-name
-column on startup and preserves existing handles, memberships and permissions; immutable game history
-keeps its recorded labels. Local account files use version 2 only.
+contain the handle and effective permissions, with no display name. Handles preserve capitalization,
+using 3–24 ASCII letters/digits/hyphens, starting with a letter. Search and uniqueness ignore case.
+Migration V3 accepts mixed-case handles and adds a case-insensitive unique index without rewriting
+existing accounts or games. PostgreSQL migration V2 removes the display-name column on startup and
+preserves existing handles, memberships and permissions; immutable game history keeps its recorded
+labels. Local account files use version 2 only.
 
 | Administrative endpoint | Contract |
 | --- | --- |

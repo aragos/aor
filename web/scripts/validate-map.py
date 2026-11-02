@@ -515,3 +515,21 @@ for edge, path in geometry["supports"].items():
     support_lines[edge] = line
     support_envelopes[edge] = envelope
 print(f"Checked {len(expected_supports)} short, straight support paths, endpoints, clear labels and uncrossed shafts.")
+
+# These compact crossings must keep a readable border beside the arrow.
+shetland_border = water["shetland-islands"].boundary.intersection(water["bergen"].boundary.buffer(.003))
+assert shetland_border.bounds[2] - shetland_border.bounds[0] < .01, (
+    "Shetland–Bergen must share one straight north–south coastal border."
+)
+marseilles_border = water["cagliari"].boundary.intersection(water["marseilles"].boundary.buffer(.003))
+assert marseilles_border.difference(support_envelopes["cagliari marseilles"]).length > 28, (
+    "Cagliari–Marseilles must retain visible border beyond the arrowhead and halo."
+)
+print("Checked straight Shetland–Bergen border and visible Cagliari–Marseilles border.")
+
+for first, second in [("marseilles", "genoa"), ("marseilles", "cagliari")]:
+    shared = water[first].boundary.intersection(water[second].boundary.buffer(.003))
+    assert shared.convex_hull.area < shared.length * .01, (
+        f"{first}–{second}: the Ligurian junction must use a straight border without hooks."
+    )
+print("Checked simple Marseilles–Genoa–Cagliari junction.")

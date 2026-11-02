@@ -109,7 +109,7 @@ function Register({refresh}: {refresh: () => Promise<void>}) {
         finally {setBusy(false);}
     }
     return <main className="landing panel"><h1>{t('hosted.choose-your-player-identity')}</h1><form className="account-form" onSubmit={register}>
-        <label>{t('hosted.public-handle')}<input value={handle} autoComplete="username" onChange={event => setHandle(event.target.value.toLowerCase())} pattern="[a-z][a-z0-9-]{2,23}" minLength={3} maxLength={24} required/></label>
+        <label>{t('hosted.public-handle')}<input value={handle} autoComplete="username" onChange={event => setHandle(event.target.value)} pattern="[A-Za-z][A-Za-z0-9\-]{2,23}" minLength={3} maxLength={24} required/></label>
         <p className="muted small">{t('hosted.a-unique-handle-lets-other')}</p>
         <Problem value={error}/><button disabled={busy}>{busy ? t('hosted.working') : t('hosted.register-player')}</button>
     </form></main>;

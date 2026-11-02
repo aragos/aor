@@ -58,7 +58,7 @@ class HostedApplicationTest(private val postgres: Boolean) {
 
         assertThat(response.status).isEqualTo(HttpStatusCode.Conflict)
         assertThat(reopenedAccounts().find(AccountId("new-user"))?.handle)
-            .isEqualTo(PlayerHandle("new-player"))
+            .isEqualTo(PlayerHandle("New-Player"))
     }
 
     @Test
@@ -67,10 +67,19 @@ class HostedApplicationTest(private val postgres: Boolean) {
 
         assertThat(response.status).isEqualTo(HttpStatusCode.OK)
         val account = json.readTree(response.bodyAsText())
-        assertThat(account["handle"].asText()).isEqualTo("new-player")
+        assertThat(account["handle"].asText()).isEqualTo("New-Player")
         assertThat(account.has("displayName")).isFalse()
         assertThat(reopenedAccounts().find(AccountId("new-user")))
-            .isEqualTo(RegisteredAccount(AccountId("new-user"), PlayerHandle("new-player")))
+            .isEqualTo(RegisteredAccount(AccountId("new-user"), PlayerHandle("New-Player")))
+    }
+
+    @Test
+    fun directorySearchIgnoresHandleCaseAfterRestart() = withHosted {
+        accounts.register(AccountId("new-user"), "New-Player")
+
+        val matches = reopenedAccounts().search("nEW-pLA")
+
+        assertThat(matches.map { it.handle.value }).containsExactly("New-Player")
     }
 
     @Test

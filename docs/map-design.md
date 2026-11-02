@@ -77,8 +77,10 @@ Access hatching follows the viewer's authoritative missing-advance projection, i
 routes, ships and phase. Shade the whole area, including its water, when every province shares the
 lock; otherwise shade only locked provinces' land and coastal water. Keep commodities, pieces,
 labels and inspection available. Remove hatching with its lock as soon as access is acquired.
-Hatching marks mandatory regional and overseas access. Leave Iceland and West Africa unhatched;
-their alternative navigation requirements still apply to legal actions.
+Hatching marks mandatory regional and overseas access. A fully locked New World or Far East group
+uses its entire inset box, including the space around its provinces, as the hatching footprint.
+Leave Iceland and West Africa unhatched; their alternative navigation requirements still apply to
+legal actions.
 Inspecting a province highlights each directly connected sea with deep blue water, sparse diagonal
 hatching, a contrasting dashed perimeter and a light name with a dark halo. Sea texture remains
 distinct from the pale solid coastal bands. Hatch spacing and perimeter width stay consistent on
@@ -181,8 +183,11 @@ European board. Show each as a short, straight crossing of the shared province/c
 with the tip inside the supported market. Avoid detours, crossing shafts and ambiguous clusters.
 The visible shaft and its contrasting halo stop inside the arrowhead so neither protrudes beside
 its narrow tip at high zoom; the arrowhead retains the exact catalogued endpoint.
-Cagliari's coastal-water arrows to Genoa and Marseilles use longer 48-unit shafts to remain visible;
-the Marseilles route extends back into Cagliari to leave its target's marker slot clear.
+Cagliari's Genoa arrow uses a longer 48-unit shaft to remain visible. Its Marseilles crossing has
+a wider coastal channel, leaving a visible border beside the arrowhead and halo. Marseilles, Genoa
+and Cagliari meet at a simple three-way coastal junction with straight Marseilles borders and a
+straight sea-facing edge at the crossing, avoiding hooked channels. Shetland–Bergen
+uses a straight north–south coastal border with a perpendicular support crossing.
 Reserve the whole arrowhead and contrasting halo when avoiding names and normal marker positions;
 dense token groups still take drawing priority. Arrow routing is drawing data and never changes
 the support graph or a province's connections.

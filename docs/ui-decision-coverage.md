@@ -5,6 +5,23 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
+The November 2 map/handle follow-up passes integrated Kotlin checks, the web build and all 55 web
+unit tests. Both geometry validators retain the land, coastal, sea and support graphs while checking
+a straight Shetland–Bergen border and visible border beside Cagliari–Marseilles support. Focused
+StrictMode browser checks cover both boards at desktop/phone widths, full overseas-box hatching,
+partial/full unlocks, retained inspection, darker timber and the Original map option label.
+Neighboring commodity inspections preserve drafts through polling and dismissal; live European
+placement survives reload (`/private/tmp/aor-polish-final`). Reviewed desktop/390-pixel captures show
+separate timber/satellite fills, the perpendicular northern crossing, visible border beside the
+Cagliari arrow, and continuous hatching across overseas headers and gaps. These are emulated-device
+observations. The subsequent Cagliari–Marseilles simplification replaces the hooked Genoa border
+and sea-facing notch with a straight-sided three-way junction on both maps. Both validators, the
+web build, and the same presentation/support/commodity/live-European browser checks pass again
+(`/private/tmp/aor-simple-border-final`). Reviewed desktop and phone captures show a clearer boundary
+beside the arrow, without changing mainland/island shores or catalog connections.
+Hosted registration preserves mixed-case input; file/PostgreSQL checks retain case-insensitive
+uniqueness/search after restart and preserve existing accounts through migration.
+
 The 2026-11-02 expansion layout checks pass the web build, all 55 web unit tests and focused
 StrictMode browser checks (`aor-browser-artifacts-qHrmfY`). Six-player fixtures cover equal summary
 heights at desktop, wrapped-tablet and phone widths, shrinking after status/pool removal, and floating
