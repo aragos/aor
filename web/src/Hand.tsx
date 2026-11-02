@@ -34,7 +34,7 @@ function revealCard(container: HTMLDivElement, card: Element) {
 /** The viewer's held cards are the shared selection surface for play, discard and trade. */
 export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boolean}) {
     const {selectedCard, setSelectedCard, setSelected, setSelectedAdvance, setPicker, inspection,
-        setInspection, selectedAction, setSelectedAction} = useMapSelection();
+        setInspection, selectedAction, setSelectedAction, setWorkspace, setSelectedArea} = useMapSelection();
     const [expanded, setExpanded] = useState(false);
     const [needsExpansion, setNeedsExpansion] = useState(false);
     const hand = useRef<HTMLElement>(null);
@@ -155,8 +155,13 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                     disabled={busy && playable}
                     className={`hand-card ${card.definition.kind} ${playable ? 'playable' : ''} ${inspected ? 'is-inspected' : ''}`}
                     onClick={() => {
+                        if (card.definition.kind === 'commodity') {
+                            setSelectedArea('');
+                            setWorkspace('map');
+                        }
                         if (finite) {
-                            setInspection(null);
+                            setInspection(card.definition.kind === 'commodity' && selectedAction !== finite.command
+                                ? {kind: 'card', id: card.reference} : null);
                             setSelectedAction(selectedAction === finite.command ? '' : finite.command);
                             setHandExpanded(false);
                             return;

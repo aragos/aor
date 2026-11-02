@@ -22,7 +22,7 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
         hand: [{reference: 'recurring', definition: famine}, {reference: 'once', definition: leader}],
         cardOffers: []}});
     assert.equal(await page.evaluate(`document.querySelector('.epoch-progress').textContent`), 'Epoch 2 (22 cards remaining)');
-    assert.equal(await page.evaluate(`document.querySelector('.table-effects').textContent.includes('22 cards')`), false, 'Deck count has one home');
+    assert.equal(await page.evaluate(`document.querySelector('.table-effects') !== null`), false, 'Deck count has one home');
     assert.equal(await page.evaluate(`document.querySelectorAll('.hand-card .eyebrow').length`), 0, 'Card type headers are removed');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-hand-card="recurring"] .recurring-badge').length`), 1);
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-hand-card="once"] .recurring-badge').length`), 0);
@@ -42,7 +42,10 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
     }
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-detail .reference-link').length`), 0, 'Standalone reference-track links are removed');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-player-context-desktop.png'), 1280, 900);
-    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-player-context-phone.png'), 390, 844, true);
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
+    await page.wait(`document.querySelector('#tab-players')`, 'Phone player tab');
+    await page.evaluate(`document.querySelector('#tab-players').click()`);
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-player-context-phone.png'));
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
     assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-summary > summary')].every(summary=>summary.scrollWidth<=summary.clientWidth)`), true, 'Track icons and long fleet names fit player boxes');
     await show({...fixture, game: {...fixture.game, currentEpoch: 3, deckRemaining: 4}});

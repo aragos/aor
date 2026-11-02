@@ -40,12 +40,7 @@ export async function checkTableConsistency(page, web, baseline) {
             !document.querySelector('.decision-toolbar .pass-action');
     })()`, 'Undo stays at the upper right and Pass belongs to the pinned action footer');
     await assertToolbar();
-    assert.equal(await page.evaluate(`(() => {
-        const row=document.querySelector('.player-summary.is-viewer .player-status-row');
-        const pool=row.querySelector('.player-pool').getBoundingClientRect();
-        const status=row.querySelector('.player-status').getBoundingClientRect();
-        return Math.abs((pool.top+pool.bottom)/2-(status.top+status.bottom)/2)<1;
-    })()`), true, 'Pool and status share a centered row when space permits');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-status')].some(status => /Waiting|Decision/.test(status.textContent))`), false, 'Waiting and decision requests belong to the action pane');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-compact-expansion.png'), 1440, 1000);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-compact-expansion-phone.png'), 390, 844, true);
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);

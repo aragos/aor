@@ -249,7 +249,9 @@ export async function checkBottomHand(page, web, baseline) {
         if (process.env.AOR_BROWSER_ARTIFACTS) await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-bottom-hand-${width}.png`), width, height, mobile);
         await click('.card-inspection-dialog .close-detail');
 
-        for (const selector of ['.table-effects', '.table-configuration', '.command-dock']) {
+        assert.equal(await page.evaluate(`document.querySelector('.table-effects')`), null, 'Turn information has no bottom disclosure');
+        if (mobile) await click('#tab-players');
+        for (const selector of ['.table-configuration', '.command-dock']) {
             await assertControlReachable(page, `${selector} > summary`, `${viewport} auxiliary expander ${selector}`);
             await click(`${selector} > summary`);
             await page.wait(`document.querySelector('${selector}').open`, `${selector} opens`);
@@ -257,7 +259,7 @@ export async function checkBottomHand(page, web, baseline) {
         }
         assert.equal(await page.evaluate(`document.querySelector('.command-private-hand, .command-dock [data-hand-card]')`), null, 'Commands do not repeat the private hand');
         await capture('tools');
-        for (const selector of ['.table-effects', '.table-configuration', '.command-dock']) {
+        for (const selector of ['.table-configuration', '.command-dock']) {
             await click(`${selector} > summary`);
             await page.wait(`!document.querySelector('${selector}').open`, `${selector} closes`);
         }
@@ -308,10 +310,11 @@ export async function checkBottomHand(page, web, baseline) {
         assert(Math.max(...expandedHeights)-Math.min(...expandedHeights)<1, 'Expanded cards share equal heights across rows');
         await assertBottomHandVisible(page, `${width} expanded dual-commodity values`);
 
+        if (mobile) await click('#tab-players');
         await assertControlReachable(page, '.player-summary.is-viewer > summary', `${width} expanded hand and player details`);
         await click('.player-summary.is-viewer > summary');
         await page.wait(`document.querySelector('.player-summary.is-viewer').open`, 'Viewer details open');
-        await click('.player-detail:popover-open .close-detail');
+        await click('.player-summary:has(.player-detail:popover-open) > summary');
         await page.wait(`!document.querySelector('.player-detail:popover-open')`, 'Player detail closes before returning to tools');
         await assertControlReachable(page, '.command-dock > summary', `${width} expanded hand and Commands`);
         await click('.command-dock > summary');

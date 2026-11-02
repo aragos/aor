@@ -63,7 +63,6 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
     const advances = catalog?.advances.filter(advance => player.advances.includes(advance.id));
     const categories = [...new Set(advances?.map(advance => advance.category))];
     return <div ref={ref} className="player-detail" role="region" aria-label={player.name}>
-        <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => ref.current?.hidePopover()}>×</button>
         <dl className="detail-list">
             <div className="written-cash"><dt title={t('game.writtenCashHelp')}>{t('game.writtenCash')}</dt><dd>${player.writtenCash}</dd></div>
             {player.poolAvailable && <div className="player-pool-detail"><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>}
@@ -71,7 +70,7 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
             <div><dt>{t('game.boardMarkers')}</dt><dd>{player.boardMarkers}</dd></div>
         </dl>
         <h4>{t('game.advances')}</h4>
-        {advances ? categories.map(category => <section className="player-advance-category" data-advance-category={category} key={category}>
+        {!player.advances.length ? <p className="player-no-advances">{t('game.noAdvances')}</p> : advances ? categories.map(category => <section className="player-advance-category" data-advance-category={category} key={category}>
             <h5>{label(category, 'category')}</h5>
             <ul className="plain-list">{advances.filter(advance => advance.category === category).map(advance => <li key={advance.id}>{advanceName(advance.id)}</li>)}</ul>
         </section>) : <ul className="plain-list">{player.advances.map(advance => <li key={advance}>{advanceName(advance)}</li>)}</ul>}
@@ -90,7 +89,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const active = snapshot.prompt?.players.includes(player.id);
             const submitted = snapshot.submitted.includes(player.id);
             const finished = snapshot.game.stage === 'FINISHED';
-            const status = finished ? t('game.finished') : submitted ? t('game.submitted') : active ? t('table.decision') : t('game.waiting');
+            const status = finished ? t('game.finished') : submitted ? t('game.submitted') : '';
             const fleet = player.ships.fleet === 'NONE' ? '—' : `${label(player.ships.fleet, 'fleet')} ${player.ships.level}`;
             const swap = finiteDecisions(snapshot).find(offer => offer.kind === 'order-swap' && offer.subject.id === player.id)?.command;
             const eligible = playerPicker?.eligible.includes(player.id) || !!swap;
@@ -101,19 +100,19 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
                     if (event.target instanceof Element && event.target.closest('button, a')) return;
                     if (eligible) { if (swap) setSelectedAction(selectedAction === swap ? '' : swap); else playerPicker?.pick(player.id);}
-                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}, ${status}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
+                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}${status ? `, ${status}` : ''}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
                     <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>
                         {player.capital && <span className="player-person" title={player.name}>{person}</span>}</span>
                         <small>{player.id === snapshot.viewerId ? t('table.you') : order.includes(player.id) ? String(order.indexOf(player.id) + 1).padStart(2, '0') : ''}</small></span>
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
-                        <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span>
+                        <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/><HelpLink topic="income-track" label={t('reference.income-track')}/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b></span>
                         <span className="player-advance-count" title={t('game.advances')} aria-label={`${t('game.advances')}: ${player.advances.length}`}><TableIcon kind="advances"/> <b>{player.advances.length}</b></span></span>
                     <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')}/></span>
                         <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')}/></span></span>
                     <span className="player-status-row">
                         {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
-                        {!finished && <span className="player-status">{status}</span>}
+                        {!finished && submitted && <span className="player-status">{status}</span>}
                     </span>
                     {snapshot.game.stage === 'EXPANSION' && <span className="player-white-markers" aria-label={`${t('table.whiteMarkers')}: ${whiteMarkers}`}>
                         <b>{whiteMarkers}</b><small>{t('table.whiteMarkers')}</small>

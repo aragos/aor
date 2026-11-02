@@ -10,6 +10,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import transform, unary_union
 from map_geography import SCANDINAVIAN_INTERIOR, display_point
 from map_catalog import load_catalog
+from support_geometry import arrow_footprint, label_footprints, marker_footprints
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -447,9 +448,14 @@ print(
 # Arrows are authored from the catalog and cannot acquire new support relationships.
 expected_supports = {f"{satellite} {market}" for satellite, market in relations["supports"]}
 assert set(geometry["supports"]) == expected_supports, "Support arrows must match the catalog."
+support_lines = {}
+support_envelopes = {}
+label_bounds = label_footprints(geometry["provinces"])
+marker_bounds = marker_footprints(geometry["provinces"])
 for edge, path in geometry["supports"].items():
     values = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", path)]
     points = list(zip(values[::2], values[1::2]))
+    assert len(points) == 2, f"{edge}: support must be one straight border crossing."
     source_id, target_id = edge.split()
     assert footprints[source_id].buffer(0.003).covers(Point(points[0])), (
         f"{edge}: support arrow must begin in its satellite."
@@ -457,5 +463,34 @@ for edge, path in geometry["supports"].items():
     assert footprints[target_id].buffer(0.003).covers(Point(points[-1])), (
         f"{edge}: support arrow must end in its market."
     )
-    assert LineString(points).length >= 24, f"{edge}: support arrow must have visible length."
-print(f"Checked {len(expected_supports)} directed support paths and their province endpoints.")
+    line = LineString(points)
+    assert 24 <= line.length <= 48.01, f"{edge}: keep support crossings short and visible."
+    envelope = arrow_footprint(line)
+    assert frame.buffer(0.003).covers(envelope), f"{edge}: the complete arrow must stay on the board."
+    assert envelope.intersection(label_bounds).area < 0.1, f"{edge}: arrowhead/halo overlaps a label."
+    assert envelope.intersection(marker_bounds).area < 0.1, (
+        f"{edge}: arrowhead/halo overlaps a normal control-marker slot."
+    )
+    assert all(envelope.intersection(other).area < 0.1 for other in support_envelopes.values()), (
+        f"{edge}: arrowheads and halos must not overlap another support arrow."
+    )
+    foreign_length = sum(
+        line.intersection(shape).length
+        for key, shape in footprints.items() if key not in (source_id, target_id)
+    )
+    # Cornwall and Chester meet at a corner on the European drawing; the standard
+    # drawing separates them by a sub-unit sliver at the Wales/Portsmouth junction.
+    corner_crossing = edge == "cornwall chester"
+    assert foreign_length < (0.5 if corner_crossing else 0.01), (
+        f"{edge}: support must not run through another province."
+    )
+    owned = footprints[source_id].union(footprints[target_id]).buffer(0.01)
+    assert envelope.difference(owned).area < (130 if corner_crossing else 4), (
+        f"{edge}: keep the arrowhead and halo within the supported pair's footprint."
+    )
+    assert all(not line.crosses(other) for other in support_lines.values()), (
+        f"{edge}: support shafts must not cross."
+    )
+    support_lines[edge] = line
+    support_envelopes[edge] = envelope
+print(f"Checked {len(expected_supports)} short, straight support paths, endpoints, clear labels and uncrossed shafts.")

@@ -22,27 +22,30 @@ const topics = [
     ['variants', 'reference.variants'],
     ['map-legend', 'reference.map-key'],
     ['commodities', 'reference.payout-boxes'],
+    ['income-track', 'reference.income-track'],
     ['misery-track', 'reference.misery-track'],
     ['shipping-track', 'reference.shipping'],
     ['history', 'reference.undo-policies'],
 ];
 
 /** Contextual public lookup leaves the live game, current draft and page title intact. */
-export default function ReferencePopup({initialTopic, close}: {initialTopic: string; close: () => void}) {
+export default function ReferencePopup({initialTopic, close, catalog: gameCatalog}: {
+    initialTopic: string; close: () => void; catalog?: PublicCatalog | null;
+}) {
     const [topic, setTopic] = useState(initialTopic);
     const [reference, setReference] = useState<ReferenceData | null>(null);
     const [error, setError] = useState(false);
     const needsCatalog = topic === 'map-legend' || topic === 'commodities' ||
         topic.startsWith('commodity-') || topic.endsWith('-track');
     useEffect(() => {
-        if (!needsCatalog) return;
+        if (!needsCatalog || gameCatalog) return;
         let active = true;
         setError(false);
         void loadReference().then(data => {if (active) setReference(data);})
             .catch(() => {if (active) setError(true);});
         return () => {active = false;};
-    }, [needsCatalog]);
-    const catalog = reference?.catalog;
+    }, [needsCatalog, gameCatalog]);
+    const catalog = gameCatalog ?? reference?.catalog;
     return <CardInspectionDialog label={t('reference.help-and-reference')} close={close} className="reference-dialog">
         <div className="reference-popup" data-help-content={topic}>
             <button type="button" className="close-detail" aria-label={t('table.close')} onClick={close}>×</button>
@@ -76,6 +79,14 @@ export default function ReferencePopup({initialTopic, close}: {initialTopic: str
                     <h3><Commodity commodity={commodity.id}/></h3><p>{t("reference.base-value")}{commodity.baseValue}{t("reference.dice-total")}{commodity.diceTotal}</p>
                     <ol className="payout-boxes" aria-label={t('reference.payoutBoxes', {commodity: label(commodity.id, 'commodity')})}>{commodity.printedPayouts.map((amount, index) => <li className="payout-box" key={index}><span>{index + 1}</span><strong>${amount}</strong></li>)}</ol>
                 </article>)}
+            </section>}
+            {topic === 'income-track' && <section id="income-track"><h2>{t('reference.income-track')}</h2>
+                <p>{t('reference.income-markers')}</p>
+                <ol className="payout-boxes" aria-label={t('reference.income-track')}>{catalog?.incomeTrack.map((amount, markers) =>
+                    <li className="payout-box" key={markers} aria-label={t('reference.income-space', {markers, amount})}>
+                        <span>{markers}</span><strong>${amount}</strong>
+                    </li>)}</ol>
+                <p>{t('reference.income-modifiers')}</p>
             </section>}
             {topic === 'misery-track' && <section id="misery-track"><h2>{t('reference.misery-track')}</h2>
             <ol className="reference-track misery-track" aria-label={t('reference.misery-track')}>{catalog?.miseryTrack.map(value => <li key={value ?? 'chaos'}><MiseryBox value={value} track={catalog.miseryTrack}/></li>)}</ol>

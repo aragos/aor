@@ -385,6 +385,8 @@ data class PublicCatalog(
     val miseryTrack: List<MiseryStep>,
     /** Legal fleet spaces, grouped by fleet in the UI rather than implying an upgrade route. */
     val shippingTrack: List<ShippingCapability>,
+    /** Base income in dollars, indexed by map markers, for the game's starting player count. */
+    val incomeTrack: List<Int>,
 ) {
     companion object {
         fun forPlayers(playerCount: Int, rules: RuleOptions = RuleOptions()): PublicCatalog {
@@ -404,6 +406,7 @@ data class PublicCatalog(
                     .toMap(),
                 MiseryStep.entries,
                 ShippingCapability.entries,
+                EconomyTables.incomeFor(playerCount),
             )
         }
     }

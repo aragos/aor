@@ -1,6 +1,43 @@
 import assert from 'node:assert/strict';
 import {createGame} from './browser-support.mjs';
 
+export async function checkCapitalTieConsequences(page, web, baseline) {
+    await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
+    await page.wait(`typeof window.setMapSnapshot === 'function'`, 'capital roll activity harness');
+    const participants = baseline.game.players.slice(0, 3).map((player, index) => ({
+        id: player.id, name: ['First bidder', 'Second bidder', 'Third bidder'][index], capital: null,
+    }));
+    const event = {id: 'capital-tie-consequence', kind: 'ROLL', actor: null, turnNumber: null,
+        stage: 'CAPITAL_TIE', provinces: [], card: null, commodity: null, advance: null, amount: null,
+        detail: 'CAPITAL_TIE', participants,
+        dice: [{player: participants[0].id, value: 2}, {player: participants[1].id, value: 6},
+            {player: participants[2].id, value: 2}]};
+    let revision = 29200;
+    async function show(currentEvent, players = baseline.game.players) {
+        await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...baseline,
+            revision: ++revision, events: [currentEvent], game: {...baseline.game, players}})})`);
+        await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, 'capital consequence render');
+    }
+    const text = () => page.evaluate(`document.querySelector('.capital-choice-order').textContent`);
+    await show(event);
+    await page.evaluate(`document.querySelector('#tab-activity').click()`);
+    assert.equal(await text(), 'Capital choice order: Second bidder → First bidder / Third bidder (roll again)',
+        'Higher rolls choose before lower rolls, with an explicit unresolved subgroup');
+    const recorded = await page.evaluate(`document.querySelector('.capital-choice-order').innerHTML`);
+    await show(event, baseline.game.players.map(player => ({...player, name: 'Later identity', capital: 'venice'})));
+    assert.equal(await page.evaluate(`document.querySelector('.capital-choice-order').innerHTML`), recorded,
+        'Later assignments and polling cannot rewrite entry-time capital priority');
+    await show({...event, dice: event.dice.map(die => ({...die, value: 4}))});
+    assert.equal(await text(), 'Capital choice order: First bidder / Second bidder / Third bidder (roll again)',
+        'An entirely tied roll does not claim that anyone chooses first');
+    await show({...event, dice: [{player: participants[0].id, value: 2},
+        {player: participants[1].id, value: 6}, {player: participants[2].id, value: 4}]});
+    assert.equal(await text(), 'Capital choice order: Second bidder → Third bidder → First bidder',
+        'A resolved roll states the complete priority among its participants');
+    assert.equal(await page.evaluate(`window.mapCommands.length`), 0);
+    console.log('Passed: capital tie activity states capital-choice priority, unresolved rerolls and immutable entry-time identities.');
+}
+
 export async function checkAdvanceCategoryGroups(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
     await page.wait(`typeof window.setMapSnapshot === 'function'`, 'grouped player details harness');
@@ -10,7 +47,7 @@ export async function checkAdvanceCategoryGroups(page, web, baseline) {
         players: baseline.game.players.map(player => player.id === viewer ? {...player, advances: acquisitions} : player)}};
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify(fixture)})`);
     await page.wait(`document.querySelector('[data-test-revision="29000"]')`, 'grouped details fixture');
-    await page.evaluate(`document.querySelector('[data-player="${viewer}"] > summary').click()`);
+    await page.evaluate(`document.querySelector('#tab-players')?.click(); document.querySelector('[data-player="${viewer}"] > summary').click()`);
     const groups = await page.evaluate(`[...document.querySelectorAll('[data-player="${viewer}"] .player-advance-category')].map(group => ({category:group.querySelector('h5').textContent,advances:[...group.querySelectorAll('li')].map(item=>item.textContent)}))`);
     assert.deepEqual(groups, [
         {category: 'Science', advances: ['The Heavens', 'Human Body']},

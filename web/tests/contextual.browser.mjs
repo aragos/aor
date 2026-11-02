@@ -37,7 +37,7 @@ export async function checkContextualUx(page, web, baseline) {
     await show({...baseline});
     await page.evaluate(`document.querySelector('[data-map-province="genoa"]').focus()`);
     assert.equal(await page.evaluate(`document.querySelector('[data-province-outline="genoa"]').dataset.highlightPriority`), '3', 'Keyboard focus emphasizes the province border');
-    await page.evaluate(`document.querySelector('[aria-label="Zoom in"]').focus()`);
+    await page.evaluate(`document.querySelector('#tab-map').focus()`);
     assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="genoa"][data-highlight-priority="3"]')`), false, 'Leaving keyboard focus clears the transient province border');
     const beforeAreaInspection = await page.evaluate('window.mapCommands.length');
     await click('[data-map-area-label="IV"]');
@@ -54,7 +54,7 @@ export async function checkContextualUx(page, web, baseline) {
     await click('[data-map-area-label="IV"]');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-connected-sea]').length`), 0, 'Area inspection clears province sea emphasis');
     await click('[data-map-province="genoa"]');
-    await page.evaluate(`document.querySelector('[data-map-province="genoa"]').focus(); document.querySelector('[aria-label="Zoom in"]').focus()`);
+    await page.evaluate(`document.querySelector('[data-map-province="genoa"]').focus(); document.querySelector('#tab-map').focus()`);
     assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="genoa"][data-highlight-priority="4"]')`), true, 'Keyboard blur retains a deliberately selected province');
     await page.evaluate(`document.querySelector('[data-map-terrain]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
     assert.equal(await page.evaluate(`!!document.querySelector('.province-inspector')`), false, 'Non-province land clears province inspection');

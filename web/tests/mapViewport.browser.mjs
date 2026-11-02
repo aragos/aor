@@ -92,7 +92,7 @@ export async function checkMapViewport(page, web, baseline) {
                 await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS,
                     `aor-map-width-fit-${variant.game.rules.map.toLowerCase()}-${width}.png`));
             }
-            await page.evaluate(`document.querySelector('[aria-label="Zoom in"]').click()`);
+            await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '+', bubbles: true}))`);
             for (const horizontal of [-1, 1]) {
                 for (const vertical of [-1, 1]) {
                     await dragToEdge(page, horizontal, vertical);
@@ -109,11 +109,11 @@ export async function checkMapViewport(page, web, baseline) {
                             events: await page.evaluate('window.mapPointerEvents')}));
                 }
             }
-            await page.evaluate(`document.querySelector('[aria-label="Zoom out"]').click()`);
-            await page.click('Fit map');
+            await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '-', bubbles: true}))`);
+            await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '0', bubbles: true}))`);
             await frame(page, label + ' restored fit', true);
 
-            await page.evaluate(`document.querySelector('[aria-label="Zoom in"]').click()`);
+            await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '+', bubbles: true}))`);
             const beforePoll = await page.evaluate(`document.querySelector('.world-map').getAttribute('viewBox')`);
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...fixture, revision: ++revision})})`);
             await page.wait(`document.querySelector('[data-test-revision="${revision}"]')`, label + ' polling');
@@ -131,7 +131,7 @@ export async function checkMapViewport(page, web, baseline) {
                 await page.evaluate(`Object.assign(document.querySelector('.map-viewport').style,
                     {width: '220px', height: '400px', flex: '0 0 400px'})`);
                 await frame(page, label + ' portrait resize');
-                await page.click('Fit map');
+                await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '0', bubbles: true}))`);
                 await frame(page, label + ' portrait cover fit', true);
             }
             assert.equal(await page.evaluate('window.mapCommands.length'), 0, label + ': map framing never submits');

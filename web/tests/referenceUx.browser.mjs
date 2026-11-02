@@ -83,13 +83,27 @@ export async function checkReferenceUx(page, web, baseline) {
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS,'aor-help-popup-phone.png'),390,844,true);
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`),true,'Popup fits a phone');
     for (const [name, selector] of [['Map key', '#map-legend .reference-legend'],
-        ['Misery track', '#misery-track .reference-track'], ['Shipping', '#shipping-track .reference-track'],
+        ['Income track', '#income-track .payout-boxes'], ['Misery track', '#misery-track .reference-track'], ['Shipping', '#shipping-track .reference-track'],
         ['Undo policies', '#undo-friendly-game'], ['Variants', '#variant-map']]) {
         await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);
         await choose(name);
         await page.wait(`document.querySelector(${JSON.stringify(selector)})`, name + ' popup');
+        if (name === 'Income track') {
+            assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'The topic chooser retains the active game income track');
+        }
     }
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+    await page.evaluate(`document.querySelector('#tab-players')?.click(); document.querySelector('.player-summary.is-viewer .income-value .help-link').click()`);
+    await page.wait(`document.querySelector('#income-track .payout-box')`, 'Income symbol opens its own track');
+    assert.equal(await page.evaluate(`document.querySelectorAll('#income-track .payout-box').length`), 26, 'Every marker count from 0 to 25 has a base income');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'Income reference uses the active game’s starting player count');
+    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /numbered tokens do not count.*White markers count too/);
+    await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+    await show({game: {players: baseline.game.players.map(player => player.id === viewer ? {...player, advances: []} : player)}});
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
+    await page.wait(`document.querySelector('.player-summary.is-viewer .player-detail:popover-open')`, 'Player with no advances expands');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-no-advances').textContent`), 'No advances yet.');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-detail .close-detail')`), null, 'Expanded player has no overlapping close button');
     await page.send('Page.navigate', {url:web+'/'});
     await page.wait(`document.querySelector('#variant-map')`, 'Variant help controls');
     assert.equal(await page.evaluate(`document.querySelector('#variant-map button:first-child').textContent`),'Standard map');

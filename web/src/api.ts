@@ -82,6 +82,7 @@ export interface PublicCatalog {
     seaCoasts: {sea: string; province: string}[];
     seaAreas: Record<string, string>;
     miseryTrack: (number | null)[];
+    incomeTrack: number[];
     shippingTrack: PlayerView['ships'][];
 }
 export interface ProvinceView {

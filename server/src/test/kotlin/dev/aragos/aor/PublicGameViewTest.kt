@@ -51,6 +51,32 @@ class PublicGameViewTest {
         assertThat(catalog.provinces.map(ProvinceDefinition::area))
             .containsNoneOf(GeographicalArea.I, GeographicalArea.II, GeographicalArea.III)
         assertThat(catalog.advances).hasSize(26)
+        assertThat(catalog.incomeTrack).hasSize(26)
+        assertThat(catalog.incomeTrack.first()).isEqualTo(15)
+        assertThat(catalog.incomeTrack.last()).isEqualTo(90)
+    }
+
+    @Test
+    fun incomeTrackKeepsStartingPlayerCountAfterChaos() {
+        val initial = GameState(header)
+        val state =
+            initial.copy(
+                players =
+                    initial.players.mapValues { (id, player) ->
+                        if (id == PlayerId("p3")) {
+                            player.copy(misery = MiseryStep.CHAOS)
+                        } else {
+                            player
+                        }
+                    }
+            )
+
+        val catalog =
+            requireNotNull(state.viewForPlayer(PlayerId("p1")).catalog) {
+                "Player views must include the public catalog."
+            }
+
+        assertThat(catalog.incomeTrack.last()).isEqualTo(90)
     }
 
     @Test
