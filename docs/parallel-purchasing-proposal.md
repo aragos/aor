@@ -210,52 +210,31 @@ game completion prevents execution. A history edit or engine upgrade disarms all
 and retains their unexecuted contents for review; it must never resurrect a consumed authorization
 when an earlier phase becomes active again. Ordinary phase completion expires remaining work.
 
-## Upgrading ongoing games
+## Completed storage cutover
 
-The recommended path changes service storage and UI capabilities while preserving existing
-engine transitions and replay text. Existing games can acquire empty private-plan storage without
-restarting, redealing, changing order or replaying a purchase differently. Keep rules/data versions
-unchanged only after demonstrating identical continuation and outcomes; if implementation changes
-those contracts, require a separate explicit engine upgrade.
+The format-6-to-7 cutover is complete and its conversion endpoint and UI have been retired.
+Current-format games retain the complete original revision chain, entry identities, recorded
+outcomes, memberships, credentials, metadata and private submissions. Historical zero-entry
+`upgrade-planning` audit revisions and exact source archives remain readable. Ordinary play
+accepts only format 7; it never rewrites these receipts or silently converts older files.
 
-Provide a narrow, explicit upgrade from the supported source game format to the new format:
-
-1. Dry-run validation checks the expected revision, source format, replay and all private durable
-   state. Report the target format and affected games without private contents. Allow dry runs
-   during any phase, including mid-Purchase and unrevealed bidding.
-2. During publication, lock the game and verify its storage generation as well as public revision,
-   so a concurrent private bid replacement is not overwritten. Archive the exact source bytes by
-   hash and apply conversion plus its administrative audit receipt atomically.
-3. Add empty plan state and record capability activation. Preserve the full existing revision
-   sequence and entry identities, current state and prompt, recorded outcome identities,
-   memberships, credential hashes, lifecycle, undo policy, metadata, archives, pending bids and
-   their private freshness/operation receipts. An appended administrative revision may invalidate
-   old clients' public revision guards, but must not reset a pending secret batch.
-4. Validate replay/state equality and each preserved field before publication. On failure leave
-   the original untouched. In PostgreSQL, schema migration adds the storage infrastructure;
-   per-game activation remains explicit and auditable. File conversion uses the same validator.
-
-The existing [administrative log replacement](../server/src/main/kotlin/dev/aragos/aor/GameAdministration.kt)
-is an engine checkpoint operation: it replaces effective history and constructs fresh private
-state. Do not use it as the storage converter for this feature. Preserve original revisions rather
-than rewriting them as an initial plan checkpoint. The ordinary decoder should continue accepting
-only the new current format; put source-version handling in the explicit upgrader, with a dry-run
-inventory and backup before cutover. Do not add decoders for unrelated historical formats.
+The [administrative log replacement](../server/src/main/kotlin/dev/aragos/aor/GameAdministration.kt)
+remains a separate engine checkpoint operation. It archives the preceding document and replaces
+effective history under the existing validation and optimistic-concurrency contracts.
 
 For a game already in Purchase, the active player can plan only their remaining steps; later
 players can prepare full activities. Players who finished cannot reopen them through planning.
 The same rule applies mid-Buy Card, preserving already-used purchase/discard allowances. Plans
 may be saved during phase-opening Renaissance windows, but automatic authorization waits until
-those windows finish and the settled order has been reviewed. Upgrading never executes a plan
-or converts an existing browser draft into authorization.
+those windows finish and the settled order has been reviewed. The completed storage cutover did
+not execute plans or convert browser drafts into authorization.
 
 ## Delivery and verification
 
-Implement private save/review and truthful core previews first, together with the explicit storage
-upgrade so ongoing games can participate. Then add automatic authorization, durable scheduling
-and receipts. Apply the shared mechanism to Buy Card and immediate Master Art, then remove the
-special browser queue. This ordering makes the review workflow useful before offline execution
-is enabled.
+Implement private save/review and truthful core previews first. Then add automatic authorization,
+durable scheduling and receipts. Apply the shared mechanism to Buy Card and immediate Master Art,
+then remove the special browser queue. This ordering makes the review workflow useful before offline
+execution is enabled.
 
 Verify the following before enabling automatic execution:
 

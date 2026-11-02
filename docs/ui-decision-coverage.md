@@ -5,6 +5,13 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
+The completed format-6 upgrade flow is retired. A captured pre-cleanup format-7 save verifies
+replay, continued bidding after file/PostgreSQL restart, historical upgrade receipts and exact
+archive retention, including subsequent administrative checkpoints. Integrated Kotlin checks,
+web tests/build and the focused StrictMode planning browser suite pass. Live planning checks cover
+reload, phone layout, cancellation, offline execution and card-draw boundaries; neighboring hand,
+purchase and Help interactions also pass (`aor-browser-artifacts-PnixuL`).
+
 The November 2 map/handle follow-up passes integrated Kotlin checks, the web build and all 55 web
 unit tests. Both geometry validators retain the land, coastal, sea and support graphs while checking
 a straight Shetland–Bergen border and visible border beside Cagliari–Marseilles support. Focused
@@ -225,8 +232,9 @@ Creation checks cover required names, server rejection of blank names without lo
 trimmed Unicode names, durable header/tab display and long-name phone layout. StrictMode hosted
 fixtures show names in member/admin rows and send the creator's chosen name while preserving it
 after a failed creation. File and PostgreSQL service tests cover named creation, directory/snapshot
-projection and history replacement; restart and value-validation tests also pass. Current game
-documents use format 6, with the name kept in server metadata independently of engine history.
+projection and history replacement; restart and value-validation tests also pass. Those game
+documents used format 6; current documents use format 7. The name stays in server
+metadata independently of engine history.
 The comprehensive browser suite also passes (`aor-browser-artifacts-t66C2C`), including hosted
 accounts, all creation flows, both maps, decision families and live gameplay lifecycles.
 

@@ -134,17 +134,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         require(
             replacement.id == id &&
                 replacement.revision == expectedRevision + 1 &&
-                ((replacement.baseRevision == expectedRevision &&
-                    replacement.previousArchive == reference) ||
-                    (replacement.revisions.last().storageArchive == reference &&
-                        root["revisions"].toList().dropLast(1).map { revision ->
-                            revision.deepCopy<ObjectNode>().apply { remove("storageArchive") }
-                        } ==
-                            original["revisions"].map { revision ->
-                                revision.deepCopy<ObjectNode>().apply { remove("storageArchive") }
-                            } &&
-                        replacement.baseRevision == original["baseRevision"].asInt() &&
-                        root["previousArchive"] == original["previousArchive"]))
+                replacement.baseRevision == expectedRevision &&
+                replacement.previousArchive == reference
         ) {
             "A checkpoint must advance one revision and retain its preceding archive."
         }

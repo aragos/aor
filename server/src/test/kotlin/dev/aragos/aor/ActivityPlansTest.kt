@@ -1,6 +1,5 @@
 package dev.aragos.aor
 
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import java.nio.file.Files
@@ -336,63 +335,6 @@ class ActivityPlansTest {
     }
 
     @Test
-    fun formatUpgradePreservesPendingBidsAndOriginalRevisions() {
-        val fixture = fileFixture()
-        fixture.submit(0, "bid-capital 3")
-        val before = fixture.store.read(fixture.game.gameId)
-        val source = fixture.makeVersionSix()
-        val quote = fixture.service.planningUpgrade(fixture.game.gameId, fixture.access(0))
-
-        fixture.service.planningUpgrade(
-            fixture.game.gameId,
-            fixture.access(0),
-            quote.revision,
-            quote.sourceHash,
-        )
-
-        val after = fixture.store.read(fixture.game.gameId)
-        assertThat(after.state()).isEqualTo(before.state())
-        assertThat(after.revisions.dropLast(1)).isEqualTo(before.revisions)
-        assertThat(after.effectiveEntries()).isEqualTo(before.effectiveEntries())
-        assertThat(after.pendingBids).isEqualTo(before.pendingBids)
-        assertThat(after.submissionVersions).isEqualTo(before.submissionVersions)
-        assertThat(
-                fixture.store.archivedDocument(
-                    fixture.game.gameId,
-                    requireNotNull(after.revisions.last().storageArchive) {
-                        "The upgrade requires its source archive."
-                    },
-                )
-            )
-            .isEqualTo(source)
-    }
-
-    @Test
-    fun aChangedPrivateBidInvalidatesTheUpgradeDryRun() {
-        val fixture = fileFixture()
-        fixture.submit(0, "bid-capital 3")
-        val source = fixture.makeVersionSix()
-        val quote = fixture.service.planningUpgrade(fixture.game.gameId, fixture.access(0))
-        val changed = json.readTree(source) as ObjectNode
-        (changed["pendingBids"] as ObjectNode).put("p1", 4)
-        val directory = directories.last()
-        Files.writeString(directory.resolve("${fixture.game.gameId}.json"), changed.toString())
-
-        val failure =
-            assertFailsWith<ServiceFailure> {
-                fixture.service.planningUpgrade(
-                    fixture.game.gameId,
-                    fixture.access(0),
-                    quote.revision,
-                    quote.sourceHash,
-                )
-            }
-
-        assertThat(failure.code).isEqualTo("STALE_UPGRADE")
-        assertThat(fixture.store.archives(fixture.game.gameId)).isEmpty()
-    }
-
-    @Test
     fun postgresRestartAndConcurrentWorkersPublishOneExecution() =
         PostgresFixture().use { database ->
             val fixture = PlanningFixture(database.service(), database.store)
@@ -480,56 +422,6 @@ class ActivityPlansTest {
         assertThat(after.history.drop(before.history.size)).contains("p2: buy-card")
         assertThat(after.history.drop(before.history.size)).doesNotContain("p2: pass")
         assertThat(after.game.activity?.actor).isEqualTo(PlayerId("p3"))
-    }
-
-    @Test
-    fun postgresFormatUpgradeKeepsOldRevisionRowsAndPrivateBids() =
-        PostgresFixture().use { database ->
-            val fixture = PlanningFixture(database.service(), database.store)
-            fixture.submit(0, "bid-capital 3")
-            val before = fixture.store.read(fixture.game.gameId)
-            database.database.write { connection ->
-                connection
-                    .prepareStatement(
-                        "UPDATE games SET document = jsonb_set(document, '{fileVersion}', '6'), storage_version = storage_version + 1 WHERE id = ?"
-                    )
-                    .use { statement ->
-                        statement.setObject(1, UUID.fromString(fixture.game.gameId))
-                        statement.executeUpdate()
-                    }
-            }
-            val source = fixture.store.document(fixture.game.gameId)
-            val quote = fixture.service.planningUpgrade(fixture.game.gameId, fixture.access(0))
-
-            fixture.service.planningUpgrade(
-                fixture.game.gameId,
-                fixture.access(0),
-                quote.revision,
-                quote.sourceHash,
-            )
-
-            val after = database.reopened().store.read(fixture.game.gameId)
-            assertThat(after.revisions.dropLast(1)).isEqualTo(before.revisions)
-            assertThat(after.pendingBids).isEqualTo(before.pendingBids)
-            assertThat(after.submissionVersions).isEqualTo(before.submissionVersions)
-            assertThat(
-                    fixture.store.archivedDocument(
-                        fixture.game.gameId,
-                        requireNotNull(after.revisions.last().storageArchive) {
-                            "The upgrade requires its exact source archive."
-                        },
-                    )
-                )
-                .isEqualTo(source)
-        }
-
-    private fun PlanningFixture.makeVersionSix(): String {
-        val root = json.readTree(store.document(game.gameId)) as ObjectNode
-        root.put("fileVersion", 6)
-        root.remove(listOf("plans", "planVersions", "planReceipts", "planExecutions"))
-        val contents = root.toString()
-        Files.writeString(directories.last().resolve("${game.gameId}.json"), contents)
-        return contents
     }
 }
 

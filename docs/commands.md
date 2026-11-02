@@ -244,7 +244,5 @@ version. Use that receipt to advance a local draft's base: automatic progression
 newer snapshot that already includes another device's subsequent save. A reconciled duplicate
 operation returns current state without claiming a fresh write receipt.
 
-`POST /api/games/{id}/planning-upgrade` with an empty body dry-runs the format-6-to-7 upgrade for
-the authenticated creator. Repeat with its `revision` as `expectedRevision` and `sourceHash` to
-publish. The exact source is archived and a zero-entry `upgrade-planning` audit revision is
-appended. Existing engine entries, outcomes and private bids remain intact.
+Historical `upgrade-planning` audit revisions remain readable in previously upgraded games;
+they contain no engine entries and are not a player command or an available API operation.

@@ -226,11 +226,11 @@ readiness derives from real prompts, and public ETags exclude others' private wr
 disarm plans; manual actions cancel that owner's authorization. Turn/phase completion expires
 remaining work. Inactive games cannot execute.
 
-An explicit creator-authorized format-6-to-7 upgrade archives the exact locked source, retains the
-complete original revision chain and private submissions, and appends a zero-entry `upgrade-planning`
-audit revision. Dry-run source hashes guard private as well as public changes. The normal decoder
-accepts only format 7. This operation does not change rules/data versions or use the administrative
-engine checkpoint operation.
+The normal decoder accepts only format 7. The completed format-6-to-7 conversion is retired;
+there is no conversion endpoint or game-screen activation flow. Previously upgraded games retain
+their zero-entry `upgrade-planning` audit revisions and exact source archives. These historical
+revisions remain part of the original revision chain and do not alter engine replay or entry IDs.
+New administrative checkpoints use the ordinary archived full-checkpoint contract.
 
 ## 7. UI and localization
 

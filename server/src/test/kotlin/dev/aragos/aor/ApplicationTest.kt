@@ -20,6 +20,18 @@ import kotlin.test.Test
 
 class ApplicationTest {
     @Test
+    fun retiredPlanningUpgradeRouteIsUnavailable() = withGame {
+        val response =
+            client.post("$url/planning-upgrade") {
+                bearerAuth(tokens[0])
+                contentType(ContentType.Application.Json)
+                setBody("{}")
+            }
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.NotFound)
+    }
+
+    @Test
     fun referenceCatalogIsPublicAndContainsNoGameState() = withGame {
         val response = client.get("/api/reference")
         val reference = json.readTree(response.bodyAsText())

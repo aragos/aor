@@ -136,20 +136,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         } finally { busyRef.current = false; setBusy(false); }
     }
 
-    async function upgradePlanning() {
-        if (busyRef.current) return;
-        busyRef.current = true; setBusy(true);
-        try {
-            const source = await request<{revision: number; sourceHash: string}>(`${path}/planning-upgrade`, token, {}, undefined, {readOnly: true});
-            await request(`${path}/planning-upgrade`, token, {expectedRevision: source.revision, sourceHash: source.sourceHash});
-            const next = await requestSnapshot(path, token);
-            if (next.snapshot) acceptSnapshot(next.snapshot);
-            setConnectionError('');
-        } catch (failure) {setConnectionError(errorCode(failure));}
-        finally {busyRef.current = false; setBusy(false);}
-    }
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
-        {connectionError === 'PLANNING_UPGRADE_REQUIRED' && <button disabled={busy} onClick={() => {void upgradePlanning();}}>{t('plan.upgrade')}</button>}
         <a href="/">{t('game.new')}</a></main>;
     return <MapSelectionProvider><GameTable snapshot={snapshot} busy={busy} saved={saved}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
