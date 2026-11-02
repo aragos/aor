@@ -62,7 +62,7 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 | Capital | Dark background behind the complete market badge, including commodity |
 | Owner | The same capital color and silhouette as every other player representation |
 | Piece kind / age | A count identifies tokens; an unnumbered piece is a marker. White is new, filled is established. Separate owners and ages. |
-| Directed support | Always-visible arrowhead with a contrasting outline; only catalogued support |
+| Directed support | Short, straight satellite-to-market border crossing with a contrasting arrowhead; only catalogued support |
 | Area / shared access | A clear interior area badge, preferably in open sea space; locks on the owning area or overseas heading |
 
 Province fills retain commodity identity when control changes. Land and coastal water receive the
@@ -92,7 +92,8 @@ Coastal water selects the same province as land. A click prepares a draft; the e
 commits it. Sea or non-province background clicks clear inspection, focus and the inspected border;
 dragging preserves them. Background clicks preserve an active action draft and picker selections.
 
-Keep zoom in, zoom out and Fit floating over the board. Always show support arrows; omit a visibility
+On desktop, keep zoom in, zoom out and Fit floating over the board. Phones retain gesture and
+keyboard controls without floating buttons. Always show support arrows; omit a visibility
 toggle. Support modifier-scroll, trackpad pinch, two-finger touch pinch and dragging, centered on the
 gesture and constrained to board bounds. Initially fit the board to the viewport width, with the view
 matching the viewport's proportions. If a tall viewport would expose empty space above or below the
@@ -149,18 +150,25 @@ the user accepted their current labels on 2026-10-29.
 Absent land connections use a twelve-unit neutral band so they remain distinguishable at overview
 scale. Shared coastal boundaries in southwestern France and around Constantinople/Smyrna receive
 the same topology-preserving simplification as the Baltic and British Isles. The independent
-validator retains all 146 land, 105 coastal and 95 sea contacts, including visible sea exclusions.
+validator retains all 146 land, 105 coastal and 96 sea contacts, including visible sea exclusions.
 
 Label fitting searches the province's own coastal interior when land cannot hold its name and
 market badge. Piece packing uses that final label position. Toulouse and Constantinople's current
 labels are accepted; preserve their placement.
 
-Support paths are generated for all 77 catalogued arrows. Endpoints stay inside the supporting
-satellite and supported market; alternate crossings avoid names and normal control-marker slots
-where space permits. Dense token groups still take drawing priority. Arrow routing is drawing data
-and never changes the support graph. Regeneration includes `support_geometry.py`.
-Toulouse's Montpellier and Barcelona arrows use short, straight east/south crossings in both
-drawings, replacing the long coastal route and bent path while retaining the accepted labels.
+Support paths retain every catalogued direction: 78 on the full standard board and 76 on the
+European board. Show each as a short, straight crossing of the shared province/coastal border,
+with the tip inside the supported market. Avoid detours, crossing shafts and ambiguous clusters.
+Reserve the whole arrowhead and contrasting halo when avoiding names and normal marker positions;
+dense token groups still take drawing priority. Arrow routing is drawing data and never changes
+the support graph or a province's connections.
+
+Regeneration includes `support_geometry.py`. Toulouse retains its clear east/south exits and accepted
+label placement; the Montpellier arrow ends before the printed name. Cornwall–Chester requires a
+placed corner crossing on each drawing: the standard route crosses less than one SVG unit of the
+Wales/Portsmouth separator. This does not create a movement connection. Validators check catalog
+parity, short straight paths, direction, complete arrow bounds, label clearance, province traversal
+and uncrossed shafts; the tiny corner separator has an explicit exception.
 
 Label fitting reserves extra room for platform font substitutions while keeping names readable.
 Tight footprints retain their fitted label budget before accepting a constrained layout. Both map

@@ -248,7 +248,7 @@ handlers do not make those rules selectable in current game creation.
 | Reviewed topology | Catalog/shipping/geometry/browser checks cover separate standard Aegean/Central seas and European merger, Crete/Smyrna contacts, Belgrade/Durazzo, Danish/Baltic exclusions/support and British/Channel coasts. Core tests verify Fez's exact sea contacts; regenerated standard/European geometry passes validation, including more than 20 SVG units of Western Mediterranean frontage. The [connection inventory](connection-inventory.md) owns the graph. |
 | Sea emphasis | Full connected-sea highlighting is distinct from coastal bands, retains screen-size hatch/perimeter during zoom, changes with province inspection and clears with area/background selection. Desktop/zoom/phone baseline screenshots were reviewed. |
 | Dense labels | Copenhagen's earlier exception was removed. The user accepted Toulouse/Constantinople labels on 2026-10-29; their constrained geometry metadata remains descriptive. |
-| Support arrows | Both geometry validators check catalogued directions and province endpoints. Desktop/phone visual review confirms short, straight Toulouse crossings to Montpellier and Barcelona on both maps, with accepted labels preserved. Both maps render every catalogued arrow even with a previously disabled browser preference; the visibility toggle is removed. |
+| Support arrows | Both geometry validators check all 78 standard / 76 European directions, short straight shafts, complete arrow bounds, label/normal-marker clearance and non-overlapping arrows. Browser review covers both maps with 3–6 players, occupied desktop regions and phone Britain/Levant views. Full regeneration preserves every non-support geometry field and the accepted labels; ordinary rendering retains every catalogued arrow. |
 | Resources and payouts | Core calculations distinguish ordinary/conditional income, current/projected payout, free/blocked offers and public zero/unavailable pools. Browser fixtures check those distinctions and legal partial alternatives. |
 | Reference text and errors | Unit completeness for 18 event effects and concise hand summaries, 26 advances and supported variants; browser reference text, quantity interpolation and typed named diagnostics. Compact hand leader credits share their Written Record qualification when applicable. Unknown object IDs are omitted. |
 | Help and misery severity | Help removes the game-flow overview and consolidates shared commodity/leader rules. Desktop/phone review verifies all four undo policies and their common limits, plus the complete colored misery track. Player summaries, stabilization and final scores use the same track-position colors, including Chaos. The stabilization button shows current → target boxes; phone inspection verifies 50 → 80 and 1000 → Chaos, retaining the canonical payment command. Printed values remain visible; existing browser flows and unit checks pass. |
@@ -414,3 +414,28 @@ account navigation and both maps. Final artifacts are retained in
 Reviewed the phone player-detail capture: the Players icon is selected, income help stays beside
 its symbol, the empty-advances message is explicit, and no close control overlaps the detail.
 Physical-phone and screen-reader checks remain separate.
+
+
+### November 1 support-arrow review
+
+The review covered every support route on both drawings. The previous label-centered routing could
+bend or travel far across a pair's combined footprint: standard Cornwall → Portsmouth passed through
+Chester, Jerusalem → Acre left the map frame, and Barca → Tripoli spanned 254 SVG units despite a
+shared border. Cyprus-bound arrows crossed; some arrowheads approached normal marker slots.
+
+The generator now places short straight border crossings and reserves the entire head/halo against
+labels, normal markers, foreign provinces and other arrows. All standard arrows are at most 40 units;
+European arrows are at most 48. Every catalogued direction is retained. The tiny Cornwall → Chester
+corner separator remains explicitly bounded; Toulouse's accepted labels stay in place, with its
+Montpellier tip shortened to clear the name. Full regeneration changed only `supports` in both assets;
+a further standard rebuild exactly reproduced the checked-in drawing.
+
+Both map validators and the production web build pass. The standalone
+`AOR_BROWSER_SUITE=supportArrows.browser.mjs npm run test:browser` passes both maps at all 3–6 player
+counts, checking live-catalog coverage, direction, straightness, length and frame containment. Regional
+captures cover Britain, Scandinavia, Spain, France/Cagliari, central/eastern Europe, the Balkans,
+North Africa and the Levant; occupied captures check normal markers and satellite tokens. Desktop and
+390 × 844 phone inspection confirmed separate Cornwall/Cagliari crossings, a fully visible Jerusalem
+arrow, and heads clear of names and markers. Artifacts are retained in
+`/var/folders/ns/q6zj8mz14ksd0kp97xrp1mrm0000gn/T/aor-browser-artifacts-5CJ2LF`.
+These are emulated-device observations; dense multi-owner groups still paint above arrows.

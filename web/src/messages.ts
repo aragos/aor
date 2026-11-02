@@ -409,7 +409,7 @@ export const en: Record<string, string> = {
     "reference.stippling-satellite": "Stippling: satellite",
     "reference.pale-water-a-province-s-coastal": "Pale water: a province’s coastal band",
     "reference.capital-color-and-silhouette-identify-the": "Capital color and silhouette identify the owner everywhere. Land and its pale coastal band select the same province.",
-    "reference.named-seas-are-distinct-from-coastal": "Click a province to highlight connected seas with blue hatching. Arrows show satellite support. Legal destinations have blue shading.",
+    "reference.named-seas-are-distinct-from-coastal": "Click a province to highlight connected seas with blue hatching. Arrows point from satellites to the markets they support. Legal destinations have blue shading.",
     "reference.eligible-targets-use-blue-emphasis-the": "Blue shading marks eligible targets; a stronger outline marks your selection. Click a province to highlight its connections. Zoom in to read crowded pieces.",
     "reference.use-and-fit-modifier-scroll-trackpad": "Scroll or drag to pan the map. Zoom with +, −, modifier-scroll or pinch. Use 0 to fit the map; desktop also has a Fit button. Arrow keys move between provinces; Enter or Space selects. Tab moves to confirmation. Drag the hand to see more cards. On phones, use the left icons to switch workspaces; Players contains player details, Game options and Commands.",
     "reference.history-cards": "Leader credits",
