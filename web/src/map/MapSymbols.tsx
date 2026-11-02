@@ -2,7 +2,7 @@ import type {PlayerView} from '../api';
 
 export const commodityColors: Record<string, [string, string]> = {
     WINE: ['#edbfd0', '#893453'], WOOL: ['#f4dfb9', '#83551c'], SILK: ['#d9c4ed', '#70439a'],
-    GRAIN: ['#f3d575', '#735313'], METAL: ['#b9cddb', '#365b75'], TIMBER: ['#bedbb7', '#37683c'],
+    GRAIN: ['#f3d575', '#735313'], METAL: ['#b9cddb', '#365b75'], TIMBER: ['#9ac58f', '#37683c'],
     IVORY: ['#eee4bc', '#746332'], STONE: ['#d7d5ca', '#626152'], CLOTH: ['#bcded9', '#2d6d68'],
     FUR: ['#d6bca7', '#775036'], GOLD: ['#edbf5c', '#8b6312'], SPICE: ['#ebae91', '#963c25'],
 };

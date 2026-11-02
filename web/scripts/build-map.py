@@ -420,15 +420,17 @@ for attempt in range(10):
         pa, pb = nearest_points(first, second)
         channel = route(pa, pb)
 
+        # Leave enough shared border visible beside Cagliari's support arrowhead.
+        channel_width = 28 if {a, b} == {"cagliari", "marseilles"} else 12
         first = (
             substring(channel, 0, channel.length / 2)
-            .buffer(12, cap_style=2, join_style=1)
+            .buffer(channel_width, cap_style=2, join_style=1)
             .difference(land_domain)
             .intersection(world)
         )
         second = (
             substring(channel, channel.length / 2, channel.length)
-            .buffer(12, cap_style=2, join_style=1)
+            .buffer(channel_width, cap_style=2, join_style=1)
             .difference(land_domain)
             .intersection(world)
             .difference(first)
@@ -1190,6 +1192,43 @@ terrain = terrain.difference(enclosed_land).buffer(0)
 water["copenhagen"] = union_all([
     water["copenhagen"], copenhagen_enclaves.difference(land_union),
 ], grid_size=0.001)
+
+# Split the northern bridge with one straight border instead of retaining the
+# stepped halves of its automatically routed channel. Neither shore is moved.
+northern_bridge = union_all([water["shetland-islands"], water["bergen"]], grid_size=0.001)
+western_half = box(-10000, -10000, 990, 10000)
+water["shetland-islands"] = northern_bridge.intersection(western_half).buffer(0)
+water["bergen"] = northern_bridge.difference(western_half).buffer(0)
+
+# Use a simple three-way junction between Marseilles, Genoa and Cagliari. The
+# automatic coastal channel leaves a hooked Genoa border and a sea-facing notch.
+# These sectors replace only open water, preserving the mainland and island shores.
+marseilles_shore = (1217.291, 1123.423)
+genoa_front = (1296.516, 1118.880)
+marseilles_front = (1209.440, 1178.897)
+cagliari_front = (1240.430, 1208.391)
+ligurian_junction = (1254, 1152)
+support_front = tuple((a + b) / 2 for a, b in zip(marseilles_front, cagliari_front))
+ligurian_patch = Polygon([marseilles_shore, genoa_front, cagliari_front, marseilles_front])
+ligurian_sectors = {
+    "marseilles": [marseilles_shore, ligurian_junction, support_front, marseilles_front],
+    "genoa": [marseilles_shore, genoa_front, ligurian_junction],
+    "cagliari": [genoa_front, cagliari_front, support_front, ligurian_junction],
+}
+assert ligurian_patch.intersection(land_union).area < .01, (
+    "The Ligurian junction may only reshape water, never a mainland or island shore."
+)
+for province, corners in ligurian_sectors.items():
+    water[province] = union_all([
+        water[province].difference(ligurian_patch), Polygon(corners),
+    ], grid_size=0.001)
+seas["WESTERN_MEDITERRANEAN"] = seas["WESTERN_MEDITERRANEAN"].difference(ligurian_patch)
+assert pairs(water) == {tuple(sorted(pair)) for pair in relations["coast"]}, (
+    "The Ligurian junction must preserve every coastal route."
+)
+assert sea_connections(water, seas) == set(contacts), (
+    "The Ligurian junction must preserve sea access."
+)
 
 # Area outlines enclose member spaces, including neutral islands and intervening unassigned water.
 # Close subpixel shoreline cracks before stroking. Reset the precision model first so the

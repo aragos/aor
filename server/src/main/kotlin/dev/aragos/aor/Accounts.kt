@@ -14,16 +14,19 @@ data class AccountId(val value: String) {
     }
 }
 
-/** Unique public identity used throughout hosted play. */
+/** Public identity preserving entered case; uniqueness and search use [identityKey]. */
 data class PlayerHandle(val value: String) {
     init {
-        require(value.matches(Regex("[a-z][a-z0-9-]{2,23}"))) {
-            "Handles require 3–24 lowercase letters, digits or hyphens, starting with a letter."
+        require(value.matches(Regex("[A-Za-z][A-Za-z0-9-]{2,23}"))) {
+            "Handles require 3–24 letters, digits or hyphens, starting with a letter."
         }
     }
 
+    val identityKey: String
+        get() = value.lowercase()
+
     companion object {
-        fun parse(value: String): PlayerHandle = PlayerHandle(value.trim().lowercase())
+        fun parse(value: String): PlayerHandle = PlayerHandle(value.trim())
     }
 }
 
@@ -56,7 +59,7 @@ interface AccountStore {
     fun search(query: String, limit: Int = 20): List<RegisteredAccount> {
         val normalized = query.lowercase()
         return all()
-            .filter { normalized in it.handle.value || query == it.id.value }
+            .filter { normalized in it.handle.identityKey || query == it.id.value }
             .sortedBy { it.handle.value }
             .take(limit)
     }
@@ -77,7 +80,7 @@ class FileAccountStore(private val path: Path, private val writer: GameWriter = 
             throw ServiceFailure(409, "ACCOUNT_ALREADY_REGISTERED")
         }
         val account = RegisteredAccount.create(id, handle)
-        if (accounts.any { it.handle == account.handle }) {
+        if (accounts.any { it.handle.identityKey == account.handle.identityKey }) {
             throw ServiceFailure(409, "HANDLE_UNAVAILABLE")
         }
         save(accounts + account)
@@ -111,7 +114,7 @@ class FileAccountStore(private val path: Path, private val writer: GameWriter = 
             require(accounts.map(RegisteredAccount::id).distinct().size == accounts.size) {
                 "Account IDs must be unique."
             }
-            require(accounts.map(RegisteredAccount::handle).distinct().size == accounts.size) {
+            require(accounts.map { it.handle.identityKey }.distinct().size == accounts.size) {
                 "Account handles must be unique."
             }
             return accounts

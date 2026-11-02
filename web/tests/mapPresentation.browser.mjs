@@ -8,6 +8,7 @@ export async function checkMapPresentation(page, web) {
         const snapshot = await game.snapshot(game.links[0]);
         assert.equal(snapshot.game.catalog.dataVersion, 'ah1996-catalog-15', 'New games use the complete Bristol Channel coastal connections');
         const stone = snapshot.game.catalog.provinces.find(province => province.commodities.includes('STONE'));
+        const timber = snapshot.game.catalog.provinces.find(province => province.commodities.includes('TIMBER'));
         for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
             await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
             await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -15,6 +16,9 @@ export async function checkMapPresentation(page, web) {
             await page.wait(`typeof window.setMapSnapshot === 'function'`, 'map presentation harness');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
             await page.wait(`document.querySelector('[data-support="cagliari genoa"]')`, 'Cagliari support paths');
+            assert.equal(await page.evaluate(`document.querySelector('.table-configuration').textContent
+                .includes('${map === 'standard' ? 'Original map' : 'European map'}')`), true,
+                'Game options name the selected board');
             for (const [province, x, y] of [
                 ['chester', 720, 603], ['cornwall', 718, 619], ['portsmouth', 735, 610],
             ]) {
@@ -35,11 +39,19 @@ export async function checkMapPresentation(page, web) {
             assert.equal(await page.evaluate(`document.querySelector(
                 '[data-locked-province="iceland"], [data-locked-province="west-africa"]') !== null`), false,
                 'Navigation requirements do not crosshatch Iceland or West Africa');
-            const lockedOverseas = snapshot.game.catalog.provinces.filter(province => province.overseas &&
-                snapshot.game.lockedProvinces.includes(province.id)).map(province => province.id).sort();
+            assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-locked-overseas]')]
+                .map(box => ({group: box.dataset.lockedOverseas,
+                    x: box.x.baseVal.value, y: box.y.baseVal.value,
+                    width: box.width.baseVal.value, height: box.height.baseVal.value}))
+                .sort((a, b) => a.y - b.y)`), [
+                    {group: 'NEW_WORLD', x: 0, y: 630, width: 190, height: 420},
+                    {group: 'FAR_EAST', x: 0, y: 1050, width: 190, height: 600},
+                ], 'Locked overseas hatching covers each complete box, including its header and gaps');
+            const overseasIds = snapshot.game.catalog.provinces.filter(province => province.overseas)
+                .map(province => province.id);
             assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-locked-province]')]
-                .map(path => path.dataset.lockedProvince).filter(id => ${JSON.stringify(lockedOverseas)}.includes(id)).sort()`),
-                lockedOverseas, 'Both overseas groups have access shading from the live projection');
+                .map(path => path.dataset.lockedProvince).filter(id => ${JSON.stringify(overseasIds)}.includes(id))`),
+                [], 'Whole-box hatching replaces individual overseas province hatching');
             assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.map-access-shading')).pointerEvents`),
                 'none', 'Access shading preserves province and commodity hit targets');
             const texture = () => page.evaluate(`(() => {
@@ -49,18 +61,26 @@ export async function checkMapPresentation(page, web) {
                 return {spacing: pattern.width.baseVal.value * scale,
                     radius: pattern.querySelector('circle').r.baseVal.value * scale,
                     satellite: pattern.querySelector('rect').getAttribute('fill'),
+                    timber: map.querySelector('[data-map-province="${timber.id}"] .province-shape').getAttribute('fill'),
                     stone: map.querySelector('[data-map-province="${stone.id}"] .province-shape').getAttribute('fill')};
             })()`);
             await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
             const fit = await texture();
             assert.notEqual(fit.satellite, fit.stone, 'Satellites and Stone have different base colors');
+            const luminance = color => {
+                const channels = color.slice(1).match(/../g).map(hex => parseInt(hex, 16) / 255)
+                    .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+                return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+            };
+            assert(luminance(fit.satellite) - luminance(fit.timber) > .15,
+                'Timber has a visibly darker base than satellites');
             assert(Math.abs(fit.spacing - 7) < .01 && fit.radius >= .7 && fit.radius <= 1,
                 'Satellite stippling remains small and consistent at Fit');
             await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '+', bubbles: true}))`);
             assert(Math.abs((await texture()).spacing - fit.spacing) < .01, 'Satellite texture keeps its screen spacing when zoomed');
             for (const target of ['genoa', 'marseilles']) {
                 const length = await page.evaluate(`document.querySelector('[data-support="cagliari ${target}"] [marker-end]').getTotalLength()`);
-                assert(length >= 47.99 && length <= 48.01, 'Both Cagliari arrows have a visible 48-unit crossing');
+                assert(length >= 39.99 && length <= 48.01, 'Cagliari support crossings remain visible');
             }
             const protrudingShafts = await page.evaluate(`[...document.querySelectorAll('[data-support]')].filter(arrow => {
                 const centerline = arrow.querySelector('[marker-end]');
@@ -75,7 +95,8 @@ export async function checkMapPresentation(page, web) {
             if (process.env.AOR_BROWSER_ARTIFACTS) {
                 await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-satellites-${map}-${width}.png`));
                 for (const [region, x, y, w] of [
-                    ['britain', 700, 560, 650], ['iceland', 200, 100, 500], ['west-africa', 145, 1940, 500],
+                    ['britain', 700, 560, 650], ['shetland', 1010, 40, 600],
+                    ['overseas', 95, 1140, 480], ['iceland', 200, 100, 500], ['west-africa', 145, 1940, 500],
                 ]) {
                     await page.evaluate(`(() => {
                         const map = document.querySelector('.world-map'), rect = map.getBoundingClientRect();
@@ -122,10 +143,20 @@ export async function checkMapPresentation(page, web) {
             await page.evaluate(`document.querySelector('[data-map-province="${inspected}"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
             await page.wait(`document.querySelector('[data-map-province="${inspected}"][aria-pressed="true"]')`,
                 'Locked provinces remain inspectable');
+            await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 999,
+                game: {...snapshot.game, lockedProvinces: snapshot.game.lockedProvinces.filter(id => id !== inspected)}})})`);
+            await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 999}"]')`, 'Partial overseas access');
+            assert.equal(await page.evaluate(`document.querySelector('[data-locked-overseas="FAR_EAST"], [data-locked-province="${inspected}"]') !== null`), false,
+                'A partly unlocked overseas box leaves its accessible province unhatched');
+            const stillLocked = snapshot.game.catalog.provinces.filter(province => province.overseas === 'FAR_EAST' &&
+                province.id !== inspected && snapshot.game.lockedProvinces.includes(province.id)).map(province => province.id).sort();
+            assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-locked-province]')]
+                .map(path => path.dataset.lockedProvince).filter(id => ${JSON.stringify(stillLocked)}.includes(id)).sort()`),
+                stillLocked, 'Partial overseas access retains individual shading for the remaining locked provinces');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1000,
                 game: {...snapshot.game, lockedProvinces: []}})})`);
             await page.wait(`document.querySelector('[data-test-revision="${snapshot.revision + 1000}"]')`, 'Access advances acquired');
-            assert.equal(await page.evaluate(`document.querySelectorAll('[data-locked-area], [data-locked-province], [data-area-lock], [data-overseas-lock]').length`),
+            assert.equal(await page.evaluate(`document.querySelectorAll('[data-locked-area], [data-locked-province], [data-locked-overseas], [data-area-lock], [data-overseas-lock]').length`),
                 0, 'Authoritative access removes hatching and locks on the next poll');
             assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${inspected}"]').getAttribute('aria-pressed')`),
                 'true', 'Access updates preserve province inspection');

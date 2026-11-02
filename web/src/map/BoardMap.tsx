@@ -457,7 +457,12 @@ export function BoardMap({snapshot, busy}: {
                     <g className="map-access-shading" pointerEvents="none" aria-hidden="true" fill={`url(#${prefix}-locked-area)`}>
                         {areaEntries.filter(([area]) => areaAccess[area].length > 0).map(([area, shape]) =>
                             <path key={area} data-locked-area={area} d={shape.path}/>)}
+                        {Object.entries(overseasLocks).filter(([, locked]) => locked).map(([group]) =>
+                            <rect key={group} data-locked-overseas={group} x={0}
+                                y={group === 'NEW_WORLD' ? 630 : 1050} width={190}
+                                height={group === 'NEW_WORLD' ? 420 : 600}/>)}
                         {catalog.provinces.filter(province => lockedProvinces.has(province.id) &&
+                            !(province.overseas && overseasLocks[province.overseas]) &&
                             (!province.area || areaAccess[province.area].length === 0)).map(province =>
                             <path key={province.id} data-locked-province={province.id} d={geometry.provinces[province.id].outline}/>)}
                     </g>

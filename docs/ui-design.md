@@ -107,7 +107,8 @@ choice and understand its result through visual controls and commands, on deskto
 - Pending capital bids and token purchases offer withdrawal until simultaneous reveal. Clear saved
   readiness while retaining the amount in the local input; reloading must not restore a withdrawn
   submission. Committed history and resource balances change only on reveal.
-- Hosted registration asks only for a unique handle. Search, selected participants, live game labels
+- Hosted registration asks only for a unique handle, preserving capitalization while search and
+  uniqueness ignore case. Search, selected participants, live game labels
   and administrator player lists use `@handle`; account UIDs remain internal to selection and requests.
   Compact player boxes put the handle beside the capital name and omit `@` there. Keep this identity
   on one row; long handles truncate visually, with the full identity available on hover and to
