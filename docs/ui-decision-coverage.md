@@ -694,3 +694,9 @@ Java 21 production-server checks retain health, game creation and all four built
 MIME, immutable caching and gzip contracts. The five Python asset-verifier regressions pass.
 No game rules, saved-game formats or SQL migrations change in this batch. Gradle Actions 6 uses
 the basic cache provider explicitly; Python Actions 7 retains Python 3.12 for validation scripts.
+
+Decision-family fixtures now await a fresh harness document and the revision rendered by the App.
+Transport counters and fixture-variable mutation do not establish that rendering has completed.
+Their four absence assertions return booleans, retaining strict absence checks without serializing
+React DOM objects through CDP. Both full browser suites pass again with these guards; artifacts
+are retained in `/private/tmp/aor-dependabot-readiness-browser-artifacts`.
