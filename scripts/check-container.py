@@ -21,7 +21,10 @@ def verify_built_client(origin):
     for path in scripts:
         with urlopen(origin + path, timeout=5) as response:
             javascript = response.read().decode()
-        drawings.update(re.findall(r'["\'](/assets/[^"\'\s]+Geometry-[^"\'\s]+\.json)["\']', javascript))
+        # Vite's minifier may use backticks for static URLs. Ignore interpolated templates.
+        literals = re.findall(
+            r'''(["'`])(/assets/[^"'`\s${}]+Geometry-[^"'`\s${}]+\.json)\1''', javascript)
+        drawings.update(path for _, path in literals)
     if not drawings:
         raise RuntimeError("The built client does not reference separately loaded map drawings.")
     required = {"bounds", "frame", "provinces", "coasts", "areas", "seas", "terrain", "supports"}

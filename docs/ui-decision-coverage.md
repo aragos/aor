@@ -655,3 +655,22 @@ both maps show the clean three-way junction and crossing support arrows without 
 sliver or sea-facing notch. The turn-order/reference captures are in
 `/private/tmp/aor-help-neighbor-review`. These are emulated browser observations; they do not
 establish physical-device or screen-reader accessibility.
+
+## Dependency integration under React 19 and Vite 8
+
+The 2026-11-02 integration passes the full Kotlin JVM/JS/server checks and formatting with
+Kotlin 2.4.21, Gradle 9.8.2, Jackson 2.22.4, Logback 1.6.6 and real PostgreSQL 18.6. Existing
+saved-game replay, restart, private-plan and upgrade-archive regressions remain green; domain
+rules and stored formats are unchanged.
+
+A clean script-free npm install passes all 76 web unit tests, the TypeScript 7 build and the npm
+advisory audit with React 19.3.1, Vite 8.3.5 and React plugin 6.1.2. The complete StrictMode map
+and history browser suites pass against the updated server. They retain live action, rejection,
+polling, private-plan, reference, hosted-auth fixture and undo coverage. Reviewed desktop expansion
+and phone planning captures retain capital symbols, readable consequences and reachable controls
+(`aor-browser-artifacts-pUcRe1`); these are emulated views.
+
+The Java 21 production-server smoke check serves the built client and all four map drawings with
+the required MIME type, immutable caching and gzip. Five Python regressions cover Vite 7/8 URL
+quoting and failed asset contracts. Java 24 and Node 25 container proposals are excluded because
+their support has ended; supported Java 21 and Node 24 images remain in place.

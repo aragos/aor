@@ -192,6 +192,11 @@ branch protection with the `verify` context, and enables merging after required 
 executes PR code with write permissions. A ruleset-only setup needs a corresponding policy check
 before automatic patch merging will activate.
 
+Container images retain supported Java 21 and Node 24 release lines. Dependabot excludes Java 24
+and Node 25 because those lines have reached end of life; later supported major versions remain
+eligible for review. Check the [Adoptium support dates](https://adoptium.net/support/) and
+[Node release schedule](https://github.com/nodejs/Release) before changing the runtime images.
+
 For weekly runtime/base-image refreshes, set Actions secret `RENDER_API_KEY` and repository variable
 `RENDER_SERVICE_ID`. Monday's scheduled workflow is defined on `main` but checks out and fully verifies
 `release`, then requests a cache-cleared rebuild of that exact tested commit via the
