@@ -57,7 +57,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :server:test checkKotlinFormat
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Independent geometry and public option catalogs
