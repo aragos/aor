@@ -271,8 +271,6 @@ def geography(province_ids=None):
         ]
     )
     land = land.difference(straits)
-    # Retain the Bristol Channel: Cornwall reaches Wales and Chester by coastal
-    # water, with Portsmouth its only land neighbor.
     # Non-playing interiors separate graph branches that share a real landmass.
     # Strait widths are exaggerated to keep the separate coastal spaces readable.
     neutral = unary_union(
@@ -333,6 +331,15 @@ def geography(province_ids=None):
         .union(fixed_insets)
         .buffer(0)
     )
+    # Exaggerate the Bristol Channel into a bay between Cornwall, Chester and
+    # Portsmouth. Keep its head short of the Chester–Portsmouth land border's
+    # northern end and its southern shore clear of Cornwall–Portsmouth's crossing.
+    bristol_channel = Polygon([
+        (575, 620), (620, 620), (665, 625), (695, 612), (720, 589),
+        (749, 577), (754, 591), (738, 619), (704, 642), (650, 656),
+        (595, 650),
+    ])
+    land = land.difference(bristol_channel).buffer(0)
     frame = Polygon(
         [display_point(x, y) if x else (0, y) for x, y in frame.exterior.coords]
     )

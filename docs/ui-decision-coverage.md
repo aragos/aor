@@ -92,6 +92,22 @@ focused map, support-arrow, commodity, European-game, turn-order, spectator and 
 browser suites pass together (`/private/tmp/aor-map-merge-browser-artifacts`). Catalog-13 file and
 PostgreSQL compatibility checks also pass against `main`'s unchanged storage format.
 
+The further November 2 coastal correction widens the Bristol Channel toward Chester and
+Portsmouth. Catalog 15 includes Chester–Portsmouth by coast; all three pairwise coastal borders
+meet at one clear junction inside the bay, while existing land crossings remain. Both geometry
+validators pass exact catalog parity and the complete support-arrow envelope checks. Integrated
+core JVM/server tests, Kotlin/JS compilation, Kotlin formatting, the web build and 55 web unit
+tests pass. Focused presentation and support-arrow browser checks pass on both maps, including
+desktop/390-pixel coastal hit targets and inspection, saved catalog-13/catalog-14 drawings, and
+3–6-player support catalogs (`/private/tmp/aor-british-final-browser`). Reviewed Britain captures
+show the widened water and Cornwall–Chester support without spill into Portsmouth's coast.
+Catalog-14 saves replay a recorded Cornwall placement, survive restart and continue with their
+original connections and history; catalog-13 compatibility checks also pass.
+The isolated integration with current `main` also passes both geometry validators, the web build,
+55 unit tests and combined map-presentation, support-arrow, turn-order and live purchasing-plan
+browser checks (`/private/tmp/aor-british-merge-browser`), retaining the existing storage-upgrade
+regression and newer UI features.
+
 The main-view polish passes integrated core JVM, Kotlin/JS, server and Kotlin formatting checks,
 the web build, all 55 web unit tests and the comprehensive browser suite
 (`aor-browser-artifacts-cOCtoR`). Live bidding shows every commodity from setup with no premature

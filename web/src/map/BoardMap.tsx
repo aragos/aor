@@ -13,6 +13,8 @@ import geometryData from './boardGeometry.json';
 import europeanGeometryData from './europeanBoardGeometry.json';
 import catalog13GeometryData from './catalog13BoardGeometry.json';
 import catalog13EuropeanGeometryData from './catalog13EuropeanBoardGeometry.json';
+import catalog14GeometryData from './catalog14BoardGeometry.json';
+import catalog14EuropeanGeometryData from './catalog14EuropeanBoardGeometry.json';
 import './map.css';
 
 interface Geometry {
@@ -119,10 +121,13 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
 export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
-    const legacyCatalog = snapshot.game.catalog?.dataVersion === 'ah1996-catalog-13';
-    const mapGeometries = legacyCatalog
-        ? {STANDARD: catalog13GeometryData, EUROPEAN: catalog13EuropeanGeometryData}
-        : {STANDARD: geometryData, EUROPEAN: europeanGeometryData};
+    const catalogGeometries = {
+        'ah1996-catalog-13': {STANDARD: catalog13GeometryData, EUROPEAN: catalog13EuropeanGeometryData},
+        'ah1996-catalog-14': {STANDARD: catalog14GeometryData, EUROPEAN: catalog14EuropeanGeometryData},
+        'ah1996-catalog-15': {STANDARD: geometryData, EUROPEAN: europeanGeometryData},
+    };
+    const version = snapshot.game.catalog?.dataVersion as keyof typeof catalogGeometries;
+    const mapGeometries = catalogGeometries[version] ?? catalogGeometries['ah1996-catalog-15'];
     const geometry: Geometry = mapGeometries[snapshot.game.rules.map === 'EUROPEAN' ? 'EUROPEAN' : 'STANDARD'];
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');

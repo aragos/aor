@@ -1031,6 +1031,9 @@ Chester and Portsmouth are its direct coastal-water neighbors. The Bristol Chann
 Cornwall from Wales. This applies to both maps in catalog 14. Existing catalog-13 games retain
 their recorded topology, including the former Wales–Cornwall land connection, for replay and
 continued play; they are not silently converted to different movement rules.
+The further 2026-11-02 correction adds Chester–Portsmouth as a direct coastal-water connection
+in catalog 15 on both maps. Cornwall, Chester and Portsmouth each border the other two by coast;
+their existing land connections remain. Catalog-14 games also retain their recorded topology.
 On the standard board, Athens and Crete retain their shared coastal border. On 2026-10-27 the user corrected the sea
 transcription: the Aegean and Central Mediterranean are separate seas, both in Area VIII. Crete
 adjoins the Aegean, Central Mediterranean and Eastern Mediterranean. This supersedes the earlier

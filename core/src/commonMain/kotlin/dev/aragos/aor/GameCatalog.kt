@@ -8,7 +8,7 @@ package dev.aragos.aor
 data class CatalogConfiguration(
     val playerCount: Int,
     val rules: RuleOptions = RuleOptions(),
-    val version: CatalogVersion = CatalogVersion.CATALOG_14,
+    val version: CatalogVersion = CatalogVersion.CATALOG_15,
 ) {
     init {
         require(playerCount in 3..6) { "Catalog configurations require three through six players." }
@@ -81,7 +81,7 @@ object GameCatalog {
     fun requireResolvedFor(
         playerCount: Int,
         rules: RuleOptions = RuleOptions(),
-        version: CatalogVersion = CatalogVersion.CATALOG_14,
+        version: CatalogVersion = CatalogVersion.CATALOG_15,
     ): CatalogConfiguration {
         val configuration = validateFor(playerCount, rules, version)
         require(configuration.unresolvedReferences.isEmpty()) {
@@ -94,7 +94,7 @@ object GameCatalog {
     fun validateFor(
         playerCount: Int,
         rules: RuleOptions = RuleOptions(),
-        version: CatalogVersion = CatalogVersion.CATALOG_14,
+        version: CatalogVersion = CatalogVersion.CATALOG_15,
     ): CatalogConfiguration {
         val configuration = CatalogConfiguration(playerCount, rules, version)
         val definitions = configuration.map.provinces

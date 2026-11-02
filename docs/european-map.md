@@ -114,9 +114,9 @@ one Central Mediterranean sea in Area VIII.
 The selected map is used throughout setup, board validation, expansion, card targets, commodity
 ownership and public catalogs. Wine has seven ownership boxes on the full European board;
 payments use the same quadratic formula. The selected option is recorded in the initial revision
-and replayed on restart. Catalog version `ah1996-catalog-14` also includes Cornwall's corrected
-land/coastal connections on both maps. Existing catalog-13 saves remain directly playable with
-their recorded topology and drawing.
+and replayed on restart. Catalog version `ah1996-catalog-15` includes the corrected Cornwall
+land/coastal connections and Chester–Portsmouth coastal contact on both maps. Existing catalog-13
+and catalog-14 saves remain directly playable with their recorded topology and drawing.
 
 Province declarations do not redraw the browser asset. After changing the map, update its anchors
 in `web/scripts/map_geography.py` as needed, then export the resolved engine catalog and regenerate

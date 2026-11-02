@@ -276,10 +276,11 @@ full account-directory/disaster-recovery backup.
 
 ## Engine upgrades and recovery
 
-Catalogs `ah1996-catalog-13` and `ah1996-catalog-14` are both directly supported. New games use 14,
-which corrects Cornwall's land and coastal connections on both maps. Catalog-13 files retain their
-recorded movement rules throughout replay and future play, including pending private submissions;
-their public catalog selects the matching legacy drawing. No storage rewrite, archive
+Catalogs `ah1996-catalog-13`, `ah1996-catalog-14` and `ah1996-catalog-15` are directly supported.
+New games use 15, which includes Cornwall's corrected connections and the Chester–Portsmouth
+coastal contact on both maps. Catalog-13 and catalog-14 files retain their
+recorded movement rules throughout replay and future play, including pending private submissions
+and plans; their public catalog selects the matching legacy drawing. No storage rewrite, archive
 or automatic rules conversion occurs when opening those saves. Unknown catalog versions remain
 unavailable. Explicit history replacement preserves the supported source catalog identity.
 

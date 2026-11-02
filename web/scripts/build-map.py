@@ -1063,6 +1063,29 @@ water, seas = simplify_water_boundaries(
 water, seas = simplify_water_boundaries(
     water, seas, focus={"armagh", "waterford", "edinburgh", "chester", "wales", "cornwall"}
 )
+# Give the three Bristol Channel coasts a simple junction in open water. Automatic
+# shortest-channel repair puts Cornwall–Portsmouth against the shore and leaves
+# only a tiny shared edge. Preserve the surrounding shores and coastal boundaries.
+bristol_west = (704.555, 608.224)
+bristol_north = (752.418, 586.570)
+bristol_south = (721.065, 630.456)
+bristol_junction = (733, 611)
+bristol_coasts = {
+    "chester": [bristol_west, bristol_north, bristol_junction],
+    "portsmouth": [bristol_north, bristol_south, bristol_junction],
+    "cornwall": [bristol_south, bristol_west, bristol_junction],
+}
+bristol_water = union_all([water[key] for key in bristol_coasts], grid_size=0.001)
+bristol_patch = Polygon([bristol_west, bristol_north, bristol_south]).intersection(bristol_water)
+for province, corners in bristol_coasts.items():
+    sector = Polygon(corners).intersection(bristol_patch)
+    water[province] = union_all([
+        water[province].difference(bristol_patch), sector,
+    ], grid_size=0.001)
+assert pairs(water) == {tuple(sorted(pair)) for pair in rel["coast"]}, (
+    "The Bristol Channel junction must preserve every coastal route."
+)
+
 water, seas = simplify_water_boundaries(
     water, seas, focus={"toulouse", "bordeaux", "montpellier", "constantinople",
                        "smyrna"}
