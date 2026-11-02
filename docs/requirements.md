@@ -44,7 +44,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   while inspecting other objects. Use the object itself rather than separate Inspect controls;
   keep province inspection on the map. Clear the province after accepted token/marker placement,
   retaining correctable work after rejection. Show available cash alongside spending decisions; omit
-  a permanent resource section. Include each player's advance count in their summary. Expanded
+  a permanent resource section. Include each player's advance count in their summary. Player boxes
+  share the height of the tallest summary across all rows, without extra reserved space. Expanded
   advances follow printed category and letter order, with an explicit empty state when none are owned.
   Expanded player details omit the repeated name and close button; the summary toggles the floating
   detail without resizing the player strip or map. Show written cash in expanded player details and
@@ -59,6 +60,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   its lower space to it. Workspace, action and activity scrolling must not push the hand below the
   viewport or cover it. On narrow screens, coordinate the action review and confirmation above the
   hand rather than overlaying separate fixed panels. Keep short action panes sized to their content.
+  Let the turn-status box and headings scroll with long action reviews, retaining reachable Undo and
+  confirmation controls and usable review space on short phones, including with an expanded hand.
   On phones, use a left icon rail for workspaces and a dedicated Players tab instead of the player
   strip. Keep Commands and configuration in Players, without a bottom bar. Show Papal Decree as a
   banner in Advances; relevant actions own other turn effects. Omit the visible private-hand heading
@@ -94,6 +97,12 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   reveal it follows the chosen policy. Keep the full action-sidebar height available for decisions.
   Player boxes share a wrapping status/pool row. Expansion uses one current
   → projected pool balance. Center action labels and inline identities.
+- Make the printed turn-position → order-box → green-die mapping discoverable beside token
+  purchases, unresolved turn-order ties, player order boxes and competition previews. Before order
+  resolves, show the starting-player-count track without assigning capitals or predicting private
+  bids. Once resolved, show current capital assignments and identify the viewer. Show applicable
+  green-die winning faces beside an attack, including Proselytism and Chaos restrictions; distinguish
+  this alternative win condition from the black/white dice. Reference preserves valid action drafts.
 - Omit expansion destinations with no commitment possible under pool/shipping limits. Preserve
   feasible partial placements; call the largest legal partial placement **maximum possible tokens**.
   During expansion, show each player's white markers and active military cards with matchup

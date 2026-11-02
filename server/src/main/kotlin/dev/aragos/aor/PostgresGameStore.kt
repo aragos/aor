@@ -253,7 +253,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                         WHERE m.game_id = g.id AND m.needs_move) AS action_players,
                     CASE WHEN g.document->>'fileVersion' <> '7'
                         OR g.document->'header'->>'rulesVersion' <> ?
-                        OR g.document->'header'->>'dataVersion' <> ? THEN 'UNAVAILABLE'
+                        OR NOT (g.document->'header'->>'dataVersion' = ANY (?)) THEN 'UNAVAILABLE'
                         ELSE g.listing_status END AS base_status,
                     g.stage
                 FROM games g LEFT JOIN game_players p ON p.game_id = g.id AND p.account_id = ?
@@ -271,7 +271,13 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         val games =
             connection.prepareStatement(sql).use { statement ->
                 statement.setString(1, RULES_VERSION)
-                statement.setString(2, DATA_VERSION)
+                statement.setArray(
+                    2,
+                    connection.createArrayOf(
+                        "text",
+                        CatalogVersion.entries.map(CatalogVersion::wireValue).toTypedArray(),
+                    ),
+                )
                 statement.setString(3, viewer.value)
                 statement.setBoolean(4, scope == GameListScope.ALL)
                 statement.setBoolean(5, scope == GameListScope.OWN)

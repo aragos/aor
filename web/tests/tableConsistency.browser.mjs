@@ -47,10 +47,10 @@ export async function checkTableConsistency(page, web, baseline) {
     await assertToolbar();
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .pool-summary').length`), 1);
     assert.equal(await page.evaluate(`(() => {
-        const heading=document.querySelector('.decision-heading').getBoundingClientRect();
+        const review=document.querySelector('.decision-scroll').getBoundingClientRect();
         const toolbar=document.querySelector('.decision-toolbar').getBoundingClientRect();
-        return Math.abs(heading.top-toolbar.top)<1 && toolbar.left>=heading.right;
-    })()`), true, 'Phone expansion toolbar shares the short decision heading row');
+        return toolbar.bottom<=review.top && review.height>=180;
+    })()`), true, 'Phone expansion keeps Undo above a readable scrolling review');
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
 
     const definition = baseline.game.cardInspections.find(card => card.definition.id === 'revolutionary-uprisings').definition;
@@ -147,6 +147,7 @@ if (process.argv[1]?.endsWith('/tableConsistency.browser.mjs')) {
         await checkActionButtons(page, web, baseline);
         await checkCompactPresentation(page, web, baseline);
         await checkReferenceUx(page, web, baseline);
+        await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
         await checkTable(page, web, baseline);
         await checkTableConsistency(page, web, baseline);
         await checkMarketInsights(page, web, baseline);

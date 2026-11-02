@@ -2,9 +2,17 @@ import {createContext, lazy, Suspense, useContext, useState} from 'react';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {t} from './messages';
-import type {PublicCatalog} from './api';
+import type {PlayerView, PublicCatalog} from './api';
 
 export const ReferenceCatalogContext = createContext<PublicCatalog | null>(null);
+
+/** Only public identities and resolved assignments enter the live printed-track lookup. */
+export const ReferenceOrderContext = createContext<{
+    viewerId: string | null;
+    players: Pick<PlayerView, 'id' | 'name' | 'capital'>[];
+    turnOrder: string[];
+    orderBoxes: Record<string, number>;
+} | null>(null);
 
 const ReferencePopup = lazy(() => import('./ReferencePopup'));
 

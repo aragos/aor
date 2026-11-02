@@ -1,7 +1,7 @@
 package dev.aragos.aor
 
 const val RULES_VERSION = "ah1996-three-epoch-4"
-const val DATA_VERSION = "ah1996-catalog-13"
+const val DATA_VERSION = "ah1996-catalog-14"
 
 /**
  * A registered participant, independent of their capital or creator role.
@@ -37,7 +37,7 @@ data class GameHeader(
             "The game creator must be a registered player."
         }
         require(rulesVersion == RULES_VERSION) { "Unsupported rules version: $rulesVersion." }
-        require(dataVersion == DATA_VERSION) { "Unsupported data version: $dataVersion." }
+        CatalogVersion.fromWire(dataVersion)
     }
 }
 
@@ -89,7 +89,10 @@ data class GameState(
     val playedLeaders: Set<LeaderId> = emptySet(),
     val activeWar: WarState? = null,
     val voids: CardVoids = CardVoids(),
-    val board: BoardState = BoardState(definition = rules.map.definition),
+    val board: BoardState =
+        BoardState(
+            definition = CatalogVersion.fromWire(header.dataVersion).mapDefinition(rules.map)
+        ),
     val flow: TurnFlow = TurnFlow(),
     val endingTriggered: Boolean = false,
     val entryCount: Int = 0,
@@ -103,7 +106,9 @@ data class GameState(
     val turnNumber: Int? = null,
     val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
 ) {
-    val catalog: CatalogConfiguration by lazy { CatalogConfiguration(playerIds.size, rules) }
+    val catalog: CatalogConfiguration by lazy {
+        CatalogConfiguration(playerIds.size, rules, CatalogVersion.fromWire(header.dataVersion))
+    }
 
     val playerIds: List<PlayerId>
         get() = header.players.map(Player::id)

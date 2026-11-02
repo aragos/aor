@@ -5,12 +5,48 @@ control, deterministic UI fixture and live authorized game are different evidenc
 exercise the App and submission path but cannot establish domain validity, authorization or secrecy;
 core/service tests own those contracts. Authority outcomes are never player controls.
 
+The 2026-11-02 expansion layout checks pass the web build, all 55 web unit tests and focused
+StrictMode browser checks (`aor-browser-artifacts-qHrmfY`). Six-player fixtures cover equal summary
+heights at desktop, wrapped-tablet and phone widths, shrinking after status/pool removal, and floating
+details that leave those heights unchanged. They verify matching status/pool widths and the active
+game's marker-to-income help, including its example. At 390×844 and 320×640, long military reviews
+scroll their headings away while Undo and confirmation stay pinned; expanded hands retain map and
+review space. Neighboring card/purchase flows, native validation/Enter, help navigation, polling and
+rejection also pass. A live 320×640 placement after scrolling verifies the pinned control, recorded
+marker, authoritative pool balance and accepted-draft cleanup. Reviewed desktop and phone captures show aligned
+player boxes, readable placement/income consequences and readable income reference boxes. These
+are emulated browser observations, not a physical-phone accessibility review.
+The isolated main integration repeats the web build, all 55 unit tests and the focused browser
+checks against the current main server (`aor-browser-artifacts-AlCGFx`), retaining the turn-order
+reference and other previously integrated features.
+
 The 2026-10-29 checks cover integrated core JVM, Kotlin/JS, server and formatting checks, web
 build/unit tests, and the comprehensive browser suite, including private-seat, hosted and live
 European-map flows. Presentation fixtures use production StrictMode. The live Crusades regression
 first reproduced the lifecycle failure, then committed a map-selected province after its fix.
 Historical long runs and separate history-editor evidence remain identified below. See
 [README](../README.md) for commands rather than relying on frozen test counts.
+
+The 2026-11-02 turn-order reference adds focused StrictMode browser evidence
+(`aor-browser-artifacts-ZkHuVt`). Real game catalogs verify the distinct printed tracks for
+3–6 starting players. Live token bidding retains an unsaved amount through help and another
+player's polled submission; unresolved bids and ties assign no capitals. Resolved player boxes
+retain **You**, position and printed box separately. A changed-order fixture updates an open lookup,
+including the viewer row, without sending a command. Live competition help preserves the selected
+attack; confirmation still resolves it and the result expires at Expansion end while history remains.
+Core regressions compare projected green faces with recorded competition outcomes at every
+three-player box, with/without Proselytism and defender Chaos. The existing replay/storage checks
+cover continuity; this change adds public projections without changing saved records or commands.
+
+Rendered desktop and phone captures were reviewed separately: the three-column printed track fits
+without horizontal scrolling, capital names keep their silhouettes, and the viewer's row has both
+**You** and a background highlight. Pending order clearly explains how positions are established;
+the lookup keeps the black/white victory condition and tie exceptions beside the printed table.
+Keyboard Escape and closing restore focus; the neighboring income topic and reference chooser
+remain usable. The web build, 55 web unit tests, core JVM tests, Kotlin/JS compilation, server tests and Kotlin
+formatting check pass. The focused reference checks are also registered in the main browser suite.
+Integration with spectator support additionally verifies public order lookup without an own-player
+marker, retained spectator inspection and an empty command log (`aor-browser-artifacts-TnaOho`).
 
 The 2026-11-02 map polish passes the web build, 55 web unit tests and both map geometry validators.
 Regeneration changes only Cagliari's two support paths on each board, retaining all graph, label,
@@ -34,6 +70,27 @@ projections, removal on unlock, partial-area shading and retained inspection thr
 commodity icons still accept real clicks without changing the prepared card action. Reviewed
 high-zoom arrow and desktop overview captures show clean tips and muted diagonal hatching, with
 commodity colors, pieces, labels and locks retained (`aor-browser-artifacts-Vsby8I`).
+
+The November 2 Cornwall correction supersedes the earlier filled-estuary drawing. Integrated
+core JVM, Kotlin/JS, server and formatting checks pass, alongside the web build, 55 unit tests,
+both geometry validators and focused presentation, support-arrow, commodity-inspection and live
+European-map browser suites (`/private/tmp/aor-cornwall-final`). Catalog 14 gives Cornwall only
+Portsmouth on land and Wales, Chester and Portsmouth by coastal water. Validators check visible
+water separation, all three coastal frontages and the ordinary support-arrow envelope without a
+corner exception. Both full boards and reduced 3–6 player boards retain catalog parity.
+Catalog-13 saves replay a four-round Wales-to-Cornwall land move, survive file-store restart and
+continue play with unchanged history. Private bids and metadata survive restart; PostgreSQL lists
+registered catalog-13 games as playable. Browser fixtures switch between matching old/new drawings.
+Reviewed desktop overview and desktop/390-pixel Britain/inset captures show moderately contrasting
+sage-green satellite stippling, an open Bristol Channel and plain ivory insets. Regional/overseas
+shading, partial unlocks, polling-safe inspection and commodity-card draft preservation still pass;
+a live European placement survives reload. These are emulated-device observations.
+
+The isolated merge onto `main` repeats the integrated Kotlin checks, web build, all 55 web unit
+tests and both geometry validators with the current turn-order/spectator changes retained. The
+focused map, support-arrow, commodity, European-game, turn-order, spectator and live competition
+browser suites pass together (`/private/tmp/aor-map-merge-browser-artifacts`). Catalog-13 file and
+PostgreSQL compatibility checks also pass against `main`'s unchanged storage format.
 
 The main-view polish passes integrated core JVM, Kotlin/JS, server and Kotlin formatting checks,
 the web build, all 55 web unit tests and the comprehensive browser suite
@@ -488,6 +545,11 @@ owner's authorization operation/version and its base position to the committed r
 Focused service regressions also verify cancellation after intervening public progress and an exact
 write acknowledgement that differs from a subsequent save included in automatic progression.
 Screenshots are retained in `aor-browser-artifacts-orcMT8`.
+
+After integrating the current `main` catalog, turn-order references and mobile expansion layout,
+the same live planning/table/help/hand suite passes in the isolated
+`/private/tmp/aor-parallel-purchasing-merge` worktree. Its screenshots are retained in
+`aor-browser-artifacts-CT9OcM`. The production web build and all 55 web unit tests also pass.
 
 Verification used `/private/tmp/aor-planning-verify-6fjvxeq_` to exclude hot reloads from concurrent
 map edits. The broader map browser run did not pass: the live checkout run lost focus during hot

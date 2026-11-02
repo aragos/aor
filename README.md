@@ -71,7 +71,8 @@ handles, membership access and managed PostgreSQL for all durable state. For SQL
 another provider, set `AOR_STORAGE=postgres` and secret `AOR_DATABASE_URL`. TLS defaults to
 `verify-full`; loopback development may use `?sslmode=disable`. See [deployment](docs/deployment.md).
 
-Current games use file format 7, rules `ah1996-three-epoch-4` and data `ah1996-catalog-13`.
+Current games use file format 7, rules `ah1996-three-epoch-4` and data `ah1996-catalog-14`.
+Existing catalog-13 games retain their original catalog and remain playable.
 Creators can explicitly upgrade format-6 games from the game screen. The upgrade archives the
 source and retains all original revisions, outcomes, memberships and pending bids.
 Creation records configuration in revision 1 and automatic setup/outcomes in revision 2. Ordinary

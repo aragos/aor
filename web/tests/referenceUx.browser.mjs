@@ -103,7 +103,9 @@ export async function checkReferenceUx(page, web, baseline) {
     await page.wait(`document.querySelector('#income-track .payout-box')`, 'Income symbol opens its own track');
     assert.equal(await page.evaluate(`document.querySelectorAll('#income-track .payout-box').length`), 26, 'Every marker count from 0 to 25 has a base income');
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'Income reference uses the active game’s starting player count');
-    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /numbered tokens do not count.*White markers count too/);
+    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /Numbered tokens do not count.*White markers count too/);
+    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`),
+        new RegExp(`3 markers provide \\$${baseline.game.catalog.incomeTrack[3]} base income`));
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     await show({game: {players: baseline.game.players.map(player => player.id === viewer ? {...player, advances: []} : player)}});
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);

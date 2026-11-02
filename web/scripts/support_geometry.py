@@ -7,8 +7,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import linemerge, transform, unary_union
 
 
-# Toulouse's accepted labels leave clear east/south exits. Cornwall–Chester has
-# only a corner/gap, so its two drawings need explicitly placed crossings.
+# Toulouse's accepted labels leave clear east/south exits.
 # Cagliari's coastal-water shafts need extra length to remain visible at Fit;
 # extend Marseilles' source end to keep its arrowhead clear of the marker slot.
 DIRECT_ROUTES = {
@@ -16,10 +15,6 @@ DIRECT_ROUTES = {
     ("cagliari", "genoa"): [((1323.001, 1151.561), (1292.374, 1114.602))],
     ("toulouse", "montpellier"): [((903, 1140), (935, 1140))],
     ("toulouse", "barcelona"): [((843, 1177), (843, 1216))],
-    ("cornwall", "chester"): [
-        ((705.884, 625.663), (712.483, 588.241)),
-        ((701.037, 622.966), (701.037, 582.966)),
-    ],
 }
 
 
@@ -53,17 +48,22 @@ def border_crossings(source, target):
             before = part.interpolate(max(0, distance - 1))
             after = part.interpolate(min(part.length, distance + 1))
             angle = math.atan2(after.y - before.y, after.x - before.x) + math.pi / 2
+            # Unequal depths let the complete head clear a narrow coastal junction.
+            depths = [(20, 20), (14, 26), (26, 14), (16, 24), (24, 16),
+                      (16, 16), (24, 24), (14, 14)]
             variants = product([0, -.3, .3, -.6, .6, -.9, .9, -1.2, 1.2],
-                               [20, 16, 24, 14], [1, -1])
-            for rotation, half, sign in variants:
+                               depths, [1, -1])
+            for rotation, (source_depth, target_depth), sign in variants:
                 dx, dy = math.cos(angle + rotation), math.sin(angle + rotation)
-                start = Point(center.x - sign * half * dx, center.y - sign * half * dy)
-                end = Point(center.x + sign * half * dx, center.y + sign * half * dy)
+                start = Point(center.x - sign * source_depth * dx, center.y - sign * source_depth * dy)
+                end = Point(center.x + sign * target_depth * dx, center.y + sign * target_depth * dy)
                 if (not source_interior.covers(start) or not target_interior.covers(end)
                         or not source_clearance.covers(LineString([start, center]))
                         or not target_clearance.covers(LineString([center, end]))):
                     continue
-                yield LineString([start, end]), abs(half - 20) + abs(distance - part.length / 2) / 20
+                yield LineString([start, end]), (abs(source_depth + target_depth - 40)
+                    + abs(source_depth - target_depth) / 20
+                    + abs(distance - part.length / 2) / 20)
 
 
 def label_footprints(provinces):
@@ -90,8 +90,7 @@ def support_paths(relations, provinces, footprints, compact_easting):
 
     Names and normal marker slots keep priority. Dense multi-owner token layouts
     still paint above arrows. Automatic routes stay within the two province
-    footprints; the authored Cornwall–Chester crossing bridges its tiny corner
-    separator without a detour.
+    footprints, including Cornwall's coastal-water crossing to Chester.
     """
     domains = {key: transform(lambda x, y, z=None: (compact_easting(x), y), shape)
                for key, shape in footprints.items()}

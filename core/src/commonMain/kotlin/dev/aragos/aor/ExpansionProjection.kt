@@ -33,6 +33,8 @@ data class ExpansionOfferView(
     val reachable: Boolean,
     /** Printed access conditions the viewer has not satisfied; independent of route existence. */
     val missingAccess: List<AccessRequirement> = emptyList(),
+    /** Null for peaceful placements; otherwise the faces that win on green alone, with advances. */
+    val greenDieWins: List<Int>? = null,
 )
 
 /** Consequences from the same mutation used by the voluntary marker-reduction command. */
@@ -179,6 +181,20 @@ internal object ExpansionProjection {
             province.access.filterNot { requirement ->
                 requirement.isSatisfiedBy(viewer.advances.owned)
             },
+            if (contested) {
+                val defenders =
+                    when (occupants) {
+                        is ProvincePieces.Marker -> setOf(occupants.owner)
+                        else -> holdings.keys - player
+                    }
+                CompetitionRules.greenWinningRolls(
+                    orderBox =
+                        requireNotNull(state.orderBoxes[player]) {
+                            "An expansion attacker requires a resolved printed order box."
+                        },
+                    proselytism = CompetitionRules.proselytismApplies(context, player, defenders),
+                )
+            } else null,
         )
     }
 

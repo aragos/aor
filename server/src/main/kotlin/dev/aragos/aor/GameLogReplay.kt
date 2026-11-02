@@ -6,6 +6,13 @@ import java.nio.file.Path
 
 /** Replays an explicit operational upgrade under the current engine without fresh outcomes. */
 internal fun replayUpgradedLog(header: JsonNode, entries: List<String>): GameState {
+    val dataVersion = header.field("dataVersion").string()
+    if (
+        header.field("rulesVersion").string() != RULES_VERSION ||
+            CatalogVersion.entries.none { it.wireValue == dataVersion }
+    ) {
+        throw ServiceFailure(422, "HISTORY_IDENTITY_UNVERIFIABLE")
+    }
     val currentHeader =
         GameHeader(
             players =
@@ -13,6 +20,7 @@ internal fun replayUpgradedLog(header: JsonNode, entries: List<String>): GameSta
                     Player(PlayerId(player.field("id").string()), player.field("name").string())
                 },
             creatorId = PlayerId(header.field("creatorId").string()),
+            dataVersion = dataVersion,
         )
     try {
         if (entries.map(TextCodec::parse).map(Entry::toText) != entries) {

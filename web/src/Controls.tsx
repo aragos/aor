@@ -8,6 +8,7 @@ import {GameActions} from './GameActions';
 import {MapPicker} from './map/MapSelection';
 import type {PurchaseQuote, QuotePurchase} from './GameTable';
 import {errorCode} from './api';
+import {HelpLink} from './HelpLink';
 
 function bidSubmitLabel(snapshot: Snapshot): string {
     const pending = snapshot.pendingBid !== null;
@@ -70,6 +71,8 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
         return <LabelMessage text={t('controls.between')} values={{before: <PlayerLabel snapshot={snapshot} id={order[slot - 2]}/>, after: <PlayerLabel snapshot={snapshot} id={order[slot - 1]}/>}}/>;
     };
     return <>
+        {(isTokenPurchase || stage === 'TURN_ORDER_TIE') &&
+            <div className="turn-order-help"><HelpLink topic="turn-order" label={t('reference.turnOrder')} compact={false}/></div>}
         {eligiblePurchase && <div className="token-stock-summary"><span>{t('game.tokens')}</span><strong>{me.stockTokens}</strong></div>}
         {eligiblePurchase && quoteError && <p className="blocker">{t(`error.${quoteError}`)}</p>}
         {((stage === 'BIDDING' && me.misery !== null) || eligiblePurchase) && <DecisionForm onSubmit={event => { event.preventDefault(); if (!busy && (!isTokenPurchase || (validPurchase && quoted))) void submit(`${isTokenPurchase ? 'buy-tokens' : 'bid-capital'} ${bid}`); }}>

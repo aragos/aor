@@ -6,6 +6,31 @@ import kotlin.test.assertFailsWith
 
 class TurnOrderTest {
     @Test
+    fun pendingOrderRetainsTheStartingPlayerCountPrintedTrack() {
+        val expected =
+            mapOf(
+                3 to listOf(2, 4, 6),
+                4 to listOf(1, 3, 5, 6),
+                5 to listOf(1, 2, 3, 4, 5),
+                6 to listOf(1, 2, 3, 4, 5, 6),
+            )
+        for (count in 3..6) {
+            val view = purchasing(count).viewForPlayer(PlayerId("p1"))
+            val track =
+                requireNotNull(view.catalog) { "Games must include their public catalog." }
+                    .orderTrack
+
+            assertThat(view.turnOrder).isEmpty()
+            assertThat(view.orderBoxes).isEmpty()
+            assertThat(track.map(OrderBoxView::number))
+                .containsExactlyElementsIn(expected[count])
+                .inOrder()
+            assertThat(track.last().greenWins)
+                .containsExactlyElementsIn(if (count == 5) listOf(6) else emptyList())
+        }
+    }
+
+    @Test
     fun setupHasNoTurnNumber() {
         assertThat(GameState(header()).viewForPlayer(PlayerId("p1")).turnNumber).isNull()
     }

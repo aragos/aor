@@ -67,7 +67,9 @@ choice and understand its result through visual controls and commands, on deskto
 
 ## Current table contracts
 
-- Expanded player details float below their summary without changing the player strip or map height.
+- Player boxes share the smallest equal height that fits the tallest summary, including across
+  wrapped rows and in the phone Players workspace. They shrink together when status rows disappear.
+  Expanded player details float below their summary without changing the player strip or map height.
   They omit the repeated player name and show written cash, tokens, deployed markers, and owned
   advances. Toggle them through the summary, without an overlapping close button. Explicitly say when
   no advances are owned. Keep income only in the summary, with a question mark beside its symbol
@@ -80,7 +82,10 @@ choice and understand its result through visual controls and commands, on deskto
   and available pool tokens on one wrapping row.
 - Undo stays at the upper right of the action panel, outside its scrolling review. All final actions,
   including Pass, occupy one pinned footer. Draft choices and inputs stay with their consequences;
-  opening inspection or scrolling cannot move confirmation away. Keep native form validation and
+  the full-width turn-status box, heading and resource summaries scroll with the review. Long phone
+  action panes may use up to 55% of the viewport height; avoid reserving most of that space for fixed
+  headings or stacking three footer actions when two can share a row.
+  Opening inspection or scrolling cannot move confirmation away. Keep native form validation and
   Enter submission intact. Number inputs ignore mouse-wheel changes while retaining focus,
   typing and arrow-key adjustment. Focusing a zero-valued number input clears it for immediate
   entry; preserve nonzero drafts. One action plus Pass uses a joined two-button control with a single
@@ -193,6 +198,17 @@ choice and understand its result through visual controls and commands, on deskto
   Maintain separate full inspection evaluations so selecting an omitted destination still explains
   pool/shipping limits, missing access, no route or existing control. Candidate highlights and
   enabled controls use feasible commitments, including legal partial placements.
+- Turn-order reference is a printed-track lookup, linked by a visible **Turn order & green die**
+  control beside token purchases and unresolved ties, a footnote beside each resolved player box,
+  and the competition's green-die consequence. The shared topic stays in the reference chooser.
+  Pending order shows positions and boxes for the starting player count without capital assignments;
+  resolved order adds capital silhouettes, names and a distinct viewer row. Player summaries retain
+  position and printed box separately from **You**, and omit misleading capital-order position
+  numbers while this turn's order is unresolved. Live order changes update an open lookup.
+  Competition shows engine-projected winning green faces, including Proselytism and defender Chaos;
+  an empty set explicitly says green cannot win. The lookup explains the independent black/white
+  route to victory and tie modifiers without adding a general rules section. Opening or closing it
+  preserves bid and attack drafts; keyboard dismissal restores focus to a surviving trigger.
 - Expansion uses one compact pool summary with current → projected balances while reviewing a
   placement. Keep commitment, outcome and income beside confirmation; omit repeated action headings.
   Competition omits the generic dice disclaimer. Whenever an offered route uses shipping, show

@@ -25,7 +25,7 @@ import type {QuotePlan, WritePlan} from './ActivityPlanner';
 import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
-import {ReferenceCatalogContext} from './HelpLink';
+import {ReferenceCatalogContext, ReferenceOrderContext} from './HelpLink';
 import {useStoredSetting} from './preferences';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
@@ -179,7 +179,10 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
             open={commandsOpen} onToggle={setCommandsOpen}/>}
     </div>;
-    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
+    return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
+        <ReferenceOrderContext.Provider value={{viewerId: snapshot.viewerId,
+            players: snapshot.game.players, turnOrder: snapshot.game.turnOrder,
+            orderBoxes: snapshot.game.orderBoxes}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
@@ -236,13 +239,13 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
                         <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
-                    <div className="decision-header">
-                        <div className="decision-toolbar">
-                            {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
-                                className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
-                                title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
-                                onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
-                        </div>
+                    <div className="decision-toolbar">
+                        {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
+                            className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
+                            title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
+                            onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
+                    </div>
+                    <div className="decision-scroll" ref={decisionScroll}>
                         <div className={`decision-heading ${objectAction ? 'object-heading' : ''}`}>
                             {spectator && <p className="eyebrow">{t('table.publicInformationOnly')}</p>}
                             {finished && <p className="eyebrow">{t('game.finished')}</p>}
@@ -261,8 +264,6 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                                 onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
                             {snapshot.game.activity?.actor && snapshot.game.activity.decisionPlayer && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                         </div>
-                    </div>
-                    <div className="decision-scroll" ref={decisionScroll}>
                     {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status">
                         <PlayerLabel snapshot={snapshot} id={expansionPlayer.id}/>
                         <span>{t('table.poolTokens')}</span><strong><TableIcon kind="token"/><span data-pool-current>{expansionPlayer.poolTokens}</span>
@@ -300,5 +301,5 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         {inspectedCard && <CardInspectionDialog label={cardDefinition ? t(cardDefinition.messageId) : t('table.inspection')} close={closeInspection}>
             <CardDecision key={inspectedCard} mode="inspection" inspectedId={inspectedCard} historical={inspection?.kind === 'history-card'} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
         </CardInspectionDialog>}
-    </main></ReferenceCatalogContext.Provider>;
+    </main></ReferenceOrderContext.Provider></ReferenceCatalogContext.Provider>;
 }

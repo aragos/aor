@@ -43,8 +43,7 @@ Each listed neighbor is connected in both directions. Source is the Board region
 | edinburgh | york, chester | N |
 | york | chester, london | N |
 | chester | wales, portsmouth | N |
-| wales | cornwall | N |
-| cornwall | portsmouth | N |
+| cornwall | portsmouth | N; user correction 2026-11-02: Cornwall's only land neighbor |
 | portsmouth | london | N |
 | armagh | waterford | N |
 | amsterdam | bruges, cologne | C |
@@ -138,7 +137,7 @@ Seaworthy Vessels. Overseas boxes have no edges in this main-map graph.
 | waterford | wales | N |
 | chester | wales | N |
 | wales | cornwall | N |
-| cornwall | portsmouth | N |
+| cornwall | portsmouth, chester | N; user correction 2026-11-02: Chester coastal contact |
 | portsmouth | london, paris, st-malo | N + Errata; user correction 2026-10-26 |
 | london | york, paris, bruges | N + Errata; user correction 2026-10-26 |
 | amsterdam | bruges | C |
