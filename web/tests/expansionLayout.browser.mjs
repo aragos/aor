@@ -94,6 +94,7 @@ export async function checkExpansionLayout(page, web, baseline) {
         if (mobile) {
             await click('.hand-toggle');
             const expanded = await bounds();
+            await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-expanded-review-${width}.png`));
             assert(expanded.review.height >= 150 && expanded.hand.bottom <= height && expanded.map.height >= 60,
                 `Expanded hand leaves room for the review and map: ${JSON.stringify(expanded)}`);
             await click('.hand-toggle');

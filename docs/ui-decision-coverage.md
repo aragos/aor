@@ -36,6 +36,12 @@ are emulated browser observations, not a physical-phone accessibility review.
 The isolated main integration repeats the web build, all 55 unit tests and the focused browser
 checks against the current main server (`aor-browser-artifacts-AlCGFx`), retaining the turn-order
 reference and other previously integrated features.
+Release CI subsequently exposed a 320×640 expanded-hand layout with only 49.5 pixels of map height.
+The phone grid now reserves map space and caps the expanded hand at 18% of the viewport height.
+Repeating CI's measured header/footer dimensions locally retains a 62-pixel map, a 155-pixel review
+and visible confirmation. The focused suite also passes neighboring hand, Help, card-action and
+live placement/cleanup checks (`aor-browser-artifacts-JZcJh9`); reviewed captures show readable
+consequences and complete action labels beside the scrolling expanded hand.
 
 The 2026-10-29 checks cover integrated core JVM, Kotlin/JS, server and formatting checks, web
 build/unit tests, and the comprehensive browser suite, including private-seat, hosted and live

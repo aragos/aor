@@ -513,7 +513,7 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
     .game-header > .account-controls { grid-column: 2; grid-row: 1; flex-direction: column; align-items: flex-end; gap: .1rem; max-width: 8rem; font-size: .75rem; }
     .game-header > .account-controls span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .header-stage { grid-row: 2; font-size: .75rem; }
-    .table-workspace { grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; grid-template-areas: "tabs workspace" "tabs side" "hand hand"; }
+    .table-workspace { grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: minmax(60px, 1fr) minmax(0, auto) minmax(0, auto); grid-template-areas: "tabs workspace" "tabs side" "hand hand"; }
     .workspace-tabs { flex-direction: column; justify-content: flex-start; align-items: stretch; gap: .25rem; padding: .35rem 0; border-bottom: 0; border-right: 1px solid #d6ddcd; overflow-y: auto; }
     .workspace-tabs button { flex: none; min-height: 44px; padding: .55rem .4rem; border-left: 3px solid transparent; }
     .workspace-tabs button > span { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -536,7 +536,7 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
     .decision-heading .mobile-selected:empty { display: none; }
     .decision-content:empty { display: none; }
     .decision-content > .game-actions { margin-block: .4rem; }
-    .table-hand.hand-expanded { max-height: 20dvh; }
+    .table-hand.hand-expanded { max-height: 18dvh; }
     .workspace-main .markets-workspace, .workspace-main .advances-workspace { padding: .8rem; }
 }
 .activity-planner { border-bottom: 1px solid var(--border, #bac6c4); padding-bottom: .8rem; margin-bottom: .8rem; }

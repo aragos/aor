@@ -80,6 +80,7 @@ jobs:
         run: npm run test:browser --workspace web
         env:
           CHROME_BIN: /usr/bin/google-chrome
+          AOR_BROWSER_TIMEOUT_MS: '600000'
           AOR_BROWSER_SERVER: ${{ github.workspace }}/web/scripts/postgres-browser-server.sh
       - name: Live undo and history
         run: npm run test:browser --workspace web
