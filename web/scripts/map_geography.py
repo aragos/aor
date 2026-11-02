@@ -271,9 +271,8 @@ def geography(province_ids=None):
         ]
     )
     land = land.difference(straits)
-    # Simplify the Bristol estuary at board scale so Wales and Cornwall retain
-    # their printed land border without disconnected pieces of either province.
-    land = land.union(LineString([project(-3.8, 51.6), project(-3.7, 51.1)]).buffer(14))
+    # Retain the Bristol Channel: Cornwall reaches Wales and Chester by coastal
+    # water, with Portsmouth its only land neighbor.
     # Non-playing interiors separate graph branches that share a real landmass.
     # Strait widths are exaggerated to keep the separate coastal spaces readable.
     neutral = unary_union(
@@ -317,7 +316,6 @@ def geography(province_ids=None):
     # Follow bays and peninsulas when a direct city-to-city chord crosses water.
     routes = {
         ("kongsberg", "malmo"): scandinavian_corridor[1:-1],
-        ("wales", "cornwall"): [(-3.7, 51.3)],
         ("amsterdam", "bruges"): [(4.3, 51.6)],
         ("barcelona", "valencia"): [(0.2, 40.8)],
         ("salonika", "athens"): [(22.4, 39.2)],

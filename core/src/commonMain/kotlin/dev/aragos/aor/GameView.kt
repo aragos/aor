@@ -146,7 +146,12 @@ data class GameView(
                     state.board.pieces.map { (province, pieces) ->
                         ProvinceView.from(province, pieces)
                     },
-                catalog = PublicCatalog.forPlayers(state.playerIds.size, state.rules),
+                catalog =
+                    PublicCatalog.forPlayers(
+                        state.playerIds.size,
+                        state.rules,
+                        state.catalog.version,
+                    ),
                 lockedProvinces =
                     viewer
                         ?.let { participant ->
@@ -414,10 +419,16 @@ data class PublicCatalog(
      * Printed boxes and green-die results for the starting player count, before or after bidding.
      */
     val orderTrack: List<OrderBoxView>,
+    /** Recorded catalog identity also selects the matching browser geometry. */
+    val dataVersion: String = DATA_VERSION,
 ) {
     companion object {
-        fun forPlayers(playerCount: Int, rules: RuleOptions = RuleOptions()): PublicCatalog {
-            val configuration = CatalogConfiguration(playerCount, rules)
+        fun forPlayers(
+            playerCount: Int,
+            rules: RuleOptions = RuleOptions(),
+            version: CatalogVersion = CatalogVersion.CATALOG_14,
+        ): PublicCatalog {
+            val configuration = CatalogConfiguration(playerCount, rules, version)
             return PublicCatalog(
                 configuration.provinces,
                 AdvanceData.definitions,
@@ -440,6 +451,7 @@ data class PublicCatalog(
                         greenWins = CompetitionRules.greenWinningRolls(box),
                     )
                 },
+                dataVersion = version.wireValue,
             )
         }
     }

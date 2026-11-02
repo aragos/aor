@@ -11,6 +11,8 @@ import {clampMapView, fitMapView, panMapView, resizeMapView, zoomMapView} from '
 import type {MapView, MapViewport} from './mapView';
 import geometryData from './boardGeometry.json';
 import europeanGeometryData from './europeanBoardGeometry.json';
+import catalog13GeometryData from './catalog13BoardGeometry.json';
+import catalog13EuropeanGeometryData from './catalog13EuropeanBoardGeometry.json';
 import './map.css';
 
 interface Geometry {
@@ -117,7 +119,11 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
 export function BoardMap({snapshot, busy}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>; error?: string; status?: string;
 }) {
-    const geometry: Geometry = snapshot.game.rules.map === 'EUROPEAN' ? europeanGeometryData : geometryData;
+    const legacyCatalog = snapshot.game.catalog?.dataVersion === 'ah1996-catalog-13';
+    const mapGeometries = legacyCatalog
+        ? {STANDARD: catalog13GeometryData, EUROPEAN: catalog13EuropeanGeometryData}
+        : {STANDARD: geometryData, EUROPEAN: europeanGeometryData};
+    const geometry: Geometry = mapGeometries[snapshot.game.rules.map === 'EUROPEAN' ? 'EUROPEAN' : 'STANDARD'];
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
     // Background dismissal hides the border while retaining the action's province draft.
@@ -329,7 +335,11 @@ export function BoardMap({snapshot, busy}: {
             : province.commodities.map(commodity => `${province.id}:${commodity}`);
     });
     const commodityTabStop = commodityKeys.includes(tabCommodity) ? tabCommodity : commodityKeys[0];
-    const lockedProvinces = new Set(snapshot.game.lockedProvinces);
+    // Hatch mandatory regional access, leaving alternative navigation requirements unshaded.
+    const lockedProvinces = new Set(catalog.provinces.filter(province =>
+        snapshot.game.lockedProvinces.includes(province.id) &&
+        province.access.some(requirement => requirement !== 'THE_HEAVENS_OR_SEAWORTHY_VESSELS'))
+        .map(province => province.id));
     const areaAccess = Object.fromEntries(areaEntries.map(([area]) => {
         const members = catalog.provinces.filter(province => province.area === area);
         return [area, members.length && members.every(province => lockedProvinces.has(province.id))

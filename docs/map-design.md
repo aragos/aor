@@ -41,6 +41,9 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
   Chester and Wales. Chester remains separated from named seas.
   The Bay of Biscay reaches Edinburgh along a broad, continuous front west of Scotland, with
   the Greenland Sea retained along its northern coast.
+  Retain visible Bristol Channel water between Cornwall and Wales. Cornwall's only land neighbor
+  is Portsmouth; its coastal water directly borders Wales, Chester and Portsmouth. Cornwall's
+  Chester support crosses their shared coastal-water boundary.
 - Belgrade reaches the Adriatic shore between Dubrovnik and Durazzo, sharing land and coastal
   borders with both and a coastal border with Bari. A visible strip of Belgrade separates
   Dubrovnik from Durazzo on land and water. The Adriatic name follows the narrow channel and
@@ -58,7 +61,7 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 | Information | Encoding |
 | --- | --- |
 | Commodity / market | Permanent commodity fill, pictogram and readable market number; divided fills for multiple commodities |
-| Satellite | Pale green with dark stippling at a consistent screen size, distinct from solid gray Stone |
+| Satellite | Pale sage green with fine, moderately contrasting stippling at a consistent screen size, distinct from solid gray Stone |
 | Capital | Dark background behind the complete market badge, including commodity |
 | Owner | The same capital color and silhouette as every other player representation |
 | Piece kind / age | A count identifies tokens; an unnumbered piece is a marker. White is new, filled is established. Separate owners and ages. |
@@ -72,6 +75,8 @@ Access hatching follows the viewer's authoritative missing-advance projection, i
 routes, ships and phase. Shade the whole area, including its water, when every province shares the
 lock; otherwise shade only locked provinces' land and coastal water. Keep commodities, pieces,
 labels and inspection available. Remove hatching with its lock as soon as access is acquired.
+Hatching marks mandatory regional and overseas access. Leave Iceland and West Africa unhatched;
+their alternative navigation requirements still apply to legal actions.
 Inspecting a province highlights each directly connected sea with deep blue water, sparse diagonal
 hatching, a contrasting dashed perimeter and a light name with a dark halo. Sea texture remains
 distinct from the pale solid coastal bands. Hatch spacing and perimeter width stay consistent on
@@ -126,6 +131,8 @@ regeneration commands for the playable European variant.
 
 The browser selects checked-in `web/src/map/boardGeometry.json` or `europeanBoardGeometry.json`
 according to the game's recorded map option. Both are keyed by stable province IDs.
+Catalog-13 saves use the matching `catalog13BoardGeometry.json` or
+`catalog13EuropeanBoardGeometry.json` instead, preserving the topology they actually play.
 The catalog owns connections, memberships and access; game state owns pieces and assigned capitals.
 Geometry does not determine eligibility or calculate game effects.
 
@@ -179,11 +186,10 @@ dense token groups still take drawing priority. Arrow routing is drawing data an
 the support graph or a province's connections.
 
 Regeneration includes `support_geometry.py`. Toulouse retains its clear east/south exits and accepted
-label placement; the Montpellier arrow ends before the printed name. Cornwall–Chester requires a
-placed corner crossing on each drawing: the standard route crosses less than one SVG unit of the
-Wales/Portsmouth separator. This does not create a movement connection. Validators check catalog
-parity, short straight paths, direction, complete arrow bounds, label clearance, province traversal
-and uncrossed shafts; the tiny corner separator has an explicit exception.
+label placement; the Montpellier arrow ends before the printed name. Coastal crossings may place
+more of their shaft inside the market so the full arrowhead clears a narrow junction. Validators
+check catalog parity, short straight paths, direction, complete arrow bounds, label clearance,
+province traversal and uncrossed shafts; Cornwall–Chester uses the ordinary coastal-boundary checks.
 
 Label fitting reserves extra room for platform font substitutions while keeping names readable.
 Tight footprints retain their fitted label budget before accepting a constrained layout. Both map

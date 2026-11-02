@@ -76,6 +76,7 @@ export interface AdvanceDefinition {
     prerequisites: string[]; messageId: string; purchaseMisery: number;
 }
 export interface PublicCatalog {
+    dataVersion: string;
     provinces: ProvinceDefinition[]; advances: AdvanceDefinition[];
     commodities: {id: string; baseValue: number; diceTotal: number; ownershipTrackBoxes: number; printedPayouts: number[]}[];
     landBorders: {first: string; second: string}[]; coastalConnections: {first: string; second: string}[];

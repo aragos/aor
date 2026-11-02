@@ -16,8 +16,8 @@ export const areaColors: Record<string, string> = {
 export function SatellitePattern({id, scale = 1}: {id: string; scale?: number}) {
     return <pattern id={id} width="7" height="7" patternUnits="userSpaceOnUse"
         patternTransform={`scale(${scale})`}>
-        <rect width="7" height="7" fill="#dce7c6"/>
-        <circle cx="3.5" cy="3.5" r="1.15" fill="#657a4f"/>
+        <rect width="7" height="7" fill="#d9e7c8"/>
+        <circle cx="3.5" cy="3.5" r=".85" fill="#8c9f76"/>
     </pattern>;
 }
 

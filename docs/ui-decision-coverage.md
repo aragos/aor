@@ -56,6 +56,27 @@ commodity icons still accept real clicks without changing the prepared card acti
 high-zoom arrow and desktop overview captures show clean tips and muted diagonal hatching, with
 commodity colors, pieces, labels and locks retained (`aor-browser-artifacts-Vsby8I`).
 
+The November 2 Cornwall correction supersedes the earlier filled-estuary drawing. Integrated
+core JVM, Kotlin/JS, server and formatting checks pass, alongside the web build, 55 unit tests,
+both geometry validators and focused presentation, support-arrow, commodity-inspection and live
+European-map browser suites (`/private/tmp/aor-cornwall-final`). Catalog 14 gives Cornwall only
+Portsmouth on land and Wales, Chester and Portsmouth by coastal water. Validators check visible
+water separation, all three coastal frontages and the ordinary support-arrow envelope without a
+corner exception. Both full boards and reduced 3–6 player boards retain catalog parity.
+Catalog-13 saves replay a four-round Wales-to-Cornwall land move, survive file-store restart and
+continue play with unchanged history. Private bids and metadata survive restart; PostgreSQL lists
+registered catalog-13 games as playable. Browser fixtures switch between matching old/new drawings.
+Reviewed desktop overview and desktop/390-pixel Britain/inset captures show moderately contrasting
+sage-green satellite stippling, an open Bristol Channel and plain ivory insets. Regional/overseas
+shading, partial unlocks, polling-safe inspection and commodity-card draft preservation still pass;
+a live European placement survives reload. These are emulated-device observations.
+
+The isolated merge onto `main` repeats the integrated Kotlin checks, web build, all 55 web unit
+tests and both geometry validators with the current turn-order/spectator changes retained. The
+focused map, support-arrow, commodity, European-game, turn-order, spectator and live competition
+browser suites pass together (`/private/tmp/aor-map-merge-browser-artifacts`). Catalog-13 file and
+PostgreSQL compatibility checks also pass against `main`'s unchanged storage format.
+
 The main-view polish passes integrated core JVM, Kotlin/JS, server and Kotlin formatting checks,
 the web build, all 55 web unit tests and the comprehensive browser suite
 (`aor-browser-artifacts-cOCtoR`). Live bidding shows every commodity from setup with no premature
