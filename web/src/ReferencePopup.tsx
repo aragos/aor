@@ -26,6 +26,7 @@ const topics = [
     ['misery-track', 'reference.misery-track'],
     ['shipping-track', 'reference.shipping'],
     ['history', 'reference.undo-policies'],
+    ['plans', 'plan.helpTitle'],
 ];
 
 /** Contextual public lookup leaves the live game, current draft and page title intact. */
@@ -123,6 +124,9 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             </ul>
             <p>{t("reference.undo-last-action-appears-in-the")}<code>@entry</code>{t("reference.references-retain-recorded-actions-accepted-edits")}</p>
         </section>}
+            {topic === 'plans' && <section id="plans"><h2>{t('plan.helpTitle')}</h2>
+                <p>{t('plan.helpSaving')}</p><p>{t('plan.helpAutomatic')}</p><p>{t('plan.helpBoundaries')}</p>
+            </section>}
         </div>
     </CardInspectionDialog>;
 }

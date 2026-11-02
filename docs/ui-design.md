@@ -264,8 +264,15 @@ choice and understand its result through visual controls and commands, on deskto
   misery box; Civil War's earlier misery is already applied. Disable spending beyond the pool.
   After its capital replacement, Civil War shows the payable cash/token losses and remaining
   balances, using the same rounded calculation as execution.
-- Urban Ascendancy may be queued privately while waiting. The cancelable draft requires the view
-  to remain open, clears on expiry or a history edit and submits once when offered; it does not auto-pass Master Art.
+- Purchase and Buy Card allow parallel preparation using the existing advances and hand. Label
+  preview actions “Add to plan”; keep the actual required actor visible and public player summaries
+  unchanged. Distinguish unsaved input, saved-for-review plans and explicit offline authorization.
+  Saving never buys, reserves resources or auto-passes. Review plans remain editable on the legal
+  turn; automatic plans expose cancellation before execution starts. Editing first confirms disarm.
+  Show exact planned payment recipients, balances and misery effects beside each action, with
+  hypothetical assumptions while waiting. A changed consequence or draw pauses for review; no
+  automatic discard follows a draw. Preserve local work through polling, navigation and inspection;
+  server saves survive reload and another device. History edits cancel previous authorization.
 - Activity occupies its workspace tab or optional left block, with bounded scrolling and no count.
   Keep its pin control clear of receipt text. It explains draw reasons,
   epoch/end triggers, protection money, leader rebates, related cash/misery

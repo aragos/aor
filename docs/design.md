@@ -4,7 +4,8 @@
 This document covers application architecture, storage, player interaction and development scope.
 The three-epoch human game, selected variants, visual table, scoped history editing and registered
 account hosting are implemented. [Deployment](deployment.md) owns provider setup and operation.
-Strategy controllers and private plans remain deferred contracts.
+Phase-scoped private plans support Purchase and Buy Card. Strategy controllers and plans spanning
+future phases remain deferred.
 
 ## 1. Principles
 
@@ -90,7 +91,7 @@ replays one effective revision. Requests name the expected revision; reject stal
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
 pending submissions and previews. Earlier revisions retain the same information restrictions as live play.
 
-Game file format 6 stores the creator-chosen game name as intrinsic metadata, separate from engine
+Game file format 7 stores the creator-chosen game name as intrinsic metadata, separate from engine
 state and immutable entry-time player identities. Ordinary revision entries are deltas. An edit
 records `replaceFrom`, the
 number of effective entries to retain, and a replacement suffix containing validated actions and
@@ -192,18 +193,44 @@ assignment changes and explicit treatment of pending submissions.
 
 ## 6. Private plans
 
-Deferred contract.
+Private plans contain canonical commands bound to their intended decisions, for the owner's
+remaining activity in the current Purchase or Buy Card phase. Saving has no game effect. Explicit
+automatic authorization binds the saved version to the exact previewed consequences; review plans
+wait for explicit confirmation on the legal turn. Future-turn scripts and strategy controllers
+remain deferred.
 
-Plans are private saved drafts of ordinary command text, tied to a player, base revision and log position. They may
-be incomplete and reach future turns. The engine provides partial projections and per-entry diagnostics
-([engine §5](engine.md#5-planning)). Initially there is no sharing or automatic execution: a plan becoming actionable
-never submits it.
+Core projects the owner activity using shared rules, opaque deck placeholders and public counts for
+other hands. Hypothetical previews assume earlier players do not change relevant inputs. Each
+segment stops at the activity boundary, a missing decision or an authority outcome. Validate the
+whole deterministic segment before committing any of it; planned deterministic interruptions can
+continue only with an explicit answer. Draws resolve normally, then disarm the remaining plan.
 
-On explicit submission of a plan or selected commands, rebase and validate entries in order. Commit only the
-executable prefix belonging to that player. Stop at a missing choice, another player's prompt, a random request or
-an invalid command, and report what was accepted. The service may resolve normal system prompts, but must not resume
-the remaining plan automatically. Preserve the remainder as a draft. If the revision changes during submission,
-stop and require rebasing before accepting more entries.
+The service stores plans, owner versions, bounded operation receipts and execution revision ranges
+outside replay history. Private writes check public revision and owner version atomically. Arming
+also checks the current preview token. Same-seat stale writes conflict; other seats' private saves
+do not. Cancellation and execution serialize on the game lock. Editing an armed plan requires a
+confirmed disarm; committed actions use the game's existing undo policy.
+Disarm and deletion tolerate intervening public appends when the exact owner receipt remains
+unchanged, so cancellation can win the lock before execution even as an earlier player finishes.
+Future revisions, changed owner receipts, edits and consumed authorizations still conflict.
+
+After writes, the service executes actionable authorizations in bounded, per-actor transactions.
+The armed record is durable work: an application worker scans for actionable plans after startup
+and every five seconds. Reads never execute. Each transaction appends ordinary owner-authored
+command revisions and consumed plan progress together. Failed writes leave both unchanged; replay
+never invokes plans. Consequence changes and invalid segments disarm for review without silently
+substituting commands. Draws stop even a planned suffix that would be legal afterward.
+
+Only owners receive plan state, operation receipts, previews and execution provenance. Public
+readiness derives from real prompts, and public ETags exclude others' private writes. History edits
+disarm plans; manual actions cancel that owner's authorization. Turn/phase completion expires
+remaining work. Inactive games cannot execute.
+
+An explicit creator-authorized format-6-to-7 upgrade archives the exact locked source, retains the
+complete original revision chain and private submissions, and appends a zero-entry `upgrade-planning`
+audit revision. Dry-run source hashes guard private as well as public changes. The normal decoder
+accepts only format 7. This operation does not change rules/data versions or use the administrative
+engine checkpoint operation.
 
 ## 7. UI and localization
 
@@ -239,4 +266,5 @@ rejection and stale requests. UI fixture checks cannot establish secrecy or pers
 
 When controller or planning work begins, verify its contracts above before calling
 it supported. Preserve recorded outcomes and private audiences, reject invalid edits atomically,
-and never execute a private plan or substitute a strategy decision implicitly.
+and execute a private plan only under its owner's explicit authorization. Never substitute a
+strategy decision implicitly.

@@ -7,6 +7,9 @@ internal object GameDocuments {
     fun read(id: String, contents: String): StoredGame = read(id, json.readTree(contents))
 
     fun read(id: String, root: JsonNode): StoredGame {
+        if (root["fileVersion"]?.asInt() == 6) {
+            throw ServiceFailure(409, "PLANNING_UPGRADE_REQUIRED")
+        }
         try {
             require(root.field("id").string() == id) { "Stored game ID must match its key." }
             val game = decode(root)
@@ -94,6 +97,8 @@ internal object GameDocuments {
                                 if (it.isNull) null else AdministrativeAction.valueOf(it.string())
                             },
                         at = revision.field("at").longInteger(),
+                        storageArchive =
+                            revision["storageArchive"]?.takeUnless(JsonNode::isNull)?.string(),
                         undoPolicy =
                             revision.field("undoPolicy").let {
                                 if (it.isNull) null else UndoPolicy.valueOf(it.string())
@@ -127,11 +132,73 @@ internal object GameDocuments {
                 pendingNode.properties().associate { (player, bid) ->
                     PlayerId(player) to bid.integer()
                 },
+            plans =
+                root["plans"]
+                    ?.properties()
+                    ?.associate { (player, node) ->
+                        PlayerId(player) to
+                            SavedActivityPlan(
+                                turnNumber = node.field("turnNumber").integer(),
+                                stage = Stage.valueOf(node.field("stage").string()),
+                                baseRevision = node.field("baseRevision").integer(),
+                                baseEntryCount = node.field("baseEntryCount").integer(),
+                                authorizationOperationId =
+                                    node["authorizationOperationId"]
+                                        ?.takeUnless(JsonNode::isNull)
+                                        ?.string(),
+                                actions =
+                                    node.field("actions").array().map { action ->
+                                        PlannedAction(
+                                            action.field("decision").string(),
+                                            action.field("command").string(),
+                                        )
+                                    },
+                                signature =
+                                    node["signature"]?.takeUnless(JsonNode::isNull)?.string(),
+                                pause =
+                                    node["pause"]
+                                        ?.takeUnless(JsonNode::isNull)
+                                        ?.string()
+                                        ?.let(PlanPause::valueOf),
+                            )
+                    }
+                    .orEmpty(),
+            planVersions =
+                root["planVersions"]
+                    ?.properties()
+                    ?.associate { (player, node) ->
+                        PlayerId(player) to node.string()
+                    }
+                    .orEmpty(),
+            planReceipts =
+                root["planReceipts"]
+                    ?.properties()
+                    ?.associate { (player, node) ->
+                        PlayerId(player) to node.array().map(JsonNode::string)
+                    }
+                    .orEmpty(),
+            planExecutions =
+                root["planExecutions"]
+                    ?.properties()
+                    ?.associate { (player, node) ->
+                        PlayerId(player) to
+                            node.array().map { receipt ->
+                                PlanExecution(
+                                    receipt.field("version").string(),
+                                    receipt.field("fromRevision").integer(),
+                                    receipt.field("toRevision").integer(),
+                                    receipt.field("operationId").string(),
+                                    receipt.field("baseRevision").integer(),
+                                    receipt.field("baseEntryCount").integer(),
+                                )
+                            }
+                    }
+                    .orEmpty(),
         )
     }
 
     fun validate(game: StoredGame) {
-        require(game.fileVersion == 6) { "Only game file version 6 is supported." }
+        require(game.fileVersion == 7) { "Only game file version 7 is supported." }
         require(game.createdAt > 0) { "Game creation time must be positive Unix milliseconds." }
         require(
             game.baseRevision >= 0 && (game.previousArchive != null) == (game.baseRevision > 0)
@@ -167,6 +234,39 @@ internal object GameDocuments {
             "A game must have an initial configuration revision."
         }
         val state = validateRevisions(game)
+        require(
+            players.containsAll(game.plans.keys) &&
+                players.containsAll(game.planVersions.keys) &&
+                players.containsAll(game.planReceipts.keys) &&
+                players.containsAll(game.planExecutions.keys)
+        ) {
+            "Private planning state requires registered owners."
+        }
+        require(
+            game.planVersions.keys.containsAll(game.plans.keys) &&
+                game.planVersions.values.all(GAME_ID_PATTERN::matches)
+        ) {
+            "Each private plan requires an opaque owner version."
+        }
+        require(
+            game.planReceipts.values.all { receipts ->
+                receipts.size <= 16 &&
+                    receipts.distinct().size == receipts.size &&
+                    receipts.all(GAME_ID_PATTERN::matches)
+            }
+        ) {
+            "Planning operation receipts require at most sixteen distinct UUIDs per owner."
+        }
+        require(
+            game.planExecutions.values.all { receipts ->
+                receipts.size <= 16 &&
+                    receipts.all { receipt ->
+                        receipt.toRevision <= game.revision
+                    }
+            }
+        ) {
+            "Plan executions require valid owner versions and committed revision ranges."
+        }
         require(
             players.containsAll(game.submissionVersions.keys) &&
                 game.submissionVersions.values.all { it.matches(GAME_ID_PATTERN) }
@@ -230,6 +330,23 @@ internal object GameDocuments {
                     pendingBids = emptyMap(),
                 )
             when {
+                revision.storageArchive != null -> {
+                    require(
+                        index > 0 &&
+                            revision.author == game.header.creatorId &&
+                            revision.command == "upgrade-planning" &&
+                            revision.at > 0 &&
+                            revision.entries.isEmpty() &&
+                            revision.replaceFrom == null &&
+                            revision.undoPolicy == null &&
+                            revision.adminAuthor == null &&
+                            revision.administrativeAction == null &&
+                            revision.storageArchive.matches(ARCHIVE_PATTERN)
+                    ) {
+                        "A storage upgrade must retain history and audit its creator and exact archive."
+                    }
+                    state
+                }
                 index == 0 && game.baseRevision > 0 -> {
                     require(
                         revision.adminAuthor != null &&

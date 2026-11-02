@@ -136,8 +136,14 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   explain the blocker and offer Pass. Show the unused MR dollars from this turn's advance purchases.
   Also show that running MR total during advance purchasing, updating it after each purchase.
   A confirmed relief purchase also finishes purchasing; unaffordable relief requires explicit Pass.
-  Permit an optional, cancelable Urban Ascendancy purchase draft
-  while waiting; submit once on the legal turn while that view remains open, with no failed retries.
+  Allow parallel private preparation of Purchase and Buy Card activities. Save for review never
+  executes automatically and remains editable on the legal turn, including under Competitive undo.
+  Explicit automatic authorization survives browser closure and restart; cancellation wins only
+  before execution starts. Revalidate exact consequences and pause on changes, missing decisions
+  or draws. Shared plans support Urban Ascendancy and both Master Art discard opportunities, with
+  normal command, information and undo boundaries. Keep plans private and execute each segment once.
+  Upgrade current format-6 games explicitly to format 7, preserving effective history, entry IDs,
+  recorded outcomes, current prompts, metadata, membership and pending secrets with exact archives.
   Resolve event replacements in current player order. Offer all of the chooser's affected provinces
   together, enforce their shared pool budget, and review the complete group before one confirmation.
   Identify the event, recipient, pool cost and result; explain when no pool token remains and avoid
@@ -225,5 +231,5 @@ Prefer managed authentication/TLS and automated dependency checks and fresh depl
 
 [Follow-ups](follow-ups.md) own launch credentials, DNS and initial administrator decisions. Human
 screen-reader, physical-phone, browser-chrome zoom and composited/SVG contrast review remain separate
-from automated evidence. Toulouse and Constantinople's labels are accepted. Bots and persistent private plans
-remain deferred; the in-view Urban Ascendancy draft does not provide a general planning system.
+from automated evidence. Toulouse and Constantinople's labels are accepted. Bots and general plans
+spanning future phases remain deferred; private plans cover current Purchase and Buy Card activities.

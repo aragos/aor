@@ -5,6 +5,11 @@ import {t} from './messages';
 
 const ActionTarget = createContext<HTMLDivElement | null | undefined>(undefined);
 const ActionForm = createContext<string | undefined>(undefined);
+const PlanningContext = createContext(false);
+
+export function PlanningActions({children, active}: {children: ReactNode; active: boolean}) {
+    return <PlanningContext.Provider value={active}>{children}</PlanningContext.Provider>;
+}
 
 /** Keep final actions in a fixed footer; its portal target precedes Pass in keyboard order. */
 export function DecisionActions({children, pass}: {children: ReactNode; pass?: ReactNode}) {
@@ -40,8 +45,9 @@ export function DecisionForm({id, ...props}: FormHTMLAttributes<HTMLFormElement>
 }
 
 export function DecisionAction({type = 'button', form, ...props}: ButtonHTMLAttributes<HTMLButtonElement>) {
+    const planning = useContext(PlanningContext);
     const target = useContext(ActionTarget);
     const formId = useContext(ActionForm);
-    const button = <button {...props} type={type} form={form ?? formId}/>;
+    const button = <button {...props} type={type} form={form ?? formId}>{planning && <>{t('plan.add')} · </>}{props.children}</button>;
     return target === undefined ? button : target && createPortal(button, target);
 }

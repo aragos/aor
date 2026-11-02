@@ -537,3 +537,10 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
     .decision-content > .game-actions { margin-block: .4rem; }
     .workspace-main .markets-workspace, .workspace-main .advances-workspace { padding: .8rem; }
 }
+.activity-planner { border-bottom: 1px solid var(--border, #bac6c4); padding-bottom: .8rem; margin-bottom: .8rem; }
+.activity-planner h3 { margin: .3rem 0; }
+.activity-planner > button { margin: .25rem .4rem .25rem 0; }
+.plan-actions { padding-left: 1.4rem; }
+.plan-actions li { margin: .5rem 0; }
+.plan-actions li > button { display: block; font-size: .8rem; padding: .25rem .4rem; margin-top: .25rem; }
+.plan-effect { display: block; font-size: .85rem; }

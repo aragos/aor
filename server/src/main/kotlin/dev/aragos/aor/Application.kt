@@ -8,8 +8,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.call
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.Netty
@@ -31,7 +33,11 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 fun main() {
@@ -74,6 +80,7 @@ fun Application.module(
                 call.request.path().startsWith("/api/admin/games/") &&
                     call.request.path().endsWith("/log") -> 8L * 1024 * 1024
                 call.request.path().endsWith("/history") -> 524288L
+                call.request.path().contains("/plans") -> 65536L
                 else -> 16384L
             }
         }
@@ -88,7 +95,30 @@ fun Application.module(
             }
         }
     }
+    val planWorker =
+        launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    gameService.recoverPlans { id, failure ->
+                        log.warn(
+                            "Plan recovery failed for {} ({})",
+                            id,
+                            failure.javaClass.simpleName,
+                        )
+                    }
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    log.warn(
+                        "Plan recovery directory unavailable ({})",
+                        failure.javaClass.simpleName,
+                    )
+                }
+                delay(5000)
+            }
+        }
+    monitor.subscribe(ApplicationStopping) { planWorker.cancel() }
     monitor.subscribe(ApplicationStopped) {
+        planWorker.cancel()
         (hosted?.verifier as? AutoCloseable)?.close()
         (gameService.store as? AutoCloseable)?.close()
     }
@@ -264,6 +294,65 @@ fun Application.module(
                 call.respondJson(result)
             }
         }
+        post("/api/games/{id}/plans/preview") {
+            call.api {
+                val body = call.body(65536)
+                body.fieldsOnly("expectedRevision", "actions")
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        gameService.previewPlan(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            body.field("expectedRevision").integer(),
+                            body.plannedActions(),
+                        )
+                    }
+                )
+            }
+        }
+        post("/api/games/{id}/plans") {
+            call.api {
+                val body = call.body(65536)
+                body.fieldsOnly(
+                    "expectedRevision",
+                    "expectedVersion",
+                    "operationId",
+                    "operation",
+                    "actions",
+                    "previewToken",
+                )
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        gameService.writePlan(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            body.field("expectedRevision").integer(),
+                            body["expectedVersion"]?.takeUnless(JsonNode::isNull)?.string(),
+                            body.field("operationId").string(),
+                            PlanOperation.valueOf(body.field("operation").string()),
+                            body.plannedActions(),
+                            body["previewToken"]?.takeUnless(JsonNode::isNull)?.string(),
+                        )
+                    }
+                )
+            }
+        }
+        post("/api/games/{id}/planning-upgrade") {
+            call.api {
+                val body = call.body()
+                body.fieldsOnly("expectedRevision", "sourceHash")
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        gameService.planningUpgrade(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            body["expectedRevision"]?.integer(),
+                            body["sourceHash"]?.string(),
+                        )
+                    }
+                )
+            }
+        }
         System.getenv("AOR_WEB_DIR")?.let { directory ->
             val web = File(directory)
             require(File(web, "index.html").isFile) {
@@ -290,6 +379,15 @@ fun Application.module(
                 call.respondFile(File(web, "index.html"))
             }
         }
+    }
+}
+
+private fun JsonNode.plannedActions(): List<PlannedAction> {
+    val actions = get("actions")?.array().orEmpty()
+    if (actions.size > 100) throw ServiceFailure(400, "INVALID_REQUEST")
+    return actions.map { action ->
+        action.fieldsOnly("decision", "command")
+        PlannedAction(action.field("decision").string(), action.field("command").string())
     }
 }
 

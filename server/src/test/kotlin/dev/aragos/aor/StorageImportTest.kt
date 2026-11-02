@@ -63,7 +63,7 @@ class StorageImportTest {
                 val path = directory.resolve("${game.gameId}.json")
                 Files.writeString(
                     path,
-                    Files.readString(path).replace("\"fileVersion\":6", "\"fileVersion\":99"),
+                    Files.readString(path).replace("\"fileVersion\":7", "\"fileVersion\":99"),
                 )
 
                 assertFailsWith<ServiceFailure> { importFileStorage(directory, fixture.database) }

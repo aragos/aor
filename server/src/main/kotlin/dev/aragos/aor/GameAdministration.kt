@@ -207,39 +207,50 @@ class GameAdministration(
         val status =
             original["status"]?.takeIf { it.isTextual }?.let { GameStatus.valueOf(it.asText()) }
                 ?: GameStatus.ACTIVE
-        return StoredGame(
-            id = id,
-            name = GameName(original.field("name").string()),
-            header = header,
-            credentials =
-                original.field("credentials").properties().associate { (player, hash) ->
-                    PlayerId(player) to hash.string()
-                },
-            memberships =
-                original["memberships"]
-                    ?.properties()
-                    ?.associate { (player, uid) -> PlayerId(player) to uid.string() }
-                    .orEmpty(),
-            createdAt =
-                original["createdAt"]?.takeIf(JsonNode::isIntegralNumber)?.longValue()
-                    ?: clock.millis(),
-            initialStatus = status,
-            baseRevision = expectedRevision,
-            previousArchive = reference,
-            revisions =
-                listOf(
-                    Revision(
-                        id = expectedRevision + 1,
-                        parent = expectedRevision,
-                        author = header.creatorId,
-                        command = "admin-replace-log",
-                        entries = entries,
-                        undoPolicy = policy,
-                        adminAuthor = actor.value,
-                        administrativeAction = AdministrativeAction.UPGRADE,
-                        at = clock.millis(),
-                    )
-                ),
+        val privatePlans =
+            if (original["fileVersion"]?.asInt() == 7) {
+                GameDocuments.read(id, original)
+            } else null
+        return ActivityPlans.disarm(
+            StoredGame(
+                id = id,
+                name = GameName(original.field("name").string()),
+                header = header,
+                credentials =
+                    original.field("credentials").properties().associate { (player, hash) ->
+                        PlayerId(player) to hash.string()
+                    },
+                memberships =
+                    original["memberships"]
+                        ?.properties()
+                        ?.associate { (player, uid) -> PlayerId(player) to uid.string() }
+                        .orEmpty(),
+                createdAt =
+                    original["createdAt"]?.takeIf(JsonNode::isIntegralNumber)?.longValue()
+                        ?: clock.millis(),
+                initialStatus = status,
+                baseRevision = expectedRevision,
+                previousArchive = reference,
+                plans = privatePlans?.plans.orEmpty(),
+                planVersions = privatePlans?.planVersions.orEmpty(),
+                planReceipts = privatePlans?.planReceipts.orEmpty(),
+                planExecutions = privatePlans?.planExecutions.orEmpty(),
+                revisions =
+                    listOf(
+                        Revision(
+                            id = expectedRevision + 1,
+                            parent = expectedRevision,
+                            author = header.creatorId,
+                            command = "admin-replace-log",
+                            entries = entries,
+                            undoPolicy = policy,
+                            adminAuthor = actor.value,
+                            administrativeAction = AdministrativeAction.UPGRADE,
+                            at = clock.millis(),
+                        )
+                    ),
+            ),
+            PlanPause.EDITED,
         )
     }
 

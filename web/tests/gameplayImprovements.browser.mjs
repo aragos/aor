@@ -85,31 +85,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.match(await page.evaluate(`document.querySelector('.game-actions .guided-form .blocker').textContent`), /afford/i);
     assert.equal(await page.evaluate(`document.querySelector('.decision-actions .pass-action').disabled`), false, 'Unaffordable relief retains Pass');
 
-    const order = [other.id, viewer, ...baseline.game.turnOrder.filter(id => id !== viewer && id !== other.id)];
-    const players = baseline.game.players.map(player => player.id === viewer ? {...player, cash: 20, advances: [...player.advances, 'URBAN_ASCENDANCY']} : player);
-    const waiting = {stage: 'BUY_CARD', players, turnOrder: order,
-        activity: {...baseline.game.activity, actor: other.id, decisionPlayer: other.id}};
-    await show({prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
-    assert.match(await page.evaluate(`document.querySelector('.urban-ascendancy-queue').textContent`), /Cash available: \$20/);
-    const count = await page.evaluate('window.mapCommands.length');
-    await click('.urban-queue-action');
-    assert.equal(await page.evaluate('window.mapCommands.length'), count, 'Preregistration waits for the authoritative turn');
-    await show({prompt: {messageId: 'prompt.buy-card', players: [viewer]}, legalChoices: {commands: ['buy-card', 'pass']},
-        game: {...waiting, activity: {...waiting.activity, actor: viewer, decisionPlayer: viewer}}});
-    await page.wait(`window.mapCommands.length === ${count + 1}`, 'Queued Urban Ascendancy purchase');
-    assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'buy-card');
-    await show({prompt: {messageId: 'prompt.buy-card', players: [viewer]}, legalChoices: {commands: ['buy-card', 'pass']},
-        game: {...waiting, activity: {...waiting.activity, actor: viewer, decisionPlayer: viewer}}});
-    assert.equal(await page.evaluate('window.mapCommands.length'), count + 1, 'Polling cannot repeat a queued purchase');
-    // History replacement invalidates preauthorization even when game, viewer and turn stay equal.
-    await show({prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
-    await click('.urban-queue-action');
-    const afterFirstQueue = await page.evaluate('window.mapCommands.length');
-    await show({undo: {...baseline.undo, editRevision: (baseline.undo?.editRevision ?? 0) + 1},
-        prompt: {messageId: 'prompt.buy-card', players: [other.id]}, legalChoices: {commands: []}, game: waiting});
-    await show({prompt: {messageId: 'prompt.buy-card', players: [viewer]}, legalChoices: {commands: ['buy-card', 'pass']},
-        game: {...waiting, activity: {...waiting.activity, actor: viewer, decisionPlayer: viewer}}});
-    assert.equal(await page.evaluate('window.mapCommands.length'), afterFirstQueue, 'An edited history requires fresh purchase authorization');
+    // Durable private planning is covered through live offers in planning.browser.mjs.
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .province-inspector, .decision-panel .province-details').length`), 0);
     assert(me.capital && (await page.evaluate('document.title')).toLowerCase().includes(me.capital), 'Page title identifies the capital');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => /inspect/i.test(button.textContent))`), false, 'Objects do not have parallel Inspect controls');
@@ -139,5 +115,5 @@ export async function checkGameplayImprovements(page, web, baseline) {
             players: baseline.game.players.map(player => player.id === viewer ? {...player, ships: {fleet: 'GALLEY', level: 2}} : player),
             shippingOffer: {cost: 10, ships: {fleet: 'GALLEY', level: 4}, cashAfter: 30, blockers: []}}});
     assert.match(await page.evaluate(`document.querySelector('.game-actions .purchase-preview').textContent`), /Galley 2 → Galley 4/);
-    console.log('Passed: compact capital title, separate inspections, automatic Crusades/Rebellion/Pirates map targeting, priced actions, relief blockers and queued Urban Ascendancy purchase.');
+    console.log('Passed: compact capital title, separate inspections, automatic Crusades/Rebellion/Pirates map targeting, priced actions and relief blockers.');
 }
