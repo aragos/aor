@@ -9,7 +9,7 @@ collectionsImmutable = "0.5.2"
 firebaseAdmin = "9.11.0"
 postgresql = "42.7.14"
 hikari = "7.1.0"
-flyway = "13.11.1"
+flyway = "13.12.0"
 embeddedPostgres = "2.2.2"
 postgresBinaries = "18.6.0"
 
