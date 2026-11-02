@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {join} from 'node:path';
+import {open} from './browser-support.mjs';
 
 export async function checkPortal(page, web) {
     await page.send('Page.navigate', {url: web + '/tests/portal-harness.html'});
@@ -30,11 +32,12 @@ export async function checkPortal(page, web) {
     const readyIcon = await page.evaluate(`document.querySelector('link[rel=icon]').href`);
     const iconSvg = await fetch(readyIcon).then(response=>response.text());
     assert(iconSvg.includes('#205c4b'), 'Any awaiting game colors the game-list favicon');
-    await page.click('My move');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.games-panel .choice-buttons').length`), 0, 'Filters do not compete with game tabs');
+    await page.evaluate(`document.querySelector('.game-list-filter select').value='my-move'; document.querySelector('.game-list-filter select').dispatchEvent(new Event('change', {bubbles:true}))`);
     await page.wait(`document.querySelectorAll('.game-directory > li').length === 1`, 'my move game filter');
     await page.reload();
-    await page.wait(`document.querySelectorAll('.game-directory > li').length === 1 && [...document.querySelectorAll('button')].some(button=>button.textContent==='My move' && button.getAttribute('aria-pressed')==='true')`, 'persisted game filter');
-    await page.click('Finished');
+    await page.wait(`document.querySelectorAll('.game-directory > li').length === 1 && document.querySelector('.game-list-filter select')?.value === 'my-move'`, 'persisted game filter');
+    await page.evaluate(`document.querySelector('.game-list-filter select').value='finished'; document.querySelector('.game-list-filter select').dispatchEvent(new Event('change', {bubbles:true}))`);
     await page.wait(`document.querySelector('.game-directory').textContent.includes('Finished')`, 'finished games');
     assert.equal(await page.evaluate(`document.querySelector('link[rel=icon]').href`), readyIcon, 'Finished filter does not hide a turn in another game');
     assert.equal(await page.evaluate(`document.querySelectorAll('.game-row-player.needs-action').length`), 0, 'Finished games highlight no players');
@@ -50,9 +53,24 @@ export async function checkPortal(page, web) {
     await page.click('Add');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].find(button=>button.textContent==='Create game').disabled`), false);
     assert.equal(await page.evaluate(`document.querySelectorAll('.create-registered select').length`), 0, 'Creation options use visible buttons');
-    await page.click('All games');
-    await page.click('All');
-    await page.wait(`document.querySelectorAll('.admin-game').length === 3`, 'administrator list of every game');
+    await page.click('Other games');
+    await page.wait(`document.querySelector('.game-directory').textContent.includes('Eastern trade routes')`, 'public game directory');
+    assert.equal(await page.evaluate(`document.querySelector('.game-directory').textContent.includes('@alice')`), false, 'Other games excludes memberships');
+    assert.equal(await page.evaluate(`document.querySelector('.game-list-filter select').value`), 'ongoing', 'Other games starts with its own filter');
+    assert.equal(await page.evaluate(`document.querySelector('.game-list-filter option[value="my-move"]')`), null, 'Spectators have no My move filter');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.game-directory a.game-row').length`), 2, 'Other games open as spectator links');
+    assert.equal(await page.evaluate(`document.querySelector('link[rel=icon]').href`), readyIcon, 'Spectating directory retains own-game turn indicator');
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-other-games-desktop.png'), 1280, 900);
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-other-games-phone.png'), 390, 844, true);
+    assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'Spectator directory fits a phone');
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.evaluate(`document.getElementById('games-tab-other').focus()`);
+    await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'ArrowLeft', code: 'ArrowLeft'});
+    await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'ArrowLeft', code: 'ArrowLeft'});
+    await page.wait(`document.getElementById('games-tab-mine').getAttribute('aria-selected') === 'true' && document.querySelector('.game-directory').textContent.includes('Spring campaign')`, 'keyboard tab returns to saved own filter');
+    await page.click('Administration');
+    await page.evaluate(`document.querySelector('.game-list-filter select').value='all'; document.querySelector('.game-list-filter select').dispatchEvent(new Event('change', {bubbles:true}))`);
+    await page.wait(`document.querySelectorAll('.admin-game').length === 6`, 'administrator list of every game');
     await page.evaluate(`document.querySelector('.admin-game > summary').click()`);
     await page.click('Abandon game');
     await page.wait(`window.portalRequests.some(request=>request.path.endsWith('/status') && request.body.action==='abandon' && request.body.expectedRevision===4)`, 'revision checked lifecycle action');
@@ -70,5 +88,21 @@ export async function checkPortal(page, web) {
     await page.wait(`window.portalRequests.some(request => request.path === '/api/games' && request.body?.name === 'Friday with friends')`, 'registered creation submits chosen name');
     await page.wait(`document.querySelector('.create-registered [role=alert]')`, 'creation failure surfaced');
     assert.equal(await page.evaluate(`document.querySelector('#game-name').value`), 'Friday with friends', 'Failed registered creation preserves the game name');
-    console.log('Passed: unique player handles, independent turn favicon, creation, filters, administration, lifecycle and approvals.');
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.send('Page.navigate', {url: web + '/tests/portal-harness.html?admin=false'});
+    await page.wait(`document.querySelector('.portal')`, 'regular registered player directory');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.game-list-tabs [role=tab]').length`), 2, 'Every registered player has Own games and Other games tabs');
+    assert.equal(await page.evaluate(`document.getElementById('games-tab-admin')`), null, 'Administrative controls are separate from spectator access');
+    await page.click('Other games');
+    await page.wait(`document.querySelector('.game-directory').textContent.includes('Eastern trade routes')`, 'regular players can browse public games');
+    console.log('Passed: spectator directory, unique player handles, independent turn favicon, creation, filters, administration, lifecycle and approvals.');
+}
+
+if (process.env.AOR_BROWSER_SUITE === 'portal.browser.mjs') {
+    const page = await open('about:blank');
+    try {await checkPortal(page, process.env.MAP_WEB_URL);}
+    finally {
+        page.ws.close();
+        await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);
+    }
 }

@@ -46,7 +46,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId)!;
     const isTokenPurchase = stage === 'TOKEN_PURCHASE';
     const eligiblePurchase = isTokenPurchase && me.misery !== null && snapshot.legalChoices.commands.includes('buy-tokens');
-    const canAct = snapshot.prompt?.players.includes(snapshot.viewerId) ?? false;
+    const canAct = snapshot.viewerId !== null && (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
     const amount = Number(bid);
     const validPurchase = bid.trim() !== '' && Number.isInteger(amount) && Math.abs(amount) <= me.cash;
     const quoteRequest = useRef(quotePurchase);

@@ -36,6 +36,7 @@ export function useActionResult(snapshot: Snapshot, sendCommand: (command: strin
         if (!waiting || snapshot.game.turnNumber !== resultRequest.turn) setResultRequest(null);
     }, [resultRequest, snapshot]);
     async function submit(command: string) {
+        if (snapshot.viewerId === null) return false;
         setResult(null);
         const [verb, first, second] = command.trim().split(/\s+/);
         const province = verb === 'attack' ? first : verb === 'place' ? second : undefined;

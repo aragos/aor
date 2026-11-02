@@ -110,7 +110,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     }, [path, token, pollInterval]);
 
     async function mutate(endpoint: string, operation: Record<string, unknown>): Promise<boolean> {
-        if (!snapshot || busyRef.current) return false;
+        if (!snapshot || snapshot.viewerId === null || busyRef.current) return false;
         busyRef.current = true; ++sequence.current;
         etag.current = undefined;
         const operationId = crypto.randomUUID();

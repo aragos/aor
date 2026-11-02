@@ -184,6 +184,8 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
   transaction as the public revision. A stale same-seat write conflicts; another seat's private write
   does not. Saving and returning to an earlier amount still changes the receipt. Distinguish the saved
   private value from an unsaved browser draft, including after withdrawal.
+- Present shipping, advances, stabilization and misery relief as steps within Purchase, including
+  continuation buttons that identify the next step or finish purchasing.
 - Offer Renaissance only in Buy Card, Play Cards, Purchase, Expansion and Final Card Play. Skip
   publicly empty windows at activation, using the same target calculation as swaps. Treat changed
   replay continuation as an explicit rules-version boundary.
@@ -213,8 +215,13 @@ the user handle and sign-out control share the top bar with the game title and i
 one clickable row showing the creator-chosen game name and participants, distinguished by
 pending-action status, without creation dates or visible IDs. Require a name in the creation form;
 retain it in the game header and browser tab across reloads and history edits.
-Administrators control creation permission; members can filter their own ongoing, awaiting-move and
-finished games.
+Administrators control creation permission. Every registered user can switch between Own games and
+Other games, with a compact status filter. Own games includes ongoing, awaiting-move and finished games;
+Other games excludes the viewer’s memberships and opens a read-only spectator table. Spectators can
+inspect the public board, players, advances, commodities, activity and final scores. Spectator responses
+exclude private hands, unrevealed bids and token amounts, private commands and choices, saved-submission
+receipts, and history-edit or action permissions. Public inspection must never impersonate a seat.
+Spectating requires the same authenticated, verified and registered account as hosted play.
 Administrators may inspect games, cancel/abandon them, export logs, validate upgrades and purge by ID.
 These operations are authenticated, audited and distinct from player actions.
 

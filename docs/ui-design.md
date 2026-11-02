@@ -111,6 +111,17 @@ choice and understand its result through visual controls and commands, on deskto
   beside the colored favicon in the game header, in the browser tab, and above participants in game
   listings. Long names truncate within the available header/row width and retain their full text.
   Failed creation preserves the name and player draft.
+- Purchase substeps identify their parent explicitly: Purchase · Shipping, Purchase · Advances,
+  Purchase · Stabilization and Purchase · Misery relief. A purchasing Pass names the next step or
+  finishing Purchase, while preserving the same canonical command and engine readiness.
+- The online directory prioritizes the game list, with Own games and Other games tabs for every
+  registered account and a compact labeled status select. Keep creation collapsed below the list;
+  administrative controls have their own tab. Own-game filters are retained independently of browsing
+  other games. Other games excludes memberships and offers public spectator links, without a My move
+  filter. Preserve the own-game turn indicator while browsing other games.
+  Spectator tables identify Spectating and Public information only, retain public object inspection
+  and activity, and omit the private hand, action forms, undo, command console and history editing.
+  Public player detail shows written cash; no private balance or card identity may be reconstructed.
 - The game icon is a named link to My games; omit a separate My games link. Hosted handle and sign-out
   controls share the top header row with the game title and icon, including on phones. Game listings use one
   keyboard-accessible link per row, with a distinct background and status text for pending actions.

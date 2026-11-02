@@ -94,7 +94,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const swap = finiteDecisions(snapshot).find(offer => offer.kind === 'order-swap' && offer.subject.id === player.id)?.command;
             const eligible = playerPicker?.eligible.includes(player.id) || !!swap;
             const picked = playerPicker?.selected.includes(player.id) || (!!swap && selectedAction === swap);
-            const person = snapshot.accountId ? player.name.replace(/^@/, '') : player.name;
+            const person = (snapshot.accountId || snapshot.viewerId === null) ? player.name.replace(/^@/, '') : player.name;
             const position = snapshot.game.turnOrder.indexOf(player.id) + 1;
             const orderBox = snapshot.game.orderBoxes[player.id];
             const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
@@ -192,7 +192,7 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
     return <section className="advances-workspace" aria-label={t('game.advances')}>
         <PlayedLeaders snapshot={snapshot}/>
         {categories.map(category => <div className="advance-category" key={category}>
-            <h3>{label(category, 'category')} <small>{advances.filter(advance => advance.category === category && me?.advances.includes(advance.id)).length}</small></h3>
+            <h3>{label(category, 'category')}{me && <> <small>{advances.filter(advance => advance.category === category && me.advances.includes(advance.id)).length}</small></>}</h3>
             <div className="advance-tiles">{advances.filter(advance => advance.category === category).map(advance => {
                 const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === advance.id);
                 const owned = me?.advances.includes(advance.id);

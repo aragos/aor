@@ -8,7 +8,7 @@ export const ReferenceCatalogContext = createContext<PublicCatalog | null>(null)
 
 /** Only public identities and resolved assignments enter the live printed-track lookup. */
 export const ReferenceOrderContext = createContext<{
-    viewerId: string;
+    viewerId: string | null;
     players: Pick<PlayerView, 'id' | 'name' | 'capital'>[];
     turnOrder: string[];
     orderBoxes: Record<string, number>;

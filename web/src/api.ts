@@ -136,7 +136,9 @@ export interface HistoryEventView {
 export interface TokenPurchaseQuoteResponse {revision: number; quote: TokenPurchaseOfferView}
 export interface Snapshot {
     name: string;
-    gameId: string; revision: number; viewerId: string; creatorId: string;
+    gameId: string; revision: number; creatorId: string;
+    /** Null for an authenticated spectator receiving only public information. */
+    viewerId: string | null;
     status?: 'ACTIVE' | 'CANCELLED' | 'ABANDONED'; accountId?: string | null;
     game: {stage: string; currentEpoch: number;
         rules: {[key: string]: string | boolean};

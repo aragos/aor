@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
 import {checkLiveCompetitionLifecycle} from './competitionLifecycle.browser.mjs';
+import {checkSpectator} from './spectator.browser.mjs';
 
 export async function checkTurnOrder(page, web) {
     const artifacts = process.env.AOR_BROWSER_ARTIFACTS;
@@ -123,12 +124,14 @@ export async function checkTurnOrder(page, web) {
     assert.equal(await page.evaluate(`document.querySelectorAll('${popup} .order-track-player').length`), 0, 'An unresolved tie assigns no boxes');
     await escape();
     console.log('Passed: printed tracks for 3–6 players, pending/tied order, live assignments, preserved bid and attack drafts, reference chooser, focus and phone layout.');
+    return resolved;
 }
 
 if (process.argv[1]?.endsWith('/turnOrder.browser.mjs')) {
     const page = await open('about:blank');
     try {
-        await checkTurnOrder(page, process.env.MAP_WEB_URL);
+        const baseline = await checkTurnOrder(page, process.env.MAP_WEB_URL);
+        await checkSpectator(page, process.env.MAP_WEB_URL, baseline);
         await checkLiveCompetitionLifecycle(page, process.env.MAP_WEB_URL);
     } finally {
         page.ws.close();
