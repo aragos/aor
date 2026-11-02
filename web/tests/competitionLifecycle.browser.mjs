@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createGame, open} from './browser-support.mjs';
+import {createGame, open, waitForMap} from './browser-support.mjs';
 
 export async function checkLiveCompetitionLifecycle(page, web) {
     const game = await createGame(3);
@@ -38,6 +38,7 @@ export async function checkLiveCompetitionLifecycle(page, web) {
     const turn = state.game.turnNumber;
     await page.send('Page.navigate', {url: web + attacker.path});
     await page.wait(`document.querySelector('.pool-summary')`, 'live competition actor');
+    await waitForMap(page, state);
     await page.evaluate(`document.querySelector('[data-map-province="${target.destination}"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     await page.wait(`document.querySelector('.primary-expansion:not([disabled])')`, 'live authoritative attack');
     const greenPreview = await page.evaluate(`document.querySelector('.competition-green-die').textContent`);

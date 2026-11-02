@@ -620,6 +620,11 @@ cross-device rejection remains visible without overflowing the phone viewport. A
 `aor-browser-artifacts-0froOM`. These emulated views do not establish physical-device or
 screen-reader evidence.
 
+Release CI exposed a competition-fixture race after on-demand map loading: the action panel can
+appear before province targets. The fixture now waits for its recorded map drawing before selecting
+the attack destination. The focused live competition lifecycle suite passes with that readiness
+check; the attack, receipt expiration and next-turn assertions remain unchanged.
+
 ## Commodity quantities, live reference tracks and saved-game border polish
 
 The 2026-11-02 checks pass 942 core JVM tests, Kotlin/JS compilation, the server suite
