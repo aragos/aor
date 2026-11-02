@@ -605,6 +605,21 @@ reload, and the fixed snapshot stopped at the Sarai frame-selection assertion. T
 establish a green comprehensive map suite. The focused purchasing/table/help/hand evidence above
 is separate from that remaining map failure and from physical-device or screen-reader evidence.
 
+The private-plan copy cleanup passes the production web build, all 76 web unit tests and the
+focused StrictMode `planning.browser.mjs` suite, including its neighboring table, purchase, Help
+and hand checks. Planning explanations appear in Help; only brief draft/save/authorization status
+and operational feedback remain in the panel. Live assertions verify that Continue/Pass rows are
+absent while their saved commands, execution order, purchase effects and removal indices remain
+intact. Reload, polling, cross-device rejection, Help inspection, cancellation and offline execution
+retain their coverage. This is a presentation change; saved-plan commands and game formats remain
+unchanged.
+
+Rendered screenshot inspection at 1280×900 and 390×844 shows two numbered changing actions with
+their own cash endpoints, compact status, the Help footnote and reachable controls. The captured
+cross-device rejection remains visible without overflowing the phone viewport. Artifacts are in
+`aor-browser-artifacts-0froOM`. These emulated views do not establish physical-device or
+screen-reader evidence.
+
 ## Commodity quantities, live reference tracks and saved-game border polish
 
 The 2026-11-02 checks pass 942 core JVM tests, Kotlin/JS compilation, the server suite

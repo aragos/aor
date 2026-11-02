@@ -132,7 +132,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             <p>{t("reference.undo-last-action-appears-in-the")}<code>@entry</code>{t("reference.references-retain-recorded-actions-accepted-edits")}</p>
         </section>}
             {topic === 'plans' && <section id="plans"><h2>{t('plan.helpTitle')}</h2>
-                <p>{t('plan.helpSaving')}</p><p>{t('plan.helpAutomatic')}</p><p>{t('plan.helpBoundaries')}</p>
+                <p>{t('plan.helpSaving')}</p><p>{t('plan.helpPreview')}</p><p>{t('plan.helpAutomatic')}</p><p>{t('plan.helpBoundaries')}</p>
             </section>}
         </div>
     </CardInspectionDialog>;

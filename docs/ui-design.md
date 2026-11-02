@@ -291,12 +291,15 @@ choice and understand its result through visual controls and commands, on deskto
   balances, using the same rounded calculation as execution.
 - Purchase and Buy Card allow parallel preparation using the existing advances and hand. Label
   preview actions “Add to plan”; keep the actual required actor visible and public player summaries
-  unchanged. Distinguish unsaved input, saved-for-review plans and explicit offline authorization.
+  unchanged. Distinguish unsaved input, saved-for-review plans and explicit offline authorization
+  with compact status labels. Help owns planning instructions, preview assumptions and boundary
+  explanations. The plan list shows changes and omits Continue steps; retain those explicitly
+  selected continuations in the saved plan and preserve their execution order.
   Saving never buys, reserves resources or auto-passes. Review plans remain editable on the legal
   turn; automatic plans expose cancellation before execution starts. Editing first confirms disarm.
-  Show exact planned payment recipients, balances and misery effects beside each action, with
-  hypothetical assumptions while waiting. A changed consequence or draw pauses for review; no
-  automatic discard follows a draw. Preserve local work through polling, navigation and inspection;
+  Show exact planned payment recipients, balances and misery effects beside each action.
+  A changed consequence or draw pauses for review; no automatic discard follows a draw. Preserve
+  local work through polling, navigation and inspection;
   server saves survive reload and another device. History edits cancel previous authorization.
 - Activity occupies its workspace tab or optional left block, with bounded scrolling and no count.
   Keep its pin control clear of receipt text. It explains draw reasons,
