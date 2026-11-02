@@ -347,7 +347,7 @@ private class WithdrawalFixture(postgres: Boolean) : AutoCloseable {
     fun independentWriter(): GameService = sql?.reopened() ?: service
 
     fun myMoveGames(): GamePage =
-        store.listGames(players.first().id, false, GameListStatus.MY_MOVE, null, 10)
+        store.listGames(players.first().id, GameListScope.OWN, GameListStatus.MY_MOVE, null, 10)
 
     fun revealCapitalBids() {
         submit(0, "bid-capital 3")

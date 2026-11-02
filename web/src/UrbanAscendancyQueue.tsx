@@ -13,7 +13,7 @@ export function UrbanAscendancyQueue({snapshot, busy, submit}: {
     const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.game.turnNumber}:${snapshot.undo?.editRevision}`;
     const player = snapshot.game.players.find(candidate => candidate.id === snapshot.viewerId);
     const actorIndex = snapshot.game.turnOrder.indexOf(snapshot.game.activity?.actor ?? '');
-    const playerIndex = snapshot.game.turnOrder.indexOf(snapshot.viewerId);
+    const playerIndex = snapshot.game.turnOrder.indexOf(snapshot.viewerId ?? '');
     const offer = snapshot.game.cardPurchaseOffer;
     const eligible = snapshot.game.stage === 'BUY_CARD' && player?.misery !== null &&
         player?.advances.includes('URBAN_ASCENDANCY') && (offer ? offer.blockers.length === 0 : player.cash >= 10 &&

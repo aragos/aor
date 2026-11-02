@@ -120,8 +120,9 @@ data class GameView(
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
 ) {
     companion object {
-        internal fun forPlayer(state: GameState, viewer: PlayerState): GameView {
-            val expansionInspections = ExpansionProjection.inspections(state, viewer)
+        internal fun forViewer(state: GameState, viewer: PlayerState?): GameView {
+            val expansionInspections =
+                viewer?.let { ExpansionProjection.inspections(state, it) }.orEmpty()
             return GameView(
                 stage = state.stage,
                 currentEpoch = state.currentEpoch.number,
@@ -132,7 +133,7 @@ data class GameView(
                     state.playerIds.map { playerId ->
                         PlayerView.from(state.playerState(playerId), state)
                     },
-                hand = viewer.hand,
+                hand = viewer?.hand.orEmpty(),
                 capitalOrder =
                     if (state.capitalSelection.isResolved) state.capitalOrder else emptyList(),
                 revealedBids = SetupProjection.revealedCapitalBids(state),
@@ -147,14 +148,18 @@ data class GameView(
                     },
                 catalog = PublicCatalog.forPlayers(state.playerIds.size, state.rules),
                 lockedProvinces =
-                    state.catalog.provinces
-                        .filterNot { province ->
-                            province.access.all { requirement ->
-                                requirement.isSatisfiedBy(viewer.advances.owned)
-                            }
+                    viewer
+                        ?.let { participant ->
+                            state.catalog.provinces
+                                .filterNot { province ->
+                                    province.access.all { requirement ->
+                                        requirement.isSatisfiedBy(participant.advances.owned)
+                                    }
+                                }
+                                .map(ProvinceDefinition::id)
+                                .toSet()
                         }
-                        .map(ProvinceDefinition::id)
-                        .toSet(),
+                        .orEmpty(),
                 activity = ActivityView.from(state),
                 deckRemaining = state.deck.size,
                 endingTriggered = state.endingTriggered,
@@ -178,9 +183,9 @@ data class GameView(
                 pirateTargets =
                     if (
                         state.turnNumber != null &&
-                            viewer.hand.any { card ->
+                            viewer?.hand?.any { card ->
                                 card.definition.id == EventId.PIRATES_VIKINGS.cardId
-                            }
+                            } == true
                     ) {
                         val context = state.cardContext()
                         PirateTargetsView(
@@ -189,32 +194,50 @@ data class GameView(
                         )
                     } else null,
                 voids = state.voids,
-                advanceOffers = advanceOffers(state, viewer),
-                patronageOffers = PatronageOfferView.from(state, viewer.player.id),
-                adjustmentOffers = AdjustmentCancellation.offers(state, viewer.player.id),
-                reliefOffers = ReliefOfferView.from(state, viewer),
+                advanceOffers = viewer?.let { advanceOffers(state, it) }.orEmpty(),
+                patronageOffers =
+                    viewer?.let { PatronageOfferView.from(state, it.player.id) }.orEmpty(),
+                adjustmentOffers =
+                    viewer?.let { AdjustmentCancellation.offers(state, it.player.id) }.orEmpty(),
+                reliefOffers = viewer?.let { ReliefOfferView.from(state, it) }.orEmpty(),
                 reliefRatingAvailable =
-                    state.turnNumber?.let { turn ->
-                        PlayerEconomy.availableReliefRating(viewer, turn)
+                    viewer?.let { participant ->
+                        state.turnNumber?.let { turn ->
+                            PlayerEconomy.availableReliefRating(participant, turn)
+                        }
                     } ?: 0,
                 cardPurchaseOffer =
-                    CardPurchases.offer(state, viewer).takeIf { state.stage == Stage.BUY_CARD },
+                    viewer
+                        ?.let { CardPurchases.offer(state, it) }
+                        ?.takeIf { state.stage == Stage.BUY_CARD },
                 stabilizationCost =
-                    if (state.turnNumber == null) null else PlayerEconomy.stabilizationCost(viewer),
+                    if (state.turnNumber == null) null
+                    else viewer?.let(PlayerEconomy::stabilizationCost),
                 stabilizationMisery =
-                    MiseryRules.payDebt(viewer.misery, PlayerEconomy.stabilizationCost(viewer))
-                        .value,
-                burdenReferences = burdenReferences(state, viewer),
+                    viewer?.let { participant ->
+                        MiseryRules.payDebt(
+                                participant.misery,
+                                PlayerEconomy.stabilizationCost(participant),
+                            )
+                            .value
+                    },
+                burdenReferences = viewer?.let { burdenReferences(state, it) }.orEmpty(),
                 expansionOffers = ExpansionProjection.offers(expansionInspections),
-                markerReductionOffers = ExpansionProjection.reductions(state, viewer),
+                markerReductionOffers =
+                    viewer?.let { ExpansionProjection.reductions(state, it) }.orEmpty(),
                 expansionInspections = expansionInspections,
                 commodityPayouts = CommodityPayoutView.from(state),
-                cardOffers = CardProjection.offers(state, viewer),
+                cardOffers = viewer?.let { CardProjection.offers(state, it) }.orEmpty(),
                 cardInspections = CardProjection.inspections(state, viewer),
-                tokenPurchaseOffers = TokenPurchaseProjection.offers(state, viewer),
-                shippingOffer = ShippingOfferView.from(state, viewer),
+                tokenPurchaseOffers =
+                    viewer?.let { TokenPurchaseProjection.offers(state, it) }.orEmpty(),
+                shippingOffer = viewer?.let { ShippingOfferView.from(state, it) },
                 expansionCardCost =
-                    if (state.stage == Stage.EXPANSION && state.flow.actor == viewer.player.id) {
+                    if (
+                        state.stage == Stage.EXPANSION &&
+                            viewer != null &&
+                            state.flow.actor == viewer.player.id
+                    ) {
                         EconomyTables.expansionCardCost(state.flow.expansionCardCount)
                     } else {
                         null

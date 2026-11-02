@@ -33,6 +33,45 @@ export async function checkPurchaseClarity(page, web, baseline) {
     const viewer = baseline.viewerId;
     const others = baseline.game.players.filter(player => player.id !== viewer);
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+    async function assertContinuationWords(width) {
+        assert.equal(await page.evaluate(`(() => {
+            const text = document.querySelector('.pass-action').firstChild;
+            return [...text.textContent.matchAll(/\\S+/g)].every(word => {
+                const range = document.createRange();
+                range.setStart(text, word.index); range.setEnd(text, word.index + word[0].length);
+                return range.getClientRects().length === 1;
+            });
+        })()`), true, `Purchase continuation keeps each word intact at ${width}px`);
+    }
+    for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        for (const [step, name, continuation] of [
+            ['SHIPPING', 'Shipping', 'Continue to advances'],
+            ['ADVANCES', 'Advances', 'Continue to stabilization'],
+            ['STABILIZATION', 'Stabilization', null],
+            ['RELIEF', 'Misery relief', 'Finish purchase'],
+        ]) {
+            await show({prompt: {messageId: `prompt.purchase-${step.toLowerCase()}`, players: [viewer]},
+                legalChoices: {commands: continuation ? ['pass'] : ['stabilize cash', 'stabilize misery']},
+                game: {stage: 'PURCHASE', shippingOffer: null, advanceOffers: [], reliefOffers: [],
+                    reliefRatingAvailable: 0, stabilizationCost: 10, stabilizationMisery: 20,
+                    activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer,
+                        choice: `purchase-${step.toLowerCase()}`, purchaseStep: step}}});
+            assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), `Purchase · ${name}`,
+                `${name} identifies its Purchase phase at ${width}px`);
+            if (continuation) {
+                assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), continuation);
+                const count = await page.evaluate('window.mapCommands.length');
+                await click('.pass-action');
+                assert.equal(await page.evaluate('window.mapCommands.length'), count + 1);
+                assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'pass', 'Continuation uses the canonical Pass command');
+                assert.equal(await page.evaluate(`(() => {const button = document.querySelector('.pass-action');return button.scrollWidth <= button.clientWidth && button.scrollHeight <= button.clientHeight;})()`), true,
+                    `${continuation} fits its action button at ${width}px`);
+                await assertContinuationWords(width);
+            }
+        }
+    }
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
     await show({legalChoices: {commands: ['buy-expansion-card', 'pass'], bidMin: null, bidMax: null},
         prompt: {messageId: 'prompt.expand', players: [viewer]}, game: {stage: 'EXPANSION', expansionCardCost: 9,
             activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer, choice: 'expand'}}});
@@ -78,8 +117,11 @@ export async function checkPurchaseClarity(page, web, baseline) {
     await click('.decision-panel .price-details > summary');
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .price-breakdown').textContent`), /Printed cost\$100.*Urban Ascendancy−\$20.*Institutional Research−\$10.*Price\$40/);
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.decision-panel [data-misery-preview-player] [data-misery-box]')].map(box => box.dataset.miseryBox)`), ['20', '30']);
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions').dataset.layout`), 'paired');
+    await assertContinuationWords(1280);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-purchase-preview-desktop.png'), 1280, 900);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-purchase-preview-phone.png'), 390, 844, true);
+    await assertContinuationWords(390);
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true, 'Quote and misery previews fit a phone');
 
     const source = baseline.game.catalog.advances.find(advance => advance.miseryRelief > 0);

@@ -13,6 +13,13 @@ enum class GameListStatus {
     UNAVAILABLE,
 }
 
+/** Listing membership is independent from administrative authority to inspect private logs. */
+enum class GameListScope {
+    OWN,
+    OTHER,
+    ALL,
+}
+
 data class GameSummary(
     val id: String,
     val createdAt: Long,
@@ -59,7 +66,7 @@ class GameAdministration(
 ) {
     fun list(
         viewer: AccountId,
-        admin: Boolean,
+        scope: GameListScope,
         filter: String?,
         after: String?,
         limit: Int,
@@ -67,7 +74,7 @@ class GameAdministration(
     ): GamePage {
         requireLimit(limit)
         requireCursor(after)
-        return store.listGames(viewer, admin, parseFilter(filter), after, limit, accounts)
+        return store.listGames(viewer, scope, parseFilter(filter), after, limit, accounts)
     }
 
     fun log(id: String, archive: String? = null): GameLog {

@@ -227,7 +227,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
      */
     override fun listGames(
         viewer: AccountId,
-        admin: Boolean,
+        scope: GameListScope,
         status: GameListStatus?,
         after: String?,
         limit: Int,
@@ -248,7 +248,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                         ELSE g.listing_status END AS base_status,
                     g.stage
                 FROM games g LEFT JOIN game_players p ON p.game_id = g.id AND p.account_id = ?
-                WHERE (? OR p.account_id IS NOT NULL) AND (?::uuid IS NULL OR g.id > ?::uuid)
+                WHERE (? OR (p.account_id IS NOT NULL) = ?)
+                    AND (?::uuid IS NULL OR g.id > ?::uuid)
             )
             SELECT *, CASE WHEN base_status = 'ONGOING' AND needs_move
                 THEN 'MY_MOVE' ELSE base_status END AS viewer_status
@@ -263,13 +264,14 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                 statement.setString(1, RULES_VERSION)
                 statement.setString(2, DATA_VERSION)
                 statement.setString(3, viewer.value)
-                statement.setBoolean(4, admin)
-                statement.setObject(5, cursor)
+                statement.setBoolean(4, scope == GameListScope.ALL)
+                statement.setBoolean(5, scope == GameListScope.OWN)
                 statement.setObject(6, cursor)
-                statement.setString(7, status?.name)
+                statement.setObject(7, cursor)
                 statement.setString(8, status?.name)
                 statement.setString(9, status?.name)
-                statement.setInt(10, limit + 1)
+                statement.setString(10, status?.name)
+                statement.setInt(11, limit + 1)
                 statement.executeQuery().use { rows ->
                     buildList {
                         while (rows.next()) {

@@ -27,12 +27,12 @@ interface ManagedGameStore : GameStore {
     /** Lists use rebuildable engine projections; authorization scope is supplied by the service. */
     fun listGames(
         viewer: AccountId,
-        admin: Boolean,
+        scope: GameListScope,
         status: GameListStatus?,
         after: String?,
         limit: Int,
         accounts: AccountStore? = null,
-    ): GamePage = GameDirectory.list(this, viewer, admin, status, after, limit, accounts)
+    ): GamePage = GameDirectory.list(this, viewer, scope, status, after, limit, accounts)
 
     fun document(id: String): String
 

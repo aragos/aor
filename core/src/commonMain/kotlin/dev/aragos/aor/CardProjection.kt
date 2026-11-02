@@ -66,15 +66,16 @@ data class PlayedLeaderDiscountView(
     val discounts: List<LeaderDiscountView>,
 ) {
     companion object {
-        internal fun from(state: GameState, viewer: PlayerState): List<PlayedLeaderDiscountView> =
+        internal fun from(state: GameState, viewer: PlayerState?): List<PlayedLeaderDiscountView> =
             state.effects.leaders.map { played ->
                 PlayedLeaderDiscountView(
                     played.leader,
-                    played.owner == viewer.player.id ||
-                        viewer.player.id in played.patronageClaimants,
+                    viewer != null &&
+                        (played.owner == viewer.player.id ||
+                            viewer.player.id in played.patronageClaimants),
                     LeaderDiscountView.forLeader(
                         played.leader,
-                        viewer.advances.owned,
+                        viewer?.advances?.owned.orEmpty(),
                         state.effects.crusadesPlayed,
                         played.mongolEnhanced,
                     ),
@@ -114,7 +115,7 @@ data class CardInspectionView(
 )
 
 internal object CardProjection {
-    fun inspections(state: GameState, viewer: PlayerState): List<CardInspectionView> {
+    fun inspections(state: GameState, viewer: PlayerState?): List<CardInspectionView> {
         val played = PlayedLeaderDiscountView.from(state, viewer).associateBy { it.leader.cardId }
         return CardData.all.map { definition ->
             val spec = CardEffectData.forCard(definition.id)
@@ -234,13 +235,13 @@ internal object CardProjection {
 
     private fun discounts(
         state: GameState,
-        viewer: PlayerState,
+        viewer: PlayerState?,
         spec: CardEffectSpec,
     ): List<LeaderDiscountView> {
         if (spec !is CardEffectSpec.Leader) return emptyList()
         return LeaderDiscountView.forLeader(
             spec.leader,
-            viewer.advances.owned,
+            viewer?.advances?.owned.orEmpty(),
             state.effects.crusadesPlayed,
             state.voids.crusades,
         )

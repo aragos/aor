@@ -25,6 +25,7 @@ import {checkCardAndPlayerDetails, checkReplacementContext} from './contextDetai
 import {checkExpansionDiagnostics} from './expansionDiagnostics.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
+import {checkSpectator} from './spectator.browser.mjs';
 import {checkPortal} from './portal.browser.mjs';
 import {checkHosted} from './hosted.browser.mjs';
 import {checkBackgroundPolling} from './backgroundPolling.browser.mjs';
@@ -528,6 +529,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkCommodityMap(page, web, after);
     await checkMobileTable(page, web, after);
     await checkPurchaseClarity(page, web, after);
+    await checkSpectator(page, web, after);
     await checkLiveCommodityValues(page, web, after);
     await checkClearAdvancePrices(page, web, after);
     await checkAdvanceCategoryGroups(page, web, after);

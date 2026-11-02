@@ -169,7 +169,10 @@ data class GameState(
     }
 
     fun viewForPlayer(player: PlayerId): GameView =
-        GameView.forPlayer(state = this, viewer = playerState(player))
+        GameView.forViewer(state = this, viewer = playerState(player))
+
+    /** Public facts and reference data, without a seat, private hand, or actionable offers. */
+    fun publicView(): GameView = GameView.forViewer(state = this, viewer = null)
 
     fun step(entry: Entry): GameState = transition(entry).state
 

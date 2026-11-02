@@ -110,6 +110,32 @@ class HistoryProjectionTest {
     }
 
     @Test
+    fun spectatorsNeverReceivePrivateDrawTradeDiscardOrOfferIdentities() {
+        val trade =
+            state.copy(
+                flow = TurnFlow(decisions = listOf(BoardDecision.TradeOffer(owner, recipient)))
+            )
+        val entries =
+            listOf(
+                GameOutcome.Draw(owner, "private-hand-reference", "stone-1"),
+                GameOutcome.Trade(owner, recipient, "private-hand-reference"),
+                Entry.Action(owner, TurnCommand.DiscardCard("private-hand-reference")),
+                Entry.Action(owner, BoardCommand.OfferCard("private-hand-reference")),
+            )
+
+        val lines = entries.map { HistoryProjection.line(trade, it, null) }
+
+        assertThat(lines)
+            .containsExactly(
+                "!draw p1 private-hand-reference <hidden>",
+                "!trade p1 p2 <hidden>",
+                "p1: discard-card <hidden>",
+                "p1: offer-card <hidden>",
+            )
+            .inOrder()
+    }
+
+    @Test
     fun masterArtDiscardRemainsVisibleToItsOwner() {
         val entry = Entry.Action(owner, TurnCommand.DiscardCard("private-hand-reference"))
 

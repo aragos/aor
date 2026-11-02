@@ -24,6 +24,8 @@ export async function checkLiveMiseryRelief(page, web) {
             url.searchParams.set('relief-check', String(state.revision));
             await page.send('Page.navigate', {url: url.href});
             await page.wait(`performance.timeOrigin !== ${previousDocument} && document.querySelector('.relief-rating-summary')`, 'live relief decision');
+            assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), 'Purchase · Misery relief');
+            assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), 'Finish purchase');
             assert.equal(await page.evaluate(`document.querySelector('.relief-rating-summary strong').textContent`), `$${state.game.reliefRatingAvailable}`);
             checkedRating ||= state.game.reliefRatingAvailable > 0;
             if (!affordable && state.game.reliefOffers.length > 0 && !checkedBlocked) {
@@ -87,6 +89,8 @@ export async function checkLiveMiseryRelief(page, web) {
             url.searchParams.set('advance-check', String(state.revision));
             await page.send('Page.navigate', {url: url.href});
             await page.wait(`performance.timeOrigin !== ${previousDocument} && document.querySelector('.advance-relief-rating')`, 'live accumulated MR before advance purchase');
+            assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), 'Purchase · Advances');
+            assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), 'Continue to stabilization');
             assert.equal(await page.evaluate(`document.querySelector('.advance-relief-rating strong').textContent`), `$${state.game.reliefRatingAvailable}`);
             await page.evaluate(`document.querySelector('[data-advance="${advance.advance}"]').click()`);
             assert.equal(await page.evaluate(`document.querySelector('.advance-relief-rating strong').textContent`), `$${state.game.reliefRatingAvailable}`, 'Selecting an advance retains the total');
