@@ -9,7 +9,11 @@ from shapely.ops import linemerge, transform, unary_union
 
 # Toulouse's accepted labels leave clear east/south exits. Cornwall–Chester has
 # only a corner/gap, so its two drawings need explicitly placed crossings.
+# Cagliari's coastal-water shafts need extra length to remain visible at Fit;
+# extend Marseilles' source end to keep its arrowhead clear of the marker slot.
 DIRECT_ROUTES = {
+    ("cagliari", "marseilles"): [((1270.140, 1189.587), (1232.040, 1160.391))],
+    ("cagliari", "genoa"): [((1323.001, 1151.561), (1292.374, 1114.602))],
     ("toulouse", "montpellier"): [((903, 1140), (935, 1140))],
     ("toulouse", "barcelona"): [((843, 1177), (843, 1216))],
     ("cornwall", "chester"): [

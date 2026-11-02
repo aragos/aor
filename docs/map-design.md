@@ -58,16 +58,20 @@ come from the catalog and engine. The [UX principles](ui-design.md) govern inter
 | Information | Encoding |
 | --- | --- |
 | Commodity / market | Permanent commodity fill, pictogram and readable market number; divided fills for multiple commodities |
-| Satellite | Neutral stippling |
+| Satellite | Pale green with dark stippling at a consistent screen size, distinct from solid gray Stone |
 | Capital | Dark background behind the complete market badge, including commodity |
 | Owner | The same capital color and silhouette as every other player representation |
 | Piece kind / age | A count identifies tokens; an unnumbered piece is a marker. White is new, filled is established. Separate owners and ages. |
 | Directed support | Short, straight satellite-to-market border crossing with a contrasting arrowhead; only catalogued support |
-| Area / shared access | A clear interior area badge, preferably in open sea space; locks on the owning area or overseas heading |
+| Area / shared access | A clear interior area badge, preferably in open sea space; muted diagonal hatching and locks mark missing access advances |
 
 Province fills retain commodity identity when control changes. Land and coastal water receive the
 same reachability, eligibility, focus and selection emphasis. Use one selected outline around their
 combined footprint. Area emphasis covers the whole area and strongly dims its surroundings.
+Access hatching follows the viewer's authoritative missing-advance projection, independently of
+routes, ships and phase. Shade the whole area, including its water, when every province shares the
+lock; otherwise shade only locked provinces' land and coastal water. Keep commodities, pieces,
+labels and inspection available. Remove hatching with its lock as soon as access is acquired.
 Inspecting a province highlights each directly connected sea with deep blue water, sparse diagonal
 hatching, a contrasting dashed perimeter and a light name with a dark halo. Sea texture remains
 distinct from the pale solid coastal bands. Hatch spacing and perimeter width stay consistent on
@@ -88,6 +92,13 @@ geometry metadata and verify them explicitly. Do not create a new game connectio
 ## Navigation and selection
 
 Provinces and area badges support direct pointer and keyboard inspection and target selection.
+Areas excluded from the current game's catalog by player count remain dimmed background: their
+badges cannot highlight, select or receive keyboard focus. Derive active areas from the catalog.
+Clicking a province's commodity icon highlights every in-play province of that commodity, using the
+same emphasis as commodity cards. Each icon on a multi-commodity province inspects only its own
+commodity. This inspection preserves prepared actions through polling and closes with ordinary map
+inspection or dismissal. Commodity icons share one roving tab stop, with arrow-key traversal and
+Enter/Space activation, alongside the province and area groups.
 Coastal water selects the same province as land. A click prepares a draft; the explicit action button
 commits it. Sea or non-province background clicks clear inspection, focus and the inspected border;
 dragging preserves them. Background clicks preserve an active action draft and picker selections.
@@ -159,6 +170,10 @@ labels are accepted; preserve their placement.
 Support paths retain every catalogued direction: 78 on the full standard board and 76 on the
 European board. Show each as a short, straight crossing of the shared province/coastal border,
 with the tip inside the supported market. Avoid detours, crossing shafts and ambiguous clusters.
+The visible shaft and its contrasting halo stop inside the arrowhead so neither protrudes beside
+its narrow tip at high zoom; the arrowhead retains the exact catalogued endpoint.
+Cagliari's coastal-water arrows to Genoa and Marseilles use longer 48-unit shafts to remain visible;
+the Marseilles route extends back into Cagliari to leave its target's marker slot clear.
 Reserve the whole arrowhead and contrasting halo when avoiding names and normal marker positions;
 dense token groups still take drawing priority. Arrow routing is drawing data and never changes
 the support graph or a province's connections.

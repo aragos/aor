@@ -4,7 +4,7 @@ import type {PublicCatalog} from './api';
 import {label} from './labels';
 import {t} from './messages';
 import {Commodity} from './TablePanels';
-import {AccessLock, PlayerPiece} from './map/MapSymbols';
+import {AccessLock, LockedAreaPattern, PlayerPiece, SatellitePattern} from './map/MapSymbols';
 import {MiseryBox} from './MiseryBox';
 import ruleOptions from './ruleOptions.json';
 import {CardInspectionDialog} from './CardInspectionDialog';
@@ -63,8 +63,8 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                 <span><svg viewBox="-28 -28 56 56" width="32" height="32" aria-hidden="true"><PlayerPiece capital="barcelona" size={44}/></svg>{t("reference.unnumbered-silhouette-domination-marker")}</span>
                 <span><svg viewBox="-28 -28 56 56" width="32" height="32" aria-hidden="true"><PlayerPiece capital="venice" count={2} size={44}/></svg>{t("reference.numbered-silhouette-token-count")}</span>
                 <span><svg viewBox="-28 -28 56 56" width="32" height="32" aria-hidden="true"><PlayerPiece capital="barcelona" fresh size={44}/></svg>{t("reference.white-face-new-this-turn-filled")}</span>
-                <span><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><AccessLock/></svg>{t("reference.lock-an-advance-is-required")}</span>
-                <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><defs><pattern id="reference-satellite" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#e0e4d9"/><circle cx="3" cy="3" r="1" fill="#879481"/></pattern></defs><rect width="32" height="32" fill="url(#reference-satellite)"/></svg>{t("reference.stippling-satellite")}</span>
+                <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><defs><LockedAreaPattern id="reference-locked-area"/></defs><rect width="32" height="32" fill="url(#reference-locked-area)"/><AccessLock x={4} y={4}/></svg>{t("reference.lock-an-advance-is-required")}</span>
+                <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><defs><SatellitePattern id="reference-satellite"/></defs><rect width="32" height="32" fill="url(#reference-satellite)"/></svg>{t("reference.stippling-satellite")}</span>
                 <span><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect x="1" y="1" width="30" height="30" fill="#d2efed" stroke="#56929c"/></svg>{t("reference.pale-water-a-province-s-coastal")}</span>
             </div>
             {catalog && <div className="reference-legend">{catalog.provinces.filter(province => province.capital).map(province => <span key={province.id}><svg viewBox="-28 -28 56 56" width="28" height="28" aria-hidden="true"><PlayerPiece capital={province.capital} size={44}/></svg>{label(province.id, 'capital')}</span>)}</div>}
@@ -93,8 +93,11 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             <p>{t('reference.colors-progress-from-green-through-amber')}</p>
         </section>}
             {topic === 'shipping-track' && <section id="shipping-track"><h2>{t('reference.shipping')}</h2>
+            <p>{t('reference.shipping-boxes')}</p>
             {[...new Set(catalog?.shippingTrack.map(space => space.fleet))].map(fleet => <div key={fleet}><h3>{label(fleet, 'fleet')}</h3>
+                <p>{t(`reference.shipping-${fleet.toLowerCase()}`)}</p>
                 <ol className="reference-track">{catalog?.shippingTrack.filter(space => space.fleet === fleet).map(space => <li key={space.level}>{space.level}</li>)}</ol></div>)}
+            <p>{t('reference.shipping-commitments-and-available-capacity-are')}</p>
         </section>}
             {(topic === 'history' || topic.startsWith('undo-')) && <section id="history"><h2>{t("reference.undo-policies-55")}</h2>
             <p>{t("reference.choose-a-policy-when-creating-the")}</p>
