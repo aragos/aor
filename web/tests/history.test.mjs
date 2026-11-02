@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {readFile} from 'node:fs/promises';
-import ts from 'typescript';
-
-const source=await readFile(new URL('../src/history.ts',import.meta.url),'utf8');
-const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2020}}).outputText;
-const {displayHistoryLine}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+import {displayHistoryLine} from '../src/history.ts';
 const players={p1:'London',p2:'Paris'};
 
 test('player aliases cover actors, targets, attributed dice and edit authors',()=>{

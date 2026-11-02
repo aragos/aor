@@ -15,6 +15,15 @@ tasks.named<JavaExec>("run") {
     workingDir(rootProject.projectDir)
 }
 
+tasks.register<Test>("fastTest") {
+    group = "verification"
+    description = "Runs server tests except complete-game HTTP acceptance; test runs all coverage."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    exclude("**/FullGameHttpTest*")
+    shouldRunAfter(tasks.test)
+}
+
 tasks.register<JavaExec>("verifyGameLogs") {
     group = "verification"
     description =

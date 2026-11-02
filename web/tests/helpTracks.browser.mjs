@@ -3,6 +3,8 @@ import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
 
 export async function checkHelpTracks(page, web) {
+    // Background tabs defer media-query events, so foreground the responsive interaction fixture.
+    await page.send('Page.bringToFront');
     const game = await createGame(6);
     const baseline = await game.snapshot(game.links[0]);
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -82,9 +84,13 @@ export async function checkHelpTracks(page, web) {
 
 if (process.argv[1]?.endsWith('/helpTracks.browser.mjs')) {
     const page = await open('about:blank');
+    // Exercise the same hidden-tab entry state left by other live checks in the complete suite.
+    const otherTab = await open('about:blank');
     try { await checkHelpTracks(page, process.env.MAP_WEB_URL); }
     finally {
-        page.ws.close();
-        await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);
+        for (const target of [page, otherTab]) {
+            target.ws.close();
+            await fetch(`${process.env.MAP_CDP_URL}/json/close/${target.target.id}`);
+        }
     }
 }

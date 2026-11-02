@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {readFile} from 'node:fs/promises';
-import ts from 'typescript';
-
-const source = await readFile(new URL('../src/decision.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext}}).outputText;
-const {decisionIdentity, targetSelection} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+import {decisionIdentity, targetSelection} from '../src/decision.ts';
 
 const baseline = {gameId:'game',viewerId:'p1',revision:1,prompt:{messageId:'prompt.expand',players:['p1','p2']},
     game:{turnNumber:1,stage:'EXPANSION',activity:{actor:'p1',decisionPlayer:'p1',choice:'expand',decisionEntry:3}}};

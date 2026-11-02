@@ -1,17 +1,24 @@
 import {spawn, execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {mkdtemp, mkdir, rm} from 'node:fs/promises';
+import {access, mkdtemp, mkdir, rm} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {browserOptions} from './browser-options.mjs';
+import {resetBrowserSession} from '../tests/browser-support.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const {suites, timeout} = browserOptions(process.argv.slice(2), process.env, resolve(root, 'web/tests'));
+// Catch misspelled suite names before building or starting the isolated services.
+await Promise.all(suites.map(suite => access(suite.path)));
 const temporary = await mkdtemp(resolve(tmpdir(), 'aor-browser-'));
 const artifacts = resolve(process.env.AOR_BROWSER_ARTIFACTS ?? await mkdtemp(resolve(tmpdir(), 'aor-browser-artifacts-')));
 const children = [];
 let interrupted;
 const interruption = new Promise((_, reject) => { interrupted = reject; });
+// Signals can arrive between awaited operations; keep rejection handled until the next race.
+void interruption.catch(() => {});
 const onSignal = signal => interrupted(new Error(`Browser checks interrupted by ${signal}`));
 const handlers = new Map(['SIGINT', 'SIGTERM'].map(signal => [signal, () => onSignal(signal)]));
 for (const [signal, handler] of handlers) process.on(signal, handler);
@@ -56,8 +63,9 @@ async function ready(url, tracked) {
     throw new Error(`Timed out waiting for ${url}`);
 }
 async function ownedProcesses() {
-    const {stdout} = await promisify(execFile)('ps', ['-axo', 'pid=,pgid=,stat='], {timeout: 5000});
     const groups = new Set(children.flatMap(tracked => tracked.child.pid ? [tracked.child.pid] : []));
+    if (!groups.size) return [];
+    const {stdout} = await promisify(execFile)('ps', ['-axo', 'pid=,pgid=,stat='], {timeout: 5000});
     return stdout.trim().split('\n').flatMap(line => {
         const [pid, group, state] = line.trim().split(/\s+/);
         return groups.has(Number(group)) && !state?.startsWith('Z') ? [{pid: Number(pid), group: Number(group)}] : [];
@@ -94,10 +102,11 @@ async function cleanup() {
     }
 }
 
+let failure;
 try {
     await mkdir(artifacts, {recursive: true});
     if (!process.env.AOR_BROWSER_SERVER) {
-        await checked(launch('server distribution build', './gradlew', [':server:installDist', '--no-daemon']), 300000);
+        await checked(launch('server distribution build', './gradlew', [':server:installDist']), 300000);
     }
     const [apiPort, webPort, cdpPort] = await Promise.all([port(), port(), port()]);
     const api = `http://127.0.0.1:${apiPort}`;
@@ -114,10 +123,22 @@ try {
         `--user-data-dir=${resolve(temporary, 'chrome')}`, 'about:blank',
     ]);
     await Promise.all([ready(`${api}/api/health`, server), ready(web, vite), ready(`${cdp}/json/version`, browser)]);
-    await checked(launch('browser interactions', process.execPath, [resolve(root, 'web/tests', process.env.AOR_BROWSER_SUITE ?? 'map.browser.mjs')], {
-        MAP_API_URL: api, MAP_WEB_URL: web, MAP_CDP_URL: cdp, AOR_BROWSER_ARTIFACTS: artifacts,
-    }), Number(process.env.AOR_BROWSER_TIMEOUT_MS ?? 300000));
+    for (const [index, suite] of suites.entries()) {
+        if (index) await Promise.race([resetBrowserSession(cdp, [web, api]), interruption]);
+        await checked(launch(suite.name, process.execPath, [suite.path], {
+            MAP_API_URL: api, MAP_WEB_URL: web, MAP_CDP_URL: cdp,
+            AOR_BROWSER_ARTIFACTS: artifacts, AOR_BROWSER_SUITE: suite.name,
+        }), timeout);
+    }
     console.log(`Browser checks passed. Screenshots: ${artifacts}`);
+} catch (error) {
+    failure = error;
+    throw error;
 } finally {
-    await cleanup();
+    try {
+        await cleanup();
+    } catch (error) {
+        if (failure) throw new AggregateError([failure, error], 'Browser checks and cleanup failed');
+        throw error;
+    }
 }

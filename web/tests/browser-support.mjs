@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 const api = process.env.MAP_API_URL ?? 'http://127.0.0.1:8095';
 const cdp = process.env.MAP_CDP_URL ?? 'http://127.0.0.1:9351';
+const cdpTimeoutMs = 15000;
 
 class CdpError extends Error {
     constructor(message, code, method) {
@@ -32,20 +33,53 @@ export class Page {
                 if (message.error) pending.reject(new CdpError(message.error.message, message.error.code, pending.method)); else pending.resolve(message.result);
             }
         });
+        const disconnected = error => {
+            this.failure ??= error;
+            for (const pending of this.pending.values()) pending.reject(this.failure);
+            this.pending.clear();
+        };
+        ws.addEventListener('close', () => disconnected(new Error('CDP connection closed')));
+        ws.addEventListener('error', () => disconnected(new Error('CDP connection failed')));
     }
     static async connect(url) {
         const ws = new WebSocket(url);
-        await new Promise((resolve, reject) => { ws.addEventListener('open', resolve); ws.addEventListener('error', reject); });
-        const page = new Page(ws);
-        await page.send('Runtime.enable');
-        return page;
+        try {
+            await new Promise((resolve, reject) => {
+                const finish = (callback, value) => {
+                    clearTimeout(timeout);
+                    ws.removeEventListener('open', opened);
+                    ws.removeEventListener('error', failed);
+                    ws.removeEventListener('close', closed);
+                    callback(value);
+                };
+                const opened = () => finish(resolve);
+                const failed = () => finish(reject, new Error('CDP connection failed'));
+                const closed = () => finish(reject, new Error('CDP connection closed before opening'));
+                const timeout = setTimeout(() => finish(reject, new Error('CDP connection timed out')), cdpTimeoutMs);
+                ws.addEventListener('open', opened);
+                ws.addEventListener('error', failed);
+                ws.addEventListener('close', closed);
+            });
+            const page = new Page(ws);
+            await page.send('Runtime.enable');
+            return page;
+        } catch (error) {
+            ws.close();
+            throw error;
+        }
     }
     send(method, params = {}) {
+        if (this.failure) return Promise.reject(this.failure);
         return new Promise((resolve, reject) => {
             const id = ++this.next;
-            const timeout = setTimeout(() => { this.pending.delete(id); reject(new Error(`CDP timed out: ${method}`)); }, 15000);
+            const timeout = setTimeout(() => { this.pending.delete(id); reject(new Error(`CDP timed out: ${method}`)); }, cdpTimeoutMs);
             this.pending.set(id, {method, resolve: value => {clearTimeout(timeout); resolve(value);}, reject: error => {clearTimeout(timeout); reject(error);}});
-            this.ws.send(JSON.stringify({id, method, params}));
+            try {
+                this.ws.send(JSON.stringify({id, method, params}));
+            } catch (error) {
+                this.pending.get(id)?.reject(error);
+                this.pending.delete(id);
+            }
         });
     }
     async evaluate(expression) {
@@ -99,6 +133,42 @@ export async function open(url) {
     const page = await Page.connect(target.webSocketDebuggerUrl);
     page.target = target;
     return page;
+}
+
+/** A fixture revision can render before its separately downloaded map drawing. */
+export function waitForMap(page, snapshot) {
+    const key = `${snapshot.game.catalog.dataVersion}:${snapshot.game.rules.map}`;
+    const selector = `[data-map-geometry="${key}"] .world-map`;
+    return page.wait(`document.querySelector(${JSON.stringify(selector)})`, `map drawing ${key}`);
+}
+
+/** Give separately launched suites fresh browser state while retaining the shared Chrome process. */
+export async function resetBrowserSession(cdpUrl, origins) {
+    const created = await fetch(cdpUrl + '/json/new?about:blank', {
+        method: 'PUT', signal: AbortSignal.timeout(cdpTimeoutMs),
+    });
+    assert(created.ok, `Could not create browser reset target: ${created.status}`);
+    const resetTarget = await created.json();
+    const response = await fetch(cdpUrl + '/json/list', {signal: AbortSignal.timeout(cdpTimeoutMs)});
+    assert(response.ok, `Could not list browser targets: ${response.status}`);
+    const targets = (await response.json()).filter(target =>
+        target.type === 'page' && target.id !== resetTarget.id);
+    // Keep a fresh blank page so Chrome remains available even when a suite closes all its tabs.
+    for (const target of targets) {
+        const closed = await fetch(`${cdpUrl}/json/close/${target.id}`, {
+            signal: AbortSignal.timeout(cdpTimeoutMs),
+        });
+        assert(closed.ok, `Could not close browser target ${target.id}: ${closed.status}`);
+    }
+    // Close active documents before clearing their storage so polling/unload cannot restore it.
+    const page = await Page.connect(resetTarget.webSocketDebuggerUrl);
+    try {
+        for (const origin of origins) {
+            await page.send('Storage.clearDataForOrigin', {origin, storageTypes: 'all'});
+        }
+    } finally {
+        page.ws.close();
+    }
 }
 
 

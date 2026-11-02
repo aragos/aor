@@ -18,6 +18,7 @@ import './app.css';
 const HostedApp = lazy(() => import('./HostedApp'));
 
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
+function isAccessFailure(code: string) { return ['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code); }
 
 function CreateGame() {
     const [name, setName] = useState('');
@@ -73,6 +74,14 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const uncertainOperation = useRef<string | null>(null);
     const path = `/api/games/${id}`;
 
+    function clearAuthorizedSnapshot(code: string) {
+        etag.current = undefined;
+        acceptedSnapshot.current = undefined;
+        setTurnFavicon(false);
+        setSnapshot(null);
+        setConnectionError(code);
+    }
+
     function acceptSnapshot(next: Snapshot) {
         if (uncertainOperation.current && (next.submissionReceipts?.includes(uncertainOperation.current) || next.planning?.receipts.includes(uncertainOperation.current))) {
             setActionError(new ApiError('OUTCOME_CONFIRMED'));
@@ -102,8 +111,8 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
             }, onError: failure => {
                 if (active && readSequence === sequence.current) {
                     const code = errorCode(failure);
-                    if (['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code)) setSnapshot(null);
-                    setConnectionError(code);
+                    if (isAccessFailure(code)) clearAuthorizedSnapshot(code);
+                    else setConnectionError(code);
                 }
             }});
         return () => {active = false; stop(); setTurnFavicon(false);};
@@ -123,14 +132,18 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
             setConnectionError(''); setSaved(true); return accepted;
         } catch (failure) {
             const code = errorCode(failure);
-            if (['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code)) setSnapshot(null);
+            if (isAccessFailure(code)) clearAuthorizedSnapshot(code);
             setActionError(failure instanceof ApiError ? failure : new ApiError(code));
             if (code === 'OUTCOME_UNKNOWN') uncertainOperation.current = operationId;
             if (['STALE_REVISION', 'STALE_SUBMISSION', 'STALE_PLAN', 'STALE_PLAN_PREVIEW', 'OUTCOME_UNKNOWN'].includes(code)) {
                 try {
                     const refreshed = await requestSnapshot(path, token);
                     if (refreshed.snapshot) acceptSnapshot(refreshed.snapshot);
-                } catch (refreshFailure) {setConnectionError(errorCode(refreshFailure));}
+                } catch (refreshFailure) {
+                    const refreshCode = errorCode(refreshFailure);
+                    if (isAccessFailure(refreshCode)) clearAuthorizedSnapshot(refreshCode);
+                    else setConnectionError(refreshCode);
+                }
             }
             return null;
         } finally { busyRef.current = false; setBusy(false); }

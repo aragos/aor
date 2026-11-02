@@ -750,16 +750,14 @@ class HostedApplicationTest(private val postgres: Boolean) {
         assertThat(failure.code).isEqualTo("ARCHIVE_NOT_FOUND")
     }
 
-    private fun withHosted(block: suspend HostedFixture.() -> Unit) = testApplication {
-        val fixture = HostedFixture(postgres)
-        try {
-            application { module(fixture.service, fixture.hosted) }
-            fixture.client = client
-            fixture.block()
-        } finally {
-            fixture.close()
+    private fun withHosted(block: suspend HostedFixture.() -> Unit) =
+        HostedFixture(postgres).use { fixture ->
+            testApplication {
+                application { module(fixture.service, fixture.hosted) }
+                fixture.client = client
+                fixture.block()
+            }
         }
-    }
 }
 
 private class HostedFixture(postgres: Boolean) : AutoCloseable {

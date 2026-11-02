@@ -312,24 +312,26 @@ class ApplicationTest {
     }
 
     @Test
-    fun malformedJsonReturnsStructuredErrors() = testApplication {
+    fun malformedJsonReturnsStructuredErrors() {
         val directory = Files.createTempDirectory("aor-input-test-")
         try {
-            application { module(createGameService(directory)) }
-            for (body in
-                listOf(
-                    "null",
-                    "[]",
-                    "{",
-                    "{}",
-                    """{"players":"Alice"}""",
-                    """{"players":["Alice","Bob","Carol"],"epochs":1.2}""",
-                    """{"players":["Alice","Bob","Carol"],"epochs":3}""",
-                )) {
-                val response = client.post("/api/games") { setBody(body) }
-                assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
-                assertThat(json.readTree(response.bodyAsText())["code"].asText())
-                    .isEqualTo("INVALID_REQUEST")
+            testApplication {
+                application { module(createGameService(directory)) }
+                for (body in
+                    listOf(
+                        "null",
+                        "[]",
+                        "{",
+                        "{}",
+                        """{"players":"Alice"}""",
+                        """{"players":["Alice","Bob","Carol"],"epochs":1.2}""",
+                        """{"players":["Alice","Bob","Carol"],"epochs":3}""",
+                    )) {
+                    val response = client.post("/api/games") { setBody(body) }
+                    assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+                    assertThat(json.readTree(response.bodyAsText())["code"].asText())
+                        .isEqualTo("INVALID_REQUEST")
+                }
             }
         } finally {
             directory.toFile().deleteRecursively()
@@ -337,18 +339,21 @@ class ApplicationTest {
     }
 
     @Test
-    fun invalidRegistrationsReturnStructuredErrors() = testApplication {
+    fun invalidRegistrationsReturnStructuredErrors() {
         val directory = Files.createTempDirectory("aor-input-test-")
         try {
-            application { module(createGameService(directory)) }
-            for (names in listOf(listOf("A", "B"), listOf("A", "a", "C"), listOf("A", " ", "C"))) {
-                val response =
-                    client.post("/api/games") {
-                        setBody(json.writeValueAsString(mapOf("players" to names)))
-                    }
-                assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
-                assertThat(json.readTree(response.bodyAsText())["code"].asText())
-                    .isEqualTo("INVALID_GAME")
+            testApplication {
+                application { module(createGameService(directory)) }
+                for (names in
+                    listOf(listOf("A", "B"), listOf("A", "a", "C"), listOf("A", " ", "C"))) {
+                    val response =
+                        client.post("/api/games") {
+                            setBody(json.writeValueAsString(mapOf("players" to names)))
+                        }
+                    assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+                    assertThat(json.readTree(response.bodyAsText())["code"].asText())
+                        .isEqualTo("INVALID_GAME")
+                }
             }
         } finally {
             directory.toFile().deleteRecursively()
@@ -361,26 +366,28 @@ class ApplicationTest {
             (get("game") as ObjectNode).remove("cardInspections")
         }
 
-    private fun withGame(block: suspend ApiGame.() -> Unit) = testApplication {
+    private fun withGame(block: suspend ApiGame.() -> Unit) {
         val directory = Files.createTempDirectory("aor-api-test-")
         try {
-            application { module(createGameService(directory, FixedRandom())) }
-            val response =
-                client.post("/api/games") {
-                    contentType(ContentType.Application.Json)
-                    setBody("""{"players":["Alice","Bob","Carol"]}""")
-                }
-            val created = json.readTree(response.bodyAsText())
-            ApiGame(
-                    client = client,
-                    directory = directory,
-                    id = created["gameId"].asText(),
-                    tokens =
-                        created["links"].map { link ->
-                            link["path"].asText().substringAfter("token=")
-                        },
-                )
-                .block()
+            testApplication {
+                application { module(createGameService(directory, FixedRandom())) }
+                val response =
+                    client.post("/api/games") {
+                        contentType(ContentType.Application.Json)
+                        setBody("""{"players":["Alice","Bob","Carol"]}""")
+                    }
+                val created = json.readTree(response.bodyAsText())
+                ApiGame(
+                        client = client,
+                        directory = directory,
+                        id = created["gameId"].asText(),
+                        tokens =
+                            created["links"].map { link ->
+                                link["path"].asText().substringAfter("token=")
+                            },
+                    )
+                    .block()
+            }
         } finally {
             directory.toFile().deleteRecursively()
         }
