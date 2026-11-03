@@ -41,8 +41,10 @@ export async function checkMainView(page) {
         }
         await page.evaluate(`document.querySelector('.table-configuration > summary').click()`);
         await page.wait(`document.querySelector('.table-configuration').open`, 'Game options opens');
-        assert.equal(await page.evaluate(`document.querySelector('.table-configuration a, .table-configuration button')`), null,
+        assert.equal(await page.evaluate(`document.querySelectorAll('.table-configuration a').length`), 0,
             'In-game options contain settings without navigation links');
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.table-configuration button')].map(button => button.className)`),
+            ['secondary abandon-game'], 'Abandonment is the only action tucked into Game options');
         assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
         if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-main-view-${width}.png`));
         await page.evaluate(`document.querySelector('.table-configuration > summary').click(); document.querySelector('#tab-map').click()`);
