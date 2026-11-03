@@ -173,7 +173,7 @@ export async function checkBottomHand(page, web, baseline) {
         await page.wait(`document.querySelector('[data-map-province="jerusalem"].eligible')`, 'Hand-selected event activates targets');
         await target();
         assert.equal(await page.evaluate(`document.querySelector('.card-inspection-dialog[open], .inspection-panel')`), null, 'Selected event does not also open an inspector');
-        assert.match(await page.evaluate(`document.querySelector('.decision-heading h2').textContent`), /Crusades/);
+        assert.match(await page.evaluate(`document.querySelector('#decision-title').textContent`), /Crusades/);
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-decision h2')`), null, 'The selected card has one title in the decision heading');
         assert.equal(await page.evaluate(`document.querySelector('.decision-panel .card-effect-detail')`), null, 'Selected effects do not require opening a rules disclosure');
         assert.equal(await page.evaluate(`document.querySelector('.card-play-effects .card-event-text').checkVisibility()`), true, 'The selected event spells out its effects');

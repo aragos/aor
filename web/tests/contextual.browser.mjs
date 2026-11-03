@@ -203,7 +203,7 @@ export async function checkContextualUx(page, web, baseline) {
         return paths.length===1 && paths[0].hasAttribute('clip-path');
     })`), true, 'Each area border stays within its exact member footprint without a separating halo');
     assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false);
-    await click('.decision-heading [data-close-action]');
+    await click('.decision-toolbar [data-close-action]');
 
     await show({game:{hand:[{reference:'area-target',definition:{id:'black-death',kind:'event',messageId:'card.black-death',shape:'CIRCLE'}}],
         cardOffers:[{reference:'area-target',playable:true,blockers:[],choices:[

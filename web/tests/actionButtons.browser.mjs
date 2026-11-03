@@ -54,6 +54,13 @@ export async function checkActionButtons(page, web, baseline) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         console.log('Action footer:', width, 'card review and activity navigation');
         await show();
+        assert.equal(await page.evaluate(`(() => {
+            const title = document.querySelector('#decision-title').getBoundingClientRect();
+            const undo = document.querySelector('.undo-action').getBoundingClientRect();
+            const status = document.querySelector('.decision-status').getBoundingClientRect();
+            return Math.abs((title.top + title.bottom) / 2 - (undo.top + undo.bottom) / 2) < 1 &&
+                title.right <= undo.left && status.top >= Math.max(title.bottom, undo.bottom);
+        })()`), true, `Phase and Undo share a row above the status at ${width}px`);
         await click('[data-hand-card="footer-stone"]');
         await page.wait(`document.querySelector('.decision-actions .play-card-action')`, 'Selected card action reaches the footer');
         let frame = await pinned(`${width} selected card`);

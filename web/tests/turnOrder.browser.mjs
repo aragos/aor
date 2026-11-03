@@ -85,7 +85,11 @@ export async function checkTurnOrder(page, web) {
     await game.send(game.links[2], 'buy-tokens 9');
     await game.send(game.links[3], 'buy-tokens 10');
     await page.wait(`document.querySelector('.player-turn-order')`, 'resolved printed boxes');
-    assert.match(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-turn-order').textContent`), /Position 1.*Box 1/);
+    assert.match(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-turn-order').textContent`), /^Box 1/);
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').textContent.includes('Position')`), false,
+        'Player boxes show the printed box without a redundant position');
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-turn-order').parentElement.className`), 'player-status-row',
+        'The printed box shares the pool/submission row');
     assert.match(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-identity').textContent`), /You/i);
     await page.evaluate(`document.querySelector('#tab-players')?.click()`);
     const viewerHelp = '.player-summary.is-viewer [data-help-topic="turn-order"]';
@@ -110,7 +114,7 @@ export async function checkTurnOrder(page, web) {
         turnOrder: swappedOrder, orderBoxes: Object.fromEntries(swappedOrder.map((id, i) => [id, expected[4][i]]))}};
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify(swapped)})`);
     await page.wait(`document.querySelector('${popup} .is-viewer')?.dataset.orderBox === '6'`, 'open lookup follows changed order');
-    assert.match(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-turn-order').textContent`), /Position 4.*Box 6/);
+    assert.match(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-turn-order').textContent`), /^Box 6/);
     await page.screenshot(join(artifacts, 'turn-order-current-desktop.png'), 1280, 900);
     await escape();
     assert.equal(await page.evaluate(`window.mapCommands.length`), 0, 'Reference never submits a game action');

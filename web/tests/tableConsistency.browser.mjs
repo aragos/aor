@@ -8,6 +8,8 @@ import {checkTable} from './table.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkBottomHand} from './bottomHand.browser.mjs';
 import {checkBidWithdrawal} from './purchaseClarity.browser.mjs';
+import {assertTextAlignment} from './identityAlignment.browser.mjs';
+import {checkActivityPayments} from './activityPayments.browser.mjs';
 
 export async function checkTableConsistency(page, web, baseline) {
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -97,6 +99,7 @@ export async function checkTableConsistency(page, web, baseline) {
                 Math.abs((b.left+b.right)/2-(text.left+text.right)/2)<1;
         });
     })()`), true, 'Before and After sentences center as complete units');
+    await assertTextAlignment(page, '.turn-tie .capital-choices > button[aria-pressed]', 'Turn-order sentences share a baseline inside centered buttons');
     const stone = baseline.game.cardInspections.find(card => card.definition.id === 'stone-1').definition;
     await show({prompt: {messageId: 'prompt.play-cards', players: [viewer]}, undo: {...baseline.undo, available: true},
         legalChoices: {commands: ['play stone commodity stone', 'pass']},
@@ -107,6 +110,7 @@ export async function checkTableConsistency(page, web, baseline) {
     for (const [width, height, mobile] of [[1440, 1000, false], [390, 844, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         await assertToolbar();
+        await assertTextAlignment(page, '.cash-preview .label-message', 'Capital names and commodity receipt text share a baseline');
         assert.equal(await page.evaluate(`(() => {
             const message=document.querySelector('.cash-preview .label-message');
             const icon=message.querySelector('svg').getBoundingClientRect();
@@ -151,6 +155,7 @@ if (process.argv[1]?.endsWith('/tableConsistency.browser.mjs')) {
         await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
         await checkTable(page, web, baseline);
         await checkTableConsistency(page, web, baseline);
+        await checkActivityPayments(page, web, baseline);
         await checkMarketInsights(page, web, baseline);
         await checkBottomHand(page, web, baseline);
     } finally {

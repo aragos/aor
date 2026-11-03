@@ -29,12 +29,19 @@ mechanics and [map design](map-design.md) owns spatial rendering.
 - Show the actor, question, relevant resources and one waiting status beside the action. Open the
   relevant workspace once per decision. Interruptions name the responder and resumed activity.
   Keep confirmation reachable while the review scrolls; retain map/hand space on narrow screens.
+  Keep the decision title beside Undo above the status. Player summaries show the printed order box
+  beside pool/submission status; the reference owns the full position-to-box mapping.
 - Show deterministic effects inline before commitment: prices, named discounts, cash/misery
   endpoints, current → new shipping and limiting pool/shipping resources. Distinguish forecasts,
   conditions and unknown dice results. A blocked choice explains its authoritative cause and
   preserves legal alternatives. Purchase steps and Pass identify their actual continuation.
 - Reuse capital silhouettes with every visible capital name, including previews, references and
-  receipts; use public handles before assignment. Retain numeric/text labels alongside color.
+  receipts; use public handles before assignment. Use `CapitalLabel` for capital/name pairs and
+  `LabelMessage` for translated sentences. Keep names and surrounding copy on the same text baseline;
+  text rows using flex layout must align by baseline, with symbols centered inside their labels.
+  [Identity browser checks](../web/tests/identityAlignment.browser.mjs) measure text alignment across
+  font sizes and desktop/phone widths and run in the CI browser suite. Retain numeric/text labels
+  alongside color.
   Misery uses track order from green through amber/red to dark Chaos. Dice identify their colors.
 - Keep the hand available for card decisions. A card click prepares or toggles selection; dragging
   the hand does not select or submit. Commodity inspection highlights matching in-play provinces
@@ -87,10 +94,10 @@ are read-only. Explain fresh rolls, restored-deck draws, no redo and retained kn
 Policy conversion refreshes capabilities and closes the legacy editor while preserving unchanged
 decision drafts; actual rewind clears them. [Architecture](design.md#history-and-undo) owns scopes.
 
-Keep abandonment in auxiliary tools, with one consent section alongside ordinary play. The proposal
-counts as agreement; all seats must agree. Label the final response **Agree and abandon game** and
-explain that it ends without a winner. Nonfinal responses preserve drafts; terminal cleanup removes
-mutations and retains permitted inspection.
+Keep abandonment inside collapsed Game options, with one consent section alongside ordinary play.
+The proposal counts as agreement; all seats must agree. Label the final response
+**Agree and abandon game** and explain that it ends without a winner. Nonfinal responses preserve
+drafts; terminal cleanup removes mutations and retains permitted inspection.
 
 ## Game-table review gate
 

@@ -4,7 +4,10 @@ import type {Snapshot} from './api';
 import {playerName, provinceName} from './labels';
 import {PlayerPiece} from './map/MapSymbols';
 
-/** Reuse the board's capital silhouette wherever a capital is named in the table. */
+/**
+ * Reuse the board's silhouette and preserve the name's text baseline.
+ * Text rows containing this label must align flex items by baseline, not by box center.
+ */
 export function CapitalLabel({capital, children}: {capital: string | null; children: ReactNode}) {
     return <span className="identity-label">
         {capital && <svg width="16" height="16" viewBox="-28 -28 56 56" aria-hidden="true">

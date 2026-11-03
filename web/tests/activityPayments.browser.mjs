@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertTextAlignment} from './identityAlignment.browser.mjs';
 
 export async function checkActivityPayments(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -55,6 +56,7 @@ export async function checkActivityPayments(page, web, baseline) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         await page.evaluate(`document.querySelector('.activity-list').scrollTop = 0`);
         await page.evaluate(`document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))`);
+        await assertTextAlignment(page, '.activity-content', `Activity actors, targets, payments and copy share a baseline at ${width}px`);
         const geometry = await page.evaluate(`(() => {
             const list = document.querySelector('.activity-list');
             const bounds = list.getBoundingClientRect();

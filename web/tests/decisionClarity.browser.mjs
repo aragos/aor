@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {createGame, waitForMap} from './browser-support.mjs';
+import {assertTextAlignment} from './identityAlignment.browser.mjs';
 
 export async function checkDecisionClarity(page, web, baseline) {
     await page.send('Page.navigate', {url: web + '/tests/map-harness.html'});
@@ -47,13 +48,7 @@ export async function checkDecisionClarity(page, web, baseline) {
             eligibleProvinces: [], overseasCapacity: 0},
             activity: {actor: other, decisionPlayer: viewer, choice: 'cede-war', decisionEntry: revision + 1}}});
     assert.equal(await page.evaluate(`!!document.querySelector('.interrupt-owner')`), true, 'Actual interruptions retain their owner');
-    const alignment = await page.evaluate(`(() => {
-        const row = document.querySelector('.war-cession-summary');
-        const name = row.querySelector('.identity-label').getBoundingClientRect();
-        const text = row.querySelector('span').getBoundingClientRect();
-        return Math.abs((name.top + name.height / 2) - (text.top + text.height / 2));
-    })()`);
-    assert(alignment < 2, 'War winner symbol and surrounding text share a vertical center');
+    await assertTextAlignment(page, '.war-cession-summary', 'War winner and surrounding text share a baseline');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-war-winner-alignment.png'), 1280, 900);
     console.log('Passed: advance prerequisites/relief, explicit Master Art discard, toggle cleanup, compact ending status, interruption ownership and War alignment.');
 }

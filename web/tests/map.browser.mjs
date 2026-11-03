@@ -1,4 +1,5 @@
 import {checkTurnOrder} from './turnOrder.browser.mjs';
+import {checkIdentityAlignment} from './identityAlignment.browser.mjs';
 import {checkResponsiveLifecycle} from './responsiveLifecycle.browser.mjs';
 import {checkMapGeometry} from './mapGeometry.browser.mjs';
 import {checkDecisionClarity, checkLiveMarkerReduction} from './decisionClarity.browser.mjs';
@@ -102,6 +103,8 @@ const game = await createGame(6);
 const page = await open(web + game.links[0].path);
 try {
 await page.wait(`document.querySelector('.game-table')`, 'configuration controls');
+assert.equal(await page.evaluate(`document.querySelector('.table-configuration .abandon-game').checkVisibility()`), false,
+    'Abandonment stays inside closed Game options without occupying the table tools bar');
 await checkMainView(page);
 assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => button.textContent === 'Start setup')`), false, 'Creation starts setup implicitly');
 await page.wait(`document.querySelector('#bid')`, 'capital bidding');
@@ -618,7 +621,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
     assert.equal(await page.evaluate('window.mapCommands.at(-1)'), 'play hand-pirates provinces genoa rome');
 
-    await page.evaluate(`document.querySelector('.decision-heading [data-close-action]')?.click()`);
+    await page.evaluate(`document.querySelector('.decision-toolbar [data-close-action]')?.click()`);
     await show({legalChoices: {commands: ['cede-war']}, game: {warCession: {winner: 'p2', requiredCount: 2,
         eligibleProvinces: ['genoa', 'china', 'india'], overseasCapacity: 1}}});
     await page.wait(`document.querySelector('.eligible-shade') && document.querySelector('#tab-map[aria-selected=true]')`, 'war cession targets activate automatically');
@@ -649,6 +652,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkTurnOrder(page,web);
     await checkResponsiveLifecycle(page,web);
     await checkMapGeometry(page,web);
+    await checkIdentityAlignment(page,web);
 } finally {
     page.ws.close();
     await fetch(cdp + '/json/close/' + page.target.id);

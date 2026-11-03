@@ -27,6 +27,28 @@ try {
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-track-player]').length`), 0, 'Tracks omit player positions before capitals');
     await click('.reference-dialog .close-detail');
     await page.fill('#bid', '7');
+    for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        if (mobile) {
+            await page.wait(`document.querySelector('#tab-players')`, 'Phone Players tab mounts after resizing');
+            await click('#tab-players');
+        }
+        assert.equal(await page.evaluate(`document.querySelector('.abandon-game').checkVisibility()`), false,
+            'Abandonment takes no space while Game options is closed');
+        assert.equal(await page.evaluate(`document.querySelector('.abandon-game').closest('.table-configuration') !== null`), true);
+        await click('.table-configuration > summary');
+        await page.evaluate(`document.querySelector('.abandon-game').focus(); document.activeElement.click()`);
+        await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('Request abandonment')`, 'Abandonment confirmation opens through Game options');
+        assert.equal((await game.snapshot(link)).abandonment, null, 'Opening confirmation does not propose abandonment');
+        await page.click('Back');
+        await page.wait(`!document.querySelector('dialog[open]')`, 'Abandonment confirmation closes');
+        assert.equal(await page.evaluate(`document.activeElement.matches('.abandon-game')`), true, 'Closing confirmation restores focus to its opener');
+        await click('.table-configuration > summary');
+        if (mobile) await click('#tab-map');
+        assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Reviewing abandonment preserves the bid draft');
+    }
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
+    await page.wait(`!document.querySelector('#tab-players')`, 'Desktop tool placement returns');
     await vote(1, 'propose');
     await page.wait(`document.querySelector('.abandonment-status')`, 'live consent offer');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Consent polling preserves private browser draft');

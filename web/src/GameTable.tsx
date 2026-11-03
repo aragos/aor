@@ -189,8 +189,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}>
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
+            {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
         </details>
-        {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
         {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
             open={commandsOpen} onToggle={setCommandsOpen} loadRewindTargets={loadRewindTargets} reviewRewind={setRewindTarget}/>}
     </div>;
@@ -264,7 +264,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
                         <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
-                    <div className="decision-toolbar">
+                    <div className={`decision-toolbar ${objectAction ? 'object-heading' : ''}`}>
+                        <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
                         {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
                             className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
                             title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
@@ -272,24 +273,23 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                                 if (!withdrawing && snapshot.undo.capability === 'PREFIX_REWIND' && snapshot.undo.latestTarget) setRewindTarget(snapshot.undo.latestTarget);
                                 else void submit(withdrawing ? 'withdraw-bid' : 'undo');
                             }}>{t('history.undo')}</button>}
+                        {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed}
+                            aria-label={t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}
+                            aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>
+                            {sheetCollapsed ? '▴' : '▾'}
+                        </button>}
+                        {objectAction && <button type="button" className="close-detail" data-close-action aria-label={t('table.close')}
+                            onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
                     </div>
                     <div className="decision-scroll" ref={decisionScroll}>
-                        <div className={`decision-heading ${objectAction ? 'object-heading' : ''}`}>
+                        <div className="decision-heading">
                             {spectator && <p className="eyebrow">{t('table.publicInformationOnly')}</p>}
                             {finished && <p className="eyebrow">{t('game.finished')}</p>}
                             {!inactive && !finished && <div className={`decision-status ${actuallyActing ? 'is-ready' : 'is-waiting'}`} role="status">
                                 <strong>{t(actuallyActing ? 'table.yourMove' : 'prompt.waitingFor')}</strong>
                                 {!actuallyActing && liveSnapshot.prompt && <span className="waiting-players"><PlayerLabels snapshot={liveSnapshot} ids={liveSnapshot.prompt.players}/></span>}
                             </div>}
-                            <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
                             {!objectAction && <span className="mobile-selected">{province ? <ProvinceLabel snapshot={snapshot} id={province.id}/> : ''}</span>}
-                            {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed}
-                                aria-label={t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}
-                                aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>
-                                {sheetCollapsed ? '▴' : '▾'}
-                            </button>}
-                            {objectAction && <button type="button" className="close-detail" data-close-action aria-label={t('table.close')}
-                                onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
                             {snapshot.game.activity?.actor && snapshot.game.activity.decisionPlayer && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                         </div>
                     <AbandonmentStatus snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>

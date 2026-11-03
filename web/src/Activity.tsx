@@ -35,7 +35,7 @@ function CashPayment({event, player, amount, children}: {
     const participant = eventPlayer(event, player);
     const cash = amount === 0 ? '$0' : `${amount < 0 ? '−' : '+'}$${Math.abs(amount)}`;
     return <span className="event-cash-change" data-cash-player={player}>
-        <Emblem player={participant} size={13}/><span>{eventName(event, player)}</span>
+        <CapitalLabel capital={participant.capital}>{eventName(event, player)}</CapitalLabel>
         <strong>{cash}</strong>{children}
     </span>;
 }
@@ -76,7 +76,7 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
         return !event.tokenPurchases?.some(purchase => purchase.player === change.player && change.amount === -purchase.cashCost);
     });
     return <span className="activity-content">
-        {actor && <span className="activity-actor"><Emblem player={actor} size={15}/><strong>{eventName(event, actor.id)}</strong></span>}
+        {actor && <span className="activity-actor"><CapitalLabel capital={actor.capital}><strong>{eventName(event, actor.id)}</strong></CapitalLabel></span>}
         <span>{t(`activity.${event.kind}`)}</span>
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
         {event.war && <strong>{warHeading(event, event.war)}</strong>}
@@ -87,7 +87,7 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
         {event.amount !== null && event.protectionCash == null && <strong>{event.kind === 'BID_CAPITAL' ? '$' : ''}{event.amount}</strong>}
         {event.protectionCash != null && <span className="event-detail">{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
         {event.leaderRebate != null && <span className="event-detail">{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
-        {target && <span className="activity-actor">→ <Emblem player={target} size={15}/>{eventName(event, target.id)}</span>}
+        {target && <span className="activity-actor">→ <CapitalLabel capital={target.capital}>{eventName(event, target.id)}</CapitalLabel></span>}
         {event.detail && <span className="event-detail">{label(event.detail)}</span>}
         {event.drawReason && <span className="event-detail">{t(`activity.drawReason.${event.drawReason}`)}</span>}
         {event.dice.map((die, index) => {
