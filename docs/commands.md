@@ -80,11 +80,16 @@ prefix. Every accepted change records its author and parent revision in immutabl
 
 | Command | Behavior |
 | --- | --- |
-| `set-undo-policy <scope>` | Creator before `start`; `competitive`, `regular-turn` (default), `friendly-turn`, or `friendly-game` |
-| `undo` | Remove the most recent action when the current scope and recorded outcomes permit it |
+| `set-undo-policy <scope>` | Creator before `start`; `competitive`, `regular-turn` (default), `friendly-turn`, or `linear-game` (`friendly-game` is retained for legacy history) |
+| `undo` | Remove the latest complete unit under Linear game; legacy policies retain their outcome constraints |
 | `undo <entry-count>` | Retain this many effective engine entries and validate the removed suffix |
 
-`POST /api/games/{id}/history` accepts `expectedRevision`, zero-based `fromEntry`, and `lines`.
+Linear game accepts only exact-prefix `undo` / `undo N`; its suffix endpoint rejects even an empty
+replacement. `GET /api/games/{id}/rewind-targets?expectedRevision=N[&before=K]` returns up to 30 legal
+viewer-safe targets, newest first, with `nextBefore` for pagination. Commands revalidate the exact
+entry count under the write lock. There is no redo.
+
+For suffix-editing policies, `POST /api/games/{id}/history` accepts `expectedRevision`, zero-based `fromEntry`, and `lines`.
 Each line is an ordinary command from the editor or `@<entry-index>` retaining an original action.
 Delete/reorder references to remove/reorder actions where the scope permits. The engine must still
 accept every retained dependent action and the unchanged recorded outcomes of the same logical
@@ -246,3 +251,15 @@ operation returns current state without claiming a fresh write receipt.
 
 Historical `upgrade-planning` audit revisions remain readable in previously upgraded games;
 they contain no engine entries and are not a player command or an available API operation.
+
+### Player abandonment API
+
+`POST /api/games/{id}/abandonment` requires seat authentication, `expectedRevision`, canonical UUID
+`operationId`, and `operation`: `propose`, `agree`, `decline` or `withdraw`. Responses other than
+`propose` also require the current `requestId`; proposing allocates it on the server. No caller can
+supply another seat, votes or status. Exact retries return their receipt and the current snapshot;
+reused identifiers with different payloads reject. Final agreement closes the game in that revision.
+Consent is outside the engine command language and does not run or disarm plans until closure.
+
+An already-agreed seat's fresh `agree` returns the current snapshot with
+`abandonmentResult: ALREADY_AGREED`, without a new operation receipt or revision.

@@ -45,7 +45,7 @@ export async function checkPortal(page, web) {
     await page.fill('input[type=search]', 'bo');
     await page.wait(`document.querySelector('[aria-label="Matching players"]')?.textContent.includes('@bob')`, 'registered player directory search');
     assert.equal(await page.evaluate(`document.querySelector('[aria-label="Matching players"]').textContent.includes('uid-bob')`), false, 'Search results omit UIDs');
-    await page.click('Add');
+    await page.click('@bob');
     assert.equal(await page.evaluate(`document.querySelector('.create-registered .player-directory').textContent.includes('@bob')`), true, 'Selected players show unique handles');
     assert.equal(await page.evaluate(`document.querySelector('.create-registered .player-directory').textContent.includes('uid-')`), false, 'Selected players omit UIDs');
     await page.fill('input[type=search]', 'ca');

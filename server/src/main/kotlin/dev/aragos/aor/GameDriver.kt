@@ -11,6 +11,9 @@ data class Revision(
     val entries: List<String>,
     /** Edits retain this many effective entries, then append [entries] as a replacement suffix. */
     val replaceFrom: Int? = null,
+    val abandonment: AbandonmentEvent? = null,
+    /** Pending request closed by this archived administrative checkpoint. */
+    val abandonmentCheckpoint: java.util.UUID? = null,
     /** Present on creation and explicit setup policy commands; later revisions inherit it. */
     val undoPolicy: UndoPolicy? = null,
     /** A new engine checkpoint is authorized by this administrator and archived separately. */
@@ -55,10 +58,15 @@ data class StoredGame(
             when (
                 revisions
                     .lastOrNull {
-                        it.administrativeAction in
-                            setOf(AdministrativeAction.CANCEL, AdministrativeAction.ABANDON)
+                        it.abandonment?.closure == AbandonmentClosure.UNANIMOUS ||
+                            it.administrativeAction in
+                                setOf(AdministrativeAction.CANCEL, AdministrativeAction.ABANDON)
                     }
-                    ?.administrativeAction
+                    ?.let {
+                        if (it.abandonment?.closure == AbandonmentClosure.UNANIMOUS)
+                            AdministrativeAction.ABANDON
+                        else it.administrativeAction
+                    }
             ) {
                 AdministrativeAction.CANCEL -> GameStatus.CANCELLED
                 AdministrativeAction.ABANDON -> GameStatus.ABANDONED
@@ -148,14 +156,14 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
 
     fun submit(stored: StoredGame, player: PlayerId, command: Command): StoredGame {
         val state = stored.state()
-        return submit(stored, state, player, command)
+        return GameAbandonment.reconcile(stored, submit(stored, state, player, command))
     }
 
     /** Resolve live shorthand after authentication, then record only canonical commands. */
     fun submit(stored: StoredGame, player: PlayerId, text: String): StoredGame {
         val state = stored.state()
         val action = TextCodec.parseAction(text, state, actor = player)
-        return submit(stored, state, player, action.command)
+        return GameAbandonment.reconcile(stored, submit(stored, state, player, action.command))
     }
 
     /**

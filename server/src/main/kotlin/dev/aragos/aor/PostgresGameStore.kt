@@ -131,13 +131,20 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         val reference = "$expectedRevision-$hash.json"
         val replacement = transform(contents, reference)
         val root = encoded(replacement)
+        val preservesHistory =
+            replacement.revisions.last().storageArchive == reference &&
+                replacement.baseRevision == original.field("baseRevision").integer() &&
+                replacement.previousArchive ==
+                    original["previousArchive"]?.takeUnless { it.isNull }?.string() &&
+                replacement.revisions.dropLast(1) == GameDocuments.read(id, contents).revisions &&
+                replacement.revisions.last().storageArchive == reference
         require(
             replacement.id == id &&
                 replacement.revision == expectedRevision + 1 &&
-                replacement.baseRevision == expectedRevision &&
-                replacement.previousArchive == reference
+                ((replacement.baseRevision == expectedRevision &&
+                    replacement.previousArchive == reference) || preservesHistory)
         ) {
-            "A checkpoint must advance one revision and retain its preceding archive."
+            "An archived update must advance one revision and retain its source archive."
         }
         require(
             root["header"]["players"] == original["header"]["players"] &&
@@ -148,12 +155,16 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             "A checkpoint cannot change game registration or membership."
         }
         retainArchive(id, reference, contents)
-        connection.prepareStatement("DELETE FROM game_revisions WHERE game_id = ?").use { statement
-            ->
-            statement.setObject(1, key(id))
-            statement.executeUpdate()
+        if (preservesHistory) {
+            insertRevisions(connection, id, listOf(replacement.revisions.last()))
+        } else {
+            connection.prepareStatement("DELETE FROM game_revisions WHERE game_id = ?").use {
+                statement ->
+                statement.setObject(1, key(id))
+                statement.executeUpdate()
+            }
+            insertRevisions(connection, id, replacement.revisions)
         }
-        insertRevisions(connection, id, replacement.revisions)
         writePlayers(connection, replacement)
         writeRow(connection, row, replacement, root)
         replacement
@@ -310,15 +321,25 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                                     if (viewStatus == GameListStatus.UNAVAILABLE) {
                                         emptyList()
                                     } else {
-                                        rows
-                                            .getString("action_players")
-                                            ?.let { actionPlayers ->
-                                                json.readTree(actionPlayers).map {
-                                                    PlayerId(it.asText())
+                                        root["actionPlayers"]?.map { PlayerId(it.string()) }
+                                            ?: rows
+                                                .getString("action_players")
+                                                ?.let { actionPlayers ->
+                                                    json.readTree(actionPlayers).map {
+                                                        PlayerId(it.asText())
+                                                    }
                                                 }
-                                            }
-                                            .orEmpty()
+                                                .orEmpty()
                                     },
+                                    root["consentResponders"]
+                                        ?.map { PlayerId(it.string()) }
+                                        .orEmpty(),
+                                    root["consentResponders"]?.any { responder ->
+                                        memberships[responder.string()]?.asText() == viewer.value
+                                    } == true,
+                                    root["actionPlayers"]?.any { actor ->
+                                        memberships[actor.string()]?.asText() == viewer.value
+                                    } ?: (viewStatus == GameListStatus.MY_MOVE),
                                 )
                             )
                         }
@@ -351,6 +372,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
 
     private fun document(connection: Connection, row: Row): ObjectNode {
         val root = row.document.deepCopy()
+        root.remove(listOf("actionPlayers", "consentResponders"))
         root.put("id", row.id)
         root.put("revision", row.revision)
         val revisions = root.putArray("revisions")
@@ -414,7 +436,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
     }
 
     private fun writePlayers(connection: Connection, game: StoredGame) {
-        val actionPlayers = GameDirectory.summary(game, null).actionPlayers
+        val summary = GameDirectory.summary(game, null)
+        val actionPlayers = summary.actionPlayers + summary.consentResponders
         connection
             .prepareStatement(
                 """
@@ -484,7 +507,17 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
     }
 
     private fun encoded(game: StoredGame): ObjectNode =
-        json.readTree(GameDocuments.write(game)) as ObjectNode
+        (json.readTree(GameDocuments.write(game)) as ObjectNode).apply {
+            val summary = GameDirectory.summary(game, null)
+            set<com.fasterxml.jackson.databind.JsonNode>(
+                "actionPlayers",
+                json.valueToTree(summary.actionPlayers),
+            )
+            set<com.fasterxml.jackson.databind.JsonNode>(
+                "consentResponders",
+                json.valueToTree(summary.consentResponders),
+            )
+        }
 
     private fun metadata(root: ObjectNode): ObjectNode =
         root.deepCopy().apply {

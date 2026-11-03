@@ -8,7 +8,7 @@ export function AdvancePrice({offer, printedCost, compact = false, inlineDetails
     offer: AdvanceOfferView | undefined; printedCost: number; compact?: boolean; inlineDetails?: boolean;
 }) {
     const quote = offer?.priceBreakdown;
-    const price = offer?.price ?? printedCost;
+    const price = quote?.price ?? printedCost;
     const discount = quote?.effectiveDiscount ?? 0;
     if (compact) return <span className="advance-price-compact">
         <strong>${price}</strong>
@@ -23,11 +23,11 @@ export function AdvancePrice({offer, printedCost, compact = false, inlineDetails
     const breakdown = <>
         <dl className="detail-list price-breakdown">
             <div><dt>{t('table.printedCost')}</dt><dd>${quote.baseCost}</dd></div>
-            {quote.advanceCredits.map(credit => <div className="advance-credit-source" data-credit-advance={credit.advance} key={credit.advance}>
+            {quote.advanceCredits.filter(credit => credit.amount > 0).map(credit => <div className="advance-credit-source" data-credit-advance={credit.advance} key={credit.advance}>
                 <dt>{advanceName(credit.advance)}</dt><dd>−${credit.amount}</dd>
             </div>)}
             {quote.institutionalResearchCredit > 0 && <div><dt>{t('table.institutionalResearchCredit')}</dt><dd>−${quote.institutionalResearchCredit}</dd></div>}
-            {quote.leaders.map(discount => <div className="leader-discount" key={discount.leaderCardId}>
+            {quote.leaders.filter(discount => discount.amount > 0).map(discount => <div className="leader-discount" key={discount.leaderCardId}>
                 <dt>{label(discount.leaderCardId, 'leader')}</dt>
                 <dd><LeaderCredit amount={discount.amount} writtenRecordBonus={discount.writtenRecordBonus}/></dd>
             </div>)}

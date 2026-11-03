@@ -21,7 +21,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
     const [saving, setSaving] = useState(false);
     const request = useRef(quote);
     request.current = quote;
-    const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.game.turnNumber}:${snapshot.game.stage}:${snapshot.undo?.editRevision}`;
+    const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.status}:${snapshot.game.turnNumber}:${snapshot.game.stage}:${snapshot.undo?.editRevision}`;
     useEffect(() => {setOpen(false); setActions([]); setQuoted(null); setError(''); setBaseVersion(null); setSaving(false);}, [scope]);
     useEffect(() => {if (!snapshot.planning?.available) setOpen(false);}, [snapshot.planning?.available]);
     const key = JSON.stringify([snapshot.revision, actions]);

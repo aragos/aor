@@ -41,6 +41,40 @@ class ActivityPlansTest {
     }
 
     @Test
+    fun policyUpgradePreservesAutomaticAuthorizationWithoutExecutingIt() {
+        val fixture = fileFixture(policy = UndoPolicy.FRIENDLY_GAME)
+        fixture.toPurchase()
+        fixture.plan(1, PlanOperation.SAVE, purchase)
+        fixture.plan(1, PlanOperation.ARM)
+        val before = fixture.store.read(fixture.game.gameId)
+
+        LinearGameMigration.run(fixture.store)
+
+        val upgraded = fixture.store.read(before.id)
+        assertThat(upgraded.plans).isEqualTo(before.plans)
+        assertThat(upgraded.planVersions).isEqualTo(before.planVersions)
+        assertThat(upgraded.planReceipts).isEqualTo(before.planReceipts)
+        assertThat(upgraded.planExecutions).isEqualTo(before.planExecutions)
+        assertThat(upgraded.state()).isEqualTo(before.state())
+    }
+
+    @Test
+    fun linearRewindDisarmsOfflinePlansAndPreventsImmediateReexecution() {
+        val fixture = fileFixture(policy = UndoPolicy.LINEAR_GAME)
+        fixture.toPurchase()
+        fixture.plan(1, PlanOperation.SAVE, purchase)
+        fixture.plan(1, PlanOperation.ARM)
+        fixture.submit(0, "pass")
+
+        fixture.submit(0, "undo")
+        fixture.service.recoverPlans { _, failure -> throw failure }
+
+        assertThat(fixture.view(1).planning?.saved?.armed).isFalse()
+        assertThat(fixture.view(1).planning?.saved?.actions).isEqualTo(purchase)
+        assertThat(fixture.view(1).planning?.saved?.pause).isEqualTo(PlanPause.EDITED)
+    }
+
+    @Test
     fun historyEditsDisarmUnexecutedPlans() {
         val fixture = fileFixture(policy = UndoPolicy.FRIENDLY_GAME)
         fixture.toPurchase()

@@ -72,7 +72,8 @@ internal object HistoryProjection {
                     it.replaceFrom != null ||
                         it.storageArchive != null ||
                         it.adminAuthor != null ||
-                        (it.id > 1 && it.undoPolicy != null)
+                        (it.id > 1 && it.undoPolicy != null) ||
+                        it.abandonment != null
                 }
                 .forEach { revision ->
                     add(
@@ -80,7 +81,58 @@ internal object HistoryProjection {
                     )
                 }
         }
-        return PlayerHistory(state, lines, events.toList())
+        var revisionEntries = emptyList<String>()
+        var revisionState = GameState(stored.header)
+        stored.revisions.forEach { revision ->
+            val before = revisionState
+            val consent = revision.abandonment
+            val rewind = revision.replaceFrom != null && revision.command.startsWith("undo ")
+            if (consent != null || rewind || revision.abandonmentCheckpoint != null) {
+                val participants =
+                    stored.header.players.map { player ->
+                        HistoryParticipantView(
+                            player.id,
+                            player.name,
+                            before.players[player.id]?.capital,
+                        )
+                    }
+                val kind =
+                    if (consent != null)
+                        HistoryEventKind.valueOf("ABANDONMENT_${consent.operation}")
+                    else if (rewind) HistoryEventKind.REWIND else HistoryEventKind.ABANDONMENT_CLOSE
+                events.add(
+                    HistoryEventView(
+                        id = "${revision.id}:audit",
+                        kind = kind,
+                        actor = revision.author.takeIf { revision.adminAuthor == null },
+                        turnNumber = before.turnNumber,
+                        stage = before.stage,
+                        detail =
+                            consent?.closure?.name
+                                ?: AbandonmentClosure.UPGRADED.name.takeIf {
+                                    revision.abandonmentCheckpoint != null
+                                },
+                        participants = participants,
+                    )
+                )
+            }
+            val prefix =
+                revision.replaceFrom?.let {
+                    replay(stored.header, revisionEntries.take(it))
+                } ?: revisionState
+            revisionState =
+                revision.entries.fold(prefix) { current, text ->
+                    current.step(TextCodec.parse(text))
+                }
+            revisionEntries =
+                revisionEntries.take(revision.replaceFrom ?: revisionEntries.size) +
+                    revision.entries
+        }
+        return PlayerHistory(
+            state,
+            lines,
+            events.sortedBy { it.id.substringBefore(':').toIntOrNull() ?: 0 },
+        )
     }
 
     /**

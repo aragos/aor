@@ -105,7 +105,11 @@ internal object GameDirectory {
                     else -> emptyList()
                 }
             }
-        val myMove = seat != null && seat in actionPlayers
+        val responders =
+            if (game.status == GameStatus.ACTIVE) GameAbandonment.open(game)?.outstanding.orEmpty()
+            else emptyList()
+        val consentResponse = seat != null && seat in responders
+        val myMove = seat != null && (seat in actionPlayers || consentResponse)
         val status =
             when {
                 game.status == GameStatus.CANCELLED -> GameListStatus.CANCELLED
@@ -130,6 +134,9 @@ internal object GameDirectory {
             myMove,
             game.name,
             actionPlayers,
+            responders,
+            consentResponse,
+            seat != null && seat in actionPlayers,
         )
     }
 }

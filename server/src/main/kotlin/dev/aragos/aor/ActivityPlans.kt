@@ -254,12 +254,17 @@ internal object ActivityPlans {
             )
     }
 
-    fun disarm(game: StoredGame, pause: PlanPause): StoredGame =
-        game.copy(
-            plans =
-                game.plans.mapValues { (_, plan) -> plan.copy(signature = null, pause = pause) },
-            planVersions = game.planVersions.mapValues { UUID.randomUUID().toString() },
-        )
+    fun disarm(game: StoredGame, pause: PlanPause): StoredGame {
+        val disarmed =
+            game.copy(
+                plans =
+                    game.plans.mapValues { (_, plan) ->
+                        plan.copy(signature = null, pause = pause)
+                    },
+                planVersions = game.planVersions.mapValues { UUID.randomUUID().toString() },
+            )
+        return if (game.status == GameStatus.ACTIVE) reconcile(disarmed) else disarmed
+    }
 
     fun afterManual(game: StoredGame, owner: PlayerId): StoredGame {
         val plan = game.plans[owner] ?: return reconcile(game)

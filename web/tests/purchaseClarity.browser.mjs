@@ -114,8 +114,8 @@ export async function checkPurchaseClarity(page, web, baseline) {
     const tileText = await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').textContent`);
     assert.match(tileText, /\$40.*−\$60 credits/);
     await click(`[data-advance="${advance.id}"]`);
-    await click('.decision-panel .price-details > summary');
-    assert.match(await page.evaluate(`document.querySelector('.decision-panel .price-breakdown').textContent`), /Printed cost\$100.*Urban Ascendancy−\$20.*Institutional Research−\$10.*Price\$40/);
+    assert.match(await page.evaluate(`document.querySelector('.decision-panel .price-breakdown').textContent`), /Printed cost\$100.*Urban Ascendancy−\$20.*Institutional Research−\$10/);
+    assert.match(await page.evaluate(`document.querySelector('.decision-panel .advance-price-heading').textContent`), /Price\$40/);
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.decision-panel [data-misery-preview-player] [data-misery-box]')].map(box => box.dataset.miseryBox)`), ['20', '30']);
     assert.equal(await page.evaluate(`document.querySelector('.decision-actions').dataset.layout`), 'paired');
     await assertContinuationWords(1280);

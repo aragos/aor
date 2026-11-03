@@ -162,6 +162,8 @@ fun Application.module(
                 val undoPolicy =
                     body["undoPolicy"]?.let { UndoPolicy.parse(it.string()) }
                         ?: UndoPolicy.REGULAR_TURN
+                if (undoPolicy == UndoPolicy.FRIENDLY_GAME)
+                    throw ServiceFailure(400, "INVALID_UNDO_POLICY")
                 val options = body["options"]
                 val rules =
                     if (options == null) {
@@ -210,6 +212,49 @@ fun Application.module(
                 } else {
                     call.respondJson(result.snapshot)
                 }
+            }
+        }
+        post("/api/games/{id}/abandonment") {
+            call.api {
+                val body = call.body()
+                body.fieldsOnly("operation", "expectedRevision", "operationId", "requestId")
+                val operation = runCatching {
+                    AbandonmentOperation.valueOf(body.field("operation").string().uppercase())
+                }
+                    .getOrElse { throw ServiceFailure(400, "INVALID_REQUEST") }
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        gameService.abandonment(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            body.field("expectedRevision").integer(),
+                            body.field("operationId").string(),
+                            operation,
+                            body["requestId"]?.takeUnless(JsonNode::isNull)?.string(),
+                        )
+                    }
+                )
+            }
+        }
+        get("/api/games/{id}/rewind-targets") {
+            call.api {
+                val expected =
+                    call.request.queryParameters["expectedRevision"]?.toIntOrNull()
+                        ?: throw ServiceFailure(400, "INVALID_REQUEST")
+                val before =
+                    call.request.queryParameters["before"]?.let {
+                        it.toIntOrNull() ?: throw ServiceFailure(400, "INVALID_REQUEST")
+                    }
+                call.respondJson(
+                    withContext(Dispatchers.IO) {
+                        gameService.rewindTargets(
+                            call.parameters["id"]!!,
+                            call.gameAccess(hosted),
+                            expected,
+                            before,
+                        )
+                    }
+                )
             }
         }
         get("/api/games/{id}/revisions/{revision}") {

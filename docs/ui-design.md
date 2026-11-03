@@ -350,6 +350,44 @@ choice and understand its result through visual controls and commands, on deskto
   compares the editable amount with the authoritative saved value; generic operation success cannot
   label an edited or withdrawn value as saved.
 
+## Linear game undo interaction
+
+These contracts govern [Linear game](design.md#linear-game-undo). Legacy policy revisions
+remain readable under their original semantics.
+
+- Creation describes Linear game beside its choice: the creator can rewind earlier play, players
+  can rewind their current activity, and later play is removed together. State that new rolls and
+  random selections can change while a draw follows the restored deck. Help explains the limits
+  and that information already learned remains known. The existing policy default stays Regular
+  turn. Upgraded Friendly games show Linear game and a compact notice that Friendly game has been
+  replaced with linear undo, including random events. Help explains the new continuation behavior;
+  historical views before conversion retain the Friendly game label.
+- Keep one primary Undo at the upper right. Under Linear game it opens a compact consequence review
+  for the latest removable unit: destination, removed public actions, removal of random events,
+  clearing saved submissions and pausing automatic plans. Confirm with **Rewind to here**. Use the
+  same review for an earlier target selected under Commands; do not add a second timeline or a
+  replacement-command textarea. Earlier targets use safe action labels and the destination's
+  capital symbols; raw entry counts remain in the technical Commands view.
+- Only present server-offered legal targets for this viewer. Never make an activity grouping imply
+  that a protected partial batch or an isolated die/draw is independently removable. Prior revision
+  inspection stays read-only. A missing permission or an inactive game cannot be bypassed by opening
+  an old review. The creator can reach rewind review in a finished active game without a live prompt.
+- Preserve the existing unrevealed-submission shortcut: primary Undo withdraws the caller's own
+  saved bid/token amount and retains the unsaved local draft. That operation does not rewind history.
+  Earlier history rewind remains reachable under Commands where permitted; its review explicitly
+  says pending amounts will be cleared and will need resubmission.
+- Successful rewind closes review, clears obsolete decisions/results and refreshes the table,
+  scores and pending status. A stale review requires refreshed targets and another explicit
+  confirmation. Polling and rejection preserve valid drafts; neither commits an offered target.
+  Keep focus restoration, keyboard activation, phone scrolling and confirmation reachable. Expose
+  one author-attributed rewind notice without duplicating removed events in live Activity; Help
+  owns the explanation of old revisions and absent redo.
+- Policy conversion refreshes capabilities and closes the old suffix editor without submitting its
+  contents. Explain that earlier edits remain in history and new changes use rewind. Preserve the
+  current action draft, saved private submissions and plan status when the underlying decision is
+  unchanged. Only an actual rewind clears submissions and disarms plans. A stale pre-conversion
+  write refreshes the new policy without automatic resubmission.
+
 ## Acceptance evidence
 
 Review discovery, inspection, preparation, commitment and outcome together, including waiting,
@@ -389,3 +427,21 @@ assertion is insufficient: verify the unwanted duplicate is absent and the remai
 - Activity records public position changes with entry-time capital identities and before/after
   positions. Automatic Civil War movement appears when Expansion starts, separately from the
   original card play and any subsequent Renaissance swap.
+
+## Table refinements and unanimous abandonment
+
+Use a consequence review for expansion Pass while a reachable marker commitment remains. Repeating
+an inspected commodity card toggles highlights without discarding its action draft. Render waiting
+names and punctuation in a single text flow. Track Help waits for completed capital selection;
+access hatching leaves overseas labels readable.
+
+Advance review shares printed future-credit facts with inspection and shows the authoritative price
+breakdown inline. Show accumulated MR → projected MR once, in dollars; omit an unchanged projection
+when the gain is zero. Future category credit names its category, other advances and next-turn timing.
+
+Place Abandon game in auxiliary tools (Players on phones). Confirm that proposing counts as agreement.
+Show one consent section alongside the ordinary decision, with proposer, agreed seats and outstanding
+responders using capital symbols. Agreement lasts as play continues; the last agreement irreversibly
+ends the game without a winner. Use Agree and abandon game for the last responder. Keep play available
+until unanimity and preserve valid drafts through nonfinal success, polling and rejection. Terminal
+cleanup removes action controls and stale results; retain permitted inspection and the unanimous cause.
