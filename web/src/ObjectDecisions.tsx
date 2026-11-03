@@ -11,7 +11,7 @@ import {InvalidChoice, useTargets} from './DecisionControls';
 import {CardEventText} from './CardEventText';
 import {CardPlayEffects} from './CardPlayEffects';
 import {AdvanceBenefits} from './AdvanceBenefits';
-import {AdvanceInspection} from './AdvanceInspection';
+import {AdvanceCreditBenefit, AdvanceInspection} from './AdvanceInspection';
 import {LeaderCredit} from './LeaderCredit';
 import {AdvancePrice} from './AdvancePrice';
 import {MiseryPreview} from './MiseryPreview';
@@ -144,13 +144,17 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'action', inspec
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     return <section className="object-decision advance-decision" aria-labelledby="decision-title">
         <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
-        <p className="advance-prerequisites">{t('advance.prerequisites')}: {advance.prerequisites.map(advanceName).join(', ') || t('reference.none')}</p>
-        <p className="advance-relief">{t('advance.reliefRating', {amount: advance.miseryRelief})}</p>
-        <AdvancePrice offer={offer} printedCost={advance.cost}/>
-        {offer?.price !== null && offer?.price !== undefined && <>
+        {advance.prerequisites.some(id => !me?.advances.includes(id)) && <p className="advance-prerequisites">{t('advance.prerequisites')}: {advance.prerequisites.filter(id => !me?.advances.includes(id)).map(advanceName).join(', ')}</p>}
+        <AdvancePrice offer={offer} printedCost={advance.cost} inlineDetails/>
+        <dl className="detail-list advance-purchase-benefits">
+            <div className="advance-relief"><dt>{t('controls.reliefRatingAvailable')}</dt><dd>${snapshot.game.reliefRatingAvailable}
+                {advance.miseryRelief > 0 && <> → ${snapshot.game.reliefRatingAvailable + advance.miseryRelief} (+${advance.miseryRelief})</>}</dd></div>
+            <AdvanceCreditBenefit advance={advance}/>
+        </dl>
+        {offer?.priceBreakdown && offer.price !== null && <>
             <p className="small">{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
         </>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
-        {offer && <DecisionAction className="card-confirmation buy-advance-action" disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}</DecisionAction>}
+        {offer && <DecisionAction className="card-confirmation buy-advance-action" disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}{offer.price != null && ` · $${offer.price}`}</DecisionAction>}
     </section>;
 }

@@ -37,6 +37,11 @@ internal object GameDocuments {
         if (!ARCHIVE_PATTERN.matches(name)) throw ServiceFailure(404, "ARCHIVE_NOT_FOUND")
     }
 
+    private fun canonicalUuid(value: String): java.util.UUID {
+        require(GAME_ID_PATTERN.matches(value)) { "Lifecycle identifiers must be canonical UUIDs." }
+        return java.util.UUID.fromString(value)
+    }
+
     private fun decode(root: JsonNode): StoredGame {
         val node = root.field("header")
         val registeredPlayers =
@@ -74,6 +79,35 @@ internal object GameDocuments {
                 root.field("revisions").array().map { revision ->
                     Revision(
                         id = revision.field("id").integer(),
+                        abandonmentCheckpoint =
+                            revision["abandonmentCheckpoint"]
+                                ?.takeUnless(JsonNode::isNull)
+                                ?.string()
+                                ?.let(::canonicalUuid),
+                        abandonment =
+                            revision["abandonment"]?.takeUnless(JsonNode::isNull)?.let { event ->
+                                AbandonmentEvent(
+                                    requestId = canonicalUuid(event.field("requestId").string()),
+                                    operation =
+                                        AbandonmentOperation.valueOf(
+                                            event.field("operation").string()
+                                        ),
+                                    operationId =
+                                        event["operationId"]
+                                            ?.takeUnless(JsonNode::isNull)
+                                            ?.string()
+                                            ?.let(::canonicalUuid),
+                                    baseRevision =
+                                        event["baseRevision"]
+                                            ?.takeUnless(JsonNode::isNull)
+                                            ?.integer(),
+                                    closure =
+                                        event["closure"]
+                                            ?.takeUnless(JsonNode::isNull)
+                                            ?.string()
+                                            ?.let(AbandonmentClosure::valueOf),
+                                )
+                            },
                         parent =
                             revision.field("parent").let { parent ->
                                 if (parent.isNull) null else parent.integer()
@@ -326,7 +360,80 @@ internal object GameDocuments {
                     revisions = game.revisions.take(index),
                     pendingBids = emptyMap(),
                 )
+            require(
+                revision.abandonmentCheckpoint == null || (index == 0 && game.baseRevision > 0)
+            ) {
+                "Only an archived administrative checkpoint can record a baseline consent closure."
+            }
+            val consent = revision.abandonment
+            if (consent?.operation == AbandonmentOperation.CLOSE) {
+                require(
+                    GameAbandonment.open(previous)?.requestId == consent.requestId &&
+                        consent.operationId == null &&
+                        revision.at > 0 &&
+                        consent.baseRevision == null &&
+                        GameAbandonment.closure(
+                            previous,
+                            game.copy(
+                                revisions =
+                                    game.revisions.take(index) + revision.copy(abandonment = null)
+                            ),
+                        ) == consent.closure
+                ) {
+                    "An automatic consent closure must record its exact cause and request."
+                }
+            } else if (index > 0 && consent == null) {
+                require(
+                    GameAbandonment.closure(
+                        previous,
+                        game.copy(revisions = game.revisions.take(index + 1)),
+                    ) == null
+                ) {
+                    "A superseding operation must close its pending consent request."
+                }
+            }
             when {
+                consent != null && consent.operation != AbandonmentOperation.CLOSE -> {
+                    require(
+                        index > 0 &&
+                            consent.operationId != null &&
+                            consent.baseRevision == previous.revision &&
+                            revision.entries.isEmpty() &&
+                            revision.replaceFrom == null &&
+                            revision.undoPolicy == null &&
+                            revision.adminAuthor == null &&
+                            revision.administrativeAction == null &&
+                            revision.storageArchive == null &&
+                            revision.at > 0 &&
+                            revision.command ==
+                                "abandonment ${consent.operation.name.lowercase()}" &&
+                            previous.revisions.none {
+                                it.abandonment?.operationId == consent.operationId
+                            } &&
+                            GameAbandonment.transition(previous, revision.author, consent) ==
+                                consent
+                    ) {
+                        "Player consent requires a canonical eligible transition and unique operation receipt."
+                    }
+                    state
+                }
+                revision.storageArchive != null && revision.command == "upgrade-linear-game" -> {
+                    require(
+                        index > 0 &&
+                            previous.undoPolicy == UndoPolicy.FRIENDLY_GAME &&
+                            revision.undoPolicy == UndoPolicy.LINEAR_GAME &&
+                            revision.author == game.header.creatorId &&
+                            revision.adminAuthor == "system-linear-game" &&
+                            revision.administrativeAction == null &&
+                            revision.at > 0 &&
+                            revision.entries.isEmpty() &&
+                            revision.replaceFrom == null &&
+                            revision.storageArchive.matches(ARCHIVE_PATTERN)
+                    ) {
+                        "A Linear game upgrade must audit its source archive and preserve all gameplay."
+                    }
+                    state
+                }
                 revision.storageArchive != null -> {
                     require(
                         index > 0 &&
@@ -390,6 +497,13 @@ internal object GameDocuments {
                     require(revision.undoPolicy == null) {
                         "A history edit cannot change the undo policy."
                     }
+                    require(
+                        previous.undoPolicy != UndoPolicy.LINEAR_GAME ||
+                            (revision.command == "undo ${revision.replaceFrom}" &&
+                                revision.entries.isEmpty())
+                    ) {
+                        "Linear game accepts only canonical empty-suffix rewinds."
+                    }
                     val actions =
                         HistoryEdits.retainedLines(
                             previous,
@@ -426,7 +540,13 @@ internal object GameDocuments {
                 revision.undoPolicy != null && index > 0 -> {
                     val configured =
                         HistoryEdits.configure(previous, revision.author, revision.undoPolicy)
-                    require(configured.revisions.last() == revision) {
+                    require(
+                        configured.revisions.last() ==
+                            revision.copy(
+                                abandonment = null,
+                                at = if (consent == null) revision.at else 0,
+                            )
+                    ) {
                         "Undo policy revisions must be canonical."
                     }
                     state

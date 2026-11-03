@@ -20,13 +20,14 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
 1. The engine owns legality, prices, commitments, eligibility and readiness. Use strong domain types,
    intrinsic validation and typed rejections; geometry, transport and persistence do not decide rules.
 2. Replay uses canonical commands and recorded outcomes, with no IO, clock reads or fresh randomness.
-   History edits preserve the outcomes of the same logical random events.
+   Suffix-editing policies preserve the outcomes of the same logical random events. Linear game may
+   remove random outcomes only together with their complete later suffix.
 3. Ordinary revisions append deltas. Edits retain an explicit prefix and replace a suffix while
    earlier revisions remain immutable. Writes check the expected revision and publish atomically.
 4. Private submissions take effect only when their complete batch commits. Views, errors, history
    and earlier revisions preserve each viewer's audience. Public leader counts use public plays,
    retaining privately discarded leaders in the counts so no hidden identity is disclosed.
-5. Undo follows its four documented scopes. Setup and complete simultaneous batches are protected;
+5. Undo follows its four implemented scopes. Setup and complete simultaneous batches are protected;
    another player's answer may be retained by reference, never supplied as a replacement.
 6. Every change must preserve playability of existing saved games or include an implemented,
    documented and tested upgrade path to the newest version. Ordinary play may support only current
@@ -34,6 +35,67 @@ and [map design](map-design.md) own interaction. [README](../README.md) owns bui
    Preserve game continuity, recorded outcomes, history, identities, metadata, memberships and
    pending private state. Verify representative pre-change saves load, replay and continue play,
    directly or after upgrade; schema maintenance cannot silently change game behavior.
+
+## Linear game undo acceptance
+
+These acceptance criteria define the implemented policy. The
+[history contract](design.md#linear-game-undo) defines exact-prefix undo with removable random
+events and replaces Friendly game for new and existing games. The agreed product decisions and
+remaining implementation checks are tracked in
+[follow-ups](follow-ups.md#linear-game-undo-design-decisions).
+
+1. Every successful rewind produces an exact shorter prefix of the current effective log. The
+   creator can select any complete post-setup boundary, including across turns and after engine
+   completion; other players are limited to their own currently open phase activity. Nested
+   responses do not transfer activity ownership. Spectators and nonmembers cannot rewind.
+2. Setup, partial simultaneous batches and unresolved system-outcome sequences are not legal
+   targets. One Undo removes one complete unit, including its required outcomes; repeated Undo
+   continues backward without restoring earlier discarded play. Invalid and no-op targets reject
+   without rounding. Test boundaries within a multi-unit revision/checkpoint as well as ordinary
+   action revisions and grouped activity rows.
+3. Cover removal of competition, War and Wind/Watermill rolls, draws, random transfers and epoch
+   shuffles, plus intervening other-player answers and automatic phase changes. Replay restores
+   hands, deck order, cash, tokens, allowances, pending decisions and end triggers exactly to the
+   prefix. No later action or consequence survives. Ordinary replay and rewind call no randomness.
+4. Under fresh-outcome continuation, a new roll/selection calls the live provider;
+   a draw follows the restored deck, and only a removed shuffle can shuffle again. Test with a
+   controlled provider rather than assuming fresh samples must differ. Retained outcomes remain
+   unchanged. Existing policies and administrative upgrades still reject lost random continuity.
+5. Each rewind appends an immutable, author-attributed revision with an empty replacement suffix.
+   Revision numbers increase, retained entry identities remain stable and new entries have new
+   identities. Verify save/reload, repeated rewind after resumed play, historical views, checkpoint
+   boundaries and tampered-document rejection. No redo, arbitrary replacement or revision-restore
+   route may bypass the prefix rule.
+6. Rewind atomically clears pending submissions, changes private receipts, disarms all plans,
+   changes plan versions and invalidates previews. Retain only unarmed, in-scope private plan drafts
+   and factual execution receipts. No automatic worker may recreate undone play. Test a same-phase
+   rewind, a stale previously empty submission slot, an armed offline plan and execution/rewind
+   races on both file storage and independent PostgreSQL writers. Failed writes change nothing.
+7. Concurrent commands and rewinds use the expected public revision. Stale requests cannot undo a
+   different action; clients refresh without resubmission after conflicts or uncertain responses.
+   Cancellation/abandonment block rewind, and rewind cannot change roles, membership or metadata.
+   Reopening an engine-finished active game refreshes readiness, listings and score presentation.
+8. Target offers, review, errors, audit and old revisions preserve each viewer's information audience,
+   including the creator's. Test draws, hidden discards, trades and unrevealed submissions for owner,
+   other player and spectator. Counts must not disclose a private choice. Retained activity preserves
+   entry-time facts; only removed activity disappears from the effective timeline.
+9. Automatically upgrade existing Friendly games through an archived, audited, atomic policy
+   transition. Preserve the complete original chain, effective entry identities/outcomes, engine
+   state, prompts, metadata, lifecycle, memberships, pending secrets, receipts, saved plans and
+   valid authorizations. Validate earlier suffix edits under their original policy; new commands
+   use Linear game, including rewinds to legal prefixes before conversion. Verify representative
+   pre-change format-7 fixtures with prior edits, checkpoints and pending private state on both
+   backends: preflight, migration, reload, replay and continued play. Cover ongoing, finished and
+   inactive games, restored/imported saves, repeat migration, failure rollback and concurrent public
+   and private writes. Other policies keep their existing behavior. No decoder alias or rewriting
+   of old revisions may substitute for the explicit upgrade.
+10. Browser verification covers creator and ordinary-player scopes, target review, random-event
+    consequences, setup/batch protection, waiting and completed games, and unavailable suffix
+    editing, including a previously open Friendly game editor during conversion. Conversion alone
+    preserves the current decision and valid action drafts; actual rewind clears obsolete drafts.
+    Check keyboard and phone layouts in production StrictMode. Successful rewind clears
+    obsolete drafts even with an identical prompt; polling and rejection preserve valid work.
+    Record automated and human observations separately when implemented.
 
 ## Player experience
 
@@ -251,3 +313,31 @@ Prefer managed authentication/TLS and automated dependency checks and fresh depl
 screen-reader, physical-phone, browser-chrome zoom and composited/SVG contrast review remain separate
 from automated evidence. Toulouse and Constantinople's labels are accepted. Bots and general plans
 spanning future phases remain deferred; private plans cover current Purchase and Buy Card activities.
+
+## Table and online game controls
+
+- Confirm expansion Pass when a server offer permits committing enough tokens to establish a marker
+  in a reachable province. Inspection, cancellation and rejected commands preserve the current draft.
+- Player-search handles and Add select the same registered player. Keep game rows and creation
+  compact, with optional game settings in one disclosure and names in a normal text flow.
+- Keep overseas labels clear of access hatching. Track Help shows no player positions until every
+  capital has been chosen. A repeated commodity-card click toggles its map highlight and preserves
+  the prepared action; ordinary inspection and decision cleanup still clear highlights.
+- Advance purchase review shows named nonzero discounts, final price, quoted cash after purchase,
+  accumulated MR and the selected advance's dollar gain, plus category credit for other advances
+  from next turn. Omit satisfied prerequisites, owners and duplicate MR summaries. Keep confirmation
+  and the actual step continuation reachable while the review scrolls.
+
+## Unanimous player abandonment
+
+Any seat may request abandonment of an active, unfinished game. The proposer agrees immediately;
+all seats, including Chaos and offline players, must explicitly agree to that same request. Play
+continues while responses are pending. Decline or withdrawal closes the request; a later request
+requires fresh consent. History edits, policy upgrades, administrative closure and natural completion
+close pending consent with their actual cause.
+
+Final agreement atomically abandons without scoring or revealing private values, clears unrevealed
+submissions, rotates submission receipts and disarms plans. Board and audience-filtered history remain
+readable. Consent has its own attention reason and controls, separate from engine turn readiness.
+Nonfinal votes preserve gameplay drafts. Canonical UUID operation receipts reconcile retries, including
+through archived administrative checkpoints; stale revisions and obsolete requests cannot vote again.

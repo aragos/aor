@@ -1,11 +1,14 @@
 package dev.aragos.aor
 
+import java.util.UUID
+
 /** History authority is independent of optional game mechanics. */
 enum class UndoPolicy(val commandValue: String) {
     COMPETITIVE("competitive"),
     REGULAR_TURN("regular-turn"),
     FRIENDLY_TURN("friendly-turn"),
-    FRIENDLY_GAME("friendly-game");
+    FRIENDLY_GAME("friendly-game"),
+    LINEAR_GAME("linear-game");
 
     companion object {
         fun parse(value: String): UndoPolicy =
@@ -24,6 +27,9 @@ data class UndoView(
     val entryCount: Int,
     val editRevision: Int,
     val actions: List<EditableActionView>,
+    val capability: HistoryCapability = HistoryCapability.NONE,
+    val latestTarget: RewindTarget? = null,
+    val converted: Boolean = false,
 )
 
 /** Reject the whole proposed revision on any scope, dependency or randomness mismatch. */
@@ -47,14 +53,19 @@ internal object HistoryEdits {
                 state = state.step(entry)
             }
         }
+        val target =
+            if (stored.undoPolicy == UndoPolicy.LINEAR_GAME && player != null)
+                LinearHistory.targets(stored, player).firstOrNull()
+            else null
         val available =
             player != null &&
                 (actions.lastOrNull()?.let { action ->
                     runCatching { replacement(stored, player, action.entry, emptyList()) }.isSuccess
                 } ?: false)
+        val linear = stored.undoPolicy == UndoPolicy.LINEAR_GAME
         return UndoView(
             stored.undoPolicy,
-            available,
+            if (linear) target != null else available,
             lower,
             entries.size,
             stored.revisions
@@ -63,22 +74,38 @@ internal object HistoryEdits {
                         it.administrativeAction == AdministrativeAction.UPGRADE
                 }
                 ?.id ?: 0,
-            actions,
+            if (linear) emptyList() else actions,
+            when {
+                lower == null -> HistoryCapability.NONE
+                linear -> HistoryCapability.PREFIX_REWIND
+                else -> HistoryCapability.SUFFIX_EDIT
+            },
+            target,
+            stored.revisions.any { it.command == "upgrade-linear-game" },
         )
     }
 
     fun undo(stored: StoredGame, player: PlayerId, target: Int? = null): StoredGame {
         val from =
-            target
-                ?: stored.effectiveEntries().indexOfLast {
-                    TextCodec.parse(it.text) is Entry.Action
-                }
+            if (stored.undoPolicy == UndoPolicy.LINEAR_GAME)
+                target
+                    ?: LinearHistory.targets(stored, player).firstOrNull()?.entryCount
+                    ?: throw ServiceFailure(403, "HISTORY_EDIT_FORBIDDEN")
+            else
+                target
+                    ?: stored.effectiveEntries().indexOfLast {
+                        TextCodec.parse(it.text) is Entry.Action
+                    }
         return commit(stored, player, from, emptyList(), "undo $from")
     }
 
     /** @N retains original action N, including private actions without revealing their contents. */
-    fun edit(stored: StoredGame, player: PlayerId, from: Int, lines: List<String>): StoredGame =
-        commit(stored, player, from, lines, "edit-history $from")
+    fun edit(stored: StoredGame, player: PlayerId, from: Int, lines: List<String>): StoredGame {
+        if (stored.undoPolicy == UndoPolicy.LINEAR_GAME) {
+            throw ServiceFailure(422, "HISTORY_SUFFIX_UNSUPPORTED")
+        }
+        return commit(stored, player, from, lines, "edit-history $from")
+    }
 
     fun configure(stored: StoredGame, player: PlayerId, policy: UndoPolicy): StoredGame {
         if (player != stored.header.creatorId) throw ServiceFailure(403, "HISTORY_EDIT_FORBIDDEN")
@@ -121,6 +148,14 @@ internal object HistoryEdits {
                         ),
                 pendingBids = emptyMap(),
             )
+        if (stored.undoPolicy == UndoPolicy.LINEAR_GAME) {
+            return edited.copy(
+                submissionVersions =
+                    stored.header.players.associate {
+                        it.id to UUID.randomUUID().toString()
+                    }
+            )
+        }
         val before = stored.state()
         val after = edited.state()
         if (before.stage != after.stage || before.turnNumber != after.turnNumber) return edited
@@ -169,6 +204,11 @@ internal object HistoryEdits {
         from: Int,
         lines: List<String>,
     ): List<String> {
+        if (stored.undoPolicy == UndoPolicy.LINEAR_GAME) {
+            if (lines.isNotEmpty()) throw ServiceFailure(422, "HISTORY_SUFFIX_UNSUPPORTED")
+            LinearHistory.validate(stored, player, from)
+            return emptyList()
+        }
         val recorded = stored.effectiveEntries().map(RecordedEntry::text)
         val lower =
             editableFrom(stored, player) ?: throw ServiceFailure(403, "HISTORY_EDIT_FORBIDDEN")
@@ -253,7 +293,7 @@ internal object HistoryEdits {
         return replacement
     }
 
-    private fun editableFrom(stored: StoredGame, player: PlayerId): Int? {
+    internal fun editableFrom(stored: StoredGame, player: PlayerId): Int? {
         if (stored.undoPolicy == UndoPolicy.COMPETITIVE) return null
         val recorded = stored.effectiveEntries().map { TextCodec.parse(it.text) }
         var state = GameState(stored.header)
@@ -263,8 +303,12 @@ internal object HistoryEdits {
             if (setupEnd == null && state.turnNumber != null) setupEnd = index + 1
         }
         val setup = setupEnd ?: return null
-        if (stored.undoPolicy == UndoPolicy.FRIENDLY_GAME && player == stored.header.creatorId)
+        if (
+            stored.undoPolicy in setOf(UndoPolicy.FRIENDLY_GAME, UndoPolicy.LINEAR_GAME) &&
+                player == stored.header.creatorId
+        ) {
             return setup
+        }
         val prompt = state.prompts().singleOrNull() as? Prompt.SinglePlayer
         val owner = state.flow.actor ?: prompt?.player
         if (owner != player || state.stage == Stage.FINISHED) return null

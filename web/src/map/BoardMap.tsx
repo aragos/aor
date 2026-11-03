@@ -213,7 +213,7 @@ function LoadedBoardMap({snapshot, busy, geometry}: BoardMapProps & {geometry: G
         if (!busy && picker?.kind === 'area' && picker.eligible.includes(area)) picker.pick(area);
     };
     const chooseCommodity = (commodity: string) => {
-        setInspection({kind: 'commodity', id: commodity});
+        setInspection(inspection?.kind === 'commodity' && inspection.id === commodity ? {kind: 'closed'} : {kind: 'commodity', id: commodity});
         setSelectedArea('');
         setHovered(''); setFocused('');
     };
@@ -540,6 +540,7 @@ function LoadedBoardMap({snapshot, busy, geometry}: BoardMapProps & {geometry: G
                     </g>)}
                     <g pointerEvents="none" fill="#315d70" fontSize={18} fontWeight={700} textAnchor="middle">
                         {[{group:'NEW_WORLD', title:label('NEW_WORLD'), y:660}, {group:'FAR_EAST', title:label('FAR_EAST'), y:1080}].map(({group,title,y}) => <g key={group} data-overseas-label={group}>
+                            <rect x={8} y={y - 23} width={174} height={31} rx={4} fill="#f6f3e8"/>
                             <text x={overseasLocks[group] ? 84 : 95} y={y}>{title}</text>
                             {overseasLocks[group] && <g data-overseas-lock={group}><title>{t('board.advanceRequired')}</title><AccessLock x={146} y={y - 17} size={20}/></g>}
                         </g>)}

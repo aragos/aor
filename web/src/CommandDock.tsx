@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import type {Snapshot} from './api';
+import type {RewindTarget, Snapshot} from './api';
 import {t} from './messages';
 import {HistoryEditor} from './HistoryEditor';
 import {ChoiceButtons} from './DecisionControls';
@@ -8,13 +8,17 @@ import {displayHistoryLine} from './history';
 import {useStoredSetting} from './preferences';
 import {HelpLink} from './HelpLink';
 
+import {RewindHistory} from './RewindReview';
+import type {LoadRewindTargets} from './RewindReview';
+
 type HistoryIdentifiers = 'capitals' | 'names' | 'ids';
 const isHistoryIdentifiers = (value: unknown): value is HistoryIdentifiers =>
     value === 'capitals' || value === 'names' || value === 'ids';
 
-export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory}: {
+export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory, loadRewindTargets, reviewRewind}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     open: boolean; onToggle: (open: boolean) => void;
+    loadRewindTargets?: LoadRewindTargets; reviewRewind?: (target: RewindTarget) => void;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
 }) {
     const [command, setCommand] = useState('');
@@ -35,7 +39,9 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
             <div className="choices"><code>{snapshot.legalChoices.commands.join(' · ')}</code></div>
         </form>}
         {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${undoPolicy}`)} <HelpLink topic={`undo-${undoPolicy}`} label="Undo policy details"/></p>}
-        {editHistory && snapshot.undo && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory} format={format}/>}
+        {snapshot.undo?.converted && <p>{t('history.converted')}</p>}
+        {snapshot.undo?.capability === 'PREFIX_REWIND' && loadRewindTargets && reviewRewind && <RewindHistory snapshot={snapshot} busy={busy} load={loadRewindTargets} review={reviewRewind}/>}
+        {editHistory && snapshot.undo && snapshot.undo.capability !== 'PREFIX_REWIND' && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory} format={format}/>}
         <h3>{t('game.history')}</h3>
         <p>{t('history.identifiers')}</p><ChoiceButtons label={t('history.identifiers')} id="history-identifiers" value={identifiers} onChange={setIdentifiers}
             choices={(['capitals', 'names', 'ids'] as const).map(value => ({value, label: t(`history.identifiers.${value}`)}))}/>

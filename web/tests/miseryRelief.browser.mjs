@@ -93,7 +93,8 @@ export async function checkLiveMiseryRelief(page, web) {
             assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), 'Continue to stabilization');
             assert.equal(await page.evaluate(`document.querySelector('.advance-relief-rating strong').textContent`), `$${state.game.reliefRatingAvailable}`);
             await page.evaluate(`document.querySelector('[data-advance="${advance.advance}"]').click()`);
-            assert.equal(await page.evaluate(`document.querySelector('.advance-relief-rating strong').textContent`), `$${state.game.reliefRatingAvailable}`, 'Selecting an advance retains the total');
+            assert.equal(await page.evaluate(`document.querySelectorAll('.advance-relief-rating').length`), 0, 'Selected review replaces the generic MR summary');
+            assert.match(await page.evaluate(`document.querySelector('.advance-purchase-benefits .advance-relief dd').textContent`), new RegExp('\\$' + state.game.reliefRatingAvailable));
             const definition = state.game.catalog.advances.find(item => item.id === advance.advance);
             const expected = state.game.reliefRatingAvailable + definition.miseryRelief;
             await page.evaluate(`document.querySelector('.buy-advance-action').click()`);

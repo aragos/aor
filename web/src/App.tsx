@@ -51,9 +51,11 @@ function CreateGame() {
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
             <p className="muted small">{t('create.threeEpochs')}</p>
+            <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
             <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} id="undo-policy" value={undoPolicy} onChange={setUndoPolicy} disabled={busy}
-                choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
+                choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
+            {undoPolicy === 'linear-game' && <p className="small">{t('history.linearDescription')}</p>}</details>
             {error && <ErrorMessage code={error}/>}
             <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>
         </form>}
@@ -83,7 +85,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     }
 
     function acceptSnapshot(next: Snapshot) {
-        if (uncertainOperation.current && (next.submissionReceipts?.includes(uncertainOperation.current) || next.planning?.receipts.includes(uncertainOperation.current))) {
+        if (uncertainOperation.current && (next.submissionReceipts?.includes(uncertainOperation.current) || next.planning?.receipts.includes(uncertainOperation.current) || next.abandonmentReceipts?.includes(uncertainOperation.current))) {
             setActionError(new ApiError('OUTCOME_CONFIRMED'));
             uncertainOperation.current = null;
         }
@@ -126,7 +128,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         uncertainOperation.current = null;
         setBusy(true); setActionError(null); setSaved(false);
         try {
-            const accepted = await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(['commands', 'plans'].includes(endpoint) ? {operationId} : {}), ...operation});
+            const accepted = await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(['commands', 'plans', 'abandonment'].includes(endpoint) ? {operationId} : {}), ...operation});
             acceptSnapshot(accepted);
             activityAt.current = Date.now();
             setConnectionError(''); setSaved(true); return accepted;
@@ -151,7 +153,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
         <a href="/">{t('game.new')}</a></main>;
-    return <MapSelectionProvider><GameTable snapshot={snapshot} busy={busy} saved={saved}
+    return <MapSelectionProvider><GameTable writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy} saved={saved}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
         quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
         submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null}).then(Boolean)} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines}).then(Boolean)} connectionError={connectionError} actionError={actionError}

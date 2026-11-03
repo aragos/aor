@@ -674,3 +674,37 @@ The Java 21 production-server smoke check serves the built client and all four m
 the required MIME type, immutable caching and gzip. Five Python regressions cover Vite 7/8 URL
 quoting and failed asset contracts. Java 24 and Node 25 container proposals are excluded because
 their support has ended; supported Java 21 and Node 24 images remain in place.
+
+## Table controls, Linear game and unanimous abandonment
+
+The 2026-11-02 implementation passes the integrated Kotlin JVM/JS/server checks and formatting.
+Focused file and real-PostgreSQL regressions cover exact-prefix draw removal and restored-deck
+continuation, repeated rewind, creator/player scope, protected batches, suffix-endpoint and tampered
+save rejection, historical views, exact migration archives and repeat safety. Additional checks cover
+pending private amounts/receipts, preserved automatic authorization on policy conversion, disarmed
+offline plans after rewind, inactive-game migration, six-seat unanimity, decline/withdrawal, stale
+request IDs, retry receipts across checkpoints, final-agreement/withdrawal races, and distinct consent
+versus engine-turn readiness in indexed and file-backed listings. The web build and 76 unit tests pass.
+
+The live `gameControls.browser.mjs` flow verifies empty pre-capital Help tracks, bid drafts retained
+through consent polling/nonfinal success/withdrawal, a real advance offer's inline price/MR/future
+credit review, expansion-pass review without commitment, random-draw rewind review and restored hand,
+no Linear suffix editor, and unanimous terminal cleanup without scores. Commodity, portal, Help-track
+and legacy-history suites also pass, including repeated-card highlight toggling while retaining its
+action draft, clicking a search handle to add a player, desktop/phone layouts and legacy suffix edits.
+
+Reviewed desktop and 390px phone captures in `aor-browser-artifacts-ZKFmXw` retain readable purchase
+facts and pinned confirmation/continuation controls while the review scrolls. Portal captures in
+`aor-browser-artifacts-qOx7X7` retain compact native game links and clear handle selection. These are
+emulated browser observations, not physical-device or screen-reader verification. Deployment and
+migration of hosted production data have not been performed by this implementation task.
+
+Final verification also passes complete Kotlin checks with the policy-archive import regressions,
+including rejection of an import missing its required source archive. The fixed-source main browser
+gate passes through map/table, purchase, Activity, event-decision and advance-inspection coverage.
+Its remaining lifecycle portion passes independently as `tableLifecycle.browser.mjs`, followed by
+`gameControls.browser.mjs`: creation/settings keyboard interaction, portal, hosted authentication,
+background polling, live conflicts, sealed submissions, offline plans, printed tracks and responsive
+geometry. The setup fixture explicitly opens the new optional-settings disclosure before keyboard
+selection. Final captures are in `aor-browser-artifacts-YzVQOJ`. Already-agreed consent returns current
+state with a typed no-op result and no additional operation receipt or revision.

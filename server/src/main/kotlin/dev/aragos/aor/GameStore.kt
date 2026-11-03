@@ -147,14 +147,20 @@ class FileGameStore(
             require(replacement.id == id) { "A checkpoint cannot change the game ID." }
             GameDocuments.validate(replacement)
             val archive = directory.resolve("archives").resolve(id).resolve(reference)
-            if (Files.exists(archive)) {
+            val existed = Files.exists(archive)
+            if (existed) {
                 require(Files.readString(archive) == original) {
                     "Existing archives are immutable."
                 }
             } else {
                 writer.write(archive, original)
             }
-            persist(replacement)
+            try {
+                persist(replacement)
+            } catch (failure: Exception) {
+                if (!existed && raw(id) == original) Files.deleteIfExists(archive)
+                throw failure
+            }
             replacement
         }
 

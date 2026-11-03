@@ -23,8 +23,7 @@ export function AdvanceInspection({snapshot, advance, offer, close}: {
             <div className="advance-description">
                 <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>
                 <dl className="detail-list advance-facts">
-                    <div className="advance-category-credit"><dt>{t('advance.creditGiven', {category: label(advance.category, 'category')})}</dt>
-                        <dd>${advance.credit} <span className="small muted">{t('advance.fromNextTurn')}</span></dd></div>
+                    <AdvanceCreditBenefit advance={advance}/>
                     <div className="advance-relief"><dt>{t('reference.reliefRating')}</dt>
                         <dd>{t('advance.reliefThisTurn', {amount: advance.miseryRelief})}</dd></div>
                     <div className="advance-prerequisites"><dt>{t('advance.prerequisites')}</dt>
@@ -40,4 +39,11 @@ export function AdvanceInspection({snapshot, advance, offer, close}: {
             </div>
         </div>
     </section>;
+}
+
+/** Future category credit is distinct from the discounts applied to this purchase. */
+export function AdvanceCreditBenefit({advance}: {advance: AdvanceDefinition}) {
+    if (advance.credit === 0) return null;
+    return <div className="advance-category-credit"><dt>{t('advance.creditGiven', {category: label(advance.category, 'category')})}</dt>
+        <dd>+${advance.credit} <span className="small muted">{t('advance.otherAdvancesNextTurn')}</span></dd></div>;
 }

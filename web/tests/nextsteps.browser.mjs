@@ -45,6 +45,7 @@ export async function checkContrast(page, label) {
 export async function checkSetupEvidence(page, web) {
     await page.send('Page.navigate', {url:web+'/'});
     await page.wait(`document.querySelector('#names') && document.querySelector('#variant-initial-card')`, 'players and variants share creation');
+    await page.evaluate(`document.querySelector('.creation-settings > summary').click()`);
     await page.fill('#names','Ada\nBruno\nClara');
     await page.fill('#game-name', 'Friday Renaissance');
     await page.evaluate(`document.querySelector('#variant-deck-modification button:last-child').click();
@@ -129,8 +130,12 @@ export async function checkDecisionEvidence(page, web, baseline) {
     for (const advance of baseline.game.catalog.advances) {
         await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').click()`);
         assert.equal(await page.evaluate(`!!document.querySelector('.inspection-panel .advance-benefits')`), true, 'Advance benefits stay in the game');
-        assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit dd').textContent`), `$${advance.credit} from next turn`);
-        assert.match(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit dt').textContent`), /Credit to other .* advances/);
+        if (advance.credit > 0) {
+            assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit dd').textContent`), `+$${advance.credit} toward other advances in this category, from next turn`);
+            assert.match(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit dt').textContent`), /Credit to other .* advances/);
+        } else {
+            assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .advance-category-credit')`), null, 'Omit category credit without a benefit');
+        }
         assert.equal(await page.evaluate(`document.querySelector('.inspection-panel .advance-relief dd').textContent`), `$${advance.miseryRelief} this turn`);
         assert.equal(await page.evaluate(`document.querySelector('.inspection-panel details, .inspection-panel a, .inspection-panel .reference-link')`), null, 'Printed values and prices are visible without links or foldouts');
     }

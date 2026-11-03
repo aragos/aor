@@ -5,6 +5,27 @@ Current behavior is specified in [requirements](requirements.md), [UI contracts]
 2026-10-29. Their owning contracts are authoritative; no gameplay default remains awaiting approval.
 This file retains operational checks and deferred work.
 
+## Linear game undo design decisions
+
+The [Linear game implementation](design.md#linear-game-undo) replaces Friendly game in new
+creation and upgrades stored Friendly games on startup. The agreed choices are:
+
+- Use fresh rolls and random selections after rewind, with draws following the restored deck
+  and a fresh shuffle only when a removed shuffle is required again. This permits rerolls and play
+  informed by discarded history.
+- Replace Friendly game in new-game creation and automatically upgrade existing Friendly games
+  through an explicit audited migration. Preserve their complete history and current saved state;
+  earlier revisions retain their original validation semantics. Keep Regular turn as the default.
+
+Before rollout, verify the migration on representative saved games and both backends, including
+private-state continuity, original suffix edits, repeat/restart safety, concurrent writes and
+continued play. Record per-game migration results and resolve failures before declaring completion.
+
+Acceptance belongs in [requirements](requirements.md#linear-game-undo-acceptance),
+architecture in the proposal and interaction in
+[UI design](ui-design.md#linear-game-undo-interaction). Automated evidence is recorded in [decision coverage](ui-decision-coverage.md). Physical-device,
+screen-reader and deployed migration verification remain operational checks.
+
 ## Needed before public launch
 
 - The deployment setup is complete and the application runs successfully on Render. Google is

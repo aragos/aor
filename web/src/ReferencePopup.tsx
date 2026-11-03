@@ -122,14 +122,17 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             {(topic === 'history' || topic === 'undo-friendly-game') && <article id="undo-friendly-game"><h3>{t('undoPolicy.friendly-game')}</h3>
                 <p>{t("reference.everyone-has-friendly-turn-permissions-the")}</p>
             </article>}
-            <h3>{t("reference.limits-shared-by-all-editable-policies")}</h3>
+            {(topic === 'history' || topic === 'undo-linear-game') && <article id="undo-linear-game"><h3>{t('undoPolicy.linear-game')}</h3>
+                <p>{t('history.linearDescription')}</p><p>{t('history.linearLimits')}</p><p>{t('history.rewindConsequences')}</p><p>{t('history.randomnessRemoved')}</p><p>{t('history.linearPrivate')}</p>
+            </article>}
+            {topic !== 'undo-linear-game' && <><h3>{t("reference.limits-shared-by-all-editable-policies")}</h3>
             <ul>
                 <li>{t("reference.setup-is-protected-committed-simultaneous-decisions")}</li>
                 <li>{t("reference.dice-draws-shuffles-and-random-trades")}</li>
                 <li>{t("reference.you-can-retain-another-player-s")}</li>
                 <li>{t("reference.every-later-action-must-still-be")}</li>
             </ul>
-            <p>{t("reference.undo-last-action-appears-in-the")}<code>@entry</code>{t("reference.references-retain-recorded-actions-accepted-edits")}</p>
+            <p>{t("reference.undo-last-action-appears-in-the")}<code>@entry</code>{t("reference.references-retain-recorded-actions-accepted-edits")}</p></>}
         </section>}
             {topic === 'plans' && <section id="plans"><h2>{t('plan.helpTitle')}</h2>
                 <p>{t('plan.helpSaving')}</p><p>{t('plan.helpPreview')}</p><p>{t('plan.helpAutomatic')}</p><p>{t('plan.helpBoundaries')}</p>

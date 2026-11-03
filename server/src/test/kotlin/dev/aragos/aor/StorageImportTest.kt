@@ -53,6 +53,66 @@ class StorageImportTest {
         }
 
     @Test
+    fun importsLinearPolicyHistoryAndItsExactFriendlySourceArchive() =
+        PostgresFixture().use { fixture ->
+            val directory = Files.createTempDirectory("aor-import-linear-")
+            try {
+                val source = FileGameStore(directory)
+                val service = GameService(source, GameDriver(FixedRandom()))
+                val game =
+                    service.create(
+                        listOf("Alice", "Bob", "Carol"),
+                        undoPolicy = UndoPolicy.FRIENDLY_GAME,
+                    )
+                LinearGameMigration.run(source)
+                val contents = source.document(game.gameId)
+
+                val result = importFileStorage(directory, fixture.database)
+
+                assertThat(result.archives).isEqualTo(1)
+                assertThat(json.readTree(fixture.store.document(game.gameId)))
+                    .isEqualTo(json.readTree(contents))
+                val archive = source.archives(game.gameId).single()
+                assertThat(fixture.store.archivedDocument(game.gameId, archive))
+                    .isEqualTo(source.archivedDocument(game.gameId, archive))
+                assertThat(fixture.store.read(game.gameId).undoPolicy)
+                    .isEqualTo(UndoPolicy.LINEAR_GAME)
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+
+    @Test
+    fun missingPolicySourceArchiveRejectsImportWithoutPublishingTheGame() =
+        PostgresFixture().use { fixture ->
+            val directory = Files.createTempDirectory("aor-import-missing-policy-archive-")
+            try {
+                val source = FileGameStore(directory)
+                val game =
+                    GameService(source, GameDriver(FixedRandom()))
+                        .create(
+                            listOf("Alice", "Bob", "Carol"),
+                            undoPolicy = UndoPolicy.FRIENDLY_GAME,
+                        )
+                LinearGameMigration.run(source)
+                Files.delete(
+                    directory
+                        .resolve("archives")
+                        .resolve(game.gameId)
+                        .resolve(source.archives(game.gameId).single())
+                )
+
+                assertFailsWith<IllegalArgumentException> {
+                    importFileStorage(directory, fixture.database)
+                }
+
+                assertThat(fixture.store.ids()).isEmpty()
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+
+    @Test
     fun failedImportRollsBackAccountsAndEarlierGames() =
         PostgresFixture().use { fixture ->
             val directory = Files.createTempDirectory("aor-import-invalid-")

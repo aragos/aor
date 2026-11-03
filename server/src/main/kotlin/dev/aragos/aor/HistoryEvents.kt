@@ -2,6 +2,12 @@ package dev.aragos.aor
 
 enum class HistoryEventKind {
     START,
+    REWIND,
+    ABANDONMENT_PROPOSE,
+    ABANDONMENT_AGREE,
+    ABANDONMENT_DECLINE,
+    ABANDONMENT_WITHDRAW,
+    ABANDONMENT_CLOSE,
     BID_CAPITAL,
     CHOOSE_CAPITAL,
     BUY_TOKENS,

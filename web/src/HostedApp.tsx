@@ -152,6 +152,11 @@ function RegisteredGameForm({me}: {me: Account}) {
         }, 250);
         return () => {current = false; clearTimeout(timer);};
     }, [query]);
+    function addPlayer(player: Account) {
+        if (busy || players.length >= 6) return;
+        setPlayers(current => current.some(chosen => chosen.id === player.id) ? current : [...current, player]);
+        setQuery('');
+    }
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
         try {
@@ -168,11 +173,13 @@ function RegisteredGameForm({me}: {me: Account}) {
                 {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
             <label>{t('hosted.find-a-player-by-handle')}<input type="search" value={query} maxLength={60} onChange={event => setQuery(event.target.value)}/></label>
             {query.trim().length >= 2 && <ul className="player-directory" aria-label={t('hosted.matching-players')}>{matches.filter(player => !players.some(chosen => chosen.id === player.id)).map(player => <li key={player.id}>
-                <span><strong>@{player.handle}</strong></span>
-                <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => {setPlayers([...players, player]); setQuery('');}}>{t('hosted.add')}</button>
+                <button type="button" className="player-handle" disabled={busy || players.length >= 6} onClick={() => addPlayer(player)}>@{player.handle}</button>
+                <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => addPlayer(player)}>{t('hosted.add')}</button>
             </li>)}</ul>}
+            <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
-            <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'friendly-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
+            <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
+            {undoPolicy === 'linear-game' && <p className="small">{t('history.linearDescription')}</p>}</details>
             <Problem value={error}/><button disabled={busy || players.length < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
         </form>}
     </details>;
@@ -248,7 +255,7 @@ function AdminPlayers() {
 }
 
 function GameRow({game}: {game: GameSummary}) {
-    return <><strong className="game-row-status">{t(`gameStatus.${game.status}`)}</strong>
+    return <><strong className="game-row-status">{game.consentResponse ? <>{t('abandonment.respond')}{game.turnRequired && ` · ${t(`gameStatus.${game.status}`)}`}</> : t(`gameStatus.${game.status}`)}</strong>
         <span className="game-row-description"><strong className="game-row-name">{game.name}</strong><span className="game-row-players">{game.players.map((player, index) => <Fragment key={player.id}>
             {index > 0 && ' · '}<span className={game.actionPlayers.includes(player.id) ? 'game-row-player needs-action' : 'game-row-player'}>
                 {player.name}{game.actionPlayers.includes(player.id) && <span className="sr-only"> — {t('hosted.action-required')}</span>}

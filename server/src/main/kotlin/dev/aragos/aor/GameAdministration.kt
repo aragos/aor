@@ -31,6 +31,9 @@ data class GameSummary(
     val name: GameName = GameName.DEFAULT,
     /** Seats still required by the public prompt, excluding unrevealed submissions. */
     val actionPlayers: List<PlayerId> = emptyList(),
+    val consentResponders: List<PlayerId> = emptyList(),
+    val consentResponse: Boolean = false,
+    val turnRequired: Boolean = false,
 )
 
 data class GamePage(val games: List<GameSummary>, val nextCursor: String?)
@@ -115,20 +118,25 @@ class GameAdministration(
                 if (current.revision != expectedRevision) {
                     throw ServiceFailure(409, "STALE_REVISION")
                 }
-                current.copy(
-                    revisions =
-                        current.revisions +
-                            Revision(
-                                id = current.revision + 1,
-                                parent = current.revision,
-                                author = current.header.creatorId,
-                                command = "admin-${action.name.lowercase()}",
-                                entries = emptyList(),
-                                adminAuthor = actor.value,
-                                administrativeAction = action,
-                                at = clock.millis(),
-                            ),
-                    pendingBids = emptyMap(),
+                GameAbandonment.terminal(
+                    GameAbandonment.reconcile(
+                        current,
+                        current.copy(
+                            revisions =
+                                current.revisions +
+                                    Revision(
+                                        id = current.revision + 1,
+                                        parent = current.revision,
+                                        author = current.header.creatorId,
+                                        command = "admin-${action.name.lowercase()}",
+                                        entries = emptyList(),
+                                        adminAuthor = actor.value,
+                                        administrativeAction = action,
+                                        at = clock.millis(),
+                                    ),
+                            pendingBids = emptyMap(),
+                        ),
+                    )
                 )
             }
         return GameDirectory.summary(changed, actor)
@@ -242,6 +250,8 @@ class GameAdministration(
                             parent = expectedRevision,
                             author = header.creatorId,
                             command = "admin-replace-log",
+                            abandonmentCheckpoint =
+                                privatePlans?.let { GameAbandonment.open(it)?.requestId },
                             entries = entries,
                             undoPolicy = policy,
                             adminAuthor = actor.value,

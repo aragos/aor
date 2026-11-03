@@ -111,7 +111,7 @@ export interface CardDefinition {
 export type RebuiltMarkerBonus = 'EXCLUDE' | 'INCLUDE';
 export interface HistoryEventView {
     participants?: {id: string; name: string; capital: string | null}[];
-    id: string; kind: 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
+    id: string; kind: 'REWIND' | 'ABANDONMENT_PROPOSE' | 'ABANDONMENT_AGREE' | 'ABANDONMENT_DECLINE' | 'ABANDONMENT_WITHDRAW' | 'ABANDONMENT_CLOSE' | 'START' | 'BID_CAPITAL' | 'CHOOSE_CAPITAL' | 'BUY_TOKENS' | 'CHOOSE_TURN_POSITION' |
         'PASS' | 'SWAP_ORDER' | 'BUY_CARD' | 'DISCARD_CARD' | 'CANCEL_ADJUSTMENT' | 'TOKEN_PURCHASES' |
         'UPGRADE_SHIPS' | 'BUY_ADVANCE' | 'STABILIZE' | 'RELIEVE_MISERY' | 'PLACE' | 'ESTABLISH_MARKER' |
         'ATTACK' | 'COMPETITION_RESULT' | 'WAR_RESULT' | 'REDUCE_MARKER' | 'BUY_EXPANSION_CARD' | 'CATHEDRAL' | 'WINDMILL' |
@@ -205,18 +205,22 @@ export interface Snapshot {
         expansionCardCost?: number | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};
+    abandonment?: {requestId: string; proposer: string; agreed: string[]; outstanding: string[]; operations: string[]} | null;
+    abandonmentResult?: 'COMMITTED' | 'ALREADY_AGREED' | null;
+    abandonmentReceipt?: string | null; abandonmentReceipts?: string[];
     submissionVersion?: string | null; submissionReceipts?: string[]; submitted: string[]; pendingBid: number | null; history: string[];
     events: HistoryEventView[];
-    undo: {policy: 'COMPETITIVE' | 'REGULAR_TURN' | 'FRIENDLY_TURN' | 'FRIENDLY_GAME'; available: boolean;
+    undo: {policy: 'COMPETITIVE' | 'REGULAR_TURN' | 'FRIENDLY_TURN' | 'FRIENDLY_GAME' | 'LINEAR_GAME'; available: boolean;
         fromEntry: number | null; entryCount: number; editRevision: number;
-        actions: {entry: number; actor: string; text: string}[]};
+        actions: {entry: number; actor: string; text: string}[];
+        capability?: 'NONE' | 'SUFFIX_EDIT' | 'PREFIX_REWIND'; latestTarget?: RewindTarget | null; converted?: boolean};
 }
 export interface CreatedGame {gameId: string; name: string; registered?: boolean; links: {id: string; name: string; path: string}[]}
 export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Record<string, string> | null; pollIntervalMs: number}
 export interface Account {id: string; handle: string; mayCreateGames: boolean; admin: boolean}
 export interface Session {id: string; emailVerified: boolean; account: Account | null}
 export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABANDONED' | 'UNAVAILABLE';
-export interface GameSummary {id: string; name: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean; actionPlayers: string[]}
+export interface GameSummary {id: string; name: string; createdAt: number; revision: number; status: GameStatus; stage: string | null; players: {id: string; name: string}[]; myMove: boolean; actionPlayers: string[]; consentResponders?: string[]; consentResponse?: boolean; turnRequired?: boolean}
 export interface GamePage {games: GameSummary[]; nextCursor: string | null}
 export class ApiError extends Error {
     constructor(public code: string, public entityIds: string[] = [], public entryIndex: number | null = null, public parameters: Record<string, number> = {}, public causeCode: string | null = null) { super(code); }
@@ -286,3 +290,6 @@ export async function requestSnapshot(path: string, token?: string, etag?: strin
     }, signal);
 }
 export function errorCode(error: unknown): string { return error instanceof ApiError ? error.code : 'SERVER'; }
+
+export interface RewindTarget {entryCount: number; turnNumber: number | null; stage: string; removesRandomness: boolean; actor: string; actionText: string}
+export interface RewindTargets {expectedRevision: number; targets: RewindTarget[]; nextBefore: number | null}

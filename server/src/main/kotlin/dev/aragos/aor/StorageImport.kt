@@ -73,6 +73,9 @@ fun importFileStorage(directory: Path, database: PostgresDatabase): StorageImpor
             require(game.previousArchive == null || game.previousArchive in names) {
                 "Every checkpoint must include its preceding archive in the source."
             }
+            require(game.revisions.mapNotNull(Revision::storageArchive).all { it in names }) {
+                "Every policy or storage upgrade must include its exact source archive."
+            }
             target.create(game)
             names.forEach { name ->
                 target.retainArchive(id, name, source.archivedDocument(id, name))

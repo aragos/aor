@@ -19,7 +19,7 @@ export function setTurnFavicon(canAct: boolean) {
 
 export function hasPlayerAction(snapshot: Snapshot): boolean {
     return snapshot.viewerId !== null && snapshot.status !== 'CANCELLED' && snapshot.status !== 'ABANDONED' &&
-        snapshot.game.stage !== 'FINISHED' && (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
+        snapshot.game.stage !== 'FINISHED' && ((snapshot.prompt?.players.includes(snapshot.viewerId) ?? false) || (snapshot.abandonment?.outstanding.includes(snapshot.viewerId) ?? false));
 }
 
 export function useTurnFavicon(canAct: boolean) {

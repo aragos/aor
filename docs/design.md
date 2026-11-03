@@ -86,6 +86,9 @@ hidden state.
 
 ## 4. Revisions and undo
 
+New games offer Competitive, Regular turn, Friendly turn and [Linear game](#linear-game-undo).
+Friendly game remains readable in historical revisions and is upgraded on application startup.
+
 Keep immutable revision history: revision id, parent, author, edit command and resulting text-log changes. The engine
 replays one effective revision. Requests name the expected revision; reject stale requests after an edit. Publishing
 an accepted revision atomically replaces the active revision, invalidates affected caches and requires rebasing
@@ -134,12 +137,12 @@ its turn-scoped undo window; phase-start and simultaneous windows have their own
 
 | Scope                  | Permitted changes                                                                                                                                                                      |
 |------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Friendly game          | The creator may edit any part of the log, excluding setup, retaining revision history. Also implies friendly turn.                                                                                                |
+| Linear game            | The creator may rewind any complete post-setup prefix; other players may rewind their currently open activity. All later play, including random outcomes, is removed together.                                                                                                |
 | Friendly turn          | The active player may undo within their current phase activity, including nested decisions by others, provided recorded random events and outcomes are preserved.                      |
 | Regular turn (default) | A player may undo their own entries in the current phase activity until another player acts or a random outcome is recorded. Undo cannot cross those boundaries or the activity start. |
 | Competitive            | Every committed change is final; unsubmitted text and plans remain editable.                                                                                                           |
 
-Every editable scope is subject to the randomness constraints below. Friendly scopes may cross a recorded random
+Suffix-editing scopes are subject to the randomness constraints below. Linear game uses the prefix-only exception described later. Friendly scopes may cross a recorded random
 outcome while editing surrounding decisions; they cannot remove or replace the event or its outcome.
 
 Replay the retained prefix, then validate the edited suffix in order. Report invalid dependent entries and their
@@ -151,9 +154,9 @@ player's replacement answer. Secret batches are atomic undo boundaries; revalida
 
 ### Randomness after edits
 
-Any edit must be compatible with already recorded random outcomes. If an edit adds a random event or removes the need
-for one, it is rejected. This applies to undo, deletion, reordering and all other history edits, including shortening
-the log. There is no fresh-outcome mode or randomness policy option for edits.
+Suffix edits must be compatible with already recorded random outcomes. If an edit adds a random event or removes the need
+for one, it is rejected. This applies to legacy-policy undo, deletion, reordering and suffix edits, including shortening
+the log. Linear game has the exact-prefix exception below. There is no fresh-outcome mode or randomness policy option for edits.
 
 Every recorded random event must still be required and accept its unchanged outcome. Match the same logical request,
 not merely its position or the total number of events; an unrelated roll cannot substitute for a removed roll. Card
@@ -168,6 +171,224 @@ active revision unchanged; do not pause for a replacement outcome, reroll or pub
 Normal new actions in live play still request and record fresh outcomes. Planning may use explicit hypothetical
 inputs but never consumes live randomness; ordinary replay always uses recorded outcomes. Historical revision views
 retain private-information restrictions, and undo cannot erase knowledge a player has already acquired.
+
+### Linear game undo
+
+Offer **Linear game** (`linear-game`) for groups that want to take back play, including random
+events. Replace Friendly game in the new-game chooser and upgrade existing Friendly games to this
+policy through an explicit, audited migration. Regular turn remains the default; Competitive and
+Friendly turn remain available unchanged. This is an application history policy, not a rules variant.
+The acceptance and interaction contracts live in
+[requirements](requirements.md#linear-game-undo-acceptance) and
+[UI design](ui-design.md#linear-game-undo-interaction).
+
+The central invariant is **the resulting effective log is an exact, shorter prefix of the current
+effective log**. A rewind removes every later action and authority outcome together. It cannot
+delete an action from the middle, reorder actions, retain a later answer, supply a replacement
+answer or edit an outcome. Resume with ordinary commands from the restored position. There is one
+active timeline, no redo command and no player operation that restores a discarded suffix from an
+older revision. Prior revisions remain available for authorized inspection and audit.
+
+#### Permission and boundaries
+
+| Caller | Permission |
+| --- | --- |
+| Creator | Rewind any post-setup suffix, including other players' actions, earlier turns and the ending of a completed game. |
+| Other player | Rewind within their currently open phase activity, including nested answers by others and random outcomes. Completing that activity closes this permission, as with Friendly turn today. |
+| Spectator or nonmember | Read permitted history only; no rewind. Administrator access alone grants no player rewind permission. |
+
+All players under Linear game use prefix-only undo; none receive the suffix editor. A nested
+responder does not gain authority over the outer player's activity just by answering its prompt.
+Permission is evaluated against the current live position, not against the target's former owner.
+The creator may act while waiting or after engine completion. Cancellation and abandonment still
+block all player mutations; rewind cannot change operational lifecycle, membership or creator role.
+No voting or approval round is proposed: this policy grants the creator this authority, including
+in upgraded Friendly games.
+
+Setup remains protected through completed capital selection and entry into turn 1, matching the
+existing service boundary. Opening configuration, shuffle, deal, capital bids, tie rolls and
+capital choices cannot be rewound. The earliest target is the completed setup prefix. A finished
+game with an active operational lifecycle can return to play; refresh its listing, readiness and
+scores from the restored engine state. Rewinding cannot resurrect a cancelled or abandoned game.
+
+An undo unit is one player action together with all immediately required authority outcomes and
+automatic transitions, ending when the engine next waits for players or finishes. A simultaneous
+reveal is one unit containing every participant's action and all resulting outcomes. Private saves,
+plan authorization, policy/audit revisions and uncommitted browser drafts are not undo units.
+
+Offer only retained entry counts that end complete units in the effective history and are within
+the caller's scope. Derive these boundaries from replay and complete-batch constraints; do not
+assume every raw entry, displayed activity row or revision is a unit. Some displayed rows group
+several commands; earlier suffix edits or administrative checkpoints can also group many units
+inside one revision. Never offer a boundary inside a batch or before pending authority outcomes
+have resolved. Do not silently round an invalid target to a different position.
+
+`undo` removes the most recent unit if the caller may remove it. `undo N` retains exactly `N`
+effective engine entries, where `N` is a zero-based prefix length bound to `expectedRevision`.
+Repeated undo walks backward through gameplay units, skipping audit-only revisions; it does not
+undo an undo revision and thereby restore discarded play. Selecting the current entry count is a
+no-op rejection. Selecting an older revision is not a substitute for selecting a current prefix.
+
+#### Randomness and resumed play
+
+Rewind itself only replays the retained prefix; it never calls the randomness provider, resolves
+new system outcomes or changes retained entries. Unlike the existing policies, it may discard
+random events because every subsequent dependency is also discarded. This exception applies only
+to exact-prefix truncation under Linear game. Existing suffix editing and administrative engine
+upgrades must continue to prove continuity of recorded random events.
+
+**Continuation behavior:** new live requests use the ordinary authority provider.
+There is no queue of removed outcomes and no RNG-seed rewind. A repeated roll or random selection
+gets a fresh sample, which can coincidentally equal its earlier result. A draw still takes the top
+of the restored deck; undoing a draw alone does not reshuffle it or promise a different card. An
+epoch shuffle gets a new permutation only if that shuffle was removed and becomes necessary again.
+Retained shuffles and all other retained outcomes remain byte-for-byte unchanged. This behavior applies to new Linear games and upgraded Friendly games.
+
+| Sequence removed | Restored position and continuation |
+| --- | --- |
+| `buy-expansion-card` plus its draw | Refund tokens and restore deck, hand and purchase allowance through replay. Buying again draws the same top card unless a removed epoch shuffle is required. |
+| An attack plus later Cathedral answers and dice | Restore the position before commitment. An ordinary new attack can use a different target and receives fresh dice when needed. |
+| A Cathedral decline that immediately triggered dice | Restore the Cathedral prompt, retaining the preceding attack. Declining again makes a fresh roll; an eligible declaration instead follows the normal automatic-win rule. |
+| An action that drew from an empty deck, including its shuffle | Restore the pre-action deck/epoch state. Repeating the action generates a new eligible shuffle and records the resulting draw. |
+| An offered-card action plus its random transfer | Restore both hands and the offer prompt. A new offer requests a fresh selection from the then-eligible hand. |
+| A revealed token-purchase batch | Restore the unrevealed round with no saved submissions; every participant must submit again. Previously revealed amounts remain known. |
+
+This permits deliberate rerolls and reconsideration with information already learned. The creation
+description and Help must say so. Private historical views remain audience-filtered, but the server
+cannot make players forget a revealed card, bid or result. Do not describe Linear game as preserving
+competitive fairness or hiding previously learned information. It grants no new access to hidden
+hands, shuffle orders or another player's private history.
+
+#### Publication, private state and audit
+
+Reuse the existing immutable delta/suffix model. Append a revision with the current revision as
+parent, the requesting player as author, canonical command `undo N`, `replaceFrom = N`, and an
+empty replacement suffix. The retained entries keep their existing identities. Revision numbers
+and storage generations increase even though effective entry count falls. Subsequent ordinary
+actions append to that prefix; removed entry identities are never reused for new entries.
+
+Authorize, check `expectedRevision`, validate the exact boundary, replay the prefix and publish all
+effects under the same game lock/transaction. Rejection or storage failure leaves history and all
+private state unchanged. A lost response is reconciled by reading the current revision and audit;
+clients must not automatically retry against a newer revision, which could rewind another unit.
+Concurrent rewinds or gameplay writes serialize; an operation based on the losing revision is stale.
+
+On an accepted rewind:
+
+- Clear all pending capital/token submissions, even when the target has the same phase and turn.
+  Advance every affected owner's submission receipt, including empty slots, so an old private write
+  cannot reappear. Retain bounded operation acknowledgements as receipts, never as restored amounts.
+  Historical revisions do not contain pending values and must not recreate them.
+- Disarm every automatic plan and rotate plan versions in the same transaction. Retain saved
+  actions only as private, unarmed drafts for fresh validation/review; expire out-of-scope plans.
+  Never restore former authorizations, consumed plan progress or execution permission from history.
+  Existing execution receipts remain factual records of what previously ran, even if later undone.
+  The post-command plan worker must find no armed work to execute immediately after a rewind.
+- Invalidate affected snapshots, quotes, previews and decision scopes using the new edit revision.
+  Browsers clear stale action drafts and outcomes when they receive the replacement position, even
+  if its prompt text, phase and actor match the old position. Ordinary polling without an edit
+  continues to preserve valid work.
+- Preserve game ID/name, creation time, options, policy, metadata, memberships, credentials, roles,
+  operational lifecycle and exact upgrade archives. They are outside the replayed gameplay prefix.
+
+Show one public audit notice naming the rewind author and public destination, with a reference to
+the prior revision for permitted inspection. Keep removed events out of the current activity list;
+do not rewrite retained entry-time identities or receipts. Derive destination labels and removal
+summaries from the viewer's projection. Never reveal hidden action text, card identities, hand
+references, shuffle orders or counts that disclose a private choice. The creator's broader rewind
+authority does not broaden their history-reading audience.
+
+#### Service and implementation boundary
+
+Keep `undo` and `undo N` on the existing authenticated command endpoint. Add an explicit history
+capability to `UndoView` distinguishing prefix rewind, legacy suffix editing and no permission;
+policy labels or `fromEntry` alone must not decide which controls to render. Return the latest
+legal target for the primary Undo control. Provide bounded, paginated, read-only target offers
+with `expectedRevision`, retained entry count, a viewer-safe destination/removed-range summary and
+whether random events are removed. Fetch target offers using the ordinary game authorization and
+reject stale revisions. Offers expose legal targets, not arbitrary historical state exports; the
+command must revalidate the selected target under the write lock.
+
+For Linear game, reject the history replacement endpoint even for an empty replacement. There
+must be one canonical write operation for the same rewind. Preserve that endpoint's existing
+behavior for other policies and Friendly games awaiting upgrade. Use typed diagnostics for
+forbidden scope, protected or incomplete
+boundary, no change, stale revision, inactive game and unsupported suffix editing; never use
+`HISTORY_RANDOMNESS_CHANGED` merely because a permitted rewind removes randomness.
+
+Share exact-prefix validation between live commands and stored-revision validation. The current
+`GameDocuments` validator reconstructs every edit through outcome-preserving
+`HistoryEdits.replacement`; merely relaxing the live undo path would produce saves that fail on
+reload. Dispatch by the recorded policy and canonical operation, requiring an empty suffix for
+Linear game. Validate parent chain, scope, protected setup, complete units and retained replay
+without generating outcomes. Validate each historical operation against the policy in effect at
+its parent revision, retaining the stricter validation for earlier Friendly game edits. Reject
+documents that use the new policy to smuggle in arbitrary replacements or retroactively legalize
+an invalid old edit.
+
+#### Existing games and rollout
+
+Existing games whose current setting is Friendly game receive Linear game functionality through
+an automatic deployment migration, without requiring recreation, a creator opt-in or a new game.
+Include ongoing, engine-finished, cancelled and abandoned games; preserve their lifecycle and only
+permit actual rewind where the normal active-game checks allow it. Competitive, Regular turn and
+Friendly turn games keep their selected policy. Imported or restored Friendly saves use the same
+upgrade path before returning to ordinary play under the new behavior.
+
+Do not alias `FRIENDLY_GAME` to `LINEAR_GAME` in the decoder or rewrite the creation revision.
+Preserve the complete original revision chain and append a dedicated administrative policy-upgrade
+revision with no engine entries or suffix replacement. Record the previous and new policy,
+administrator, time, source revision/content hash and exact source-document archive receipt. This
+is a narrowly authorized upgrade operation, not a relaxation of setup-only `set-undo-policy`.
+The resulting effective policy is Linear game; revisions before the upgrade retain Friendly game
+semantics for validation and historical inspection. Never revalidate earlier arbitrary suffix
+edits as if they had been prefix-only rewinds.
+
+The policy upgrade is not itself a gameplay undo unit. Rewinds may reach any legal post-setup
+prefix, including positions before the upgrade and within a formerly edited suffix. Such a rewind
+does not remove the upgrade revision or restore Friendly game permissions. Derive target boundaries
+from the current effective entries, not from discarded branches in older revisions or archives.
+
+Preflight the original history with its original policy rules and validate the candidate with
+revision-time policy dispatch. Replay must prove identical effective entries, entry identities,
+recorded outcomes, public/private engine state and prompts before and after upgrade. Preserve game
+identity/name, options, metadata, creation time, memberships, credentials, roles, lifecycle, pending
+private submissions, owner receipts, saved plans and execution receipts, plus existing exact
+archives. The migration must not clear pending submissions, discard drafts or restore consumed
+plan progress. Preserve valid automatic authorizations subject to their ordinary exact-consequence
+checks; the migration itself never executes plans or generates randomness. Actual later rewinds
+apply the clearing and disarming rules above.
+
+Archive and publish each upgrade atomically under the game lock with an expected revision and
+storage generation, including private writes that do not advance the public revision. If a player
+or worker changes the game first, retry preflight against the new source rather than overwrite it.
+If upgrade wins, stale commands and suffix-editor submissions reject and refresh to the new
+capabilities. Advance the public revision and storage generation; invalidate history offers,
+editor drafts and preview tokens without changing the current gameplay decision. Failure leaves
+the game, private state and archives unchanged. Retrying an already upgraded game is a no-op and
+does not append another upgrade receipt. Report per-game success or a typed failure; never skip a
+failed game while claiming the migration complete.
+
+This application policy upgrade needs no engine/rules version change. If its audit/archive fields
+require a new file format, implement a supported format-7 upgrade that preserves the original
+chain and private state rather than replacing them with a gameplay checkpoint. Keep a decoder and
+validator for source saves until they can be upgraded; a version bump or export-only fallback is
+insufficient. Existing engine upgrades still need their separate validated continuity mapping.
+
+Deploy readers/validators that understand both policies and the upgrade receipt to all serving
+instances before enabling migration or new Linear game creation. Run preflight and the resumable
+migration, verify saved-state continuity and continued play, then retire Friendly game from new
+creation. Separate creation-choice validation from parsing old saved revisions. Reflect the
+replacement in remembered creation preferences and explain it beside the renamed choice; keep
+Regular turn as the default. Historical views show Friendly game before the upgrade, while the
+live game shows Linear game with a compact conversion notice. Rollback after policy upgrades or
+new-policy games exist requires compatible code; restoring a source archive would lose subsequent
+play and is not a routine rollback.
+
+The implementation shares prefix validation between live and stored operations, publishes under
+the game lock, upgrades existing histories with exact archives, and offers reviewed targets in the UI.
+The implementation acceptance matrix belongs in
+[requirements](requirements.md#linear-game-undo-acceptance).
 
 ## 5. Human and strategy controllers
 

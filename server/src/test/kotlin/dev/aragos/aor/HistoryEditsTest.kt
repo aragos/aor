@@ -253,6 +253,147 @@ class HistoryEditsTest(private val postgres: Boolean) {
         assertThat(fixture.stored()).isEqualTo(before)
     }
 
+    @Test
+    fun linearRewindRemovesDrawWithoutNewRandomnessAndResumesFromRestoredDeck() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val before = fixture.stored()
+        val drawn = fixture.send(0, "buy-expansion-card")
+        val card = drawn.game.hand.last()
+
+        val undone = fixture.send(0, "undo")
+
+        assertThat(fixture.stored().effectiveEntries()).isEqualTo(before.effectiveEntries())
+        assertThat(fixture.stored().state()).isEqualTo(before.state())
+        assertThat(fixture.reopened().get(fixture.game.gameId, fixture.token(0))).isEqualTo(undone)
+        assertThat(fixture.send(0, "buy-expansion-card").game.hand.last().definition)
+            .isEqualTo(card.definition)
+    }
+
+    @Test
+    fun linearRepeatedUndoWalksTheEffectivePrefixAcrossAuditRevisions() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val before = fixture.stored()
+        fixture.placeOne()
+        fixture.send(0, "buy-expansion-card")
+        fixture.send(0, "undo")
+
+        fixture.send(0, "undo")
+
+        assertThat(fixture.stored().effectiveEntries()).isEqualTo(before.effectiveEntries())
+    }
+
+    @Test
+    fun linearCreatorCanRewindOtherActivitiesButOtherPlayersCannot() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val before = fixture.stored()
+        fixture.send(0, "pass")
+        val actor = fixture.currentActor()
+        fixture.placeOne(actor)
+
+        assertThat(
+                assertFailsWith<ServiceFailure> {
+                        fixture.send(actor, "undo ${before.effectiveEntries().size}")
+                    }
+                    .code
+            )
+            .isEqualTo("HISTORY_EDIT_BOUNDARY")
+        fixture.send(0, "undo ${before.effectiveEntries().size}")
+
+        assertThat(fixture.stored().state()).isEqualTo(before.state())
+    }
+
+    @Test
+    fun linearRejectsSuffixEndpointAndTamperedStoredReplacement() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val from = fixture.stored().effectiveEntries().size
+        fixture.placeOne()
+        val source = fixture.stored()
+
+        assertThat(assertFailsWith<ServiceFailure> { fixture.edit(0, from, emptyList()) }.code)
+            .isEqualTo("HISTORY_SUFFIX_UNSUPPORTED")
+        val undone = HistoryEdits.undo(source, source.header.creatorId, from)
+        val tampered =
+            undone.copy(
+                revisions =
+                    undone.revisions.dropLast(1) +
+                        undone.revisions.last().copy(command = "edit-history $from")
+            )
+        assertFailsWith<IllegalArgumentException> { GameDocuments.validate(tampered) }
+    }
+
+    @Test
+    fun linearTargetsExcludeSetupSystemOutcomesAndPartialBatches() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val source = fixture.stored()
+        val targets = LinearHistory.targets(source, source.header.creatorId)
+        val partial =
+            source.effectiveEntries().indexOfFirst { it.text.contains(": buy-tokens ") } + 1
+
+        assertThat(targets.map(RewindTarget::entryCount)).doesNotContain(partial)
+        assertThat(assertFailsWith<ServiceFailure> { fixture.send(0, "undo $partial") }.code)
+            .isEqualTo("HISTORY_EDIT_BOUNDARY")
+        assertThat(assertFailsWith<ServiceFailure> { fixture.send(0, "undo 0") }.code)
+            .isEqualTo("HISTORY_EDIT_BOUNDARY")
+    }
+
+    @Test
+    fun friendlyMigrationPreservesEarlierSuffixEditsPrivateStateAndExactArchive() {
+        val fixture = fixture(UndoPolicy.FRIENDLY_GAME)
+        fixture.placeOne()
+        fixture.send(0, "undo")
+        val source = fixture.stored()
+        val contents = fixture.store.document(source.id)
+
+        assertThat(LinearGameMigration.run(fixture.store)).containsExactly(source.id)
+        val upgraded = fixture.stored()
+
+        assertThat(upgraded.undoPolicy).isEqualTo(UndoPolicy.LINEAR_GAME)
+        assertThat(upgraded.revisions.dropLast(1)).isEqualTo(source.revisions)
+        assertThat(upgraded.effectiveEntries()).isEqualTo(source.effectiveEntries())
+        assertThat(upgraded.state()).isEqualTo(source.state())
+        assertThat(upgraded.copy(revisions = source.revisions)).isEqualTo(source)
+        assertThat(
+                json.readTree(
+                    fixture.store.archivedDocument(
+                        source.id,
+                        upgraded.revisions.last().storageArchive!!,
+                    )
+                )
+            )
+            .isEqualTo(json.readTree(contents))
+        assertThat(LinearGameMigration.run(fixture.store)).isEmpty()
+        fixture.send(0, "buy-expansion-card")
+        fixture.send(0, "undo")
+        assertThat(fixture.reopened().get(source.id, fixture.token(0)).game)
+            .isEqualTo(fixture.view(0).game)
+    }
+
+    @Test
+    fun acceptedRewindClearsConsentAndEverySubmissionSlotAtomically() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val source = fixture.stored()
+        fixture.service.abandonment(
+            source.id,
+            GameAccess.SeatToken(fixture.token(1)),
+            source.revision,
+            java.util.UUID.randomUUID().toString(),
+            AbandonmentOperation.PROPOSE,
+            null,
+        )
+        fixture.placeOne()
+
+        fixture.send(0, "undo")
+
+        val rewound = fixture.stored()
+        assertThat(GameAbandonment.open(rewound)).isNull()
+        assertThat(rewound.revisions.last().abandonment?.closure)
+            .isEqualTo(AbandonmentClosure.HISTORY_CHANGED)
+        assertThat(rewound.submissionVersions.keys)
+            .containsExactlyElementsIn(source.header.players.map(Player::id))
+        assertThat(rewound.effectiveEntries()).isEqualTo(source.effectiveEntries())
+        GameDocuments.validate(rewound)
+    }
+
     private fun fixture(policy: UndoPolicy = UndoPolicy.REGULAR_TURN): Fixture {
         val directory = Files.createTempDirectory("aor-history-edit-")
         directories.add(directory)

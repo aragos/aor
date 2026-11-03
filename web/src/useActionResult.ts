@@ -11,12 +11,14 @@ export function useActionResult(snapshot: Snapshot, sendCommand: (command: strin
     const [result, setResult] = useState<HistoryEventView | null>(null);
     const [resultRequest, setResultRequest] = useState<ResultRequest | null>(null);
     const inExpansion = (turn: number | null) => snapshot.game.stage === 'EXPANSION' && snapshot.game.turnNumber === turn;
-    const visibleResult = result && snapshot.events.some(event => event.id === result.id) &&
+    const active = !snapshot.status || snapshot.status === 'ACTIVE';
+    const visibleResult = active && result && snapshot.events.some(event => event.id === result.id) &&
         (!result.competition || inExpansion(result.turnNumber)) ? result : null;
     useEffect(() => {
         if (result && !visibleResult) setResult(null);
     }, [result, visibleResult]);
     useEffect(() => {
+        if (!active) {setResultRequest(null); return;}
         if (resultRequest?.kind === 'competition' && !inExpansion(resultRequest.turn)) {
             setResultRequest(null);
             return;

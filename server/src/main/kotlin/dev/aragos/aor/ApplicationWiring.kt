@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import java.nio.file.Path
+import org.slf4j.LoggerFactory
 
 /** Composes the local file store with the game driver at the application's boundary. */
 fun createGameService(
@@ -24,6 +25,9 @@ fun createConfiguredGameService(environment: Map<String, String> = System.getenv
                 FileGameStore(Path.of(environment["AOR_DATA_DIR"] ?: ".aor-data").toAbsolutePath())
             else -> error("AOR_STORAGE must be postgres or file.")
         }
+    LinearGameMigration.run(store).forEach { id ->
+        LoggerFactory.getLogger("LinearGameMigration").info("Upgraded Linear game {}", id)
+    }
     return GameService(store)
 }
 

@@ -566,3 +566,30 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .reference-track-player { display: inline-flex; padding: 2px; border-radius: 4px; }
 .reference-track-player.is-viewer { outline: 1px solid #245c50; background: #fffef8; }
 .reference-track-player .identity-label { gap: 0; }
+
+/* Keep waiting identities in one text flow so separators do not become flex items. */
+.decision-status > .waiting-players { display: inline; }
+.portal { max-width: 1040px; }
+.portal > .panel { border-color: #d6ddcf; border-radius: 12px; box-shadow: 0 3px 14px #263d2910; }
+.game-directory { display: grid; gap: .5rem; margin-bottom: 0; }
+.game-directory .game-row { border-radius: 8px; padding: .85rem 1rem; background: #fafbf7; }
+.game-directory .game-row.needs-action { background: #eaf2e3; }
+.game-row-name { font-size: 1.05rem; }
+.game-row-description .game-row-players { color: #526450; line-height: 1.6; }
+.create-registered > summary { font-size: 1.15rem; }
+.create-registered > form { display: grid; gap: .7rem; padding-top: .8rem; }
+.create-registered > form > h2, .create-registered > form > p { margin-bottom: 0; }
+.create-registered > form > input { width: 100%; box-sizing: border-box; }
+.create-registered .player-directory { margin: 0; }
+.create-registered .player-directory li { padding: .45rem .65rem; border-radius: 6px; background: #f2f5ed; border-bottom: 0; margin-bottom: .3rem; }
+.player-handle { background: none; color: #285542; padding: .4rem 0; box-shadow: none; text-align: left; font-weight: 700; }
+.player-handle:hover { background: none; text-decoration: underline; }
+.create-registered .creation-variants { border: 1px solid #d6ddcf; border-radius: 8px; }
+.create-registered > form > button[type=submit], .create-registered > form > button:last-child { justify-self: start; }
+
+.abandonment-status { border: 1px solid #d4c5a7; background: #fbf6e9; border-radius: 7px; padding: .65rem; margin-bottom: .8rem; }
+.abandonment-status h3 { font-size: 1rem; margin-bottom: .4rem; }
+.abandonment-status p { margin-bottom: .45rem; }
+.abandonment-status .button-row { gap: .4rem; }
+.rewind-targets { max-height: 20rem; overflow: auto; padding-left: 1.5rem; }
+.rewind-targets li { margin-bottom: .4rem; }

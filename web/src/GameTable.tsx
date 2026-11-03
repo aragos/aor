@@ -1,5 +1,5 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
+import type {ApiError, Snapshot, RewindTarget, TokenPurchaseQuoteResponse} from './api';
 import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label, purchasePassLabel} from './labels';
 import {t} from './messages';
@@ -27,6 +27,10 @@ import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
 import {ReferenceCatalogContext, ReferenceGameContext} from './HelpLink';
 import {useStoredSetting} from './preferences';
+import {AbandonmentStatus, AbandonmentTools} from './Abandonment';
+import type {WriteAbandonment} from './Abandonment';
+import {RewindReview} from './RewindReview';
+import type {LoadRewindTargets} from './RewindReview';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
 export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
@@ -34,17 +38,20 @@ export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 const ACTIVITY_PIN_QUERY = '(min-width: 1400px)';
 const MOBILE_QUERY = '(max-width: 700px)';
 
-export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan}: {
+export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
-    writePlan?: WritePlan; quotePlan?: QuotePlan;
+    writePlan?: WritePlan; quotePlan?: QuotePlan; loadRewindTargets?: LoadRewindTargets; writeAbandonment?: WriteAbandonment;
 }) {
     const planner = useActivityPlanner(liveSnapshot, writePlan, quotePlan);
     const snapshot = planner.effective;
     const busy = requestBusy || planner.loading || !!liveSnapshot.planning?.saved?.armed;
     const actuallyActing = liveSnapshot.viewerId !== null && (liveSnapshot.prompt?.players.includes(liveSnapshot.viewerId) ?? false);
     const spectator = snapshot.viewerId === null;
+    const [expansionPass, setExpansionPass] = useState<number | null>(null);
+    const [rewindTarget, setRewindTarget] = useState<RewindTarget | null>(null);
+    useEffect(() => {if (liveSnapshot.status && liveSnapshot.status !== 'ACTIVE') setRewindTarget(null);}, [liveSnapshot.status]);
     const [commandsOpen, setCommandsOpen] = useState(false);
     const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
     const finished = snapshot.game.stage === 'FINISHED';
@@ -98,6 +105,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     // Reset before new forms activate their automatic target pickers.
     useLayoutEffect(() => {
         resetSelection();
+        setExpansionPass(null);
         if (document.activeElement instanceof HTMLElement &&
             document.activeElement.matches('.hand-card, .advance-tile')) document.activeElement.blur();
     }, [decisionKey, resetSelection]);
@@ -118,8 +126,13 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     useEffect(() => {
         if (inspection?.kind === 'card' && !snapshot.game.hand.some(card => card.reference === inspection.id)) setInspection(null);
     }, [inspection, setInspection, snapshot.game.hand]);
-    async function submit(command: string) {
+    async function submit(command: string, confirmedPass = false) {
         if (spectator) return false;
+        if (!confirmedPass && command.trim() === 'pass' && snapshot.game.stage === 'EXPANSION' &&
+            snapshot.game.activity?.actor === snapshot.viewerId &&
+            snapshot.game.expansionOffers.some(offer => offer.primaryAction !== 'INSPECT' &&
+                offer.reachable && offer.establishesMarker && offer.blockers.length === 0 &&
+                offer.resultingPool !== null)) {setExpansionPass(snapshot.revision); return false;}
         if (planner.open) {
             const appended = await planner.append(command);
             if (appended) resetSelection();
@@ -177,14 +190,24 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
         </details>
+        {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
         {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
-            open={commandsOpen} onToggle={setCommandsOpen}/>}
+            open={commandsOpen} onToggle={setCommandsOpen} loadRewindTargets={loadRewindTargets} reviewRewind={setRewindTarget}/>}
     </div>;
     return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
         <ReferenceGameContext.Provider value={{viewerId: liveSnapshot.viewerId,
-            players: liveSnapshot.game.players, turnOrder: liveSnapshot.game.turnOrder,
+            players: liveSnapshot.game.players.every(player => player.capital !== null) ? liveSnapshot.game.players : [], turnOrder: liveSnapshot.game.turnOrder,
             orderBoxes: liveSnapshot.game.orderBoxes, commodityCards: liveSnapshot.game.commodityCards,
             commodityPayouts: liveSnapshot.game.commodityPayouts}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
+        {expansionPass !== null && <CardInspectionDialog label={t('action.pass')} close={() => setExpansionPass(null)}>
+            <h2>{t('action.pass')}</h2><p>{t('controls.confirmExpansionPass')}</p>
+            {expansionPass !== snapshot.revision && <p className="blocker">{t('history.staleDraft')}</p>}
+            <div className="button-row"><button type="button" disabled={busy || expansionPass !== snapshot.revision} onClick={async () => {
+                if (await submit('pass', true)) setExpansionPass(null);
+            }}>{t('controls.passAnyway')}</button><button type="button" className="secondary" onClick={() => setExpansionPass(null)}>{t('abandonment.back')}</button></div>
+        </CardInspectionDialog>}
+        {rewindTarget && <RewindReview snapshot={liveSnapshot} target={rewindTarget} busy={busy}
+            close={() => setRewindTarget(null)} submit={submit}/>}
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
@@ -197,7 +220,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
                 <AccountControls showGames={false}/>
             </header>
-            {inactive && <p className="ending-notice" role="status">{t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
+            {inactive && <p className="ending-notice" role="status">{snapshot.status === 'ABANDONED' && snapshot.events.some(event => event.kind === 'ABANDONMENT_AGREE' && event.detail === 'UNANIMOUS') ? t('abandonment.ended') : t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
             {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
         </div>
         <div className="table-workspace" data-activity-pinned={activityPinned}>
@@ -245,7 +268,10 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                         {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
                             className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
                             title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
-                            onClick={() => { void submit(withdrawing ? 'withdraw-bid' : 'undo'); }}>{t('history.undo')}</button>}
+                            onClick={() => {
+                                if (!withdrawing && snapshot.undo.capability === 'PREFIX_REWIND' && snapshot.undo.latestTarget) setRewindTarget(snapshot.undo.latestTarget);
+                                else void submit(withdrawing ? 'withdraw-bid' : 'undo');
+                            }}>{t('history.undo')}</button>}
                     </div>
                     <div className="decision-scroll" ref={decisionScroll}>
                         <div className={`decision-heading ${objectAction ? 'object-heading' : ''}`}>
@@ -253,7 +279,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                             {finished && <p className="eyebrow">{t('game.finished')}</p>}
                             {!inactive && !finished && <div className={`decision-status ${actuallyActing ? 'is-ready' : 'is-waiting'}`} role="status">
                                 <strong>{t(actuallyActing ? 'table.yourMove' : 'prompt.waitingFor')}</strong>
-                                {!actuallyActing && liveSnapshot.prompt && <PlayerLabels snapshot={liveSnapshot} ids={liveSnapshot.prompt.players}/>}
+                                {!actuallyActing && liveSnapshot.prompt && <span className="waiting-players"><PlayerLabels snapshot={liveSnapshot} ids={liveSnapshot.prompt.players}/></span>}
                             </div>}
                             <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
                             {!objectAction && <span className="mobile-selected">{province ? <ProvinceLabel snapshot={snapshot} id={province.id}/> : ''}</span>}
@@ -266,6 +292,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                                 onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
                             {snapshot.game.activity?.actor && snapshot.game.activity.decisionPlayer && snapshot.game.activity.actor !== snapshot.game.activity.decisionPlayer && <p className="interrupt-owner">{t('table.resumes')}: <PlayerLabel snapshot={snapshot} id={snapshot.game.activity.actor}/></p>}
                         </div>
+                    <AbandonmentStatus snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>
                     {expansionPlayer?.poolAvailable && <div className="pool-summary" role="status">
                         <PlayerLabel snapshot={snapshot} id={expansionPlayer.id}/>
                         <span>{t('table.poolTokens')}</span><strong><TableIcon kind="token"/><span data-pool-current>{expansionPlayer.poolTokens}</span>
@@ -280,7 +307,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                     {result && <ActionResultNotice event={result} snapshot={snapshot} onDismiss={dismissResult}/>}
                     {!spectator && !inactive && <ActivityPlanner snapshot={liveSnapshot} planner={planner} busy={requestBusy}/>}
                     {spending && me && <p className="action-cash">{t('controls.availableCash')}: <strong>${me.cash}</strong></p>}
-                    {buyingAdvances && <p className="relief-rating-summary advance-relief-rating"><span>{t('controls.reliefRatingAvailable')}</span><strong>${snapshot.game.reliefRatingAvailable}</strong></p>}
+                    {buyingAdvances && !advanceAction && <p className="relief-rating-summary advance-relief-rating"><span>{t('controls.reliefRatingAvailable')}</span><strong>${snapshot.game.reliefRatingAvailable}</strong></p>}
                     <PlanningActions active={planner.open}>{cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : province && !picker && <ProvinceActions key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit}/>}

@@ -147,7 +147,6 @@ export async function checkActionContext(page, web, baseline) {
     await click(`[data-advance="${advance.id}"]`);
     assert.match(await page.evaluate(`document.querySelector('.action-cash').textContent`), /Cash available:.*\$/);
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .advance-benefits').textContent`), /.+/);
-    await click('.decision-panel .price-details > summary');
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .leader-discount').textContent`), /−\$30.*Includes \$10 Written Record/);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-action-context-desktop.png'), 1280, 900);
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-action-context-phone.png'), 390, 844, true);

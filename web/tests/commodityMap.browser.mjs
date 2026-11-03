@@ -41,6 +41,11 @@ export async function checkCommodityMap(page, web, baseline) {
         assert.equal(await page.evaluate(`document.querySelectorAll('[data-commodity-highlight].inactive').length`), 0, 'Unused provinces remain unhighlighted');
         assert.equal(await page.evaluate(`document.querySelectorAll('.card-inspection-dialog').length`), 0, 'A commodity click needs no duplicate inspector');
         assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.map-zoom')).display === 'none'`), mobile, 'Map buttons are absent on mobile');
+        await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
+        await page.wait(`!document.querySelector('[data-commodity-highlight]')`, 'second card click clears commodity highlights');
+        assert.equal(await page.evaluate(`document.querySelector('.decision-content .card-decision') !== null`), true, 'Unhighlighting retains the prepared card action');
+        await page.evaluate(`document.querySelector('[data-hand-card="${reference}"]').click()`);
+        await page.wait(`document.querySelector('[data-commodity-highlight]')`, 'third click restores highlight');
         const draft = await page.evaluate(`document.querySelector('.decision-content .card-decision').textContent`);
         const iconExamples = [
             fixture.game.catalog.provinces.find(province => province.commodities.includes('STONE')),

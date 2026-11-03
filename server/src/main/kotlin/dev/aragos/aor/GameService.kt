@@ -51,6 +51,10 @@ data class GameSnapshot(
     val status: GameStatus,
     val accountId: String?,
     val planning: ActivityPlanningView? = null,
+    val abandonment: AbandonmentView? = null,
+    val abandonmentReceipt: String? = null,
+    val abandonmentReceipts: List<String> = emptyList(),
+    val abandonmentResult: AbandonmentWriteResult? = null,
     /** The acknowledged write's version can differ from a newer state in this response. */
     val planWriteReceipt: PlanWriteReceipt? = null,
 )
@@ -303,9 +307,10 @@ class GameService(
                                     },
                                 )
                         }
+                    val reconciled = GameAbandonment.reconcile(current, next)
                     val saved =
                         if (privateWrite) {
-                            next.copy(
+                            reconciled.copy(
                                 submissionVersions =
                                     if (next.revision == current.revision)
                                         next.submissionVersions +
@@ -320,7 +325,7 @@ class GameService(
                                                     .takeLast(16))
                                     else next.submissionReceipts,
                             )
-                        } else next
+                        } else reconciled
                     if (text.trim() == "undo" || text.trim().startsWith("undo ")) {
                         ActivityPlans.disarm(saved, PlanPause.EDITED)
                     } else ActivityPlans.afterManual(saved, player)
@@ -334,6 +339,124 @@ class GameService(
             }
         val result = advancePlans(id) ?: stored
         return snapshot(result, authenticate(result, access))
+    }
+
+    private fun consentReceipt(current: StoredGame, operationId: UUID): Revision? {
+        current.revisions
+            .firstOrNull { it.abandonment?.operationId == operationId }
+            ?.let {
+                return it
+            }
+        val managed = store as? ManagedGameStore ?: return null
+        return managed.archives(current.id).asReversed().firstNotNullOfOrNull { name ->
+            val root = json.readTree(managed.archivedDocument(current.id, name))
+            if (
+                root["fileVersion"]?.asInt() != 7 ||
+                    root["revisions"]?.any { revision ->
+                        revision["abandonment"]?.get("operationId")?.asText() ==
+                            operationId.toString()
+                    } != true
+            )
+                null
+            else
+                GameDocuments.read(current.id, root).revisions.firstOrNull {
+                    it.abandonment?.operationId == operationId
+                }
+        }
+    }
+
+    internal fun abandonment(
+        id: String,
+        access: GameAccess,
+        expectedRevision: Int,
+        operationId: String,
+        operation: AbandonmentOperation,
+        requestId: String?,
+    ): GameSnapshot {
+        val stored =
+            store.update(id) { current ->
+                val player = authenticate(current, access)
+                if (
+                    !operationId.matches(GameDocuments.GAME_ID_PATTERN) ||
+                        (requestId != null && !requestId.matches(GameDocuments.GAME_ID_PATTERN))
+                ) {
+                    throw ServiceFailure(400, "INVALID_REQUEST")
+                }
+                val operationUuid = UUID.fromString(operationId)
+                val prior = consentReceipt(current, operationUuid)
+                if (prior != null) {
+                    val event =
+                        checkNotNull(prior.abandonment) {
+                            "A consent receipt requires its audit payload."
+                        }
+                    if (
+                        prior.author != player ||
+                            event.operation != operation ||
+                            event.baseRevision != expectedRevision ||
+                            (if (operation == AbandonmentOperation.PROPOSE) requestId != null
+                            else requestId != event.requestId.toString())
+                    ) {
+                        throw ServiceFailure(409, "OPERATION_ID_REUSED")
+                    }
+                    return@update current
+                }
+                if (current.revision != expectedRevision)
+                    throw ServiceFailure(409, "STALE_REVISION")
+                if (
+                    (operation == AbandonmentOperation.PROPOSE) != (requestId == null) ||
+                        operation == AbandonmentOperation.CLOSE
+                ) {
+                    throw ServiceFailure(400, "INVALID_REQUEST")
+                }
+                val event =
+                    AbandonmentEvent(
+                        requestId = requestId?.let(UUID::fromString) ?: UUID.randomUUID(),
+                        operation = operation,
+                        operationId = operationUuid,
+                        baseRevision = expectedRevision,
+                    )
+                if (
+                    operation == AbandonmentOperation.AGREE &&
+                        current.status == GameStatus.ACTIVE &&
+                        current.state().stage != Stage.FINISHED &&
+                        GameAbandonment.open(current)?.let {
+                            it.requestId == event.requestId && player in it.agreed
+                        } == true
+                )
+                    return@update current
+                GameAbandonment.apply(current, player, event)
+            }
+        val committed = consentReceipt(stored, UUID.fromString(operationId)) != null
+        return snapshot(stored, authenticate(stored, access))
+            .copy(
+                abandonmentReceipt = operationId.takeIf { committed },
+                abandonmentResult =
+                    if (committed) AbandonmentWriteResult.COMMITTED
+                    else AbandonmentWriteResult.ALREADY_AGREED,
+            )
+    }
+
+    internal fun rewindTargets(
+        id: String,
+        access: GameAccess,
+        expectedRevision: Int,
+        before: Int? = null,
+    ): RewindTargets {
+        val stored = store.read(id)
+        val player = authenticate(stored, access)
+        if (stored.revision != expectedRevision) throw ServiceFailure(409, "STALE_REVISION")
+        if (stored.undoPolicy != UndoPolicy.LINEAR_GAME)
+            throw ServiceFailure(422, "HISTORY_SUFFIX_UNSUPPORTED")
+        val targets =
+            LinearHistory.targets(stored, player).filter {
+                before == null || it.entryCount < before
+            }
+        val page = targets.take(30)
+        return RewindTargets(
+            stored.revision,
+            page,
+            page.lastOrNull()?.entryCount?.takeIf { targets.size > page.size },
+        )
     }
 
     internal fun editHistory(
@@ -351,7 +474,10 @@ class GameService(
                     throw ServiceFailure(409, "STALE_REVISION")
                 }
                 ActivityPlans.disarm(
-                    HistoryEdits.edit(current, player, fromEntry, lines),
+                    GameAbandonment.reconcile(
+                        current,
+                        HistoryEdits.edit(current, player, fromEntry, lines),
+                    ),
                     PlanPause.EDITED,
                 )
             }
@@ -460,11 +586,24 @@ class GameService(
             undo =
                 HistoryEdits.view(stored, player).let {
                     if (stored.status == GameStatus.ACTIVE) it
-                    else it.copy(available = false, fromEntry = null, actions = emptyList())
+                    else
+                        it.copy(
+                            available = false,
+                            fromEntry = null,
+                            actions = emptyList(),
+                            capability = HistoryCapability.NONE,
+                            latestTarget = null,
+                        )
                 },
             status = stored.status,
             accountId = stored.memberships[player],
             planning = player?.let { ActivityPlans.view(stored, it) },
+            abandonment = GameAbandonment.open(stored, player),
+            abandonmentReceipts =
+                stored.revisions
+                    .filter { it.author == player }
+                    .mapNotNull { it.abandonment?.operationId?.toString() }
+                    .takeLast(16),
         )
     }
 
