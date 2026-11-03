@@ -16,7 +16,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/dependency-submission@v5
+      - uses: gradle/actions/dependency-submission@v6
         with:
+          cache-provider: basic
           dependency-graph: generate-and-submit
           dependency-resolution-task: ':server:dependencies'

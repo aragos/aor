@@ -675,6 +675,32 @@ the required MIME type, immutable caching and gzip. Five Python regressions cove
 quoting and failed asset contracts. Java 24 and Node 25 container proposals are excluded because
 their support has ended; supported Java 21 and Node 24 images remain in place.
 
+## Node 26, Ktor and Flyway follow-up
+
+The next dependency batch passes clean Node 26 installation, all 76 web unit tests, the production
+build and the npm advisory audit. Ktor 3.6.1 and Flyway 13.12.0 pass integrated Kotlin JVM/JS/server
+checks, formatting, real PostgreSQL 18.6 migrations and saved-game compatibility regressions.
+
+An isolated Java 21/PostgreSQL 18.6 check starts the previous Ktor 3.6.0/Flyway 13.11.1 server,
+creates two games with a sealed bid and saved review plan, then restarts with the updated server
+against that populated schema. Existing V1–V3 migration history validates without new migrations.
+All seven application tables, including 12 immutable revisions, remain unchanged; six player views
+match apart from one refreshed preview token. The pending bid then resolves with its original value,
+and the saved purchase executes exactly once with preceding history retained. Temporary servers
+and the disposable schema are removed. Evidence is retained in `aor-populated-upgrade-ymzn40u7`.
+
+Both complete StrictMode map and history browser suites pass (`aor-browser-artifacts-v9rWMj`).
+Java 21 production-server checks retain health, game creation and all four built map drawings'
+MIME, immutable caching and gzip contracts. The five Python asset-verifier regressions pass.
+No game rules, saved-game formats or SQL migrations change in this batch. Gradle Actions 6 uses
+the basic cache provider explicitly; Python Actions 7 retains Python 3.12 for validation scripts.
+
+Decision-family fixtures now await a fresh harness document and the revision rendered by the App.
+Transport counters and fixture-variable mutation do not establish that rendering has completed.
+Their four absence assertions return booleans, retaining strict absence checks without serializing
+React DOM objects through CDP. Both full browser suites pass again with these guards; artifacts
+are retained in `/private/tmp/aor-dependabot-readiness-browser-artifacts`.
+
 ## Table controls, Linear game and unanimous abandonment
 
 The 2026-11-02 implementation passes the integrated Kotlin JVM/JS/server checks and formatting.

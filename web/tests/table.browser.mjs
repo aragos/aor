@@ -231,8 +231,9 @@ export async function checkTokenContinuity(page, web, tokenFixture) {
 }
 
 export async function checkDecisionFamilies(page, web, baseline) {
+    const previous = await page.evaluate('performance.timeOrigin');
     await page.send('Page.navigate', {url: web + '/tests/ui-harness.html'});
-    await page.wait(`typeof window.setUiSnapshot === 'function'`, 'decision family harness');
+    await page.wait(`performance.timeOrigin !== ${previous} && typeof window.setUiSnapshot === 'function'`, 'new decision family harness');
     let revision = baseline.revision + 100;
     const viewer = baseline.viewerId;
     const other = baseline.game.players.find(player => player.id !== viewer).id;
@@ -244,11 +245,8 @@ export async function checkDecisionFamilies(page, web, baseline) {
             legalChoices: {commands, bidMin: null, bidMax: null},
             game: {...baseline.game, stage, expansionOffers: [], cardOffers: [],
                 activity: {actor: other, decisionPlayer: viewer, choice, purchaseStep: null, startEntry: revision}, ...game}};
-        const requests = await page.evaluate('window.uiRequests');
         await page.evaluate(`window.setUiSnapshot(${JSON.stringify(snapshot)})`);
-        await page.wait(`window.uiRequests > ${requests}`, choice + ' polled');
-        await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-        await page.wait(`window.uiSnapshot.revision === ${revision} && document.querySelector('.decision-panel')`, choice + ' fixture');
+        await page.wait(`document.querySelector('.command-dock > summary small')?.textContent.trim() === 'Revision ${revision}'`, choice + ' fixture rendered');
         return snapshot;
     }
     const finite = [
@@ -267,7 +265,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
             : '.game-actions .action-buttons button.secondary';
         await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
         if (/^(discard-card|offer-card) /.test(command)) {
-            assert.equal(await page.evaluate(`document.querySelector('.game-actions .action-buttons button.secondary')`), null, 'Card choices have one home in the hand');
+            assert.equal(await page.evaluate(`!!document.querySelector('.game-actions .action-buttons button.secondary')`), false, 'Card choices have one home in the hand');
         }
         await page.wait(`document.querySelector('.selected-action-confirmation:not([disabled])')`, choice + ' selected');
         assert.equal(await page.evaluate('window.uiCommands.length'), count, `${choice} selection cannot submit`);
@@ -277,7 +275,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
     }
     const quotesBeforeRenaissance = await page.evaluate('window.uiQuoteRequests.length');
     await show('renaissance', ['pass', `swap-order ${other}`], {}, 'TOKEN_PURCHASE');
-    assert.equal(await page.evaluate(`document.querySelector('#bid')`), null,
+    assert.equal(await page.evaluate(`!!document.querySelector('#bid')`), false,
         'Renaissance precedes token purchase controls');
     assert.equal(await page.evaluate('window.uiQuoteRequests.length'), quotesBeforeRenaissance,
         'Renaissance does not request unavailable token quotes');
@@ -336,7 +334,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
         if (kind === 'PROVINCE' || kind === 'AREA') {
             await page.wait(`document.querySelector('#tab-map[aria-selected=true]') && document.querySelector('.eligible-shade')`,
                 id+' automatically opens the map and shades legal targets');
-            assert.equal(await page.evaluate(`document.querySelector('button.map-picker')`), null,
+            assert.equal(await page.evaluate(`!!document.querySelector('button.map-picker')`), false,
                 'Map picking needs no activation button');
             const selector = kind === 'PROVINCE' ? `[data-map-province="${value}"]` : `[data-map-area-label="${value.toUpperCase()}"]`;
             await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
@@ -361,7 +359,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
         advanceOffers:[{advance:advance.id,price:10,unavailableReason:'MISSING_ADVANCE_PREREQUISITE'}],
     }, 'PURCHASE');
     await page.evaluate(`[...document.querySelectorAll('.advance-tile')].find(tile=>tile.querySelector('.advance-letter').textContent===${JSON.stringify(advance.letter)}).click()`);
-    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision')`), null, 'Blocked advance inspection leaves the decision flow alone');
+    assert.equal(await page.evaluate(`!!document.querySelector('.decision-panel .advance-decision')`), false, 'Blocked advance inspection leaves the decision flow alone');
     assert.match(await page.evaluate(`document.querySelector('.inspection-panel .advance-decision .blocker').textContent`), /prerequisite/i);
     await page.evaluate(`document.querySelector('.inspection-panel .advance-decision .close-detail').click()`);
     const dualReference = 'fixture-dual';

@@ -31,7 +31,7 @@ web/      React/TypeScript client, built independently with Vite
 
 ## Run locally
 
-Use JDK 21 and Node 24.12 or newer. From the repository root:
+Use JDK 21 and Node 26 LTS. From the repository root:
 
 ```sh
 npm install
