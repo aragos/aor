@@ -52,6 +52,10 @@ data class StoredGame(
     /** Revisions before this checkpoint are retained in [previousArchive]. */
     val baseRevision: Int = 0,
     val previousArchive: String? = null,
+    /** Automated controllers keep ordinary engine seats; absent fields preserve existing saves. */
+    val bots: Map<PlayerId, AutomatedPlayer> = emptyMap(),
+    /** Durable browser ownership, fencing and reconciliation; never part of engine replay. */
+    val botRunner: BotRunnerState? = null,
 ) {
     val status: GameStatus
         get() =

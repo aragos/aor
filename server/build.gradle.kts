@@ -73,6 +73,7 @@ tasks.register<JavaExec>("postgresBrowserServer") {
 
 dependencies {
     api(project(":core"))
+    implementation(project(":ai"))
     implementation(libs.postgresql)
     implementation(libs.hikari)
     implementation(libs.flyway.core)

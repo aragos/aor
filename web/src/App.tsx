@@ -1,7 +1,7 @@
 import {lazy, Suspense, useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
 import {ApiError, errorCode, request, requestSnapshot} from './api';
-import type {ApplicationConfig, CreatedGame, Snapshot, PlanningQuote} from './api';
+import type {ApplicationConfig, BotDifficulty, CreatedGame, Snapshot, PlanningQuote} from './api';
 import {t} from './messages';
 import {defaultVariants, validVariants, Variants} from './Variants';
 import {isUndoPolicy, useStoredSetting} from './preferences';
@@ -13,6 +13,9 @@ import type {PurchaseQuote} from './GameTable';
 import {MapSelectionProvider} from './map/MapSelection';
 import {hasPlayerAction, setTurnFavicon} from './favicon';
 import {startPolling} from './polling';
+import {AutomatedOpponents} from './AutomatedOpponents';
+import {useBotAutomation} from './ai/useBotAutomation';
+import {BotControls} from './ai/BotControls';
 import './app.css';
 
 const HostedApp = lazy(() => import('./HostedApp'));
@@ -23,6 +26,8 @@ function isAccessFailure(code: string) { return ['UNAUTHORIZED', 'GAME_MEMBERSHI
 function CreateGame() {
     const [name, setName] = useState('');
     const [names, setNames] = useState('Alice\nBob\nCarol');
+    const [bots, setBots] = useState<BotDifficulty[]>([]);
+    const humanNames = names.split('\n').map(value => value.trim()).filter(Boolean);
     const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
     const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants);
     const [created, setCreated] = useState<CreatedGame | null>(null);
@@ -30,7 +35,7 @@ function CreateGame() {
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: names.split('\n'), options: variants, undoPolicy})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: humanNames, bots: bots.map(difficulty => ({difficulty})), options: variants, undoPolicy})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
@@ -50,6 +55,7 @@ function CreateGame() {
             <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
+            <AutomatedOpponents value={bots} onChange={setBots} humanCount={humanNames.length} disabled={busy}/>
             <p className="muted small">{t('create.threeEpochs')}</p>
             <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
@@ -57,7 +63,7 @@ function CreateGame() {
                 choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {undoPolicy === 'linear-game' && <p className="small">{t('history.linearDescription')}</p>}</details>
             {error && <ErrorMessage code={error}/>}
-            <button disabled={busy}>{t(busy ? 'status.working' : 'create.submit')}</button>
+            <button disabled={busy || humanNames.length < 1 || humanNames.length + bots.length < 3 || humanNames.length + bots.length > 6}>{t(busy ? 'status.working' : 'create.submit')}</button>
         </form>}
     </main>;
 }
@@ -74,7 +80,9 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const acceptedSnapshot = useRef<string>(undefined);
     const activityAt = useRef(0);
     const uncertainOperation = useRef<string | null>(null);
+    const botRefresh = useRef<AbortController | null>(null);
     const path = `/api/games/${id}`;
+    useEffect(() => () => {botRefresh.current?.abort(); ++sequence.current;}, [path, token]);
 
     function clearAuthorizedSnapshot(code: string) {
         etag.current = undefined;
@@ -95,6 +103,23 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         setTurnFavicon(hasPlayerAction(next));
         setSnapshot(next);
     }
+
+    async function refreshForBots() {
+        if (busyRef.current) return;
+        botRefresh.current?.abort();
+        const controller = new AbortController();
+        botRefresh.current = controller;
+        const current = ++sequence.current;
+        try {
+            const next = await requestSnapshot(path, token, undefined, controller.signal);
+            if (controller.signal.aborted || current !== sequence.current || busyRef.current) return;
+            etag.current = next.etag;
+            if (next.snapshot) acceptSnapshot(next.snapshot);
+        } finally {
+            if (botRefresh.current === controller) botRefresh.current = null;
+        }
+    }
+    const automation = useBotAutomation(snapshot, token, busyRef, refreshForBots);
 
     useEffect(() => {
         let active = true;
@@ -153,7 +178,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
         <a href="/">{t('game.new')}</a></main>;
-    return <MapSelectionProvider><GameTable writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy} saved={saved}
+    return <MapSelectionProvider><GameTable botControls={<BotControls snapshot={snapshot} {...automation}/>} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy} saved={saved}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
         quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
         submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null}).then(Boolean)} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines}).then(Boolean)} connectionError={connectionError} actionError={actionError}

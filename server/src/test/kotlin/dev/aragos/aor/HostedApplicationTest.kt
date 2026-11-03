@@ -162,6 +162,124 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
+    fun soloCreationRegistersOnlyTheHumanAccountAndAddsAutomatedSeats() = withHosted {
+        val response =
+            post(
+                "/api/games",
+                "alice",
+                mapOf(
+                    "players" to listOf("alice"),
+                    "bots" to listOf(mapOf("difficulty" to "EASY"), mapOf("difficulty" to "HARD")),
+                ),
+            )
+        val created = json.readTree(response.bodyAsText())
+        val stored = store.read(created["gameId"].asText())
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.Created)
+        assertThat(stored.memberships).containsExactly(PlayerId("p1"), "alice")
+        assertThat(stored.credentials).isEmpty()
+        assertThat(stored.bots.keys).containsExactly(PlayerId("p2"), PlayerId("p3"))
+        assertThat(stored.header.players.map(Player::name))
+            .containsExactly("@alice", "Automated 1", "Automated 2")
+            .inOrder()
+    }
+
+    @Test
+    fun legacyHumanOnlySaveCanCheckpointAndContinueWithoutAutomationFields() = withHosted {
+        val created = game()
+        val legacy = json.readTree(store.document(created.gameId)) as ObjectNode
+        legacy.remove(listOf("bots", "botRunner"))
+        replaceDocument(created.gameId, legacy)
+        val state = store.read(created.gameId).state()
+
+        val upgraded =
+            hosted.administration.replaceLog(
+                created.gameId,
+                AccountId("admin"),
+                2,
+                hosted.administration.log(created.gameId).entries,
+            )
+        val continued = command(created.gameId, "alice", upgraded.revision, "bid-capital 12")
+
+        assertThat(continued.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(store.read(created.gameId).state()).isEqualTo(state)
+        assertThat(store.read(created.gameId).pendingBids[PlayerId("p1")]).isEqualTo(12)
+        assertThat(store.read(created.gameId).bots).isEmpty()
+    }
+
+    @Test
+    fun creatorBotCommandEndpointReconcilesAcceptedSealedDecision() = withHosted {
+        val created =
+            post(
+                "/api/games",
+                "alice",
+                mapOf(
+                    "players" to listOf("alice"),
+                    "bots" to
+                        listOf(mapOf("difficulty" to "NORMAL"), mapOf("difficulty" to "NORMAL")),
+                ),
+            )
+        val gameId = json.readTree(created.bodyAsText())["gameId"].asText()
+        val runnerId = UUID.randomUUID().toString()
+        val claimed =
+            post(
+                "/api/games/$gameId/bots/runner",
+                "alice",
+                mapOf("operation" to "claim", "runnerId" to runnerId, "expectedEpoch" to 0),
+            )
+        val work = json.readTree(claimed.bodyAsText())
+        val job = work["observations"].first()
+        val operationId = UUID.randomUUID().toString()
+
+        val accepted =
+            post(
+                "/api/games/$gameId/bots/commands",
+                "alice",
+                mapOf(
+                    "expectedRevision" to work["revision"].asInt(),
+                    "expectedSubmissionVersion" to null,
+                    "runnerId" to runnerId,
+                    "epoch" to work["epoch"].asInt(),
+                    "operationId" to operationId,
+                    "seat" to job["seat"].asText(),
+                    "decisionId" to job["decisionId"].asText(),
+                    "command" to "bid-capital 10",
+                ),
+            )
+        val result = json.readTree(accepted.bodyAsText())
+
+        assertThat(accepted.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(result["revision"].asInt()).isEqualTo(work["revision"].asInt())
+        assertThat(result["operationReceipts"].map { it.asText() }).contains(operationId)
+        assertThat(result["observations"].size()).isEqualTo(1)
+    }
+
+    @Test
+    fun authenticatedSpectatorsCannotAcquireBotWork() = withHosted {
+        val created =
+            post(
+                "/api/games",
+                "alice",
+                mapOf(
+                    "players" to listOf("alice"),
+                    "bots" to
+                        listOf(mapOf("difficulty" to "NORMAL"), mapOf("difficulty" to "NORMAL")),
+                ),
+            )
+        val gameId = json.readTree(created.bodyAsText())["gameId"].asText()
+
+        val rejected =
+            post(
+                "/api/games/$gameId/bots/runner",
+                "outsider",
+                mapOf("operation" to "claim", "runnerId" to UUID.randomUUID().toString()),
+            )
+
+        assertThat(rejected.status).isEqualTo(HttpStatusCode.Forbidden)
+        assertThat(store.read(gameId).botRunner?.runnerId).isNull()
+    }
+
+    @Test
     fun newGamesRejectUnregisteredParticipants() = withHosted {
         val response =
             post("/api/games", "alice", mapOf("players" to listOf("alice", "bob", "unknown")))

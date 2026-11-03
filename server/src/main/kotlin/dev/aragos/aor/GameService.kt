@@ -1,5 +1,6 @@
 package dev.aragos.aor
 
+import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -57,6 +58,7 @@ data class GameSnapshot(
     val abandonmentResult: AbandonmentWriteResult? = null,
     /** The acknowledged write's version can differ from a newer state in this response. */
     val planWriteReceipt: PlanWriteReceipt? = null,
+    val automation: AutomationView? = null,
 )
 
 data class PlanWriteReceipt(val operationId: String, val version: String)
@@ -70,7 +72,7 @@ data class PlanningQuote(
 /** Authenticates players and projects the driver's state for the HTTP API. */
 class GameService(
     internal val store: GameStore,
-    private val driver: GameDriver = GameDriver(),
+    internal val driver: GameDriver = GameDriver(),
     private val accounts: AccountStore? = null,
 ) {
     private val credentialsRandom = SecureRandom()
@@ -83,8 +85,12 @@ class GameService(
         rules: RuleOptions = RuleOptions(),
         undoPolicy: UndoPolicy = UndoPolicy.REGULAR_TURN,
         name: GameName = GameName.DEFAULT,
+        bots: List<AutomatedPlayerRequest> = emptyList(),
     ): CreatedGame {
-        val normalized = names.map(String::trim)
+        val normalized = names.map(String::trim) + bots.map(AutomatedPlayerRequest::name)
+        if (names.isEmpty() || names.size + bots.size !in 3..6) {
+            throw ServiceFailure(400, "INVALID_GAME")
+        }
         if (normalized.map(String::lowercase).distinct().size != normalized.size) {
             throw ServiceFailure(400, "INVALID_GAME")
         }
@@ -102,12 +108,13 @@ class GameService(
             }
         val id = UUID.randomUUID().toString()
         val players = header.players
-        val tokens = players.associate { player ->
-            player.id to
-                Base64.getUrlEncoder()
-                    .withoutPadding()
-                    .encodeToString(ByteArray(32).also(credentialsRandom::nextBytes))
-        }
+        val tokens =
+            players.take(names.size).associate { player ->
+                player.id to
+                    Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(ByteArray(32).also(credentialsRandom::nextBytes))
+            }
         store.create(
             driver
                 .create(
@@ -117,13 +124,17 @@ class GameService(
                     rules = rules,
                     undoPolicy = undoPolicy,
                 )
-                .copy(name = name)
+                .copy(
+                    name = name,
+                    bots = botSeats(players.drop(names.size), bots),
+                    botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
+                )
         )
         return CreatedGame(
             gameId = id,
             name = name,
             links =
-                players.map { player ->
+                players.take(names.size).map { player ->
                     val token =
                         requireNotNull(tokens[player.id]) {
                             "Every registered player requires an access token."
@@ -144,9 +155,10 @@ class GameService(
         rules: RuleOptions,
         policy: UndoPolicy,
         name: GameName = GameName.DEFAULT,
+        bots: List<AutomatedPlayerRequest> = emptyList(),
     ): CreatedGame {
         if (
-            players.size !in 3..6 ||
+            players.size + bots.size !in 3..6 ||
                 players.map(RegisteredAccount::id).distinct().size != players.size ||
                 players.none { it.id == creator }
         ) {
@@ -161,7 +173,10 @@ class GameService(
             GameHeader(
                 seats.map { (id, account) ->
                     Player(id, "@${account.handle.value}")
-                },
+                } +
+                    bots.mapIndexed { index, bot ->
+                        Player(PlayerId("p${players.size + index + 1}"), bot.name)
+                    },
                 creatorId,
             )
         val id = UUID.randomUUID().toString()
@@ -171,6 +186,8 @@ class GameService(
                 .copy(
                     name = name,
                     memberships = seats.associate { (seat, account) -> seat to account.id.value },
+                    bots = botSeats(header.players.drop(players.size), bots),
+                    botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
                 )
         )
         val creatorName = header.players.single { it.id == creatorId }.name
@@ -424,7 +441,17 @@ class GameService(
                         } == true
                 )
                     return@update current
-                GameAbandonment.apply(current, player, event)
+                val next = GameAbandonment.apply(current, player, event)
+                if (
+                    player == current.header.creatorId &&
+                        operation in
+                            setOf(
+                                AbandonmentOperation.PROPOSE,
+                                AbandonmentOperation.AGREE,
+                            )
+                ) {
+                    BotAutomation.agreeToAbandonment(next, event.requestId)
+                } else next
             }
         val committed = consentReceipt(stored, UUID.fromString(operationId)) != null
         return snapshot(stored, authenticate(stored, access))
@@ -529,6 +556,7 @@ class GameService(
             gameId = stored.id,
             name = stored.name,
             revision = stored.revision,
+            automation = BotAutomation.view(stored, player),
             viewerId = player,
             creatorId = stored.header.creatorId,
             game =
@@ -768,8 +796,17 @@ class GameService(
             is GameAccess.SeatToken -> authenticateSeat(stored, access.token)
         }
 
-    private fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
+    internal fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
         viewer(stored, access) ?: throw ServiceFailure(403, "GAME_MEMBERSHIP_REQUIRED")
+
+    private fun botSeats(
+        players: List<Player>,
+        requests: List<AutomatedPlayerRequest>,
+    ): Map<PlayerId, AutomatedPlayer> =
+        players.zip(requests).associate { (player, request) ->
+            player.id to
+                AutomatedPlayer(request.difficulty, BOT_POLICY_VERSION, credentialsRandom.nextInt())
+        }
 
     private fun authenticateSeat(stored: StoredGame, token: String): PlayerId {
         if (token.length !in 20..100) throw ServiceFailure(401, "UNAUTHORIZED")

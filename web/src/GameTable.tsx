@@ -1,4 +1,5 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import type {ReactNode} from 'react';
 import type {ApiError, Snapshot, RewindTarget, TokenPurchaseQuoteResponse} from './api';
 import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label, purchasePassLabel} from './labels';
@@ -38,11 +39,12 @@ export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 const ACTIVITY_PIN_QUERY = '(min-width: 1400px)';
 const MOBILE_QUERY = '(max-width: 700px)';
 
-export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment}: {
+export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botControls}: {
     snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
     writePlan?: WritePlan; quotePlan?: QuotePlan; loadRewindTargets?: LoadRewindTargets; writeAbandonment?: WriteAbandonment;
+    botControls?: ReactNode;
 }) {
     const planner = useActivityPlanner(liveSnapshot, writePlan, quotePlan);
     const snapshot = planner.effective;
@@ -190,6 +192,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
             {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
+            {botControls}
         </details>
         {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
             open={commandsOpen} onToggle={setCommandsOpen} loadRewindTargets={loadRewindTargets} reviewRewind={setRewindTarget}/>}

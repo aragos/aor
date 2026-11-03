@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.BotDifficulty
 
 /** Current game-document encoding and replay validation shared by durable storage adapters. */
 internal object GameDocuments {
@@ -145,6 +146,39 @@ internal object GameDocuments {
             baseRevision = root.field("baseRevision").integer(),
             previousArchive =
                 root.field("previousArchive").let { if (it.isNull) null else it.string() },
+            bots =
+                root["bots"]
+                    ?.properties()
+                    ?.associate { (player, bot) ->
+                        PlayerId(player) to
+                            AutomatedPlayer(
+                                difficulty =
+                                    BotDifficulty.valueOf(bot.field("difficulty").string()),
+                                policyVersion = bot.field("policyVersion").string(),
+                                seed = bot.field("seed").integer(),
+                            )
+                    }
+                    .orEmpty(),
+            botRunner =
+                root["botRunner"]?.takeUnless(JsonNode::isNull)?.let { runner ->
+                    BotRunnerState(
+                        epoch = runner.field("epoch").integer(),
+                        paused = runner.field("paused").boolean(),
+                        runnerId = runner["runnerId"]?.takeUnless(JsonNode::isNull)?.string(),
+                        leaseUntil = runner.field("leaseUntil").longInteger(),
+                        receipts =
+                            runner["receipts"]
+                                ?.array()
+                                ?.map { receipt ->
+                                    BotOperationReceipt(
+                                        operationId = receipt.field("operationId").string(),
+                                        requestHash = receipt.field("requestHash").string(),
+                                        revision = receipt.field("revision").integer(),
+                                    )
+                                }
+                                .orEmpty(),
+                    )
+                },
             submissionReceipts =
                 root["submissionReceipts"]
                     ?.properties()
@@ -240,15 +274,22 @@ internal object GameDocuments {
             "Archive references must be canonical revision and SHA-256 filenames."
         }
         val players = game.header.players.map(Player::id).toSet()
+        require(game.bots.keys.all { it in players } && game.header.creatorId !in game.bots) {
+            "Automated controllers require registered seats and cannot own the creator role."
+        }
+        require(game.bots.isEmpty() == (game.botRunner == null)) {
+            "Automated seats require durable browser runner state."
+        }
+        val humanPlayers = players - game.bots.keys
         if (game.memberships.isEmpty()) {
-            require(game.credentials.keys == players) {
-                "Local games require one credential per player."
+            require(game.credentials.keys == humanPlayers) {
+                "Local games require one credential per human player."
             }
         } else {
             require(
                 game.credentials.isEmpty() &&
-                    game.memberships.keys == players &&
-                    game.memberships.values.distinct().size == players.size
+                    game.memberships.keys == humanPlayers &&
+                    game.memberships.values.distinct().size == humanPlayers.size
             ) {
                 "Registered games require unique account membership for every " +
                     "seat and no transferable credentials."
@@ -257,6 +298,11 @@ internal object GameDocuments {
         }
         require(game.credentials.values.all(CREDENTIAL_PATTERN::matches)) {
             "Credentials must be SHA-256 hashes encoded as 64 lowercase hexadecimal characters."
+        }
+        game.botRunner?.let { runner ->
+            require(runner.receipts.all { it.revision <= game.revision }) {
+                "Automated command receipts cannot name future revisions."
+            }
         }
         require(game.credentials.values.distinct().size == game.credentials.size) {
             "Player credentials must be unique."

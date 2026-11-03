@@ -178,6 +178,13 @@ data class GameState(
     fun viewForPlayer(player: PlayerId): GameView =
         GameView.forViewer(state = this, viewer = playerState(player))
 
+    /**
+     * Seat-safe decision facts without unrelated help/inspection projections. Offers for the live
+     * decision have the same legality and consequences as [viewForPlayer].
+     */
+    fun viewForDecision(player: PlayerId): GameView =
+        GameView.forViewer(state = this, viewer = playerState(player), decisionOnly = true)
+
     /** Public facts and reference data, without a seat, private hand, or actionable offers. */
     fun publicView(): GameView = GameView.forViewer(state = this, viewer = null)
 

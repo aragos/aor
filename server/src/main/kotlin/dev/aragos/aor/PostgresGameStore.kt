@@ -79,7 +79,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             require(
                 next.header == current.header &&
                     next.memberships == current.memberships &&
-                    next.credentials == current.credentials
+                    next.credentials == current.credentials &&
+                    next.bots == current.bots
             ) {
                 "Ordinary writes cannot change game registration or compatibility versions."
             }
@@ -150,7 +151,8 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             root["header"]["players"] == original["header"]["players"] &&
                 root["header"]["creatorId"] == original["header"]["creatorId"] &&
                 root["memberships"] == original["memberships"] &&
-                root["credentials"] == original["credentials"]
+                root["credentials"] == original["credentials"] &&
+                root["bots"] == (original["bots"] ?: json.createObjectNode())
         ) {
             "A checkpoint cannot change game registration or membership."
         }
@@ -406,7 +408,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                     while (rows.next()) {
                         val account = rows.getString("account_id")
                         if (account != null) memberships.put(rows.getString("seat"), account)
-                        else
+                        else if (rows.getString("credential_hash") != null)
                             credentials.put(
                                 rows.getString("seat"),
                                 rows.getString("credential_hash"),
@@ -441,10 +443,11 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         connection
             .prepareStatement(
                 """
-                INSERT INTO game_players (game_id, seat, account_id, credential_hash, needs_move)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO game_players (game_id, seat, account_id, credential_hash, needs_move, automated)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT (game_id, seat) DO UPDATE SET account_id = EXCLUDED.account_id,
-                    credential_hash = EXCLUDED.credential_hash, needs_move = EXCLUDED.needs_move
+                    credential_hash = EXCLUDED.credential_hash, needs_move = EXCLUDED.needs_move,
+                    automated = EXCLUDED.automated
                 """
                     .trimIndent()
             )
@@ -459,6 +462,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                         5,
                         player.id in actionPlayers,
                     )
+                    statement.setBoolean(6, player.id in game.bots)
                     statement.addBatch()
                 }
                 statement.executeBatch()
