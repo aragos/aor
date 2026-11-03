@@ -1,91 +1,33 @@
-# Online deployment and operation
+# Deployment and operation
 
-Use a Render Docker web service, managed PostgreSQL 18 and Firebase email/password or Google
-authentication.
-The repository contains a two-resource Blueprint, SQL migrations, CI, dependency updates, an account
-dashboard and administrative APIs. Public hosting requires managed authentication; private-link
-mode is for loopback development. Infrastructure and DNS are provisioned by the owner.
+Production uses a Render Docker service, managed PostgreSQL 18 and Firebase email/password or
+Google authentication. The checked-in [render.yaml](../render.yaml), [Dockerfile](../Dockerfile),
+[CI](../.github/workflows/checks.yml) and [deployment configuration](../deployment/) own the exact
+settings. [Architecture](design.md) explains transactions and history; [open work](follow-ups.md)
+tracks provider checks that local tests cannot establish.
 
-## Hosting choice and expected cost
+## Configure hosting
 
-**Recommend Render with managed PostgreSQL.** The starting configuration is $7/month for the
-`0.5c-512mb` application, $6/month for the `0.1c-256mb` database and $0.30/month for 1 GB of database
-storage: approximately **$13.30/month before tax and usage overages** on the free Hobby workspace.
-The [compute prices](https://render.com/articles/production-rails-hosting-guide) and
-[database storage price](https://render.com/articles/how-much-does-cloud-application-hosting-cost-for-small-businesses)
-were reviewed October 28, 2026. There is no application disk. Start small and monitor database size,
-CPU, connections, application memory, build minutes and outbound traffic. Hundreds of games per
-month alone cannot establish capacity; simultaneous players and retained history matter.
-
-The managed PostgreSQL options compare as follows:
-
-| Option | Assessment for this application |
-| --- | --- |
-| Render app + Render PostgreSQL | About $13.30/month baseline, one Blueprint and private same-region networking. Managed database maintenance and recovery fit the operating budget. |
-| DigitalOcean App Platform + managed PostgreSQL | A credible alternative with more database memory: $5 app plus database compute starting at $15.15, with separately priced storage. Less budget headroom; compare the final storage quote. See [app pricing](https://www.digitalocean.com/pricing/app-platform) and [database pricing](https://www.digitalocean.com/pricing/managed-databases). |
-| Small app host + Neon | Potentially cheaper for intermittent use. Neon Free has 100 CU-hours/month and 1 GB; Launch meters compute at $0.106/CU-hour and storage at $0.35/GB-month. Continuous 0.25-CU operation is about $19.35/month in compute alone. Application polling and health checks can prevent sleep. See [Neon pricing](https://neon.com/pricing). |
-| Fly.io + Fly Managed PostgreSQL | Managed PostgreSQL starts at $38/month before the app or storage, exceeding this budget. See [Fly pricing](https://docs.fly.io/about/pricing). |
-| Railway app + PostgreSQL | A credible metered alternative: Hobby has a $5 minimum credited toward usage; RAM is $10/GB-month and CPU $20/vCPU-month. Railway patches its maintained database templates; backups/PITR must be enabled explicitly. Cost may be lower at idle or higher under load. Render offers a simpler fixed starting quote. See [pricing](https://docs.railway.com/pricing) and [database responsibilities](https://docs.railway.com/databases#what-railway-manages). |
-
-Render's advantage here is the combination of predictable entry pricing, managed PostgreSQL,
-GitHub-triggered Docker deploys and one provider for the application/database. The application uses
-standard PostgreSQL and can move elsewhere. This entry tier has no high-availability standby;
-maintenance can interrupt play. Confirm actual load on the deployed instance before claiming that
-this size is sufficient. Increasing either compute tier may require revisiting the $25 budget.
-
-Paid Render databases include continuous recovery: Hobby retains three days, Pro or higher seven.
-Recovery creates another database for inspection and cutover; it is not an in-place undo and the
-recovery instance is billed. See [recovery and backups](https://render.com/docs/postgresql-backups).
-Render applies [minor-version security updates](https://render.com/docs/postgresql-upgrading), with
-maintenance-window controls. This is independent of application dependency and container updates.
-
-Email authentication at this scale fits the first 50,000 monthly active users in the tier-1
-[Identity Platform allowance](https://cloud.google.com/identity-platform/pricing). Email sending
-quotas also apply; see [Firebase limits](https://firebase.google.com/docs/auth/limits). SMS is unused.
-
-## First launch
-
-1. Create a Firebase project and register a web application. Enable Email/Password and Google
-   authentication. For Google, choose the project's support email and save the provider settings.
-   In Authentication settings, enable email enumeration protection and an enforced password policy
-   of at least 12 characters. Set an appropriate verification/reset email template and contact
-   address. The application requires verified email before registering a player or joining games.
-   [Firebase password authentication](https://firebase.google.com/docs/auth/web/password-auth)
-   describes the password provider settings. [Firebase Google authentication](https://firebase.google.com/docs/auth/web/google-signin)
-   describes the Google provider settings. The application uses popup sign-in with the existing
-   Firebase auth domain; Google users continue through the same verified-email and player-registration
-   checks as password users. Allow popups for the application if the browser blocks the sign-in window.
-2. Create a dedicated service account with the Firebase Authentication Viewer role
-   (`roles/firebaseauth.viewer`). The server verifies ID tokens and checks disabled/revoked users;
-   it does not create identities or manage passwords. Generate its credential JSON and keep it out
-   of the repository. Supply it as Render's secret file **`firebase-admin.json`** at
-   `/etc/secrets/firebase-admin.json`. The Admin SDK uses application-default credentials. See
-   [Admin setup](https://firebase.google.com/docs/admin/setup) and
-   [token verification](https://firebase.google.com/docs/auth/admin/verify-id-tokens).
-3. Push the selected version to the remote `release` branch. Connect the repository to Render and
-   create a Blueprint from `render.yaml`, linking the Blueprint to `release` with Auto Sync enabled.
-   Confirm the service also tracks `release` with Auto-Deploy set to **After CI Checks Pass**.
-   Confirm the plan, PostgreSQL 18, 1 GB database storage and matching Virginia regions.
-   Fill `AOR_FIREBASE_PROJECT_ID`
-   and `AOR_FIREBASE_WEB_API_KEY` from the web app configuration. The web API key is public configuration; the service-account JSON is
-   a secret. Do not grant that service account general Editor/Owner access.
-4. Create and verify the initial administrator's Firebase account. Copy its **UID**, not its email,
-   to `AOR_ADMIN_UIDS`; multiple UIDs are comma-separated. An empty list grants no administration.
-   Add the Render hostname and intended custom hostname to Firebase's authorized domains. Deploy,
-   then sign in and register the administrator's unique handle in the application.
-5. Register a few players. Keep `AOR_GAME_CREATION_POLICY=approved` (default), and use **Player
-   creation permissions** to approve game organizers. `registered` instead allows every verified,
-   registered account to create games. Administrators always can. Games require 3–6 distinct
-   registered UIDs including the creator; public handles identify the intended person.
-6. Confirm that the database has no public IP allowlist entries and the application uses its
-   internal URL. Startup applies checksum-validated Flyway schema migrations before accepting
-   traffic. Health checks query PostgreSQL. The Blueprint sets `sslmode=require` because Render's
-   internal certificates are self-signed; other managed endpoints default to hostname-verified TLS.
-   See [Render connection security](https://render.com/docs/postgresql-creating-connecting).
-7. Verify Google sign-in, signup, verification email delivery, password reset, restart persistence,
-   cross-account isolation, database restoration and a complete game on the actual service. CI runs real
-   PostgreSQL tests and a non-root production-container smoke check. Provider credentials, email
-   delivery and capacity on the smallest paid tiers require live checks.
+1. Register a Firebase web application. Enable Email/Password and Google with a support email,
+   email enumeration protection and an enforced password policy of at least 12 characters. Configure
+   verification/reset templates. The app requires verified email and a registered unique handle.
+2. Create a dedicated service account with `roles/firebaseauth.viewer` for token/revocation checks.
+   Supply its credential JSON as Render's secret file `firebase-admin.json` at
+   `/etc/secrets/firebase-admin.json`; keep it out of Git. The SDK uses application-default credentials.
+3. Connect the repository Blueprint to `release` with Auto Sync enabled and the service's Auto-Deploy
+   set to **After CI Checks Pass**. Keep application/database in the same region. Fill the Firebase
+   project ID and public web API key. Confirm actual provider plans, prices, storage and recovery
+   retention before provisioning; the project's budget and capacity goals are in [scope](requirements.md).
+4. Verify the initial administrator's Firebase account and put its UID in `AOR_ADMIN_UIDS`. Add the
+   Render/custom hostnames to Firebase authorized domains. Sign in and register the admin handle.
+   Approve organizers through Player creation permissions; `approved` is the default creation policy.
+5. Use the internal database URL and no public IP allowlist entries. The Blueprint uses
+   `sslmode=require` for Render's internal certificates; other endpoints default to `verify-full`.
+   Startup applies Flyway migrations before traffic; `/api/health` checks the database.
+6. For a Squarespace-managed domain, add a Render custom domain and its supplied CNAME in Squarespace,
+   retaining existing website/mail records. Render provisions TLS. Add the hostname to Firebase too.
+7. Verify sign-in, email verification/reset, cross-account privacy, persistence and recovery on the
+   actual deployment. Monitor CPU, application memory, database size/connections, traffic and billing.
 
 Runtime configuration:
 
@@ -111,139 +53,56 @@ application volume is needed. URLs permit only `sslmode` and `sslrootcert` query
 driver options are rejected. Default TLS uses the JVM trust store with hostname verification;
 `sslrootcert` can select a provider CA file. Keep credentials in secret environment configuration.
 
-### Storage, concurrency and schema updates
+## Release and maintenance
 
-PostgreSQL owns accounts, unique handles, memberships, permissions, game metadata, private pending
-submissions, immutable revision rows, upgrade archives and administrative receipts. Indexed directory
-projections provide status and my-move filtering without replaying every game. The engine still owns
-legality and readiness. Revisions retain their delta/suffix/checkpoint meaning; this is not a SQL
-rewrite of the game rules.
+A release request authorizes the full promotion workflow in [AGENTS.md](../AGENTS.md): fetch and
+preserve remote changes, push `main`, wait for CI on that exact commit, promote it to `release`
+without force, then verify Render reports that commit live. Check `/api/health` and the web entry
+point. Verify saved-game compatibility before promotion. Merging into `main` alone does not deploy.
+If access prevents live verification, report the release as unverified.
 
-Each write locks its game row and commits history, pending submissions and directory projections in
-one transaction. Private submissions advance a storage generation even when the public revision
-stays unchanged. Independent servers and restarted pools detect that generation before using cached
-state. Permission changes and purge receipts commit atomically with their operation. Failed writes
-roll back, and stale public revisions still receive 409. No write is automatically retried with fresh
-randomness. All durable application state is shared, permitting overlapping deployments and multiple
-instances running the same engine/schema versions. The Blueprint starts with one instance.
+[checks.yml](../.github/workflows/checks.yml) defines tests, browser checks, dependency audit and
+production-container/PostgreSQL smoke checks. Enable the required `verify` check where the repository
+plan permits it. Branch protection was unavailable on this private repository's plan; checking CI
+directly must not be described as enforced protection.
 
-Flyway applies versioned database-schema changes at startup and rejects altered migration checksums.
-Never edit an applied migration. Future migrations must remain compatible with any old instance
-serving traffic during deploys; otherwise schedule a maintenance cutover. Schema migration does not
-upgrade game rules, commands or catalog versions. That remains the explicit log-upgrade operation.
+[Dependabot](../.github/dependabot.yml) and [dependency-graph.yml](../.github/workflows/dependency-graph.yml)
+own update monitoring. Optional patch auto-merge in [patch-updates.yml](../.github/workflows/patch-updates.yml)
+requires `AUTO_MERGE_PATCHES=true`, secret `DEPENDENCY_MERGE_TOKEN`, GitHub auto-merge and classic
+branch protection with `verify`. Use a scoped bot token with contents/PR write and protection read;
+review major/minor updates. Runtime image versions remain pinned to supported release lines.
 
-### Importing existing file data
+Weekly/manual runtime refresh needs secret `RENDER_API_KEY` and variable `RENDER_SERVICE_ID`.
+The workflow on `main` verifies the current `release` and requests a cache-cleared rebuild of that
+exact commit only if `release` has not moved. Push/PR runs do not request refreshes. Without those
+settings, refresh is disabled. Monitor failures and rotate provider credentials.
 
-The format-6-to-7 conversion is retired after the completed online cutover. Previously upgraded
-games retain their audit revisions and exact source archives; those archives remain exportable.
+Never edit applied [Flyway migrations](../server/src/main/resources/db/migration/). Keep new schemas
+compatible with old instances during overlapping deployments or schedule a maintenance cutover.
+Schema maintenance cannot change game rules or substitute for a game-version upgrade.
 
-For current game file format 7, stop the file-backed server and keep a private copy of its complete
-data directory. Configure the target database secrets and run:
+## Import file storage
+
+For current format-7 data, stop the file-backed server, retain a private copy of the complete data
+directory, configure database secrets, then run:
 
 ```sh
 ./gradlew :server:importFileStorage -PstorageImport=/absolute/path/to/stopped-data
 ```
 
-The target application schema must be empty. One transaction imports accounts, creation permissions,
-memberships, active histories, pending bids, undo policies, exact archive bytes and audit receipts.
-An error rolls back the entire import; existing SQL data is never overwritten and source files are
-unchanged. Use the same Firebase project to retain UID ownership. Private-link games keep their
-original credentials and require local mode; importing does not assign registered memberships. Verify counts, player views and
-archives before switching traffic. Unsupported active game formats/rules require an explicit engine
-upgrade first; this tool does not introduce legacy decoding. Keep the stopped source as a rollback
-copy, and do not resume it after accepting new SQL moves.
-
-## Squarespace domain
-
-Keep Squarespace as domain/DNS provider. Choose a subdomain such as `play.example.com`, add it as a
-custom domain in Render, then add the CNAME record Render supplies in Squarespace DNS. Existing
-website/mail records can stay in place. Render provisions and renews TLS after DNS verification;
-follow its displayed records if using an apex domain instead. Add the same hostname to Firebase's
-authorized domains. See [Render custom domains](https://render.com/docs/custom-domains).
-
-## Updates and automatic protection
-
-`Checks / verify` runs Kotlin tests/JS compilation/formatting, web tests/build, browser interactions,
-the live undo suite against PostgreSQL, an npm advisory audit, and a fresh production container
-build/startup check against PostgreSQL. HTTP tests also exercise the file backend. Render's
-`checksPass` setting deploys `release` after CI succeeds. CI runs for pushes to both `main` and
-`release`, as well as pull requests. Keep developing and merging into `main`; promote a chosen version
-to `release` and push that branch only when the owner explicitly requests a deployment. Advancing
-`release` is the deployment decision. Merging into `main` alone does not change the deployed version.
-
-Keep the Blueprint linked to `release` with Auto Sync enabled, so infrastructure changes also take
-effect when promoted to `release`. For an existing deployment, merge these workflow changes into
-`main` to replace the old scheduled refresh and include them in the chosen `release` version.
-Ensure the production Blueprint is linked to `release` and manages the existing application and
-database. Confirm that the service tracks `release` with **After CI Checks Pass**; the service branch
-is also declared in `render.yaml`.
-
-Require the `verify` check on `main` and `release` and enable the repository's dependency graph,
-Dependabot alerts/security updates and secret scanning where available. The separate JVM
-dependency-graph workflow submits transitive Gradle dependencies for advisory monitoring.
-
-Dependabot proposes npm/Gradle updates daily and Docker/Actions updates weekly. Major/minor updates
-need review. To automate patches, enable GitHub auto-merge and set repository variable
-`AUTO_MERGE_PATCHES=true` and supply Actions secret `DEPENDENCY_MERGE_TOKEN`, a repository-scoped
-bot token with contents/pull-request write and branch-protection read access. Set its expiry and
-rotation policy. This uses a separate token so the resulting main push triggers CI; the default
-Actions token suppresses follow-on workflow events. The supplied workflow verifies Dependabot metadata, requires classic
-branch protection with the `verify` context, and enables merging after required checks. It never
-executes PR code with write permissions. A ruleset-only setup needs a corresponding policy check
-before automatic patch merging will activate.
-
-Container images use supported Java 21 and Node 26 LTS release lines. Dependabot excludes Java
-22–24 and 26, and Node 25, because those lines have reached end of life; maintained major versions
-remain eligible for review. Check the [Adoptium support dates](https://adoptium.net/support/) and
-[Node release schedule](https://github.com/nodejs/Release) before changing the runtime images.
-
-For weekly runtime/base-image refreshes, set Actions secret `RENDER_API_KEY` and repository variable
-`RENDER_SERVICE_ID`. Monday's scheduled workflow is defined on `main` but checks out and fully verifies
-`release`, then requests a cache-cleared rebuild of that exact tested commit via the
-[Render deployment API](https://api-docs.render.com/reference/create-deploy). Manually running
-**Checks** on `main` or `release` performs the same release verification and refresh. Push and pull
-request runs never request a runtime refresh. A new release push cancels an in-progress refresh run;
-the refresh also skips its deployment request if `release` has changed since verification. Refreshes
-do not promote newer application code from `main`.
-Use a dedicated Render account/key with access only to the deployment's workspace and rotate it.
-Without those settings, CI reports that automatic runtime refresh is disabled. Watch failed checks
-and deployment notifications; automation does not guarantee that every future security fix is
-compatible with the engine.
-
-Render supplies [automatic DDoS protection](https://render.com/docs/ddos-protection), managed TLS and
-host maintenance. Firebase manages identity credentials and abuse limits. Application boundaries
-verify membership/roles, cap request bodies, reject emulator tokens in hosted mode, set CSP/security
-headers, and never log bearer tokens or passwords. Revocation checks may be cached for up to 30
-seconds. Private responses are not stored by intermediary caches; unchanged polls use private
-ETags. Game tabs schedule hidden polling every 30 seconds; accepted responses update the favicon
-without waiting for UI rendering. Snapshot reads time out after 15 seconds, including token refresh
-and body transfer; the next interval retries. Visibility, resume, page restoration and network
-reconnect trigger fresh reads. Each tab owns one read and timer; replaced reads are canceled.
-Browser throttling may lengthen background intervals, and frozen/discarded pages cannot keep running
-JavaScript; resumed pages refresh immediately. See the browser’s
-[page lifecycle contract](https://developer.chrome.com/docs/web-platform/page-lifecycle-api).
-Static hashed assets may be cached for a year.
+The target schema must be empty. [StorageImport.kt](../server/src/main/kotlin/dev/aragos/aor/StorageImport.kt)
+imports all durable repositories and exact archives in one transaction without modifying the source.
+Use the same Firebase project for UID continuity. Private-link games retain credentials and require
+local mode; import does not assign memberships. Unsupported active versions need an explicit engine
+upgrade first. Verify counts, private player views and archives before switching traffic. Keep the
+source stopped once SQL accepts new moves.
 
 ## Game operations and programmatic access
 
-The portal shows your participating games, with ongoing/my move/finished and lifecycle filters.
-Each game occupies one linked row, highlighted when it requires your action. Account navigation is
-part of the game overview bar. Administrative rows expand their management controls.
-Preferences and creation defaults use local browser storage with an in-memory fallback. Admins
-also have all-game views, creator approvals, cancellation/abandonment, log export, validation and
-permanent purge controls. An admin role does not impersonate a seat or reveal its private player
-view; the explicit admin log API contains authoritative private outcomes.
-
-All hosted APIs use `Authorization: Bearer <Firebase ID token>`. `/api/config` is public;
-`/api/me` exposes the signed-in identity and registered player. Directory search (`/api/players?q=`)
-requires registration, returns at most 20 matches, and does not expose email addresses.
-`POST /api/players/register` accepts only `{"handle":"unique-handle"}`. Public account responses
-contain the handle and effective permissions, with no display name. Handles preserve capitalization,
-using 3–24 ASCII letters/digits/hyphens, starting with a letter. Search and uniqueness ignore case.
-Migration V3 accepts mixed-case handles and adds a case-insensitive unique index without rewriting
-existing accounts or games. PostgreSQL migration V2 removes the display-name column on startup and
-preserves existing handles, memberships and permissions; immutable game history keeps its recorded
-labels. Local account files use version 2 only.
+[HostedRoutes.kt](../server/src/main/kotlin/dev/aragos/aor/HostedRoutes.kt) owns hosted routes;
+[GameAdministration.kt](../server/src/main/kotlin/dev/aragos/aor/GameAdministration.kt) owns validated
+administrative log changes. Hosted APIs use `Authorization: Bearer <Firebase ID token>`.
+Admins do not impersonate seats; explicit log exports contain authoritative private outcomes.
 
 | Administrative endpoint | Contract |
 | --- | --- |
@@ -256,47 +115,40 @@ labels. Local account files use version 2 only.
 | `POST /api/admin/games/{id}/status` | `expectedRevision`, `action:"cancel"` or `"abandon"`; retains read access/history |
 | `POST /api/admin/games/{id}/purge` | `expectedRevision`; deletes the game and its archives, retaining a small audit receipt |
 
-Ordinary members use `GET /api/games?status=ongoing`, `my-move`, `finished`, `cancelled`, `abandoned`
-or `all`. Lists accept a limit of 1–100. Writes and lifecycle changes check optimistic concurrency;
-stale requests return 409. Cancelled/abandoned games reject further commands and history edits.
-
-The standard-library client avoids shell passwords and redirects. It writes token/export files
-with mode 0600 and refuses to overwrite existing files. Use an HTTPS origin and Python 3.9+:
+Use [scripts/game-admin.py](../scripts/game-admin.py) for login, listing, exports, validation,
+publication and purge. Run `--help` and subcommand `--help` for options. It avoids shell passwords,
+writes files with mode 0600, refuses overwrite, and stores neither passwords nor refresh tokens.
+Use HTTPS. The login token lasts about an hour; automation can supply `AOR_ADMIN_TOKEN` instead.
+Exports contain secrets and are replay artifacts, not full disaster-recovery backups.
 
 ```sh
 python3 scripts/game-admin.py --url https://play.example.com --token-file /tmp/aor.admin-token.json login --email admin@example.com
-python3 scripts/game-admin.py --url https://play.example.com --token-file /tmp/aor.admin-token.json list --status all
 python3 scripts/game-admin.py --url https://play.example.com --token-file /tmp/aor.admin-token.json export --include-archives --output /tmp/aor-games.json
 ./gradlew :server:verifyGameLogs -PgameLogs=/tmp/aor-games.json
 ```
 
-The token expires in about an hour; the tool saves neither the password nor a refresh token. For
-automation, supply `AOR_ADMIN_TOKEN` from your identity system instead of a token file. Exports
-contain hidden card outcomes and must remain private. They are replay/upgrade artifacts, not a
-full account-directory/disaster-recovery backup.
+## Saved-game compatibility
 
-## Engine upgrades and recovery
+Current games use file format **7**, rules `ah1996-three-epoch-4` and data `ah1996-catalog-15`.
+[CatalogVersion.kt](../core/src/commonMain/kotlin/dev/aragos/aor/CatalogVersion.kt) also supports
+catalogs 13 and 14 without rewriting their topology. Catalog 14 corrected Cornwall's land/coast
+links; 15 added Chester–Portsmouth coastal contact. Standard legacy drawings remain selected by
+recorded identity. Unused old European drawings are retired; unknown combinations never substitute
+current geometry.
 
-Catalogs `ah1996-catalog-13`, `ah1996-catalog-14` and `ah1996-catalog-15` are directly supported.
-New games use 15, which includes Cornwall's corrected connections and the Chester–Portsmouth
-coastal contact on both maps. Catalog-13 and catalog-14 files retain their
-recorded movement rules throughout replay and future play, including pending private submissions
-and plans; their public catalog selects the matching legacy drawing. No storage rewrite, archive
-or automatic rules conversion occurs when opening those saves. Unknown catalog versions remain
-unavailable. Explicit history replacement preserves the supported source catalog identity.
-
-The admin command-log replacement flow does not migrate a game's catalog: changing the exported
-header cannot switch versions. A catalog migration needs a dedicated validated operation that
-archives the source and preserves recorded history, identities, private state and concurrency
-checks. Until such an operation has been applied, legacy standard games retain their own geometry,
-downloaded only when needed. Unused catalog-13 and catalog-14 European drawing assets are retired;
-their removal does not rewrite stored catalog identities or engine rules.
+Changing an exported header does not migrate a catalog. A dedicated validated upgrade must preserve
+continuity, outcomes, identities, history, metadata, memberships and private state, with archives and
+concurrency checks. Representative pre-change saves must load, replay and continue play. Existing
+Friendly game policy migration has its separate preservation contract in [architecture](design.md#linear-game).
+The completed format-6 conversion is retired; earlier upgraded format-7 games keep their original
+audit revisions and exact archives. There is no conversion endpoint or silent legacy decoder.
 
 1. Export logs before an engine change and run `:server:verifyGameLogs` with the proposed engine.
    It reports every active log's compatibility without IO/randomness during replay or storage writes.
 2. If syntax/rules/data versions change, transform an exported game's `entries` deliberately.
-   Use canonical text and preserve every recorded `!` outcome exactly and in order, bound to its original logical request. Incompatible source versions without a validated event mapping are rejected. The full log
-   must replay without a pending authority request or an incomplete simultaneous transaction.
+   Use canonical text and preserve every recorded `!` outcome exactly and in order, bound to its
+   original logical request. Incompatible source versions without a validated event mapping reject.
+   The full log must replay without a pending authority request or incomplete simultaneous transaction.
 3. After deploying the corresponding engine, validate against the game's current revision:
 
    ```sh
@@ -306,8 +158,8 @@ their removal does not rewrite stored catalog identities or engine rules.
 
 4. Publication creates a full checkpoint at revision 43 and archives the complete preceding file
    under its revision/content SHA-256. Later revisions append deltas or scoped edit suffixes.
-   The creator-chosen name, credentials/memberships, creation time, lifecycle and undo policy stay with the game. Pending
-   unrevealed submissions are cleared and must be resubmitted. Admin identity/time/action appear
+   The name, credentials/memberships, creation time, lifecycle and undo policy stay with the game.
+   Pending unrevealed submissions are cleared and must be resubmitted. Admin identity/time/action appear
    in history. A failed replay or database write leaves the preceding game and archive set unchanged.
 
 Only game file format **7** and the supported rules/catalog versions are decoded for ordinary play.
@@ -332,7 +184,7 @@ archives and receipts; admin game-log exports alone are insufficient. Keep contr
 Firebase project and a secure copy of deployment secrets. Restore into a separate database, validate
 it, then stop writes and repoint the application. Use an appropriate trusted IP temporarily if an
 external backup tool needs access; the Blueprint blocks external database connections by default.
-Test recovery before launch, and retain backups beyond the Hobby three-day window if desired.
+Test recovery before launch and set retention beyond the provider recovery window as needed.
 A restore loses subsequent moves; a restored database and the old database must not both accept play.
 
 Before deploying rules version `ah1996-three-epoch-4`, retain a complete private backup. Versions 2
@@ -340,5 +192,4 @@ and 3 may contain Renaissance passes for windows that no longer exist; simply ch
 cannot interpret them safely.
 The current server lists incompatible games as unavailable and permits administrative export; it
 rejects unproved upgrades. Finish such games with their matching engine or supply an explicit validated
-upgrade implementation. The release branch and green CI do not substitute for the hosted recovery and
-identity checks in [follow-ups](follow-ups.md).
+upgrade implementation. Complete the hosted recovery and identity checks in [open work](follow-ups.md).

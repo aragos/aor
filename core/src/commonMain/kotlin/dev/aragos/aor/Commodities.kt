@@ -90,7 +90,9 @@ class CommodityCatalogBuilder {
 fun commodities(declare: CommodityCatalogBuilder.() -> Unit): List<CommodityDefinition> =
     CommodityCatalogBuilder().apply(declare).build()
 
-/** Printed commodity log on board photograph BGG 192678; see docs/data-inventory.md. */
+/**
+ * Printed commodity log on board photograph BGG 192678; see docs/rules.md for source provenance.
+ */
 object CommodityData {
     val definitions: List<CommodityDefinition> = commodities {
         commodity(Commodity.STONE, baseValue = 1, diceTotal = 2, ownershipTrackBoxes = 8)

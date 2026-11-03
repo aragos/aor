@@ -4,7 +4,7 @@ package dev.aragos.aor
  * European map differences from the standard board, selected with `set-option map european`.
  * Commented examples illustrate additional authoring operations. Run ./gradlew
  * :server:describeEuropeanMap to validate and print the complete differences. Regenerate and
- * validate europeanBoardGeometry.json after editing; see docs/european-map.md.
+ * validate europeanBoardGeometry.json after editing; see docs/map-design.md.
  */
 object EuropeanMapData {
     val definition: BoardMapDefinition by lazy {

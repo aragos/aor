@@ -55,9 +55,11 @@ global Codex `AGENTS.md`. Apply that guidance alongside these project-specific c
   automatic phase receipts separately, retaining actual resource endpoints and public causes.
 - Derive public summaries only from public information; a count must not reveal a private card or
   decision. Distinguish a private browser draft from a committed or server-saved action.
-- Keep goals and acceptance in `docs/requirements.md`, reusable UI contracts in `docs/ui-design.md`,
-  observed evidence in `docs/ui-decision-coverage.md`, and unresolved defaults in `docs/follow-ups.md`.
-  Update their owners instead of copying requirements into historical task lists.
+- Keep contributor entry points in `README.md` and `docs/contributing.md`, goals in
+  `docs/requirements.md`, architecture in `docs/design.md` and `docs/engine.md`, interaction contracts
+  in `docs/ui-design.md` and `docs/map-design.md`, and open work in `docs/follow-ups.md`. Keep
+  executable evidence in tests and link to owning files instead of duplicating catalogs, completed
+  proposals or dated execution reports.
 
 ## Formatting and verification
 

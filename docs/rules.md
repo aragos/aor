@@ -3,14 +3,12 @@
 Summary of the rules of *Age of Renaissance* (Avalon Hill, 1996; Greenwood & Scarborough) as needed for the engine.
 
 **Baseline:** the 1996 Avalon Hill rules plus the official Avalon Hill *Errata and Clarifications* (7 May 1998).
-The 1999 EuroGames 2nd edition and common optional rules are listed in [§13 Variants](#13-variants) and are not
-part of the baseline.
+Only the explicit options in [§13 Variants](#13-variants) are supported; second-edition and
+tournament mechanics are outside the baseline.
 
-**Confidence.** Each rule here was cross-checked against at least two independent secondary sources (see
-[Sources](#sources)) unless it is tagged. Tags:
-
-- **[Qn]**: open question. See [§14](#14-open-questions). The text states the reading we currently favour.
-- **[data]**: a value that belongs in the static game data (map, cards, tables) rather than in rules logic.
+**Sources and rulings.** Printed references, errata and reviewed project decisions are recorded in
+[§14](#14-reviewed-rulings) and [Sources](#sources). Static values belong in the catalog files linked
+from [Maps and catalogs](map-design.md#catalog-ownership); this document owns their rule meanings.
 
 ---
 
@@ -733,7 +731,7 @@ Excess discount is lost, with one exception: **Printed Word**.
 
 - Each card carries its epoch number, printed in a **circle** (the card is recycled) or a **square** (the card leaves
   the game after use) [data]. Recycling classifications are verified against the Liumas card
-  reference, PDF pages 2–3; see the [card inventory](card-inventory.md).
+  reference, PDF pages 2–3; see [Sources](#sources).
 - When a card must be drawn and the pile is empty:
     - the new pile is the **next epoch's deck** plus all **circle cards already in the discard pile**;
     - cards still in hands are not included.
@@ -895,7 +893,6 @@ These notes are for the engine.
 - History-card hands and drawn-card identities; only their owner sees them.
 - The written cash and token bids during Order of Play, until revealed.
 - The capital bids during setup, until revealed.
-- In the improved setup, which card is returned.
 
 **Public:**
 
@@ -952,68 +949,31 @@ and values.
 
 ---
 
-## 14. Open Questions
+## 14. Reviewed rulings
 
-The recycling ruling below remains part of the baseline. Earlier improved-setup rulings are historical; that variant was retired on 2026-10-27.
+These rulings supplement the baseline; they are resolved decisions, not selectable variants.
 
-**Verified recycling classification (2026-10-24):**
+- **Recycling:** the Liumas reference confirms 40 recyclable and 24 single-use cards. Leaders,
+  Armor, Stirrups, Long Bow, Gunpowder and Mongol Armies leave play; all other cards recycle.
+- **Pirates/Vikings:** select the full epoch-dependent number of distinct eligible coastal markers,
+  or all eligible markers when fewer exist (approved 2026-10-24).
+- **Marker exhaustion:** a War/Crusades recipient may forgo the award or move an owned colored marker
+  from another province. The source becomes empty; destination pieces are removed even when the
+  award is forgone. A declined War award adds no extra misery to the loser (2026-10-23).
+- **Commodity overflow:** continue the quadratic payment formula beyond printed box 10.
+  Nine Wool markets plus Industry and a shortage pay $242 (2026-10-23).
+- **Attack commitment:** commit exactly the calculated requirement, including existing attacker
+  tokens; reject excess commitments (2026-10-23).
+- **Expansion bonus:** event-rebuilt and voluntarily rebuilt markers are excluded. Earlier selectable
+  rebuilt-marker, improved-setup and alternate-edition rules are retired; §13 owns current options.
+- **Caravan:** official May 1998 errata requires successful competition in a fully occupied
+  intermediate province before passing through it.
 
-- **Q7:** the user-supplied Liumas card reference confirms that every leader plus Armor,
-  Stirrups, Long Bow, Gunpowder and Mongol Armies is removed after use. All other cards recycle:
-  40 recyclable and 24 single-use cards. PDF page 2 marks event recycling; page 3 specifies that
-  all commodities recycle and no leaders do. Every implemented status matches this reference.
-
-**Historical reinsertion ruling (retired 2026-10-27):**
-
-- **Q14 / improved setup:** the user approved shuffling the five held-out cards back in after
-  turn 1's regular Draw Card phase for 3–4 players, or turn 2's for 5–6 players. Published sources
-  disagree; this is the approved project rule. Alternate timings may be introduced later as
-  separate options and are not part of the current implementation.
-
-**Resolved setup compatibility ruling (2026-10-24):**
-
-- The user selected treating "get three, choose two" as incompatible with reduced initial-deal
-  decks for now. The current reduced-deck option is commodity-only initial dealing; it cannot
-  be combined with improved setup. Each option remains available independently.
-
-**Additional approved rule defaults (2026-10-24):**
-
-- **Pirates/Vikings:** select the full epoch-dependent number of distinct eligible coastal
-  markers, or all eligible markers when fewer are available.
-- **Alternate Wind/Watermill:** making a commodity neutral clears its entire shortage/surplus
-  status, including both markers of a double adjustment.
-- **Second-edition Patronage credit:** use 20, preserving the reviewed value despite a source
-  table that prints 10.
-- **Completion-based misery relief:** grant 1/2/3 additional spaces immediately on reaching
-  2/3/4 advances in each of Science, Commerce and Communication. Each threshold is awarded once;
-  the final threshold requires four in each category, not every Commerce advance.
-
-The user approved these implemented defaults despite the source ambiguities recorded in the
-[card inventory](card-inventory.md) and [variant inventory](variant-inventory.md).
-
-**Resolved implementation decisions (2026-10-23):**
-
-- **Q15 / card-marker exhaustion:** the user allows the receiving player to forgo a new marker
-  or move one from another controlled province. The vacated source becomes empty; the destination's
-  prior pieces are removed even when placement is forgone. A War award declined by its winner
-  adds no extra misery to its loser.
-- **Q16 / commodity overflow:** the user selected the quadratic progression beyond printed box 10.
-  All nine Wool markets plus Industry and a shortage pay $242.
-
-- **Q16 / commodity payout overflow:** the user chose to continue the quadratic formula beyond
-  the ten printed payment boxes. Nine Wool markets with Industry and a shortage pay $242.
-- **Q10 / attack commitment:** the user disallowed attacks with excess tokens. Commit exactly the
-  calculated requirement, including attacker tokens already present; reject extra committed tokens.
-- **Expansion bonus (§5.6):** the user requested both interpretations of event-rebuilt markers as
-  a game option. `rebuilt-marker-bonus` supports `exclude` (default) and `include`.
-- **Caravan (§6.3):** the official May 1998 errata requires a successful competition in a fully
-  occupied intermediate province before passing through it.
-
-**Map transcription:** the [catalog inventory](data-inventory.md) records the component references,
-province and economic tables, connections and outstanding review questions. The photographed board has no
-Loire market, six Area I satellites (including Smolensk), Libya in Area VI and the printed Aegean label.
+**Map transcription:** catalog definitions live in `BoardProvinces.kt`, `BoardConnections.kt` and
+`EuropeanMapData.kt`; [map tooling](map-design.md) exports and validates the resolved graph.
+The photographed board has no Loire market, six Area I satellites (including Smolensk), Libya in Area VI and the printed Aegean label.
 The user confirmed on 2026-10-23 that Gallipoli and Angora do not touch; they have no direct coastal-water
-connection. This resolves the final recorded map question. The inventory records the source checks and ruling.
+connection. This resolves the final recorded map question.
 The user confirmed on 2026-10-25 that Tunis and Sicily touch through their coastal-water spaces.
 They share a direct coastal-water connection and no land border.
 The user confirmed on 2026-10-26 that Oran and Granada have no direct coastal-water connection,
@@ -1025,7 +985,7 @@ Further user corrections on 2026-10-26 remove the Smyrna–Crete and Naples–Si
 and add Bari–Durazzo, Portsmouth–St Malo, and London–Bruges. Bari retains its coastal connection
 with Naples. Corsica is part of Cagliari; the northern Greek island landmass is part of Athens;
 and Bari includes Italy's toe. Kamyshin connects by land to Sarai and Tana; Tana does not touch Poti.
-The [connection inventory](connection-inventory.md) records the complete reviewed graph.
+The catalog owns the complete reviewed graph.
 On 2026-11-02 the user corrected Cornwall: Portsmouth is its only land neighbor; Wales,
 Chester and Portsmouth are its direct coastal-water neighbors. The Bristol Channel separates
 Cornwall from Wales. This applies to both maps in catalog 14. Existing catalog-13 games retain
@@ -1061,13 +1021,40 @@ The 2026-10-29 clarification confirms no Smyrna–Taurus land or direct coastal-
 map. Galleys may still reach Taurus from Smyrna in two coastal steps through Adalia; reachability
 does not imply adjacency. The reviewed catalog already has this graph.
 
+Additional resolved transcription details: no St. Gall–Nuremberg support; Cagliari supports
+Marseilles/Genoa and Leon supports Toledo. Barcelona–Montpellier has land and coastal-water borders.
+Toulouse has Atlantic coastal water but no Mediterranean incidence. Kongsberg shares coastal water
+with Malmo and Copenhagen; Lubeck–Prague has a land border. St. Gall separates Milan from Salzburg.
+Cagliari–Rome is only a corner contact. Gallipoli's water separates Salonika from Constantinople.
+Shetland–Bergen shares coastal water. Granada has no Canary Basin incidence; Seville and Fez do.
+Fez also adjoins the Western Mediterranean (2026-10-28 correction). Sarai's only land neighbor is
+Kamyshin; Tana has a direct Black Sea front. These contacts remain independent of schematic spacing.
+
 ---
 
 ## Sources
 
-The original rules summary was assembled from secondary sources. The catalog milestone also uses photographs
-of the printed board and a scan of the original rulebook; exact locators and source discrepancies are in the
-[review inventory](data-inventory.md).
+Use printed AH1996 values and official errata ahead of inconsistent secondary summaries. Board
+photographs resolve labels, areas and contacts; the sharper image 4041958 resolves fine borders and
+support arrows. The reference bundle's PDF page numbers below start at one. No source images or
+user-supplied PDFs are copied into the repository.
+
+- **Map locators:** bundle page 12 (§6.2 area values) and pages 18–21 (commodity reference sheets)
+  cross-check the board. Printed data has 68 mainland markets, 35 satellites and five overseas boxes.
+- **Economy locators:** bundle page 14 (AH1996 Advance Log) and pages 22–24 (advance panels);
+  Hexagonia page 6 (player mat), §5.5.3 (stabilization) and §5.5.1 (shipping).
+  Printed ownership tracks count markets; AH1996 §7.11 separately specifies ten card payment boxes.
+- **Edition boundary:** bundle pages 4/17 describe EuroGames differences, excluded from baseline.
+  AH1996 J is Wind/Watermill, K Improved Agriculture; N/O/P/Q credits are 10/10/10/0 and V–Z are
+  10/20/30/40/50. The Boone FAQ's 24-marker component count is wrong: rulebook §5.2, the physical
+  mat, Hexagonia and Conboy establish 25, plus the separate zero-income position ($15).
+- **Card provenance:** the supplied Liumas PDF was checked by text and visual inspection on
+  2026-10-24. All 64 recycling statuses, 29/22/13 epoch counts and 19 leader discount schedules match,
+  including Walter's 20/30 and Marco Polo's 20/40 conditions. It uses recycling arrows rather than
+  physical-card symbols. Author metadata: Chris Conboy, creation 2008-10-07; filename label 2008-09.
+  SHA-256: `714d64ec362447c5c2fd6d8f63e20adeda0da16e2815fe010a1432c5599497f4`.
+- **Military precedence:** official errata §9.32 preserves older played military cards against third
+  parties; the later unofficial FAQ's broader cancellation does not override it.
 
 - Printed Avalon Hill board photographs:
   <https://boardgamegeek.com/image/192678/age-of-renaissance>,
@@ -1076,8 +1063,8 @@ of the printed board and a scan of the original rulebook; exact locators and sou
 - Original AH1996 rulebook scan: <https://www.scribd.com/document/709810410/Age-of-Renaissance-regles-VO>.
 - Chris Conboy (Liumas), *Age Of Renaissance Cards Reference*, user-supplied local file
   `AOR_Cards_Reference_by_Liumas_2008-09.pdf`: PDF page 2 covers all events and recycling marks;
-  page 3 covers commodity quantities and all leader discounts/recycling. The
-  [card inventory](card-inventory.md) records artifact metadata, checksum and verification.
+  page 3 covers commodity quantities and all leader discounts/recycling. Metadata and checksum
+  are recorded above.
 
 - Official Avalon Hill *Errata and Clarifications* (7 May 1998), M. Boone FAQ v0.5 (1999), the EuroGames 2nd-edition
   change list, the Advance Log and the commodity log, all bundled in one

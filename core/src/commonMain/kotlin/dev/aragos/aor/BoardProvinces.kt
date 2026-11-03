@@ -193,7 +193,7 @@ class ProvinceCatalogBuilder {
 fun provinces(declare: ProvinceCatalogBuilder.() -> Unit): List<ProvinceDefinition> =
     ProvinceCatalogBuilder().apply(declare).build()
 
-/** AH1996 printed board, transcribed and cross-checked in docs/province-inventory.md. */
+/** AH1996 printed board, source provenance in docs/rules.md. */
 object ProvinceData {
     val definitions: List<ProvinceDefinition> = provinces {
         area(GeographicalArea.I) {

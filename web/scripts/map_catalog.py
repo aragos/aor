@@ -1,5 +1,6 @@
 """Read standard transcription sources or a resolved engine catalog exported by Gradle."""
 
+import csv
 import json
 import re
 from pathlib import Path
@@ -32,13 +33,8 @@ def load_catalog(path=None):
         seas = [(edge["sea"], edge["province"]) for edge in catalog["seaCoasts"]]
         return provinces, relations, seas, catalog["seaAreas"]
 
-    provinces = {}
-    for line in (ROOT / "docs/province-inventory.md").read_text().splitlines():
-        cells = [value.strip() for value in line.split("|")[1:-1]]
-        if len(cells) == 7 and re.fullmatch("[a-z]+(?:-[a-z]+)*", cells[0]):
-            provinces[cells[0]] = dict(
-                zip(["id", "area", "market", "commodity", "capital", "coastal", "access"], cells)
-            )
+    with (ROOT / "web/scripts/standard-provinces.csv").open(newline="") as source:
+        provinces = {row["id"]: row for row in csv.DictReader(source)}
     source = (ROOT / "core/src/commonMain/kotlin/dev/aragos/aor/BoardConnections.kt").read_text()
     relations = {}
     for kind in ["land", "coast", "supports"]:

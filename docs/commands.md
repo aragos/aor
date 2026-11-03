@@ -71,7 +71,7 @@ an application game after creation.
 
 Initial-deal exclusions remain in the deck for later draws. No preset, improved setup, alternate
 advance table, St. Gall support toggle or rebuilt-marker-bonus option is supported. Event-rebuilt
-markers use the baseline exclusion from the expansion bonus. See [variants](variant-inventory.md).
+markers use the baseline exclusion from the expansion bonus. See [rules §13](rules.md#13-variants).
 
 ## Application history commands
 
@@ -210,8 +210,8 @@ A successful candidate replay alone cannot prove that equal dice belong to the o
 Unsupported source versions are exportable, but replacement rejects unprovable event continuity.
 
 The supported language excludes `return-card`, `written-record` and `adjust-market`. These retired
-mechanics cannot be selected through any supported option. A canonical empty Renaissance pass from
-rules version 2 is not a version-3 command history; see [compatibility](engine.md#transition-receipts-and-compatibility).
+mechanics cannot be selected through any supported option. Older Renaissance-window histories require
+explicit compatibility validation; see [saved-game compatibility](deployment.md#saved-game-compatibility).
 
 Command writes may include a canonical UUID `operationId` and the viewer's `expectedSubmissionVersion`.
 The public `expectedRevision` remains mandatory. Private save/replacement/withdrawal compares the
