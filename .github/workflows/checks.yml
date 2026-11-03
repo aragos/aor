@@ -58,7 +58,7 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :server:test checkKotlinFormat
+      - run: ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :ai:jvmTest :ai:jsNodeTest :ai:jsBrowserProductionLibraryDistribution :training:test :server:test checkKotlinFormat
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -81,7 +81,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_*.py'
           python3 scripts/check-container.py
       - name: Browser interactions
-        run: npm run test:browser --workspace web -- map.browser.mjs history.browser.mjs
+        run: npm run test:browser --workspace web -- map.browser.mjs history.browser.mjs bots.browser.mjs
         env:
           CHROME_BIN: /usr/bin/google-chrome
           AOR_BROWSER_TIMEOUT_MS: '600000'

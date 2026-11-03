@@ -1,6 +1,6 @@
 # Product scope
 
-AoR supports complete, asynchronous, three-epoch Age of Renaissance games for 3–6 people, including
+AoR supports complete, asynchronous, three-epoch Age of Renaissance games for 3–6 seats, including
 private hands, simultaneous bids, nested decisions, all 64 cards and final scoring. The visual table
 serves ordinary play; commands support expert input, reproducible reports and authorized history edits.
 
@@ -33,5 +33,9 @@ per month within a $25/month hosting budget; representative production load must
 An existing Squarespace domain can supply a subdomain. [Deployment](deployment.md) owns configuration
 and recovery; [open work](follow-ups.md) distinguishes unverified launch checks from automated tests.
 
-Purchase and Buy Card support private phase-scoped plans. Strategy controllers, general future-turn
-scripts and controller replacement remain deferred.
+Purchase and Buy Card support private phase-scoped plans. Automated seats offer Easy, Normal and
+Hard policies with an integrated economic evaluator. The creator's browser runs a single worker;
+server-authoritative games pause automated progression when no creator browser is available.
+Client hosting is for solo and trusted casual play: the host can inspect automated hands and modify
+its local policy. General future-turn scripts, midgame controller replacement, trusted competitive
+bot hosting and fully offline authority remain deferred.

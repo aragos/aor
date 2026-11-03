@@ -35,6 +35,8 @@ data class ExpansionOfferView(
     val missingAccess: List<AccessRequirement> = emptyList(),
     /** Null for peaceful placements; otherwise the faces that win on green alone, with advances. */
     val greenDieWins: List<Int>? = null,
+    /** Exact dice-only attack probability; optional Cathedral declarations remain decisions. */
+    val competitionWinProbability: Double? = null,
 )
 
 /** Consequences from the same mutation used by the voluntary marker-reduction command. */
@@ -195,6 +197,23 @@ internal object ExpansionProjection {
                     proselytism = CompetitionRules.proselytismApplies(context, player, defenders),
                 )
             } else null,
+            (plan as? PlacementPlan.Competition)?.let { competition ->
+                val greenWins =
+                    CompetitionRules.greenWinningRolls(
+                            requireNotNull(state.orderBoxes[player]) {
+                                "A competition requires the attacker's printed order box."
+                            },
+                            CompetitionRules.proselytismApplies(
+                                context,
+                                player,
+                                competition.defenders,
+                            ),
+                        )
+                        .size
+                val blackWins =
+                    15 + if (competition.breakdown.offensiveMilitary.isNotEmpty()) 6 else 0
+                (blackWins * 6 + (36 - blackWins) * greenWins) / 216.0
+            },
         )
     }
 

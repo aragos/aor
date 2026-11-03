@@ -1,19 +1,23 @@
+FROM eclipse-temurin:21-jdk-noble AS server
+WORKDIR /build
+COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
+COPY gradle ./gradle
+COPY core ./core
+COPY ai ./ai
+COPY server ./server
+COPY training/build.gradle.kts ./training/build.gradle.kts
+RUN ./gradlew --no-daemon -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8" \
+    -Pkotlin.compiler.execution.strategy=in-process --max-workers=2 \
+    :server:installDist :ai:jsBrowserProductionLibraryDistribution
+
 FROM node:26-bookworm-slim AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 COPY web/package.json ./web/package.json
 RUN npm ci --ignore-scripts
 COPY web ./web
+COPY --from=server /build/ai/build/dist/js/productionLibrary ./ai/build/dist/js/productionLibrary
 RUN npm run build
-
-FROM eclipse-temurin:21-jdk-noble AS server
-WORKDIR /build
-COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
-COPY gradle ./gradle
-COPY core ./core
-COPY server ./server
-RUN ./gradlew --no-daemon -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8" \
-    -Pkotlin.compiler.execution.strategy=in-process :server:installDist
 
 FROM eclipse-temurin:21-jre-noble
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \

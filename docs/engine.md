@@ -73,6 +73,27 @@ prefix and return typed invalid/blocked results. Stop at a missing decision, unk
 request or activity boundary without pretending the suffix executed. Service persistence and execution
 are in [architecture](design.md#private-plans).
 
+## Opponent policies
+
+[AI](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/) is separate from rules and authority. Policies
+consume numerical seat observations, never authoritative `GameState`. The observation adapter uses
+the same viewer-safe projections as ordinary play. Exact competition probabilities and Wind/Watermill
+quotes belong to their core rule projections. Candidate generation supplements the deliberately
+nonexhaustive command hints with bounded numeric and target alternatives.
+
+All difficulties share one contextual economic evaluator. Easy varies among reasonable choices;
+Normal ranks current alternatives; Hard adds bounded resource-budget planning over current offers.
+This planning is advisory: every accepted action refreshes authoritative offers before the next
+decision. It does not claim full-game search or knowledge of unseen cards. Capital features include
+the initial hand, nearby opportunities, player count and map. Variant and epoch interactions permit
+offline tuning without independent rule implementations.
+
+[Training](../training/src/main/kotlin/dev/aragos/aor/training/) supplies sampled authority outcomes
+through ordinary entries, while every simulated policy receives only its seat observation. Sealed
+decisions are selected from a shared pre-batch position. Directed fixtures and complete games verify
+decision coverage, legal actions, privacy, replay and cross-target policy behavior. The persisted
+history contains moves and outcomes, so later policy or model updates cannot change earlier play.
+
 ## Verify changes
 
 Start with the corresponding [core tests](../core/src/jvmTest/kotlin/dev/aragos/aor/).

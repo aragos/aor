@@ -119,9 +119,16 @@ data class GameView(
     val expansionCardCost: Int? = null,
     val playedLeaderDiscounts: List<PlayedLeaderDiscountView> = emptyList(),
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
+    val windmillOffer: WindmillOfferView? = null,
 ) {
     companion object {
-        internal fun forViewer(state: GameState, viewer: PlayerState?): GameView {
+        internal fun forViewer(
+            state: GameState,
+            viewer: PlayerState?,
+            decisionOnly: Boolean = false,
+        ): GameView {
+            val decision = ActivityView.from(state).choice
+            fun needed(vararg choices: String): Boolean = !decisionOnly || decision in choices
             val expansionInspections =
                 viewer?.let { ExpansionProjection.inspections(state, it) }.orEmpty()
             return GameView(
@@ -155,6 +162,7 @@ data class GameView(
                     ),
                 lockedProvinces =
                     viewer
+                        .takeUnless { decisionOnly }
                         ?.let { participant ->
                             state.catalog.provinces
                                 .filterNot { province ->
@@ -200,12 +208,20 @@ data class GameView(
                         )
                     } else null,
                 voids = state.voids,
-                advanceOffers = viewer?.let { advanceOffers(state, it) }.orEmpty(),
+                advanceOffers =
+                    viewer
+                        ?.takeIf { needed("purchase-advances") }
+                        ?.let { advanceOffers(state, it) }
+                        .orEmpty(),
                 patronageOffers =
                     viewer?.let { PatronageOfferView.from(state, it.player.id) }.orEmpty(),
                 adjustmentOffers =
                     viewer?.let { AdjustmentCancellation.offers(state, it.player.id) }.orEmpty(),
-                reliefOffers = viewer?.let { ReliefOfferView.from(state, it) }.orEmpty(),
+                reliefOffers =
+                    viewer
+                        ?.takeIf { needed("purchase-relief") }
+                        ?.let { ReliefOfferView.from(state, it) }
+                        .orEmpty(),
                 reliefRatingAvailable =
                     viewer?.let { participant ->
                         state.turnNumber?.let { turn ->
@@ -230,12 +246,36 @@ data class GameView(
                 burdenReferences = viewer?.let { burdenReferences(state, it) }.orEmpty(),
                 expansionOffers = ExpansionProjection.offers(expansionInspections),
                 markerReductionOffers =
-                    viewer?.let { ExpansionProjection.reductions(state, it) }.orEmpty(),
+                    viewer
+                        ?.takeIf { !decisionOnly || state.board.markerCount(it.player.id) == 25 }
+                        ?.let { ExpansionProjection.reductions(state, it) }
+                        .orEmpty(),
                 expansionInspections = expansionInspections,
-                commodityPayouts = CommodityPayoutView.from(state),
-                commodityCards = CommodityCardCountView.from(state),
-                cardOffers = viewer?.let { CardProjection.offers(state, it) }.orEmpty(),
-                cardInspections = CardProjection.inspections(state, viewer),
+                commodityPayouts =
+                    if (
+                        needed(
+                            "expand",
+                            "play-cards",
+                            "prepare-war",
+                            "choose-capital",
+                            "cancel-adjustment",
+                            "war-surrender",
+                            "replace-event-token",
+                            "place-event-marker",
+                        )
+                    ) {
+                        CommodityPayoutView.from(state)
+                    } else emptyList(),
+                commodityCards =
+                    if (decisionOnly) emptyList() else CommodityCardCountView.from(state),
+                cardOffers =
+                    viewer
+                        ?.takeIf { needed("play-cards", "prepare-war") }
+                        ?.let { CardProjection.offers(state, it) }
+                        .orEmpty(),
+                cardInspections =
+                    if (needed("choose-capital")) CardProjection.inspections(state, viewer)
+                    else emptyList(),
                 tokenPurchaseOffers =
                     viewer?.let { TokenPurchaseProjection.offers(state, it) }.orEmpty(),
                 shippingOffer = viewer?.let { ShippingOfferView.from(state, it) },
@@ -249,8 +289,24 @@ data class GameView(
                     } else {
                         null
                     },
-                playedLeaderDiscounts = PlayedLeaderDiscountView.from(state, viewer),
-                unplayedAdvanceLeaders = AdvanceLeaderAvailabilityView.from(state),
+                playedLeaderDiscounts =
+                    if (needed("purchase-advances")) {
+                        PlayedLeaderDiscountView.from(state, viewer)
+                    } else emptyList(),
+                unplayedAdvanceLeaders =
+                    if (decisionOnly) emptyList() else AdvanceLeaderAvailabilityView.from(state),
+                windmillOffer =
+                    (state.flow.decisions.lastOrNull() as? BoardDecision.WindmillOpportunity)
+                        ?.let { opportunity ->
+                            val cost = state.catalog.map.province(opportunity.province).marketNumber
+                            WindmillOfferView(
+                                opportunity.player,
+                                opportunity.victim,
+                                opportunity.province,
+                                cost,
+                                cost / 6.0,
+                            )
+                        },
             )
         }
 
@@ -298,6 +354,15 @@ data class GameView(
         }
     }
 }
+
+/** Public token price and dice chance for the current optional Wind/Watermill attempt. */
+data class WindmillOfferView(
+    val player: PlayerId,
+    val victim: PlayerId,
+    val province: ProvinceId,
+    val tokenCost: Int,
+    val successProbability: Double,
+)
 
 /** Public recipient and destination of the next physical marker choice after a card effect. */
 data class MarkerPlacementView(val player: PlayerId, val destination: ProvinceId)

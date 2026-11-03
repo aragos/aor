@@ -184,10 +184,12 @@ internal object GameAbandonment {
 
     fun terminal(game: StoredGame): StoredGame =
         ActivityPlans.disarm(
-            game.copy(
-                pendingBids = emptyMap(),
-                submissionVersions =
-                    game.header.players.associate { it.id to UUID.randomUUID().toString() },
+            BotAutomation.pause(
+                game.copy(
+                    pendingBids = emptyMap(),
+                    submissionVersions =
+                        game.header.players.associate { it.id to UUID.randomUUID().toString() },
+                )
             ),
             PlanPause.EDITED,
         )

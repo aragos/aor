@@ -16,6 +16,8 @@ web/*.tsbuildinfo
 
 # Local games, credentials and private history
 .aor-data/
+.aor-training/
+/training-supervisor.log
 .env
 .env.*
 firebase-admin.json

@@ -128,6 +128,43 @@ outcome. Draws resolve normally and disarm the suffix; changed consequences paus
 substituting commands. Manual actions cancel the owner's authorization; history edits disarm plans;
 phase completion expires them and inactive games cannot execute. Failed writes consume no progress.
 
+## Automated seats
+
+[BotAutomation.kt](../server/src/main/kotlin/dev/aragos/aor/BotAutomation.kt) owns application-level
+controller metadata and creator-only browser leases. Bot seats retain ordinary engine identities;
+only human seats have account memberships or private-link credentials. Existing documents without
+automation fields decode as human-only games. The PostgreSQL membership migration permits explicit
+automated seats without manufacturing accounts, while archives and checkpoints preserve controller
+metadata and pending decisions.
+
+The browser's [runner](../web/src/ai/botRunner.ts) sends one seat-specific observation to one local
+worker at a time. [AI](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/) consumes viewer-safe public facts,
+the deciding seat's private facts and bounded candidate features. It returns an ordinary canonical
+command. The server validates and records it and supplies actual authority outcomes. Reads do not
+execute bots; search makes no speculative server calls.
+
+Thirty-second leases carry a fencing epoch. Bot commands check the lease, public revision, decision
+identity and owner's private-submission version atomically. Bounded UUID/hash receipts reconcile
+uncertain responses without repeating decisions. Accepted sealed amounts remain private and do not
+advance public revision until the ordinary batch reveal. Public snapshots exclude runner identity,
+lease deadlines, seeds, bot hands and operation receipts.
+
+Only the creator can host, pause, resume or explicitly take over a runner. History edits and prefix
+rewinds pause bots and rotate their epoch, preventing stale or renewed workers from recreating undone
+play without explicit resume. Completion and closure stop new bot work. Creator abandonment consent
+also records a separate agreement for each bot; all other human seats still need their own consent.
+
+The browser host is trusted with bot information and execution. A Web Worker isolates computation
+from rendering, not secrets from its host. Competitive trusted execution and fully local authority
+are separate hosting modes. Persisted commands replay without loading a model or running a policy.
+
+Offline [training](../training/src/main/kotlin/dev/aragos/aor/training/) runs as a standalone executable,
+with no production storage or model service. Its matrix covers the complete player-count/variant
+product. Compact model assets are versioned by schema/rules/catalog; incompatible downloads fall
+back to the rule-based prior. Parameter exploration uses a population of opponents and independent
+final evaluation. Training checks coverage explicitly and retains the prior when promotion evidence
+is insufficient. [Contributing](contributing.md#opponent-training) owns operation and resource limits.
+
 ## Lifecycle and activity
 
 [GameOperations.kt](../server/src/main/kotlin/dev/aragos/aor/GameOperations.kt) handles administrative

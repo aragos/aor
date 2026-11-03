@@ -148,15 +148,16 @@ class HostedServices(
         rules: RuleOptions,
         policy: UndoPolicy,
         name: GameName = GameName.DEFAULT,
+        bots: List<AutomatedPlayerRequest> = emptyList(),
     ): CreatedGame {
         val creator = account(identity)
         if (!mayCreate(creator)) throw ServiceFailure(403, "GAME_CREATION_FORBIDDEN")
-        if (ids.size !in 3..6 || ids.distinct().size != ids.size) {
+        if (ids.isEmpty() || ids.size + bots.size !in 3..6 || ids.distinct().size != ids.size) {
             throw ServiceFailure(400, "INVALID_GAME")
         }
         val players = ids.map { id ->
             accounts.find(AccountId(id)) ?: throw ServiceFailure(400, "UNREGISTERED_PLAYER")
         }
-        return games.createRegistered(players, creator.id, rules, policy, name)
+        return games.createRegistered(players, creator.id, rules, policy, name, bots)
     }
 }

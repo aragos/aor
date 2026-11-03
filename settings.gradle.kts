@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 
-include(":core", ":server")
+include(":core", ":ai", ":server", ":training")

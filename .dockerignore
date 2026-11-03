@@ -4,6 +4,7 @@
 .codex
 .aws
 .aor-data
+.aor-training
 .gradle
 .kotlin
 **/build

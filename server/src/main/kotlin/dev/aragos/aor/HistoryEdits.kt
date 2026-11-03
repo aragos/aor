@@ -135,18 +135,20 @@ internal object HistoryEdits {
     ): StoredGame {
         val entries = replacement(stored, player, from, lines)
         val edited =
-            stored.copy(
-                revisions =
-                    stored.revisions +
-                        Revision(
-                            id = stored.revision + 1,
-                            parent = stored.revision,
-                            author = player,
-                            command = command,
-                            entries = entries,
-                            replaceFrom = from,
-                        ),
-                pendingBids = emptyMap(),
+            BotAutomation.pause(
+                stored.copy(
+                    revisions =
+                        stored.revisions +
+                            Revision(
+                                id = stored.revision + 1,
+                                parent = stored.revision,
+                                author = player,
+                                command = command,
+                                entries = entries,
+                                replaceFrom = from,
+                            ),
+                    pendingBids = emptyMap(),
+                )
             )
         if (stored.undoPolicy == UndoPolicy.LINEAR_GAME) {
             return edited.copy(

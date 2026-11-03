@@ -243,6 +243,8 @@ class GameAdministration(
                 planVersions = privatePlans?.planVersions.orEmpty(),
                 planReceipts = privatePlans?.planReceipts.orEmpty(),
                 planExecutions = privatePlans?.planExecutions.orEmpty(),
+                bots = privatePlans?.bots.orEmpty(),
+                botRunner = privatePlans?.let(BotAutomation::pause)?.botRunner,
                 revisions =
                     listOf(
                         Revision(

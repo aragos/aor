@@ -158,7 +158,21 @@ export interface PlanningView {
     executions: {version: string; fromRevision: number; toRevision: number}[];
     canArm: boolean; canExecute: boolean;
 }
+export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
+export interface BotAutomation {
+    players: {id: string; name: string; difficulty: BotDifficulty; policyVersion: string}[];
+    canControl: boolean; paused: boolean; epoch: number;
+}
+export interface BotJob {
+    seat: string; difficulty: BotDifficulty; seed: number; decisionId: string;
+    submissionVersion: string | null; observation: unknown;
+}
+export interface BotWork {
+    revision: number; epoch: number; leaseUntil: number; paused: boolean;
+    observations: BotJob[]; operationReceipts?: string[];
+}
 export interface Snapshot {
+    automation?: BotAutomation | null;
     planning?: PlanningView | null;
     planWriteReceipt?: {operationId: string; version: string} | null;
     name: string;

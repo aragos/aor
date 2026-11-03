@@ -17,6 +17,7 @@ export async function checkHosted(page, web, artifacts) {
     let holdSession = false;
     let releaseSession;
     const registrations = [];
+    const creations = [];
     const intercept = async event => {
         const {method, params} = JSON.parse(event.data);
         if (method !== 'Fetch.requestPaused') return;
@@ -39,7 +40,10 @@ export async function checkHosted(page, web, artifacts) {
                     account = {id: 'google-player', handle: registration.handle, admin: false, mayCreateGames: false};
                     body = JSON.stringify(account);
                 } else if (path === `/api/games/${gameId}`) body = JSON.stringify(snapshot);
-                else if (path === '/api/games') body = JSON.stringify({games: [], nextCursor: null});
+                else if (path === '/api/games' && params.request.method === 'POST') {
+                    creations.push(JSON.parse(params.request.postData));
+                    body = JSON.stringify({gameId, name: creations.at(-1).name, registered: true, links: []});
+                } else if (path === '/api/games') body = JSON.stringify({games: [], nextCursor: null});
                 else throw new Error(`Unexpected hosted request: ${path}`);
             }
             await page.send('Fetch.fulfillRequest', {requestId: params.requestId, responseCode: 200,
@@ -132,6 +136,25 @@ export async function checkHosted(page, web, artifacts) {
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('.portal')`, 'Registered player dashboard');
             assert.equal(await page.evaluate(`document.querySelector('.account-controls').textContent.includes('@alice')`), true);
+        });
+        await check('A registered human can create a game with mixed local opponent difficulties', async () => {
+            account = {...registeredAccount, mayCreateGames: true};
+            await page.click('Sign in with Google');
+            await page.evaluate(`window.firebaseTest.finishPopup()`);
+            await page.wait(`document.querySelector('.create-registered form')`, 'approved game creation');
+            await page.evaluate(`document.querySelector('.create-registered').open = true`);
+            await page.fill('#game-name', 'Alice faces two automated opponents');
+            await page.click('Add automated opponent');
+            await page.click('Add automated opponent');
+            await page.fill('#bot-difficulty-0', 'EASY');
+            await page.fill('#bot-difficulty-1', 'HARD');
+            assert.equal(await page.evaluate(`document.querySelector('.automated-opponents').textContent.includes('3 of 6 seats')`), true);
+            assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), false);
+            await page.click('Create game');
+            await page.wait(`location.pathname === '/games/${gameId}' && document.readyState === 'complete'`, 'hosted creation navigates to the human game');
+            assert.deepEqual(creations.at(-1).players, ['google-player']);
+            assert.deepEqual(creations.at(-1).bots, [{difficulty: 'EASY'}, {difficulty: 'HARD'}]);
+            assert.equal(creations.at(-1).name, 'Alice faces two automated opponents');
         });
         await check('Hosted game account controls share the game overview bar', async () => {
             account = registeredAccount;

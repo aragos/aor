@@ -139,6 +139,7 @@ fun Application.module(
             )
         }
         if (hosted != null) hostedRoutes(hosted)
+        botRoutes(gameService, hosted)
         get("/api/health") {
             call.api {
                 withContext(Dispatchers.IO) {
@@ -152,7 +153,8 @@ fun Application.module(
         post("/api/games") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("players", "options", "undoPolicy", "name")
+                body.fieldsOnly("players", "bots", "options", "undoPolicy", "name")
+                val bots = body.automatedPlayers()
                 val name =
                     try {
                         body["name"]?.let { GameName.parse(it.string()) } ?: GameName.DEFAULT
@@ -180,7 +182,7 @@ fun Application.module(
                     withContext(Dispatchers.IO) {
                         val players = body.field("players").array().map(JsonNode::string)
                         if (hosted == null) {
-                            gameService.create(players, rules, undoPolicy, name)
+                            gameService.create(players, rules, undoPolicy, name, bots)
                         } else {
                             hosted.create(
                                 hosted.identity(call.token()),
@@ -188,6 +190,7 @@ fun Application.module(
                                 rules,
                                 undoPolicy,
                                 name,
+                                bots,
                             )
                         }
                     }
