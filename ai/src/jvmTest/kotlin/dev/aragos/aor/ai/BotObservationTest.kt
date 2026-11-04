@@ -35,6 +35,8 @@ import dev.aragos.aor.TurnDecision
 import dev.aragos.aor.TurnFlow
 import dev.aragos.aor.TurnOrderSelection
 import dev.aragos.aor.WarResult
+import dev.aragos.aor.WarRound
+import dev.aragos.aor.WarState
 import kotlin.test.Test
 
 class BotObservationTest {
@@ -175,6 +177,53 @@ class BotObservationTest {
                 }
             )
             .isGreaterThan(1)
+        assertCandidatesLegal(state, observation)
+    }
+
+    @Test
+    fun anUnresolvedWarExcludesAnotherWarFromBotCandidates() {
+        val state =
+            fixture()
+                .copy(
+                    stage = Stage.PLAY_CARDS,
+                    activeWar =
+                        WarState(
+                            p2,
+                            ids.last(),
+                            startedTurn = 1,
+                            ties = 1,
+                            lastRound = WarRound(2, finalCardPlay = false, actor = p1),
+                        ),
+                )
+                .withHand(p1, "war", "timber")
+
+        val observation = BotObservations.from(state, p1)
+
+        assertThat(observation.candidates.map { it.command })
+            .containsExactly("pass", "play held-timber commodity timber")
+        assertCandidatesLegal(state, observation)
+    }
+
+    @Test
+    fun aFinalHandWithOnlyABlockedWarStillHasALegalBotCandidate() {
+        val state =
+            fixture()
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar =
+                        WarState(
+                            p2,
+                            ids.last(),
+                            startedTurn = 1,
+                            ties = 1,
+                            lastRound = WarRound(2, finalCardPlay = true, actor = p1),
+                        ),
+                )
+                .withHand(p1, "war")
+
+        val observation = BotObservations.from(state, p1)
+
+        assertThat(observation.candidates.map { it.command }).containsExactly("pass")
         assertCandidatesLegal(state, observation)
     }
 

@@ -190,6 +190,91 @@ class CardGameTest {
     }
 
     @Test
+    fun anUnresolvedWarDoesNotOfferAnotherWarInEitherCardPhase() {
+        for (stage in listOf(Stage.PLAY_CARDS, Stage.FINAL_CARD_PLAY)) {
+            val state =
+                running("war")
+                    .copy(
+                        stage = stage,
+                        activeWar =
+                            WarState(
+                                p2,
+                                p3,
+                                startedTurn = 1,
+                                ties = 1,
+                                lastRound =
+                                    WarRound(
+                                        1,
+                                        finalCardPlay = stage == Stage.FINAL_CARD_PLAY,
+                                        actor = p1,
+                                    ),
+                            ),
+                    )
+
+            val choices = state.legalChoices(p1).commands
+            choices.forEach { command -> state.play("p1: $command") }
+
+            assertThat(choices).contains("play hand-4 commodity fur")
+            assertThat(choices.filter { it.startsWith("play hand-1") }).isEmpty()
+            assertThat(state.viewForPlayer(p1).cardOffers.first().blockers)
+                .containsExactly(CardOfferBlocker.INVALID_WAR)
+        }
+    }
+
+    @Test
+    fun startingAnotherWarWhileTheFirstIsUnresolvedStillRejectsTheCommand() {
+        val state = running("war").copy(activeWar = WarState(p2, p3, startedTurn = 1))
+
+        val failure = assertFailsWith<CardRuleViolation> { state.play("p1: play hand-1 player p2") }
+
+        assertThat(failure.code).isEqualTo(CardRuleCode.INVALID_WAR)
+    }
+
+    @Test
+    fun aFinalRoundWithOnlyABlockedWarFinishesAfterRecordedRerolls() {
+        val initial =
+            running("war")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar = WarState(p2, p3, startedTurn = 1),
+                )
+                .withPlayer(p1) { player -> player.copy(hand = listOf(hand("hand-1", "war"))) }
+                .withPlayer(p2) { player -> player.copy(hand = emptyList()) }
+                .withPlayer(p3) { player -> player.copy(hand = emptyList()) }
+                .normalise()
+        val tied = initial.play("!roll war 3 3")
+        val continuation = arrayOf("p1: pass", "!roll war 3 3", "!roll war 3 3")
+
+        val finished = tied.play(*continuation)
+        val replayed = initial.play("!roll war 3 3", *continuation)
+
+        assertThat(finished.stage).isEqualTo(Stage.FINISHED)
+        assertThat(finished.activeWar).isNull()
+        assertThat(finished.playerState(p1).hand.map { it.definition.id }).containsExactly("war")
+        assertThat(replayed).isEqualTo(finished)
+    }
+
+    @Test
+    fun aBlockedWarDoesNotAllowSkippingOtherFinalCards() {
+        val state =
+            running("war")
+                .copy(
+                    stage = Stage.FINAL_CARD_PLAY,
+                    activeWar =
+                        WarState(
+                            p2,
+                            p3,
+                            startedTurn = 1,
+                            lastRound = WarRound(1, finalCardPlay = true, actor = p1),
+                        ),
+                )
+
+        val failure = assertFailsWith<RuleViolation> { state.play("p1: pass") }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.UNPLAYED_FINAL_CARDS)
+    }
+
+    @Test
     fun anEmptyHandStillHostsTheNextWarReroll() {
         val tied = running("war").play("p1: play hand-1 player p2", "!roll war 3 3")
         val nextRound =

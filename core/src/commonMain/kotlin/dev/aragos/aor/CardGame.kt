@@ -213,7 +213,7 @@ object CardGame {
             )
         }
         cardRule(
-            state.activeWar == null || cardId != EventId.WAR.cardId,
+            !isBlockedByWar(state, cardId),
             CardRuleCode.INVALID_WAR,
             "A second War cannot begin while the first is unresolved.",
         )
@@ -543,12 +543,17 @@ object CardGame {
         }
     }
 
+    /** A recycled War stays in hand if its earlier battle is still unresolved. */
     internal fun canPassFinalCards(state: GameState, actor: PlayerId): Boolean {
         val context = state.cardContext()
         return state.playerState(actor).hand.all { card ->
-            CardRules.isBurden(context, card.definition.id)
+            CardRules.isBurden(context, card.definition.id) ||
+                isBlockedByWar(state, card.definition.id)
         }
     }
+
+    private fun isBlockedByWar(state: GameState, cardId: String): Boolean =
+        state.activeWar != null && cardId == EventId.WAR.cardId
 
     /** Concrete legal card commands, including targets, also used in the military reroll window. */
     fun playChoices(
@@ -562,6 +567,7 @@ object CardGame {
             if (militaryOnly && !spec.isMilitary()) return@flatMap emptyList()
             choices(context, spec).mapNotNull { choice ->
                 try {
+                    requirePlayableCard(state, card.definition.id)
                     CardRules.resolve(context, actor, CardPlay(card.definition.id, choice))
                     CardCommand.PlayCard(card.reference, choice).toText()
                 } catch (_: CardRuleViolation) {

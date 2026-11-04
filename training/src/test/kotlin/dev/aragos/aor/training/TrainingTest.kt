@@ -75,6 +75,33 @@ class TrainingTest {
     }
 
     @Test
+    fun reportedSixPlayerTrainingSeedCompletesAndReplays() {
+        val configuration =
+            TrainingConfiguration(
+                playerCount = 6,
+                rules =
+                    RuleOptions(
+                        deckModification = false,
+                        initialCard = InitialCardRule.NO_EVENTS,
+                        immediateMasterArtDiscard = true,
+                        map = MapRule.EUROPEAN,
+                    ),
+            )
+
+        val result =
+            Simulation()
+                .play(
+                    configuration = configuration,
+                    seed = 2101805946,
+                    competitors = List(6) { Competitor(BotModels.default) },
+                    verifyReplay = true,
+                )
+
+        assertThat(result.scores).hasSize(6)
+        assertThat(result.coverage.playedCards).contains("war")
+    }
+
+    @Test
     fun elapsedDeadlineStopsBeforeAnotherPolicyDecision() {
         assertFailsWith<CancellationException> {
             Simulation()

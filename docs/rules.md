@@ -594,6 +594,10 @@ cards left in its hand, in any order it chooses. Misery burdens are not played.
 - Enlightened Ruler still protects its player, because this step is the same turn.
 - Civil War here takes no cash. Its token half applies, which is half of zero.
 - A tied War is left unresolved.
+- **Implementation inference for a recycled War:** a War card from an earlier epoch cannot start
+  another War while the earlier battle is unresolved. If only that blocked War and misery burdens
+  remain, the player may pass and keep them in hand. The pending War still rerolls at the start of
+  subsequent players' rounds.
 
 **Score.** Each player scores the total cost of its advances, plus its cash, minus the **value** of its misery box. The
 highest score wins. A tie results in more than one winner.
