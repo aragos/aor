@@ -253,6 +253,84 @@ class BotAutomationTest(private val postgres: Boolean) {
         }
 
     @Test
+    fun regularUndoPreservesTheSavedGameAndRunner() =
+        AutomationFixture(postgres, policy = UndoPolicy.REGULAR_TURN).use { fixture ->
+            fixture.prepareHumanExpansion()
+            val work = fixture.claim()
+            val saved = GameDocuments.read(fixture.game.gameId, json.readTree(fixture.document()))
+            val placement = fixture.placement()
+            fixture.humanCommand(placement)
+
+            val undone = fixture.humanCommand("undo")
+            val restored = fixture.reopened().store.read(fixture.game.gameId)
+
+            assertThat(undone.automation?.paused).isFalse()
+            assertThat(restored.botRunner).isEqualTo(saved.botRunner)
+            assertThat(restored.state()).isEqualTo(saved.state())
+            assertThat(restored.revisions.take(saved.revisions.size)).isEqualTo(saved.revisions)
+            assertThat(restored.bots).isEqualTo(saved.bots)
+            assertThat(restored.credentials).isEqualTo(saved.credentials)
+            assertThat(restored.pendingBids).isEqualTo(saved.pendingBids)
+            assertThat(fixture.read(work.epoch).observations).isEmpty()
+        }
+
+    @Test
+    fun regularUndoAllowsTheSameBrowserToSubmitTheNextBotDecision() =
+        AutomationFixture(postgres, policy = UndoPolicy.REGULAR_TURN).use { fixture ->
+            fixture.prepareHumanExpansion()
+            val work = fixture.claim()
+            fixture.humanCommand(fixture.placement())
+            fixture.humanCommand("undo")
+            fixture.humanCommand("pass")
+            val fresh = fixture.read(work.epoch)
+            val job = fresh.observations.first()
+            val command = job.observation.candidates.first().command
+
+            val accepted = fixture.submit(fresh, job, command)
+
+            assertThat(accepted.paused).isFalse()
+            assertThat(accepted.epoch).isEqualTo(work.epoch)
+            assertThat(accepted.operationReceipts).hasSize(1)
+        }
+
+    @Test
+    fun regularHistoryEditPreservesTheRunner() =
+        AutomationFixture(postgres, policy = UndoPolicy.REGULAR_TURN).use { fixture ->
+            fixture.prepareHumanExpansion()
+            fixture.claim()
+            val before = fixture.service.store.read(fixture.game.gameId).botRunner
+            val placement = fixture.placement()
+            val replacement = fixture.placement(tokens = 2)
+            val placed = fixture.humanCommand(placement)
+
+            val edited =
+                fixture.service.editHistory(
+                    fixture.game.gameId,
+                    fixture.access(),
+                    placed.revision,
+                    placed.undo.actions.last().entry,
+                    listOf(replacement),
+                )
+
+            assertThat(edited.automation?.paused).isFalse()
+            assertThat(fixture.service.store.read(fixture.game.gameId).botRunner).isEqualTo(before)
+        }
+
+    @Test
+    fun regularUndoPreservesAnExplicitPause() =
+        AutomationFixture(postgres, policy = UndoPolicy.REGULAR_TURN).use { fixture ->
+            fixture.prepareHumanExpansion()
+            fixture.control("pause", fixture.claim().epoch)
+            val before = fixture.service.store.read(fixture.game.gameId).botRunner
+            fixture.humanCommand(fixture.placement())
+
+            val undone = fixture.humanCommand("undo")
+
+            assertThat(undone.automation?.paused).isTrue()
+            assertThat(fixture.service.store.read(fixture.game.gameId).botRunner).isEqualTo(before)
+        }
+
+    @Test
     fun rewindPausesBotsAndFencesThePreviousBrowser() =
         AutomationFixture(postgres).use { fixture ->
             fixture.prepareFirstTurn()
@@ -391,7 +469,12 @@ class BotAutomationTest(private val postgres: Boolean) {
         }
 }
 
-private class AutomationFixture(postgres: Boolean, humans: Int = 1, bots: Int = 2) : AutoCloseable {
+private class AutomationFixture(
+    postgres: Boolean,
+    humans: Int = 1,
+    bots: Int = 2,
+    policy: UndoPolicy = UndoPolicy.LINEAR_GAME,
+) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-bot-test-")
     private val database = if (postgres) PostgresFixture() else null
     val service = database?.service() ?: createGameService(directory, FixedRandom())
@@ -405,7 +488,7 @@ private class AutomationFixture(postgres: Boolean, humans: Int = 1, bots: Int = 
                         if (index == 0) BotDifficulty.NORMAL else BotDifficulty.HARD,
                     )
                 },
-            undoPolicy = UndoPolicy.LINEAR_GAME,
+            undoPolicy = policy,
         )
     val runnerId: String = UUID.randomUUID().toString()
 
@@ -415,6 +498,9 @@ private class AutomationFixture(postgres: Boolean, humans: Int = 1, bots: Int = 
     fun snapshot(human: Int = 0): GameSnapshot = service.get(game.gameId, access(human))
 
     fun claim(): BotWork = control("claim", expectedEpoch = 0)
+
+    fun read(epoch: Int): BotWork =
+        BotAutomation.read(service, game.gameId, access(), runnerId, epoch, now = 1100)
 
     fun control(
         operation: String,
@@ -458,6 +544,43 @@ private class AutomationFixture(postgres: Boolean, humans: Int = 1, bots: Int = 
     }
 
     fun document(): String = (service.store as ManagedGameStore).document(game.gameId)
+
+    fun placement(tokens: Int = 1): String {
+        val destination =
+            snapshot()
+                .game
+                .expansionOffers
+                .first { offer ->
+                    offer.primaryAction == ExpansionAction.PLACE &&
+                        ((offer.blockers.isEmpty() && offer.requiredTokens == tokens) ||
+                            offer.partialPlacements.any { it.tokens == tokens })
+                }
+                .destination
+        return "place $tokens $destination"
+    }
+
+    fun prepareHumanExpansion() {
+        prepareFirstTurn()
+        service.store.update(game.gameId) { initial ->
+            var current = initial
+            repeat(100) {
+                val state = current.state()
+                val prompt = state.prompts().single() as Prompt.SinglePlayer
+                if (state.stage == Stage.EXPANSION && prompt.player == PlayerId("p1")) {
+                    return@update current
+                }
+                val choices = state.legalChoices(prompt.player).commands
+                val command =
+                    when {
+                        "stabilize cash" in choices -> "stabilize cash"
+                        "pass" in choices -> "pass"
+                        else -> choices.first()
+                    }
+                current = service.driver.submit(current, prompt.player, command)
+            }
+            error("The fixture must reach the human's expansion activity.")
+        }
+    }
 
     fun prepareFirstTurn() {
         service.store.update(game.gameId) { initial ->

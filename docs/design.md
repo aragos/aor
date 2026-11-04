@@ -149,10 +149,13 @@ uncertain responses without repeating decisions. Accepted sealed amounts remain 
 advance public revision until the ordinary batch reveal. Public snapshots exclude runner identity,
 lease deadlines, seeds, bot hands and operation receipts.
 
-Only the creator can host, pause, resume or explicitly take over a runner. History edits and prefix
-rewinds pause bots and rotate their epoch, preventing stale or renewed workers from recreating undone
-play without explicit resume. Completion and closure stop new bot work. Creator abandonment consent
-also records a separate agreement for each bot; all other human seats still need their own consent.
+Only the creator can host, pause, resume or explicitly take over a runner. Regular-turn undo and
+history edits preserve the runner and any explicit pause: their own-action scope cannot cross another
+seat's action or a recorded outcome. The new revision rejects stale bot work, and the runner fetches a
+fresh decision automatically. Other history edits and prefix rewinds pause bots and rotate their epoch,
+preventing stale or renewed workers from recreating undone play without explicit resume. Completion
+and closure stop new bot work. Creator abandonment consent also records a separate agreement for each
+bot; all other human seats still need their own consent.
 
 The browser host is trusted with bot information and execution. A Web Worker isolates computation
 from rendering, not secrets from its host. Competitive trusted execution and fully local authority
