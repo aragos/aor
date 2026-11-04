@@ -998,6 +998,9 @@ continued play; they are not silently converted to different movement rules.
 The further 2026-11-02 correction adds Chester–Portsmouth as a direct coastal-water connection
 in catalog 15 on both maps. Cornwall, Chester and Portsmouth each border the other two by coast;
 their existing land connections remain. Catalog-14 games also retain their recorded topology.
+On 2026-11-04 the user confirmed that Portsmouth and York share a land border on the standard
+map. Catalog 16 includes this border; the European map retains its existing topology. Existing
+catalog-15 games retain their recorded topology and matching drawings for replay and continued play.
 On the standard board, Athens and Crete retain their shared coastal border. On 2026-10-27 the user corrected the sea
 transcription: the Aegean and Central Mediterranean are separate seas, both in Area VIII. Crete
 adjoins the Aegean, Central Mediterranean and Eastern Mediterranean. This supersedes the earlier

@@ -104,6 +104,10 @@ for neighbor in ["wales", "chester", "portsmouth"]:
 assert land["cornwall"].boundary.buffer(0.03).intersection(land["portsmouth"].boundary).length > 20, (
     "Portsmouth must remain Cornwall's only land neighbor."
 )
+if ("portsmouth", "york") in pairs("land"):
+    assert land["portsmouth"].boundary.buffer(0.03).intersection(land["york"].boundary).length > 20, (
+        "Portsmouth and York must share a visible land border on the standard map."
+    )
 bristol_channel = box(680, 575, 765, 655)
 for first, second in [
     ("cornwall", "chester"),

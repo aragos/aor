@@ -1,7 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import type {ApiError, Snapshot, RewindTarget, TokenPurchaseQuoteResponse} from './api';
-import {PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
+import {LabelMessage, PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label, purchasePassLabel} from './labels';
 import {t} from './messages';
 import {DecisionActions, PlanningActions} from './DecisionActions';
@@ -187,7 +187,12 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         : t('history.undo');
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
-    const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
+    const competitionProvince = snapshot.game.activity?.competitionProvince;
+    const decisionTitle = prompt === 'cathedral' && competitionProvince
+        ? <LabelMessage text={t('table.prompt.cathedralProvince')}
+            values={{province: <ProvinceLabel snapshot={snapshot} id={competitionProvince}/>}}/>
+        : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
+    const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : decisionTitle;
     const tools = <div className="table-tools">
         <details className="table-configuration"><summary>{t('table.configuration')}</summary>
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}>

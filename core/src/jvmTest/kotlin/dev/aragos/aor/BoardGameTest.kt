@@ -512,6 +512,35 @@ class BoardGameTest {
     }
 
     @Test
+    fun aDefendersCathedralViewNamesTheContestedProvinceForEveryViewer() {
+        val state =
+            expansion(
+                BoardState().placeMarker(id("florence"), p2).board,
+                advances = mapOf(p2 to setOf(AdvanceId.CATHEDRAL)),
+            )
+
+        val pending = state.act("attack florence")
+
+        val views = listOf(pending.publicView()) + listOf(p1, p2, p3).map(pending::viewForPlayer)
+        assertThat(views.map { view -> view.activity?.competitionProvince })
+            .containsExactly(id("florence"), id("florence"), id("florence"), id("florence"))
+    }
+
+    @Test
+    fun aCompletedCathedralResponseClearsTheContestedProvince() {
+        val pending =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p2 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        val defended = pending.act("cathedral", p2)
+
+        assertThat(defended.viewForPlayer(p2).activity?.competitionProvince).isNull()
+    }
+
+    @Test
     fun aDefendersCathedralConsumesThePerOpponentUseAndReturnsTheAttackersTokens() {
         val pending =
             expansion(

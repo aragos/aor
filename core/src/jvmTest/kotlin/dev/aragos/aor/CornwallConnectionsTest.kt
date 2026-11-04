@@ -80,7 +80,7 @@ class CornwallConnectionsTest {
     @Test
     fun catalog13RetainsEveryPreviousMapFactForReplayAndContinuedPlay() {
         for (map in MapRule.entries) {
-            val current = CatalogConfiguration(6, RuleOptions(map = map)).map
+            val current = CatalogVersion.CATALOG_15.mapDefinition(map)
             val legacy = CatalogVersion.CATALOG_13.mapDefinition(map)
 
             assertThat(legacy)
@@ -104,7 +104,7 @@ class CornwallConnectionsTest {
     @Test
     fun catalog14RetainsEveryPreviousMapFactForReplayAndContinuedPlay() {
         for (map in MapRule.entries) {
-            val current = CatalogConfiguration(6, RuleOptions(map = map)).map
+            val current = CatalogVersion.CATALOG_15.mapDefinition(map)
 
             assertThat(CatalogVersion.CATALOG_14.mapDefinition(map))
                 .isEqualTo(
@@ -143,7 +143,7 @@ class CornwallConnectionsTest {
         map: MapRule,
         base: String,
         ships: ShippingCapability = ShippingCapability.NONE,
-        version: CatalogVersion = CatalogVersion.CATALOG_15,
+        version: CatalogVersion = CatalogVersion.CATALOG_16,
     ): BoardRulesContext =
         BoardRulesContext(
             configuration = CatalogConfiguration(6, RuleOptions(map = map), version),

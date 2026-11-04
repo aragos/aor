@@ -13,7 +13,12 @@ export type QuotePlan = (actions: PlannedAction[]) => Promise<PlanningQuote>;
 
 /** Local drafts follow the phase and owner, not polling revisions or object inspection. */
 export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?: QuotePlan) {
-    const [open, setOpen] = useState(false);
+    const [editing, setOpen] = useState(false);
+    const saved = snapshot.planning?.saved;
+    const acting = snapshot.viewerId !== null &&
+        (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
+    const available = !!snapshot.planning?.available && (!acting || !!saved);
+    const open = editing && available;
     const [actions, setActions] = useState<PlannedAction[]>([]);
     const [quoted, setQuoted] = useState<{key: string; value: PlanningQuote} | null>(null);
     const [error, setError] = useState('');
@@ -23,7 +28,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
     request.current = quote;
     const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.status}:${snapshot.game.turnNumber}:${snapshot.game.stage}:${snapshot.undo?.editRevision}`;
     useEffect(() => {setOpen(false); setActions([]); setQuoted(null); setError(''); setBaseVersion(null); setSaving(false);}, [scope]);
-    useEffect(() => {if (!snapshot.planning?.available) setOpen(false);}, [snapshot.planning?.available]);
+    useEffect(() => {if (!available) setOpen(false);}, [available]);
     const key = JSON.stringify([snapshot.revision, actions]);
     useEffect(() => {
         if (!open || !request.current || !snapshot.planning?.available) return;
@@ -36,7 +41,6 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
         return () => {active = false; clearTimeout(timer);};
     }, [actions, key, open, snapshot.planning?.available]);
     const preview = quoted?.key === key && quoted.value.revision === snapshot.revision ? quoted.value : null;
-    const saved = snapshot.planning?.saved;
     const dirty = JSON.stringify(actions) !== JSON.stringify(saved?.actions ?? []);
     async function edit() {
         let view = snapshot.planning;
@@ -74,7 +78,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
     return {open, actions, preview, error, dirty, effective, edit, operate, append,
         conflict: open && baseVersion !== (snapshot.planning?.version ?? null) && !saving,
         close: () => setOpen(false), removeFrom: (index: number) => setActions(current => current.slice(0, index)),
-        loading: open && !preview, supported: !!write && !!quote && !!snapshot.planning?.available};
+        loading: open && !preview, supported: !!write && !!quote && available};
 }
 
 function actionName(action: PlannedAction, snapshot: Snapshot): string {

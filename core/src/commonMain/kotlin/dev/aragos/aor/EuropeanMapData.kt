@@ -49,6 +49,7 @@ object EuropeanMapData {
             removeConnections {
                 sea(SeaArea.EASTERN_MEDITERRANEAN, "crete", "libya", "barca")
                 land(from = "st-malo", "bordeaux")
+                land("york", "portsmouth")
             }
             addConnections {
                 land(from = "london", "chester")

@@ -6,7 +6,7 @@ export async function checkMapPresentation(page, web) {
     for (const map of ['standard', 'european']) {
         const game = await createGame(6, {options: {map}});
         const snapshot = await game.snapshot(game.links[0]);
-        assert.equal(snapshot.game.catalog.dataVersion, 'ah1996-catalog-15', 'New games use the complete Bristol Channel coastal connections');
+        assert.equal(snapshot.game.catalog.dataVersion, 'ah1996-catalog-16', 'New games use the corrected Portsmouth–York land border on the standard map');
         const stone = snapshot.game.catalog.provinces.find(province => province.commodities.includes('STONE'));
         const timber = snapshot.game.catalog.provinces.find(province => province.commodities.includes('TIMBER'));
         for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
@@ -16,7 +16,7 @@ export async function checkMapPresentation(page, web) {
             await page.send('Page.bringToFront');
             await page.wait(`performance.timeOrigin !== ${previousDocument} && typeof window.setMapSnapshot === 'function'`, 'new map presentation harness');
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
-            await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:${map.toUpperCase()}"] [data-support="cagliari genoa"]')`, 'Cagliari support paths');
+            await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-16:${map.toUpperCase()}"] [data-support="cagliari genoa"]')`, 'Cagliari support paths');
             assert.equal(await page.evaluate(`document.querySelector('.table-configuration').textContent
                 .includes('${map === 'standard' ? 'Original map' : 'European map'}')`), true,
                 'Game options name the selected board');
@@ -184,10 +184,13 @@ export async function checkMapPresentation(page, web) {
                 }
             };
             await assertLigurianJunction();
+            const yorkPath = await page.evaluate(`document.querySelector('[data-map-province="york"] .province-shape').getAttribute('d')`);
             const cornwallPath = await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`);
             if (map === 'standard') {
+                const legacyLandBorders = snapshot.game.catalog.landBorders.filter(edge =>
+                    !([edge.first, edge.second].includes('portsmouth') && [edge.first, edge.second].includes('york')));
                 const legacyCatalog = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-13',
-                    landBorders: [...snapshot.game.catalog.landBorders, {first: 'cornwall', second: 'wales'}],
+                    landBorders: [...legacyLandBorders, {first: 'cornwall', second: 'wales'}],
                     coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
                         !(['cornwall', 'portsmouth'].some(province => [edge.first, edge.second].includes(province)) &&
                             [edge.first, edge.second].includes('chester')))};
@@ -197,7 +200,7 @@ export async function checkMapPresentation(page, web) {
                 await assertLigurianJunction();
                 assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                     cornwallPath, 'Existing games retain the drawing matching their recorded topology');
-                const catalog14 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-14',
+                const catalog14 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-14', landBorders: legacyLandBorders,
                     coastalConnections: snapshot.game.catalog.coastalConnections.filter(edge =>
                         !([edge.first, edge.second].includes('chester') && [edge.first, edge.second].includes('portsmouth')))};
                 await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1003,
@@ -214,6 +217,13 @@ export async function checkMapPresentation(page, web) {
                 }
                 assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                     cornwallPath, 'Catalog-14 saves retain their narrower Bristol Channel');
+                const catalog15 = {...snapshot.game.catalog, dataVersion: 'ah1996-catalog-15', landBorders: legacyLandBorders};
+                await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1005,
+                    game: {...snapshot.game, catalog: catalog15}})})`);
+                await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:STANDARD"] .world-map')`, 'Saved catalog-15 drawing');
+                await assertLigurianJunction();
+                assert.notEqual(await page.evaluate(`document.querySelector('[data-map-province="york"] .province-shape').getAttribute('d')`),
+                    yorkPath, 'Catalog-15 saves retain their recorded Portsmouth–York separation');
             } else {
                 for (const version of [13, 14]) {
                     await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot,
@@ -233,7 +243,7 @@ export async function checkMapPresentation(page, web) {
                 }
             }
             await page.evaluate(`window.setMapSnapshot(${JSON.stringify({...snapshot, revision: snapshot.revision + 1004})})`);
-            await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:${map.toUpperCase()}"] .world-map')`, 'Current catalog drawing');
+            await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-16:${map.toUpperCase()}"] .world-map')`, 'Current catalog drawing');
             assert.equal(await page.evaluate(`document.querySelector('[data-map-province="cornwall"] .province-shape').getAttribute('d')`),
                 cornwallPath, 'Returning to a current game restores the corrected water channel');
         }

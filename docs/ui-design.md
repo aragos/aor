@@ -28,6 +28,7 @@ mechanics and [map design](map-design.md) owns spatial rendering.
   with their objects. Avoid parallel inspectors, repeated panels and rule walkthroughs in Help.
 - Show the actor, question, relevant resources and one waiting status beside the action. Open the
   relevant workspace once per decision. Interruptions name the responder and resumed activity.
+  Cathedral interruptions identify the contested province beside the decision title.
   Keep confirmation reachable while the review scrolls; retain map/hand space on narrow screens.
   On phones, let the action area collapse to its title and toggle, returning space to the active
   workspace without discarding drafts. Polling and navigation preserve this choice; a new decision
@@ -75,9 +76,10 @@ Withdrawal retains an unsaved local amount, without restoring a saved submission
 Activity is one bounded log, in its workspace or pinned left block on wide screens. Pinning uses a
 labeled button above the log so its destination is visible without covering entries. Keep entry-time
 identities, causes, dice and resource endpoints stable as history grows. Group revealed token bids
-without changing canonical history. A player's submitted competition result may open a dismissible
-notice; polling someone else's result must not. Expansion notices expire with their expansion,
-while history remains. Final scores use a dismissible/reopenable popup and leave board inspection.
+without changing canonical history. Pair the two shortage/surplus rolls in one activity entry,
+retaining each roll's dice, adjustments and consequences. A player's submitted competition result
+may open a dismissible notice; polling someone else's result must not. Expansion notices expire with
+their expansion, while history remains. Final scores use a dismissible/reopenable popup and leave board inspection.
 
 The favicon reflects required player actions independently of rendering. Hidden game tabs poll every
 five seconds for two minutes after engagement/changed state, then every 30 seconds while idle;
@@ -87,6 +89,8 @@ filter/page. Keep one read/timer and refresh after visibility, resume or reconne
 ## Review sensitive operations
 
 Private plans distinguish unsaved input, saved-for-review work and explicit offline authorization.
+Offer new plans while waiting for a turn; turn arrival closes an unsaved preview and restores live
+controls. Existing saved plans remain available for review and explicit execution on the owner's turn.
 Show exact consequences, assumptions and cancellation. Saving never executes; draws or changed
 consequences pause for review. Editing confirms disarm. See [architecture](design.md#private-plans).
 

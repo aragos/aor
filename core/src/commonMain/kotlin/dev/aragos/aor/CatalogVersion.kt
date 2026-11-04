@@ -4,13 +4,15 @@ package dev.aragos.aor
 enum class CatalogVersion(val wireValue: String) {
     CATALOG_13("ah1996-catalog-13"),
     CATALOG_14("ah1996-catalog-14"),
-    CATALOG_15(DATA_VERSION);
+    CATALOG_15("ah1996-catalog-15"),
+    CATALOG_16(DATA_VERSION);
 
     fun mapDefinition(map: MapRule): BoardMapDefinition =
         when (this) {
             CATALOG_13 -> catalog13Maps[map] ?: error("Missing catalog-13 map: $map.")
             CATALOG_14 -> catalog14Maps[map] ?: error("Missing catalog-14 map: $map.")
-            CATALOG_15 -> map.definition
+            CATALOG_15 -> catalog15Maps[map] ?: error("Missing catalog-15 map: $map.")
+            CATALOG_16 -> map.definition
         }
 
     companion object {
@@ -19,9 +21,22 @@ enum class CatalogVersion(val wireValue: String) {
                 "Unsupported data version: $value."
             }
 
+        private val catalog15Maps: Map<MapRule, BoardMapDefinition> by lazy {
+            MapRule.entries.associateWith { map ->
+                when (map) {
+                    MapRule.STANDARD ->
+                        boardMap(map.definition) {
+                            removeConnections { land("york", "portsmouth") }
+                        }
+                    MapRule.EUROPEAN -> map.definition
+                }
+            }
+        }
+
         private val catalog14Maps: Map<MapRule, BoardMapDefinition> by lazy {
             MapRule.entries.associateWith { map ->
-                boardMap(map.definition) {
+                val previous = catalog15Maps[map] ?: error("Missing catalog-15 map: $map.")
+                boardMap(previous) {
                     removeConnections { coast("chester", "portsmouth") }
                 }
             }

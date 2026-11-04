@@ -129,11 +129,11 @@ python3 scripts/game-admin.py --url https://play.example.com --token-file /tmp/a
 
 ## Saved-game compatibility
 
-Current games use file format **7**, rules `ah1996-three-epoch-4` and data `ah1996-catalog-15`.
+Current games use file format **7**, rules `ah1996-three-epoch-4` and data `ah1996-catalog-16`.
 [CatalogVersion.kt](../core/src/commonMain/kotlin/dev/aragos/aor/CatalogVersion.kt) also supports
-catalogs 13 and 14 without rewriting their topology. Catalog 14 corrected Cornwall's land/coast
-links; 15 added Chester–Portsmouth coastal contact. Standard legacy drawings remain selected by
-recorded identity. Unused old European drawings are retired; unknown combinations never substitute
+catalogs 13–15 without rewriting their topology. Catalog 14 corrected Cornwall's land/coast
+links; 15 added Chester–Portsmouth coastal contact; 16 adds the standard Portsmouth–York land
+border. Standard legacy drawings remain selected by recorded identity. Unused old European drawings are retired; unknown combinations never substitute
 current geometry.
 
 Changing an exported header does not migrate a catalog. A dedicated validated upgrade must preserve

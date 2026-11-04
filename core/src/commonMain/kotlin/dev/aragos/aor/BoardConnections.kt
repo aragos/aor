@@ -141,7 +141,7 @@ object BoardConnectionData {
             land("novgorod", "smolensk")
             land("smolensk", "kiev")
             land("edinburgh", "york", "chester")
-            land("york", "chester", "london")
+            land("york", "chester", "london", "portsmouth")
             land("chester", "wales", "portsmouth")
             land("cornwall", "portsmouth")
             land("portsmouth", "london")

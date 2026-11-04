@@ -35,7 +35,7 @@ class CatalogCompatibilityTest {
         for (map in MapRule.entries) {
             val directory = Files.createTempDirectory("aor-catalog13-")
             try {
-                val before = legacyCornwallGame(map)
+                val before = legacyExpansionGame(map)
                 FileGameStore(directory).create(before)
                 val reopened = FileGameStore(directory)
 
@@ -89,7 +89,7 @@ class CatalogCompatibilityTest {
             val directory = Files.createTempDirectory("aor-catalog14-")
             try {
                 val before =
-                    legacyCornwallGame(
+                    legacyExpansionGame(
                         map,
                         version = CatalogVersion.CATALOG_14,
                         route = listOf("portsmouth", "cornwall"),
@@ -118,6 +118,41 @@ class CatalogCompatibilityTest {
         }
     }
 
+    @Test
+    fun catalog15SavesReplayAndContinueWithTheirRecordedYorkPortsmouthSeparation() {
+        val directory = Files.createTempDirectory("aor-catalog15-")
+        try {
+            val before =
+                legacyExpansionGame(
+                        MapRule.STANDARD,
+                        version = CatalogVersion.CATALOG_15,
+                        route = listOf("york", "chester", "portsmouth"),
+                        goal = ProvinceId("portsmouth"),
+                    )
+                    .copy(name = GameName("Existing standard table"))
+            FileGameStore(directory).create(before)
+            val reopened = FileGameStore(directory)
+
+            val restored = reopened.read(before.id)
+            val continued = GameDriver(FixedRandom()).submit(restored, owner, "pass")
+            reopened.update(before.id) { continued }
+
+            assertThat(restored).isEqualTo(before)
+            assertThat(restored.state()).isEqualTo(before.state())
+            assertThat(restored.state().board.pieces[ProvinceId("portsmouth")]).isNotNull()
+            assertThat(restored.state().catalog.landBorders)
+                .doesNotContain(ProvinceConnection.of(ProvinceId("york"), ProvinceId("portsmouth")))
+            assertThat(continued.effectiveEntries().take(before.effectiveEntries().size))
+                .isEqualTo(before.effectiveEntries())
+            assertThat(reopened.read(before.id).header).isEqualTo(before.header)
+            assertThat(reopened.read(before.id).name).isEqualTo(before.name)
+            assertThat(reopened.read(before.id).credentials).isEqualTo(before.credentials)
+            assertThat(reopened.read(before.id).state()).isEqualTo(continued.state())
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
     private fun legacyGame(
         map: MapRule,
         version: CatalogVersion = CatalogVersion.CATALOG_13,
@@ -137,17 +172,18 @@ class CatalogCompatibilityTest {
             )
     }
 
-    /** Follow recorded land connections to Cornwall without ships. */
-    private fun legacyCornwallGame(
+    /** Follow recorded land connections to [goal] without ships. */
+    private fun legacyExpansionGame(
         map: MapRule,
         version: CatalogVersion = CatalogVersion.CATALOG_13,
         route: List<String> = listOf("york", "chester", "wales", "cornwall"),
+        goal: ProvinceId = ProvinceId("cornwall"),
     ): StoredGame {
         val driver = GameDriver(FixedRandom())
         var game = legacyGame(map, version)
         for (step in 1..400) {
             val state = game.state()
-            if (state.board.pieces[ProvinceId("cornwall")] != null) return game
+            if (state.board.pieces[goal] != null) return game
             val actor =
                 when (val prompt = state.prompts().single()) {
                     is Prompt.SinglePlayer -> prompt.player
@@ -172,6 +208,6 @@ class CatalogCompatibilityTest {
                 }
             game = driver.submit(game, actor, command)
         }
-        error("The legacy fixture must reach Cornwall through its recorded land connections.")
+        error("The legacy fixture must reach $goal through its recorded land connections.")
     }
 }

@@ -7,6 +7,7 @@ import {Commodity, Emblem} from './TablePanels';
 import {CapitalLabel, LabelMessage} from './IdentityLabel';
 import {HelpLink} from './HelpLink';
 import {MiseryBox} from './MiseryBox';
+import {activityRows} from './activityRows';
 
 function eventPlayer(event: HistoryEventView, id: string) {
     return event.participants?.find(player => player.id === id) ??
@@ -64,8 +65,9 @@ function CapitalTieConsequence({event}: {event: HistoryEventView}) {
     </span>;
 }
 
-function EventContent({event, track, onInspectCard, cardInspections}: {
+function EventContent({event, track, onInspectCard, cardInspections, marketRoll = false}: {
     cardInspections?: Snapshot['game']['cardInspections'];
+    marketRoll?: boolean;
     event: HistoryEventView; track: Snapshot['game']['catalog']; onInspectCard?: (cardId: string) => void;
 }) {
     const actor = event.actor ? eventPlayer(event, event.actor) : null;
@@ -77,7 +79,7 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
     });
     return <span className="activity-content">
         {actor && <span className="activity-actor"><CapitalLabel capital={actor.capital}><strong>{eventName(event, actor.id)}</strong></CapitalLabel></span>}
-        <span>{t(`activity.${event.kind}`)}</span>
+        {!marketRoll && <span>{t(`activity.${event.kind}`)}</span>}
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
         {event.war && <strong>{warHeading(event, event.war)}</strong>}
         {event.provinces.map(province => <span className="event-entity" key={province}><CapitalLabel capital={track?.provinces.find(candidate => candidate.id === province)?.capital ?? null}>{provinceName(province)}</CapitalLabel></span>)}
@@ -88,7 +90,7 @@ function EventContent({event, track, onInspectCard, cardInspections}: {
         {event.protectionCash != null && <span className="event-detail">{t('activity.protectionCash')}: <strong>${event.protectionCash}</strong></span>}
         {event.leaderRebate != null && <span className="event-detail">{t('activity.leaderRebate')}: <strong>+${event.leaderRebate}</strong></span>}
         {target && <span className="activity-actor">→ <CapitalLabel capital={target.capital}>{eventName(event, target.id)}</CapitalLabel></span>}
-        {event.detail && <span className="event-detail">{label(event.detail)}</span>}
+        {event.detail && !marketRoll && <span className="event-detail">{label(event.detail)}</span>}
         {event.drawReason && <span className="event-detail">{t(`activity.drawReason.${event.drawReason}`)}</span>}
         {event.dice.map((die, index) => {
             const player = die.player ? eventPlayer(event, die.player) : null;
@@ -191,7 +193,7 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
     snapshot: Snapshot; onInspectCard: (cardId: string) => void;
     active: boolean; pinned: boolean; canPin: boolean; onTogglePin: () => void;
 }) {
-    const events = snapshot.events.filter(event => event.kind !== 'PASS');
+    const rows = activityRows(snapshot.events).filter(row => row[0].kind !== 'PASS');
     const pinLabel = t(pinned ? 'table.unpinActivity' : 'table.pinActivity');
     return <section id="workspace-activity" className="table-activity" hidden={!active && !pinned}
         role={pinned ? 'region' : 'tabpanel'} aria-label={pinned ? t('table.activity') : undefined}
@@ -206,10 +208,15 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
             <span>{pinLabel}</span>
         </button>}
         <div className="activity-body">
-            {events.length === 0 && <p>{t('table.noActivity')}</p>}
-            <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...events].reverse().map(event => <li key={event.id} data-event-id={event.id}>
+            {rows.length === 0 && <p>{t('table.noActivity')}</p>}
+            <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...rows].reverse().map(([event, ...following]) => <li key={event.id} data-event-id={event.id}>
                 <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
-                <EventContent event={event} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections} onInspectCard={onInspectCard}/>
+                {event.marketRoll ? <div className="market-roll-round">
+                    <span>{t('activity.marketAdjustments')}</span>
+                    {[event, ...following].map(roll => <div key={roll.id} data-market-roll-id={roll.id}>
+                        <EventContent event={roll} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections} onInspectCard={onInspectCard} marketRoll/>
+                    </div>)}
+                </div> : <EventContent event={event} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections} onInspectCard={onInspectCard}/>}
             </li>)}</ol>
         </div>
     </section>;

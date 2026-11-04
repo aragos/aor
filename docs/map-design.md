@@ -70,8 +70,9 @@ catalog compatibility; preserve old saves with their recorded topology and match
 
 [BoardMap.tsx](../web/src/map/BoardMap.tsx) renders checked-in JSON selected by
 [geometryAssets.ts](../web/src/map/geometryAssets.ts). Current assets are `boardGeometry.json` and
-`europeanBoardGeometry.json`; supported older standard saves use `catalog13BoardGeometry.json` or
-`catalog14BoardGeometry.json`. Unsupported combinations show an unavailable map, never a substituted
+`europeanBoardGeometry.json`; supported older standard saves use `catalog13BoardGeometry.json`,
+`catalog14BoardGeometry.json` or `catalog15BoardGeometry.json`. Catalogs 15 and 16 share the unchanged
+European drawing. Unsupported combinations show an unavailable map, never a substituted
 topology. Assets cache across polling and failed downloads can retry without sending actions.
 
 Author anchors in [map_geography.py](../web/scripts/map_geography.py). The offline coastline subset,

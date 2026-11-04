@@ -199,7 +199,7 @@ export interface Snapshot {
             civilWarLossPending: boolean} | null;
         civilWarLoss?: {player: string; cashCost: number; tokenCost: number; cashAfter: number; poolAfter: number} | null;
         warCession: {winner: string; requiredCount: number; eligibleProvinces: string[]; overseasCapacity: number} | null;
-        activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number} | null;
+        activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number; competitionProvince?: string | null} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
         advanceOffers: AdvanceOfferView[];
         patronageOffers?: {command: string; payer: string; recipient: string; cost: number; payerCashAfter: number; recipientCashAfter: number}[];

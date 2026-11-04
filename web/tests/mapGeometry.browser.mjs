@@ -48,7 +48,7 @@ export async function checkMapGeometry(page, web) {
     await page.click('Try again');
     await page.wait(`window.geometryPending.length === 2`, 'map retry requests the same drawing');
     await page.evaluate(`window.releaseGeometry(1)`);
-    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:STANDARD"] .world-map')`, 'retried standard drawing');
+    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-16:STANDARD"] .world-map')`, 'retried standard drawing');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7');
     assert.equal(await page.evaluate('window.geometryRequests.every(url => url.endsWith("/boardGeometry.json"))'), true, 'A standard game downloads only its drawing');
     await page.evaluate(`document.querySelector('button[aria-label="Zoom in"]').click()`);
@@ -65,10 +65,10 @@ export async function checkMapGeometry(page, web) {
     assert.equal(await page.evaluate(`document.querySelector('.world-map')`), null, 'A new catalog never displays the previous drawing while loading');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Map loading retains the independent action draft');
     await page.evaluate(`window.releaseGeometry(2)`);
-    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:EUROPEAN"] .world-map')`, 'European drawing');
+    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-16:EUROPEAN"] .world-map')`, 'European drawing');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="smolensk"]')`), false);
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify(standard)})`);
-    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:STANDARD"] .world-map')`, 'cached standard drawing');
+    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-16:STANDARD"] .world-map')`, 'cached standard drawing');
     assert.equal(await page.evaluate('window.geometryRequests.length'), 3, 'Returning to a loaded drawing uses the cache');
 
     await harness(page, web);
@@ -77,11 +77,11 @@ export async function checkMapGeometry(page, web) {
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify(european)})`);
     await page.wait(`window.geometryPending.length === 2`, 'European request replaces a delayed standard load');
     await page.evaluate(`window.releaseGeometry(1)`);
-    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-15:EUROPEAN"] .world-map')`, 'newer map request finishes first');
+    await page.wait(`document.querySelector('[data-map-geometry="ah1996-catalog-16:EUROPEAN"] .world-map')`, 'newer map request finishes first');
     await page.evaluate(`window.originalEuropeanMap = document.querySelector('.world-map'); window.releaseGeometry(0)`);
     await page.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
     assert.equal(await page.evaluate(`window.originalEuropeanMap === document.querySelector('.world-map')`), true);
-    assert.equal(await page.evaluate(`document.querySelector('[data-map-geometry]').dataset.mapGeometry`), 'ah1996-catalog-15:EUROPEAN', 'A late drawing cannot replace the current map');
+    assert.equal(await page.evaluate(`document.querySelector('[data-map-geometry]').dataset.mapGeometry`), 'ah1996-catalog-16:EUROPEAN', 'A late drawing cannot replace the current map');
     console.log('Passed: only the selected drawing loads, StrictMode coalesces requests, failure/retry and polling preserve drafts, and map switches reject stale completions.');
 }
 

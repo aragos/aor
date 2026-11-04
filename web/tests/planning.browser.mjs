@@ -7,7 +7,7 @@ import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkBottomHand} from './bottomHand.browser.mjs';
 import {checkTable} from './table.browser.mjs';
 
-export async function checkParallelPlanning(page, web) {
+async function purchaseGame() {
     const game = await createGame(3, {undoPolicy: 'competitive'});
     for (let seat = 0; seat < 3; seat++) await game.send(game.links[seat], `bid-capital ${3 - seat}`);
     for (let step = 0; step < 30; step++) {
@@ -23,6 +23,44 @@ export async function checkParallelPlanning(page, web) {
         assert(command, `Expected setup command at ${own.game.stage}`);
         await game.send(actor, command);
     }
+    return game;
+}
+
+async function checkPlanningTurnArrival(page, web) {
+    const game = await purchaseGame();
+    async function visit(seat) {
+        const previous = await page.evaluate('performance.timeOrigin');
+        const url = new URL(game.links[seat].path, web);
+        url.searchParams.set('turn-arrival-check', String(seat));
+        await page.send('Page.navigate', {url: url.href});
+        await page.wait(`performance.timeOrigin !== ${previous} && document.querySelector('.game-table')`,
+            'turn arrival player view');
+    }
+    await visit(0);
+    await page.wait(`document.querySelector('.decision-status.is-ready')`, 'active purchase');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-planner')`), null,
+        'The active player is not offered a new plan');
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-active-purchase-desktop.png'), 1280, 900);
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-active-purchase-phone.png'), 390, 844, true);
+    assert.equal(await page.evaluate(`document.querySelector('.activity-planner')`), null,
+        'The active player is not offered a new plan on a phone');
+    assert(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`));
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
+    await visit(1);
+    await page.wait(`document.querySelector('.activity-planner')`, 'waiting player can prepare');
+    await page.click('Prepare a plan');
+    await page.wait(`document.querySelector('.pass-action')?.textContent.includes('Add to plan')`, 'unsaved preview');
+    for (const command of ['pass', 'pass', 'stabilize cash']) await game.send(game.links[0], command);
+    await page.wait(`document.querySelector('.decision-status.is-ready') && !document.querySelector('.activity-planner')`,
+        'turn arrival closes the unsaved preview');
+    assert.doesNotMatch(await page.evaluate(`document.querySelector('.pass-action').textContent`), /Add to plan/,
+        'Turn arrival restores live purchase controls');
+    assert.equal((await game.snapshot(game.links[1])).planning.saved, null,
+        'Closing a browser preview does not save or execute it');
+}
+
+export async function checkParallelPlanning(page, web) {
+    const game = await purchaseGame();
     const initial = await game.snapshot(game.links[1]);
     assert.equal(initial.game.stage, 'PURCHASE');
     let navigation = 0;
@@ -209,6 +247,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     const web = process.env.MAP_WEB_URL;
     const page = await open(web);
     try {
+        await checkPlanningTurnArrival(page, web);
         await checkParallelPlanning(page, web);
         const game = await createGame(6);
         for (let seat = 0; seat < 6; seat++) await game.send(game.links[seat], `bid-capital ${6 - seat}`);

@@ -495,7 +495,7 @@ data class PublicCatalog(
         fun forPlayers(
             playerCount: Int,
             rules: RuleOptions = RuleOptions(),
-            version: CatalogVersion = CatalogVersion.CATALOG_15,
+            version: CatalogVersion = CatalogVersion.CATALOG_16,
         ): PublicCatalog {
             val configuration = CatalogConfiguration(playerCount, rules, version)
             return PublicCatalog(
@@ -539,6 +539,8 @@ data class ActivityView(
     val startEntry: Int,
     /** Game-local entry ordinal identifying this decision, including nested replacements. */
     val decisionEntry: Int,
+    /** Public contested province while a Cathedral response or competition roll is pending. */
+    val competitionProvince: ProvinceId? = null,
 ) {
     companion object {
         internal fun from(state: GameState): ActivityView {
@@ -554,6 +556,11 @@ data class ActivityView(
                 if (state.stage == Stage.PURCHASE) state.flow.purchaseStep else null,
                 state.activityStart,
                 state.decisionStart,
+                when (val decision = state.flow.decisions.lastOrNull()) {
+                    is BoardDecision.CathedralChoice -> decision.plan.destination
+                    is BoardDecision.CompetitionDice -> decision.plan.destination
+                    else -> null
+                },
             )
         }
     }

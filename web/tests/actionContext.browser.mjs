@@ -32,9 +32,10 @@ export async function checkActionContext(page, web, baseline) {
     await page.evaluate(`document.querySelector('[data-map-province="rome"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}))`);
     await click('.primary-expansion');
     await page.wait(`window.mapCommands.at(-1) === 'attack rome'`, 'local attack sent');
-    await show({...fixture, game: {...fixture.game, activity: {...fixture.game.activity, choice: 'cathedral', decisionPlayer: other.id}},
+    await show({...fixture, game: {...fixture.game, activity: {...fixture.game.activity, choice: 'cathedral', decisionPlayer: other.id, competitionProvince: 'rome'}},
         prompt: {messageId: 'prompt.cathedral', players: [other.id]}, legalChoices: {commands: [], bidMax: null}});
     assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), false, 'Attack waits through the Cathedral response');
+    assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), 'Cathedral in Rome', 'The attacker sees which competition awaits a response');
     const result = {...event, id: 'local-result'};
     await show({...fixture, events: [event, result]});
     await page.wait(`document.querySelector('.competition-notice.lost')`, 'new local competition explicitly shown');
@@ -45,18 +46,27 @@ export async function checkActionContext(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'Remote competitions do not create an action notice');
 
     await show({...fixture, prompt: {messageId: 'prompt.cathedral', players: [viewer]}, legalChoices: {commands: ['cathedral', 'pass'], bidMax: null},
-        game: {...fixture.game, activity: {...fixture.game.activity, choice: 'cathedral', decisionPlayer: viewer}}});
+        game: {...fixture.game, activity: {...fixture.game.activity, actor: other.id, choice: 'cathedral', decisionPlayer: viewer, competitionProvince: 'venice'}}});
     assert.equal(await page.evaluate(`!!document.querySelector('.action-cash')`), false, 'Cathedral does not spend cash');
+    assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), 'Cathedral in Venice', 'The non-active defender sees the contested province beside their action');
+    assert.equal(await page.evaluate(`!!document.querySelector('#decision-title .identity-label svg')`), true, 'A contested capital retains its silhouette');
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-cathedral-desktop.png'), 1100, 900);
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-cathedral-phone.png'), 390, 844, true);
+    assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true, 'The Cathedral question fits a phone');
+    await show({...fixture});
+    assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), 'Cathedral in Venice', 'Polling retains the authoritative Cathedral target');
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1100, height: 900, deviceScaleFactor: 1, mobile: false});
     await click('.decision-actions .simple-action');
-    await show({...fixture, events: [...fixture.events, {...event, id: 'local-cathedral'}]});
+    await show({...fixture, events: [...fixture.events, {...event, id: 'local-cathedral', actor: other.id, provinces: ['venice']}]});
     await page.wait(`document.querySelector('.competition-notice')`, 'local Cathedral explicitly shows its result');
     await show({...fixture});
     assert.equal(await page.evaluate(`!!document.querySelector('.competition-notice')`), true, 'Polling retains a result during its expansion');
     const retainedResults = fixture.events;
     await show({...fixture, prompt: {messageId: 'prompt.purchase-advances', players: [other.id]},
         legalChoices: {commands: [], bidMax: null}, game: {...fixture.game, stage: 'PURCHASE',
-            activity: {...fixture.game.activity, choice: 'purchase-advances', decisionPlayer: other.id}}});
+            activity: {...fixture.game.activity, choice: 'purchase-advances', decisionPlayer: other.id, competitionProvince: null}}});
     await page.wait(`!document.querySelector('.competition-notice')`, 'Expansion end clears its competition result');
+    assert.doesNotMatch(await page.evaluate(`document.querySelector('#decision-title').textContent`), /Venice/, 'The next question does not retain the Cathedral target');
     assert.deepEqual(fixture.events, retainedResults, 'Clearing the popup retains every activity result');
     await show({...fixture});
     assert.equal(await page.evaluate(`document.querySelector('.competition-notice')`), null, 'Polling after expansion cannot restore the result');
