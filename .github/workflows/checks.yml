@@ -16,7 +16,8 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Allow cold compilation, the production image build and serial browser suites to finish.
+    timeout-minutes: 45
     outputs:
       commit: ${{ steps.revision.outputs.commit }}
     services:
