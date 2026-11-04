@@ -38,6 +38,20 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await page.wait(`document.querySelector('#tab-map[aria-selected="true"]')`, 'Expansion starts on its map');
     assert.equal(await page.evaluate(`document.querySelector('.workspace-side .table-activity, .activity-toggle, .activity-resizer')`), null,
         'Activity has no space or split controls in the action sidebar');
+    await viewport(390, 844, true);
+    await page.wait(`document.querySelector('.sheet-toggle')?.checkVisibility()`, 'Phone actions can collapse before any object is selected');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel').classList.contains('has-context')`), false);
+    assert.match(await page.evaluate(`document.querySelector('.sheet-toggle').textContent.trim()`), /Hide actions/);
+    assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-controls')`), 'decision-review decision-footer');
+    await click('.sheet-toggle');
+    await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="false"]')`, 'The whole phone action area collapses');
+    assert.match(await page.evaluate(`document.querySelector('.sheet-toggle').textContent.trim()`), /Show actions/);
+    assert.equal(await page.evaluate(`document.querySelector('.decision-scroll').checkVisibility()`), false, 'Collapsed actions hide the review');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions').checkVisibility()`), false, 'Collapsed actions hide all confirmation buttons');
+    await click('.sheet-toggle');
+    await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]')`, 'Phone actions reopen without object context');
+    await viewport(1280, 900, false);
+    await page.wait(`!document.querySelector('.sheet-toggle')?.checkVisibility()`, 'Desktop has the full action area');
     await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
     await page.wait(`document.querySelector('.primary-expansion:not([disabled])')`, 'Authoritative live placement draft');
     const draft = await page.evaluate(`document.querySelector('.primary-expansion').textContent`);
@@ -90,7 +104,13 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await page.evaluate(`document.querySelector('.activity-list').scrollTop=220`);
     await viewport(1440, 980, false);
     await page.wait(`document.querySelector('.activity-pin')?.checkVisibility()`, 'Wide screens offer activity pinning');
-    assert.equal(await page.evaluate(`document.querySelector('.activity-pin').getAttribute('aria-label')`), 'Pin activity to left');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-pin').getAttribute('aria-label')`), 'Pin to sidebar');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-pin').textContent.trim()`), 'Pin to sidebar', 'The pin control explains itself in visible text');
+    assert.equal(await page.evaluate(`(() => {
+        const button = document.querySelector('.activity-pin').getBoundingClientRect();
+        const list = document.querySelector('.activity-list').getBoundingClientRect();
+        return button.height >= 44 && button.bottom <= list.top;
+    })()`), true, 'The labeled sidebar control has its own touch-sized row above the log');
     await settle();
     const readingEntry = () => page.evaluate(`(() => {
         const list = document.querySelector('.activity-list');
@@ -112,7 +132,8 @@ export async function checkActivityWorkspace(page, web, baseline) {
     assert.equal(await readingEntry(), beforePin, 'Pinning retains the visible activity entry as text reflows');
     assert(await page.evaluate(`document.querySelector('.activity-list').scrollTop>0`), 'Pinning keeps the reader within the log');
     assert.equal(await selected(), 'true', 'Pinning retains the prepared placement');
-    assert.equal(await page.evaluate(`document.querySelector('.activity-pin').getAttribute('aria-label')`), 'Return activity to tab');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-pin').getAttribute('aria-label')`), 'Return to tab');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-pin').textContent.trim()`), 'Return to tab', 'The pinned log keeps a visible return label');
     await assertBottomHandVisible(page, 'Pinned activity');
     await poll();
     assert.equal(await page.evaluate(`document.querySelector('#tab-activity')`), null, 'Polling retains the left block');
@@ -128,8 +149,29 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await poll();
     assert.equal(await page.evaluate(`document.querySelector('#tab-activity').getAttribute('aria-selected')`), 'true', 'Narrow polling leaves Activity selected');
     if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-activity-phone.png'));
+    const expandedPhoneActions = await bounds('.workspace-side');
+    const expandedPhoneLog = await bounds('#workspace-activity');
+    await page.evaluate(`window.preparedPlacement=document.querySelector('.primary-expansion'); true`);
+    await click('.sheet-toggle');
+    await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="false"]')`, 'Phone reading can collapse a prepared placement');
+    await settle();
+    const collapsedPhoneActions = await bounds('.workspace-side');
+    const collapsedPhoneLog = await bounds('#workspace-activity');
+    assert(collapsedPhoneActions.height < expandedPhoneActions.height - 70, 'Collapsing releases action height');
+    assert(collapsedPhoneLog.height > expandedPhoneLog.height + 70, 'The active workspace receives the released height');
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion')===window.preparedPlacement`), true, 'Collapsing preserves the mounted placement draft');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-actions').checkVisibility()`), false);
+    await poll();
+    assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'false', 'Polling preserves collapsed actions');
+    await click('#tab-advances');
+    await page.wait(`document.querySelector('#workspace-advances').checkVisibility()`, 'Advances can use the expanded phone workspace');
+    assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-expanded')`), 'false', 'Workspace navigation preserves collapsed actions');
+    await click('#tab-activity');
+    if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-activity-phone-collapsed.png'));
     await viewport(1440, 980, false);
     await page.wait(`!document.querySelector('#tab-activity') && document.querySelector('.activity-pin')?.checkVisibility()`, 'Widening restores the preferred left block');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-scroll').checkVisibility() && document.querySelector('.decision-actions').checkVisibility()`), true, 'Desktop shows all actions even when phone actions were collapsed');
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), draft, 'Responsive collapse preserves the placement draft');
     await click('.activity-pin');
     await page.wait(`document.querySelector('#tab-activity[aria-selected="true"]')`, 'Unpinning returns directly to the Activity tab');
     assert.equal(await page.evaluate(`document.querySelector('.table-activity')===window.activityNode`), true, 'Tab and left block share one activity surface');
@@ -165,7 +207,15 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await click('#tab-map');
     await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
     assert.equal(await selected(), 'true', 'Explicitly selecting the same province restores its border');
-    console.log('Passed: Activity workspace and optional left block, real-offer draft preservation, scrolling, card inspection, polling, responsive fallback, keyboard navigation and accepted/rejected cleanup.');
+    await viewport(390, 844, true);
+    await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]')?.checkVisibility()`, 'Selecting a province reopens phone actions');
+    await click('.sheet-toggle');
+    fixture = {...fixture, game: {...fixture.game, activity: {...fixture.game.activity,
+        decisionEntry: fixture.game.activity.decisionEntry + 1}}};
+    await poll();
+    await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="true"]')`, 'A new decision reopens phone actions');
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion')`), null, 'A new decision also clears its obsolete placement draft');
+    console.log('Passed: Activity workspace and labeled sidebar control, mobile action collapse, real-offer draft preservation, scrolling, card inspection, polling, responsive fallback, keyboard navigation and accepted/rejected cleanup.');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

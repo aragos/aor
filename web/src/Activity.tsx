@@ -203,6 +203,7 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
                 <path d="M7 3v14"/>
                 <path d={pinned ? 'm11 7 3 3-3 3' : 'm14 7-3 3 3 3'}/>
             </svg>
+            <span>{pinLabel}</span>
         </button>}
         <div className="activity-body">
             {events.length === 0 && <p>{t('table.noActivity')}</p>}

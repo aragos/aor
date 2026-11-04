@@ -88,7 +88,7 @@ function actionName(action: PlannedAction, snapshot: Snapshot): string {
             const card = snapshot.game.hand.find(candidate => candidate.reference === argument);
             return `${t('action.discard')} · ${card ? t(card.definition.messageId) : t('plan.missingCard')}`;
         }
-        case 'stabilize': return t(`action.stabilize ${argument}`);
+        case 'stabilize': return t(`plan.stabilize ${argument}`);
         case 'relieve-misery': return `${t('action.relieveMisery')} · ${argument} ${t('controls.spaces')}`;
         case 'patronize': return `${t('action.patronize')} · ${t(`leader.${argument.toUpperCase().replace(/-/g, '_')}`)}`;
         default: return t(`action.${verb}`);

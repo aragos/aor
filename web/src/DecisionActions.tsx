@@ -30,7 +30,7 @@ export function DecisionActions({children, pass}: {children: ReactNode; pass?: R
     }, [target]);
     return <ActionTarget.Provider value={target}>
         {children}
-        <div className="decision-actions" role="group" aria-label={t('table.actions')}>
+        <div id="decision-footer" className="decision-actions" role="group" aria-label={t('table.actions')}>
             <div ref={setTarget} className="decision-action-target"/>
             {pass}
         </div>

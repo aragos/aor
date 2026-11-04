@@ -29,6 +29,9 @@ mechanics and [map design](map-design.md) owns spatial rendering.
 - Show the actor, question, relevant resources and one waiting status beside the action. Open the
   relevant workspace once per decision. Interruptions name the responder and resumed activity.
   Keep confirmation reachable while the review scrolls; retain map/hand space on narrow screens.
+  On phones, let the action area collapse to its title and toggle, returning space to the active
+  workspace without discarding drafts. Polling and navigation preserve this choice; a new decision
+  or object selection reopens the actions.
   Keep the decision title beside Undo above the status. Player summaries show the printed order box
   beside pool/submission status; the reference owns the full position-to-box mapping.
 - Show deterministic effects inline before commitment: prices, named discounts, cash/misery
@@ -69,7 +72,8 @@ releases the UI and reconciles an authorized snapshot; it never automatically re
 Distinguish browser drafts, server-saved private submissions and committed actions using owner receipts.
 Withdrawal retains an unsaved local amount, without restoring a saved submission.
 
-Activity is one bounded log, in its workspace or pinned left block on wide screens. Keep entry-time
+Activity is one bounded log, in its workspace or pinned left block on wide screens. Pinning uses a
+labeled button above the log so its destination is visible without covering entries. Keep entry-time
 identities, causes, dice and resource endpoints stable as history grows. Group revealed token bids
 without changing canonical history. A player's submitted competition result may open a dismissible
 notice; polling someone else's result must not. Expansion notices expire with their expansion,

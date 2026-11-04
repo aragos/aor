@@ -84,6 +84,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         if (!mobile && workspace === 'players') setWorkspace('map');
     }, [mobile, setWorkspace, workspace]);
     const activityPinned = pinActivity && wideScreen;
+    const actionsCollapsed = mobile && sheetCollapsed;
     const previousWorkspace = useRef<Exclude<Workspace, 'activity'>>('map');
     useLayoutEffect(() => {
         if (workspace !== 'activity') previousWorkspace.current = workspace;
@@ -108,6 +109,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     useLayoutEffect(() => {
         resetSelection();
         setExpansionPass(null);
+        setSheetCollapsed(false);
         if (document.activeElement instanceof HTMLElement &&
             document.activeElement.matches('.hand-card, .advance-tile')) document.activeElement.blur();
     }, [decisionKey, resetSelection]);
@@ -264,7 +266,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             <Activity snapshot={liveSnapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}
                 active={workspace === 'activity'} pinned={activityPinned} canPin={wideScreen} onTogglePin={toggleActivityPin}/>
             <div className="workspace-side">
-                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${sheetCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
+                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
                         <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
                     <div className={`decision-toolbar ${objectAction ? 'object-heading' : ''}`}>
@@ -276,15 +278,15 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                                 if (!withdrawing && snapshot.undo.capability === 'PREFIX_REWIND' && snapshot.undo.latestTarget) setRewindTarget(snapshot.undo.latestTarget);
                                 else void submit(withdrawing ? 'withdraw-bid' : 'undo');
                             }}>{t('history.undo')}</button>}
-                        {hasContext && <button type="button" className="secondary sheet-toggle" aria-expanded={!sheetCollapsed}
-                            aria-label={t(sheetCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}
-                            aria-controls="decision-content" onClick={() => setSheetCollapsed(current => !current)}>
-                            {sheetCollapsed ? '▴' : '▾'}
+                        {mobile && <button type="button" className="secondary sheet-toggle" aria-expanded={!actionsCollapsed}
+                            aria-controls="decision-review decision-footer" onClick={() => setSheetCollapsed(current => !current)}>
+                            <span aria-hidden="true">{actionsCollapsed ? '▴' : '▾'}</span>
+                            {t(actionsCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}
                         </button>}
                         {objectAction && <button type="button" className="close-detail" data-close-action aria-label={t('table.close')}
                             onClick={() => {if (cardAction) setSelectedCard(''); else setSelectedAdvance('');}}>×</button>}
                     </div>
-                    <div className="decision-scroll" ref={decisionScroll}>
+                    <div id="decision-review" className="decision-scroll" ref={decisionScroll}>
                         <div className="decision-heading">
                             {spectator && <p className="eyebrow">{t('table.publicInformationOnly')}</p>}
                             {finished && <p className="eyebrow">{t('game.finished')}</p>}

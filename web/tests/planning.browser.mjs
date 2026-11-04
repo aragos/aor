@@ -61,8 +61,12 @@ export async function checkParallelPlanning(page, web) {
         await page.evaluate(`[...document.querySelectorAll('.simple-action')].find(b=>b.textContent.includes('Pay cash')).click()`);
         await waitPlan(2);
         await assertCompactPlan();
+        assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li strong')[1].textContent`),
+            'Stabilization: pay cash', 'The draft identifies the stabilization step');
         await page.click('Save for review');
         await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Saved for review'`, 'durable review plan');
+        assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li strong')[1].textContent`),
+            'Stabilization: pay cash', 'The saved summary identifies the stabilization step');
     }
 
     await visit(1);

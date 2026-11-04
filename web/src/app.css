@@ -137,8 +137,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: 0s !important; } }
 .table-activity { grid-area: workspace; position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: #f4f7ed; font-size: .85rem; padding: .75rem; }
 .table-workspace[data-activity-pinned="true"] .table-activity { grid-area: activity; border-right: 1px solid #bdcbb2; }
-.table-activity .activity-pin { position: absolute; top: .55rem; right: .75rem; z-index: 1; display: flex; align-items: center; justify-content: center; width: 32px; min-height: 32px; padding: .2rem; color: #315447; }
-.table-activity:has(.activity-pin) .activity-list li, .table-activity:has(.activity-pin) .activity-body > p { padding-right: 2.75rem; }
+.table-activity .activity-pin { align-self: flex-end; flex: none; min-height: 44px; padding: .4rem .65rem; margin-bottom: .5rem; color: #315447; font-size: .85rem; font-weight: 600; }
 .activity-pin svg { width: 20px; height: 20px; }
 .activity-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .activity-body > p { margin: .3rem 0; }
@@ -193,9 +192,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
     .object-heading h2 { font-size: 1.15rem; }
     .object-heading .sheet-toggle { padding-inline: .6rem; }
     .mobile-selected { display: inline; font-family: Georgia, serif; font-size: 1.1rem; }
-    .sheet-toggle { display: inline-flex; margin-left: auto; font-size: .75rem; min-height: 40px; padding: .35rem .6rem; }
+    .sheet-toggle { display: inline-flex; margin-left: auto; font-size: .75rem; min-height: 44px; padding: .35rem .6rem; white-space: nowrap; }
     .decision-panel.has-context .decision-heading { margin-bottom: .5rem; }
-    .decision-panel.sheet-collapsed .decision-content { display: none; }
+    .decision-panel.sheet-collapsed .decision-scroll, .decision-panel.sheet-collapsed .decision-actions { display: none; }
+    .decision-panel.sheet-collapsed .decision-toolbar { margin-bottom: 0; }
     .decision-panel.has-context .province-actions > div > .eyebrow, .decision-panel.has-context .province-actions h2 { display: none; }
     .table-hand { max-height: 24dvh; padding: .3rem .45rem; gap: .25rem; }
     .hand-card { padding: .45rem .55rem; }
@@ -538,6 +538,7 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
     .workspace-side .decision-panel { flex: 0 1 auto; max-height: 55dvh; padding: .5rem .65rem; }
     .decision-scroll { flex: 0 1 auto; }
     .decision-heading { gap: .25rem .5rem; }
+    .decision-toolbar { margin-bottom: .25rem; }
     .decision-toolbar h2 { font-size: 1.1rem; }
     .decision-panel.has-context .decision-toolbar:not(.object-heading) h2 { font-size: .85rem; font-family: inherit; font-weight: 600; color: #61756b; }
     .decision-status { margin: 0; padding: .3rem .45rem; }
