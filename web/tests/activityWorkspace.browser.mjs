@@ -42,6 +42,7 @@ export async function checkActivityWorkspace(page, web, baseline) {
     await page.wait(`document.querySelector('.sheet-toggle')?.checkVisibility()`, 'Phone actions can collapse before any object is selected');
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel').classList.contains('has-context')`), false);
     assert.match(await page.evaluate(`document.querySelector('.sheet-toggle').textContent.trim()`), /Hide actions/);
+    assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').textContent.trim()`), 'Hide actions', 'The toggle has no decorative arrow');
     assert.equal(await page.evaluate(`document.querySelector('.sheet-toggle').getAttribute('aria-controls')`), 'decision-review decision-footer');
     await click('.sheet-toggle');
     await page.wait(`document.querySelector('.sheet-toggle[aria-expanded="false"]')`, 'The whole phone action area collapses');

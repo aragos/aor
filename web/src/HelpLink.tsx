@@ -19,6 +19,13 @@ export const ReferenceGameContext = createContext<{
 
 const ReferencePopup = lazy(() => import('./ReferencePopup'));
 
+/** Keep help visually on its action without nesting interactive buttons. */
+export function ButtonHelp({children, topic, label}: {
+    children: ReactNode; topic: string; label: string;
+}) {
+    return <span className="button-with-help">{children}<HelpLink topic={topic} label={label}/></span>;
+}
+
 /** Inspect reference material in place while retaining the prepared game action. */
 export function HelpLink({topic = '', label = 'Help', compact = true, icon}: {
     topic?: string; label?: string; compact?: boolean; icon?: ReactNode;

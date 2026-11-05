@@ -29,11 +29,10 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
     useLayoutEffect(() => {
         const panel = ref.current;
         const details = panel?.closest('details');
-        if (!panel || !details) return;
+        const summary = details?.querySelector('summary');
+        if (!panel || !details || !summary) return;
         panel.popover = 'auto';
         const position = () => {
-            const summary = details.querySelector('summary');
-            if (!summary) return;
             const bounds = summary.getBoundingClientRect();
             const width = Math.min(320, innerWidth - 24);
             const top = Math.min(bounds.bottom + 6, innerHeight - 100);
@@ -42,7 +41,8 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
                 maxHeight: `${innerHeight - top - 12}px`});
         };
         const sync = () => {
-            if (details.open) {position(); panel.showPopover();}
+            // Keep a second summary tap inside the popover's scope so it closes the details.
+            if (details.open) {position(); panel.showPopover({source: summary});}
             else panel.hidePopover();
         };
         const dismissed = () => {

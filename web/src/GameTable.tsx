@@ -290,7 +290,6 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                             }}>{t('history.undo')}</button>}
                         {mobile && <button type="button" className="secondary sheet-toggle" aria-expanded={!actionsCollapsed}
                             aria-controls="decision-review decision-footer" onClick={() => setSheetCollapsed(current => !current)}>
-                            <span aria-hidden="true">{actionsCollapsed ? '▴' : '▾'}</span>
                             {t(actionsCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}
                         </button>}
                         {objectAction && <button type="button" className="close-detail" data-close-action aria-label={t('table.close')}

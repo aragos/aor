@@ -156,7 +156,7 @@ export function AdvanceDecision({snapshot, busy, submit, mode = 'action', inspec
             <AdvanceCreditBenefit advance={advance}/>
         </dl>
         {offer?.priceBreakdown && offer.price !== null && <>
-            <p className="small">{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
+            <p>{t('controls.remainingCash')}: ${(me?.cash ?? 0) - offer.price}</p>
         </>}
         <MiseryPreview snapshot={snapshot} changes={offer?.miseryChanges ?? []}/>
         {offer && <DecisionAction className="card-confirmation buy-advance-action" disabled={busy || !available} onClick={async () => { if (available && await submit(command)) setSelectedAdvance(''); }}>{t('action.buyAdvance')}{offer.price != null && ` · $${offer.price}`}</DecisionAction>}

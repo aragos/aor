@@ -24,6 +24,7 @@ mechanics and [map design](map-design.md) owns spatial rendering.
   Prepare useful defaults and sole choices, but commit only through an explicit action.
 - Keep inspection, eligibility, draft selection and commitment distinct. Cards, advances, players
   and provinces are their own controls. Reference popups restore focus and preserve prepared work.
+  Tapping an expanded player box again closes its details.
   Help owns printed lookup data, variants and non-obvious app behavior; card/advance details stay
   with their objects. Avoid parallel inspectors, repeated panels and rule walkthroughs in Help.
 - Show the actor, question, relevant resources and one waiting status beside the action. Open the
@@ -33,12 +34,15 @@ mechanics and [map design](map-design.md) owns spatial rendering.
   On phones, let the action area collapse to its title and toggle, returning space to the active
   workspace without discarding drafts. Polling and navigation preserve this choice; a new decision
   or object selection reopens the actions.
+  The phone icon rail ends at the workspace; the action area below spans the whole table width.
+  Keep Hide/Show actions the same height as its neighboring Undo control, with a text label.
   Keep the decision title beside Undo above the status. Player summaries show the printed order box
   beside pool/submission status; the reference owns the full position-to-box mapping.
 - Show deterministic effects inline before commitment: prices, named discounts, cash/misery
-  endpoints, current → new shipping and limiting pool/shipping resources. Distinguish forecasts,
-  conditions and unknown dice results. A blocked choice explains its authoritative cause and
-  preserves legal alternatives. Purchase steps and Pass identify their actual continuation.
+  endpoints, current → new shipping and limiting pool/shipping resources. Use one body text size
+  for related purchase descriptions and resource consequences. Distinguish forecasts, conditions
+  and unknown dice results. A blocked choice explains its authoritative cause and preserves legal
+  alternatives. Purchase steps and Pass identify their actual continuation.
 - Reuse capital silhouettes with every visible capital name, including previews, references and
   receipts; use public handles before assignment. Use `CapitalLabel` for capital/name pairs and
   `LabelMessage` for translated sentences. Keep names and surrounding copy on the same text baseline;
@@ -97,6 +101,7 @@ filter/page. Keep one read/timer and refresh after visibility, resume or reconne
 ## Review sensitive operations
 
 Private plans distinguish unsaved input, saved-for-review work and explicit offline authorization.
+Put planning help on the related action buttons instead of adding separate plan headings.
 Offer new plans while waiting for a turn; turn arrival closes an unsaved preview and restores live
 controls. Existing saved plans remain available for review and explicit execution on the owner's turn.
 Show exact consequences, assumptions and cancellation. Saving never executes; draws or changed

@@ -52,13 +52,23 @@ export async function checkPurchaseClarity(page, web, baseline) {
             ['RELIEF', 'Misery relief', 'Finish purchase'],
         ]) {
             await show({prompt: {messageId: `prompt.purchase-${step.toLowerCase()}`, players: [viewer]},
-                legalChoices: {commands: continuation ? ['pass'] : ['stabilize cash', 'stabilize misery']},
-                game: {stage: 'PURCHASE', shippingOffer: null, advanceOffers: [], reliefOffers: [],
+                legalChoices: {commands: step === 'SHIPPING' ? ['upgrade-ships', 'pass'] : continuation ? ['pass'] : ['stabilize cash', 'stabilize misery']},
+                game: {stage: 'PURCHASE', shippingOffer: step === 'SHIPPING'
+                    ? {cost: 10, ships: {fleet: 'GALLEY', level: 4}, cashAfter: 30, blockers: []} : null,
+                    advanceOffers: [], reliefOffers: [],
                     reliefRatingAvailable: 0, stabilizationCost: 10, stabilizationMisery: 20,
                     activity: {...baseline.game.activity, actor: viewer, decisionPlayer: viewer,
                         choice: `purchase-${step.toLowerCase()}`, purchaseStep: step}}});
             assert.equal(await page.evaluate(`document.querySelector('#decision-title').textContent`), `Purchase · ${name}`,
                 `${name} identifies its Purchase phase at ${width}px`);
+            if (step === 'SHIPPING') {
+                const fonts = await page.evaluate(`(() => {
+                    const content = document.querySelector('.decision-content');
+                    return [content, ...content.querySelectorAll('.purchase-preview p')].map(node => getComputedStyle(node).fontSize);
+                })()`);
+                assert(fonts.length >= 3 && fonts.every(size => size === fonts[0]),
+                    `Shipping descriptions and costs share the decision body text size at ${width}px`);
+            }
             if (continuation) {
                 assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), continuation);
                 const count = await page.evaluate('window.mapCommands.length');
@@ -116,6 +126,8 @@ export async function checkPurchaseClarity(page, web, baseline) {
     await click(`[data-advance="${advance.id}"]`);
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .price-breakdown').textContent`), /Printed cost\$100.*Urban Ascendancy−\$20.*Institutional Research−\$10/);
     assert.match(await page.evaluate(`document.querySelector('.decision-panel .advance-price-heading').textContent`), /Price\$40/);
+    const purchaseFonts = await page.evaluate(`['.decision-content', '.advance-benefits', '.price-breakdown > div', '.advance-purchase-benefits > div', '.advance-decision > p'].map(selector => getComputedStyle(document.querySelector(selector)).fontSize)`);
+    assert(purchaseFonts.every(size => size === purchaseFonts[0]), 'Advance descriptions, prices and resources share the same body size as shipping');
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.decision-panel [data-misery-preview-player] [data-misery-box]')].map(box => box.dataset.miseryBox)`), ['20', '30']);
     assert.equal(await page.evaluate(`document.querySelector('.decision-actions').dataset.layout`), 'paired');
     await assertContinuationWords(1280);

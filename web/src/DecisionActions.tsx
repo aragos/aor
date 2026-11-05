@@ -2,6 +2,7 @@ import {createContext, useContext, useId, useLayoutEffect, useState} from 'react
 import type {ButtonHTMLAttributes, FormHTMLAttributes, ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {t} from './messages';
+import {ButtonHelp} from './HelpLink';
 
 const ActionTarget = createContext<HTMLDivElement | null | undefined>(undefined);
 const ActionForm = createContext<string | undefined>(undefined);
@@ -18,7 +19,7 @@ export function DecisionActions({children, pass}: {children: ReactNode; pass?: R
         const footer = target?.parentElement;
         if (!footer) return;
         const group = () => {
-            const buttons = [...footer.querySelectorAll('button')];
+            const buttons = [...footer.querySelectorAll('button:not(.help-link)')];
             footer.dataset.layout = buttons.length === 2 && buttons.some(button => button.classList.contains('pass-action'))
                 ? 'paired' : 'separate';
             footer.dataset.actionCount = String(buttons.length);
@@ -44,13 +45,14 @@ export function DecisionForm({id, ...props}: FormHTMLAttributes<HTMLFormElement>
     return <ActionForm.Provider value={formId}><form {...props} id={formId}/></ActionForm.Provider>;
 }
 
-export function DecisionAction({type = 'button', form, notice, ...props}: ButtonHTMLAttributes<HTMLButtonElement> & {
+export function DecisionAction({type = 'button', form, notice, help, ...props}: ButtonHTMLAttributes<HTMLButtonElement> & {
     notice?: ReactNode;
+    help?: {topic: string; label: string};
 }) {
     const planning = useContext(PlanningContext);
     const target = useContext(ActionTarget);
     const formId = useContext(ActionForm);
     const button = <button {...props} type={type} form={form ?? formId}>{planning && <>{t('plan.add')} · </>}{props.children}</button>;
-    const content = <>{notice}{button}</>;
+    const content = <>{notice}{help ? <ButtonHelp {...help}>{button}</ButtonHelp> : button}</>;
     return target === undefined ? content : target && createPortal(content, target);
 }

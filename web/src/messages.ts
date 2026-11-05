@@ -219,7 +219,6 @@ export const en: Record<string, string> = {
     'plan.helpPreview': "The preview assumes earlier players leave these resources and choices unchanged. They are checked again on your turn. Continue steps are saved with the plan. You can plan the whole activity or leave decisions for later.",
     'plan.helpAutomatic': "Execute automatically on my turn also runs while you are offline. Cancel it before execution to reconsider; signing out does not cancel it. Completed actions follow the game’s undo policy.",
     'plan.helpBoundaries': "Automatic execution pauses if resources or consequences change, even when a purchase becomes cheaper. A draw pauses for card review. Unplanned decisions wait for you. History edits cancel automatic execution.",
-    'plan.editing': 'Plan preview',
     'plan.unsaved': 'Unsaved draft',
     'plan.saved': 'Saved for review',
     'plan.armed': 'Automatic execution enabled',

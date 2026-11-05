@@ -5,7 +5,7 @@ import {DecisionAction} from './DecisionActions';
 import {advanceName, label} from './labels';
 import {PlayerLabel} from './IdentityLabel';
 import {MiseryBox} from './MiseryBox';
-import {HelpLink} from './HelpLink';
+import {ButtonHelp} from './HelpLink';
 import {t} from './messages';
 
 export type WritePlan = (operation: PlanOperation, actions?: PlannedAction[], previewToken?: string, expectedVersion?: string | null) => Promise<Snapshot | null>;
@@ -113,8 +113,8 @@ export function ActivityPlanner({snapshot, planner, busy}: {
     const invalidContinuation = preview?.invalidIndex != null &&
         actions[preview.invalidIndex]?.command === 'pass';
     const ready = !busy && (!planner.open || !!planner.preview);
-    return <section className="activity-planner" aria-label={t('plan.title')}>
-        <h3>{t(planner.open ? 'plan.editing' : 'plan.title')} <HelpLink topic="plans" label={t('plan.helpTitle')}/></h3>
+    const help = {topic: 'plans', label: t('plan.helpTitle')};
+    return <section className="activity-planner" aria-label={t('plan.title')} data-editing={planner.open}>
         {(saved || planner.open && planner.dirty) && <p className="private-draft-status" role="status">{t(saved?.armed ? 'plan.armed' : planner.open && planner.dirty ? 'plan.unsaved' : 'plan.saved')}</p>}
         {saved?.pause && <p className="blocker" role="status">{t(`plan.pause.${saved.pause}`)}</p>}
         {visibleActions.length > 0 && <ol className="plan-actions">{visibleActions.map(({action, index}) => {
@@ -141,12 +141,12 @@ export function ActivityPlanner({snapshot, planner, busy}: {
         {planner.conflict && <p className="blocker" role="status">{t('plan.changedElsewhere')}
             <button type="button" disabled={busy} onClick={() => {void planner.edit();}}>{t('plan.loadSaved')}</button></p>}
         {planner.loading && <p role="status">{t('table.quotePending')}</p>}
-        {!planner.open ? <button type="button" className="secondary" disabled={busy} onClick={() => {void planner.edit();}}>{t(saved ? 'plan.edit' : 'plan.prepare')}</button>
+        {!planner.open ? <ButtonHelp {...help}><button type="button" className="secondary" disabled={busy} onClick={() => {void planner.edit();}}>{t(saved ? 'plan.edit' : 'plan.prepare')}</button></ButtonHelp>
             : <button type="button" className="secondary" disabled={busy} onClick={planner.close}>{t('plan.close')}</button>}
-        {saved?.armed ? <DecisionAction className="secondary" disabled={busy} onClick={() => {void planner.operate('DISARM');}}>{t('plan.cancelAutomatic')}</DecisionAction> : <>
-            {planner.open && <DecisionAction disabled={!ready || planner.conflict} onClick={() => {void planner.operate('SAVE');}}>{t('plan.save')}</DecisionAction>}
+        {saved?.armed ? <DecisionAction help={help} className="secondary" disabled={busy} onClick={() => {void planner.operate('DISARM');}}>{t('plan.cancelAutomatic')}</DecisionAction> : <>
+            {planner.open && <DecisionAction help={help} disabled={!ready || planner.conflict} onClick={() => {void planner.operate('SAVE');}}>{t('plan.save')}</DecisionAction>}
             {saved && (!planner.open || !planner.dirty) && <DecisionAction disabled={!ready || planner.conflict || !view.canArm || !preview?.effects.length || preview.boundary === 'INVALID'}
-                onClick={() => {void planner.operate(view.canExecute ? 'EXECUTE' : 'ARM');}}>{t(view.canExecute ? 'plan.execute' : 'plan.automatic')}</DecisionAction>}
+                help={help} onClick={() => {void planner.operate(view.canExecute ? 'EXECUTE' : 'ARM');}}>{t(view.canExecute ? 'plan.execute' : 'plan.automatic')}</DecisionAction>}
         </>}
         {saved && <button type="button" className="secondary" disabled={busy} onClick={() => {void planner.operate('DELETE');}}>{t('plan.delete')}</button>}
     </section>;

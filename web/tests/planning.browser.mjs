@@ -79,6 +79,7 @@ export async function checkParallelPlanning(page, web) {
     }
     async function assertCompactPlan() {
         const panel = await page.evaluate(`document.querySelector('.activity-planner').textContent`);
+        assert.equal(await page.evaluate(`document.querySelector('.activity-planner h3')`), null, 'Plan controls need no separate heading');
         assert.doesNotMatch(panel, /Prepare now|Nothing will execute|Preview assumes|This plan finishes|remaining decisions for review|stops after drawing/, 'Planning explanations live in Help');
         const entries = await page.evaluate(`[...document.querySelectorAll('.plan-actions li strong')].map(entry => entry.textContent)`);
         assert(entries.every(entry => !/Continue|Finish purchasing|^Pass$/.test(entry)), 'Only changing actions appear in the plan');
@@ -99,6 +100,15 @@ export async function checkParallelPlanning(page, web) {
         await page.evaluate(`[...document.querySelectorAll('.simple-action')].find(b=>b.textContent.includes('Pay cash')).click()`);
         await waitPlan(2);
         await assertCompactPlan();
+        const beforeHelp = await game.snapshot(game.links[1]);
+        await page.evaluate(`document.querySelector('.decision-actions .button-with-help [data-help-topic="plans"]').click()`);
+        await page.wait(`document.querySelector('[data-help-content="plans"]')`, 'Save help opens from its button');
+        await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+        await page.wait(`!document.querySelector('.reference-dialog')`, 'Plan help closes');
+        assert.deepEqual((await game.snapshot(game.links[1])).planning.saved, beforeHelp.planning.saved,
+            'Opening action help does not save or execute the draft');
+        assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li').length`), 2,
+            'Action help preserves the local plan');
         assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li strong')[1].textContent`),
             'Stabilization: pay cash', 'The draft identifies the stabilization step');
         await page.click('Save for review');
@@ -141,7 +151,7 @@ export async function checkParallelPlanning(page, web) {
     assert(await page.evaluate(`[...document.querySelectorAll('.decision-actions button')].find(b=>b.textContent === 'Save for review').disabled`), 'A stale draft cannot overwrite the other device');
     await page.click('Load saved version');
     await waitPlan(2);
-    await page.evaluate(`document.querySelector('[data-help-topic="plans"]').click()`);
+    await page.evaluate(`document.querySelector('.decision-actions [data-help-topic="plans"]').click()`);
     await page.wait(`document.querySelector('[data-help-content="plans"]')`, 'private planning help');
     const help = await page.evaluate(`document.querySelector('[data-help-content="plans"]').textContent`);
     assert.match(help, /earlier players/);
@@ -188,7 +198,7 @@ export async function checkParallelPlanning(page, web) {
     await page.click('Execute automatically on my turn');
     await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Automatic execution enabled'`, 'server authorization');
     await page.click('Edit plan');
-    await page.wait(`document.querySelector('.activity-planner h3').textContent.startsWith('Plan preview')`, 'confirmed disarm before editing');
+    await page.wait(`document.querySelector('.activity-planner[data-editing="true"]')`, 'confirmed disarm before editing');
     assert.equal((await game.snapshot(game.links[2])).planning.saved.armed, false);
     await page.click('Return to the table');
     await page.click('Execute automatically on my turn');
@@ -204,7 +214,7 @@ export async function checkParallelPlanning(page, web) {
     assert(!(await game.snapshot(game.links[1])).game.players[1].advances.includes('URBAN_ASCENDANCY'));
     await visit(1);
     await page.click('Edit plan');
-    await page.wait(`document.querySelector('.activity-planner h3').textContent.startsWith('Plan preview')`, 'review editing');
+    await page.wait(`document.querySelector('.activity-planner[data-editing="true"]')`, 'review editing');
     await page.evaluate(`document.querySelectorAll('.plan-actions li')[0].querySelector('button').click()`);
     await waitPlan(0);
     await enabled('.pass-action');
