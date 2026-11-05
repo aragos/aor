@@ -2,6 +2,7 @@ package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.ai.BotDifficulty
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -162,26 +163,44 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
-    fun soloCreationRegistersOnlyTheHumanAccountAndAddsAutomatedSeats() = withHosted {
+    fun onlineCreationRejectsAutomatedOpponentsWithoutSavingAGame() = withHosted {
         val response =
             post(
                 "/api/games",
                 "alice",
                 mapOf(
-                    "players" to listOf("alice"),
-                    "bots" to listOf(mapOf("difficulty" to "EASY"), mapOf("difficulty" to "HARD")),
+                    "players" to listOf("alice", "bob", "carol"),
+                    "bots" to listOf(mapOf("difficulty" to "EASY")),
                 ),
             )
-        val created = json.readTree(response.bodyAsText())
-        val stored = store.read(created["gameId"].asText())
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+        assertThat(json.readTree(response.bodyAsText())["code"].asText())
+            .isEqualTo("AUTOMATED_OPPONENTS_UNAVAILABLE")
+        assertThat(store.ids()).isEmpty()
+    }
+
+    @Test
+    fun onlineCreationRequiresAtLeastThreeHumanPlayers() = withHosted {
+        val response = post("/api/games", "alice", mapOf("players" to listOf("alice", "bob")))
+
+        assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+        assertThat(store.ids()).isEmpty()
+    }
+
+    @Test
+    fun onlineCreationAcceptsAnEmptyLegacyBotSelection() = withHosted {
+        val response =
+            post(
+                "/api/games",
+                "alice",
+                mapOf("players" to listOf("alice", "bob", "carol"), "bots" to emptyList<Any>()),
+            )
 
         assertThat(response.status).isEqualTo(HttpStatusCode.Created)
-        assertThat(stored.memberships).containsExactly(PlayerId("p1"), "alice")
-        assertThat(stored.credentials).isEmpty()
-        assertThat(stored.bots.keys).containsExactly(PlayerId("p2"), PlayerId("p3"))
-        assertThat(stored.header.players.map(Player::name))
-            .containsExactly("@alice", "Automated 1", "Automated 2")
-            .inOrder()
+        val stored = store.read(json.readTree(response.bodyAsText())["gameId"].asText())
+        assertThat(stored.memberships.values).containsExactly("alice", "bob", "carol")
+        assertThat(stored.bots).isEmpty()
     }
 
     @Test
@@ -208,18 +227,8 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
-    fun creatorBotCommandEndpointReconcilesAcceptedSealedDecision() = withHosted {
-        val created =
-            post(
-                "/api/games",
-                "alice",
-                mapOf(
-                    "players" to listOf("alice"),
-                    "bots" to
-                        listOf(mapOf("difficulty" to "NORMAL"), mapOf("difficulty" to "NORMAL")),
-                ),
-            )
-        val gameId = json.readTree(created.bodyAsText())["gameId"].asText()
+    fun existingAutomatedGameCanContinueWithAnAcceptedSealedDecision() = withHosted {
+        val gameId = existingAutomatedGame().gameId
         val runnerId = UUID.randomUUID().toString()
         val claimed =
             post(
@@ -256,17 +265,7 @@ class HostedApplicationTest(private val postgres: Boolean) {
 
     @Test
     fun authenticatedSpectatorsCannotAcquireBotWork() = withHosted {
-        val created =
-            post(
-                "/api/games",
-                "alice",
-                mapOf(
-                    "players" to listOf("alice"),
-                    "bots" to
-                        listOf(mapOf("difficulty" to "NORMAL"), mapOf("difficulty" to "NORMAL")),
-                ),
-            )
-        val gameId = json.readTree(created.bodyAsText())["gameId"].asText()
+        val gameId = existingAutomatedGame().gameId
 
         val rejected =
             post(
@@ -968,6 +967,20 @@ private class HostedFixture(postgres: Boolean) : AutoCloseable {
             listOf("alice", "bob", "carol"),
             RuleOptions(),
             UndoPolicy.REGULAR_TURN,
+        )
+
+    /** Persists a game supported before online creation stopped offering automated seats. */
+    fun existingAutomatedGame(): CreatedGame =
+        service.createRegistered(
+            players = listOf(hosted.account(AccountIdentity(AccountId("alice"), true))),
+            creator = AccountId("alice"),
+            rules = RuleOptions(),
+            policy = UndoPolicy.REGULAR_TURN,
+            bots =
+                listOf(
+                    AutomatedPlayerRequest("Automated 1", BotDifficulty.NORMAL),
+                    AutomatedPlayerRequest("Automated 2", BotDifficulty.NORMAL),
+                ),
         )
 
     fun startedGame(): CreatedGame = game()

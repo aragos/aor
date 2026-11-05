@@ -33,7 +33,10 @@ per month within a $25/month hosting budget; representative production load must
 An existing Squarespace domain can supply a subdomain. [Deployment](deployment.md) owns configuration
 and recovery; [open work](follow-ups.md) distinguishes unverified launch checks from automated tests.
 
-Purchase and Buy Card support private phase-scoped plans. Automated seats offer Easy, Normal and
+Online game creation requires 3–6 registered human players and does not offer automated opponents.
+Existing saved games retain their controllers and can continue play.
+
+Purchase and Buy Card support private phase-scoped plans. Local automated seats offer Easy, Normal and
 Hard policies with an integrated economic evaluator. The creator's browser runs a single worker;
 server-authoritative games pause automated progression when no creator browser is available.
 Client hosting is for solo and trusted casual play: the host can inspect automated hands and modify

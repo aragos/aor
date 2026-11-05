@@ -39,8 +39,9 @@ npm install
 Run `npm start` in another terminal and open <http://localhost:5173>. Ktor listens on
 `127.0.0.1:8080`; Vite proxies API requests. The IDE's **web** configuration uses the same npm
 command. Creation selects players, variants and undo policy, then starts setup automatically.
-Add Easy, Normal or Hard automated seats during creation. The creator's open browser runs them;
-hosted games retain server validation, persistence and randomness. They pause while no host is open.
+Local games can add Easy, Normal or Hard automated seats during creation. The creator's open browser
+runs them with server validation, persistence and randomness. They pause while no host is open.
+Online game creation requires 3–6 registered human players; automated opponents are unavailable.
 Keep each private player link: only credential hashes are stored, so lost links cannot be recovered.
 
 Local storage defaults to `.aor-data/`. Use one server per directory; `AOR_DATA_DIR` selects an

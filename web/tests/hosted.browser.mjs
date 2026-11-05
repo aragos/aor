@@ -39,6 +39,10 @@ export async function checkHosted(page, web, artifacts) {
                     registrations.push(registration);
                     account = {id: 'google-player', handle: registration.handle, admin: false, mayCreateGames: false};
                     body = JSON.stringify(account);
+                } else if (path === '/api/players') {
+                    const query = new URL(params.request.url).searchParams.get('q');
+                    body = JSON.stringify([{id: 'player-bob', handle: 'bob'}, {id: 'player-carol', handle: 'carol'}]
+                        .filter(player => player.handle.includes(query)));
                 } else if (path === `/api/games/${gameId}`) body = JSON.stringify(snapshot);
                 else if (path === '/api/games' && params.request.method === 'POST') {
                     creations.push(JSON.parse(params.request.postData));
@@ -137,24 +141,37 @@ export async function checkHosted(page, web, artifacts) {
             await page.wait(`document.querySelector('.portal')`, 'Registered player dashboard');
             assert.equal(await page.evaluate(`document.querySelector('.account-controls').textContent.includes('@alice')`), true);
         });
-        await check('A registered human can create a game with mixed local opponent difficulties', async () => {
+        await check('Online games require registered humans and offer no automated opponents', async () => {
             account = {...registeredAccount, mayCreateGames: true};
             await page.click('Sign in with Google');
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('.create-registered form')`, 'approved game creation');
             await page.evaluate(`document.querySelector('.create-registered').open = true`);
-            await page.fill('#game-name', 'Alice faces two automated opponents');
-            await page.click('Add automated opponent');
-            await page.click('Add automated opponent');
-            await page.fill('#bot-difficulty-0', 'EASY');
-            await page.fill('#bot-difficulty-1', 'HARD');
-            assert.equal(await page.evaluate(`document.querySelector('.automated-opponents').textContent.includes('3 of 6 seats')`), true);
+            await page.fill('#game-name', 'Alice, Bob and Carol');
+            assert.equal(await page.evaluate(`document.querySelector('.automated-opponents')`), null);
+            assert.equal(await page.evaluate(`document.querySelector('.create-registered').textContent.toLowerCase().includes('automated opponents')`), false);
+            assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), true,
+                'One registered player cannot start an online game');
+            await page.fill('input[type=search]', 'bob');
+            await page.wait(`document.querySelector('[aria-label="Matching players"]')?.textContent.includes('@bob')`, 'Bob appears in the directory');
+            await page.click('@bob');
+            assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), true,
+                'Two registered players cannot start an online game');
+            await page.fill('input[type=search]', 'carol');
+            await page.wait(`document.querySelector('[aria-label="Matching players"]')?.textContent.includes('@carol')`, 'Carol appears in the directory');
+            await page.click('@carol');
             assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), false);
+            await page.screenshot(join(artifacts, 'hosted-creation-desktop.png'), 1280, 900);
+            await page.screenshot(join(artifacts, 'hosted-creation-phone.png'), 390, 844, true);
+            assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true,
+                'Online creation fits a phone');
+            assert.equal(await page.evaluate(`document.querySelector('.automated-opponents')`), null);
             await page.click('Create game');
             await page.wait(`location.pathname === '/games/${gameId}' && document.readyState === 'complete'`, 'hosted creation navigates to the human game');
-            assert.deepEqual(creations.at(-1).players, ['google-player']);
-            assert.deepEqual(creations.at(-1).bots, [{difficulty: 'EASY'}, {difficulty: 'HARD'}]);
-            assert.equal(creations.at(-1).name, 'Alice faces two automated opponents');
+            assert.deepEqual(creations.at(-1).players, ['google-player', 'player-bob', 'player-carol']);
+            assert.equal(Object.hasOwn(creations.at(-1), 'bots'), false);
+            assert.equal(creations.at(-1).name, 'Alice, Bob and Carol');
+            await page.send('Emulation.clearDeviceMetricsOverride');
         });
         await check('Hosted game account controls share the game overview bar', async () => {
             account = registeredAccount;

@@ -26,6 +26,7 @@ export const en: Record<string, string> = {
     'bots.error': 'Automated opponents could not continue. Resume to try again.',
     'abandonment.botAgreement': 'Your agreement also agrees for all automated opponents.',
     'abandonment.soloConfirm': 'Abandon this game? This ends it immediately without a winner. It cannot be resumed; the board and history remain available.',
+    'error.AUTOMATED_OPPONENTS_UNAVAILABLE': 'Automated opponents are available only in local games. Choose 3–6 registered players for online play.',
     'error.BOT_POLICY_FAILED': 'The automated opponent could not choose an action. Resume to try again.',
     'reference.turnOrder': 'Turn order & green die',
     'order.position': 'Position {position}',

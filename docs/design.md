@@ -130,6 +130,10 @@ phase completion expires them and inactive games cannot execute. Failed writes c
 
 ## Automated seats
 
+New automated seats are available only in local private-link games. Hosted creation rejects automated
+opponents and requires 3–6 registered human players. Existing saved games retain their controller
+metadata and creator automation endpoints so they can continue without a save migration.
+
 [BotAutomation.kt](../server/src/main/kotlin/dev/aragos/aor/BotAutomation.kt) owns application-level
 controller metadata and creator-only browser leases. Bot seats retain ordinary engine identities;
 only human seats have account memberships or private-link credentials. Existing documents without
