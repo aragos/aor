@@ -50,6 +50,11 @@ mechanics and [map design](map-design.md) owns spatial rendering.
 - Keep the hand available for card decisions. A card click prepares or toggles selection; dragging
   the hand does not select or submit. Commodity inspection highlights matching in-play provinces
   without replacing a draft. Track popups follow accepted public updates and retain shared positions.
+  Explain voided cards beside the action; warn before a legal no-target play consumes a card with
+  no effect. The warning comes from the projected card resolution and follows live updates.
+- Keep zoom, Fit and map help beside the workspace tabs, outside the map. Hide them when the bar
+  cannot fit them, including a narrow bar beside pinned Activity. Gestures and keyboard map controls
+  remain available. Explanatory copy describes current actions and consequences, not past UI versions.
 - Public summaries use public facts only. Unplayed-card counts cannot reveal private discards.
   The epoch's remaining-card lookup lists introduced cards not publicly played, including hands
   and private discards. Recurring plays reset on the next epoch's shuffle; square plays stay excluded.

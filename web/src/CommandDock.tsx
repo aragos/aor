@@ -39,7 +39,6 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
             <div className="choices"><code>{snapshot.legalChoices.commands.join(' · ')}</code></div>
         </form>}
         {snapshot.undo && <p>{t('history.policy')}: {t(`undoPolicy.${undoPolicy}`)} <HelpLink topic={`undo-${undoPolicy}`} label="Undo policy details"/></p>}
-        {snapshot.undo?.converted && <p>{t('history.converted')}</p>}
         {snapshot.undo?.capability === 'PREFIX_REWIND' && loadRewindTargets && reviewRewind && <RewindHistory snapshot={snapshot} busy={busy} load={loadRewindTargets} review={reviewRewind}/>}
         {editHistory && snapshot.undo && snapshot.undo.capability !== 'PREFIX_REWIND' && <HistoryEditor snapshot={snapshot} busy={busy} edit={editHistory} format={format}/>}
         <h3>{t('game.history')}</h3>

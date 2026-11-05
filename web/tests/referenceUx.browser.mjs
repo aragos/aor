@@ -66,7 +66,7 @@ export async function checkReferenceUx(page, web, baseline) {
     assert(colorful.includes('#205c4b') && colorful.includes('#f5ce62'),'Turn favicon uses the colorful shield and money bag');
 
     const gameLocationBeforeHelp = await page.evaluate('location.href');
-    assert.equal(await page.evaluate(`document.querySelector('.game-header .help-link')`), null);
+    assert.equal(await page.evaluate(`document.querySelectorAll('.game-header .help-link').length`), 1, 'The remaining-card footnote is the only header help control');
     await page.evaluate(`document.querySelector('#tab-markets').click(); document.querySelector('.market-tile .help-link').click()`);
     await page.wait(`document.querySelector('.reference-popup .payout-box')`, 'Commodity reference from the main market box');
     await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);
@@ -88,10 +88,13 @@ export async function checkReferenceUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`),true,'Popup fits a phone');
     for (const [name, selector] of [['Map key', '#map-legend .reference-legend'],
         ['Income track', '#income-track .payout-boxes'], ['Misery track', '#misery-track .reference-track'], ['Shipping', '#shipping-track .reference-track'],
-        ['Undo policies', '#undo-friendly-game'], ['Variants', '#variant-map']]) {
+        ['Undo policies', '#undo-linear-game'], ['Variants', '#variant-map']]) {
         await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);
         await choose(name);
         await page.wait(`document.querySelector(${JSON.stringify(selector)})`, name + ' popup');
+        if (name === 'Undo policies') {
+            assert.equal(await page.evaluate(`document.querySelector('#undo-friendly-game')`), null, 'General Help lists the currently available policies');
+        }
         if (name === 'Income track') {
             assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'The topic chooser retains the active game income track');
         }
@@ -106,7 +109,7 @@ export async function checkReferenceUx(page, web, baseline) {
     await page.wait(`document.querySelector('#income-track .payout-box')`, 'Income symbol opens its own track');
     assert.equal(await page.evaluate(`document.querySelectorAll('#income-track .payout-box').length`), 26, 'Every marker count from 0 to 25 has a base income');
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'Income reference uses the active game’s starting player count');
-    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /Numbered tokens do not count.*White markers count too/);
+    assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`), /white markers.*Numbered tokens do not count/);
     assert.match(await page.evaluate(`document.querySelector('#income-track').textContent`),
         new RegExp(`3 markers provide \\$${baseline.game.catalog.incomeTrack[3]} base income`));
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);

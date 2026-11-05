@@ -85,7 +85,8 @@ export async function checkContextualUx(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"]').classList.contains('eligible')`), true);
 
     assert.equal(await page.evaluate(`!!document.querySelector('.interactive-board select')`), false, 'Map has no drop-down menus');
-    assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.map-zoom')).position`), 'absolute', 'Zoom controls float over the map');
+    assert.equal(await page.evaluate(`!!document.querySelector('.workspace-bar .map-zoom')`), true, 'Zoom controls share the workspace bar');
+    assert.equal(await page.evaluate(`document.querySelector('.interactive-board .map-zoom')`), null, 'Map controls leave the board unobstructed');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${reachable.destination}"] .reach-shade').getAttribute('fill')`), '#ffffff', 'Reachable provinces use a light fill');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-map-province="${reachable.destination}"] [stroke-dasharray]')`), false, 'Expansion highlights have no dashed border');
     await show({game:{stage:'PURCHASE',activity:{...baseline.game.activity,actor:viewer,purchaseStep:'ADVANCES'}}});

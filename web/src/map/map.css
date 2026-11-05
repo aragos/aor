@@ -1,11 +1,11 @@
 .interactive-board { margin-bottom: 1.4rem; scroll-margin-top: 1rem; }
-.map-heading, .map-players, .map-pick-banner, .map-zoom { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem 1rem; }
+.map-heading, .map-players, .map-pick-banner { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem 1rem; }
 .map-heading { justify-content: space-between; }
 .map-heading h2 { margin-bottom: .6rem; }
 .map-players { font-size: .8rem; }
 .map-players span span, .map-facts span { display: inline-flex; align-items: center; gap: .3rem; }
 .map-players small { color: #667268; }
-.map-zoom { gap: .35rem; }
+.map-zoom { display: flex; align-items: center; gap: .25rem; }
 .map-zoom button { margin: 0; }
 .map-viewport { background: #eae8dd; border: 1px solid #92aaa6; border-radius: 8px; overflow: hidden; }
 .world-map { display: block; width: 100%; height: min(75vh, 850px); min-height: 440px; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
@@ -41,7 +41,7 @@
 }
 /* Selection details share the decision panel beside the board. */
 .interactive-board { margin: 0; }
-.map-zoom { gap: .25rem; } .map-zoom button { padding: .55rem .75rem; }
+.map-zoom button:not(.help-link) { padding: .4rem .6rem; min-height: 32px; font-size: .8rem; }
 .map-viewport { border: 0; border-radius: 0; }
 .world-map { height: min(65vh, 750px); min-height: 460px; }
 .map-orders form { display: block; } .map-orders form label { max-width: none; }
@@ -68,17 +68,12 @@
 }
 
 .map-viewport { position: relative; }
-.map-zoom { position: absolute; top: .75rem; right: .75rem; z-index: 2; flex-wrap: nowrap; padding: .3rem; border-radius: 7px; background: #fcfcf5ed; box-shadow: 0 2px 10px #142a3133; }
 
 /* The gameplay viewport reserves the hand and action area outside the map. */
 .game-table .interactive-board { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .game-table .map-pick-banner { flex: none; margin: .3rem .6rem; padding: .4rem .6rem; }
 .game-table .map-viewport { flex: 1; min-height: 0; }
 .game-table .world-map { height: 100%; min-height: 0; max-height: none; }
-
-@media (max-width: 700px) {
-    .map-zoom { display: none; }
-}
 
 .map-load-status {
     display: flex; flex-direction: column; align-items: center; justify-content: center;

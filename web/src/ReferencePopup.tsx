@@ -126,7 +126,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             {(topic === 'history' || topic === 'undo-friendly-turn') && <article id="undo-friendly-turn"><h3>{t('undoPolicy.friendly-turn')}</h3>
                 <p>{t("reference.the-current-activity-s-owner-may")}</p>
             </article>}
-            {(topic === 'history' || topic === 'undo-friendly-game') && <article id="undo-friendly-game"><h3>{t('undoPolicy.friendly-game')}</h3>
+            {topic === 'undo-friendly-game' && <article id="undo-friendly-game"><h3>{t('undoPolicy.friendly-game')}</h3>
                 <p>{t("reference.everyone-has-friendly-turn-permissions-the")}</p>
             </article>}
             {(topic === 'history' || topic === 'undo-linear-game') && <article id="undo-linear-game"><h3>{t('undoPolicy.linear-game')}</h3>

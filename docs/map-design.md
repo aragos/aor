@@ -124,7 +124,8 @@ requirements; [deployment](deployment.md#saved-game-compatibility) owns supporte
   Background clicks clear inspection while preserving action drafts; dragging preserves both.
 - Initially fit width, or cover height when necessary to avoid empty bands. Bound zoom, pan and resize
   in both axes; preserve prepared actions and use the rendered scale for gestures. Desktop keeps
-  zoom/Fit buttons; phones retain gesture and keyboard access. No map mode or parallel province panel.
+  zoom/Fit buttons beside the workspace tabs when the bar has room; narrow layouts retain gesture
+  and keyboard access. No map mode or parallel province panel.
 
 The validator checks graph parity, province/area outlines, sea exclusions, support paths and fitted
 label/piece bounds. Browser geometry and map suites check rendered bounds, dense groups, reduced

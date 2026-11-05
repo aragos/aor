@@ -23,6 +23,8 @@ data class CardChoiceView(
     val miseryChanges: List<MiseryChangeView> = emptyList(),
     val miseryUncertainPlayers: List<PlayerId> = emptyList(),
     val cashChanges: List<CashChangeView> = emptyList(),
+    /** The card can be consumed without an effect because it has no legal target. */
+    val noEffect: Boolean = false,
 )
 
 /** Viewer-specific credit; authorization to use a played leader is projected separately. */
@@ -115,6 +117,12 @@ data class CardInspectionView(
 )
 
 internal object CardProjection {
+    private data class ResolvedChoice(
+        val choice: CardChoice,
+        val preview: CardMiseryPreview,
+        val noEffect: Boolean,
+    )
+
     fun inspections(state: GameState, viewer: PlayerState?): List<CardInspectionView> {
         val played = PlayedLeaderDiscountView.from(state, viewer).associateBy { it.leader.cardId }
         return CardData.all.map { definition ->
@@ -153,7 +161,11 @@ internal object CardProjection {
                                 viewer.player.id,
                                 CardPlay(card.definition.id, choice),
                             )
-                        choice to CardMiseryPreview.from(context, resolution)
+                        ResolvedChoice(
+                            choice,
+                            CardMiseryPreview.from(context, resolution),
+                            noEffect = resolution is CardResolution.NoEffect,
+                        )
                     } catch (_: CardRuleViolation) {
                         null
                     }
@@ -174,13 +186,14 @@ internal object CardProjection {
             } else null
         val choices =
             legal
-                .filterNot { (choice, _) -> pirate && choice != CardChoice.None }
-                .map { (choice, preview) ->
+                .filterNot { (choice) -> pirate && choice != CardChoice.None }
+                .map { (choice, preview, noEffect) ->
                     choiceView(card.reference, choice)
                         .copy(
                             miseryChanges = preview.changes,
                             miseryUncertainPlayers = preview.uncertainPlayers,
                             cashChanges = preview.cashChanges,
+                            noEffect = noEffect,
                         )
                 } +
                 listOfNotNull(
@@ -191,7 +204,7 @@ internal object CardProjection {
                         protection != null
                     },
                 )
-        val commonMisery = legal.map { (_, preview) -> preview }.distinct().singleOrNull()
+        val commonMisery = legal.map(ResolvedChoice::preview).distinct().singleOrNull()
         return CardOfferView(
             card.reference,
             block == null && choices.isNotEmpty(),

@@ -55,6 +55,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     const [rewindTarget, setRewindTarget] = useState<RewindTarget | null>(null);
     useEffect(() => {if (liveSnapshot.status && liveSnapshot.status !== 'ACTIVE') setRewindTarget(null);}, [liveSnapshot.status]);
     const [commandsOpen, setCommandsOpen] = useState(false);
+    const [mapControlsHost, setMapControlsHost] = useState<HTMLDivElement | null>(null);
     const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
     const finished = snapshot.game.stage === 'FINISHED';
     useEffect(() => setScoresOpen(finished), [finished]);
@@ -241,25 +242,28 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <PlayerOverview snapshot={liveSnapshot}/>
                 {tools}
             </section>
-            <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')} aria-orientation={mobile ? 'vertical' : 'horizontal'}>
-                {tabs.map(tab => <button type="button" key={tab} role="tab" id={`tab-${tab}`} aria-selected={workspace === tab}
-                    tabIndex={workspace === tab ? 0 : -1}
-                    title={t(`table.${tab}`)} aria-label={t(`table.${tab}`)} aria-controls={`workspace-${tab}`} onClick={() => setWorkspace(tab)} onKeyDown={event => {
-                        if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
-                            event.preventDefault();
-                            const next = tabs[(tabs.indexOf(tab) + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : tabs.length - 1)) % tabs.length];
-                            setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
-                        }
-                        if (event.key === 'Home' || event.key === 'End') {
-                            event.preventDefault();
-                            const next = event.key === 'Home' ? tabs[0] : tabs[tabs.length - 1];
-                            setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
-                        }
-                    }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && me && <small>{me.advances.length}</small>}</button>)}
-            </nav>
+            <div className="workspace-bar">
+                <nav className="workspace-tabs" role="tablist" aria-label={t('table.workspace')} aria-orientation={mobile ? 'vertical' : 'horizontal'}>
+                    {tabs.map(tab => <button type="button" key={tab} role="tab" id={`tab-${tab}`} aria-selected={workspace === tab}
+                        tabIndex={workspace === tab ? 0 : -1}
+                        title={t(`table.${tab}`)} aria-label={t(`table.${tab}`)} aria-controls={`workspace-${tab}`} onClick={() => setWorkspace(tab)} onKeyDown={event => {
+                            if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+                                event.preventDefault();
+                                const next = tabs[(tabs.indexOf(tab) + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : tabs.length - 1)) % tabs.length];
+                                setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
+                            }
+                            if (event.key === 'Home' || event.key === 'End') {
+                                event.preventDefault();
+                                const next = event.key === 'Home' ? tabs[0] : tabs[tabs.length - 1];
+                                setWorkspace(next); document.getElementById(`tab-${next}`)?.focus();
+                            }
+                        }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && me && <small>{me.advances.length}</small>}</button>)}
+                </nav>
+                <div className="map-controls" ref={setMapControlsHost} hidden={workspace !== 'map'}/>
+            </div>
             <div className="workspace-main" hidden={workspace === 'activity' || workspace === 'players'}>
                 <div id="workspace-map" role="tabpanel" aria-labelledby="tab-map" hidden={workspace !== 'map'}>
-                    <BoardMap snapshot={liveSnapshot} busy={busy} submit={submit}/>
+                    <BoardMap snapshot={liveSnapshot} busy={busy} submit={submit} controlsHost={mapControlsHost}/>
                 </div>
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={liveSnapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}>{snapshot.game.effects.papalCategory && <p className="papal-decree-banner" role="status">

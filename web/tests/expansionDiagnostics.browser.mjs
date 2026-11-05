@@ -45,7 +45,7 @@ export async function checkExpansionDiagnostics(page, web, baseline) {
     await show({...blocked, blockers: ['SHIPPING_CAPACITY_EXCEEDED'],
         shipping: {required: 4, used: 2, capacity: 2}});
     assert.match(await page.evaluate('document.querySelector(".province-actions [data-expansion-blocker]").textContent'),
-        /shipment needs 4.*already shipped 2.*capacity is 2/i);
+        /Needs 4 tokens.*Already shipped here: 2.*capacity per turn: 2/i);
     assert.equal(await page.evaluate('document.querySelector(".province-actions button")'), null);
 
     const china = baseline.game.catalog.provinces.find(candidate => candidate.id === 'china');

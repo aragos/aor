@@ -44,10 +44,13 @@ export function DecisionForm({id, ...props}: FormHTMLAttributes<HTMLFormElement>
     return <ActionForm.Provider value={formId}><form {...props} id={formId}/></ActionForm.Provider>;
 }
 
-export function DecisionAction({type = 'button', form, ...props}: ButtonHTMLAttributes<HTMLButtonElement>) {
+export function DecisionAction({type = 'button', form, notice, ...props}: ButtonHTMLAttributes<HTMLButtonElement> & {
+    notice?: ReactNode;
+}) {
     const planning = useContext(PlanningContext);
     const target = useContext(ActionTarget);
     const formId = useContext(ActionForm);
     const button = <button {...props} type={type} form={form ?? formId}>{planning && <>{t('plan.add')} · </>}{props.children}</button>;
-    return target === undefined ? button : target && createPortal(button, target);
+    const content = <>{notice}{button}</>;
+    return target === undefined ? content : target && createPortal(content, target);
 }

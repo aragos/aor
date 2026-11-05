@@ -542,6 +542,38 @@ class VisualProjectionTest {
         assertThat(offer.playable).isTrue()
         assertThat(offer.choices.single().kind).isEqualTo(CardChoiceKind.NONE)
         assertThat(offer.choices.single().command).isEqualTo("play hand-1")
+        assertThat(offer.choices.single().noEffect).isTrue()
+    }
+
+    @Test
+    fun anEffectiveEventDoesNotWarnAboutHavingNoTarget() {
+        val offer =
+            withHand(state().copy(stage = Stage.PLAY_CARDS), "enlightened-ruler")
+                .viewForPlayer(p1)
+                .cardOffers
+                .single()
+
+        assertThat(offer.choices.single().noEffect).isFalse()
+    }
+
+    @Test
+    fun aVoidedCardOffersItsBurdenDiagnosticAndNoPlayCommand() {
+        val offer =
+            withHand(
+                    state()
+                        .copy(
+                            stage = Stage.PLAY_CARDS,
+                            voids = CardVoids(armorAndStirrups = true),
+                        ),
+                    "armor",
+                )
+                .viewForPlayer(p1)
+                .cardOffers
+                .single()
+
+        assertThat(offer.playable).isFalse()
+        assertThat(offer.blockers).containsExactly(CardOfferBlocker.MISERY_BURDEN)
+        assertThat(offer.choices).isEmpty()
     }
 
     @Test

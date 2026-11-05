@@ -86,7 +86,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
                 <div><dt>{t('table.conditionalDiscount')}</dt><dd>${discount.conditionalAmount}</dd></div></dl>
             {discount.condition && <p>{label(discount.condition)}</p>}
         </details>)}
-        {inspection && offer?.blockers.map(blocker => <p className="blocker" key={blocker}>{t(`error.${blocker}`)}</p>)}
+        {offer?.blockers.map(blocker => <p className="blocker" role="alert" key={blocker}>{t(`error.${blocker}`)}</p>)}
         {action && offer?.playable && <DecisionForm onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
             <CardPlayEffects snapshot={snapshot} definition={definition} choice={resolutionChoice}
                 commodities={offer.commodities} targets={targets}
@@ -125,7 +125,11 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
             </p>)}
             <MiseryPreview snapshot={snapshot} changes={miseryChanges} uncertainPlayers={uncertainPlayers}/>
             {chooseMiseryTarget && <p className="small muted">{t('controls.chooseMiseryTarget')}</p>}
-            <DecisionAction type="submit" className="card-confirmation play-card-action" disabled={busy || !actionable}>{t('action.playCard')}</DecisionAction>
+            <DecisionAction type="submit" className="card-confirmation play-card-action" disabled={busy || !actionable}
+                aria-describedby={resolutionChoice?.noEffect ? 'card-play-warning' : undefined}
+                notice={resolutionChoice?.noEffect && <p id="card-play-warning" className="card-play-warning" role="alert">{t('card.noEffectWarning')}</p>}>
+                {t(resolutionChoice?.noEffect ? 'action.playWithoutEffect' : 'action.playCard')}
+            </DecisionAction>
         </DecisionForm>}
     </section>;
 }

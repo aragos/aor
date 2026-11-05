@@ -136,7 +136,7 @@ export async function checkParallelPlanning(page, web) {
     });
     assert(replaced.ok, 'Another device can replace the saved plan');
     await replaced.json();
-    await page.wait(`document.querySelector('.activity-planner').textContent.includes('saved plan changed in another view')`, 'stale local draft warning');
+    await page.wait(`[...document.querySelectorAll('.activity-planner .blocker button')].some(button => button.textContent === 'Load saved version')`, 'stale local draft warning');
     assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li').length`), 0, 'Polling retains the unsaved local draft');
     assert(await page.evaluate(`[...document.querySelectorAll('.decision-actions button')].find(b=>b.textContent === 'Save for review').disabled`), 'A stale draft cannot overwrite the other device');
     await page.click('Load saved version');
@@ -145,7 +145,7 @@ export async function checkParallelPlanning(page, web) {
     await page.wait(`document.querySelector('[data-help-content="plans"]')`, 'private planning help');
     const help = await page.evaluate(`document.querySelector('[data-help-content="plans"]').textContent`);
     assert.match(help, /earlier players/);
-    assert.match(help, /draw stops the plan/);
+    assert.match(help, /draw pauses for card review/);
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     assert.equal(await page.evaluate('document.querySelectorAll(".plan-actions li").length'), 2, 'Help inspection preserves the draft');
     // Hold a save after its receipt is captured, then change only the server receipt elsewhere.
@@ -172,7 +172,7 @@ export async function checkParallelPlanning(page, web) {
     assert(raced.ok, 'Concurrent identical save changes its receipt');
     await raced.json();
     await page.evaluate('window.releasePlanSave()');
-    await page.wait(`document.querySelector('.activity-planner').textContent.includes('saved plan changed in another view')`, 'rejected save preserves its original receipt');
+    await page.wait(`[...document.querySelectorAll('.activity-planner .blocker button')].some(button => button.textContent === 'Load saved version')`, 'rejected save preserves its original receipt');
     assert(await page.evaluate(`[...document.querySelectorAll('.decision-actions button')].find(b=>b.textContent === 'Save for review').disabled`), 'A rejected save cannot acknowledge another device’s identical write');
     await page.evaluate('window.fetch = window.planOriginalFetch');
     await page.click('Load saved version');

@@ -20,6 +20,7 @@ export interface CardChoiceView {
     value: string | null; command: string | null;
     miseryChanges?: MiseryChangeView[]; miseryUncertainPlayers?: string[];
     cashChanges?: {player: string; before: number; after: number}[];
+    noEffect?: boolean;
 }
 export interface MiseryChangeView {player: string; fromValue: number | null; toValue: number | null}
 export interface AppliedLeaderDiscount {

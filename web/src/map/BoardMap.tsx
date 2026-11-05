@@ -1,6 +1,7 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {ProvinceDefinition, ProvinceView, Snapshot} from '../api';
+import {createPortal} from 'react-dom';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
 import {HelpLink} from '../HelpLink';
@@ -106,6 +107,8 @@ function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string
 interface BoardMapProps {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     error?: string; status?: string;
+    /** The workspace bar hosts the camera controls while the map retains its viewport state. */
+    controlsHost?: HTMLElement | null;
 }
 
 type GeometryLoad = {key: string; geometry: Geometry} | {key: string; retryable: boolean} | null;
@@ -139,7 +142,7 @@ export function BoardMap(props: BoardMapProps) {
     </section>;
 }
 
-function LoadedBoardMap({snapshot, busy, geometry}: BoardMapProps & {geometry: Geometry}) {
+function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps & {geometry: Geometry}) {
     const [hovered, setHovered] = useState('');
     const [focused, setFocused] = useState('');
     // Background dismissal hides the border while retaining the action's province draft.
@@ -375,13 +378,13 @@ function LoadedBoardMap({snapshot, busy, geometry}: BoardMapProps & {geometry: G
     return <section className="interactive-board" id="interactive-board" aria-label={t('board.world')}
         data-map-geometry={geometryKey(catalog.dataVersion, snapshot.game.rules.map)}>
         {picker && <div className="map-pick-banner" role="status"><strong>{picker.title}</strong></div>}
-        <div className="map-viewport">
-            <div className="map-zoom" role="group" aria-label={t('board.zoom')}>
+        {controlsHost && createPortal(<div className="map-zoom" role="group" aria-label={t('board.zoom')}>
                 <button type="button" className="secondary" aria-label={t('board.zoomIn')} onClick={() => zoom(.7)}>+</button>
                 <button type="button" className="secondary" aria-label={t('board.zoomOut')} onClick={() => zoom(1.4)}>−</button>
                 <button type="button" className="secondary" onClick={fit}>{t('board.fit')}</button>
                 <HelpLink topic="map-legend" label={t('board.mapKey')}/>
-            </div>
+            </div>, controlsHost)}
+        <div className="map-viewport">
             <svg ref={svg} className="world-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="group" aria-label={t('board.interactiveMap')} fillRule="evenodd"
                 data-map-bounds={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`} tabIndex={0}
                 onKeyDown={event => {
