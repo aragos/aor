@@ -225,6 +225,60 @@ class BotAutomationTest(private val postgres: Boolean) {
         }
 
     @Test
+    fun pausingInvalidatesTheHumanReadValidator() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.claim()
+            val before = fixture.service.read(fixture.game.gameId, fixture.access(), null)
+
+            fixture.control("pause", work.epoch)
+            val after = fixture.service.read(fixture.game.gameId, fixture.access(), before.etag)
+
+            assertThat(after.etag).isNotEqualTo(before.etag)
+            assertThat(after.snapshot?.automation?.paused).isTrue()
+        }
+
+    @Test
+    fun resumingInvalidatesThePausedHumanReadValidator() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.claim()
+            val paused = fixture.control("pause", work.epoch)
+            val before = fixture.service.read(fixture.game.gameId, fixture.access(), null)
+
+            fixture.control("resume", paused.epoch)
+            val after = fixture.service.read(fixture.game.gameId, fixture.access(), before.etag)
+
+            assertThat(after.etag).isNotEqualTo(before.etag)
+            assertThat(after.snapshot?.automation?.paused).isFalse()
+        }
+
+    @Test
+    fun takeoverInvalidatesTheHumanReadValidatorWithoutAPublicRevisionChange() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.claim()
+            val before = fixture.service.read(fixture.game.gameId, fixture.access(), null)
+
+            val takeover = fixture.control("resume", work.epoch, UUID.randomUUID().toString())
+            val after = fixture.service.read(fixture.game.gameId, fixture.access(), before.etag)
+
+            assertThat(after.etag).isNotEqualTo(before.etag)
+            assertThat(after.snapshot?.automation?.epoch).isEqualTo(takeover.epoch)
+            assertThat(after.snapshot?.revision).isEqualTo(before.snapshot?.revision)
+        }
+
+    @Test
+    fun renewingThePrivateLeasePreservesTheHumanReadValidator() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.claim()
+            val before = fixture.service.read(fixture.game.gameId, fixture.access(), null)
+
+            fixture.control("renew", work.epoch, now = 2000)
+            val after = fixture.service.read(fixture.game.gameId, fixture.access(), before.etag)
+
+            assertThat(after.etag).isEqualTo(before.etag)
+            assertThat(after.snapshot).isNull()
+        }
+
+    @Test
     fun pausingCancelsOutstandingWorkAndRequiresExplicitResume() =
         AutomationFixture(postgres).use { fixture ->
             val work = fixture.claim()

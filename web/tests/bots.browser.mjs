@@ -100,8 +100,49 @@ try {
     await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-opponents-phone.png'));
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
     await page.wait(`!document.querySelector('#tab-players')`, 'desktop layout returns');
+    await page.wait(`document.querySelector('.bot-controls button')?.textContent === 'Resume automated opponents' && !document.querySelector('.bot-controls button').disabled`, 'paused snapshot and control are settled');
+    // A direct refresh can lose its result to a newer poll. Retain the paused representation
+    // deliberately, then require the ordinary conditional read to reconcile the control change.
+    await page.evaluate(`(async () => {
+        const originalFetch = window.fetch;
+        window.restoreBotSnapshotFetch = () => {window.fetch = originalFetch;};
+        const snapshotPath = ${JSON.stringify('/api/games/')} + ${JSON.stringify(gameId)};
+        const pausedResponse = await originalFetch(snapshotPath, {headers: {Authorization: ${JSON.stringify(`Bearer ${token}`)}}});
+        const pausedBody = await pausedResponse.text();
+        if (!JSON.parse(pausedBody).automation.paused) throw new Error('The cached automation snapshot must be paused.');
+        window.botMissNextResumeRefresh = true;
+        window.botMissedResumeRefreshes = 0;
+        window.botConditionalAutomationReads = [];
+        window.fetch = async (input, init) => {
+            const response = await originalFetch(input, init);
+            if (String(input) !== snapshotPath || init?.method === 'POST') return response;
+            const conditional = new Headers(init?.headers).has('If-None-Match');
+            if (!conditional && window.botMissNextResumeRefresh) {
+                window.botMissNextResumeRefresh = false;
+                window.botMissedResumeRefreshes++;
+                return new Response(pausedBody, {status: 200, headers: pausedResponse.headers});
+            }
+            if (conditional && window.botMissedResumeRefreshes) {
+                window.botConditionalAutomationReads.push({status: response.status,
+                    automation: response.ok ? (await response.clone().json()).automation : null});
+            }
+            return response;
+        };
+    })()`);
     await page.click('Resume automated opponents');
     await waitState(snapshot => !snapshot.automation.paused, 'explicit resume');
+    await page.wait(`window.botMissedResumeRefreshes === 1`, 'resume direct refresh deliberately retains the cached paused snapshot');
+    try {
+        await page.wait(`window.botConditionalAutomationReads.some(read => read.status === 200 && read.automation?.paused === false)`, 'ordinary conditional polling recovers the resumed automation view');
+    } catch (failure) {
+        console.log('Resume polling diagnostics', {automation: (await state()).automation,
+            reads: await page.evaluate('window.botConditionalAutomationReads'),
+            controls: await page.evaluate(`document.querySelector('.bot-controls').textContent`)});
+        throw failure;
+    }
+    await page.wait(`document.querySelector('.bot-controls button')?.textContent === 'Pause automated opponents' && !document.querySelector('.bot-controls button').disabled`, 'resumed UI recovers after the missed direct refresh');
+    assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Automation polling preserves the prepared human bid');
+    await page.evaluate('window.restoreBotSnapshotFetch()');
 
     second = await open(web + path);
     await second.wait(`document.querySelector('.bot-controls')`, 'second StrictMode game mount');

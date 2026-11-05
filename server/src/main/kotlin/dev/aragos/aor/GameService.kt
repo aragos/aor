@@ -651,6 +651,7 @@ class GameService(
                     stored.planVersions[player],
                     stored.planReceipts[player].orEmpty(),
                     stored.planExecutions[player].orEmpty(),
+                    BotAutomation.view(stored, player),
                 )
                 .joinToString("|")
         val etag = '"' + digest(visibleVersion) + '"'
