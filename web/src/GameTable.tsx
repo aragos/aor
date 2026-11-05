@@ -210,7 +210,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             players: liveSnapshot.game.players.every(player => player.capital !== null) ? liveSnapshot.game.players : [], turnOrder: liveSnapshot.game.turnOrder,
             orderBoxes: liveSnapshot.game.orderBoxes, commodityCards: liveSnapshot.game.commodityCards,
             commodityPayouts: liveSnapshot.game.commodityPayouts,
-            unplayedCards: liveSnapshot.game.unplayedCards}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
+            unplayedCards: liveSnapshot.game.unplayedCards,
+            cardInspections: liveSnapshot.game.cardInspections}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
         {expansionPass !== null && <CardInspectionDialog label={t('action.pass')} close={() => setExpansionPass(null)}>
             <h2>{t('action.pass')}</h2><p>{t('controls.confirmExpansionPass')}</p>
             {expansionPass !== snapshot.revision && <p className="blocker">{t('history.staleDraft')}</p>}

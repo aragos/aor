@@ -400,6 +400,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .unplayed-card-list { columns: 2 12rem; padding-left: 1.25rem; }
 .unplayed-card-list li { break-inside: avoid; margin-bottom: .35rem; }
 .reference-link { background: transparent; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; display: inline-block; margin-block: .4rem; font-size: .85rem; color: #315447; }
+.unplayed-card-list .reference-link { margin: 0; font-size: inherit; text-align: left; }
 .button-with-help { position: relative; display: inline-flex; min-width: 0; vertical-align: middle; }
 .button-with-help > button:not(.help-link) { flex: 1; padding-right: 1.6rem; }
 .button-with-help > .help-link { position: absolute; top: .45rem; right: .45rem; }
