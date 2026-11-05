@@ -85,17 +85,18 @@ class TrainingArtifacts(val directory: Path) {
             require(weights.isObject) { "Model weights must be an object." }
             return BotModel(
                 weights =
-                    weights.properties().associate { (feature, weight) ->
-                        require(weight.isNumber) { "Weight $feature must be numerical." }
-                        feature to weight.doubleValue()
-                    }
+                    BotModels.default.weights +
+                        weights.properties().associate { (feature, weight) ->
+                            require(weight.isNumber) { "Weight $feature must be numerical." }
+                            feature to weight.doubleValue()
+                        }
             )
         }
     }
 }
 
 /** Coverage remains explicit: a variant sweep does not imply every rare event occurred. */
-class CoverageLedger {
+class CoverageLedger(private val profile: TrainingProfile = TrainingProfile.FULL) {
     private data class ConfigurationCoverage(
         var games: Int = 0,
         var probes: Int = 0,
@@ -109,6 +110,7 @@ class CoverageLedger {
     private val features = mutableSetOf<String>()
     private val cards = mutableSetOf<String>()
     private val families = mutableMapOf<String, Int>()
+    private var elapsedGameMillis = 0L
 
     fun add(game: SimulatedGame) {
         val record = configurations.getOrPut(game.configuration) { ConfigurationCoverage() }
@@ -120,6 +122,7 @@ class CoverageLedger {
         mergeCounts(families, game.coverage.families)
         features.addAll(game.coverage.features)
         cards.addAll(game.coverage.playedCards)
+        elapsedGameMillis += game.elapsedMillis
     }
 
     fun contains(configuration: String, seed: Int): Boolean =
@@ -135,11 +138,27 @@ class CoverageLedger {
     val featureNames: Set<String>
         get() = features.toSortedSet()
 
+    /** Observed wall time per completed game, including concurrent-worker contention. */
+    val averageGameMillis: Double
+        get() =
+            elapsedGameMillis.toDouble() / configurations.values.sumOf { it.games }.coerceAtLeast(1)
+
     val missingDecisionTypes: Set<String>
         get() = requiredDecisions - configurations.values.flatMap { it.decisions.keys }.toSet()
 
     val missingCards: Set<String>
         get() = dev.aragos.aor.CardData.all.map { it.id }.toSet() - cards
+
+    val missingConfigurations: Set<String>
+        get() =
+            profile.configurations.map(TrainingConfiguration::id).toSet() -
+                configurations.filterValues { it.games > 0 }.keys
+
+    val complete: Boolean
+        get() =
+            missingConfigurations.isEmpty() &&
+                missingDecisionTypes.isEmpty() &&
+                missingCards.isEmpty()
 
     fun report(): Map<String, Any> {
         val observed = configurations.values.flatMap { it.decisions.keys }.toSet()
@@ -149,14 +168,14 @@ class CoverageLedger {
             "rulesVersion" to RULES_VERSION,
             "dataVersion" to DATA_VERSION,
             "games" to configurations.values.sumOf { it.games },
+            "elapsedGameMillis" to elapsedGameMillis,
             "directedProbes" to configurations.values.sumOf { it.probes },
-            "requiredConfigurations" to TrainingMatrix.configurations.size,
+            "profile" to profile.commandValue,
+            "requiredConfigurations" to profile.configurations.size,
+            "requiredConfigurationIds" to profile.configurations.map(TrainingConfiguration::id),
             "observedConfigurations" to completedConfigurations.size,
             "probedConfigurations" to configurations.filterValues { it.probes > 0 }.size,
-            "missingConfigurations" to
-                TrainingMatrix.configurations
-                    .map { it.id }
-                    .filterNot(completedConfigurations::contains),
+            "missingConfigurations" to missingConfigurations.sorted(),
             "observedDecisions" to observed.sorted(),
             "missingDecisionTypes" to missingDecisionTypes.sorted(),
             "missingCards" to missingCards.sorted(),
@@ -185,7 +204,14 @@ class CoverageLedger {
         ) {
             "Saved coverage belongs to a different engine version."
         }
+        require((root["profile"]?.asText() ?: "full") == profile.commandValue) {
+            "Saved coverage belongs to a different training profile."
+        }
+        val expected = profile.configurations.map(TrainingConfiguration::id).toSet()
         for ((id, node) in root["configurations"].properties()) {
+            require(id in expected) {
+                "Saved coverage contains an out-of-profile configuration: $id."
+            }
             configurations[id] =
                 ConfigurationCoverage(
                     games = node["games"].intValue(),
@@ -207,6 +233,7 @@ class CoverageLedger {
         families.putAll(
             root["families"].properties().associate { (key, value) -> key to value.intValue() }
         )
+        elapsedGameMillis = root["elapsedGameMillis"]?.longValue() ?: 0L
     }
 
     companion object {

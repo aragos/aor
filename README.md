@@ -64,9 +64,11 @@ Training runs independently of the game server, IDE and coding agents. Build its
 
 ```sh
 ./gradlew :training:installDist
-python3 training/build/install/training/bin/train-opponents.py --mode train --output .aor-training/run --hours 48
+python3 training/build/install/training/bin/train-opponents.py --mode train --profile strategic-four-player --output .aor-training/strategic-four-player --hours 48 --seeds 256 --rounds 384
 ```
 
-The supervisor enforces CPU, memory and elapsed-time limits and writes logs, coverage, resumable
-checkpoints and evaluation results. See [contributing](docs/contributing.md#opponent-training)
-for background execution, resuming and publishing a validated model.
+The focused profile uses four players, the standard map, the War/Timber swap, no Crusades in the
+initial deal and immediate Master Art discard. The supervisor enforces CPU, memory and elapsed-time
+limits and writes logs, coverage, resumable checkpoints and evaluation results. See
+[contributing](docs/contributing.md#opponent-training) for full-matrix training, background execution,
+resuming and publishing a validated model.

@@ -31,27 +31,8 @@ object ExpansionReach {
         context: BoardRulesContext,
         player: PlayerId,
         destination: ProvinceId,
-    ): List<ExpansionRoute> {
-        val profile = context.player(player)
-        if (
-            profile.chaos ||
-                destination !in context.provinceIds ||
-                !canEnter(profile, context.province(destination))
-        ) {
-            return emptyList()
-        }
-        return context
-            .bases(player)
-            .flatMap { base ->
-                listOfNotNull(
-                    ExpansionRoute.Local(base).takeIf { base == destination },
-                    ExpansionRoute.Land(base).takeIf {
-                        connected(context.configuration.landBorders, base, destination)
-                    },
-                ) +
-                    caravanRoutes(context, profile, base, destination) +
-                    shippingRoutes(context, profile, base, destination)
-            }
+    ): List<ExpansionRoute> =
+        routes(context, player, destination)
             .distinct()
             .sortedWith(
                 compareBy<ExpansionRoute>(
@@ -61,6 +42,43 @@ object ExpansionReach {
                     ::routeKey,
                 )
             )
+            .toList()
+
+    /**
+     * Tests route existence without enumerating alternatives or sorting them. Like [routesTo], this
+     * checks movement and access; token commitment and shipping capacity remain separate.
+     */
+    fun hasRoute(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
+    ): Boolean = routes(context, player, destination).any()
+
+    private fun routes(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
+    ): Sequence<ExpansionRoute> {
+        val profile = context.player(player)
+        if (
+            profile.chaos ||
+                destination !in context.provinceIds ||
+                !canEnter(profile, context.province(destination))
+        ) {
+            return emptySequence()
+        }
+        return context.bases(player).asSequence().flatMap { base ->
+            sequence {
+                if (base == destination) {
+                    yield(ExpansionRoute.Local(base))
+                }
+                if (connected(context.configuration.landBorders, base, destination)) {
+                    yield(ExpansionRoute.Land(base))
+                }
+                yieldAll(caravanRoutes(context, profile, base, destination))
+                yieldAll(shippingRoutes(context, profile, base, destination))
+            }
+        }
     }
 
     private fun routeLength(route: ExpansionRoute): Int =

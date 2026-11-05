@@ -76,17 +76,24 @@ are in [architecture](design.md#private-plans).
 ## Opponent policies
 
 [AI](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/) is separate from rules and authority. Policies
-consume numerical seat observations, never authoritative `GameState`. The observation adapter uses
-the same viewer-safe projections as ordinary play. Exact competition probabilities and Wind/Watermill
-quotes belong to their core rule projections. Candidate generation supplements the deliberately
-nonexhaustive command hints with bounded numeric and target alternatives.
+consume seat observations, never authoritative `GameState`. Purchase observations also carry a
+bounded snapshot of the owner's economy and public purchase facts for local rule transitions.
+The observation adapter uses the same viewer-safe projections as ordinary play. Exact competition
+probabilities and Wind/Watermill quotes belong to their core rule projections. Candidate generation
+supplements the deliberately nonexhaustive command hints with bounded numeric and target alternatives.
 
-All difficulties share one contextual economic evaluator. Easy varies among reasonable choices;
-Normal ranks current alternatives; Hard adds bounded resource-budget planning over current offers.
-This planning is advisory: every accepted action refreshes authoritative offers before the next
-decision. It does not claim full-game search or knowledge of unseen cards. Capital features include
-the initial hand, nearby opportunities, player count and map. Variant and epoch interactions permit
-offline tuning without independent rule implementations.
+All difficulties share one contextual economic evaluator. Purchase planning applies shared core
+transitions through shipping, advances, stabilization and relief, recomputing choices after each
+action and valuing completed outcomes. This captures overwritten fleet upgrades, prerequisites and
+immediate abilities without granting access to hidden hands or deck positions. Other decisions use
+current candidate evaluation; Hard additionally combines expansion offers within its resource budget.
+Every accepted action refreshes authoritative offers before the next decision. Capital and expansion
+features include the owner's held commodities, independent marker income and opportunities opened by
+future bases. A bounded peaceful expansion forecast can justify retaining a commodity card for the
+next card-play phase, accounting for stabilization and ending conditions. Reach calculations respect
+piece colour and use the core movement rules. Variant and epoch interactions permit offline tuning
+without independent rule implementations. Multi-round opponent responses, hidden-information sampling
+and learned future-state values remain open work.
 
 [Training](../training/src/main/kotlin/dev/aragos/aor/training/) supplies sampled authority outcomes
 through ordinary entries, while every simulated policy receives only its seat observation. Sealed

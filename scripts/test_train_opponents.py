@@ -74,6 +74,25 @@ class OptionsAndBudgetTest(unittest.TestCase):
             self.assertNotIn("--model", arguments)
             self.assertNotIn("--resume", arguments)
 
+    def test_focused_profile_is_forwarded_to_the_packaged_trainer(self):
+        options = training.parse_options([
+            "--mode", "train", "--profile", "strategic-four-player", "--batch", "32",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
+
+        arguments = training.trainer_arguments(options, budget, 12)
+
+        self.assertEqual(arguments[arguments.index("--profile") + 1], "strategic-four-player")
+        self.assertEqual(arguments[arguments.index("--batch") + 1], "32")
+        self.assertNotIn("--configurations", arguments)
+
+    def test_focused_profile_rejects_a_larger_configuration_prefix(self):
+        with patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                training.parse_options([
+                    "--profile", "strategic-four-player", "--configurations", "2",
+                ])
+
     def test_missing_native_resume_state_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             options = training.parse_options(["--output", directory, "--resume"])

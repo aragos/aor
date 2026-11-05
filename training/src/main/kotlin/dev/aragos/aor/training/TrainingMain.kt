@@ -17,9 +17,13 @@ fun main(arguments: Array<String>) {
             AoR standalone offline opponent trainer (JDK 21+).
             Use train-opponents.py for enforced CPU, memory and elapsed-time limits.
             --mode coverage|train|evaluate  --output PATH  --hours HOURS (maximum 72)
-            --workers N  --configurations 1..128  --seeds N  --seed N
+            --workers N  --profile full|strategic-four-player  --configurations N  --seeds N  --seed N
             --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
-            Reuse a train output directory to resume its original model and completed rounds.
+            The strategic-four-player profile uses the standard map, War/Timber swap,
+            no Crusades in the initial deal and immediate Master Art discard.
+            --configurations limits the chosen profile for smoke checks; truncated profiles
+            cannot promote a model. --batch is the minimum number of paired games per round.
+            Reuse a train output directory with the same profile to resume completed rounds.
             Outputs: trainer.log, coverage.json, checkpoint.json, candidate.json, model.json,
             evaluation.json, state.json and append-only games.jsonl/rounds.jsonl.
             """
@@ -35,9 +39,9 @@ fun main(arguments: Array<String>) {
     val deadline = minOf(maximumDeadline, requestedDeadline)
     require(deadline.isAfter(Instant.now())) { "This run has exhausted its three-day allowance." }
     val deadlineNanos = System.nanoTime() + Duration.between(Instant.now(), deadline).toNanos()
-    val ledger = CoverageLedger()
+    val ledger = CoverageLedger(options.profile)
     val initial = TrainingArtifacts.readModel(options.model)
-    val configurations = TrainingMatrix.stratified.take(options.configurations)
+    val configurations = options.configurations
     artifacts.write(
         "run.json",
         mapOf(
@@ -46,7 +50,9 @@ fun main(arguments: Array<String>) {
             "mode" to options.mode,
             "workers" to options.workers,
             "maxHeapBytes" to Runtime.getRuntime().maxMemory(),
-            "requiredConfigurations" to TrainingMatrix.configurations.size,
+            "profile" to options.profile.commandValue,
+            "requiredConfigurations" to options.profile.configurations.size,
+            "configurationIds" to configurations.map(TrainingConfiguration::id),
             "requestedConfigurations" to configurations.size,
             "seedsPerConfiguration" to options.seeds,
         ),
@@ -105,10 +111,8 @@ private fun train(
     ledger: CoverageLedger,
     completed: (SimulatedGame) -> Unit,
 ) {
-    val signature =
-        trainingSignature(
-            "${options.seed}:${options.configurations}:${options.seeds}:${options.batch}"
-        )
+    val configurations = options.configurations
+    val signature = trainingSignature(options.signatureSettings)
     val restored = artifacts.read("state.json")
     var state =
         if (restored != null) {
@@ -122,12 +126,12 @@ private fun train(
         }
     }
     state.save(artifacts, ledger)
-    println("Validating rare-decision curriculum across ${options.configurations} configurations.")
-    val probes = DecisionProbes(TrainingMatrix.stratified.take(options.configurations), ledger)
+    println("Validating rare-decision curriculum across ${configurations.size} configurations.")
+    val probes = DecisionProbes(configurations, ledger)
     if (!state.warmupComplete) {
-        println("Covering ${options.configurations} configurations before parameter exploration.")
+        println("Covering ${configurations.size} configurations before parameter exploration.")
         tournaments.sweep(
-            configurations = TrainingMatrix.stratified.take(options.configurations),
+            configurations = configurations,
             seedsPerConfiguration = options.seeds,
             seedOffset = options.seed,
             model = state.initial,
@@ -149,8 +153,18 @@ private fun train(
     val population = state.population.toMutableList()
     artifacts.model(champion, "checkpoint.json")
     for (round in state.nextRound until options.rounds) {
-        // Leave time for an independent held-out evaluation instead of spending the whole budget.
-        if (System.nanoTime() + Duration.ofMinutes(10).toNanos() >= tournaments.deadlineNanos) {
+        // Reserve measured simulation work for final evaluation, including worker contention.
+        val reserveMillis =
+            evaluationReserveMillis(
+                ledger.averageGameMillis,
+                configurations.size * options.evaluationSeeds +
+                    minOf(options.batch, configurations.size) * options.roundSeeds,
+                tournaments.workers,
+            )
+        if (
+            System.nanoTime() + Duration.ofMillis(reserveMillis).toNanos() >=
+                tournaments.deadlineNanos
+        ) {
             break
         }
         val candidate =
@@ -160,17 +174,13 @@ private fun train(
                 random = Random(options.seed xor (round * 65537)),
                 scale = if (round % 5 == 0) 0.35 else 0.12,
             )
-        val matrix = TrainingMatrix.stratified
-        val configurations =
-            (0 until minOf(options.batch, options.configurations)).map { index ->
-                matrix[(round * options.batch + index) % options.configurations]
-            }
+        val roundConfigurations = options.roundConfigurations(round)
         val comparison =
             tournaments.compare(
                 candidate = candidate,
                 incumbent = champion,
-                configurations = configurations,
-                seedsPerConfiguration = 1,
+                configurations = roundConfigurations,
+                seedsPerConfiguration = options.roundSeeds,
                 seedOffset = options.seed + 100_000_000 + round * 200003,
                 opponentPool = population.toList(),
                 completed = completed,
@@ -202,30 +212,60 @@ private fun train(
         println("Round $round accepted=$accepted $comparison")
     }
     artifacts.model(champion, "candidate.json")
+    val requiredMillis =
+        evaluationReserveMillis(
+            ledger.averageGameMillis,
+            configurations.size * options.evaluationSeeds,
+            tournaments.workers,
+        )
+    val remainingMillis = (tournaments.deadlineNanos - System.nanoTime()) / 1_000_000
+    if (remainingMillis < requiredMillis) {
+        artifacts.write(
+            "evaluation.json",
+            mapOf(
+                "promoted" to false,
+                "evaluationComplete" to false,
+                "profile" to options.profile.commandValue,
+                "configurationIds" to configurations.map(TrainingConfiguration::id),
+                "reason" to "Insufficient remaining time for independent held-out evaluation.",
+                "estimatedRequiredMillis" to requiredMillis,
+                "remainingMillis" to remainingMillis,
+            ),
+        )
+        artifacts.model(state.initial)
+        println(
+            "Held-out evaluation deferred; candidate and checkpoints retained without promotion."
+        )
+        return
+    }
     // These seeds never participate in parameter selection. Do not tune against this result.
     val heldOut =
         tournaments.compare(
             candidate = champion,
             incumbent = state.initial,
-            configurations = TrainingMatrix.stratified.take(options.configurations),
-            seedsPerConfiguration = maxOf(2, options.seeds),
+            configurations = configurations,
+            seedsPerConfiguration = options.evaluationSeeds,
             seedOffset = options.seed + 1_000_000_000,
-            opponentPool = population.take(2),
+            opponentPool =
+                (listOf(state.initial, BotModels.default, champion) + population).distinct(),
             heldOut = true,
             completed = completed,
         )
-    val completeCoverage =
-        options.configurations == TrainingMatrix.configurations.size &&
-            ledger.missingDecisionTypes.isEmpty() &&
-            ledger.missingCards.isEmpty()
-    val promoted = completeCoverage && heldOut.lower95 > 0.0
+    val promoted = ledger.complete && heldOut.lower95 > 0.0
     artifacts.write(
         "evaluation.json",
         mapOf(
             "promoted" to promoted,
+            "evaluationComplete" to true,
+            "profile" to options.profile.commandValue,
+            "configurationIds" to configurations.map(TrainingConfiguration::id),
+            "opponentModels" to
+                (listOf(state.initial, BotModels.default, champion) + population).distinct().size,
             "comparison" to heldOut,
             "criterion" to
-                "All 128 configurations, cards and decision types; paired 95% lower reward bound above zero",
+                "All ${options.profile.configurations.size} ${options.profile.commandValue} configurations, " +
+                    "cards and decision types; paired 95% lower reward bound above zero",
+            "missingConfigurations" to ledger.missingConfigurations.sorted(),
             "missingDecisionTypes" to ledger.missingDecisionTypes.sorted(),
             "missingCards" to ledger.missingCards.sorted(),
         ),
@@ -243,19 +283,47 @@ private fun runStart(output: Path): Instant {
     return now
 }
 
-private data class TrainingOptions(
+internal data class TrainingOptions(
     val mode: String,
     val output: Path,
     val model: Path?,
     val workers: Int,
     val hours: Double,
-    val configurations: Int,
+    val profile: TrainingProfile,
+    val configurationLimit: Int?,
     val seeds: Int,
     val seed: Int,
     val rounds: Int,
     val batch: Int,
     val difficulty: BotDifficulty,
 ) {
+    val configurations: List<TrainingConfiguration>
+        get() = profile.configurations.take(configurationLimit ?: profile.configurations.size)
+
+    /** Repeated deals retain the pair budget when one profile contains few configurations. */
+    val roundSeeds: Int
+        get() = (batch + configurations.size - 1) / configurations.size
+
+    /** Match the full matrix's minimum 256 held-out pairs within the chosen experimental scope. */
+    val evaluationSeeds: Int
+        get() = maxOf(seeds, 2, (256 + configurations.size - 1) / configurations.size)
+
+    val signatureSettings: String
+        get() =
+            listOf(
+                    profile.commandValue,
+                    configurations.joinToString(",", transform = TrainingConfiguration::id),
+                    seed,
+                    seeds,
+                    batch,
+                )
+                .joinToString(":")
+
+    fun roundConfigurations(round: Int): List<TrainingConfiguration> =
+        (0 until minOf(batch, configurations.size)).map { index ->
+            configurations[((round.toLong() * batch + index) % configurations.size).toInt()]
+        }
+
     companion object {
         fun parse(arguments: List<String>): TrainingOptions {
             require(arguments.size % 2 == 0) { "Use --option value pairs for training arguments." }
@@ -269,6 +337,7 @@ private data class TrainingOptions(
                     "--workers",
                     "--hours",
                     "--configurations",
+                    "--profile",
                     "--seeds",
                     "--seed",
                     "--rounds",
@@ -287,7 +356,8 @@ private data class TrainingOptions(
                     workers =
                         fields["--workers"]?.toInt() ?: ((cpus * 0.8).toInt() - 2).coerceAtLeast(1),
                     hours = fields["--hours"]?.toDouble() ?: 12.0,
-                    configurations = fields["--configurations"]?.toInt() ?: 128,
+                    profile = TrainingProfile.fromCommand(fields["--profile"] ?: "full"),
+                    configurationLimit = fields["--configurations"]?.toInt(),
                     seeds = fields["--seeds"]?.toInt() ?: 1,
                     seed = fields["--seed"]?.toInt() ?: 19790531,
                     rounds = fields["--rounds"]?.toInt() ?: 96,
@@ -300,12 +370,24 @@ private data class TrainingOptions(
             require(options.hours.isFinite() && options.hours > 0.0 && options.hours <= 72.0) {
                 "A training invocation may run for more than zero and at most 72 hours."
             }
-            require(options.configurations in 1..128) { "Use between 1 and 128 configurations." }
+            require(
+                options.configurationLimit == null ||
+                    options.configurationLimit in 1..options.profile.configurations.size
+            ) {
+                "Use between 1 and ${options.profile.configurations.size} configurations for ${options.profile.commandValue}."
+            }
             require(options.seeds in 1..1000) { "Use between 1 and 1000 seeds per configuration." }
             require(options.rounds in 0..100000) { "Use between 0 and 100000 exploration rounds." }
-            require(options.batch in 1..128) { "Use between 1 and 128 configurations per round." }
+            require(options.batch in 1..128) { "Use between 1 and 128 paired games per round." }
             require(options.seed in 0..100_000_000) { "The initial seed must be 0–100000000." }
             return options
         }
     }
 }
+
+/** Minimum ten-minute allowance, otherwise measured paired-game work plus a 50% safety margin. */
+internal fun evaluationReserveMillis(averageGameMillis: Double, pairs: Int, workers: Int): Long =
+    maxOf(
+        Duration.ofMinutes(10).toMillis(),
+        (averageGameMillis * pairs * 2 / workers * 1.5).toLong(),
+    )

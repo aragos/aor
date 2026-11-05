@@ -27,6 +27,9 @@ object BotPolicy {
         }
         require(observation.candidates.isNotEmpty()) { "A bot decision requires a candidate." }
         require(observation.candidates.size <= 1024) { "A bot decision has too many candidates." }
+        if (observation.purchase != null) {
+            return BotPurchasePlanner.choose(observation, difficulty, model)
+        }
         val scores =
             observation.candidates.associate { candidate ->
                 candidate.command to score(candidate, model)

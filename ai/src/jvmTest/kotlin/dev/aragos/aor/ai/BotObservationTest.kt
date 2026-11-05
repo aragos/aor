@@ -491,7 +491,7 @@ class BotObservationTest {
                 seat,
                 observation.decision,
             )
-        assertThat(observation).isEqualTo(ordinary)
+        assertThat(observation.copy(purchase = null)).isEqualTo(ordinary)
         for (candidate in observation.candidates) {
             try {
                 state.step(

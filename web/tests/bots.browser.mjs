@@ -195,6 +195,30 @@ try {
     await page.click('Resume automated opponents');
     await waitState(snapshot => !snapshot.automation.paused && snapshot.submitted.length === 2, 'resumption computes fresh private submissions');
 
+    await send('buy-tokens 0');
+    let completedPurchase = false;
+    for (let step = 0; step < 180; step++) {
+        const snapshot = await state();
+        if (snapshot.game.stage === 'EXPANSION') {
+            completedPurchase = true;
+            break;
+        }
+        if (snapshot.prompt?.players.includes(snapshot.viewerId)) {
+            const commands = snapshot.legalChoices.commands;
+            const command = commands.includes('stabilize cash') ? 'stabilize cash'
+                : commands.includes('pass') ? 'pass' : commands[0];
+            assert(command, `The human has a legal decision at ${snapshot.game.stage}`);
+            await send(command);
+        } else await pause(150);
+    }
+    assert(completedPurchase, 'Real workers complete the first purchase phase through ordinary server commands');
+    const purchases = await page.evaluate('window.botWorkerInputs.filter(input => input.observation.purchase)');
+    assert(purchases.length >= 2, 'Both bots receive the purchase planning snapshot in the actual worker');
+    assert.equal(new Set(purchases.map(input => input.observation.playerId)).size, 2);
+    assert(purchases.every(input => input.observation.purchase.owner === input.observation.playerId));
+    assert(purchases.every(input => !('deck' in input.observation.purchase) && !('players' in input.observation.purchase)),
+        'Purchase snapshots contain no authoritative deck or player state');
+
     await page.evaluate(`document.querySelector('.table-configuration').open = true`);
     await click('.abandon-game');
     await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('ends it immediately')`, 'solo abandonment explains the actual final consequence');
@@ -203,7 +227,7 @@ try {
     await waitState(snapshot => snapshot.status === 'ABANDONED', 'creator consent includes separate bot agreements');
     await page.wait(`document.querySelector('.bot-controls').textContent.includes('ended')`, 'terminal automation status');
     assert.equal(await page.evaluate(`document.querySelector('.bot-controls button') === null`), true, 'Closed games expose no automation mutation');
-    console.log('Local automated opponents passed: creation/difficulties, real worker decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-worker rewind, explicit resume, phone layout and final abandonment.');
+    console.log('Local automated opponents passed: creation/difficulties, real worker decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-worker rewind, explicit resume, purchase planning transport and execution, phone layout and final abandonment.');
 } finally {
     page.ws.close();
     if (second) {second.ws.close(); await fetch(`${cdp}/json/close/${second.target.id}`);}

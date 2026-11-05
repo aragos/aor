@@ -36,12 +36,16 @@ There are no gameplay defaults awaiting approval.
 
 ## Opponent evaluation
 
-- Run the standalone full training matrix and independent strength evaluation before advertising
-  measured difficulty separation or a trained advantage. Coverage gaps remain explicit in the
-  artifacts and prevent model promotion; targeted fixtures do not prove a whole-game advantage.
-- Consider richer observation-safe sampled continuations, opponent beliefs and learned leaf values
-  after contextual parameter exploration establishes a reproducible baseline. Measure gains at an
-  equal browser computation budget.
+- Establish independent strength results for the strategic four-player profile before claiming a
+  strategic advantage. Evaluate other configurations before extending those claims. Coverage gaps
+  remain explicit in the artifacts and prevent promotion within the selected profile; targeted
+  fixtures do not prove a whole-game advantage.
+- Extend exact purchase planning and strategic expansion features with observation-safe sampled
+  continuations across rounds, opponent beliefs and learned future-state values. Compare gains at
+  an equal browser computation budget, including ablations of planning and feature changes.
+- Coordinate commodity-card retention and expansion within one shared spending plan. Current
+  peaceful forecasts value each held card independently and assume positions survive until next
+  card play; they do not establish that all suggested investments can be funded together.
 
 Plans across future phases and midgame controller replacement remain deferred, as defined in
 [scope](requirements.md).

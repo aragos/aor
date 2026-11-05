@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlinx.collections.immutable.persistentMapOf
@@ -9,6 +10,57 @@ class ExpansionReachTest {
     private val venice = PlayerId("p1")
     private val genoa = PlayerId("p2")
     private val barcelona = PlayerId("p3")
+
+    @Test
+    fun routeExistenceMatchesFullEnumerationAcrossMovementCapabilities() {
+        val capabilities =
+            listOf(
+                ShippingCapability.NONE to emptySet(),
+                ShippingCapability.NONE to setOf(AdvanceId.CARAVAN),
+                ShippingCapability.GALLEY_2 to emptySet(),
+                ShippingCapability.GALLEY_8 to setOf(AdvanceId.THE_HEAVENS),
+                ShippingCapability.SEAWORTHY_10 to setOf(AdvanceId.SEAWORTHY_VESSELS),
+                ShippingCapability.OCEAN_1 to emptySet(),
+                ShippingCapability.OCEAN_4 to setOf(AdvanceId.OCEAN_NAVIGATION),
+                ShippingCapability.OCEAN_4 to
+                    setOf(
+                        AdvanceId.CARAVAN,
+                        AdvanceId.THE_HEAVENS,
+                        AdvanceId.OVERLAND_EAST,
+                        AdvanceId.OCEAN_NAVIGATION,
+                        AdvanceId.NEW_WORLD,
+                    ),
+            )
+        for (map in MapRule.entries) {
+            val board =
+                BoardState(definition = map.definition)
+                    .replaceWithToken(id("smyrna"), venice)
+                    .board
+                    .placeMarker(id("florence"), genoa, PieceSide.WHITE)
+                    .board
+            for ((ships, advances) in capabilities) {
+                val context =
+                    context(advances = advances, ships = ships, board = board)
+                        .copy(configuration = CatalogConfiguration(3, RuleOptions(map = map)))
+                for (province in context.configuration.provinces) {
+                    assertWithMessage("$map / $ships / $advances / ${province.id}")
+                        .that(ExpansionReach.hasRoute(context, venice, province.id))
+                        .isEqualTo(
+                            ExpansionReach.routesTo(context, venice, province.id).isNotEmpty()
+                        )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun eliminatedPlayersHaveNoRouteEvenToTheirCapital() {
+        val initial = context()
+        val profile = initial.player(venice).copy(chaos = true)
+        val context = initial.copy(players = initial.players + (venice to profile))
+
+        assertThat(ExpansionReach.hasRoute(context, venice, id("venice"))).isFalse()
+    }
 
     @Test
     fun smyrnaCannotReachTaurusByLandOnEitherMap() {

@@ -52,3 +52,37 @@ object TrainingMatrix {
             configuration.playerCount - 3
     }
 }
+
+/**
+ * A named experimental scope. Promotion establishes strength only within this configuration set.
+ */
+enum class TrainingProfile(val commandValue: String) {
+    FULL("full"),
+    STRATEGIC_FOUR_PLAYER("strategic-four-player");
+
+    val configurations: List<TrainingConfiguration>
+        get() =
+            when (this) {
+                FULL -> TrainingMatrix.stratified
+                STRATEGIC_FOUR_PLAYER ->
+                    listOf(
+                        TrainingConfiguration(
+                            playerCount = 4,
+                            rules =
+                                RuleOptions(
+                                    deckModification = true,
+                                    initialCard = InitialCardRule.NO_CRUSADES,
+                                    immediateMasterArtDiscard = true,
+                                    map = MapRule.STANDARD,
+                                ),
+                        )
+                    )
+            }
+
+    companion object {
+        fun fromCommand(value: String): TrainingProfile =
+            requireNotNull(entries.firstOrNull { it.commandValue == value }) {
+                "Unknown training profile: $value. Use full or strategic-four-player."
+            }
+    }
+}

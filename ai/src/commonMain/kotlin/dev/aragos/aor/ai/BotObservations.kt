@@ -46,6 +46,7 @@ object BotObservations {
                 else -> error("A bot observation requires a player decision.")
             }
         return from(state.viewForDecision(seat), state.legalChoices(seat), seat, decision)
+            .copy(purchase = BotPurchaseSnapshots.from(state, seat))
     }
 
     /** Public projection entry point also supports isolated policy and privacy tests. */
@@ -72,6 +73,7 @@ private class ObservationProjection(
         else if (view.currentEpoch == 3) (1.0 - view.deckRemaining / 18.0).coerceIn(0.0, 1.0)
         else 0.0
     private val stabilization = (view.stabilizationCost ?: 0L).toDouble()
+    private val strategy by lazy { StrategicExpansion(view, seat) }
     private val conditions =
         listOf(
             "count.${view.players.size}",
@@ -106,6 +108,7 @@ private class ObservationProjection(
                     "stock" to self.stockTokens.toDouble(),
                     "misery" to (self.misery.value ?: 1000).toDouble(),
                     "income" to (self.income?.ordinary ?: 0).toDouble(),
+                    "markers" to self.boardMarkers.toDouble(),
                     "handCount" to self.handCount.toDouble(),
                     "advances" to self.advances.size.toDouble(),
                     "playerCount" to view.players.size.toDouble(),
@@ -422,6 +425,7 @@ private class ObservationProjection(
                 add("card.${card.definition.id}", 1.0)
                 add("progress", 1.0)
                 add("cash", stabilizationReduction())
+                add("heldCommodity", -strategy.retentionValue(card.reference))
                 if (choice != null) {
                     addMisery(features, choice.miseryChanges)
                     choice.cashChanges.forEach { change ->
@@ -566,15 +570,22 @@ private class ObservationProjection(
             if (complete) 1.0 else tokens.toDouble() / offer.requiredTokens.coerceAtLeast(1)
         features["tokens"] = -tokens.toDouble()
         features["progress"] = fraction
-        features["reach"] = if (definition.isSatellite) 1.5 * chance else fraction * chance
+        features["reach"] = strategy.futureReach(province, tokens, complete) * chance
         features["commodity"] =
             definition.commodities.sumOf(::commodityMarginal) * fraction * chance * 0.25
+        if (complete && !definition.isSatellite) {
+            features["heldCommodity"] = strategy.heldCommodityGain(province) * chance
+        }
         features["income"] =
             when {
                 !complete || definition.isSatellite -> 0.0
                 offer.incomeAfter != null && offer.incomeBefore != null ->
                     ((offer.incomeAfter ?: 0) - (offer.incomeBefore ?: 0)).toDouble()
-                else -> 2.0 * chance
+                else -> {
+                    val before = catalog.incomeTrack.getOrNull(self.boardMarkers) ?: 0
+                    val after = catalog.incomeTrack.getOrNull(self.boardMarkers + 1) ?: before
+                    (after - before) * chance
+                }
             }
         features["risk"] = if (offer.uncertain) (1.0 - chance) * tokens else 0.0
     }

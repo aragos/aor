@@ -49,6 +49,104 @@ class TrainingTest {
     }
 
     @Test
+    fun focusedProfileUsesTheReviewedFourPlayerConfiguration() {
+        val options = TrainingOptions.parse(listOf("--profile", "strategic-four-player"))
+
+        assertThat(options.configurations)
+            .containsExactly(
+                TrainingConfiguration(
+                    playerCount = 4,
+                    rules =
+                        RuleOptions(
+                            deckModification = true,
+                            initialCard = InitialCardRule.NO_CRUSADES,
+                            immediateMasterArtDiscard = true,
+                            map = MapRule.STANDARD,
+                        ),
+                )
+            )
+    }
+
+    @Test
+    fun focusedRoundsRepeatDealsRatherThanSelectingOnOnePair() {
+        val options =
+            TrainingOptions.parse(listOf("--profile", "strategic-four-player", "--seeds", "256"))
+
+        assertThat(options.roundConfigurations(3)).containsExactlyElementsIn(options.configurations)
+        assertThat(options.roundSeeds).isEqualTo(16)
+        assertThat(options.evaluationSeeds).isEqualTo(256)
+    }
+
+    @Test
+    fun evaluationReserveUsesMeasuredGamesAndAvailableWorkers() {
+        val reserve = evaluationReserveMillis(20_000.0, pairs = 256, workers = 4)
+
+        assertThat(reserve).isEqualTo(3_840_000L)
+    }
+
+    @Test
+    fun shortEvaluationEstimatesRetainAMinimumAllowance() {
+        assertThat(evaluationReserveMillis(10.0, pairs = 256, workers = 4)).isEqualTo(600_000L)
+    }
+
+    @Test
+    fun fullRoundsRetainTheExistingSixteenConfigurationBatch() {
+        val options = TrainingOptions.parse(emptyList())
+
+        assertThat(options.roundConfigurations(0)).hasSize(16)
+        assertThat(options.roundSeeds).isEqualTo(1)
+        assertThat(options.evaluationSeeds).isEqualTo(2)
+    }
+
+    @Test
+    fun focusedProfileCannotSelectConfigurationsOutsideItsScope() {
+        assertFailsWith<IllegalArgumentException> {
+            TrainingOptions.parse(
+                listOf("--profile", "strategic-four-player", "--configurations", "2")
+            )
+        }
+    }
+
+    @Test
+    fun resumeSettingsDistinguishTheProfileFromAnEquallySizedMatrixPrefix() {
+        val focused = TrainingOptions.parse(listOf("--profile", "strategic-four-player"))
+        val prefix = TrainingOptions.parse(listOf("--configurations", "1"))
+
+        assertThat(focused.signatureSettings).isNotEqualTo(prefix.signatureSettings)
+        assertThat(focused.signatureSettings)
+            .contains("players-4/standard/no-crusades/deck-true/art-true")
+    }
+
+    @Test
+    fun focusedCoverageCanCompleteWithoutClaimingOtherVariantCoverage() {
+        val ledger = CoverageLedger(TrainingProfile.STRATEGIC_FOUR_PLAYER)
+        val configuration = TrainingProfile.STRATEGIC_FOUR_PLAYER.configurations.single()
+        ledger.add(completeCoverageGame(configuration))
+
+        assertThat(ledger.complete).isTrue()
+        assertThat(ledger.report()["requiredConfigurations"]).isEqualTo(1)
+        assertThat(ledger.report()["profile"]).isEqualTo("strategic-four-player")
+        assertThat(ledger.missingConfigurations).isEmpty()
+    }
+
+    @Test
+    fun completingOneFullMatrixConfigurationCannotPromoteTheFullProfile() {
+        val ledger = CoverageLedger()
+        ledger.add(completeCoverageGame(TrainingMatrix.stratified.first()))
+
+        assertThat(ledger.complete).isFalse()
+        assertThat(ledger.missingConfigurations).hasSize(127)
+    }
+
+    @Test
+    fun focusedCoverageCannotResumeAsTheFullMatrix() {
+        val report = CoverageLedger(TrainingProfile.STRATEGIC_FOUR_PLAYER).report()
+        val root = ObjectMapper().valueToTree<com.fasterxml.jackson.databind.JsonNode>(report)
+
+        assertFailsWith<IllegalArgumentException> { CoverageLedger().restore(root) }
+    }
+
+    @Test
     fun completeSeededGameReplaysAndConservesObservableCoverage() {
         val result =
             Simulation()
@@ -72,6 +170,28 @@ class TrainingTest {
             )
         assertThat(CardData.all.map(CardDefinition::id))
             .containsAtLeastElementsIn(result.coverage.playedCards)
+    }
+
+    @Test
+    fun focusedProfileCompletesAndReplaysWithMixedDifficulties() {
+        val configuration = TrainingProfile.STRATEGIC_FOUR_PLAYER.configurations.single()
+        val difficulties = listOf(BotDifficulty.EASY, BotDifficulty.NORMAL, BotDifficulty.HARD)
+
+        val result =
+            Simulation()
+                .play(
+                    configuration = configuration,
+                    seed = 19790531,
+                    competitors =
+                        List(4) { seat ->
+                            Competitor(BotModels.default, difficulties[seat % difficulties.size])
+                        },
+                    verifyReplay = true,
+                )
+
+        assertThat(result.scores).hasSize(4)
+        assertThat(result.scores.any { it.winner }).isTrue()
+        assertThat(result.coverage.epochs).containsExactly(1, 2, 3)
     }
 
     @Test
@@ -122,6 +242,55 @@ class TrainingTest {
             artifacts.model(BotModels.default)
             assertThat(TrainingArtifacts.readModel(directory.resolve("model.json")))
                 .isEqualTo(BotModels.default)
+        } finally {
+            Files.deleteIfExists(directory.resolve("model.json"))
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun sparseModelsRetainNewDefaultFeaturesLikeBrowserInference() {
+        val directory = Files.createTempDirectory("aor-training-sparse-model-")
+        try {
+            val path = directory.resolve("model.json")
+            ObjectMapper()
+                .writeValue(
+                    path.toFile(),
+                    mapOf("schemaVersion" to 1, "weights" to mapOf("cash" to 1.25)),
+                )
+
+            val model = TrainingArtifacts.readModel(path)
+
+            assertThat(model.weights["cash"]).isEqualTo(1.25)
+            assertThat(model.weights["income"]).isEqualTo(BotModels.default.weights["income"])
+            assertThat(model.weights.keys).containsAtLeastElementsIn(BotModels.default.weights.keys)
+        } finally {
+            Files.deleteIfExists(directory.resolve("model.json"))
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun modelsForAnotherCatalogCannotBeUsedAsTheTrainingBaseline() {
+        val directory = Files.createTempDirectory("aor-training-obsolete-model-")
+        try {
+            val path = directory.resolve("model.json")
+            ObjectMapper()
+                .writeValue(
+                    path.toFile(),
+                    mapOf(
+                        "schemaVersion" to 1,
+                        "dataVersion" to "obsolete-catalog",
+                        "weights" to mapOf("cash" to 1.25),
+                    ),
+                )
+
+            val failure =
+                assertFailsWith<IllegalArgumentException> {
+                    TrainingArtifacts.readModel(path)
+                }
+
+            assertThat(failure).hasMessageThat().contains("different data version")
         } finally {
             Files.deleteIfExists(directory.resolve("model.json"))
             Files.deleteIfExists(directory)
@@ -203,4 +372,22 @@ class TrainingTest {
             assertThat(heldOut).isNotEqualTo(training)
         }
     }
+
+    private fun completeCoverageGame(configuration: TrainingConfiguration): SimulatedGame =
+        SimulatedGame(
+            configuration = configuration.id,
+            seed = 7,
+            steps = 1,
+            scores = emptyList(),
+            coverage =
+                GameCoverage(
+                    decisions = CoverageLedger.requiredDecisions.associateWith { 1 },
+                    families = emptyMap(),
+                    playedCards = CardData.all.map(CardDefinition::id).toSet(),
+                    capitals = emptySet(),
+                    epochs = setOf(1, 2, 3),
+                    features = emptySet(),
+                ),
+            elapsedMillis = 1,
+        )
 }

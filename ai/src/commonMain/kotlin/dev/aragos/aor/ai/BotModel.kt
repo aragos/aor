@@ -4,7 +4,7 @@ import dev.aragos.aor.CatalogVersion
 import dev.aragos.aor.RULES_VERSION
 import kotlin.math.abs
 
-const val BOT_POLICY_VERSION = "aor-policy-1"
+const val BOT_POLICY_VERSION = "aor-policy-2"
 
 /** Controller strength is independent of the rules and the engine's player identity. */
 enum class BotDifficulty {
@@ -28,6 +28,7 @@ data class BotObservation(
     val candidates: List<BotCandidate>,
     val rulesVersion: String,
     val dataVersion: String,
+    val purchase: BotPurchaseSnapshot? = null,
 ) {
     init {
         require(schemaVersion == 1) { "Unsupported bot observation schema: $schemaVersion." }
@@ -48,6 +49,15 @@ data class BotObservation(
         }
         require(rulesVersion == RULES_VERSION) { "Unsupported bot rules version: $rulesVersion." }
         CatalogVersion.fromWire(dataVersion)
+        require(
+            purchase == null ||
+                (purchase.owner == playerId &&
+                    purchase.decision == decision &&
+                    purchase.cash == availableCash &&
+                    purchase.dataVersion == dataVersion)
+        ) {
+            "Purchase planning facts must belong to this seat and decision."
+        }
     }
 }
 
@@ -113,6 +123,7 @@ object BotModels {
                     "chaos" to -10000.0,
                     "income" to 3.2,
                     "commodity" to 1.4,
+                    "heldCommodity" to 0.8,
                     "reach" to 2.1,
                     "discount" to 1.0,
                     "cards" to 7.5,

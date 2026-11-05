@@ -69,31 +69,39 @@ Python 3.10+ on macOS/Linux, with no server, IDE, agent, model service or Gradle
 ```sh
 ./gradlew :training:installDist :training:distZip
 python3 training/build/install/training/bin/train-opponents.py --help
-python3 training/build/install/training/bin/train-opponents.py --mode train --output .aor-training/run --hours 48
+python3 training/build/install/training/bin/train-opponents.py --mode train --profile strategic-four-player --output .aor-training/strategic-four-player --hours 48 --seeds 256 --rounds 384
 ```
 
 The complete folder `training/build/install/training/` is portable; retain its `bin/` and `lib/`
 directories together. A zipped distribution is available under `training/build/distributions/`.
 Use an absolute output directory when launching from another working directory.
 
+Use `--profile strategic-four-player` to concentrate experiments on four players, the standard map,
+the War/Timber swap, no Crusades in the initial deal and immediate Master Art discard. Deals, seats
+and sampled outcomes still vary. The default `--profile full` retains all 128 configurations;
+`--configurations` limits the selected profile's prefix and does not select particular variants.
+Profile-scoped evaluation establishes evidence only for that profile. Broader strength claims need
+independent evaluation across the supported configurations.
+
 For unattended execution from the repository root:
 
 ```sh
-nohup python3 training/build/install/training/bin/train-opponents.py --mode train --output .aor-training/run --hours 48 > training-supervisor.log 2>&1 &
+nohup python3 training/build/install/training/bin/train-opponents.py --mode train --profile strategic-four-player --output .aor-training/strategic-four-player --hours 48 --seeds 256 --rounds 384 > training-strategic-supervisor.log 2>&1 &
 ```
 
 Inspect or resume it without an agent:
 
 ```sh
-python3 training/build/install/training/bin/train-opponents.py --output .aor-training/run --status
-tail -f .aor-training/run/trainer.log
-python3 training/build/install/training/bin/train-opponents.py --mode train --output .aor-training/run --resume --hours 24
+python3 training/build/install/training/bin/train-opponents.py --output .aor-training/strategic-four-player --status
+tail -f .aor-training/strategic-four-player/trainer.log
+python3 training/build/install/training/bin/train-opponents.py --mode train --profile strategic-four-player --output .aor-training/strategic-four-player --resume --hours 24 --seeds 256 --rounds 384
 ```
 
 Resuming the same directory preserves the original 72-hour allowance, initial baseline, population,
-completed coverage and completed exploration rounds. Changes to policy bytecode or matrix/seed/batch
-settings require a new output directory; resource limits and the desired total round count may change.
-Repeat any nondefault matrix, seed and batch options when resuming.
+completed coverage and completed exploration rounds. Changes to policy bytecode or profile/matrix/seed/
+batch settings require a new output directory; resource limits and the desired total round count may
+change. Repeat any nondefault profile, matrix, seed and batch options when resuming. Keep experiments
+with changed planning or feature definitions in separate output directories.
 Send SIGTERM to the supervisor PID shown by `--status` to stop; complete checkpoints survive. One
 output lock prevents concurrent writers. Ordinary training never reads production games or secrets.
 
@@ -103,17 +111,21 @@ resident-memory threshold. The three-day allowance does not reset on restart. Th
 process limits; they do not reserve hardware from unrelated applications. Logs, checkpoints and raw
 results stay in ignored `.aor-training/` storage.
 
-The default matrix contains all 128 player-count/variant combinations. Complete simulations cover
+The full matrix contains all 128 player-count/variant combinations. Complete simulations cover
 capital bidding/choice, all epochs and available capitals. Directed rare-decision probes complement
 sampled games. `coverage.json` reports observed and missing decisions/cards/configurations separately;
-it does not claim exhaustive coverage of all possible positions. `rounds.jsonl` records parameter
-exploration, and `evaluation.json` records independent final comparison. A failed promotion retains
-the original model in `model.json`; `candidate.json` remains available for diagnosis.
+it does not claim exhaustive coverage of all possible positions. Coverage and promotion requirements
+are scoped to the selected profile. `--batch` sets the minimum number of paired comparisons in a
+selection round, including when only one configuration is selected. `rounds.jsonl` records parameter
+exploration, and `evaluation.json` records independent final comparison with rotated seats and a
+population of opponents. A failed promotion retains the original model in `model.json`;
+`candidate.json` remains available for diagnosis.
 
 Publish a model only after reviewing `evaluation.json` and its coverage gates. Copy the validated
 `model.json` into `web/src/ai/model.json`, then build and check the web client. Model schema, rules and
-catalog metadata protect inference compatibility. The first implementation tunes contextual action
-evaluation and bounded resource planning; richer sampled search is tracked in [open work](follow-ups.md).
+catalog metadata protect inference compatibility. Training tunes the contextual evaluator used by
+purchase planning and strategic expansion forecasts; sampled multi-round search and learned
+future-state values are tracked in [open work](follow-ups.md).
 
 ## Maintain documentation
 

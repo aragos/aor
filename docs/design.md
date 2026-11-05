@@ -166,11 +166,13 @@ from rendering, not secrets from its host. Competitive trusted execution and ful
 are separate hosting modes. Persisted commands replay without loading a model or running a policy.
 
 Offline [training](../training/src/main/kotlin/dev/aragos/aor/training/) runs as a standalone executable,
-with no production storage or model service. Its matrix covers the complete player-count/variant
-product. Compact model assets are versioned by schema/rules/catalog; incompatible downloads fall
-back to the rule-based prior. Parameter exploration uses a population of opponents and independent
-final evaluation. Training checks coverage explicitly and retains the prior when promotion evidence
-is insufficient. [Contributing](contributing.md#opponent-training) owns operation and resource limits.
+with no production storage or model service. Named profiles select either the complete player-count/
+variant product or a focused experiment. Compact model assets are versioned by schema/rules/catalog;
+incompatible downloads fall back to the rule-based prior. Parameter exploration uses a population of
+opponents and independent final evaluation. Training checks coverage within the declared profile and
+retains the initial model when promotion evidence is insufficient; focused evidence does not establish
+strength across other configurations. [Contributing](contributing.md#opponent-training) owns operation
+and resource limits.
 
 ## Lifecycle and activity
 

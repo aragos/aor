@@ -74,6 +74,8 @@ def parse_options(arguments):
     parser.add_argument("--hours", type=float, default=12.0)
     parser.add_argument("--workers", type=int)
     parser.add_argument("--model", type=Path)
+    parser.add_argument("--profile", choices=("full", "strategic-four-player"), default="full",
+                        help="Use the full matrix or the fixed four-player strategy experiment.")
     parser.add_argument("--configurations", type=int)
     parser.add_argument("--seeds", type=int)
     parser.add_argument("--seed", type=int)
@@ -91,6 +93,8 @@ def parse_options(arguments):
         value = getattr(options, name)
         if value is not None and not minimum <= value <= maximum:
             parser.error(f"--{name} must be between {minimum} and {maximum}.")
+    if options.profile == "strategic-four-player" and options.configurations not in (None, 1):
+        parser.error("--profile strategic-four-player contains exactly one configuration.")
     if options.workers is not None and options.workers < 1:
         parser.error("--workers must be positive.")
     options.output = options.output.expanduser().resolve()
@@ -211,7 +215,8 @@ def trainer_arguments(options, budget, remaining_hours):
     model = options.model
     if options.resume and not (options.output / "state.json").is_file():
         raise ValueError("--resume requires the trainer's state.json in --output.")
-    arguments = [str(TRAINER), "--mode", options.mode, "--output", str(options.output),
+    arguments = [str(TRAINER), "--mode", options.mode, "--profile", options.profile,
+                 "--output", str(options.output),
                  "--workers", str(budget.workers), "--hours", str(remaining_hours)]
     if model is not None:
         arguments += ["--model", str(model)]
@@ -463,7 +468,8 @@ def main(arguments=None):
         metadata = dict(
             startedAt=timestamp(started), allowanceDeadline=timestamp(allowance),
             deadline=timestamp(deadline), updatedAt=timestamp(now), status="starting",
-            supervisorPid=os.getpid(), mode=options.mode, machineCpus=hardware.cpus,
+            supervisorPid=os.getpid(), mode=options.mode, profile=options.profile,
+            machineCpus=hardware.cpus,
             machineMemoryBytes=hardware.memory_bytes, cpuLimitCores=budget.cpu_cores,
             rssLimitBytes=budget.memory_bytes, heapBytes=budget.heap_bytes,
             workers=budget.workers, sampleSeconds=SAMPLE_SECONDS,
