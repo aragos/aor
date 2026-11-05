@@ -81,6 +81,8 @@ data class GameView(
     val catalog: PublicCatalog? = null,
     val activity: ActivityView? = null,
     val deckRemaining: Int = 0,
+    /** Introduced cards not publicly played in this epoch, including hands and private discards. */
+    val unplayedCards: List<CardDefinition> = emptyList(),
     val endingTriggered: Boolean = false,
     val scores: List<ScoreView> = emptyList(),
     val adjustments: Map<Commodity, List<CommodityAdjustment>> = emptyMap(),
@@ -176,6 +178,7 @@ data class GameView(
                         .orEmpty(),
                 activity = ActivityView.from(state),
                 deckRemaining = state.deck.size,
+                unplayedCards = if (decisionOnly) emptyList() else CardAvailability.unplayed(state),
                 endingTriggered = state.endingTriggered,
                 scores =
                     if (state.stage == Stage.FINISHED) {

@@ -63,6 +63,13 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                     <button type="button" className="secondary" key={id} onClick={() => setTopic(id)}>{t(key)}</button>)}</nav>
             </>}
             {needsCatalog && !catalog && <p role="status">{t(error ? 'reference.unavailable' : 'reference.loading')}</p>}
+            {topic === 'unplayed-cards' && <section id="unplayed-cards">
+                <h2>{t('reference.unplayedCardsTitle')}</h2>
+                <p>{t('reference.unplayedCardsHint')}</p>
+                {current?.unplayedCards?.length ? <ul className="unplayed-card-list">
+                    {current.unplayedCards.map(card => <li key={card.id} data-unplayed-card={card.id}>{t(card.messageId)}</li>)}
+                </ul> : <p>{t('reference.noUnplayedCards')}</p>}
+            </section>}
             {(topic === 'variants' || topic.startsWith('variant-')) && <section id="variants"><h2>{t("reference.game-variants")}</h2>{ruleOptions.filter(variant => !topic.startsWith('variant-') || variant.key === topic.slice(8)).map(variant => <article id={`variant-${variant.key}`} key={variant.key}>
             <h3>{t(`option.${variant.key}`)}</h3><p>{t(`reference.variant.${variant.key}`)}</p></article>)}</section>}
             {topic === 'map-legend' && <section id="map-legend"><h2>{t("reference.map-key-and-navigation")}</h2>

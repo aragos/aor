@@ -51,6 +51,9 @@ mechanics and [map design](map-design.md) owns spatial rendering.
   the hand does not select or submit. Commodity inspection highlights matching in-play provinces
   without replacing a draft. Track popups follow accepted public updates and retain shared positions.
 - Public summaries use public facts only. Unplayed-card counts cannot reveal private discards.
+  The epoch's remaining-card lookup lists introduced cards not publicly played, including hands
+  and private discards. Recurring plays reset on the next epoch's shuffle; square plays stay excluded.
+  This list is distinct from the draw-pile size shown in the header.
   Live forecasts are distinct from actual payments; for example white circles affect current
   commodity forecasts, while payments retain their colored-marker rule.
 - Support keyboard, touch, visible focus, reduced motion and phone layouts. Every finite choice

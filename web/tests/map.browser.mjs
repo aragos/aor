@@ -33,6 +33,7 @@ import {checkAdvanceCategoryGroups, checkCapitalTieConsequences, checkSharedMark
 import {checkCardAndPlayerDetails, checkReplacementContext} from './contextDetails.browser.mjs';
 import {checkExpansionDiagnostics} from './expansionDiagnostics.browser.mjs';
 import {checkHelpTracks} from './helpTracks.browser.mjs';
+import {checkUnplayedCards} from './unplayedCards.browser.mjs';
 import {checkMarketInsights} from './marketInsights.browser.mjs';
 import {checkContextualUx, checkMapGestures} from './contextual.browser.mjs';
 import {checkSpectator} from './spectator.browser.mjs';
@@ -537,6 +538,7 @@ await page.send('Page.navigate', {url: web + actor.path});
     await checkContextualUx(page, web, after);
     await checkMarketInsights(page, web, after);
     await checkHelpTracks(page, web);
+    await checkUnplayedCards(page, web);
     await checkReferenceUx(page, web, after);
     await checkActionButtons(page, web, after);
     await checkCompactPresentation(page, web, after);

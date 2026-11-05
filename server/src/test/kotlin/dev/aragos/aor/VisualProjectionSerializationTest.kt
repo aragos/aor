@@ -127,9 +127,14 @@ class VisualProjectionSerializationTest {
         assertThat(other).doesNotContain("private-card")
         assertThat(otherView.hand).isEmpty()
         assertThat(otherView.cardOffers).isEmpty()
-        assertThat(json.writeValueAsString(otherView.copy(cardInspections = emptyList())))
+        assertThat(
+                json.writeValueAsString(
+                    otherView.copy(cardInspections = emptyList(), unplayedCards = emptyList())
+                )
+            )
             .doesNotContain("charlemagne")
         assertThat(otherView.cardInspections).isEqualTo(state.viewForPlayer(p2).cardInspections)
+        assertThat(otherView.unplayedCards).isEqualTo(state.viewForPlayer(p2).unplayedCards)
     }
 
     @Test

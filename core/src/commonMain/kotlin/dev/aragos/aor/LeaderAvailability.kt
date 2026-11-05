@@ -12,7 +12,7 @@ data class AdvanceLeaderAvailabilityView(
 ) {
     companion object {
         internal fun from(state: GameState): List<AdvanceLeaderAvailabilityView> {
-            val unplayed = LeaderData.definitions.filterNot { it.id in state.playedLeaders }
+            val unplayed = LeaderData.definitions.filterNot { it.id.cardId in state.playedCards }
             return AdvanceId.entries.map { advance ->
                 val leaders = unplayed.filter { leader ->
                     leader.discounts.any { it.advance == advance }

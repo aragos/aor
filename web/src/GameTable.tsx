@@ -26,7 +26,7 @@ import type {QuotePlan, WritePlan} from './ActivityPlanner';
 import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
-import {ReferenceCatalogContext, ReferenceGameContext} from './HelpLink';
+import {HelpLink, ReferenceCatalogContext, ReferenceGameContext} from './HelpLink';
 import {useStoredSetting} from './preferences';
 import {AbandonmentStatus, AbandonmentTools} from './Abandonment';
 import type {WriteAbandonment} from './Abandonment';
@@ -208,7 +208,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         <ReferenceGameContext.Provider value={{viewerId: liveSnapshot.viewerId,
             players: liveSnapshot.game.players.every(player => player.capital !== null) ? liveSnapshot.game.players : [], turnOrder: liveSnapshot.game.turnOrder,
             orderBoxes: liveSnapshot.game.orderBoxes, commodityCards: liveSnapshot.game.commodityCards,
-            commodityPayouts: liveSnapshot.game.commodityPayouts}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
+            commodityPayouts: liveSnapshot.game.commodityPayouts,
+            unplayedCards: liveSnapshot.game.unplayedCards}}><main className={`game-shell game-table ${hasContext ? 'has-context' : ''} ${spectator ? 'spectator-table' : ''}`}>
         {expansionPass !== null && <CardInspectionDialog label={t('action.pass')} close={() => setExpansionPass(null)}>
             <h2>{t('action.pass')}</h2><p>{t('controls.confirmExpansionPass')}</p>
             {expansionPass !== snapshot.revision && <p className="blocker">{t('history.staleDraft')}</p>}
@@ -221,7 +222,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
-                    <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</span></p></div></div>
+                    <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress">{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}<HelpLink topic="unplayed-cards" label={t('reference.unplayedCardsTitle')}/></span></p></div></div>
                 <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{spectator && <span className="spectator-status">{t('table.spectating')}</span>}</div>
                 {me && !snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                     <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"

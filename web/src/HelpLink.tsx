@@ -14,6 +14,7 @@ export const ReferenceGameContext = createContext<{
     orderBoxes: Record<string, number>;
     commodityCards: Snapshot['game']['commodityCards'];
     commodityPayouts: Snapshot['game']['commodityPayouts'];
+    unplayedCards: Snapshot['game']['unplayedCards'];
 } | null>(null);
 
 const ReferencePopup = lazy(() => import('./ReferencePopup'));

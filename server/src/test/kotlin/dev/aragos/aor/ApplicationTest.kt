@@ -127,7 +127,7 @@ class ApplicationTest {
         val started = view(0)
         val raw = started.bodyAsText()
         val own = json.readTree(raw)
-        val privateFields = withoutCardInspections(own).toString()
+        val privateFields = withoutPublicCardReferences(own).toString()
         val other = json.readTree(view(1).bodyAsText())
 
         assertThat(started.status).isEqualTo(HttpStatusCode.OK)
@@ -141,6 +141,10 @@ class ApplicationTest {
         assertThat(own["game"].has("deck")).isFalse()
         assertThat(own["game"]["players"].none { player -> player.has("hand") }).isTrue()
         assertThat(own["game"]["cardInspections"]).isEqualTo(other["game"]["cardInspections"])
+        assertThat(own["game"]["unplayedCards"]).isEqualTo(other["game"]["unplayedCards"])
+        assertThat(own["game"]["unplayedCards"].map { it["id"].asText() })
+            .containsExactlyElementsIn(CardData.epochOne.map(CardDefinition::id))
+            .inOrder()
         assertThat(other["game"]["hand"][0]["definition"]["id"].asText()).isEqualTo("stone-2")
     }
 
@@ -276,7 +280,8 @@ class ApplicationTest {
             .containsExactly("stone-1", "wool-2")
         assertThat(own["history"].map(JsonNode::asText)).contains("!draw p1 hand-4 wool-2")
         assertThat(other["history"].map(JsonNode::asText)).contains("!draw p1 hand-4 <hidden>")
-        assertThat(withoutCardInspections(other).toString()).doesNotContain("wool-2")
+        assertThat(withoutPublicCardReferences(other).toString()).doesNotContain("wool-2")
+        assertThat(other["game"]["unplayedCards"]).isEqualTo(beforeDraws["game"]["unplayedCards"])
         assertThat(other["game"]["hand"].none { card -> card["reference"].asText() == "hand-4" })
             .isTrue()
         assertThat(
@@ -360,10 +365,10 @@ class ApplicationTest {
         }
     }
 
-    /** Retains every private-bearing field while excluding the public, location-free catalog. */
-    private fun withoutCardInspections(snapshot: JsonNode): JsonNode =
+    /** Retains private-bearing fields, excluding public catalogs and location-free circulation. */
+    private fun withoutPublicCardReferences(snapshot: JsonNode): JsonNode =
         snapshot.deepCopy<ObjectNode>().apply {
-            (get("game") as ObjectNode).remove("cardInspections")
+            (get("game") as ObjectNode).remove(listOf("cardInspections", "unplayedCards"))
         }
 
     private fun withGame(block: suspend ApiGame.() -> Unit) {

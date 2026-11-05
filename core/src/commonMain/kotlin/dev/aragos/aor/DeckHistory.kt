@@ -80,7 +80,10 @@ internal fun GameState.applyShuffle(cards: List<String>): GameState {
                     },
                 deck = cards.toList(),
                 deckHistory = history.copy(discarded = emptyList()),
-                playedCommodities = emptySet(),
+                playedCards =
+                    playedCards
+                        .filterNot { CardData.definition(it).shape.recycledOnEpochChange }
+                        .toSet(),
             )
     }
 }

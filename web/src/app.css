@@ -387,6 +387,10 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .app-logo { display: block; width: 40px; height: 40px; }
 .help-link { position: relative; padding: 0; display: inline-flex; justify-content: center; align-items: center; min-width: 12px; min-height: 14px; width: 12px; height: 14px; border: 0; border-radius: 0; color: #315447; background: transparent; font-size: .65rem; font-weight: 700; text-decoration: none; align-self: flex-start; vertical-align: super; }
 .help-link::after { content: ""; position: absolute; inset: -7px -6px; }
+.epoch-progress { white-space: nowrap; }
+.epoch-progress .help-link { margin-left: .35rem; }
+.unplayed-card-list { columns: 2 12rem; padding-left: 1.25rem; }
+.unplayed-card-list li { break-inside: avoid; margin-bottom: .35rem; }
 .reference-link { background: transparent; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; display: inline-block; margin-block: .4rem; font-size: .85rem; color: #315447; }
 .help-link:hover, .reference-link:hover, .close-detail:hover { background: #edf2e7; color: #264b43; }
 .event-card { color: #284e63; text-decoration: underline; text-underline-offset: .15em; }

@@ -188,6 +188,7 @@ export interface Snapshot {
         turnNumber: number | null; turnOrder: string[]; orderBoxes: Record<string, number>;
         revealedTokenPurchases: Record<string, number>; provisionalTieOrder: string[];
         board: ProvinceView[]; catalog: PublicCatalog | null; deckRemaining: number; endingTriggered: boolean;
+        unplayedCards: CardDefinition[];
         scores: ScoreView[]; adjustments: Record<string, ('SHORTAGE' | 'SURPLUS')[]>;
         effects: CardTurnEffects; activeWar: {initiator: string; opponent: string; startedTurn: number; ties: number} | null;
         playedLeaderDiscounts: {leader: string; usable: boolean; discounts: LeaderDiscountView[]}[];

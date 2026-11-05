@@ -85,10 +85,8 @@ data class GameState(
             player.id to PlayerState(player = player)
         },
     val effects: CardTurnEffects = CardTurnEffects(),
-    /** Public leader plays across all turns; private discards never change this information. */
-    val playedLeaders: Set<LeaderId> = emptySet(),
-    /** Public physical commodity plays since the last epoch shuffle; rebuilt by replay. */
-    val playedCommodities: Set<String> = emptySet(),
+    /** Public physical plays; recycled cards reset at each epoch shuffle. Rebuilt by replay. */
+    val playedCards: Set<String> = emptySet(),
     val activeWar: WarState? = null,
     val voids: CardVoids = CardVoids(),
     val board: BoardState =

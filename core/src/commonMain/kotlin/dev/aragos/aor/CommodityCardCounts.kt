@@ -22,8 +22,7 @@ data class CommodityCardCountView(
                 CommodityCardCountView(
                     commodity = commodity.id,
                     epochs = epochs,
-                    unplayed =
-                        introduced - commodity.cardIds().count(state.playedCommodities::contains),
+                    unplayed = introduced - commodity.cardIds().count(state.playedCards::contains),
                 )
             }
     }
