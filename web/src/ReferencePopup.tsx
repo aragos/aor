@@ -35,8 +35,9 @@ const topics = [
 ];
 
 /** Contextual public lookup leaves the live game, current draft and page title intact. */
-export default function ReferencePopup({initialTopic, close, catalog: gameCatalog}: {
+export default function ReferencePopup({initialTopic, close, catalog: gameCatalog, commodityChoices}: {
     initialTopic: string; close: () => void; catalog?: PublicCatalog | null;
+    commodityChoices?: readonly string[];
 }) {
     const current = useContext(ReferenceGameContext);
     const players = current?.players ?? [];
@@ -89,7 +90,8 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             <p>{t("reference.activityLayout")}</p>
         </section>}
             {topic === 'commodities' && <section><h2>{t('reference.commodity-payout-boxes')}</h2><nav>{catalog?.commodities.map(commodity => <button type="button" className="secondary" key={commodity.id} onClick={() => setTopic(`commodity-${commodity.id.toLowerCase()}`)}><Commodity commodity={commodity.id}/></button>)}</nav></section>}
-            {topic.startsWith('commodity-') && catalog && <CommodityReference catalog={catalog} topic={topic}/>}
+            {topic.startsWith('commodity-') && catalog && <CommodityReference catalog={catalog} topic={topic}
+                choices={commodityChoices} onSelect={commodity => setTopic(`commodity-${commodity.toLowerCase()}`)}/>}
             {topic === 'turn-order' && catalog && <TurnOrderReference catalog={catalog}/>}
             {topic === 'income-track' && <section id="income-track"><h2>{t('reference.income-track')}</h2>
                 <p>{t('reference.income-markers')}</p>

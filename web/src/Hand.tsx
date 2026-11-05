@@ -3,7 +3,6 @@ import type {Snapshot} from './api';
 import {advanceName, label} from './labels';
 import {t} from './messages';
 import {Commodity, CommodityAdjustments, Payouts} from './TablePanels';
-import {CommodityIcon} from './map/MapSymbols';
 import {useMapSelection} from './map/MapSelection';
 import {finiteDecisions} from './decisionOffers';
 import {CardRecurrence} from './CardRecurrence';
@@ -137,6 +136,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
             const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
             const info = snapshot.game.cardInspections?.find(candidate => candidate.definition.id === card.definition.id);
             const commodities = offer?.commodities ?? info?.commodities ?? [];
+            const [firstCommodity] = commodities;
             const discounts = offer?.leaderDiscounts ?? info?.leaderDiscounts ?? [];
             const [firstDiscount] = discounts;
             const sharedWrittenRecordBonus = firstDiscount && discounts.every(discount =>
@@ -203,12 +203,10 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                         {status && <span className="hand-card-status">{status}</span>}
                     </span>
                 </button>
-                <span className="card-track-links">{commodities.map(commodity =>
-                    <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`}
-                        label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`}
-                        icon={<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-                            <CommodityIcon commodity={commodity}/>
-                        </svg>}/>)}</span>
+                {firstCommodity && <span className="card-track-links">
+                    <HelpLink topic={`commodity-${firstCommodity.toLowerCase()}`} commodityChoices={commodities}
+                        label={`${commodities.map(commodity => label(commodity, 'commodity')).join(' / ')} · ${t('table.fullPayouts')}`}/>
+                </span>}
             </div>;
         })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div></div>
     </section>;

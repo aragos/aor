@@ -51,6 +51,7 @@ export async function checkHelpTracks(page, web) {
         await click('#tab-markets');
         await click('[data-help-topic="commodity-stone"]');
         await page.wait(`document.querySelector('#commodity-stone .commodity-card-counts')`, 'epoch card quantities');
+        assert.equal(await page.evaluate(`document.querySelector('.commodity-reference-choices')`), null, 'A single-commodity lookup needs no chooser');
         assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.commodity-card-counts dd')].map(value => Number(value.textContent))`), [2, 0, 0]);
         assert.match(await page.evaluate(`document.querySelector('.commodity-circulation').textContent`), /Unplayed in circulation: 2/);
         assert.deepEqual(await occupants('#commodity-stone'), ids);
@@ -79,7 +80,59 @@ export async function checkHelpTracks(page, web) {
     assert.match(await page.evaluate(`document.querySelector('.commodity-circulation').textContent`), /Unplayed in circulation: 1/);
     await close();
     assert.equal(await page.evaluate('window.mapCommands.length'), 0, 'Help never submits an action');
+    await checkSharedCardHelp(page, web);
     console.log('Passed: six-player track positions, stacked markers, Chaos, no ships, commodity epoch and circulation counts, live lookup updates and desktop/phone fit.');
+}
+
+async function checkSharedCardHelp(page, web) {
+    let sample;
+    for (let attempt = 0; attempt < 12 && !sample; attempt++) {
+        const game = await createGame(6, {options: {'initial-card': 'commodity-only'}});
+        for (const link of game.links) {
+            const snapshot = await game.snapshot(link);
+            const card = snapshot.game.hand.find(card => snapshot.game.cardInspections.some(info =>
+                info.definition.id === card.definition.id && info.commodities.length > 1));
+            if (card) {sample = {game, link, snapshot, card}; break;}
+        }
+    }
+    assert(sample, 'A real opening deal contains a shared commodity card');
+    const {game, link, snapshot, card} = sample;
+    const commodities = snapshot.game.cardInspections.find(info => info.definition.id === card.definition.id).commodities;
+    await page.send('Page.navigate', {url: web + link.path});
+    await page.wait(`location.pathname === ${JSON.stringify(new URL(link.path, web).pathname)} && document.querySelector('#bid') && document.querySelector('[data-hand-card="${card.reference}"]')`, 'Live shared commodity card');
+    await page.fill('#bid', '7');
+    const help = `[data-hand-card="${card.reference}"] + .card-track-links .help-link`;
+    assert.equal(await page.evaluate(`document.querySelectorAll(${JSON.stringify(help)}).length`), 1);
+    for (const width of [1280, 390]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: width < 700});
+        await page.wait(`matchMedia('(max-width: 700px)').matches === ${width < 700}`, 'Live card viewport');
+        if (width < 700) {
+            await page.wait(`document.querySelector('.hand-toggle')`, 'Phone hand can expand');
+            await page.evaluate(`if (!document.querySelector('.table-hand').classList.contains('hand-expanded')) document.querySelector('.hand-toggle').click()`);
+        }
+        await page.wait(`document.querySelector(${JSON.stringify(help)}).checkVisibility()`, 'The single card help is visible');
+        await page.evaluate(`document.querySelector(${JSON.stringify(help)}).focus(); document.activeElement.click()`);
+        await page.wait(`document.querySelector('.commodity-reference-choices')`, 'Live card commodity chooser');
+        assert.equal(await page.evaluate(`document.querySelectorAll('.commodity-reference-choices button').length`), commodities.length);
+        for (const [index, commodity] of commodities.entries()) {
+            await page.evaluate(`document.querySelectorAll('.commodity-reference-choices button')[${index}].click()`);
+            await page.wait(`document.querySelector('#commodity-${commodity.toLowerCase()} .payout-box')`, 'Selected live commodity payout boxes');
+            const printed = snapshot.game.catalog.commodities.find(entry => entry.id === commodity).printedPayouts;
+            assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.reference-dialog .payout-box strong')].map(box => box.textContent)`),
+                printed.map(amount => '$' + amount), 'Switching shows the selected commodity’s prices');
+        }
+        assert.equal(await page.evaluate(`document.querySelector('.reference-dialog').scrollWidth <= document.querySelector('.reference-dialog').clientWidth`), true);
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `shared-commodity-live-${width}.png`));
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+        await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+        await page.wait(`!document.querySelector('.reference-dialog')`, 'Live shared lookup closes');
+        assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'The lookup preserves the live bid draft');
+        assert.equal(await page.evaluate(`document.activeElement.matches(${JSON.stringify(help)})`), true, 'Focus returns to the single help control');
+    }
+    const after = await game.snapshot(link);
+    assert.equal(after.pendingBid, null, 'Help does not submit the pending bid');
+    assert.deepEqual(after.history, snapshot.history, 'Help does not play a card or change gameplay');
+    console.log('Passed: one help control on a live shared card, both commodity payouts, desktop/phone fit and bid/focus preservation.');
 }
 
 if (process.argv[1]?.endsWith('/helpTracks.browser.mjs')) {

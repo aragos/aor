@@ -7,11 +7,15 @@ import {label} from './labels';
 import {t} from './messages';
 
 /** Printed card quantities and public live payout positions share the commodity's lookup. */
-export function CommodityReference({catalog, topic}: {catalog: PublicCatalog; topic: string}) {
+export function CommodityReference({catalog, topic, choices, onSelect}: {
+    catalog: PublicCatalog; topic: string; choices?: readonly string[];
+    onSelect: (commodity: string) => void;
+}) {
     const current = useContext(ReferenceGameContext);
     const players = current?.players ?? [];
     const commodity = catalog.commodities.find(commodity => topic === `commodity-${commodity.id.toLowerCase()}`);
     if (!commodity) return null;
+    const hasChoices = choices && choices.length > 1 && choices.includes(commodity.id);
     const counts = current?.commodityCards?.find(count => count.commodity === commodity.id)
         ?? catalog.commodityCards?.find(count => count.commodity === commodity.id);
     const owners = current?.commodityPayouts.find(payout => payout.commodity === commodity.id)?.owners ?? [];
@@ -21,8 +25,12 @@ export function CommodityReference({catalog, topic}: {catalog: PublicCatalog; to
     return <section id="commodities">
         <h2>{t('reference.commodity-payout-boxes')}</h2>
         <p>{t('reference.the-effective-box-is-established-markets')}</p>
+        {hasChoices && <nav aria-label={t('table.markets')} className="commodity-reference-choices">
+            {choices.map(id => <button type="button" className="secondary" key={id}
+                aria-pressed={id === commodity.id} onClick={() => onSelect(id)}><Commodity commodity={id}/></button>)}
+        </nav>}
         <article id={`commodity-${commodity.id.toLowerCase()}`}>
-            <h3><Commodity commodity={commodity.id}/></h3>
+            {!hasChoices && <h3><Commodity commodity={commodity.id}/></h3>}
             <p>{t('reference.base-value')}{commodity.baseValue}{t('reference.dice-total')}{commodity.diceTotal}</p>
             {counts && <>
                 <dl className="commodity-card-counts" aria-label={t('reference.cardsByEpoch')}>

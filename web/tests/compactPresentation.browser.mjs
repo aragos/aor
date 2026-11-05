@@ -69,16 +69,32 @@ export async function checkCompactPresentation(page, web, baseline) {
         if (mobile) await click('.hand-toggle');
         console.log('Compact presentation:', width, 'reference popup');
         const help = '.table-hand [data-help-topic="commodity-cloth"]';
+        assert.equal(await page.evaluate(`document.querySelector('[data-hand-card="compact-choice"]').parentElement.querySelectorAll('.help-link').length`), 1,
+            'Shared commodity cards have one help control');
         const location = await page.evaluate('location.href');
         const title = await page.evaluate('document.title');
         await page.evaluate(`document.querySelector(${JSON.stringify(help)}).focus(); document.activeElement.click()`);
         await page.wait(`document.querySelector('.reference-dialog #commodity-cloth .payout-box')`, 'Commodity reference popup loads');
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.commodity-reference-choices button')].map(button => button.textContent.trim())`), ['Cloth', 'Wine'],
+            'The popup offers both commodities on the card');
+        await page.evaluate(`document.querySelector('.commodity-reference-choices button:last-child').focus()`);
+        assert.equal(await page.evaluate(`document.activeElement.matches('.commodity-reference-choices button:last-child')`), true,
+            'The commodity chooser is keyboard reachable');
+        await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', unmodifiedText: '\r', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13});
+        await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13});
+        await page.wait(`document.querySelector('#commodity-wine .payout-box')`, 'The same popup switches to Wine');
+        assert.equal(await page.evaluate(`document.querySelector('.commodity-reference-choices [aria-pressed="true"]').textContent.trim()`), 'Wine');
+        assert.equal(await page.evaluate(`document.querySelector('#commodity-cloth')`), null, 'Only the chosen commodity is displayed');
         assert.equal(await page.evaluate('location.href'), location, 'Help never navigates away');
         assert.equal(await page.evaluate('document.title'), title, 'Help preserves the game title');
         await show({revision: revision + 1});
+        assert.equal(await page.evaluate(`document.querySelector('.commodity-reference-choices [aria-pressed="true"]').textContent.trim()`), 'Wine',
+            'Polling preserves the commodity being inspected');
         assert.equal(await page.evaluate(`document.querySelector('.card-decision .target-choices [aria-pressed=true]').textContent`), choice, 'Reference polling preserves the commodity draft');
         assert.equal(await page.evaluate(`document.querySelectorAll('.reference-dialog .payout-box:not([data-track-box="0"])').length`), 10, 'Only the requested commodity track is shown');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-reference-popup-${width}.png`));
+        await click('.commodity-reference-choices button:first-child');
+        await page.wait(`document.querySelector('#commodity-cloth .payout-box')`, 'The same popup returns to Cloth');
         await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27});
         await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27});
         await page.wait(`!document.querySelector('.reference-dialog')`, 'Reference Escape closes');
