@@ -35,7 +35,7 @@ try {
     await page.reload();
     await page.wait(`document.querySelector('#history-identifiers button[aria-pressed=true]')?.textContent==='Player labels'`, 'history name preference survives reload');
     await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
-    await page.click('Canonical IDs');
+    await page.click('Player IDs');
     assert((await page.evaluate(`document.querySelector('.command-dock pre').textContent`)).includes(actor.id+': place 1 '+target));
     await page.evaluate(`document.querySelector('.command-dock > summary').click()`);
     await page.click('Undo');
