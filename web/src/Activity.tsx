@@ -41,11 +41,16 @@ function CashPayment({event, player, amount, children}: {
     </span>;
 }
 
-function ActivityCard({cardId, onInspectCard, commodities = []}: {cardId: string; onInspectCard?: (cardId: string) => void; commodities?: string[]}) {
-    if (commodities.length) return <span className="event-card">▤ {label(cardId, 'event')}{commodities.map(commodity => <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`}/>)}</span>;
+function ActivityCard({cardId, onInspectCard, inspection}: {
+    cardId: string; onInspectCard?: (cardId: string) => void;
+    inspection?: Snapshot['game']['cardInspections'][number];
+}) {
+    const name = inspection ? t(inspection.definition.messageId) : label(cardId, 'event');
+    const commodities = inspection?.commodities ?? [];
+    if (commodities.length) return <span className="event-card">▤ {name}{commodities.map(commodity => <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`}/>)}</span>;
     return onInspectCard
-        ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {label(cardId, 'event')}</button>
-        : <span className="event-card">▤ {label(cardId, 'event')}</span>;
+        ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {name}</button>
+        : <span className="event-card">▤ {name}</span>;
 }
 
 /** Capital priority belongs to this recorded tie, independent of later rolls and assignments. */
@@ -83,7 +88,7 @@ function EventContent({event, track, onInspectCard, cardInspections, marketRoll 
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
         {event.war && <strong>{warHeading(event, event.war)}</strong>}
         {event.provinces.map(province => <span className="event-entity" key={province}><CapitalLabel capital={track?.provinces.find(candidate => candidate.id === province)?.capital ?? null}>{provinceName(province)}</CapitalLabel></span>)}
-        {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard} commodities={cardInspections?.find(card => card.definition.id === cardId)?.commodities}/>}
+        {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard} inspection={cardInspections?.find(card => card.definition.id === cardId)}/>}
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
         {event.amount !== null && event.protectionCash == null && <strong>{event.kind === 'BID_CAPITAL' ? '$' : ''}{event.amount}</strong>}
@@ -132,7 +137,7 @@ function EventContent({event, track, onInspectCard, cardInspections, marketRoll 
             <span>(<MiseryBox value={change.fromValue} track={track?.miseryTrack}/> → <MiseryBox value={change.toValue} track={track?.miseryTrack}/>)</span>
             {change.reasons?.map((reason, index) => <span className="event-detail" key={index}>
                 {reason.advance && `${advanceName(reason.advance)} · `}
-                {reason.card && reason.card !== cardId && <ActivityCard cardId={reason.card} onInspectCard={onInspectCard}/>}
+                {reason.card && reason.card !== cardId && <ActivityCard cardId={reason.card} onInspectCard={onInspectCard} inspection={cardInspections?.find(card => card.definition.id === reason.card)}/>}
                 {t(`activity.miseryReason.${reason.kind}`)}
                 {reason.spaces != null && (change.reasons?.length ?? 0) > 1 && ` (${t('activity.ruleContribution', {spaces: signedAmount(reason.spaces)})})`}
             </span>)}
