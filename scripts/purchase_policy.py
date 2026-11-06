@@ -231,6 +231,22 @@ def selection_uniform(seed):
     return value / 4294967296.0
 
 
+@dataclass(frozen=True, eq=False)
+class _PreparedObservation:
+    """Internal validated sparse numbers; storage grows with input entries, not vocabulary size.
+
+    Indices identify unique cells, so minibatch index_copy_ never sums or reorders arithmetic.
+    Preparation is independent of model weights and reusable by matching behavior/current actors.
+    """
+    dictionary: str
+    state_indices: torch.Tensor
+    state_values: torch.Tensor
+    action_indices: torch.Tensor
+    action_values: torch.Tensor
+    action_count: int
+    baseline_index: int
+
+
 class PurchasePolicy(nn.Module):
     """Compute each state's embedding once, then score a flattened legal-action batch."""
     def __init__(self, model):
@@ -239,6 +255,8 @@ class PurchasePolicy(nn.Module):
         self.state_indices = {name: index for index, name in enumerate(model["stateFeatureNames"])}
         self.action_indices = {
             name: index for index, name in enumerate(model["actionFeatureNames"])}
+        self.dictionary = digest({key: model[key] for key in (
+            "encoderVersion", "stateFeatureNames", "actionFeatureNames")})
         for name in PARAMETERS:
             value = torch.tensor(model[name], dtype=DTYPE)
             if name == "stateWeights":
@@ -254,34 +272,62 @@ class PurchasePolicy(nn.Module):
             model[name] = tensor.item() if name == "valueBias" else tensor.flatten().tolist()
         return validate_model(model)
 
+    def prepare(self, observation):
+        if isinstance(observation, _PreparedObservation):
+            require(observation.dictionary == self.dictionary,
+                    "Prepared inputs belong to a different feature dictionary.")
+            return observation
+        validate_observation(observation, self.template)
+        state = list(observation["stateFeatures"].items())
+        actions = [(row * len(self.action_indices) + self.action_indices[name], value)
+                   for row, action in enumerate(observation["actions"])
+                   for name, value in action["features"].items()]
+        return _PreparedObservation(
+            dictionary=self.dictionary,
+            state_indices=torch.tensor([self.state_indices[name] for name, _ in state],
+                                       dtype=torch.long),
+            state_values=torch.tensor([value for _, value in state], dtype=DTYPE),
+            action_indices=torch.tensor([index for index, _ in actions], dtype=torch.long),
+            action_values=torch.tensor([value for _, value in actions], dtype=DTYPE),
+            action_count=len(observation["actions"]),
+            baseline_index=observation["baselineIndex"],
+        )
+
+    def _batch_inputs(self, prepared):
+        state = torch.zeros((len(prepared), len(self.state_indices)), dtype=DTYPE)
+        action = torch.zeros((sum(item.action_count for item in prepared),
+                              len(self.action_indices)), dtype=DTYPE)
+        state_indices, action_indices, owners = [], [], []
+        cursor = 0
+        for row, item in enumerate(prepared):
+            state_indices.append(item.state_indices + row * len(self.state_indices))
+            action_indices.append(item.action_indices + cursor * len(self.action_indices))
+            owners.extend([row] * item.action_count)
+            cursor += item.action_count
+        state.view(-1).index_copy_(0, torch.cat(state_indices),
+                                  torch.cat([item.state_values for item in prepared]))
+        action.view(-1).index_copy_(0, torch.cat(action_indices),
+                                   torch.cat([item.action_values for item in prepared]))
+        return state, action, torch.tensor(owners)
+
     def forward(self, observations):
         require(1 <= len(observations) <= 256, "A numerical batch requires 1–256 decisions.")
-        count = sum(len(observation["actions"]) for observation in observations)
+        count = sum(item.action_count if isinstance(item, _PreparedObservation)
+                    else len(item["actions"]) for item in observations)
         require(count <= 16384, "A numerical batch exceeds 16384 candidate actions.")
-        state = torch.zeros((len(observations), len(self.state_indices)), dtype=DTYPE)
-        action = torch.zeros((count, len(self.action_indices)), dtype=DTYPE)
-        owners = []
-        cursor = 0
-        for row, observation in enumerate(observations):
-            validate_observation(observation, self.template)
-            for name, value in observation["stateFeatures"].items():
-                state[row, self.state_indices[name]] = value
-            for candidate in observation["actions"]:
-                for name, value in candidate["features"].items():
-                    action[cursor, self.action_indices[name]] = value
-                owners.append(row)
-                cursor += 1
+        prepared = [self.prepare(item) for item in observations]
+        state, action, owners = self._batch_inputs(prepared)
         hidden = torch.tanh(state @ self.stateWeights.T + self.stateBias)
         action_hidden = torch.tanh(
-            hidden[torch.tensor(owners)] + action @ self.actionWeights.T + self.actionBias)
+            hidden[owners] + action @ self.actionWeights.T + self.actionBias)
         residuals = torch.clamp(action_hidden @ self.actorWeights,
                                 -RESIDUAL_LIMIT, RESIDUAL_LIMIT)
         log_probabilities = []
         cursor = 0
-        for observation in observations:
-            size = len(observation["actions"])
+        for observation in prepared:
+            size = observation.action_count
             residual = residuals[cursor:cursor + size]
-            prior = torch.tensor(prior_probabilities(size, observation["baselineIndex"]),
+            prior = torch.tensor(prior_probabilities(size, observation.baseline_index),
                                  dtype=DTYPE).log()
             log_probability = torch.log_softmax(prior + residual, dim=0)
             if bool(torch.all(residual == residual[0])):
@@ -329,7 +375,7 @@ def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
 
 
 def loss_for_rows(policy, rows, config):
-    probabilities, values = policy([row["observation"] for row in rows])
+    probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
                           for logp, row in zip(probabilities, rows)])
     old = torch.tensor([row["behaviorLogProbability"] for row in rows], dtype=DTYPE)
@@ -361,7 +407,7 @@ def behavior_metrics(policy, behavior, rows, batch_size=64):
     with torch.no_grad():
         for start in range(0, len(rows), batch_size):
             batch = rows[start:start + batch_size]
-            observations = [row["observation"] for row in batch]
+            observations = [row.get("_prepared", row["observation"]) for row in batch]
             current, values = policy(observations)
             old, _ = behavior(observations)
             for logp, old_logp, value, row in zip(current, old, values, batch):
@@ -411,6 +457,7 @@ def read_collection(directory, model_path, model):
     rows = []
     rewards = []
     origins = set()
+    behavior = PurchasePolicy(model)
     for index, path in enumerate(paths):
         game = read_json(path)
         require(game.get("index") == index and type(game["index"]) is int,
@@ -444,18 +491,18 @@ def read_collection(directory, model_path, model):
                     "Controlled decisions must be in strictly increasing order.")
             previous = sequence
             observation = decision["observation"]
-            validate_observation(observation, model)
+            prepared = behavior.prepare(observation)
             integer(decision.get("selectedIndex"), "Selected action", 0,
                     len(observation["actions"]) - 1)
             number(decision.get("behaviorLogProbability"), "Behavior log probability")
             number(decision.get("behaviorValue"), "Behavior value", 0, 1)
-            rows.append({**decision, "return": reward, "originIndex": index})
+            rows.append({**decision, "return": reward, "originIndex": index,
+                         "_prepared": prepared})
     require(1 <= len(rows) <= 200000, "A purchase update requires 1–200000 controlled decisions.")
-    behavior = PurchasePolicy(model)
     with torch.no_grad():
         for start in range(0, len(rows), 16):
             batch = rows[start:start + 16]
-            probabilities, values = behavior([row["observation"] for row in batch])
+            probabilities, values = behavior([row["_prepared"] for row in batch])
             for logp, value, row in zip(probabilities, values, batch):
                 require(abs(float(logp[row["selectedIndex"]])
                             - row["behaviorLogProbability"]) <= 1e-9
