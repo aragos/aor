@@ -623,3 +623,8 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .abandonment-status .button-row { gap: .4rem; }
 .rewind-targets { max-height: 20rem; overflow: auto; padding-left: 1.5rem; }
 .rewind-targets li { margin-bottom: .4rem; }
+
+/* Keep full labels and touch targets while leaving short phones room for the action review. */
+@media (max-width: 700px) and (max-height: 700px) {
+    .decision-actions button:not(.help-link) { padding-block: .2rem; }
+}
