@@ -84,8 +84,9 @@ internal object ExpansionProjection {
             return emptyList()
         }
         val context = BoardGame.context(state)
+        val reach = ExpansionReach.query(context, viewer.player.id)
         return context.configuration.provinces.map { province ->
-            offer(state, viewer, context, province)
+            offer(state, viewer, context, reach, province)
         }
     }
 
@@ -104,6 +105,7 @@ internal object ExpansionProjection {
         state: GameState,
         viewer: PlayerState,
         context: BoardRulesContext,
+        reach: ExpansionReach.Query,
         province: ProvinceDefinition,
     ): ExpansionOfferView {
         val player = viewer.player.id
@@ -131,8 +133,7 @@ internal object ExpansionProjection {
                 else -> province.marketNumber - existing
             }
         val income = IncomeView.from(state, viewer)?.ordinary
-        val routes =
-            if (controlled) emptyList() else ExpansionReach.routesTo(context, player, province.id)
+        val routes = if (controlled) emptyList() else reach.routesTo(province.id)
         val evaluated =
             if (controlled) null else evaluate(context, viewer, province.id, required, routes)
         val plan = evaluated?.plan

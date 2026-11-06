@@ -22,6 +22,10 @@ data class PlayerView(
     val income: IncomeView? = null,
     /** A revealed expansion pool still usable this turn, including an empty pool. */
     val poolAvailable: Boolean = false,
+    /**
+     * Further distinct overseas presences allowed by fleet size; route/access checks still apply.
+     */
+    val overseasSlots: Int = 0,
 ) {
     val stockMarkers: Int
         get() = 25 - boardMarkers
@@ -50,6 +54,13 @@ data class PlayerView(
                         state.stage in Stage.DRAW_CARD..Stage.EXPANSION) &&
                         !expansionFinished &&
                         player.misery != MiseryStep.CHAOS,
+                overseasSlots =
+                    ExpansionReach.remainingOverseasSlots(
+                        state.catalog,
+                        state.board,
+                        player.player.id,
+                        player.ships,
+                    ),
             )
         }
     }
@@ -106,6 +117,8 @@ data class GameView(
     val stabilizationMisery: Int? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    /** Current-capability forecasts before Expansion, separate from executable action offers. */
+    val expansionForecast: ExpansionForecastView? = null,
     val markerReductionOffers: List<MarkerReductionOfferView> = emptyList(),
     /** Destination diagnostics include pool/shipping failures omitted from [expansionOffers]. */
     val expansionInspections: List<ExpansionOfferView> = emptyList(),
@@ -120,6 +133,8 @@ data class GameView(
     /** Pool-token cost for the viewer's current Expansion offer; never a cash price. */
     val expansionCardCost: Int? = null,
     val playedLeaderDiscounts: List<PlayedLeaderDiscountView> = emptyList(),
+    /** Informational next-purchase quote during ordinary card play; never a command offer. */
+    val purchaseShippingForecast: ShippingOfferView? = null,
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
     val windmillOffer: WindmillOfferView? = null,
 ) {
@@ -208,7 +223,11 @@ data class GameView(
                 voids = state.voids,
                 advanceOffers =
                     viewer
-                        ?.takeIf { needed("purchase-advances") }
+                        ?.takeIf {
+                            needed("purchase-advances", "purchase-shipping") ||
+                                needed("play-cards") &&
+                                    it.hand.any { card -> card.definition.kind == CardKind.LEADER }
+                        }
                         ?.let { advanceOffers(state, it) }
                         .orEmpty(),
                 patronageOffers =
@@ -243,6 +262,17 @@ data class GameView(
                     },
                 burdenReferences = viewer?.let { burdenReferences(state, it) }.orEmpty(),
                 expansionOffers = ExpansionProjection.offers(expansionInspections),
+                expansionForecast =
+                    viewer
+                        ?.takeIf {
+                            state.stage == Stage.TOKEN_PURCHASE && needed("buy-tokens") ||
+                                needed("play-cards") &&
+                                    it.hand.any { card ->
+                                        CardEffectData.forCard(card.definition.id) is
+                                            CardEffectSpec.CommodityChoices
+                                    }
+                        }
+                        ?.let { ExpansionForecastView.from(state, it) },
                 markerReductionOffers =
                     viewer
                         ?.takeIf { !decisionOnly || state.board.markerCount(it.player.id) == 25 }
@@ -252,6 +282,7 @@ data class GameView(
                 commodityPayouts =
                     if (
                         needed(
+                            "buy-tokens",
                             "expand",
                             "play-cards",
                             "prepare-war",
@@ -265,7 +296,11 @@ data class GameView(
                         CommodityPayoutView.from(state)
                     } else emptyList(),
                 commodityCards =
-                    if (decisionOnly) emptyList() else CommodityCardCountView.from(state),
+                    if (needed("play-cards", "expand", "buy-tokens")) {
+                        CommodityCardCountView.from(state)
+                    } else {
+                        emptyList()
+                    },
                 cardOffers =
                     viewer
                         ?.takeIf { needed("play-cards", "prepare-war") }
@@ -277,6 +312,14 @@ data class GameView(
                 tokenPurchaseOffers =
                     viewer?.let { TokenPurchaseProjection.offers(state, it) }.orEmpty(),
                 shippingOffer = viewer?.let { ShippingOfferView.from(state, it) },
+                purchaseShippingForecast =
+                    viewer
+                        ?.takeIf {
+                            state.stage == Stage.PLAY_CARDS &&
+                                needed("play-cards") &&
+                                it.hand.any { card -> card.definition.kind == CardKind.LEADER }
+                        }
+                        ?.let { ShippingOfferView.forecast(state, it) },
                 expansionCardCost =
                     if (
                         state.stage == Stage.EXPANSION &&

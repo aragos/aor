@@ -31,36 +31,80 @@ object ExpansionReach {
         context: BoardRulesContext,
         player: PlayerId,
         destination: ProvinceId,
-    ): List<ExpansionRoute> {
-        val profile = context.player(player)
-        if (
-            profile.chaos ||
-                destination !in context.provinceIds ||
-                !canEnter(profile, context.province(destination))
-        ) {
-            return emptyList()
+    ): List<ExpansionRoute> = query(context, player).routesTo(destination)
+
+    /**
+     * Reuse one reach search while inspecting multiple destinations in the same immutable context.
+     * A query belongs to this context and player only; changed board/capabilities require a new
+     * one.
+     */
+    internal fun query(context: BoardRulesContext, player: PlayerId): Query = Query(context, player)
+
+    internal class Query(private val context: BoardRulesContext, player: PlayerId) {
+        private val profile = context.player(player)
+        private val bases = context.bases(player)
+        private val galleyRoutesByBase by lazy {
+            bases
+                .filter { base -> context.province(base).coastal }
+                .associateWith { base ->
+                    galleyRoutes(context, profile, base)
+                }
         }
-        return context
-            .bases(player)
-            .flatMap { base ->
-                listOfNotNull(
-                    ExpansionRoute.Local(base).takeIf { base == destination },
-                    ExpansionRoute.Land(base).takeIf {
-                        connected(context.configuration.landBorders, base, destination)
-                    },
-                ) +
-                    caravanRoutes(context, profile, base, destination) +
-                    shippingRoutes(context, profile, base, destination)
+
+        fun routesTo(destination: ProvinceId): List<ExpansionRoute> {
+            if (
+                profile.chaos ||
+                    destination !in context.provinceIds ||
+                    !canEnter(profile, context.province(destination))
+            ) {
+                return emptyList()
             }
-            .distinct()
-            .sortedWith(
-                compareBy<ExpansionRoute>(
-                    { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
-                    ::routeLength,
-                    { route -> route.base.value },
-                    ::routeKey,
+            return bases
+                .flatMap { base ->
+                    listOfNotNull(
+                        ExpansionRoute.Local(base).takeIf { base == destination },
+                        ExpansionRoute.Land(base).takeIf {
+                            connected(context.configuration.landBorders, base, destination)
+                        },
+                    ) +
+                        caravanRoutes(context, profile, base, destination) +
+                        shippingRoutes(base, destination)
+                }
+                .distinct()
+                .sortedWith(
+                    compareBy<ExpansionRoute>(
+                        { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
+                        ::routeLength,
+                        { route -> route.base.value },
+                        ::routeKey,
+                    )
                 )
-            )
+        }
+
+        private fun shippingRoutes(
+            base: ProvinceId,
+            destination: ProvinceId,
+        ): List<ExpansionRoute.Shipping> {
+            if (
+                !context.province(base).coastal ||
+                    !context.province(destination).coastal ||
+                    base == destination
+            ) {
+                return emptyList()
+            }
+            return when (profile.ships.fleet) {
+                ShippingFleet.NONE -> emptyList()
+                ShippingFleet.GALLEY -> galleyRoutesByBase[base].orEmpty()[destination].orEmpty()
+                ShippingFleet.SEAWORTHY -> {
+                    if (context.province(destination).overseas == null) {
+                        listOf(directShipping(base, destination))
+                    } else {
+                        emptyList()
+                    }
+                }
+                ShippingFleet.OCEAN -> listOf(directShipping(base, destination))
+            }
+        }
     }
 
     private fun routeLength(route: ExpansionRoute): Int =
@@ -155,13 +199,37 @@ object ExpansionReach {
             context.province(destination).overseas != null &&
                 !context.board.hasPresence(player, destination)
         ) {
-            val occupied =
-                context.board.pieces.keys.count { province ->
-                    context.province(province).overseas != null &&
-                        context.board.hasPresence(player, province)
-                }
-            checkRule(occupied < profile.ships.level, ViolationCode.OVERSEAS_LIMIT_EXCEEDED)
+            checkRule(
+                remainingOverseasSlots(context, player) > 0,
+                ViolationCode.OVERSEAS_LIMIT_EXCEEDED,
+            )
         }
+    }
+
+    /**
+     * Unoccupied overseas boxes allowed by the current fleet, including existing token holdings.
+     */
+    internal fun remainingOverseasSlots(context: BoardRulesContext, player: PlayerId): Int =
+        remainingOverseasSlots(
+            context.configuration,
+            context.board,
+            player,
+            context.player(player).ships,
+        )
+
+    internal fun remainingOverseasSlots(
+        configuration: CatalogConfiguration,
+        board: BoardState,
+        player: PlayerId,
+        ships: ShippingCapability,
+    ): Int {
+        if (ships.fleet != ShippingFleet.OCEAN) return 0
+        val occupied =
+            board.pieces.keys.count { province ->
+                configuration.map.province(province).overseas != null &&
+                    board.hasPresence(player, province)
+            }
+        return (ships.level - occupied).coerceAtLeast(0)
     }
 
     fun canEnter(profile: BoardPlayerProfile, province: ProvinceDefinition): Boolean =
@@ -184,32 +252,6 @@ object ExpansionReach {
                     !opponentFills(context, profile.player, via)
             }
             .map { via -> ExpansionRoute.Caravan(base, via) }
-    }
-
-    private fun shippingRoutes(
-        context: BoardRulesContext,
-        profile: BoardPlayerProfile,
-        base: ProvinceId,
-        destination: ProvinceId,
-    ): List<ExpansionRoute.Shipping> {
-        if (
-            !context.province(base).coastal ||
-                !context.province(destination).coastal ||
-                base == destination
-        ) {
-            return emptyList()
-        }
-        return when (profile.ships.fleet) {
-            ShippingFleet.NONE -> emptyList()
-            ShippingFleet.GALLEY -> galleyRoutes(context, profile, base, destination)
-            ShippingFleet.SEAWORTHY ->
-                if (context.province(destination).overseas == null) {
-                    listOf(directShipping(base, destination))
-                } else {
-                    emptyList()
-                }
-            ShippingFleet.OCEAN -> listOf(directShipping(base, destination))
-        }
     }
 
     private fun validateShipping(
@@ -268,8 +310,7 @@ object ExpansionReach {
         context: BoardRulesContext,
         profile: BoardPlayerProfile,
         base: ProvinceId,
-        destination: ProvinceId,
-    ): List<ExpansionRoute.Shipping> {
+    ): Map<ProvinceId, List<ExpansionRoute.Shipping>> {
         data class Visit(val space: ShippingSpace, val seas: Int)
         val start = Visit(ShippingSpace.Coast(base), 0)
         val paths = mutableMapOf(start to listOf(start.space))
@@ -303,10 +344,13 @@ object ExpansionReach {
                 queue.addLast(visit)
             }
         }
-        return paths
-            .filterKeys { visit -> visit.space == ShippingSpace.Coast(destination) }
-            .values
-            .map { path -> ExpansionRoute.Shipping(base, path) }
+        return paths.entries
+            .mapNotNull { (visit, path) ->
+                (visit.space as? ShippingSpace.Coast)?.let { coast ->
+                    coast.province to ExpansionRoute.Shipping(base, path)
+                }
+            }
+            .groupBy({ it.first }, { it.second })
     }
 
     private fun waterNeighbors(

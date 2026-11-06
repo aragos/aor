@@ -133,6 +133,21 @@ class AdvancePurchasesTest {
     }
 
     @Test
+    fun newInstitutionalResearchCategoryCreditWaitsUntilTheNextTurn() {
+        val player =
+            AdvancePurchases.purchase(buyer(), AdvanceId.INSTITUTIONAL_RESEARCH, turnTwo).player
+
+        val current = AdvancePurchases.quote(player, AdvanceId.NATIONALISM, turnTwo)
+        val next = AdvancePurchases.quote(player, AdvanceId.NATIONALISM, PurchaseContext(3))
+
+        assertThat(current.institutionalResearchCredit).isEqualTo(0)
+        assertThat(current.categoryCredit).isEqualTo(0)
+        assertThat(current.price).isEqualTo(60)
+        assertThat(next.categoryCredit).isEqualTo(30)
+        assertThat(next.price).isEqualTo(30)
+    }
+
+    @Test
     fun institutionalResearchDoesNotDiscountReligion() {
         val quote =
             AdvancePurchases.quote(
