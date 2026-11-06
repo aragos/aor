@@ -1,9 +1,7 @@
 package dev.aragos.aor.ai
 
 import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.tanh
 
 /** Complete sorted vocabulary, frozen from the public catalog before collecting trajectories. */
 data class PurchaseFeatureDictionary(
@@ -133,6 +131,23 @@ data class PurchasePolicyModel(
 
     internal val stateIndices = stateFeatureNames.withIndex().associate { it.value to it.index }
     internal val actionIndices = actionFeatureNames.withIndex().associate { it.value to it.index }
+    internal val network =
+        ResidualPolicyWeights(
+            "purchase",
+            hiddenSize,
+            baselineProbability,
+            stateFeatureNames.size,
+            actionFeatureNames.size,
+            stateIndices,
+            actionIndices,
+            stateWeights,
+            stateBias,
+            actionWeights,
+            actionBias,
+            actorWeights,
+            valueWeights,
+            valueBias,
+        )
 }
 
 data class PurchasePolicyEvaluation(
@@ -184,59 +199,14 @@ object PurchasePolicy {
         require(observation.encoderVersion == model.encoderVersion) {
             "Purchase encoder identities must match."
         }
-        val state = indexed(observation.stateFeatures, model.stateIndices)
-        val hidden =
-            List(model.hiddenSize) { row ->
-                tanh(
-                    model.stateBias[row] +
-                        dot(model.stateWeights, row, model.stateFeatureNames.size, state)
-                )
-            }
-        val residuals =
-            observation.actions.map { action ->
-                val features = indexed(action.features, model.actionIndices)
-                model.actorWeights.indices
-                    .sumOf { row ->
-                        model.actorWeights[row] *
-                            tanh(
-                                hidden[row] +
-                                    model.actionBias[row] +
-                                    dot(
-                                        model.actionWeights,
-                                        row,
-                                        model.actionFeatureNames.size,
-                                        features,
-                                    )
-                            )
-                    }
-                    .coerceIn(-20.0, 20.0)
-            }
-        val prior =
-            List(observation.actions.size) { index ->
-                when {
-                    observation.actions.size == 1 -> 1.0
-                    index == observation.baselineIndex -> model.baselineProbability
-                    else -> 0.03 / (observation.actions.size - 1)
-                }
-            }
-        val logits = prior.indices.map { ln(prior[it]) + residuals[it] }
-        val probabilities =
-            if (residuals.all { it == residuals.first() }) prior
-            else {
-                val maximum = logits.max()
-                val unnormalized = logits.map { exp(it - maximum) }
-                val total = unnormalized.sum()
-                unnormalized.map { it / total }
-            }
-        val rawValue =
-            model.valueBias + hidden.indices.sumOf { model.valueWeights[it] * hidden[it] }
-        val value =
-            if (rawValue >= 0.0) 1.0 / (1.0 + exp(-rawValue))
-            else {
-                val exponential = exp(rawValue)
-                exponential / (1.0 + exponential)
-            }
-        return PurchasePolicyEvaluation(logits, probabilities, value)
+        val result =
+            ResidualPolicyMath.evaluate(
+                observation.stateFeatures,
+                observation.actions.map(PurchaseAction::features),
+                observation.baselineIndex,
+                model.network,
+            )
+        return PurchasePolicyEvaluation(result.logits, result.probabilities, result.value)
     }
 
     /** [uniform] is an actor random draw in [0,1), never a draw from hidden world outcomes. */
@@ -258,14 +228,7 @@ object PurchasePolicy {
         require(evaluation.probabilities.size == observation.actions.size) {
             "Purchase sampling requires one probability per offered action."
         }
-        var cumulative = 0.0
-        val selected =
-            evaluation.probabilities
-                .indexOfFirst { probability ->
-                    cumulative += probability
-                    uniform < cumulative
-                }
-                .let { if (it < 0) observation.actions.lastIndex else it }
+        val selected = ResidualPolicyMath.select(evaluation.probabilities, uniform)
         return PurchasePolicyChoice(
             selected,
             observation.actions[selected].command,
@@ -281,28 +244,5 @@ object PurchasePolicy {
     ): PurchasePolicyChoice = choose(observation, model, uniform(seed))
 
     /** Versioned 32-bit integer mixer, mapped through unsigned arithmetic to [0,1). */
-    fun uniform(seed: Int): Double {
-        var mixed = seed
-        mixed = (mixed xor (mixed ushr 16)) * -2048144789
-        mixed = (mixed xor (mixed ushr 13)) * -1028477387
-        mixed = mixed xor (mixed ushr 16)
-        return (mixed.toLong() and 0xffffffffL).toDouble() / 4294967296.0
-    }
-
-    private fun indexed(
-        features: Map<String, Double>,
-        indices: Map<String, Int>,
-    ): List<Pair<Int, Double>> =
-        features
-            .map { (name, value) ->
-                checkNotNull(indices[name]) { "Unknown purchase feature: $name." } to value
-            }
-            .sortedBy { it.first }
-
-    private fun dot(
-        weights: List<Double>,
-        row: Int,
-        columns: Int,
-        features: List<Pair<Int, Double>>,
-    ): Double = features.sumOf { (column, value) -> weights[row * columns + column] * value }
+    fun uniform(seed: Int): Double = ResidualPolicyMath.uniform(seed)
 }
