@@ -743,6 +743,132 @@ class ExpansionReachTest {
         assertThat(failure.code).isEqualTo(ViolationCode.OVERSEAS_LIMIT_EXCEEDED)
     }
 
+    @Test
+    fun queryingDestinationsInReverseOrderPreservesPreferredShippingPaths() {
+        val context =
+            context(
+                ships = ShippingCapability.GALLEY_8,
+                advances = setOf(AdvanceId.THE_HEAVENS),
+            )
+        val destinations = context.configuration.provinceIds.toList()
+        val forward = destinations.associateWith { ExpansionReach.routesTo(context, venice, it) }
+        val reverseContext = context.copy()
+
+        val reverse =
+            destinations.reversed().associateWith {
+                ExpansionReach.routesTo(reverseContext, venice, it)
+            }
+
+        assertThat(reverse).isEqualTo(forward)
+    }
+
+    @Test
+    fun copiedContextUsesNewColouredBasesAfterEarlierRouteQueries() {
+        val original = context()
+        ExpansionReach.routesTo(original, venice, id("naples"))
+        val changed = original.copy(board = original.board.placeMarker(id("rome"), venice).board)
+
+        val routes = ExpansionReach.routesTo(changed, venice, id("naples"))
+
+        assertThat(routes).contains(ExpansionRoute.Land(id("rome")))
+    }
+
+    @Test
+    fun copiedContextUsesNewFleetAfterEarlierRouteQueries() {
+        val original = context(ships = ShippingCapability.GALLEY_2)
+        ExpansionReach.routesTo(original, venice, id("naples"))
+        val upgraded = original.player(venice).copy(ships = ShippingCapability.GALLEY_4)
+        val changed = original.copy(players = original.players + (venice to upgraded))
+
+        val routes = ExpansionReach.routesTo(changed, venice, id("naples"))
+
+        assertThat(routes.filterIsInstance<ExpansionRoute.Shipping>()).isNotEmpty()
+    }
+
+    @Test
+    fun copiedContextUsesHeavensAfterEarlierRouteQueries() {
+        val original = context(ships = ShippingCapability.GALLEY_2)
+        val withoutHeavens = ExpansionReach.routesTo(original, venice, id("bari"))
+        val upgraded = original.player(venice).copy(advances = setOf(AdvanceId.THE_HEAVENS))
+        val changed = original.copy(players = original.players + (venice to upgraded))
+        val acrossSea =
+            ExpansionRoute.Shipping(
+                id("venice"),
+                listOf(
+                    ShippingSpace.Coast(id("venice")),
+                    ShippingSpace.Sea(SeaArea.ADRIATIC_SEA),
+                    ShippingSpace.Coast(id("bari")),
+                ),
+            )
+
+        val routes = ExpansionReach.routesTo(changed, venice, id("bari"))
+
+        assertThat(withoutHeavens).doesNotContain(acrossSea)
+        assertThat(routes).contains(acrossSea)
+    }
+
+    @Test
+    fun reusedShippingPathsStillCheckEachPlacementPool() {
+        val context = context(ships = ShippingCapability.GALLEY_2)
+        ExpansionReach.routesTo(context, venice, id("rome"))
+
+        val failure =
+            assertFailsWith<RuleViolation> {
+                BoardPlacementRules.evaluate(context, venice, id("rome"), 2, poolTokens = 1)
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INSUFFICIENT_EXPANSION_TOKENS)
+    }
+
+    @Test
+    fun copiedContextChecksNewShippingUsageAfterEarlierRouteQueries() {
+        val original =
+            context(
+                ships = ShippingCapability.SEAWORTHY_10,
+                advances = setOf(AdvanceId.SEAWORTHY_VESSELS),
+            )
+        ExpansionReach.routesTo(original, venice, id("sicily"))
+        val changed = original.recordShipment(venice, id("sicily"), tokens = 10)
+
+        val failure =
+            assertFailsWith<RuleViolation> {
+                BoardPlacementRules.evaluate(changed, venice, id("sicily"), 1, poolTokens = 10)
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.SHIPPING_CAPACITY_EXCEEDED)
+    }
+
+    @Test
+    fun copiedContextUsesNewCaravanTransitControlAfterEarlierQueries() {
+        val original =
+            context(
+                advances = setOf(AdvanceId.CARAVAN),
+                board = BoardState().placeMarker(id("florence"), genoa, PieceSide.WHITE).board,
+            )
+        ExpansionReach.routesTo(original, venice, id("rome"))
+        val changed =
+            original.copy(
+                board = original.board.placeMarker(id("florence"), venice, PieceSide.WHITE).board
+            )
+
+        val routes = ExpansionReach.routesTo(changed, venice, id("rome"))
+
+        assertThat(routes).contains(ExpansionRoute.Caravan(id("venice"), id("florence")))
+    }
+
+    @Test
+    fun unknownRoutePlayerRetainsItsTypedDiagnostic() {
+        val unknown = PlayerId("p4")
+
+        val failure =
+            assertFailsWith<RuleViolation> {
+                ExpansionReach.routesTo(context(), unknown, id("rome"))
+            }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.INVALID_BOARD_PLAYER)
+        assertThat(failure.entityIds).containsExactly(unknown.value)
+    }
+
     private fun smyrnaContext(
         map: MapRule,
         ships: ShippingCapability = ShippingCapability.NONE,

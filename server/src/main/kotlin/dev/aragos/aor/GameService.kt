@@ -774,7 +774,7 @@ class GameService(
         val managed = store as? ManagedGameStore ?: return
         var cursor: String? = null
         do {
-            val ids = managed.ids(cursor, 100)
+            val ids = managed.armedPlanIds(cursor, 100)
             for (id in ids) {
                 try {
                     val game = store.read(id)

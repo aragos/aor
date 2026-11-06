@@ -5,6 +5,7 @@ import {PlayerLabels} from './IdentityLabel';
 import {AdvanceBenefits} from './AdvanceBenefits';
 import {AdvancePrice} from './AdvancePrice';
 import {MiseryPreview} from './MiseryPreview';
+import {CathedralUsage} from './CathedralUsage';
 
 /** Printed benefits and the viewer's current price remain visible without disclosures. */
 export function AdvanceInspection({snapshot, advance, offer, close}: {
@@ -19,6 +20,7 @@ export function AdvanceInspection({snapshot, advance, offer, close}: {
                 <h2 id="advance-inspection-title">{advanceName(advance.id)}</h2></div>
             <button type="button" className="close-detail" aria-label={t('table.close')} onClick={close}>×</button>
         </header>
+        {advance.id === 'CATHEDRAL' && <CathedralUsage snapshot={snapshot}/>}
         <div className="advance-inspection-content">
             <div className="advance-description">
                 <AdvanceBenefits id={advance.id} rules={snapshot.game.rules}/>

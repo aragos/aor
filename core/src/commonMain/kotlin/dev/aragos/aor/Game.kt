@@ -106,6 +106,9 @@ data class GameState(
     val turnNumber: Int? = null,
     val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
 ) {
+    /** Derived board queries are shared only within this immutable game snapshot. */
+    internal val boardContext: BoardRulesContext by lazy { BoardGame.context(this) }
+
     val catalog: CatalogConfiguration by lazy {
         CatalogConfiguration(playerIds.size, rules, CatalogVersion.fromWire(header.dataVersion))
     }

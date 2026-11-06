@@ -31,80 +31,43 @@ object ExpansionReach {
         context: BoardRulesContext,
         player: PlayerId,
         destination: ProvinceId,
-    ): List<ExpansionRoute> = query(context, player).routesTo(destination)
+    ): List<ExpansionRoute> = context.routesTo(player, destination)
 
-    /**
-     * Reuse one reach search while inspecting multiple destinations in the same immutable context.
-     * A query belongs to this context and player only; changed board/capabilities require a new
-     * one.
-     */
-    internal fun query(context: BoardRulesContext, player: PlayerId): Query = Query(context, player)
-
-    internal class Query(private val context: BoardRulesContext, player: PlayerId) {
-        private val profile = context.player(player)
-        private val bases = context.bases(player)
-        private val galleyRoutesByBase by lazy {
-            bases
-                .filter { base -> context.province(base).coastal }
-                .associateWith { base ->
-                    galleyRoutes(context, profile, base)
-                }
+    /** Calculates a destination's preferred routes once for its owning immutable context. */
+    internal fun findRoutesTo(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
+    ): List<ExpansionRoute> {
+        val profile = context.player(player)
+        if (
+            profile.chaos ||
+                destination !in context.provinceIds ||
+                !canEnter(profile, context.province(destination))
+        ) {
+            return emptyList()
         }
-
-        fun routesTo(destination: ProvinceId): List<ExpansionRoute> {
-            if (
-                profile.chaos ||
-                    destination !in context.provinceIds ||
-                    !canEnter(profile, context.province(destination))
-            ) {
-                return emptyList()
+        return context
+            .bases(player)
+            .flatMap { base ->
+                listOfNotNull(
+                    ExpansionRoute.Local(base).takeIf { base == destination },
+                    ExpansionRoute.Land(base).takeIf {
+                        connected(context.configuration.landBorders, base, destination)
+                    },
+                ) +
+                    caravanRoutes(context, profile, base, destination) +
+                    shippingRoutes(context, profile, base, destination)
             }
-            return bases
-                .flatMap { base ->
-                    listOfNotNull(
-                        ExpansionRoute.Local(base).takeIf { base == destination },
-                        ExpansionRoute.Land(base).takeIf {
-                            connected(context.configuration.landBorders, base, destination)
-                        },
-                    ) +
-                        caravanRoutes(context, profile, base, destination) +
-                        shippingRoutes(base, destination)
-                }
-                .distinct()
-                .sortedWith(
-                    compareBy<ExpansionRoute>(
-                        { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
-                        ::routeLength,
-                        { route -> route.base.value },
-                        ::routeKey,
-                    )
+            .distinct()
+            .sortedWith(
+                compareBy<ExpansionRoute>(
+                    { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
+                    ::routeLength,
+                    { route -> route.base.value },
+                    ::routeKey,
                 )
-        }
-
-        private fun shippingRoutes(
-            base: ProvinceId,
-            destination: ProvinceId,
-        ): List<ExpansionRoute.Shipping> {
-            if (
-                !context.province(base).coastal ||
-                    !context.province(destination).coastal ||
-                    base == destination
-            ) {
-                return emptyList()
-            }
-            return when (profile.ships.fleet) {
-                ShippingFleet.NONE -> emptyList()
-                ShippingFleet.GALLEY -> galleyRoutesByBase[base].orEmpty()[destination].orEmpty()
-                ShippingFleet.SEAWORTHY -> {
-                    if (context.province(destination).overseas == null) {
-                        listOf(directShipping(base, destination))
-                    } else {
-                        emptyList()
-                    }
-                }
-                ShippingFleet.OCEAN -> listOf(directShipping(base, destination))
-            }
-        }
+            )
     }
 
     private fun routeLength(route: ExpansionRoute): Int =
@@ -244,7 +207,8 @@ object ExpansionReach {
         destination: ProvinceId,
     ): List<ExpansionRoute.Caravan> {
         if (AdvanceId.CARAVAN !in profile.advances) return emptyList()
-        return neighbors(context.configuration.landBorders, base)
+        return context.configuration.landNeighbors[base]
+            .orEmpty()
             .filter { via ->
                 via != destination &&
                     connected(context.configuration.landBorders, via, destination) &&
@@ -252,6 +216,32 @@ object ExpansionReach {
                     !opponentFills(context, profile.player, via)
             }
             .map { via -> ExpansionRoute.Caravan(base, via) }
+    }
+
+    private fun shippingRoutes(
+        context: BoardRulesContext,
+        profile: BoardPlayerProfile,
+        base: ProvinceId,
+        destination: ProvinceId,
+    ): List<ExpansionRoute.Shipping> {
+        if (
+            !context.province(base).coastal ||
+                !context.province(destination).coastal ||
+                base == destination
+        ) {
+            return emptyList()
+        }
+        return when (profile.ships.fleet) {
+            ShippingFleet.NONE -> emptyList()
+            ShippingFleet.GALLEY -> context.galleyRoutes(profile.player, base, destination)
+            ShippingFleet.SEAWORTHY ->
+                if (context.province(destination).overseas == null) {
+                    listOf(directShipping(base, destination))
+                } else {
+                    emptyList()
+                }
+            ShippingFleet.OCEAN -> listOf(directShipping(base, destination))
+        }
     }
 
     private fun validateShipping(
@@ -306,7 +296,8 @@ object ExpansionReach {
         }
     }
 
-    private fun galleyRoutes(
+    /** One traversal records both sea-free and one-sea paths to every reachable coast. */
+    internal fun galleyRoutes(
         context: BoardRulesContext,
         profile: BoardPlayerProfile,
         base: ProvinceId,
@@ -350,7 +341,10 @@ object ExpansionReach {
                     coast.province to ExpansionRoute.Shipping(base, path)
                 }
             }
-            .groupBy({ it.first }, { it.second })
+            .groupBy(Pair<ProvinceId, ExpansionRoute.Shipping>::first)
+            .mapValues { (_, routes) ->
+                routes.map(Pair<ProvinceId, ExpansionRoute.Shipping>::second)
+            }
     }
 
     private fun waterNeighbors(
@@ -385,15 +379,4 @@ object ExpansionReach {
         first: ProvinceId,
         second: ProvinceId,
     ): Boolean = first != second && ProvinceConnection.of(first, second) in edges
-
-    private fun neighbors(edges: Set<ProvinceConnection>, province: ProvinceId): Set<ProvinceId> =
-        edges
-            .mapNotNull { edge ->
-                when (province) {
-                    edge.first -> edge.second
-                    edge.second -> edge.first
-                    else -> null
-                }
-            }
-            .toSet()
 }

@@ -16,11 +16,10 @@ class ExpansionReachQueryTest {
                 board = BoardState().placeMarker(florence, player).board,
                 ships = ShippingCapability.GALLEY_2,
             )
-        val query = ExpansionReach.query(context, player)
-        query.routesTo(ProvinceId("naples"))
-        query.routesTo(florence)
+        ExpansionReach.routesTo(context, player, ProvinceId("naples"))
+        ExpansionReach.routesTo(context, player, florence)
 
-        val routes = query.routesTo(rome)
+        val routes = ExpansionReach.routesTo(context, player, rome)
 
         assertThat(routes)
             .containsExactly(
@@ -58,10 +57,9 @@ class ExpansionReachQueryTest {
     }
 
     @Test
-    fun changedShippingDoesNotReuseAnEarlierQuery() {
+    fun changedShippingDoesNotReuseAnEarlierContextCache() {
         val initial = context(ships = ShippingCapability.GALLEY_2)
-        val earlier = ExpansionReach.query(initial, player)
-        earlier.routesTo(rome)
+        ExpansionReach.routesTo(initial, player, rome)
         val changed =
             initial.copy(
                 players =
@@ -69,30 +67,29 @@ class ExpansionReachQueryTest {
                         (player to initial.player(player).copy(ships = ShippingCapability.NONE))
             )
 
-        val routes = ExpansionReach.query(changed, player).routesTo(rome)
+        val routes = ExpansionReach.routesTo(changed, player, rome)
 
         assertThat(routes).isEmpty()
     }
 
     @Test
-    fun changedBasesAreAvailableToANewQuery() {
+    fun changedBasesAreAvailableToANewContext() {
         val initial = context()
-        ExpansionReach.query(initial, player).routesTo(rome)
+        ExpansionReach.routesTo(initial, player, rome)
         val changed = initial.copy(board = initial.board.placeMarker(florence, player).board)
 
-        val routes = ExpansionReach.query(changed, player).routesTo(rome)
+        val routes = ExpansionReach.routesTo(changed, player, rome)
 
         assertThat(routes).containsExactly(ExpansionRoute.Land(florence))
     }
 
     @Test
-    fun anEarlierQueryRetainsItsBoardSnapshotAfterANewQuery() {
+    fun anEarlierContextRetainsItsBoardSnapshotAfterANewContext() {
         val initial = context()
-        val earlier = ExpansionReach.query(initial, player)
         val changed = initial.copy(board = initial.board.placeMarker(florence, player).board)
-        ExpansionReach.query(changed, player).routesTo(rome)
+        ExpansionReach.routesTo(changed, player, rome)
 
-        val routes = earlier.routesTo(rome)
+        val routes = ExpansionReach.routesTo(initial, player, rome)
 
         assertThat(routes).isEmpty()
     }
@@ -110,14 +107,13 @@ class ExpansionReachQueryTest {
                             ships = ships,
                         )
                         .copy(configuration = CatalogConfiguration(3, RuleOptions(map = map)))
-                val query = ExpansionReach.query(context, player)
 
                 for (province in context.configuration.provinces.reversed()) {
-                    val routes = query.routesTo(province.id)
+                    val routes = ExpansionReach.routesTo(context, player, province.id)
 
                     assertThat(routes)
                         .containsExactlyElementsIn(
-                            ExpansionReach.routesTo(context, player, province.id)
+                            ExpansionReach.findRoutesTo(context, player, province.id)
                         )
                         .inOrder()
                 }

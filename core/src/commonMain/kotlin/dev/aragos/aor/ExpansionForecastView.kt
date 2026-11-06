@@ -65,8 +65,7 @@ data class ExpansionForecastView(
             }
             val player = viewer.player.id
             // The forthcoming Expansion phase starts without shipments from an earlier turn.
-            val context = BoardGame.context(state).copy(shipped = emptyMap())
-            val reach = ExpansionReach.query(context, player)
+            val context = state.boardContext.copy(shipped = emptyMap())
             val markets =
                 context.configuration.provinces.mapNotNull { province ->
                     if (province.isSatellite) return@mapNotNull null
@@ -77,8 +76,8 @@ data class ExpansionForecastView(
                     val required = province.marketNumber - (holdings[player]?.total ?: 0)
                     if (required <= 0) return@mapNotNull null
                     val plan =
-                        plan(context, reach, player, province.id, required)
-                            as? PlacementPlan.Peaceful ?: return@mapNotNull null
+                        plan(context, player, province.id, required) as? PlacementPlan.Peaceful
+                            ?: return@mapNotNull null
                     PeacefulExpansionProspectView(
                         destination = province.id,
                         requiredTokens = required,
@@ -93,14 +92,13 @@ data class ExpansionForecastView(
                 overseasSlots = ExpansionReach.remainingOverseasSlots(context, player),
                 contestedMarkets =
                     if (state.stage == Stage.TOKEN_PURCHASE) {
-                        contestedMarkets(context, reach, player)
+                        contestedMarkets(context, player)
                     } else emptyList(),
             )
         }
 
         private fun contestedMarkets(
             context: BoardRulesContext,
-            reach: ExpansionReach.Query,
             player: PlayerId,
         ): List<ContestedExpansionProspectView> =
             context.configuration.provinces.mapNotNull { province ->
@@ -114,8 +112,8 @@ data class ExpansionForecastView(
                 if (!contested) return@mapNotNull null
                 val required = BoardGame.attackTokens(context, player, province.id)
                 val plan =
-                    plan(context, reach, player, province.id, required)
-                        as? PlacementPlan.Competition ?: return@mapNotNull null
+                    plan(context, player, province.id, required) as? PlacementPlan.Competition
+                        ?: return@mapNotNull null
                 ContestedExpansionProspectView(
                     destination = province.id,
                     requiredTokens = required,
@@ -128,12 +126,11 @@ data class ExpansionForecastView(
 
         private fun plan(
             context: BoardRulesContext,
-            reach: ExpansionReach.Query,
             player: PlayerId,
             destination: ProvinceId,
             required: Int,
         ): PlacementPlan? =
-            reach.routesTo(destination).firstNotNullOfOrNull { route ->
+            ExpansionReach.routesTo(context, player, destination).firstNotNullOfOrNull { route ->
                 try {
                     BoardPlacementRules.evaluate(
                         context = context,

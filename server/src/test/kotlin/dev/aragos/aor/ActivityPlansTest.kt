@@ -41,6 +41,95 @@ class ActivityPlansTest {
     }
 
     @Test
+    fun recoveryIgnoresLegacyDocumentsWithoutPlans() {
+        val fixture = fileFixture()
+        val legacyId = UUID.randomUUID().toString()
+        val legacy = """{"id":"$legacyId","fileVersion":3}"""
+        val path = (fixture.store as FileGameStore).directory.resolve("$legacyId.json")
+        Files.writeString(path, legacy)
+
+        fixture.service.recoverPlans { _, failure -> throw failure }
+
+        assertThat(Files.readString(path)).isEqualTo(legacy)
+    }
+
+    @Test
+    fun unreadableMetadataDoesNotPreventOtherPlansFromRecovering() {
+        val fixture = fileFixture()
+        fixture.toPurchase()
+        fixture.plan(1, PlanOperation.SAVE, purchase)
+        fixture.plan(1, PlanOperation.ARM)
+        fixture.store.update(fixture.game.gameId) { game ->
+            listOf("pass", "pass", "stabilize cash").fold(game) { current, command ->
+                GameDriver(FixedRandom()).submit(current, PlayerId("p1"), command)
+            }
+        }
+        val brokenId = "00000000-0000-0000-0000-000000000000"
+        Files.writeString((fixture.store as FileGameStore).directory.resolve("$brokenId.json"), "{")
+
+        val failures = buildList {
+            fixture.service.recoverPlans { id, _ -> add(id) }
+        }
+
+        assertThat(failures).containsExactly(brokenId)
+        assertThat(fixture.view(1).planning?.executions).hasSize(1)
+        assertThat(fixture.view(1).history.count { it == "p2: buy-advance V" }).isEqualTo(1)
+    }
+
+    @Test
+    fun recoveryReportsUnreadableGamesWithArmedPlans() {
+        val fixture = fileFixture()
+        val brokenId = UUID.randomUUID().toString()
+        Files.writeString(
+            (fixture.store as FileGameStore).directory.resolve("$brokenId.json"),
+            """{"id":"$brokenId","plans":{"p1":{"armed":true}}}""",
+        )
+        val failures = buildList {
+            fixture.service.recoverPlans { id, failure -> add(id to failure) }
+        }
+
+        assertThat(failures.map { it.first }).containsExactly(brokenId)
+        assertThat((failures.single().second as ServiceFailure).code)
+            .isEqualTo("STORAGE_UNAVAILABLE")
+    }
+
+    @Test
+    fun postgresRecoverySelectsOnlyArmedPlansAndPaginatesCandidates() =
+        PostgresFixture().use { database ->
+            val first = PlanningFixture(database.service(), database.store)
+            first.toPurchase()
+            first.plan(1, PlanOperation.SAVE, purchase)
+            first.plan(1, PlanOperation.ARM)
+            val second = PlanningFixture(database.service(), database.store)
+            second.toPurchase()
+            second.plan(1, PlanOperation.SAVE, purchase)
+            second.plan(1, PlanOperation.ARM)
+            val unarmed = PlanningFixture(database.service(), database.store)
+            unarmed.toPurchase()
+            unarmed.plan(1, PlanOperation.SAVE, purchase)
+            val legacyId = database.service().create(listOf("One", "Two", "Three")).gameId
+            database.database.write { connection ->
+                connection
+                    .prepareStatement(
+                        "UPDATE games SET document = '{\"fileVersion\":3}'::jsonb WHERE id = ?::uuid"
+                    )
+                    .use { statement ->
+                        statement.setString(1, legacyId)
+                        statement.executeUpdate()
+                    }
+            }
+
+            val firstPage = database.store.armedPlanIds(limit = 1)
+            val secondPage = database.store.armedPlanIds(after = firstPage.single(), limit = 1)
+            val remaining = database.store.armedPlanIds(after = secondPage.single(), limit = 1)
+
+            assertThat(firstPage + secondPage)
+                .containsExactly(first.game.gameId, second.game.gameId)
+            assertThat(remaining).isEmpty()
+            database.reopened().recoverPlans { _, failure -> throw failure }
+        }
+
+    @Test
     fun policyUpgradePreservesAutomaticAuthorizationWithoutExecutingIt() {
         val fixture = fileFixture(policy = UndoPolicy.FRIENDLY_GAME)
         fixture.toPurchase()

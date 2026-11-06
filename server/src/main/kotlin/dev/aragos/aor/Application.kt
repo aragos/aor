@@ -103,14 +103,16 @@ fun Application.module(
                         log.warn(
                             "Plan recovery failed for {} ({})",
                             id,
-                            failure.javaClass.simpleName,
+                            (failure as? ServiceFailure)?.code ?: failure.javaClass.simpleName,
+                            failure,
                         )
                     }
                 } catch (failure: Exception) {
                     if (failure is CancellationException) throw failure
                     log.warn(
                         "Plan recovery directory unavailable ({})",
-                        failure.javaClass.simpleName,
+                        (failure as? ServiceFailure)?.code ?: failure.javaClass.simpleName,
+                        failure,
                     )
                 }
                 delay(5000)
