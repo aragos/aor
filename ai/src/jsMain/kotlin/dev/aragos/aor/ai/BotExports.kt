@@ -20,6 +20,12 @@ fun chooseBotMove(
     difficulty: String,
     seed: Int,
 ): String {
+    val observation = readBotObservation(observationJson)
+    val model = readBotModel(modelJson, observation)
+    return BotPolicy.choose(observation, BotDifficulty.valueOf(difficulty.uppercase()), seed, model)
+}
+
+internal fun readBotObservation(observationJson: String): BotObservation {
     require(observationJson.length <= 8_000_000) {
         "The bot observation exceeds its transport bound."
     }
@@ -54,8 +60,7 @@ fun chooseBotMove(
             advancePlanning = readAdvancePlanning(raw.advancePlanning),
             leaderPlanning = readLeaderPlanning(raw.leaderPlanning),
         )
-    val model = readModel(modelJson, observation)
-    return BotPolicy.choose(observation, BotDifficulty.valueOf(difficulty.uppercase()), seed, model)
+    return observation
 }
 
 private fun readLeaderPlanning(raw: dynamic): BotLeaderPlanning? {
@@ -119,7 +124,7 @@ private fun readPlayerTarget(raw: dynamic): PlayerId? {
     return PlayerId(raw as String)
 }
 
-private fun readModel(modelJson: String, observation: BotObservation): BotModel {
+internal fun readBotModel(modelJson: String, observation: BotObservation): BotModel {
     if (modelJson.isBlank() || modelJson == "{}" || modelJson.length > 1_000_000) {
         return BotModels.default
     }
@@ -186,7 +191,7 @@ private fun readModelSchema(raw: dynamic): Int {
     return value.toInt()
 }
 
-private fun readConfiguration(raw: dynamic): BotConfiguration? {
+internal fun readConfiguration(raw: dynamic): BotConfiguration? {
     if (raw == null) return null
     require(jsTypeOf(raw.playerCount) == "number") { "Bot player count must be numerical." }
     val playerCount = (raw.playerCount as Number).toDouble()
