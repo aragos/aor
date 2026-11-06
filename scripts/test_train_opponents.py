@@ -83,6 +83,34 @@ class OptionsAndBudgetTest(unittest.TestCase):
         self.assertEqual(arguments[arguments.index("--side") + 1], "incumbent")
         self.assertEqual(arguments[arguments.index("--pair") + 1], str(Path("/tmp/pair-2.json").resolve()))
 
+    def test_purchase_collection_preserves_the_specification_and_resource_budget(self):
+        options = training.parse_options([
+            "--mode", "purchase-collect", "--source", "/tmp/purchase-spec.json",
+            "--output", "/tmp/purchase-output", "--workers", "2",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB), 2)
+
+        arguments = training.trainer_arguments(options, budget, 1.5)
+
+        self.assertEqual(arguments, [
+            str(training.TRAINER), "--mode", "purchase-collect",
+            "--output", str(Path("/tmp/purchase-output").resolve()),
+            "--workers", "2", "--hours", "1.5",
+            "--source", str(Path("/tmp/purchase-spec.json").resolve()),
+        ])
+
+    def test_purchase_collection_requires_its_frozen_specification(self):
+        with self.assertRaises(SystemExit):
+            training.parse_options(["--mode", "purchase-collect"])
+
+    def test_purchase_collection_rejects_cli_changes_to_frozen_training_settings(self):
+        for flag in ("--seed", "--model", "--difficulty", "--rounds", "--samples"):
+            with self.subTest(flag=flag), self.assertRaises(SystemExit):
+                training.parse_options([
+                    "--mode", "purchase-collect", "--source", "/tmp/purchase-spec.json",
+                    flag, "1",
+                ])
+
     def test_replay_index_is_rejected_in_other_modes(self):
         with self.assertRaises(SystemExit):
             training.parse_options(["--mode", "pilot", "--index", "1"])

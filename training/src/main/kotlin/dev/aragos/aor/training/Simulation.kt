@@ -27,6 +27,26 @@ import kotlin.random.Random
 data class Competitor(val model: BotModel, val difficulty: BotDifficulty = BotDifficulty.NORMAL)
 
 /**
+ * One ordinary actor-visible decision. [number] is the zero-based game command index and [seed] is
+ * the unchanged baseline-policy seed, not the authority's chance stream or a learned feature.
+ */
+data class SimulationDecision(
+    val number: Int,
+    val seat: Int,
+    val seed: Int,
+    val view: GameView,
+    val observation: BotObservation,
+)
+
+/** Explicit experiment-only policy extension; null retains the ordinary baseline command. */
+fun interface SimulationController {
+    /** Avoid projecting a full owner view for decisions this controller leaves to the baseline. */
+    fun controls(decision: String): Boolean = true
+
+    fun choose(decision: SimulationDecision): String?
+}
+
+/**
  * Optional inspection sink, never a policy input. [seat] is the zero-based registration index.
  * Decision views contain public information and only that seat's hand. Authority entries are
  * delivered separately after replay verification, including private outcomes needed for replay.
@@ -102,6 +122,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
         deadlineNanos: Long = Long.MAX_VALUE,
         verifyReplay: Boolean = false,
         trace: SimulationTrace? = null,
+        controllers: Map<Int, SimulationController> = emptyMap(),
     ): SimulatedGame {
         require(competitors.size == configuration.playerCount) {
             "Every simulated seat requires one competitor."
@@ -109,6 +130,10 @@ class Simulation(private val maxDecisions: Int = 12000) {
         require(trace == null || trace.seat in competitors.indices) {
             "A simulation trace requires a registered seat."
         }
+        require(controllers.keys.all { it in competitors.indices }) {
+            "A simulation controller requires a registered seat."
+        }
+        val controlled = controllers.toMap()
         checkDeadline(deadlineNanos)
         val started = System.nanoTime()
         val random = Random(seed)
@@ -157,13 +182,37 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 val competitor = competitors[seat]
                 val observation = BotObservations.from(state, actor)
                 observation.candidates.flatMapTo(features) { it.features.keys }
-                val candidate =
-                    BotPolicy.chooseCandidate(
-                        observation = observation,
-                        difficulty = competitor.difficulty,
-                        seed = seed xor (step * 65537 + seat * 8191),
-                        model = competitor.model,
+                val policySeed = seed xor (step * 65537 + seat * 8191)
+                val controller = controlled[seat]?.takeIf { it.controls(observation.decision) }
+                val view = if (controller != null) state.viewForPlayer(actor) else null
+                val command =
+                    controller?.choose(
+                        SimulationDecision(
+                            number = step + actorIndex,
+                            seat = seat,
+                            seed = policySeed,
+                            view =
+                                checkNotNull(view) {
+                                    "An explicit controller requires the ordinary decision view."
+                                },
+                            observation = observation,
+                        )
                     )
+                val candidate =
+                    if (command == null) {
+                        BotPolicy.chooseCandidate(
+                            observation = observation,
+                            difficulty = competitor.difficulty,
+                            seed = policySeed,
+                            model = competitor.model,
+                        )
+                    } else {
+                        requireNotNull(
+                            observation.candidates.singleOrNull { it.command == command }
+                        ) {
+                            "An experiment controller must select one of its ordinary offered commands."
+                        }
+                    }
                 if (trace != null && trace.seat == seat) {
                     val snapshotEntryCount =
                         checkNotNull(entries) {
