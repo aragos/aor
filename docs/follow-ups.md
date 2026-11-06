@@ -143,10 +143,19 @@ as diagnostic positions and hypotheses. The learner must be able to try actions 
 that neither the current heuristic nor a human example recommends. Further scalar-weight searches
 remain useful controls, but cannot discover consequences absent from their authored features.
 
-- Add a compact shared legal-action policy and value baseline, initialized from current qualified
-  choices. Feed it raw public and own-seat facts as well as action costs and effects. Use stable
-  domain identities, not transient hand references. Preserve explicit observation privacy and sealed
-  simultaneous decisions for both policy and value inputs.
+- Start with a learner controlling every shipping and advance purchase throughout complete games;
+  keep the qualified policy for other decisions. Apply each choice through the actual engine and
+  regenerate legal offers, including newly acquired prerequisites and changed prices. This first
+  milestone cannot discover better card timing or broader expansion actions. Keep its policy and
+  value boundary extensible so those phases can follow.
+- Encode raw public and own-seat facts from the ordinary acting-player view, alongside legal action
+  identities, costs and effects. Use stable domain identities, not transient hand references. Share
+  the state encoding across candidate actions and preserve portable inference. Neither the policy
+  nor value callback may receive authoritative game state or unrevealed simultaneous submissions.
+- Initialize from qualified choices, then constrain early policy updates and exploration so small
+  per-decision error rates do not compound into uncontrolled whole-game behavior. Keep support for
+  every offered purchase, measure deviations and sequence coverage, and compare complete games
+  against the unchanged initialization. Agreement with the teacher is only a starting condition.
 - Collect complete trajectories with the current learner acting repeatedly across the turn. Update
   from terminal results using an on-policy method such as [PPO](https://arxiv.org/abs/1707.06347), then
   collect new games with the updated learner. A learned value baseline aims to reduce gradient variance.
@@ -160,11 +169,17 @@ remain useful controls, but cannot discover consequences absent from their autho
   independently developed opponents for evaluation. Expand population self-play after the first
   learner shows improvement; repeatedly exploiting one familiar opponent does not establish robust
   playing strength.
-- Begin with a 256-game correctness and throughput smoke, then provisionally budget 8,192 training
-  games in batches of 256 and at most four development checkpoint evaluations. Freeze the exact
-  implementation, time allowance, splits and success criteria before launch. Treat this as a test of
-  learning progress, not a promise of human-level strength. Independently confirm the selected model
-  on untouched full games and verify the same action-selection rule in training and deployment.
+- Begin with a 256-game correctness and throughput smoke. Include a controlled delayed-reward
+  sequence check that must improve through policy updates, rather than merely fitting teacher
+  choices, plus actual-engine prerequisite, repricing, privacy and replay checks. Stop before a
+  larger run if these fail or repeated exploration produces a clear whole-game collapse.
+- Provisionally budget 8,192 training games in batches of 256 and at most four development checkpoint
+  evaluations; revise that budget from measured smoke costs before opening fresh training data.
+  Freeze implementation, exploration, time limits, seed banks and whole-game improvement and stop
+  criteria before launch. Stop at the budget if improvement is absent; do not expand the search after
+  seeing validation results. Independently confirm one frozen selection on untouched full games
+  with the same action-selection rule used during collection. Training loss and the delayed-reward
+  check establish neither playing strength nor a serious human challenge.
 - Keep all game generation, numerical learning, candidate selection, budgets, checkpoints and reports
   in ordinary code. No LLM calls are required per decision, game or update. LLM review should focus on
   implementation, failed milestones and strategic reassessment, with compact reports and selected
