@@ -229,7 +229,7 @@ export async function checkContextualUx(page, web, baseline) {
     await show({game:{stage:'EXPANSION'},events:[...baseline.events,event]});
     assert.equal(await page.evaluate(`document.querySelector('.action-result-notice, .competition-log')`),null,
         'Polling a historical competition cannot create an action receipt');
-    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /Competition won.*Rome/);
+    assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /Rome.*Competition won/s);
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-result"]').textContent`), /White die 1.*Black die 6.*Green die 4/,
         'Every recorded competition die identifies its color');
     const war = {...event,id:'fixture-war',kind:'WAR_RESULT',actor:viewer,target:other.id,competition:null,

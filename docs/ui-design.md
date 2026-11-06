@@ -69,10 +69,12 @@ Distinguish local drafts, saved submissions and committed actions via owner rece
 only an unsaved local amount.
 
 Activity is one bounded workspace log or labeled left pin on wide screens. Preserve entry-time names,
-causes, dice and endpoints. Province references show commodities and open the map without changing
-  drafts. Group revealed bids and paired shortage/surplus rolls without changing
-history or losing individual consequences. Only one's own submitted competition can open its result
-notice; expansion notices expire with expansion. Final scores can dismiss/reopen, preserving inspection.
+causes, dice and endpoints. Province references open the map without changing
+drafts; their text-sized commodities follow outside the link. Group related committed actions and
+outcomes, revealed bids, and paired market rolls (including their draw rewards), preserving each
+entry's facts and audience. Keep independent automatic causes and phase milestones distinct. Put
+consequences below their cause, with each player's resource and order changes together. Only one's own
+submitted competition can open its result notice; expansion notices expire with expansion. Final scores can dismiss/reopen, preserving inspection.
 
 Favicon action status works independently of rendering. Hidden tabs poll every five seconds for two
 minutes after engagement/change, then every 30 seconds; unchanged responses do not extend activity.

@@ -991,6 +991,10 @@ class HistoryEventsTest {
         assertThat(event?.actor).isEqualTo(owner)
         assertThat(event?.provinces).containsExactly(ProvinceId("florence"))
         assertThat(event?.competition).isEqualTo(CompetitionResultView(true, setOf(recipient)))
+        assertThat(event?.participants)
+            .contains(
+                HistoryParticipantView(recipient, "Bob", pending.playerState(recipient).capital)
+            )
         assertThat(event?.dice?.map(HistoryDieView::value)).containsExactly(1, 6, 6).inOrder()
     }
 

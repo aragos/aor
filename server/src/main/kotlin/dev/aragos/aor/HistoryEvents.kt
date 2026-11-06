@@ -352,6 +352,7 @@ internal object HistoryEvents {
     private fun HistoryEventView.withParticipants(state: GameState): HistoryEventView {
         val ids =
             listOfNotNull(actor, target, war?.initiator, war?.opponent, war?.winner) +
+                competition?.defenders.orEmpty() +
                 dice.mapNotNull(HistoryDieView::player) +
                 cashChanges.map(HistoryCashChangeView::player) +
                 miseryChanges.map(HistoryMiseryChangeView::player) +

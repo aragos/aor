@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {join} from 'node:path';
 import {createGame, open, waitForMap} from './browser-support.mjs';
 
 export async function checkLiveCompetitionLifecycle(page, web) {
@@ -56,6 +57,55 @@ export async function checkLiveCompetitionLifecycle(page, web) {
     const resolved = await game.snapshot(attacker);
     const outcome = resolved.events.findLast(event => event.competition);
     assert(outcome, 'The resolved competition remains in activity');
+    for (const defender of outcome.competition.defenders) {
+        const identity = outcome.participants.find(player => player.id === defender);
+        assert(identity, 'Live outcomes record each opposing identity');
+        const name = identity.capital ? identity.capital[0].toUpperCase() + identity.capital.slice(1) : identity.name;
+        assert((await page.evaluate(`document.querySelector('.competition-notice .event-opponents').textContent`)).includes(name),
+            'The submitting player sees the opposing side in the result notice');
+    }
+    await page.evaluate(`document.querySelector('#tab-activity').click()`);
+    const action = resolved.events.findLast(event => event.kind === 'ATTACK');
+    assert.equal(await page.evaluate(`document.querySelector('[data-activity-member="${outcome.id}"]').closest('li').dataset.eventId`), action.id,
+        'A live competition action and its recorded resolution share one activity row');
+    for (const [width, height] of [[1280, 900], [390, 844]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile: width < 700});
+        await page.evaluate(`document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))`);
+        assert(await page.evaluate(`document.querySelector('.activity-list').scrollWidth <= document.querySelector('.activity-list').clientWidth`),
+            'Grouped competition facts fit the activity workspace');
+        const notice = await page.evaluate(`(() => {
+            const notice = document.querySelector('.competition-notice');
+            const content = notice.querySelector('.activity-content');
+            const province = content.querySelector('.event-province');
+            const commodities = [...province.parentElement.querySelectorAll('.commodity-name')];
+            return {
+                summaries: content.querySelectorAll('.event-summary').length,
+                resolutions: content.querySelectorAll('.event-resolution').length,
+                resolution: content.querySelector('.event-resolution').textContent,
+                dice: content.querySelector('.event-resolution').querySelectorAll('.event-die').length,
+                province: province.dataset.activityProvince,
+                commodities: commodities.map(node => node.textContent.toUpperCase()),
+                commoditiesOutsideBox: !province.querySelector('.commodity-name'),
+                textSizedIcons: commodities.every(node => Math.abs(node.querySelector('svg').getBoundingClientRect().height -
+                    parseFloat(getComputedStyle(node).fontSize)) < 1),
+                fits: notice.scrollWidth <= notice.clientWidth, width: notice.clientWidth, scrollWidth: notice.scrollWidth,
+                dismissReachable: notice.querySelector('.close-detail').checkVisibility(),
+            };
+        })()`);
+        assert.equal(notice.summaries, 1, 'The action-pane receipt has one cause summary');
+        assert.equal(notice.resolutions, 1, 'The action-pane receipt groups outcome and dice below its cause');
+        assert.match(notice.resolution, outcome.competition.attackerWon ? /Competition won/ : /Competition lost/);
+        assert.equal(notice.dice, outcome.dice.length, 'The action-pane receipt preserves all recorded dice');
+        assert.equal(notice.province, target.destination);
+        assert.deepEqual(notice.commodities, resolved.game.catalog.provinces.find(province => province.id === target.destination).commodities);
+        assert(notice.commoditiesOutsideBox && notice.textSizedIcons,
+            'The action-pane receipt also puts text-sized commodities outside the province box');
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `competition-pane-${width}.png`));
+        assert(notice.fits && notice.dismissReachable, `The action-pane result wraps and remains dismissible at ${width}px: ${JSON.stringify(notice)}`);
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `competition-activity-${width}.png`));
+    }
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
+    await page.evaluate(`document.querySelector('#tab-map').click()`);
     state = resolved;
     for (let step = 0; step < game.links.length; step++) {
         if (state.game.stage !== 'EXPANSION') break;

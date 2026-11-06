@@ -104,8 +104,13 @@ export async function checkActivityWorkspace(page, web, baseline) {
     assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${offer.destination}"][data-highlight-priority="4"]')`), true, 'Temporary card inspection preserves the prepared province border');
     const historyProvince = fixture.game.catalog.provinces.find(province => province.id === 'venice');
     const provinceLink = '[data-activity-province="venice"]';
-    assert.deepEqual(await page.evaluate(`[...document.querySelector('${provinceLink}').querySelectorAll('.commodity-name')].map(node => node.textContent.toUpperCase())`),
+    assert.deepEqual(await page.evaluate(`[...document.querySelector('${provinceLink}').parentElement.querySelectorAll('.commodity-name')].map(node => node.textContent.toUpperCase())`),
         historyProvince.commodities, 'History includes every commodity beside its province');
+    assert.equal(await page.evaluate(`document.querySelector('${provinceLink} .commodity-name')`), null,
+        'Commodities follow the province link outside its box');
+    assert(await page.evaluate(`[...document.querySelector('${provinceLink}').parentElement.querySelectorAll('.commodity-name svg')]
+        .every(icon => Math.abs(icon.getBoundingClientRect().height - parseFloat(getComputedStyle(icon.parentElement).fontSize)) < 1)`),
+        'Commodity icons use the surrounding text size');
     await click(provinceLink);
     await page.wait(`document.querySelector('#tab-map[aria-selected="true"]') && document.activeElement?.dataset.mapProvince === 'venice'`, 'History reveals and focuses its province on the map');
     assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), draft,
