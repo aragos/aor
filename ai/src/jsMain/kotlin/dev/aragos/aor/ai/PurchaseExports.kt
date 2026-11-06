@@ -24,23 +24,7 @@ fun evaluatePurchasePolicy(observationJson: String, modelJson: String, uniform: 
                 },
             baselineIndex = purchaseInteger(input.baselineIndex),
         )
-    val raw = JSON.parse<dynamic>(modelJson)
-    val model =
-        PurchasePolicyModel(
-            schemaVersion = purchaseInteger(raw.schemaVersion),
-            encoderVersion = purchaseString(raw.encoderVersion),
-            hiddenSize = purchaseInteger(raw.hiddenSize),
-            baselineProbability = purchaseNumber(raw.baselineProbability),
-            stateFeatureNames = purchaseArray(raw.stateFeatureNames).map(::purchaseString),
-            actionFeatureNames = purchaseArray(raw.actionFeatureNames).map(::purchaseString),
-            stateWeights = purchaseArray(raw.stateWeights).map(::purchaseNumber),
-            stateBias = purchaseArray(raw.stateBias).map(::purchaseNumber),
-            actionWeights = purchaseArray(raw.actionWeights).map(::purchaseNumber),
-            actionBias = purchaseArray(raw.actionBias).map(::purchaseNumber),
-            actorWeights = purchaseArray(raw.actorWeights).map(::purchaseNumber),
-            valueWeights = purchaseArray(raw.valueWeights).map(::purchaseNumber),
-            valueBias = purchaseNumber(raw.valueBias),
-        )
+    val model = readPurchaseModel(JSON.parse<dynamic>(modelJson))
     val evaluation = PurchasePolicy.evaluate(observation, model)
     val choice = PurchasePolicy.select(observation, evaluation, uniform)
     val result = js("({})")
@@ -53,19 +37,36 @@ fun evaluatePurchasePolicy(observationJson: String, modelJson: String, uniform: 
     return JSON.stringify(result)
 }
 
-private fun purchaseString(value: dynamic): String {
+internal fun readPurchaseModel(raw: dynamic): PurchasePolicyModel =
+    PurchasePolicyModel(
+        schemaVersion = purchaseInteger(raw.schemaVersion),
+        encoderVersion = purchaseString(raw.encoderVersion),
+        hiddenSize = purchaseInteger(raw.hiddenSize),
+        baselineProbability = purchaseNumber(raw.baselineProbability),
+        stateFeatureNames = purchaseArray(raw.stateFeatureNames).map(::purchaseString),
+        actionFeatureNames = purchaseArray(raw.actionFeatureNames).map(::purchaseString),
+        stateWeights = purchaseArray(raw.stateWeights).map(::purchaseNumber),
+        stateBias = purchaseArray(raw.stateBias).map(::purchaseNumber),
+        actionWeights = purchaseArray(raw.actionWeights).map(::purchaseNumber),
+        actionBias = purchaseArray(raw.actionBias).map(::purchaseNumber),
+        actorWeights = purchaseArray(raw.actorWeights).map(::purchaseNumber),
+        valueWeights = purchaseArray(raw.valueWeights).map(::purchaseNumber),
+        valueBias = purchaseNumber(raw.valueBias),
+    )
+
+internal fun purchaseString(value: dynamic): String {
     require(jsTypeOf(value) == "string") { "Purchase JSON requires a string." }
     return value as String
 }
 
-private fun purchaseNumber(value: dynamic): Double {
+internal fun purchaseNumber(value: dynamic): Double {
     require(jsTypeOf(value) == "number") { "Purchase JSON requires a number." }
     val number = value as Double
     require(number.isFinite()) { "Purchase JSON numbers must be finite." }
     return number
 }
 
-private fun purchaseInteger(value: dynamic): Int {
+internal fun purchaseInteger(value: dynamic): Int {
     val number = purchaseNumber(value)
     require(number == number.toInt().toDouble()) {
         "Purchase JSON index/version requires an integer."
@@ -73,12 +74,12 @@ private fun purchaseInteger(value: dynamic): Int {
     return number.toInt()
 }
 
-private fun purchaseArray(value: dynamic): Array<dynamic> {
+internal fun purchaseArray(value: dynamic): Array<dynamic> {
     require(js("Array.isArray(value)") as Boolean) { "Purchase JSON requires an array." }
     return value as Array<dynamic>
 }
 
-private fun purchaseMap(value: dynamic): Map<String, Double> {
+internal fun purchaseMap(value: dynamic): Map<String, Double> {
     require(
         value != null && jsTypeOf(value) == "object" && !(js("Array.isArray(value)") as Boolean)
     ) {

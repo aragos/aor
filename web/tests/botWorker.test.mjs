@@ -55,3 +55,32 @@ test('one worker is reused for serial decisions', async context => {
     assert.equal(await second, 'second');
     assert.equal(workers.length, 1);
 });
+
+test('worker receives the optional safe purchase projection without coordinator metadata', async context => {
+    const {client, workers} = fixture(context);
+    const purchase = {encoderVersion: 'aor-purchase-observation-1', stateFeatures: {}, actions: []};
+    const result = client.think({...job, purchase}, new AbortController().signal);
+
+    assert.deepEqual(Object.keys(workers[0].message).sort(), ['difficulty', 'id', 'observation', 'purchase', 'seed']);
+    assert.deepEqual(workers[0].message.purchase, purchase);
+    workers[0].answer('pass');
+
+    assert.equal(await result, 'pass');
+});
+
+test('canceling an actor decision creates a fresh worker for the next request', async context => {
+    const {client, workers} = fixture(context);
+    const controller = new AbortController();
+    const first = client.think({...job, purchase: {}}, controller.signal);
+    const rejected = assert.rejects(first, /canceled/);
+    controller.abort();
+    await rejected;
+
+    const second = client.think(job, new AbortController().signal);
+    workers[0].answer('obsolete learned answer');
+    workers[1].answer('current baseline');
+
+    assert.equal(await second, 'current baseline');
+    assert.equal(workers[0].terminated, true);
+    assert.equal(workers.length, 2);
+});
