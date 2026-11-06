@@ -11,6 +11,10 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "purchase-collect") }) {
+        PurchaseCollectionMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-value-pilot") }) {
         TokenValuePilotMain.run(arguments.toList())
         return
@@ -48,6 +52,7 @@ fun main(arguments: Array<String>) {
             --mode arena --source COMPARISON_JSON --output PATH --hours HOURS --workers N
             --mode strategy-search --source SEARCH_JSON --output PATH --hours HOURS --workers N
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
+            --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode strategy-replay --source COMPARISON_JSON --output PATH --index N --side candidate|incumbent
             Reuse a train output directory to resume its original model and completed rounds.
             Outputs: trainer.log, coverage.json, checkpoint.json, candidate.json, model.json,
