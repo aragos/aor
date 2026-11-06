@@ -3,6 +3,9 @@ package dev.aragos.aor
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
+import dev.aragos.aor.ai.PurchaseObservationEncoder
+import dev.aragos.aor.ai.PurchasePolicyScope
+import dev.aragos.aor.ai.PurchaseProjection
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -99,6 +102,8 @@ data class BotDecisionWork(
     val decisionId: String,
     val submissionVersion: String?,
     val observation: BotObservation,
+    /** Optional ordinary actor facts; a browser binds its own compatible baseline model. */
+    val purchase: PurchaseProjection? = null,
 )
 
 /** Creator-only work; each observation belongs to exactly one automated seat. */
@@ -370,13 +375,25 @@ internal object BotAutomation {
                                 "A ready automated seat requires its controller."
                             }
                         val decision = decisionId(game, seat)
+                        val state = game.state()
+                        val observation = BotObservations.from(state, seat)
                         BotDecisionWork(
                             seat = seat,
                             difficulty = bot.difficulty,
                             seed = bot.seed xor decision.hashCode(),
                             decisionId = decision,
                             submissionVersion = game.submissionVersions[seat],
-                            observation = BotObservations.from(game.state(), seat),
+                            observation = observation,
+                            purchase =
+                                if (PurchasePolicyScope.supports(observation, bot.difficulty)) {
+                                    PurchaseObservationEncoder.project(
+                                        state.viewForPlayer(seat),
+                                        seat,
+                                        observation,
+                                    )
+                                } else {
+                                    null
+                                },
                         )
                     },
             operationReceipts = runner.receipts.map(BotOperationReceipt::operationId),
