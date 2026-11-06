@@ -1,152 +1,113 @@
 # UI contributor guide
 
-AoR is a visual game table: recognizable objects carry inspection and choices, with consequences
-beside confirmation. The server supplies viewer-safe decisions and quotes; [rules](rules.md) owns
-mechanics and [map design](map-design.md) owns spatial rendering.
+Objects carry inspection/choices; authoritative consequences sit beside confirmation. The server owns
+legality/quotes; [rules](rules.md) owns mechanics and [map design](map-design.md) spatial rendering.
 
 ## Find the implementation
 
-| Concern | Client files under [web/src](../web/src/) |
+Paths are relative to [web/src](../web/src/).
+
+| Concern | Files |
 | --- | --- |
-| Table/workspace layout | `GameTable.tsx`, `TablePanels.tsx`, `app.css` |
-| Decision identity and draft scopes | `decision.ts`, `decisionOffers.ts`, `DecisionControls.tsx` |
-| Object selection and commitment | `ObjectDecisions.tsx`, `DecisionActions.tsx`, `GameActions.tsx` |
-| Cards, advances and reference | `Hand.tsx`, `AdvanceInspection.tsx`, `CardInspectionDialog.tsx`, `ReferencePopup.tsx` |
-| Effects and prices | `CardPlayEffects.tsx`, `MiseryPreview.tsx`, `AdvancePrice.tsx` |
-| History, plans and abandonment | `Activity.tsx`, `HistoryEditor.tsx`, `RewindReview.tsx`, `ActivityPlanner.tsx`, `Abandonment.tsx` |
-| Auth, polling and requests | `HostedApp.tsx`, `api.ts`, `polling.ts`, `favicon.ts` |
-| Identity, text and preferences | `IdentityLabel.tsx`, `messages.ts`, `labels.ts`, `preferences.ts` |
+| Layout | `GameTable.tsx`, `TablePanels.tsx`, `app.css` |
+| Decision identity / drafts | `decision.ts`, `decisionOffers.ts`, `DecisionControls.tsx` |
+| Selection / commitment | `ObjectDecisions.tsx`, `DecisionActions.tsx`, `GameActions.tsx` |
+| Object details / reference | `Hand.tsx`, `AdvanceInspection.tsx`, `CardInspectionDialog.tsx`, `ReferencePopup.tsx` |
+| Effects / prices | `CardPlayEffects.tsx`, `MiseryPreview.tsx`, `AdvancePrice.tsx` |
+| History / plans / consent | `Activity.tsx`, `HistoryEditor.tsx`, `RewindReview.tsx`, `ActivityPlanner.tsx`, `Abandonment.tsx` |
+| Auth / polling / requests | `HostedApp.tsx`, `api.ts`, `polling.ts`, `favicon.ts` |
+| Identity / text / preferences | `IdentityLabel.tsx`, `messages.ts`, `labels.ts`, `preferences.ts` |
 
 ## Interaction contracts
 
-- Render authoritative costs, destinations, limits, blockers and resource endpoints. Controls and
-  text commands share validation. Never derive legality by parsing messages or recomputing rules.
-  Prepare useful defaults and sole choices, but commit only through an explicit action.
-- Keep inspection, eligibility, draft selection and commitment distinct. Cards, advances, players
-  and provinces are their own controls. Reference popups restore focus and preserve prepared work.
-  Tapping an expanded player box again closes its details.
-  Load reference content inside the dialog so the first lookup cannot change the page's scroll area.
-  Cathedral's advance details show public owner/non-owner usage pairs for the current game turn;
-  accepted updates and history changes refresh the tracker, and the next game turn resets it.
-  Help owns printed lookup data, variants and non-obvious app behavior; card/advance details stay
-  with their objects. Avoid parallel inspectors, repeated panels and rule walkthroughs in Help.
-- Show the actor, question, relevant resources and one waiting status beside the action. Open the
-  relevant workspace once per decision. Interruptions name the responder and resumed activity.
-  Cathedral interruptions identify the contested province beside the decision title.
-  Keep confirmation reachable while the review scrolls; retain map/hand space on narrow screens.
-  On phones, let the action area collapse to its title and toggle, returning space to the active
-  workspace without discarding drafts. Polling and navigation preserve this choice; a new decision
-  or object selection reopens the actions.
-  The phone icon rail ends at the workspace; the action area below spans the whole table width.
-  Keep Hide/Show actions the same height as its neighboring Undo control, with a text label.
-  Keep the decision title beside Undo above the status. Player summaries show the current score
-  (advance points + cash − misery; Chaos has no numeric score) and the printed order box
-  beside pool/submission status; the reference owns the full position-to-box mapping.
-- Show deterministic effects inline before commitment: prices, named discounts, cash/misery
-  endpoints, current → new shipping and limiting pool/shipping resources. Use one body text size
-  for related purchase descriptions and resource consequences. Distinguish forecasts, conditions
-  and unknown dice results. A blocked choice explains its authoritative cause and preserves legal
-  alternatives. Purchase steps and Pass identify their actual continuation.
-- Reuse capital silhouettes with every visible capital name, including previews, references and
-  receipts; use public handles before assignment. Use `CapitalLabel` for capital/name pairs and
-  `LabelMessage` for translated sentences. Keep names and surrounding copy on the same text baseline;
-  text rows using flex layout must align by baseline, with symbols centered inside their labels.
-  [Identity browser checks](../web/tests/identityAlignment.browser.mjs) measure text alignment across
-  font sizes and desktop/phone widths and run in the CI browser suite. Retain numeric/text labels
-  alongside color.
-  Misery uses track order from green through amber/red to dark Chaos. Dice identify their colors.
-- Keep the hand available for card decisions. A card click prepares or toggles selection; dragging
-  the hand does not select or submit. Commodity inspection highlights matching in-play provinces
-  without replacing a draft. Track popups follow accepted public updates and retain shared positions.
-  Commodity cards have one payout help control; shared cards switch commodities inside that popup.
-  Explain voided cards beside the action; warn before a legal no-target play consumes a card with
-  no effect. The warning comes from the projected card resolution and follows live updates.
-- Keep zoom, Fit and map help beside the workspace tabs, outside the map. Hide them when the bar
-  cannot fit them, including a narrow bar beside pinned Activity. Gestures and keyboard map controls
-  remain available. Explanatory copy describes current actions and consequences, not past UI versions.
-- Public summaries use public facts only. Unplayed-card counts cannot reveal private discards.
-  The epoch's remaining-card lookup lists introduced cards not publicly played, including hands
-  and private discards. Recurring plays reset on the next epoch's shuffle; square plays stay excluded.
-  This list is distinct from the draw-pile size shown in the header.
-  Its entries open the existing card details or commodity payout lookup and return to the list
-  without changing a prepared action.
-  Live forecasts are distinct from actual payments; for example white circles affect current
-  commodity forecasts, while payments retain their colored-marker rule.
-- Keep grouped action buttons equally tall when labels wrap. Attach action help to the button
-  border, clear of its label. The header’s remaining-card text opens its lookup directly.
-- Support keyboard, touch, visible focus, reduced motion and phone layouts. Every finite choice
-  group has a named question. Roving map focus must allow Tab to reach confirmation. Preferences
-  use browser storage with an in-memory fallback. Localize ordinary text; canonical syntax stays
-  locale-independent.
+- Render projected costs, destinations, limits, blockers and endpoints; never parse messages or
+  recompute legality. Prepare defaults/sole choices, but commit explicitly. Keep inspection,
+  eligibility, selection and commitment separate; references restore focus and preserve work.
+  Load reference content inside the dialog so first lookup cannot change page scrolling. Cathedral
+  details track public owner/non-owner usage pairs, refreshing with updates/history and resetting each
+  game turn. Objects own details; Help owns lookup, variants and app behavior. Avoid duplicate inspectors.
+- Beside the action, show actor, question, resources and one waiting status. Open its workspace once
+  per decision. Interruptions name responder/resumed activity; Cathedral names the province.
+  Keep confirmation reachable while review scrolls and retain map/hand space on phones. Phone actions
+  collapse without losing drafts; polling/navigation preserve collapse, new decisions/selections reopen.
+  The phone rail ends at the workspace; full-width actions keep title/Undo above status, with equal-height
+  labeled Hide/Show. Player summaries show current score (advance points + cash − misery; no numeric
+  score for Chaos) and order box; reference owns the full box mapping.
+- Preview deterministic prices/discounts, cash/misery endpoints, shipping changes and limiting resources
+  inline at consistent body size. Distinguish forecasts/conditions/unknown dice. Blockers explain causes
+  without hiding legal alternatives. Purchase/Pass name their continuation; explain marker opportunities
+  before Expansion Pass. Copy describes current behavior.
+- Retain capital silhouettes with every capital name, including previews/reference/receipts; use handles
+  before assignment. `CapitalLabel`/`LabelMessage` keep text baselines aligned and symbols centered.
+  Preserve text/numbers alongside color, green→amber/red→Chaos misery order and dice colors.
+- Keep the hand available; clicks prepare/toggle, dragging never selects/submits. Commodity inspection
+  highlights provinces without replacing drafts. Track popups follow public updates/retain positions;
+  shared commodity cards switch within one payout popup. Projected live warnings explain voided cards
+  and legal no-target plays that consume a card without effect.
+- Keep zoom/Fit/help beside workspace tabs, hiding them when space is insufficient; keyboard/gestures
+  remain. No parallel map panel. Public remaining-card lookup lists introduced, not publicly played cards
+  (including hidden hands/discards); recurring plays reset next shuffle, square plays stay excluded.
+  The header's remaining-card text opens this lookup; entries open existing card/payout details and
+  return without changing drafts. Keep draw-pile size separate and forecasts distinct from payouts.
+- Keep grouped action buttons equally tall when labels wrap; attach help to the border clear of labels.
+- Support keyboard/touch, visible focus, reduced motion and phone widths. Name finite-choice questions;
+  roving focus lets Tab reach confirmation. Localize ordinary text, never canonical syntax. Preferences
+  use browser storage with an in-memory fallback. Tapping expanded player details closes them.
 
 ## Draft and result lifetimes
 
-Scope decisions by game, viewer and `activity.decisionEntry`, separately from revision. Polling,
-private readiness, navigation, map gestures and inspection preserve valid drafts. A replaced decision
-or accepted history edit clears obsolete form state even if actor/prompt text is unchanged. Successful
-placement clears its province/amount; pass/card play closes its action context. Rejection retains
-correctable input. Stale requests refresh without automatic resubmission.
+Scope work by game, viewer and `activity.decisionEntry`, separately from revision. Polling, readiness,
+navigation, gestures and inspection preserve valid drafts. Replacement decisions/history edits clear
+obsolete state even when prompt/actor repeats. Successful placement clears province/amount; Pass/card
+play closes action context. Rejection retains correctable input; stale writes refresh without resubmit.
 
-Same-account credential refresh preserves the mounted table, viewport, inspector and editor.
-Sign-out, identity change and authorization loss clear private work; superseded results cannot
-restore it. Bound authentication, fetch and response bodies to 15 seconds. An uncertain mutation
-releases the UI and reconciles an authorized snapshot; it never automatically replays the write.
-Distinguish browser drafts, server-saved private submissions and committed actions using owner receipts.
-Withdrawal retains an unsaved local amount, without restoring a saved submission.
+Same-account credential refresh preserves table/viewport/inspectors/editors. Sign-out, identity change
+or lost authorization clears private work; superseded responses cannot restore it. Bound auth/fetch/body
+to 15 seconds. Uncertain writes release UI and reconcile an authorized snapshot without replaying.
+Distinguish local drafts, saved submissions and committed actions via owner receipts; withdrawal keeps
+only an unsaved local amount.
 
-Province references in Activity show their commodities and open the map at that province without
-changing action drafts.
+Activity is one bounded workspace log or labeled left pin on wide screens. Preserve entry-time names,
+causes, dice and endpoints. Province references show commodities and open the map without changing
+  drafts. Group revealed bids and paired shortage/surplus rolls without changing
+history or losing individual consequences. Only one's own submitted competition can open its result
+notice; expansion notices expire with expansion. Final scores can dismiss/reopen, preserving inspection.
 
-Activity is one bounded log, in its workspace or pinned left block on wide screens. Pinning uses a
-labeled button above the log so its destination is visible without covering entries. Keep entry-time
-identities, causes, dice and resource endpoints stable as history grows. Group revealed token bids
-without changing canonical history. Pair the two shortage/surplus rolls in one activity entry,
-retaining each roll's dice, adjustments and consequences. A player's submitted competition result
-may open a dismissible notice; polling someone else's result must not. Expansion notices expire with
-their expansion, while history remains. Final scores use a dismissible/reopenable popup and leave board inspection.
-
-The favicon reflects required player actions independently of rendering. Hidden game tabs poll every
-five seconds for two minutes after engagement/changed state, then every 30 seconds while idle;
-unchanged responses do not extend activity. The games list checks all owned games independently of
-filter/page. Keep one read/timer and refresh after visibility, resume or reconnect.
+Favicon action status works independently of rendering. Hidden tabs poll every five seconds for two
+minutes after engagement/change, then every 30 seconds; unchanged responses do not extend activity.
+The list checks all owned games regardless of filtering/paging. Keep one read/timer; refresh on visibility,
+resume and reconnect.
 
 ## Review sensitive operations
 
-Private plans distinguish unsaved input, saved-for-review work and explicit offline authorization.
-Put planning help on the related action buttons instead of adding separate plan headings.
-Offer new plans while waiting for a turn; keep an open draft through public updates and turn
-arrival, refreshing its quotes without discarding prepared choices. Existing saved plans remain
-available for review and explicit execution on the owner's turn.
-Show exact consequences, assumptions and cancellation. Saving never executes; draws or changed
-consequences pause for review. Editing confirms disarm. See [architecture](design.md#private-plans).
+Plans distinguish drafts, saved review and explicit offline authority. Help lives on planning actions.
+Offer new plans while waiting; preserve open drafts through public updates/turn arrival, refreshing
+quotes without discarding choices. Saved plans stay reviewable/executable on the owner's turn. Show consequences, assumptions and cancellation; saving never executes,
+draws/changed consequences pause, editing confirms disarm. [Architecture](design.md#private-plans) owns execution.
 
-Primary Undo withdraws an unrevealed submission when available. Linear game otherwise opens a
-consequence review using only server-offered targets: destination, removed public actions/random
-events, cleared submissions and paused plans. Earlier targets live under Commands. Confirm with
-**Rewind to here**; stale reviews require refreshed offers and explicit confirmation. Prior revisions
-are read-only. Explain fresh rolls, restored-deck draws, no redo and retained knowledge in Help.
-Policy conversion refreshes capabilities and closes the legacy editor while preserving unchanged
-decision drafts; actual rewind clears them. [Architecture](design.md#history-and-undo) owns scopes.
+Undo first withdraws unrevealed submissions; otherwise Linear game reviews server-offered targets and
+removed public actions/random events, cleared submissions and paused plans. Earlier targets live under
+Commands. **Rewind to here** confirms; stale offers need fresh review/confirmation. Prior revisions are
+read-only. Help explains fresh rolls, restored draws, no redo/retained knowledge. Policy conversion
+refreshes capabilities/closes legacy editor but preserves valid drafts; actual rewind clears them.
+[Architecture](design.md#history-and-undo) owns scopes.
 
-Keep abandonment inside collapsed Game options, with one consent section alongside ordinary play.
-The proposal counts as agreement; all seats must agree. Label the final response
-**Agree and abandon game** and explain that it ends without a winner. Nonfinal responses preserve
-drafts; terminal cleanup removes mutations and retains permitted inspection.
+Abandonment lives in collapsed Game options with one consent section. Proposing agrees; all seats must
+agree. Label the final response **Agree and abandon game**, explaining no winner. Nonfinal responses
+preserve drafts; closure removes mutations but retains permitted inspection.
 
 ## Game-table review gate
 
-Review the changed flow and one neighboring flow at desktop and phone widths:
+Check the changed flow and one neighbor at desktop/phone widths:
 
-1. At rest, identify the object carrying the choice. Remove duplicate homes, headings, controls
-   and copy before shrinking text. Each remaining element must help choose, explain or find data.
-2. Prepare a choice. Check the question/count, capital symbols, authoritative consequences and
-   limiting resources beside confirmation. Explain marker opportunities before expansion Pass.
-3. Open reference and return. Verify focus restoration and unchanged draft, without another inspector.
-4. Commit, reject and poll separately using live offers. Check successful cleanup, correctable-input
-   preservation and polling preservation; positive feature assertions alone miss unwanted duplicates.
-5. Inspect rendered views for reachable confirmation, clear targets, readable references and sensible
-   scrolling. DOM existence or unreviewed screenshots do not establish clarity.
+1. Remove duplicate homes, headings, controls and copy before shrinking text; each element helps choose,
+   explain or find data.
+2. Prepare a choice: question/count, capital symbols, authoritative consequences/limits beside confirmation.
+3. Open reference/return: restored focus, preserved draft, no second inspector.
+4. Separately commit, reject and poll with live offers: successful cleanup, correctable-input preservation
+   and polling preservation. Check unwanted duplicates as well as positive assertions.
+5. Inspect rendered clarity, reachable confirmation, targets, references and scrolling; DOM existence
+   or unreviewed screenshots alone are insufficient.
 
-[Web tests](../web/tests/) contain focused browser suites for these flows; [contributing](contributing.md)
-explains the runner. Record actual human observations separately from automated facts. Screen-reader,
-physical-phone, browser-chrome zoom and SVG/composited contrast remain [open checks](follow-ups.md).
+Run affected [browser fixtures](../web/tests/) via [contributing](contributing.md#checks). Separate human
+observations from automated evidence; physical-device/accessibility gaps stay in [follow-ups](follow-ups.md).

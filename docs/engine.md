@@ -1,104 +1,70 @@
 # Engine guide
 
-The pure Kotlin engine lives in [core/src/commonMain/kotlin/dev/aragos/aor](../core/src/commonMain/kotlin/dev/aragos/aor/)
-and compiles for JVM and JS. It implements [rules](rules.md) without storage, IO, authentication or
-controller execution. The server supplies recorded authority outcomes and runs the engine.
+[Core](../core/src/commonMain/kotlin/dev/aragos/aor/) implements [rules](rules.md) for JVM/JS without
+IO, storage, auth or controller execution. File names below are relative to that package.
 
 ## Follow an action
 
-1. [TextCodec.kt](../core/src/commonMain/kotlin/dev/aragos/aor/TextCodec.kt) parses locale-independent
-   commands into typed actions. [Entry.kt](../core/src/commonMain/kotlin/dev/aragos/aor/Entry.kt)
-   separates player actions from authority outcomes; [commands](commands.md) defines the language.
-2. [Game.kt](../core/src/commonMain/kotlin/dev/aragos/aor/Game.kt) applies entries to
-   immutable state. Illegal entries return typed violations without changing state. Automatic
-   normalization continues until a player decision, authority request or game completion.
-3. [TurnFlow.kt](../core/src/commonMain/kotlin/dev/aragos/aor/TurnFlow.kt) holds replayable frames
-   for phases, activities and interruptions. [TurnEngine.kt](../core/src/commonMain/kotlin/dev/aragos/aor/TurnEngine.kt)
-   advances them. Nested decisions retain outer activity ownership; no callbacks or coroutines
-   carry domain state.
-4. [Prompt.kt](../core/src/commonMain/kotlin/dev/aragos/aor/Prompt.kt),
-   [GameView.kt](../core/src/commonMain/kotlin/dev/aragos/aor/GameView.kt) and the `*Projection.kt`
-   files expose viewer-safe decisions, choices and consequences. Rendering never infers legality
-   from English messages or geometry.
+| Owner | Contract |
+| --- | --- |
+| `TextCodec.kt`, `Entry.kt` | Parse locale-independent [commands](commands.md) into typed actions/outcomes. |
+| `Game.kt` | Apply immutable transitions; typed rejection leaves state unchanged. Normalize until a player decision, authority request or completion. |
+| `TurnFlow.kt`, `TurnEngine.kt` | Replayable phase/activity/interruption frames; nested decisions retain outer ownership, without callback/coroutine state. |
+| `Prompt.kt`, `GameView.kt`, `*Projection.kt` | Viewer-safe decisions, choices and consequences; clients never infer legality from prose/geometry. |
 
 ## Find a rule owner
 
-| Concern | Core files |
+| Concern | Files |
 | --- | --- |
-| Setup, opening deal, bids and order | `SetupDeal.kt`, `CapitalSelection.kt`, `TokenPurchase.kt`, `TurnOrderSelection.kt`, `OrderBoxes.kt` |
-| Ordinary phases and Purchase steps | `TurnCommand.kt`, `TurnEngine.kt`, `PurchaseDecisions.kt` |
-| Prices, advances, misery and income | `AdvancePurchases.kt`, `PlayerAdvances.kt`, `PlayerEconomy.kt`, `MiseryRules.kt` |
-| Card play, leaders and War | `CardGame.kt`, `CardEffects.kt`, `LeaderRules.kt`, `WarRules.kt`, `CardMarkerPlacements.kt` |
-| Expansion reach, placement and competition | `ExpansionReach.kt`, `ExpansionRules.kt`, `BoardGame.kt`, `BoardPlacementRules.kt`, `CompetitionRules.kt` |
-| Deck lifecycle, epochs and draw provenance | `DeckHistory.kt`, `GameOutcome.kt`, `TurnStateOperations.kt` |
-| Public automatic-effect receipts | `EffectReceipt.kt` and the operation producing the effect |
-| Private-plan simulation | `ActivityPlanning.kt` |
-| Static data and variants | [Maps and catalogs](map-design.md#catalog-ownership) |
+| Setup, bids and order | `SetupDeal.kt`, `CapitalSelection.kt`, `TokenPurchase.kt`, `TurnOrderSelection.kt`, `OrderBoxes.kt` |
+| Phases / Purchase | `TurnCommand.kt`, `TurnEngine.kt`, `PurchaseDecisions.kt` |
+| Prices, advances, misery, income | `AdvancePurchases.kt`, `PlayerAdvances.kt`, `PlayerEconomy.kt`, `MiseryRules.kt` |
+| Cards, leaders, War | `CardGame.kt`, `CardEffects.kt`, `LeaderRules.kt`, `WarRules.kt`, `CardMarkerPlacements.kt` |
+| Expansion / competition | `ExpansionReach.kt`, `ExpansionRules.kt`, `BoardGame.kt`, `BoardPlacementRules.kt`, `CompetitionRules.kt` |
+| Deck / epochs / provenance | `DeckHistory.kt`, `GameOutcome.kt`, `TurnStateOperations.kt` |
+| Automatic public receipts / private simulation | `EffectReceipt.kt` plus effect owner / `ActivityPlanning.kt` |
+| Static data / variants | [Catalog ownership](map-design.md#catalog-ownership) |
 
-Paths in the table are relative to the core package above. Keep mechanics with their logical owner;
-generic state, commands and views remain independent of setup-specific rules. Intrinsic invariants
-belong in domain types; internal calculations trust established state. Pure arithmetic/reach helpers
-remain directly testable apart from flow.
+Keep mechanics/invariants with their types and owners; generic engine types stay setup-independent.
+Internal calculations trust established state; arithmetic/reach helpers remain directly testable.
 
 ## Replay and identity
 
-Record actual dice, shuffle permutations, draws and random transfers. Replay consumes those outcomes
-and never calls the authority provider. Configuration records all resolved options and freezes at
-`start`; changing defaults cannot alter an existing game.
+Record actual dice, permutations, draws and transfers; replay never calls live authority. Record all
+resolved configuration and freeze at `start` so changed defaults cannot alter saves. A changed prompt
+sequence can require a rules upgrade even if syntax is unchanged.
 
-Activity identity represents one player's work within a phase, including interruptions. The separate
-replay-derived `activity.decisionEntry` identifies a presentation decision and changes even when a
-replacement has the same actor and prompt. It is neither a storage revision nor a command.
-Simultaneous readiness updates do not replace the decision. Clients submit the committed revision.
-
-Transitions expose directly applied and normalized state plus deterministic public receipts.
-Income, Holy Indulgence and automatic order changes retain their actual resource endpoints and
-causes. Receipts derive from replay; commands and authority outcomes remain stored truth.
-
-History edits preserve the same logical random requests and unchanged outcomes, including participants,
-context and occurrence. Equal dice or event counts alone do not prove continuity.
-[Architecture](design.md#history-and-undo) owns authorization and the Linear game prefix exception.
+Activity identifies one phase's work including interruptions. Replay-derived `activity.decisionEntry`
+identifies the presentation decision even when actor/prompt repeats; it is neither a revision nor a
+command. Private readiness does not replace it. Clients submit committed revision.
+Transitions expose applied/normalized state and deterministic public receipts with actual resource
+endpoints/causes. Commands/outcomes remain stored truth. Suffix edits must preserve logical random
+requests (participants, context, occurrence) and outcomes; equal dice/counts do not prove continuity.
+[Architecture](design.md#history-and-undo) owns permissions and prefix rewind.
 
 ## Information and projection
 
-Hand references are opaque and do not encode card identities. Player projections expose public
-state plus only that player's private facts; spectators receive public facts alone. Apply the same
-audience to choices, diagnostics, quotes, receipts and historical views. Public counts must not
-reveal private discards or choices.
-
-Private-plan projection simulates only the owner's remaining Purchase or Buy Card activity. Hidden
-deck positions and other hands become opaque placeholders preserving public counts. Earlier players
-are assumed not to change relevant inputs; live actor/choices stay untouched. Apply a valid reachable
-prefix and return typed invalid/blocked results. Stop at a missing decision, unknown draw, authority
-request or activity boundary without pretending the suffix executed. Service persistence and execution
-are in [architecture](design.md#private-plans).
+Opaque hand references never encode identities. Project public facts plus only the viewer's private
+facts, including in choices, diagnostics, quotes, receipts and history; counts cannot reveal secrets.
+Private-plan simulation covers only the owner's remaining Purchase/Buy Card activity. Replace hidden
+deck/hands with count-preserving opaque placeholders; assume earlier actors leave relevant inputs
+unchanged. Do not alter live actor/offers. Apply a reachable prefix, returning typed blocked/invalid
+results; stop at missing answers, unknown draws, authority requests or the boundary.
+[Architecture](design.md#private-plans) owns persistence/execution.
 
 ## Opponent policies
 
-[AI](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/) is separate from rules and authority. Policies
-consume numerical seat observations, never authoritative `GameState`. The observation adapter uses
-the same viewer-safe projections as ordinary play. Exact competition probabilities and Wind/Watermill
-quotes belong to their core rule projections. Candidate generation supplements the deliberately
-nonexhaustive command hints with bounded numeric and target alternatives.
+[AI](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/) consumes numerical viewer-safe observations,
+never authoritative `GameState`. Core projections own competition probabilities and Wind/Watermill
+quotes; candidate generation adds bounded numeric/target alternatives to nonexhaustive command hints.
+One economic evaluator serves Easy (reasonable variation), Normal (current ranking) and Hard (bounded
+resource planning). Refresh authoritative offers after every action; no unseen-card knowledge or
+full-game search. Capital evaluation includes initial hand, nearby opportunities, count and map;
+epoch/variant features permit tuning without duplicating rules.
 
-All difficulties share one contextual economic evaluator. Easy varies among reasonable choices;
-Normal ranks current alternatives; Hard adds bounded resource-budget planning over current offers.
-This planning is advisory: every accepted action refreshes authoritative offers before the next
-decision. It does not claim full-game search or knowledge of unseen cards. Capital features include
-the initial hand, nearby opportunities, player count and map. Variant and epoch interactions permit
-offline tuning without independent rule implementations.
-
-[Training](../training/src/main/kotlin/dev/aragos/aor/training/) supplies sampled authority outcomes
-through ordinary entries, while every simulated policy receives only its seat observation. Sealed
-decisions are selected from a shared pre-batch position. Directed fixtures and complete games verify
-decision coverage, legal actions, privacy, replay and cross-target policy behavior. The persisted
-history contains moves and outcomes, so later policy or model updates cannot change earlier play.
-
-## Verify changes
-
-Start with the corresponding [core tests](../core/src/jvmTest/kotlin/dev/aragos/aor/).
-`SupportedGameCompletionTest` covers full games for 3–6 players; `VariantGameCompletionTest` covers
-supported options; `ReplayContractTest` covers shared replay. Preserve token/marker and physical-card
-conservation, timing, private audiences and live/replayed equivalence. See [contributing](contributing.md)
-for checks and [deployment](deployment.md#saved-game-compatibility) for supported versions. A changed
-prompt sequence can require a rules upgrade even if parsing is unchanged.
+[Training](../training/src/main/kotlin/dev/aragos/aor/training/) supplies ordinary sampled outcomes;
+policies see only their seat, and sealed decisions share the pre-batch position. Fixtures/whole games
+check legality, privacy, decision coverage, replay and cross-target behavior. Stored moves/outcomes
+make earlier play independent of model changes. [Contributing](contributing.md#opponent-training) owns
+operation; [checks](contributing.md#checks) selects tests. Preserve physical-card/token/marker conservation,
+timing and live/replayed equivalence.

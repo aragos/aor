@@ -1,47 +1,37 @@
 # Open work
 
-These checks are unresolved operational work, separate from executable tests. Current behavior lives
-in [scope](requirements.md), [architecture](design.md), [UI](ui-design.md) and [rules](rules.md).
-There are no gameplay defaults awaiting approval.
+Unresolved operational/human checks; automated tests do not establish these. Current contracts live
+with their [README owners](../README.md#find-the-owner); no gameplay defaults await approval.
 
 ## Deployment and recovery
 
-- Verify Google sign-in, signup, verification/reset delivery, three-account isolation and restart
-  persistence on Render. Retain the same Firebase project through database recovery.
-- Restore a complete private PostgreSQL backup into an isolated database: accounts, permissions,
-  memberships, histories, exact archives, receipts, pending secrets and closed games. Record schema/
-  revision, timings and continuity results without private contents. Rehearse single-writer cutover;
-  failed validation prevents switching. Agree backup retention and set billing alerts.
-- Verify deployed Friendly-to-Linear policy migration on representative saves and both backends,
-  including earlier suffix edits, checkpoints, pending secrets/plans, concurrent writes, restart,
-  repeat safety and continued play. Record per-game results and resolve failures before claiming
-  rollout complete. Conversion preserves state; an actual rewind clears submissions/disarms plans.
-- Enable required `verify`, security alerts and optional patch auto-merge where available. The private
-  repository's branch-protection API returned 403 under its plan; direct CI checks are not enforced
-  protection. Supply Render refresh credentials if weekly rebuilds are wanted.
-- For an existing file deployment, follow [import/cutover](deployment.md#import-file-storage) before
-  changing traffic. Game-log exports alone cannot restore the full application.
+- On Render, verify Google/signup/verification/reset, three-account isolation and restart persistence.
+- Rehearse [complete SQL recovery](deployment.md#recovery-and-deletion), including accounts/permissions,
+  memberships, histories/archives/receipts, pending secrets and closed games. Retain Firebase identity;
+  record schema/revision, timings and continuity without secrets. Validate before single-writer cutover;
+  agree retention/billing alerts. Existing file deployments need [import/cutover](deployment.md#import-file-storage).
+- Verify deployed [Friendly-to-Linear migration](design.md#linear-game) on representative saves/both
+  backends: prior edits/checkpoints, pending secrets/plans, concurrent writes, restart, idempotence and
+  continued play. Record per-game outcomes/resolve failures before declaring rollout complete.
+- Enable required `verify`, security alerts and optional patch auto-merge where the plan permits;
+  previous protection API returned 403. Direct CI checks are not protection. Configure Render refresh
+  credentials if weekly rebuilds are wanted; see [maintenance](deployment.md#release-and-maintenance).
 
 ## Human review and maintenance
 
-- Review full-session keyboard/screen-reader play, physical-phone touch/scrolling, browser-chrome
-  zoom and SVG/composited/native-control contrast. Record actual devices/tools and findings.
-- Measure a representative six-player conflict-heavy late game on production-like hosting before
-  changing transport/caching or claiming capacity. `performance.browser.mjs` records local timings;
-  earlier low-conflict Vite measurements do not establish production latency or isolated React cost.
-- Investigate the HTTP I/O catch attempting a second JSON response after headers are committed.
-  Preserve pre-commit storage errors while allowing a started response to terminate normally.
-- Older rules-2/3 histories need an explicit validated event mapping to current Renaissance windows.
-  Retain continuity rejection until that upgrade exists; matching older engines remain an alternative.
+- Review full-session keyboard/screen-reader play, physical-phone touch/scroll, browser-chrome zoom and
+  SVG/composited/native-control contrast. Record devices/tools/findings.
+- Measure six-player conflict-heavy late-game load on production-like hosting before claiming capacity
+  or changing transport/caching. `performance.browser.mjs` measures local timings; low-conflict Vite
+  runs do not establish production latency or isolated React cost.
+- Fix the HTTP I/O catch attempting a second JSON response after headers commit. Preserve pre-commit
+  storage errors; allow a started response to terminate normally.
+- Rules-2/3 Renaissance histories need a validated event mapping; retain continuity rejection until
+  implemented. Matching older engines remain an alternative.
 
 ## Opponent evaluation
 
-- Run the standalone full training matrix and independent strength evaluation before advertising
-  measured difficulty separation or a trained advantage. Coverage gaps remain explicit in the
-  artifacts and prevent model promotion; targeted fixtures do not prove a whole-game advantage.
-- Consider richer observation-safe sampled continuations, opponent beliefs and learned leaf values
-  after contextual parameter exploration establishes a reproducible baseline. Measure gains at an
-  equal browser computation budget.
-
-Plans across future phases and midgame controller replacement remain deferred, as defined in
-[scope](requirements.md).
+- Run the complete training matrix/independent strength evaluation before claiming measured difficulty
+  separation or trained advantage. Artifact coverage gaps block promotion; fixtures do not prove strength.
+- Consider observation-safe sampled continuations, beliefs and learned leaf values after reproducible
+  contextual tuning; compare at equal browser budgets. Deferred features remain in [scope](requirements.md).

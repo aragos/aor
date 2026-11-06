@@ -1,75 +1,46 @@
-# Project coding guidelines
+# Project guidelines
 
-Reusable Git, style, design, documentation, and testing preferences are maintained in the user's
-global Codex `AGENTS.md`. Apply that guidance alongside these project-specific contracts.
+Apply the user's global `AGENTS.md` for reusable coding conventions. Start new tasks on focused
+feature branches; preserve existing work, using a separate worktree when isolation is needed.
 
-## Development branches
+## Read only the relevant owner
 
-- Start each new development task on a new, focused feature branch before editing. Continue related
-  work on that task's branch; do not reuse an unrelated task's branch or develop directly on `main`,
-  `release`, or another shared integration branch.
-- Preserve existing uncommitted work when creating or switching branches. Use a separate worktree
-  when a new task needs isolation from ongoing changes.
+[README](README.md) is the entry point; [contributing](docs/contributing.md) owns check selection.
+Read the sections needed for the task, rather than loading every guide:
 
-## Release workflow
+| Change | Contract |
+| --- | --- |
+| Rules, replay, projections | [Engine](docs/engine.md); [rules](docs/rules.md) and [commands](docs/commands.md) for affected mechanics/syntax |
+| Service, storage, privacy, history, bots | [Architecture](docs/design.md) |
+| Client interaction | [UI review gate](docs/ui-design.md#game-table-review-gate); [map](docs/map-design.md) for spatial changes |
+| Release, compatibility, recovery | [Deployment](docs/deployment.md) |
+| Goals / unresolved work | [Scope](docs/requirements.md) / [follow-ups](docs/follow-ups.md) |
 
-- A request to "release" authorizes the complete sequence: push `main` to its upstream, wait for
-  CI to pass for that exact commit, push the verified commit to the remote `release` branch, and
-  verify that Render successfully deploys it.
-- Fetch first and preserve remote changes. Promote the verified `main` commit to `release` without
-  force-pushing. If CI fails, fix the failure and verify the updated commit before promotion.
-- A release is complete only when Render reports the intended commit live and the deployed
-  application's `/api/health` and web entry point respond successfully. Report the commit and
-  verification results; if access prevents verification, report the release as unverified.
-- Verify saved-game compatibility or the required upgrade path before promoting to `release`.
-- See `docs/deployment.md` for hosting configuration and operational requirements.
+Keep each contract with its owner; link to code/tests instead of duplicating catalogs, completed
+proposals, test inventories or execution diaries. Preserve reviewed rulings and explicit game options.
 
-## Domain and compatibility
+## Invariants
 
-- Keep generic engine state, commands, prompts, and views independent of setup-specific rules.
-- Use typed diagnostics for rejected game actions.
-- Every change must keep existing saved games playable or include an implemented, documented and
-  tested upgrade path to the newest version. This applies to rules, data, commands, replay, game
-  files and database changes; a version bump or an export-only fallback does not satisfy it.
-- Ordinary play may decode only current versions when explicit upgrades cover affected existing
-  games. Upgrades must preserve game continuity, recorded outcomes, history, identities, metadata,
-  memberships and pending private state, with validation, archives and optimistic concurrency.
-- For changes that can affect saved games, verify representative pre-change saves can load, replay
-  and continue play, directly or after upgrade. Include those regression checks with the change;
-  schema maintenance must not silently alter game behavior.
-- Use domain readiness instead of enumerating future stages.
-- Keep domain rules and rulings in `docs/rules.md`; preserve the reviewed catalog and explicit game
-  options when making implementation changes.
+- Keep generic engine state, commands and views independent of setup rules, transport and storage.
+  Use typed diagnostics and domain readiness.
+- Existing saves must remain playable or have an implemented, documented, tested upgrade. Preserve
+  continuity, outcomes, history, identities, metadata, memberships and pending private state, with
+  validation, archives and optimistic concurrency. For affected changes, test representative old saves
+  loading, replaying and continuing play. A version bump or export fallback is insufficient.
+- Project costs, eligibility and consequences from authoritative state. Preserve valid drafts during
+  polling/inspection; clear obsolete work after success. Keep temporary capabilities with their live
+  owner. Public summaries use public facts; activity retains entry-time facts and separates direct
+  actions from automatic receipts. Apply the UI review gate to changed interactions.
 
-## Interaction and documentation
+## Verification and release
 
-- Review UI changes against the game-table review gate in `docs/ui-design.md`: remove duplicate
-  controls/panels/copy, keep consequences beside actions, retain capital symbols, and check successful
-  cleanup separately from rejected/polling draft preservation. Help owns lookup data and app behavior.
-- Project costs, destinations, eligibility and consequences from authoritative domain state. Keep
-  inspection separate from action drafts, and preserve valid drafts through polling and inspection.
-- Presentation shortcuts must preserve domain provenance and lifecycle. Keep temporary facts with
-  their live owner so replacing it cannot resurrect stale capabilities.
-- Activity must use entry-time identities and facts; appending history must not rewrite existing
-  entries. Only explicit history edits may replace affected entries. Attribute direct actions and
-  automatic phase receipts separately, retaining actual resource endpoints and public causes.
-- Derive public summaries only from public information; a count must not reveal a private card or
-  decision. Distinguish a private browser draft from a committed or server-saved action.
-- Keep contributor entry points in `README.md` and `docs/contributing.md`, goals in
-  `docs/requirements.md`, architecture in `docs/design.md` and `docs/engine.md`, interaction contracts
-  in `docs/ui-design.md` and `docs/map-design.md`, and open work in `docs/follow-ups.md`. Keep
-  executable evidence in tests and link to owning files instead of duplicating catalogs, completed
-  proposals or dated execution reports.
-
-## Formatting and verification
-
-- After editing Kotlin sources or Gradle Kotlin scripts, run `./gradlew formatKotlin` to completion.
-  Then run `./gradlew checkKotlinFormat`. The pinned formatter is ktfmt in Kotlin language style;
-  `.editorconfig` supplies matching IDE defaults.
-- Run focused tests appropriate to the changed behavior. The integrated Kotlin checks are
-  `./gradlew :core:jvmTest :core:compileKotlinJs :server:test checkKotlinFormat`.
-- For browser changes, run `npm run build` from `web` and verify affected user interactions.
-  Match production React StrictMode in interaction fixtures; exercise live server offers for
-  lifecycle regressions rather than relying only on fabricated choices.
-- Serialize Gradle builds that write to the same checkout. Browser checks can reuse an installed
-  server through `AOR_BROWSER_SERVER`; use separate worktrees for concurrent build work.
+- After Kotlin or Gradle Kotlin edits, finish `./gradlew formatKotlin`, then run
+  `./gradlew checkKotlinFormat`. Use the focused checks in [contributing](docs/contributing.md#checks);
+  CI owns integrated coverage. Do not repeat successful checks without a relevant change or failure.
+- Browser changes require `npm run build` from `web` and affected interactions using production
+  StrictMode and live offers. Serialize Gradle builds per checkout; batch browser suites and reuse
+  an installed server via `AOR_BROWSER_SERVER`.
+- A release request authorizes fetching/preserving remote changes, pushing `main`, waiting for CI on
+  that exact commit, promoting it to `release` without force, and verifying Render reports it live.
+  Verify saved-game compatibility before promotion, then `/api/health` and the web entry point.
+  Report the commit and results; unavailable live verification means an unverified release.

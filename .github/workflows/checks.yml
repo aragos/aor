@@ -14,9 +14,9 @@ concurrency:
     && 'refs/heads/release' || github.ref }}
   cancel-in-progress: true
 jobs:
-  verify:
+  source:
     runs-on: ubuntu-latest
-    # Allow cold compilation, the production image build and serial browser suites to finish.
+    # Cold Kotlin compilation and the broad browser suite share one checkout.
     timeout-minutes: 45
     outputs:
       commit: ${{ steps.revision.outputs.commit }}
@@ -73,20 +73,73 @@ jobs:
           ./gradlew :server:exportRuleOptions -PruleOptionsOutput=/tmp/aor-rule-options.json
           diff web/src/ruleOptions.json /tmp/aor-rule-options.json
       - run: npm test --workspace web
-      - run: npm run build
+      # The parallel container job builds and typechecks the production client.
       - run: npm audit --audit-level=low
-      - name: Production container
-        run: docker build --pull -t aor:verify .
-      - name: Production container with PostgreSQL
-        run: |
-          python3 -m unittest discover -s scripts -p 'test_*.py'
-          python3 scripts/check-container.py
       - name: Browser interactions
         run: npm run test:browser --workspace web -- map.browser.mjs history.browser.mjs bots.browser.mjs
         env:
           CHROME_BIN: /usr/bin/google-chrome
           AOR_BROWSER_TIMEOUT_MS: '600000'
           AOR_BROWSER_SERVER: ${{ github.workspace }}/web/scripts/postgres-browser-server.sh
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: >-
+            ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+            && 'refs/heads/release' || github.sha }}
+      - name: Record the commit under verification
+        id: revision
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Python tools
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Production container (includes web build and typecheck)
+        run: docker build --pull -t aor:verify .
+      - name: Production container with PostgreSQL
+        env:
+          POSTGRES_TEST_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          export AOR_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:$POSTGRES_TEST_PORT/postgres?sslmode=disable"
+          python3 scripts/check-container.py
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
+  verify:
+    # Keep the required check stable, and fail closed if either job fails or is skipped.
+    if: always()
+    needs: [source, container]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit: ${{ needs.source.outputs.commit }}
+    steps:
+      - name: Require all checks on the same commit
+        env:
+          SOURCE_RESULT: ${{ needs.source.result }}
+          CONTAINER_RESULT: ${{ needs.container.result }}
+          SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
+          CONTAINER_COMMIT: ${{ needs.container.outputs.commit }}
+        run: |
+          test "$SOURCE_RESULT" = success
+          test "$CONTAINER_RESULT" = success
+          test -n "$SOURCE_COMMIT"
+          test "$SOURCE_COMMIT" = "$CONTAINER_COMMIT"
   refresh-runtime:
     if: >-
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release') &&
