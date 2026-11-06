@@ -8,7 +8,7 @@ export function AccountControls({showGames = true}: {showGames?: boolean}) {
     const account = useContext(AccountContext);
     if (!account) return null;
     return <nav className="account-controls" aria-label={t('hosted.account')}>
-        {showGames && <a href="/">{t('hosted.my-games')}</a>}
+        {showGames && <a href="/play">{t('hosted.my-games')}</a>}
         <span>@{account.handle}</span>
         <button className="secondary" onClick={account.signOut}>{t('hosted.sign-out')}</button>
     </nav>;

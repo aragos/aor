@@ -3,7 +3,7 @@ import {join} from 'node:path';
 
 export async function checkGameNaming(page, web) {
     const name = 'Les marchands du vendredi — Méditerranée & Renaissance';
-    await page.send('Page.navigate', {url: web + '/'});
+    await page.send('Page.navigate', {url: web + '/play'});
     await page.wait(`document.querySelector('#game-name') && document.querySelector('#names')`, 'game naming form');
     assert.equal(await page.evaluate(`document.querySelector('#game-name').required`), true);
     assert.equal(await page.evaluate(`document.querySelector('#game-name').maxLength`), 80);
@@ -21,7 +21,7 @@ export async function checkGameNaming(page, web) {
     await page.send('Page.navigate', {url: web + path});
     await page.wait(`document.querySelector('.game-name')`, 'game name in header');
     assert.equal(await page.evaluate(`document.querySelector('.game-name').textContent`), name);
-    assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('href')`), '/');
+    assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('href')`), '/play');
     assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('aria-label')`), 'My games',
         'The game icon is a named game-list link');
     assert((await page.evaluate('document.title')).includes(name));
@@ -36,6 +36,6 @@ export async function checkGameNaming(page, web) {
     await page.evaluate(`document.querySelector('.games-home').focus()`);
     await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
     await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
-    await page.wait(`location.pathname === '/' && document.querySelector('#game-name')`, 'The game icon returns to the game landing page');
+    await page.wait(`location.pathname === '/play' && document.querySelector('#game-name')`, 'The game icon returns to the game landing page');
     console.log('Passed: creator naming, blank-name rejection and draft preservation, durable header/tab names and desktop/phone layout.');
 }

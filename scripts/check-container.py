@@ -10,9 +10,20 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 
+def verify_public_homepage(origin):
+    """The homepage must explain the app in its HTML before a visitor signs in."""
+    with urlopen(origin, timeout=5) as response:
+        html = response.read().decode()
+    if "Age of Renaissance" not in html or "strategy board game" not in html:
+        raise RuntimeError("The public homepage must describe the application in its HTML.")
+    for path in ["/play", "/privacy.html"]:
+        if not re.search(r'''href=["']''' + re.escape(path) + r'''["']''', html):
+            raise RuntimeError(f"The public homepage must link to {path}.")
+
+
 def verify_built_client(origin):
     """Verify the deployed entry script and the map drawings it loads separately."""
-    with urlopen(origin, timeout=5) as response:
+    with urlopen(origin + "/play", timeout=5) as response:
         html = response.read().decode()
     scripts = re.findall(r'<script\b[^>]*\bsrc=["\'](/assets/[^"\']+\.js)["\']', html)
     if not scripts:
@@ -77,9 +88,10 @@ def main():
             game = json.load(response)
             if response.status != 201 or len(game["links"]) != 3:
                 raise RuntimeError("The production container could not persist a game.")
+        verify_public_homepage(origin)
         drawings = verify_built_client(origin)
         print(f"Passed: non-root production startup, SQL migrations, health, game persistence, "
-              f"built client and {drawings} cached, compressed map drawings.")
+              f"public homepage, built client and {drawings} cached, compressed map drawings.")
     except Exception:
         subprocess.run(["docker", "logs", name], check=False)
         raise

@@ -43,7 +43,7 @@ export async function checkContrast(page, label) {
 }
 
 export async function checkSetupEvidence(page, web) {
-    await page.send('Page.navigate', {url:web+'/'});
+    await page.send('Page.navigate', {url:web+'/play'});
     await page.wait(`document.querySelector('#names') && document.querySelector('#variant-initial-card')`, 'players and variants share creation');
     await page.evaluate(`document.querySelector('.creation-settings > summary').click()`);
     await page.fill('#names','Ada\nBruno\nClara');

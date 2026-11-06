@@ -24,6 +24,22 @@ class AssetResponse(io.BytesIO):
             self.headers[key] = value
 
 
+class PublicHomepageTest(unittest.TestCase):
+    homepage = ('<main>AoR online is the strategy board game Age of Renaissance online.</main>'
+                '<a href="/play">Play online</a><a href="/privacy.html">Privacy policy</a>')
+
+    def test_homepage_explains_the_app_before_any_script_runs(self):
+        with patch.object(check_container, "urlopen", return_value=AssetResponse(
+                self.homepage.encode(), {})):
+            check_container.verify_public_homepage("http://127.0.0.1:18080")
+
+    def test_client_loading_screen_cannot_replace_the_public_homepage(self):
+        with patch.object(check_container, "urlopen", return_value=AssetResponse(
+                b'<div id="root">Loading...</div><script src="/assets/app.js"></script>', {})):
+            with self.assertRaisesRegex(RuntimeError, "must describe the application"):
+                check_container.verify_public_homepage("http://127.0.0.1:18080")
+
+
 class BuiltClientTest(unittest.TestCase):
     origin = "http://127.0.0.1:18080"
     drawing = "/assets/boardGeometry-CBVWEg-N.json"
@@ -40,7 +56,7 @@ class BuiltClientTest(unittest.TestCase):
     def verify(self, javascript, headers=None, geometry=None):
         def serve(request, timeout):
             url = request.full_url if isinstance(request, Request) else request
-            if url == self.origin:
+            if url == self.origin + "/play":
                 return AssetResponse(b'<script type="module" src="/assets/index-HASH.js"></script>', {})
             if url == self.origin + "/assets/index-HASH.js":
                 return AssetResponse(javascript.encode(), {})

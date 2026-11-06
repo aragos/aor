@@ -48,7 +48,7 @@ try {
             }
         };
     `});
-    await page.send('Page.navigate', {url: web});
+    await page.send('Page.navigate', {url: web + '/play'});
     await page.wait(`document.querySelector('#names')`, 'local creation form');
     await page.fill('#game-name', 'A human and two local opponents');
     await page.fill('#names', 'Ada');

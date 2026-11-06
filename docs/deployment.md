@@ -9,7 +9,8 @@ Production is a Render Docker service, PostgreSQL 18 and Firebase email/password
 1. Register Firebase web app; enable Email/Password and Google, support email, enumeration protection
    and a 12-character minimum password policy. Configure verification/reset templates. Play requires
    verified email and a unique registered handle.
-   The public policy at `/privacy.html` is linked from sign-in and the games dashboard. Keep its
+   The homepage at `/` describes the app without JavaScript or sign-in; `/play` opens sign-in or
+   the game lobby. The public policy at `/privacy.html` is linked from all three pages. Keep its
    contact address and data practices current, and use that same URL in Google Auth Platform →
    Branding → Privacy policy. Set the app name to **AoR online**, supply the homepage URL, then
    verify and publish branding ([Google's requirements](https://support.google.com/cloud/answer/15549049)).

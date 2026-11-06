@@ -389,8 +389,8 @@ fun Application.module(
         }
         System.getenv("AOR_WEB_DIR")?.let { directory ->
             val web = File(directory)
-            require(File(web, "index.html").isFile) {
-                "AOR_WEB_DIR must contain the built web client."
+            require(listOf("index.html", "home.html").all { File(web, it).isFile }) {
+                "AOR_WEB_DIR must contain the built game client and public homepage."
             }
             staticFiles("/assets", File(web, "assets")) {
                 modify { _, call ->
@@ -401,6 +401,10 @@ fun Application.module(
                 }
             }
             get("/") {
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+                call.respondFile(File(web, "home.html"))
+            }
+            get("/play") {
                 call.response.header(HttpHeaders.CacheControl, "no-cache")
                 call.respondFile(File(web, "index.html"))
             }

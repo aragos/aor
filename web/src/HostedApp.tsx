@@ -408,7 +408,7 @@ export default function HostedApp({config, game}: {config: ApplicationConfig; ga
     const ready = !loading && !error && user && session?.emailVerified && session.account;
     const logOut = () => {void signOut(auth).catch(failure => setError(message(failure)));};
     return <AccountContext.Provider value={ready ? {handle: ready.handle, signOut: logOut} : null}>
-        {user && !ready && <nav className="account-controls account-pending" aria-label={t('hosted.account')}><a href="/">{t('hosted.my-games')}</a>
+        {user && !ready && <nav className="account-controls account-pending" aria-label={t('hosted.account')}><a href="/play">{t('hosted.my-games')}</a>
             <button className="secondary" onClick={logOut}>{t('hosted.sign-out')}</button></nav>}
         {loading ? <main className="landing panel"><p>{t('hosted.loading-your-account')}</p></main> : !user ? <SignIn auth={auth}/>
             : error ? <main className="landing panel"><Problem value={error}/><button onClick={() => {void refresh();}}>{t('hosted.retry')}</button></main>

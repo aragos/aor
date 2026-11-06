@@ -177,7 +177,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     }
 
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
-        <a href="/">{t('game.new')}</a></main>;
+        <a href="/play">{t('game.new')}</a></main>;
     return <MapSelectionProvider><GameTable botControls={<BotControls snapshot={snapshot} {...automation}/>} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy} saved={saved}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
         quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
@@ -196,5 +196,5 @@ export function App() {
     if (config.authMode === 'firebase') return <Suspense fallback={<main className="landing panel"><p>{t('game.loading')}</p></main>}><HostedApp config={config} game={match ? <Game id={match[1]} pollInterval={config.pollIntervalMs}/> : null}/></Suspense>;
     if (!match) return <CreateGame/>;
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
-    return token ? <Game id={match[1]} token={token}/> : <main className="landing panel"><h1><AppLogo/></h1><p role="alert">{t('game.missingToken')}</p><a href="/">{t('game.new')}</a></main>;
+    return token ? <Game id={match[1]} token={token}/> : <main className="landing panel"><h1><AppLogo/></h1><p role="alert">{t('game.missingToken')}</p><a href="/play">{t('game.new')}</a></main>;
 }

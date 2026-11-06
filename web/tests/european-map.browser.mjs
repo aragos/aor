@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
 
 export async function checkEuropeanMap(page, web) {
-    await page.send('Page.navigate', {url: web + '/'});
+    await page.send('Page.navigate', {url: web + '/play'});
     await page.wait(`document.querySelector('#variant-map')`, 'map selection on creation');
     await page.fill('#names', 'Ada\nBruno\nClara\nDario\nEva\nFarid');
     await page.evaluate(`document.querySelector('#variant-map button:last-child').click()`);

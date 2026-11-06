@@ -69,7 +69,7 @@ export async function checkHosted(page, web, artifacts) {
     await page.send('Network.setCacheDisabled', {cacheDisabled: true});
     await page.send('Fetch.enable', {patterns: [{urlPattern: '*firebase_auth.js*'}, {urlPattern: '*/api/*'}]});
     try {
-        async function check(description, action, path = '') {
+        async function check(description, action, path = '/play') {
             account = null;
             emailVerified = true;
             const previousDocument = await page.evaluate('performance.timeOrigin');
@@ -221,7 +221,7 @@ export async function checkHosted(page, web, artifacts) {
             assert.equal(await page.evaluate(`document.querySelectorAll('.account-controls').length`), 1, 'One account navigation surface');
             assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls a')`), null,
                 'The logo owns game-list navigation without an explicit My games link');
-            assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('href')`), '/');
+            assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('href')`), '/play');
             assert.equal(await page.evaluate(`document.querySelector('.game-header .games-home').getAttribute('aria-label')`), 'My games');
             assert.equal(await page.evaluate(`document.querySelector('.game-header .account-controls').textContent.includes('@alice')`), true);
             assert.equal(await page.evaluate(`document.querySelector('.private-seat-link')`), null, 'Hosted games use accounts');

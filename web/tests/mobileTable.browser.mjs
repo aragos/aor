@@ -24,7 +24,7 @@ export async function checkMobileTable(page, web, baseline) {
         assert.equal(await page.evaluate(`document.querySelector('.player-overview .player-status')`), null);
         assert.match(await page.evaluate(`document.querySelector('.decision-status').textContent`), /Waiting for/);
         assert.equal(await page.evaluate(`document.querySelector('.decision-status .identity-label') !== null`), true);
-        assert.equal(await page.evaluate(`document.querySelector('.games-home').getAttribute('href')`), '/');
+        assert.equal(await page.evaluate(`document.querySelector('.games-home').getAttribute('href')`), '/play');
         if (mobile) {
             assert.equal(await page.evaluate(`document.querySelector('#workspace-players').checkVisibility()`), false);
             assert.equal(await page.evaluate(`document.querySelector('.game-table > .table-tools')`), null);
