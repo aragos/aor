@@ -116,9 +116,14 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Changed prompt cannot auto-submit');
     assert((await page.evaluate(`document.querySelector('.decision-panel').textContent`)).includes(fixture.game.players.find(player => player.id === other).capital.replace(/\b\w/g, letter=>letter.toUpperCase())), 'Interruption names recipient');
     await show({...baseline, revision: fixture.revision + 1});
+    // A polling request starts before React renders its response and resets the old decision.
+    await page.wait(`document.querySelector('.decision-status.is-ready') && !document.querySelector('.interrupt-owner')`, 'expansion decision restored after interruption');
     await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
+    await page.wait(`document.querySelector('[data-map-province="${offer.destination}"][aria-pressed="true"]')`, 'market selected in the restored decision');
     await page.evaluate(`document.querySelector('#tab-markets').click()`);
+    await page.wait(`document.querySelector('#tab-markets[aria-selected="true"]')`, 'Markets workspace opens');
     await page.evaluate(`document.querySelector('#tab-map').click()`);
+    await page.wait(`document.querySelector('#tab-map[aria-selected="true"]')`, 'Map workspace reopens');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').getAttribute('aria-pressed')`), 'true', 'Workspace switching retains selected market');
     await page.evaluate(`window.uiNextError='INSUFFICIENT_EXPANSION_TOKENS'; document.querySelector('.primary-expansion').click()`);
     await page.wait(`document.querySelector('.decision-panel [role=alert]') && !document.querySelector('.primary-expansion').disabled`, 'rejected draft retained');
