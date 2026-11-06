@@ -47,7 +47,10 @@ owned processes and leaves artifacts outside the repository. With no selection i
 `map.browser.mjs` suite, which already includes most UI flows; select focused files during iteration.
 `AOR_BROWSER_SUITE` selects one suite; `AOR_BROWSER_TIMEOUT_MS` overrides the five-minute per-suite
 limit. `AOR_BROWSER_SERVER` reuses an installed executable. For SQL browser checks use
-`AOR_BROWSER_SERVER="$PWD/web/scripts/postgres-browser-server.sh"` before the npm command.
+`AOR_BROWSER_SERVER="$PWD/web/scripts/postgres-browser-server.sh"` before the npm command. To exercise the
+built app and worker, run `npm run build`, then set `AOR_BROWSER_PREVIEW=1` on the same browser
+command. Preview mode requires existing `web/dist/index.html` and verifies its API proxy; ordinary
+checks keep using the development server.
 
 ## Opponent training
 

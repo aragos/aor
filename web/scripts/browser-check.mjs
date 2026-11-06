@@ -12,6 +12,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const {suites, timeout} = browserOptions(process.argv.slice(2), process.env, resolve(root, 'web/tests'));
 // Catch misspelled suite names before building or starting the isolated services.
 await Promise.all(suites.map(suite => access(suite.path)));
+const preview = process.env.AOR_BROWSER_PREVIEW === '1';
+if (preview) {
+    try {await access(resolve(root, 'web/dist/index.html'));}
+    catch {throw new Error('AOR_BROWSER_PREVIEW=1 requires an existing web/dist/index.html. Run npm run build before checking the production bundle.');}
+}
+
 const temporary = await mkdtemp(resolve(tmpdir(), 'aor-browser-'));
 const artifacts = resolve(process.env.AOR_BROWSER_ARTIFACTS ?? await mkdtemp(resolve(tmpdir(), 'aor-browser-artifacts-')));
 const children = [];
@@ -115,7 +121,10 @@ try {
     const server = launch('isolated game server', process.env.AOR_BROWSER_SERVER ?? resolve(root, 'server/build/install/server/bin/server'), [], {
         AOR_HTTP_PORT: String(apiPort), AOR_DATA_DIR: resolve(temporary, 'games'),
     });
-    const vite = launch('Vite', process.execPath, [resolve(dirname(fileURLToPath(import.meta.resolve('vite/package.json'))), 'bin/vite.js'), '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {AOR_API_TARGET: api}, resolve(root, 'web'));
+    const vite = launch(preview ? 'Vite production preview' : 'Vite', process.execPath, [
+        resolve(dirname(fileURLToPath(import.meta.resolve('vite/package.json'))), 'bin/vite.js'),
+        ...(preview ? ['preview'] : []), '--host', '127.0.0.1', '--port', String(webPort), '--strictPort',
+    ], {AOR_API_TARGET: api}, resolve(root, 'web'));
     const browser = launch('isolated Chrome', process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
         '--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
         '--disable-background-networking', '--disable-component-update',
@@ -123,6 +132,8 @@ try {
         `--user-data-dir=${resolve(temporary, 'chrome')}`, 'about:blank',
     ]);
     await Promise.all([ready(`${api}/api/health`, server), ready(web, vite), ready(`${cdp}/json/version`, browser)]);
+    await ready(`${web}/api/health`, vite);
+    console.log(`Verified ${preview ? 'production preview' : 'development'} web API proxy.`);
     for (const [index, suite] of suites.entries()) {
         if (index) await Promise.race([resetBrowserSession(cdp, [web, api]), interruption]);
         await checked(launch(suite.name, process.execPath, [suite.path], {
