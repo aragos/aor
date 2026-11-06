@@ -9,6 +9,10 @@ Production is a Render Docker service, PostgreSQL 18 and Firebase email/password
 1. Register Firebase web app; enable Email/Password and Google, support email, enumeration protection
    and a 12-character minimum password policy. Configure verification/reset templates. Play requires
    verified email and a unique registered handle.
+   The public policy at `/privacy.html` is linked from sign-in and the games dashboard. Keep its
+   contact address and data practices current, and use that same URL in Google Auth Platform →
+   Branding → Privacy policy. Set the app name to **AoR online**, supply the homepage URL, then
+   verify and publish branding ([Google's requirements](https://support.google.com/cloud/answer/15549049)).
 2. Supply a dedicated `roles/firebaseauth.viewer` service-account JSON as Render secret file
    `/etc/secrets/firebase-admin.json` for application-default token/revocation checks; never commit it.
 3. Connect Blueprint to `release`, enable Auto Sync and **After CI Checks Pass** auto-deploy. Co-locate

@@ -412,6 +412,10 @@ fun Application.module(
                 call.response.header(HttpHeaders.CacheControl, "no-cache")
                 call.respondFile(File(web, "index.html"))
             }
+            get("/privacy.html") {
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+                call.respondFile(File(web, "privacy.html"))
+            }
         }
     }
 }

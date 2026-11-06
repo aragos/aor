@@ -84,6 +84,46 @@ export async function checkHosted(page, web, artifacts) {
             await page.screenshot(join(artifacts, 'hosted-sign-in.png'), 1280, 900);
             assert.equal(await page.evaluate(`document.querySelector('.google-sign-in img').naturalWidth > 0`), true);
         });
+        await check('Switching account mode preserves the email and password draft', async () => {
+            await page.fill('input[type=email]', 'player@example.com');
+            await page.fill('input[type=password]', 'fixture-password');
+            await page.click('Create account');
+
+            assert.equal(await page.evaluate(`document.querySelector('input[type=email]').value`), 'player@example.com');
+            assert.equal(await page.evaluate(`document.querySelector('input[type=password]').value`), 'fixture-password');
+            assert.equal(await page.evaluate(`document.querySelector('input[type=password]').autocomplete`), 'new-password');
+            assert.equal(await page.evaluate(`document.querySelector('input[type=password]').minLength`), 12);
+            await page.screenshot(join(artifacts, 'hosted-sign-up.png'), 1280, 900);
+            await page.screenshot(join(artifacts, 'hosted-sign-up-mobile.png'), 390, 844, true);
+            assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true);
+            await page.click('Sign in');
+            assert.equal(await page.evaluate(`document.querySelector('input[type=password]').autocomplete`), 'current-password');
+            assert.equal(await page.evaluate(`document.querySelector('input[type=password]').value`), 'fixture-password');
+            await page.send('Emulation.clearDeviceMetricsOverride');
+        });
+        await check('Password reset works without submitting the sign-in form', async () => {
+            await page.fill('input[type=email]', 'player@example.com');
+
+            await page.click('Reset password');
+
+            await page.wait(`document.querySelector('[role=status]')?.textContent.includes('password reset email')`, 'Reset confirmation');
+            assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.find(call => call.method === 'sendPasswordResetEmail')`),
+                {method: 'sendPasswordResetEmail', email: 'player@example.com'});
+            assert.equal(await page.evaluate(`window.firebaseTest.calls.some(call => call.method === 'signInWithEmailAndPassword')`), false);
+        });
+        await check('Email account creation sends verification before player registration', async () => {
+            emailVerified = false;
+            await page.click('Create account');
+            await page.fill('input[type=email]', 'player@example.com');
+            await page.fill('input[type=password]', 'fixture-password');
+
+            await page.evaluate(`document.querySelector('form').requestSubmit()`);
+
+            await page.wait(`document.querySelector('h1')?.textContent === 'Verify your email'`, 'Account email verification');
+            assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.find(call => call.method === 'createUserWithEmailAndPassword')`),
+                {method: 'createUserWithEmailAndPassword', email: 'player@example.com', password: 'fixture-password'});
+            assert.equal(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification').length`), 1);
+        });
         await check('Google popup disables concurrent sign-in actions', async () => {
             await page.click('Sign in with Google');
             await page.wait(`window.firebaseTest.popup !== null`, 'Google popup starts without email or password');

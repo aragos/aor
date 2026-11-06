@@ -81,20 +81,33 @@ function SignIn({auth}: {auth: Auth}) {
         catch (failure) {setError(message(failure));}
         finally {setBusy(false);}
     }
-    return <main className="landing panel"><p className="eyebrow">{t('app.subtitle')}</p><h1><AppLogo/></h1>
-        <Problem value={error}/><p role="status">{notice}</p>
-        <button type="button" className="google-sign-in" disabled={busy} aria-busy={busy} onClick={() => {void google();}}>
-            <img src={googleSignInButton} alt="" width={198} height={44}/><span className="sr-only">{t('hosted.sign-in-with-google')}</span>
-        </button>
-        <p className="auth-divider muted">{t('hosted.or-use-email')}</p>
-        <ChoiceButtons label={t('hosted.account')} value={mode} onChange={setMode} disabled={busy} choices={[{value: 'sign-in', label: t('hosted.sign-in')}, {value: 'sign-up', label: t('hosted.create-account')}]}/>
-        <form onSubmit={submit} className="account-form">
-            <label>{t('hosted.email')}<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254}/></label>
-            <label>{t('hosted.password')}<input type="password" autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} required minLength={mode === 'sign-up' ? 12 : undefined} maxLength={128}/></label>
-            {mode === 'sign-up' && <p className="muted small">{t('hosted.use-at-least-12-characters')}</p>}
-            <button disabled={busy}>{busy ? t('hosted.working') : mode === 'sign-up' ? t('hosted.create-account') : t('hosted.sign-in')}</button>
-            <button type="button" className="secondary" disabled={busy || !email.trim()} onClick={() => {void reset();}}>{t('hosted.reset-password')}</button>
-        </form>
+    return <main className="auth-page">
+        <header className="auth-brand">
+            <div className="auth-wordmark"><AppLogo/><h1>{t('hosted.brand')}</h1></div>
+            <p>{t('hosted.about')}</p>
+        </header>
+        <section className="auth-card" aria-label={t('hosted.account')}>
+            <ChoiceButtons id="auth-mode" label={t('hosted.account')} value={mode} onChange={value => {
+                setMode(value); setError(''); setNotice('');
+            }} disabled={busy} choices={[{value: 'sign-in', label: t('hosted.sign-in')}, {value: 'sign-up', label: t('hosted.create-account')}]}/>
+            <Problem value={error}/><p className="auth-notice" role="status">{notice}</p>
+            <button type="button" className="google-sign-in" disabled={busy} aria-busy={busy} onClick={() => {void google();}}>
+                <img src={googleSignInButton} alt="" width={198} height={44}/><span className="sr-only">{t('hosted.sign-in-with-google')}</span>
+            </button>
+            <p className="auth-divider">{t('hosted.or-use-email')}</p>
+            <form onSubmit={submit} className="account-form">
+                <label htmlFor="auth-email">{t('hosted.email')}</label>
+                <input id="auth-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254} disabled={busy}/>
+                <div className="auth-password-label">
+                    <label htmlFor="auth-password">{t('hosted.password')}</label>
+                    {mode === 'sign-in' && <button type="button" className="auth-reset" disabled={busy || !email.trim()} onClick={() => {void reset();}}>{t('hosted.reset-password')}</button>}
+                </div>
+                <input id="auth-password" type="password" autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} required minLength={mode === 'sign-up' ? 12 : undefined} maxLength={128} aria-describedby={mode === 'sign-up' ? 'auth-password-hint' : undefined} disabled={busy}/>
+                {mode === 'sign-up' && <p id="auth-password-hint">{t('hosted.use-at-least-12-characters')}</p>}
+                <button className="auth-submit" disabled={busy}>{busy ? t('hosted.working') : mode === 'sign-up' ? t('hosted.create-account') : t('hosted.sign-in')}</button>
+            </form>
+        </section>
+        <footer className="privacy-footer"><a href="/privacy.html">{t('hosted.privacy-policy')}</a></footer>
     </main>;
 }
 
@@ -352,6 +365,7 @@ export function Dashboard({me}: {me: Account}) {
         </section>
         <RegisteredGameForm me={me}/>
         {all && <AdminPlayers/>}
+        <footer className="privacy-footer"><a href="/privacy.html">{t('hosted.privacy-policy')}</a></footer>
     </main>;
 }
 

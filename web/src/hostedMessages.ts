@@ -1,5 +1,8 @@
 /** Account and operational copy uses the same message interface as gameplay. */
 export const hostedMessages: Record<string, string> = {
+    "hosted.brand": "AoR online",
+    "hosted.about": "Play Age of Renaissance with 3–6 players, at your own pace. Your next turn will be waiting.",
+    "hosted.privacy-policy": "Privacy policy",
     "hosted.games": "Games",
     "hosted.own-games": "Own games",
     "hosted.other-games": "Other games",
