@@ -3,6 +3,7 @@ package dev.aragos.aor
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.PurchaseObservationEncoder
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -56,6 +57,128 @@ class BotAutomationTest(private val postgres: Boolean) {
 
             assertThat(failure.code).isEqualTo("BOT_CONTROL_FORBIDDEN")
             assertThat(fixture.snapshot(1).automation?.canControl).isFalse()
+        }
+
+    @Test
+    fun qualifiedHardPurchaseWorkContainsCompleteOrdinaryActorFactsWithoutABaseline() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+            val state = fixture.service.store.read(fixture.game.gameId).state()
+
+            val job = fixture.claim().observations.single()
+
+            val purchase =
+                requireNotNull(job.purchase) { "Qualified HARD work needs purchase facts." }
+            assertThat(job.seat).isEqualTo(PlayerId("p4"))
+            assertThat(purchase)
+                .isEqualTo(
+                    PurchaseObservationEncoder.project(
+                        state.viewForPlayer(job.seat),
+                        job.seat,
+                        job.observation,
+                    )
+                )
+            assertThat(purchase.stateFeatures.keys.any { it.startsWith("unplayed.") }).isTrue()
+            assertThat(purchase.actions.map { it.command })
+                .containsExactlyElementsIn(job.observation.candidates.map { it.command }.sorted())
+                .inOrder()
+            val wire = json.readTree(json.writeValueAsString(job))["purchase"]
+            assertThat(wire.fieldNames().asSequence().toSet())
+                .containsExactly("encoderVersion", "stateFeatures", "actions")
+            assertThat(wire["stateFeatures"].all { it.isNumber }).isTrue()
+            assertThat(wire["actions"].all { action -> action["features"].all { it.isNumber } })
+                .isTrue()
+        }
+
+    @Test
+    fun qualifiedHardShippingWorkContainsItsActualLegalOffers() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.SHIPPING)
+
+            val job = fixture.claim().observations.single()
+
+            assertThat(job.observation.decision).isEqualTo("purchase-shipping")
+            assertThat(job.purchase?.actions?.map { it.command })
+                .containsExactlyElementsIn(job.observation.candidates.map { it.command }.sorted())
+                .inOrder()
+        }
+
+    @Test
+    fun acceptedAdvanceRegeneratesTheNextPurchaseProjection() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+            val work = fixture.claim()
+            val before = work.observations.single()
+            val advance = before.observation.candidates.single { it.command == "buy-advance A" }
+
+            val after =
+                fixture
+                    .submit(work, before, advance.command, UUID.randomUUID().toString())
+                    .observations
+                    .single()
+
+            val state = fixture.service.store.read(fixture.game.gameId).state()
+            val purchase = requireNotNull(after.purchase) { "The next purchase needs fresh facts." }
+            assertThat(after.seat).isEqualTo(before.seat)
+            assertThat(purchase.actions.map { it.command }).doesNotContain(advance.command)
+            assertThat(purchase.stateFeatures["role.0.cash"])
+                .isEqualTo((before.observation.availableCash - advance.cashCost) / 200.0)
+            assertThat(after.purchase)
+                .isEqualTo(
+                    PurchaseObservationEncoder.project(
+                        state.viewForPlayer(after.seat),
+                        after.seat,
+                        after.observation,
+                    )
+                )
+        }
+
+    @Test
+    fun normalPurchaseWorkDoesNotRequestNeuralInputs() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.preparePurchase(PlayerId("p3"), PurchaseStep.ADVANCES)
+
+            val job = fixture.claim().observations.single()
+
+            assertThat(job.difficulty).isEqualTo(BotDifficulty.NORMAL)
+            assertThat(job.purchase).isNull()
+        }
+
+    @Test
+    fun unqualifiedVariantsDoNotRequestNeuralInputs() =
+        AutomationFixture(postgres, humans = 2, bots = 2).use { fixture ->
+            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+
+            val job = fixture.claim().observations.single()
+
+            assertThat(job.difficulty).isEqualTo(BotDifficulty.HARD)
+            assertThat(job.purchase).isNull()
+        }
+
+    @Test
+    fun anotherHumanCannotReadThePurchaseWorkPayload() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+            val work = fixture.claim()
+
+            val failure =
+                assertFailsWith<ServiceFailure> {
+                    BotAutomation.read(
+                        fixture.service,
+                        fixture.game.gameId,
+                        fixture.access(1),
+                        fixture.runnerId,
+                        work.epoch,
+                        now = 1100,
+                    )
+                }
+
+            assertThat(failure.code).isEqualTo("BOT_CONTROL_FORBIDDEN")
         }
 
     @Test
@@ -528,6 +651,7 @@ private class AutomationFixture(
     humans: Int = 1,
     bots: Int = 2,
     policy: UndoPolicy = UndoPolicy.LINEAR_GAME,
+    rules: RuleOptions = RuleOptions(),
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-bot-test-")
     private val database = if (postgres) PostgresFixture() else null
@@ -543,6 +667,7 @@ private class AutomationFixture(
                     )
                 },
             undoPolicy = policy,
+            rules = rules,
         )
     val runnerId: String = UUID.randomUUID().toString()
 
@@ -657,6 +782,33 @@ private class AutomationFixture(
         }
     }
 
+    fun preparePurchase(actor: PlayerId, step: PurchaseStep) {
+        prepareFirstTurn()
+        service.store.update(game.gameId) { initial ->
+            var current = initial
+            repeat(100) {
+                val state = current.state()
+                val prompt = state.prompts().single() as Prompt.SinglePlayer
+                if (
+                    state.stage == Stage.PURCHASE &&
+                        prompt.player == actor &&
+                        state.flow.purchaseStep == step
+                ) {
+                    return@update current
+                }
+                val choices = state.legalChoices(prompt.player).commands
+                val command =
+                    when {
+                        "stabilize cash" in choices -> "stabilize cash"
+                        "pass" in choices -> "pass"
+                        else -> choices.first()
+                    }
+                current = service.driver.submit(current, prompt.player, command)
+            }
+            error("The fixture must reach the requested first-turn purchase decision.")
+        }
+    }
+
     fun reopened(): GameService =
         database?.reopened() ?: createGameService(directory, FixedRandom())
 
@@ -665,3 +817,10 @@ private class AutomationFixture(
         directory.toFile().deleteRecursively()
     }
 }
+
+private val qualifiedPurchaseRules =
+    RuleOptions(
+        deckModification = true,
+        initialCard = InitialCardRule.NO_CRUSADES,
+        immediateMasterArtDiscard = true,
+    )
