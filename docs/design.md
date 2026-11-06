@@ -186,6 +186,13 @@ pre-submit state. Complete-game artifacts bind model, encoder, runtime and seed 
 terminal labels are separate from actor inputs. Neural models use a separate schema and require
 explicit qualification before browser activation.
 
+The experimental card actor has distinct versions and controls repeated offered card plays in normal
+and final windows. It shares raw actor-state projection and residual-network arithmetic with purchase
+inference while preserving the purchase model's contract. Complete-game card collection fixes a
+separately fingerprinted purchase actor for every seat and records only the controlled seat's card
+decisions for learning. Public purchase consequences form a separate diagnostic audit, never model
+inputs or targets. Nested resolutions and other decisions retain their corresponding HARD baseline.
+
 For supported HARD purchases, creator-only automation work includes a transient, baseline-free
 projection from the ordinary actor view. The decision-only view omits public unplayed cards and is
 insufficient for this encoder. The browser worker binds its actual baseline recommendation to the

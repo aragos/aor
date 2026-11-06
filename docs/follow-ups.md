@@ -141,9 +141,12 @@ establish a serious challenge for experienced humans.
 - Evaluate the qualified purchase policy in human games and retain representative failures as
   diagnostic positions. Distinguish improved purchase priorities from contextual planning, card
   timing and expansion strength.
-- Extend repeated actor control to card timing, token commitments and expansion. Add versioned raw
-  observations and bounded legal-action coverage for each phase. A card-window pass ends that window;
-  testing retention while playing other cards requires continued control of the relevant decisions.
+- Qualify the [card learner](contributing.md#card-policy-learning) with the purchase actor fixed in
+  every continuation. Measure meaningful retention and alternative-card exploration, including
+  prerequisite blockers, cash competition, Printed Word receipts and Patronage benefits to rivals.
+  A card-window pass ends that window; playing another card can retain the leader without passing.
+- Extend repeated actor control to token commitments and expansion. Add versioned raw observations
+  and bounded legal-action coverage for each phase, preserving independently qualified policies.
 - Expand population self-play and retain historical and independently developed rivals. Test several
   learned automata together, balance seats across fresh worlds, and keep one world's counterfactual
   roles or continuations together when estimating uncertainty.
