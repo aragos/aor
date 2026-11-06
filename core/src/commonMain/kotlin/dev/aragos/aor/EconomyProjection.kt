@@ -158,6 +158,11 @@ data class ShippingOfferView(
             ) {
                 return null
             }
+            return forecast(state, viewer)
+        }
+
+        /** Current-capability quote only; this does not authorize an early shipping purchase. */
+        internal fun forecast(state: GameState, viewer: PlayerState): ShippingOfferView {
             return try {
                 val after = ShippingPurchases.upgrade(viewer, state.currentTurn()).player
                 ShippingOfferView(

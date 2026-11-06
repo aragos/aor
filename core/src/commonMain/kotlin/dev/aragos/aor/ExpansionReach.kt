@@ -162,13 +162,37 @@ object ExpansionReach {
             context.province(destination).overseas != null &&
                 !context.board.hasPresence(player, destination)
         ) {
-            val occupied =
-                context.board.pieces.keys.count { province ->
-                    context.province(province).overseas != null &&
-                        context.board.hasPresence(player, province)
-                }
-            checkRule(occupied < profile.ships.level, ViolationCode.OVERSEAS_LIMIT_EXCEEDED)
+            checkRule(
+                remainingOverseasSlots(context, player) > 0,
+                ViolationCode.OVERSEAS_LIMIT_EXCEEDED,
+            )
         }
+    }
+
+    /**
+     * Unoccupied overseas boxes allowed by the current fleet, including existing token holdings.
+     */
+    internal fun remainingOverseasSlots(context: BoardRulesContext, player: PlayerId): Int =
+        remainingOverseasSlots(
+            context.configuration,
+            context.board,
+            player,
+            context.player(player).ships,
+        )
+
+    internal fun remainingOverseasSlots(
+        configuration: CatalogConfiguration,
+        board: BoardState,
+        player: PlayerId,
+        ships: ShippingCapability,
+    ): Int {
+        if (ships.fleet != ShippingFleet.OCEAN) return 0
+        val occupied =
+            board.pieces.keys.count { province ->
+                configuration.map.province(province).overseas != null &&
+                    board.hasPresence(player, province)
+            }
+        return (ships.level - occupied).coerceAtLeast(0)
     }
 
     fun canEnter(profile: BoardPlayerProfile, province: ProvinceDefinition): Boolean =
