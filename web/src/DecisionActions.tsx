@@ -20,7 +20,8 @@ export function DecisionActions({children, pass}: {children: ReactNode; pass?: R
         if (!footer) return;
         const group = () => {
             const buttons = [...footer.querySelectorAll('button:not(.help-link)')];
-            footer.dataset.layout = buttons.length === 2 && buttons.some(button => button.classList.contains('pass-action'))
+            footer.dataset.layout = buttons.length === 2 && !footer.querySelector('.button-with-help') &&
+                buttons.some(button => button.classList.contains('pass-action'))
                 ? 'paired' : 'separate';
             footer.dataset.actionCount = String(buttons.length);
         };

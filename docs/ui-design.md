@@ -49,7 +49,8 @@ Paths are relative to [web/src](../web/src/).
   (including hidden hands/discards); recurring plays reset next shuffle, square plays stay excluded.
   The header's remaining-card text opens this lookup; entries open existing card/payout details and
   return without changing drafts. Keep draw-pile size separate and forecasts distinct from payouts.
-- Keep grouped action buttons equally tall when labels wrap; attach help to the border clear of labels.
+- Keep grouped action buttons equally tall when labels wrap; place help beside the button with a
+  separate hit target outside its border.
 - Support keyboard/touch, visible focus, reduced motion and phone widths. Name finite-choice questions;
   roving focus lets Tab reach confirmation. Localize ordinary text, never canonical syntax. Preferences
   use browser storage with an in-memory fallback. Tapping expanded player details closes them.
