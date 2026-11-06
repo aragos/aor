@@ -11,10 +11,27 @@ import java.nio.file.Path
 /** Raw file identity and decoded baseline retain explicit zeros and qualified-profile metadata. */
 internal data class PurchaseBaselineInput(val path: Path, val sha256: String, val model: BotModel)
 
+/** Exact bytes and decoded actor for an optional learned purchase policy. */
+internal data class PurchaseActorInput(
+    val path: Path,
+    val sha256: String,
+    val model: PurchasePolicyModel,
+) {
+    init {
+        require(path.isAbsolute) { "A purchase actor requires its resolved absolute source path." }
+        require(sha256.matches(Regex("[0-9a-f]{64}"))) {
+            "A purchase actor requires its exact SHA-256 fingerprint."
+        }
+    }
+}
+
 /**
  * One immutable collection: a declared arena seed bank, one setup, a rotating learner seat, and a
  * frozen HARD opponent population. Relative model paths resolve beside the source JSON. A null
  * [policy] collects exact baseline recommendations, without invented behavior likelihoods.
+ * [opponentPurchasePolicy], when present, controls purchase decisions for every other seat using
+ * that seat's existing HARD opponent model as its prior and nonpurchase policy. Only the rotating
+ * controlled seat produces training records; absent/null retains the original collection format.
  */
 internal data class PurchaseCollectionInput(
     val source: Path,
@@ -28,7 +45,19 @@ internal data class PurchaseCollectionInput(
     val modelSha256: String?,
     val policy: PurchasePolicyModel?,
     val dictionary: PurchaseFeatureDictionary,
+    val opponentPurchasePolicy: PurchaseActorInput? = null,
 ) {
+    init {
+        require(
+            listOfNotNull(policy, opponentPurchasePolicy?.model).all {
+                it.stateFeatureNames == dictionary.stateFeatureNames &&
+                    it.actionFeatureNames == dictionary.actionFeatureNames
+            }
+        ) {
+            "Every purchase policy must use this configuration's complete encoder dictionaries."
+        }
+    }
+
     val mode: String
         get() = if (policy == null) "baseline-imitation" else "on-policy"
 
@@ -53,6 +82,13 @@ internal data class PurchaseCollectionInput(
                     dictionary.stateFeatureNames,
                     dictionary.actionFeatureNames,
                 )
+                .plus(
+                    listOfNotNull(
+                        opponentPurchasePolicy?.let {
+                            "opponent-purchase-policy:${it.sha256}"
+                        }
+                    )
+                )
                 .joinToString("\n")
         )
 
@@ -64,7 +100,7 @@ internal data class PurchaseCollectionInput(
             PurchaseJson.fields(
                 node,
                 setOf("schemaVersion", "configuration", "games", "seed", "baseline", "opponents"),
-                setOf("policy"),
+                setOf("policy", "opponentPurchasePolicy"),
             )
             require(PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") == 1) {
                 "A purchase collection requires schemaVersion 1."
@@ -99,30 +135,26 @@ internal data class PurchaseCollectionInput(
             require(opponents.size in 1..16) {
                 "A purchase collection requires one through sixteen frozen opponents."
             }
-            val policyPath =
-                node["policy"]
+            fun actor(name: String): PurchaseActorInput? =
+                node[name]
                     ?.takeUnless { it.isNull }
-                    ?.let {
-                        resolve(PurchaseJson.text(it, "policy"))
+                    ?.let { value ->
+                        val path = resolve(PurchaseJson.text(value, name))
+                        val hash = PurchaseJson.hash(path)
+                        val model = PurchasePolicyInput.read(path)
+                        require(PurchaseJson.hash(path) == hash) {
+                            "A purchase actor changed while it was being read: $name."
+                        }
+                        PurchaseActorInput(path, hash, model)
                     }
-            val modelHash = policyPath?.let(PurchaseJson::hash)
-            val policy = policyPath?.let(PurchasePolicyInput::read)
+            val policy = actor("policy")
+            val opponentPolicy = actor("opponentPurchasePolicy")
             val dictionary =
                 PurchaseObservationEncoder.dictionary(
                     PublicCatalog.forPlayers(configuration.playerCount, configuration.rules)
                 )
-            require(
-                policy == null ||
-                    policy.stateFeatureNames == dictionary.stateFeatureNames &&
-                        policy.actionFeatureNames == dictionary.actionFeatureNames
-            ) {
-                "The purchase policy must use this configuration's complete encoder dictionaries."
-            }
-            require(
-                PurchaseJson.hash(realSource) == sourceHash &&
-                    policyPath?.let(PurchaseJson::hash) == modelHash
-            ) {
-                "A purchase source or policy changed while it was being read."
+            require(PurchaseJson.hash(realSource) == sourceHash) {
+                "A purchase source changed while it was being read."
             }
             return PurchaseCollectionInput(
                 realSource,
@@ -132,10 +164,11 @@ internal data class PurchaseCollectionInput(
                 seeds,
                 incumbent,
                 opponents,
-                policyPath,
-                modelHash,
-                policy,
+                policy?.path,
+                policy?.sha256,
+                policy?.model,
                 dictionary,
+                opponentPolicy,
             )
         }
     }

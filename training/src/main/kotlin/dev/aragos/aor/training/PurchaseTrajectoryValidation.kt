@@ -97,7 +97,7 @@ internal class PurchaseTrajectoryValidation(
         val baselineSeed =
             input.seeds[gameIndex] xor
                 (integer(node, "number") * 65537 + input.seat(gameIndex) * 8191)
-        require(seed == PurchaseCollector.samplingSeed(baselineSeed)) {
+        require(seed == PurchasePolicy.actorSeed(baselineSeed)) {
             "A purchase record must preserve its independently derived actor sampling seed."
         }
         val observation = observation(node.required("observation"))

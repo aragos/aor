@@ -5,6 +5,7 @@ import dev.aragos.aor.ai.BotModels
 import dev.aragos.aor.ai.PurchaseAction
 import dev.aragos.aor.ai.PurchaseObservation
 import dev.aragos.aor.ai.PurchaseObservationEncoder
+import dev.aragos.aor.ai.PurchasePolicy
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -99,7 +100,7 @@ internal class PurchaseCollectionFixture(onPolicy: Boolean = false, games: Int =
                 listOf(
                     PurchaseDecisionRecord(
                         number = 0,
-                        actorSeed = PurchaseCollector.samplingSeed(input.seeds[0]),
+                        actorSeed = PurchasePolicy.actorSeed(input.seeds[0]),
                         decision = "purchase-advances",
                         turn = 1,
                         observation = observation,
