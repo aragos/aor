@@ -308,11 +308,11 @@ object StrategyArenaMain {
                     "phase" to "initialized",
                 ),
             )
-            artifacts.model(specification.candidate, "candidate.json")
-            artifacts.model(specification.incumbent, "incumbent.json")
-            specification.opponents.forEachIndexed { index, model ->
-                artifacts.model(model, "opponent-$index.json")
-            }
+        }
+        artifacts.ensureModelSnapshot(specification.candidate, "candidate.json")
+        artifacts.ensureModelSnapshot(specification.incumbent, "incumbent.json")
+        specification.opponents.forEachIndexed { index, model ->
+            artifacts.ensureModelSnapshot(model, "opponent-$index.json")
         }
         val startPath = output.resolve("started-at.txt")
         val started =

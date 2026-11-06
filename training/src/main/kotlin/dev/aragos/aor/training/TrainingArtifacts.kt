@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.aragos.aor.DATA_VERSION
 import dev.aragos.aor.RULES_VERSION
@@ -45,16 +46,31 @@ class TrainingArtifacts(val directory: Path) {
     }
 
     fun model(model: BotModel, name: String = "model.json") {
-        write(
-            name,
-            mapOf(
-                "schemaVersion" to model.schemaVersion,
-                "rulesVersion" to RULES_VERSION,
-                "dataVersion" to DATA_VERSION,
-                "weights" to BotModels.serializedWeights(model).toSortedMap(),
-            ),
-        )
+        write(name, modelDocument(model))
     }
+
+    /**
+     * Restore an interrupted run's missing model archive after its signature has been validated.
+     * Existing snapshots must match the canonical wire document and are never overwritten.
+     */
+    internal fun ensureModelSnapshot(model: BotModel, name: String) {
+        val document = modelDocument(model)
+        val expected = json.valueToTree<JsonNode>(document)
+        val existing = read(name)
+        val present = Files.exists(directory.resolve(name))
+        require(!present || existing == expected) {
+            "Existing model snapshot $name differs from the signature-validated arena model."
+        }
+        if (!present) write(name, document)
+    }
+
+    private fun modelDocument(model: BotModel): Map<String, Any> =
+        mapOf(
+            "schemaVersion" to model.schemaVersion,
+            "rulesVersion" to RULES_VERSION,
+            "dataVersion" to DATA_VERSION,
+            "weights" to BotModels.serializedWeights(model).toSortedMap(),
+        )
 
     fun append(name: String, value: Any) {
         require(name.matches(Regex("[a-zA-Z0-9._-]+"))) {
