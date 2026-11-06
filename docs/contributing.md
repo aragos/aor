@@ -234,6 +234,51 @@ the identical final state. Keep authority outcomes separate from policy inputs: 
 simulated private draws for verification. Such inspection explains examples; it does not estimate
 average strategy effects or replace fresh confirmation games.
 
+## Purchase policy learning
+
+The experimental purchase actor controls every shipping and advance decision throughout a game.
+All other decisions use its frozen HARD baseline. Actual engine transitions regenerate prerequisites,
+prices and legal actions after each choice. The initial residual policy gives the baseline action
+97% probability and shares the remaining probability across every other offered purchase; updates
+learn from terminal win share and rank. This is a development experiment, not a qualified browser model.
+
+Build `:training:installDist` and create an isolated Python environment with the pinned dependencies
+in [purchase-policy-requirements.txt](../scripts/purchase-policy-requirements.txt). The numerical
+learner uses CPU Float64 arithmetic; no GPU or LLM service is required.
+
+A collection source is a JSON object with `schemaVersion: 1`, one `configuration` identifier,
+`games` (1–10000), an unused arena `seed` offset, `baseline` and `opponents` model paths, and
+`policy` (null for exact baseline data, otherwise an experimental purchase-policy path). Relative
+paths resolve beside that source. Both baseline and learned policies use HARD opponents. The
+replacement seat and lineup rotate as in the full-game arena; use the same bank for paired controls.
+
+```sh
+python3 scripts/train-opponents.py --mode purchase-collect --source purchase-collection.json --output .aor-training/purchase-data --workers 6 --hours 2
+python3 scripts/purchase_policy.py initialize --schema .aor-training/purchase-data/collection.json --seed 74101 --output .aor-training/purchase-initial
+python3 scripts/purchase_policy.py update --source .aor-training/purchase-on-policy --model .aor-training/purchase-initial/policy.json --seed 74102 --output .aor-training/purchase-update
+```
+
+Run the numerical commands with the isolated environment's Python. Before `update`, collect a new
+complete batch whose source names the exact input `policy.json`. Baseline imitation records have no
+invented behavior probabilities and cannot be used as on-policy update data. Freeze the numerical
+configuration with `--config FILE`; `--help` lists initialization, update and toy-check commands.
+Carry optimizer state only through `--optimizer-from CHECKPOINT` matching the exact next input model.
+
+`collection.json` owns the complete catalog-derived feature dictionaries and input fingerprints.
+Atomic `game-N.json` records retain actor-safe sparse observations, sampled choices, likelihoods and
+terminal labels. `finished.json` binds their ordered hashes. Read outcomes only after completion;
+changed inputs, code, dictionaries or recorded behavior require a new collection directory.
+`--resume` on the supervisor preserves completed games and its elapsed allowance. Numerical update
+resume also preserves its original deadline, input hashes, epoch, model and optimizer state.
+
+The update uses complete-game returns and a learned value baseline, clipped policy ratios, bounded
+parameter gradients and a behavior-KL limit. Rejected epochs restore both parameters and optimizer.
+Use the same sampled selector for collection and evaluation; greedy selection is a separate policy.
+The shared [encoder and inference](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/PurchasePolicy.kt)
+run on JVM and JavaScript. Ordinary automata continue using their existing model bundle. Fresh
+whole-game qualification and browser integration remain required before a neural policy can replace it.
+See [open learning work](follow-ups.md#autonomous-strategy-discovery) for the bounded pilot and gates.
+
 ## Token-purchase continuation learning
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary

@@ -179,6 +179,16 @@ correction uses the decision seed to break exact-score ties among the chosen car
 It preserves the selected card and timing; disabled models and older observations retain their
 previous choices. The seed makes repeated evaluation of the same decision reproducible.
 
+The experimental [purchase learner](contributing.md#purchase-policy-learning) receives only an
+ordinary acting-player view and currently offered commands through an explicit simulation controller.
+It encodes public and own-seat facts with stable domain identities, keeps all offered purchase actions,
+and shares a state embedding across action evaluation. A fixed HARD recommendation prior provides the
+starting policy; a learned residual and value baseline train from repeated decisions in complete games.
+The authority and its chance stream stay outside the controller. Sealed decisions still use a common
+pre-submit state. Complete-game artifacts bind model, encoder, runtime and seed identities; their
+terminal labels are separate from actor inputs. Neural models use a separate experimental schema and
+have no automatic path into the browser's existing model bundle.
+
 The experimental `pilot` mode uses the same engine through resumable, forkable in-memory sessions.
 Its commodity teacher samples explicit known-information curriculum fixtures and trains a compact
 four-choice selector, including retaining baseline behavior. Fresh held-out continuations must show
