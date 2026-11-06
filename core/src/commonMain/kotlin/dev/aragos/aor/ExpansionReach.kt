@@ -31,6 +31,13 @@ object ExpansionReach {
         context: BoardRulesContext,
         player: PlayerId,
         destination: ProvinceId,
+    ): List<ExpansionRoute> = context.routesTo(player, destination)
+
+    /** Calculates a destination's preferred routes once for its owning immutable context. */
+    internal fun findRoutesTo(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
     ): List<ExpansionRoute> {
         val profile = context.player(player)
         if (
@@ -176,7 +183,8 @@ object ExpansionReach {
         destination: ProvinceId,
     ): List<ExpansionRoute.Caravan> {
         if (AdvanceId.CARAVAN !in profile.advances) return emptyList()
-        return neighbors(context.configuration.landBorders, base)
+        return context.configuration.landNeighbors[base]
+            .orEmpty()
             .filter { via ->
                 via != destination &&
                     connected(context.configuration.landBorders, via, destination) &&
@@ -201,7 +209,7 @@ object ExpansionReach {
         }
         return when (profile.ships.fleet) {
             ShippingFleet.NONE -> emptyList()
-            ShippingFleet.GALLEY -> galleyRoutes(context, profile, base, destination)
+            ShippingFleet.GALLEY -> context.galleyRoutes(profile.player, base, destination)
             ShippingFleet.SEAWORTHY ->
                 if (context.province(destination).overseas == null) {
                     listOf(directShipping(base, destination))
@@ -264,12 +272,12 @@ object ExpansionReach {
         }
     }
 
-    private fun galleyRoutes(
+    /** One traversal records both sea-free and one-sea paths to every reachable coast. */
+    internal fun galleyRoutes(
         context: BoardRulesContext,
         profile: BoardPlayerProfile,
         base: ProvinceId,
-        destination: ProvinceId,
-    ): List<ExpansionRoute.Shipping> {
+    ): Map<ProvinceId, List<ExpansionRoute.Shipping>> {
         data class Visit(val space: ShippingSpace, val seas: Int)
         val start = Visit(ShippingSpace.Coast(base), 0)
         val paths = mutableMapOf(start to listOf(start.space))
@@ -303,10 +311,16 @@ object ExpansionReach {
                 queue.addLast(visit)
             }
         }
-        return paths
-            .filterKeys { visit -> visit.space == ShippingSpace.Coast(destination) }
-            .values
-            .map { path -> ExpansionRoute.Shipping(base, path) }
+        return paths.entries
+            .mapNotNull { (visit, path) ->
+                (visit.space as? ShippingSpace.Coast)?.let { coast ->
+                    coast.province to ExpansionRoute.Shipping(base, path)
+                }
+            }
+            .groupBy(Pair<ProvinceId, ExpansionRoute.Shipping>::first)
+            .mapValues { (_, routes) ->
+                routes.map(Pair<ProvinceId, ExpansionRoute.Shipping>::second)
+            }
     }
 
     private fun waterNeighbors(
@@ -341,15 +355,4 @@ object ExpansionReach {
         first: ProvinceId,
         second: ProvinceId,
     ): Boolean = first != second && ProvinceConnection.of(first, second) in edges
-
-    private fun neighbors(edges: Set<ProvinceConnection>, province: ProvinceId): Set<ProvinceId> =
-        edges
-            .mapNotNull { edge ->
-                when (province) {
-                    edge.first -> edge.second
-                    edge.second -> edge.first
-                    else -> null
-                }
-            }
-            .toSet()
 }

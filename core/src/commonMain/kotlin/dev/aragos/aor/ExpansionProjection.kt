@@ -83,7 +83,7 @@ internal object ExpansionProjection {
         ) {
             return emptyList()
         }
-        val context = BoardGame.context(state)
+        val context = state.boardContext
         return context.configuration.provinces.map { province ->
             offer(state, viewer, context, province)
         }

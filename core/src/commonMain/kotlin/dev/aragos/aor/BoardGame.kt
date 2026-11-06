@@ -123,7 +123,7 @@ object BoardGame {
         tokens: Int,
     ): GameState {
         state.requireActor(actor, Stage.EXPANSION)
-        val context = context(state)
+        val context = state.boardContext
         val plan =
             BoardPlacementRules.evaluate(
                 context,
@@ -164,7 +164,7 @@ object BoardGame {
         province: ProvinceId,
     ): GameState {
         state.requireActor(actor, Stage.EXPANSION)
-        val tokens = attackTokens(context(state), actor, province)
+        val tokens = attackTokens(state.boardContext, actor, province)
         return place(state, actor, province, tokens)
     }
 
@@ -256,7 +256,7 @@ object BoardGame {
             requireNotNull(decision) { "A validated Cathedral declaration requires a frame." }
         val resolution =
             CompetitionRules.resolveCathedral(
-                context(state),
+                state.boardContext,
                 frame.plan,
                 actor,
                 cathedralUsage(state),
@@ -307,7 +307,7 @@ object BoardGame {
         ) {
             return emptyList()
         }
-        val context = context(state)
+        val context = state.boardContext
         val player = state.playerState(actor)
         return buildList {
             add("pass")
@@ -334,7 +334,7 @@ object BoardGame {
         )
         val resolution =
             CompetitionRules.resolve(
-                context(state),
+                state.boardContext,
                 decision.plan,
                 CompetitionRoll(white = values[0], black = values[1], green = values[2]),
                 requireNotNull(state.orderBoxes[decision.plan.player]) {
@@ -457,7 +457,8 @@ object BoardGame {
         }
 
     private fun cathedralOrder(state: GameState, plan: PlacementPlan.Competition): List<PlayerId> {
-        val eligible = CompetitionRules.cathedralUsers(context(state), plan, cathedralUsage(state))
+        val eligible =
+            CompetitionRules.cathedralUsers(state.boardContext, plan, cathedralUsage(state))
         return (listOf(plan.player) + state.turnOrder.filter { player -> player != plan.player })
             .filter(eligible::contains)
     }

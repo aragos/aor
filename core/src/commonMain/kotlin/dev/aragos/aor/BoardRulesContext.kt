@@ -41,9 +41,50 @@ data class BoardRulesContext(
         return configuration.map.province(province)
     }
 
+    // A context owns one immutable board/capability snapshot. Copies rebuild these derived routes;
+    // pool tokens and per-destination shipping capacity are still checked for each placement.
+    private val routesByPlayer by lazy {
+        players.keys.associateWith { player -> lazy { destinationRoutes(player) } }
+    }
+
+    private fun destinationRoutes(player: PlayerId) = provinceIds.associateWith { destination ->
+        lazy { ExpansionReach.findRoutesTo(this, player, destination) }
+    }
+
+    internal fun routesTo(player: PlayerId, destination: ProvinceId): List<ExpansionRoute> {
+        val routes =
+            routesByPlayer[player]?.value
+                ?: throw RuleViolation(ViolationCode.INVALID_BOARD_PLAYER, listOf(player.value))
+        return routes[destination]?.value.orEmpty()
+    }
+
+    private val galleyRoutesByPlayer by lazy {
+        players.mapValues { (_, profile) ->
+            lazy {
+                bases(profile.player)
+                    .filter { province(it).coastal }
+                    .associateWith { base -> ExpansionReach.galleyRoutes(this, profile, base) }
+            }
+        }
+    }
+
+    internal fun galleyRoutes(
+        player: PlayerId,
+        base: ProvinceId,
+        destination: ProvinceId,
+    ): List<ExpansionRoute.Shipping> {
+        val routesByBase = galleyRoutesByPlayer[player]?.value ?: return emptyList()
+        return routesByBase[base]?.let { routes -> routes[destination] }.orEmpty()
+    }
+
+    private val basesByPlayer by lazy {
+        players.mapValues { (id, profile) -> board.colouredPresence(id) + profile.capital }
+    }
+
     /** Live coloured presence includes an existing base retained by its white marker conversion. */
     fun bases(player: PlayerId): Set<ProvinceId> =
-        board.colouredPresence(player) + player(player).capital
+        basesByPlayer[player]
+            ?: throw RuleViolation(ViolationCode.INVALID_BOARD_PLAYER, listOf(player.value))
 
     fun recordShipment(player: PlayerId, destination: ProvinceId, tokens: Int): BoardRulesContext {
         require(tokens >= 0) { "A recorded shipping delivery cannot be negative." }

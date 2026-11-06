@@ -35,12 +35,29 @@ class DecisionProbes(
         }
     }
 
-    fun regret(model: BotModel): Double =
-        observations
-            .map { observation ->
-                val selected = BotPolicy.chooseCandidate(observation, BotDifficulty.HARD, 17, model)
-                val best = observation.candidates.maxOf { BotPolicy.score(it, BotModels.default) }
-                (best - BotPolicy.score(selected, BotModels.default)).coerceAtLeast(0.0)
+    private val probes = observations.map(::RegretProbe)
+
+    fun regret(model: BotModel): Double = probes.map { probe -> probe.regret(model) }.average()
+}
+
+/**
+ * Fixed prior losses belong to the observation; candidate models only change which move is chosen.
+ */
+internal class RegretProbe(private val observation: BotObservation) {
+    private val regretByCommand =
+        observation.candidates
+            .associate { candidate ->
+                candidate.command to BotPolicy.score(candidate, BotModels.default)
             }
-            .average()
+            .let { scores ->
+                val best = scores.values.max()
+                scores.mapValues { (_, score) -> (best - score).coerceAtLeast(0.0) }
+            }
+
+    fun regret(model: BotModel): Double {
+        val selected = BotPolicy.chooseCandidate(observation, BotDifficulty.HARD, 17, model)
+        return checkNotNull(regretByCommand[selected.command]) {
+            "A selected probe candidate requires its fixed prior regret."
+        }
+    }
 }

@@ -71,6 +71,14 @@ count may change. Sampled process-group limits cap CPU at 80% of logical cores a
 memory; they do not reserve hardware. Logs/checkpoints stay in ignored `.aor-training/`; training
 never reads production games or secrets.
 
+For throughput work, run `./gradlew :training:benchmark --args=".aor-training/before.json"`,
+then repeat after the change with `--args=".aor-training/after.json .aor-training/before.json"`.
+The benchmark warms up before measuring 24 repeated games across 3–6 players, both maps and
+Normal/Hard policies, plus repeated directed-regret evaluations across the full curriculum.
+It records wall time, thread CPU and allocated bytes separately for games and regret, verifies
+replay in warmup, and checks outcomes, coverage and regret against the baseline. Use the same JDK
+and an idle machine for both runs. These fixed development games do not measure playing strength.
+
 The default matrix covers all 128 player-count/variant combinations. `coverage.json` distinguishes
 observed/missing decisions, cards and configurations; directed probes do not establish exhaustive
 position coverage. `rounds.jsonl` records exploration; `evaluation.json` records independent comparison.

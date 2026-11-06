@@ -93,6 +93,12 @@ data class BoardState(
     val pieces: PersistentMap<ProvinceId, ProvincePieces> = persistentMapOf(),
     val definition: BoardMapDefinition = StandardMapData.definition,
 ) {
+    private val markersByPlayer =
+        pieces.values
+            .filterIsInstance<ProvincePieces.Marker>()
+            .groupingBy(ProvincePieces.Marker::owner)
+            .eachCount()
+
     init {
         for ((province, occupants) in pieces) {
             val provinceDefinition =
@@ -110,20 +116,12 @@ data class BoardState(
                     }
             }
         }
-        val markers =
-            pieces.values
-                .filterIsInstance<ProvincePieces.Marker>()
-                .groupingBy(ProvincePieces.Marker::owner)
-                .eachCount()
-        require(markers.values.all { count -> count <= 25 }) {
+        require(markersByPlayer.values.all { count -> count <= 25 }) {
             "A player has only 25 domination markers."
         }
     }
 
-    fun markerCount(player: PlayerId): Int =
-        pieces.values.count { occupants ->
-            occupants is ProvincePieces.Marker && occupants.owner == player
-        }
+    fun markerCount(player: PlayerId): Int = markersByPlayer[player] ?: 0
 
     fun tokenCount(player: PlayerId): Int =
         pieces.values.sumOf { occupants ->
