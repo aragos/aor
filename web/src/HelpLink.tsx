@@ -27,8 +27,8 @@ export function ButtonHelp({children, topic, label}: {
 }
 
 /** Inspect reference material in place while retaining the prepared game action. */
-export function HelpLink({topic = '', label = 'Help', compact = true, commodityChoices}: {
-    topic?: string; label?: string; compact?: boolean;
+export function HelpLink({topic = '', label = 'Help', compact = true, commodityChoices, children}: {
+    topic?: string; label?: string; compact?: boolean; children?: ReactNode;
     /** Canonical commodity IDs from one card, in printed order. */
     commodityChoices?: readonly string[];
 }) {
@@ -37,7 +37,7 @@ export function HelpLink({topic = '', label = 'Help', compact = true, commodityC
     return <><button type="button" className={compact ? 'help-link' : 'reference-link'}
         data-help-topic={topic} aria-label={`Help: ${label}`} title={label} aria-haspopup="dialog"
         onClick={event => {event.preventDefault(); event.stopPropagation(); setOpen(true);}}>
-        {compact ? '?' : label}
+        {children ?? (compact ? '?' : label)}
     </button>{open && createPortal(<Suspense fallback={<p role="status">{t('reference.loading')}</p>}>
         <ReferencePopup initialTopic={topic} close={() => setOpen(false)} catalog={catalog}
             commodityChoices={commodityChoices}/>

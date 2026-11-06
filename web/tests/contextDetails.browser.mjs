@@ -23,7 +23,7 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
             ships: {fleet: 'OCEAN', level: 4}} : player),
         hand: [{reference: 'recurring', definition: famine}, {reference: 'once', definition: leader}],
         cardOffers: []}});
-    assert.equal(await page.evaluate(`document.querySelector('.epoch-progress').textContent`), 'Epoch 2 (22 cards remaining)?');
+    assert.equal(await page.evaluate(`document.querySelector('.epoch-progress').textContent`), 'Epoch 2 (22 cards remaining)');
     assert.equal(await page.evaluate(`document.querySelector('.table-effects') !== null`), false, 'Deck count has one home');
     assert.equal(await page.evaluate(`document.querySelectorAll('.hand-card .eyebrow').length`), 0, 'Card type headers are removed');
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-hand-card="recurring"] .recurring-badge').length`), 1);
@@ -51,7 +51,7 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
     assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-summary > summary')].every(summary=>summary.scrollWidth<=summary.clientWidth)`), true, 'Track icons and long fleet names fit player boxes');
     await show({...fixture, game: {...fixture.game, currentEpoch: 3, deckRemaining: 4}});
-    assert.equal(await page.evaluate(`document.querySelector('.epoch-progress').textContent`), 'Epoch 3 (4 cards remaining)?', 'Epoch/deck counter follows snapshots');
+    assert.equal(await page.evaluate(`document.querySelector('.epoch-progress').textContent`), 'Epoch 3 (4 cards remaining)', 'Epoch/deck counter follows snapshots');
 
     const civilWar = baseline.game.cardInspections.find(card => card.definition.id === 'civil-war').definition;
     const command = `play target player ${other.id}`;

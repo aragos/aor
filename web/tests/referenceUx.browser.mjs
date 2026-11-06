@@ -66,7 +66,7 @@ export async function checkReferenceUx(page, web, baseline) {
     assert(colorful.includes('#205c4b') && colorful.includes('#f5ce62'),'Turn favicon uses the colorful shield and money bag');
 
     const gameLocationBeforeHelp = await page.evaluate('location.href');
-    assert.equal(await page.evaluate(`document.querySelectorAll('.game-header .help-link').length`), 1, 'The remaining-card footnote is the only header help control');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.game-header [data-help-topic]').length`), 1, 'The remaining-card link is the only header help control');
     await page.evaluate(`document.querySelector('#tab-markets').click(); document.querySelector('.market-tile .help-link').click()`);
     await page.wait(`document.querySelector('.reference-popup .payout-box')`, 'Commodity reference from the main market box');
     await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);

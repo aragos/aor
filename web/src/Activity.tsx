@@ -8,6 +8,7 @@ import {CapitalLabel, LabelMessage} from './IdentityLabel';
 import {HelpLink} from './HelpLink';
 import {MiseryBox} from './MiseryBox';
 import {activityRows} from './activityRows';
+import {useMapSelection} from './map/MapSelection';
 
 function eventPlayer(event: HistoryEventView, id: string) {
     return event.participants?.find(player => player.id === id) ??
@@ -53,6 +54,17 @@ function ActivityCard({cardId, onInspectCard, inspection}: {
         : <span className="event-card">▤ {name}</span>;
 }
 
+/** History navigation inspects a province without editing a prepared action or target picker. */
+function ActivityProvince({id, catalog}: {id: string; catalog: Snapshot['game']['catalog']}) {
+    const {setWorkspace, setInspection} = useMapSelection();
+    const province = catalog?.provinces.find(candidate => candidate.id === id);
+    return <button type="button" className="event-entity event-province" data-activity-province={id}
+        onClick={() => {setInspection({kind: 'province', id}); setWorkspace('map');}}>
+        <CapitalLabel capital={province?.capital ?? null}>{provinceName(id)}</CapitalLabel>
+        {province?.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
+    </button>;
+}
+
 /** Capital priority belongs to this recorded tie, independent of later rolls and assignments. */
 function CapitalTieConsequence({event}: {event: HistoryEventView}) {
     if (event.kind !== 'ROLL' || event.detail !== 'CAPITAL_TIE') return null;
@@ -87,7 +99,7 @@ function EventContent({event, track, onInspectCard, cardInspections, marketRoll 
         {!marketRoll && <span>{t(`activity.${event.kind}`)}</span>}
         {event.competition && <strong>{t(event.competition.attackerWon ? 'table.competitionWon' : 'table.competitionLost')}</strong>}
         {event.war && <strong>{warHeading(event, event.war)}</strong>}
-        {event.provinces.map(province => <span className="event-entity" key={province}><CapitalLabel capital={track?.provinces.find(candidate => candidate.id === province)?.capital ?? null}>{provinceName(province)}</CapitalLabel></span>)}
+        {event.provinces.map(province => <ActivityProvince key={province} id={province} catalog={track}/>)}
         {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard} inspection={cardInspections?.find(card => card.definition.id === cardId)}/>}
         {event.commodity && <Commodity commodity={event.commodity}/>}
         {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}

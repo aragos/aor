@@ -50,13 +50,20 @@ async function checkPlanningTurnArrival(page, web) {
     await page.wait(`document.querySelector('.activity-planner')`, 'waiting player can prepare');
     await page.click('Prepare a plan');
     await page.wait(`document.querySelector('.pass-action')?.textContent.includes('Add to plan')`, 'unsaved preview');
-    for (const command of ['pass', 'pass', 'stabilize cash']) await game.send(game.links[0], command);
-    await page.wait(`document.querySelector('.decision-status.is-ready') && !document.querySelector('.activity-planner')`,
-        'turn arrival closes the unsaved preview');
-    assert.doesNotMatch(await page.evaluate(`document.querySelector('.pass-action').textContent`), /Add to plan/,
-        'Turn arrival restores live purchase controls');
+    await page.click('Add to plan · Continue to advances');
+    await page.wait(`document.querySelector('[data-advance="URBAN_ASCENDANCY"].available')`, 'planned advance');
+    await page.evaluate(`document.querySelector('[data-advance="URBAN_ASCENDANCY"]').click()`);
+    await page.wait(`document.querySelector('.decision-panel .advance-decision')`, 'prepared purchase choice');
+    await page.evaluate(`window.arrivalDraft = document.querySelector('.decision-panel .advance-decision'); true`);
+    for (const command of ['pass', 'buy-advance A', 'pass', 'stabilize cash']) await game.send(game.links[0], command);
+    await page.wait(`document.querySelector('.decision-status.is-ready') && document.querySelector('.activity-planner[data-editing="true"]') && !document.querySelector('.decision-actions button:disabled')`,
+        'turn arrival retains the unsaved preview with a refreshed quote');
+    assert.match(await page.evaluate(`document.querySelector('.pass-action').textContent`), /Add to plan/,
+        'Turn arrival keeps purchase planning controls');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision') === window.arrivalDraft`), true,
+        'Other purchases and turn arrival preserve the mounted purchase draft');
     assert.equal((await game.snapshot(game.links[1])).planning.saved, null,
-        'Closing a browser preview does not save or execute it');
+        'Turn arrival does not save or execute the browser draft');
 }
 
 export async function checkParallelPlanning(page, web) {
@@ -154,7 +161,7 @@ export async function checkParallelPlanning(page, web) {
     await page.evaluate(`document.querySelector('.decision-actions [data-help-topic="plans"]').click()`);
     await page.wait(`document.querySelector('[data-help-content="plans"]')`, 'private planning help');
     const help = await page.evaluate(`document.querySelector('[data-help-content="plans"]').textContent`);
-    assert.match(help, /earlier players/);
+    assert.match(help, /draft stays open.*when your turn arrives/);
     assert.match(help, /draw pauses for card review/);
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
     assert.equal(await page.evaluate('document.querySelectorAll(".plan-actions li").length'), 2, 'Help inspection preserves the draft');

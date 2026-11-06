@@ -4,7 +4,7 @@ import {t} from './messages';
 import {MiseryBox} from './MiseryBox';
 
 export function FinalScores({snapshot}: {snapshot: Snapshot}) {
-    if (snapshot.game.scores.length === 0) return null;
+    if (snapshot.game.stage !== 'FINISHED' || snapshot.game.scores.length === 0) return null;
     const winners = snapshot.game.scores.filter(score => score.winner).map(score => score.player);
     return <section className="panel final-scores" aria-labelledby="scores-title">
         <p className="eyebrow">{t('game.finished')}</p><h2 id="scores-title">{t('game.finalScores')}</h2>

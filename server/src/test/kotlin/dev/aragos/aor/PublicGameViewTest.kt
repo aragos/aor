@@ -40,8 +40,53 @@ class PublicGameViewTest {
     }
 
     @Test
-    fun intermediateViewsDoNotPublishFinalScores() {
-        assertThat(GameState(header).viewForPlayer(PlayerId("p1")).scores).isEmpty()
+    fun currentScoresUseCashAdvancePointsAndMiseryWithoutDeclaringWinners() {
+        val initial = GameState(header)
+        val state =
+            initial.copy(
+                players =
+                    initial.players.mapValues { (id, player) ->
+                        if (id == PlayerId("p1")) {
+                            player.copy(
+                                cash = 100,
+                                misery = MiseryStep.TWENTY,
+                                advances =
+                                    PlayerAdvances(
+                                        listOf(AdvanceAcquisition(AdvanceId.THE_HEAVENS, 1))
+                                    ),
+                            )
+                        } else {
+                            player
+                        }
+                    }
+            )
+
+        val scores = state.viewForPlayer(PlayerId("p2")).scores
+
+        assertThat(scores).hasSize(3)
+        assertThat(scores.first().total).isEqualTo(110)
+        assertThat(scores.any(ScoreView::winner)).isFalse()
+    }
+
+    @Test
+    fun currentScoresExcludeChaos() {
+        val initial = GameState(header)
+        val state =
+            initial.copy(
+                players =
+                    initial.players.mapValues { (id, player) ->
+                        if (id == PlayerId("p3")) {
+                            player.copy(cash = 10_000, misery = MiseryStep.CHAOS)
+                        } else {
+                            player
+                        }
+                    }
+            )
+
+        val score = state.viewForPlayer(PlayerId("p1")).scores.last()
+
+        assertThat(score.total).isNull()
+        assertThat(score.winner).isFalse()
     }
 
     @Test

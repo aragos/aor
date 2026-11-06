@@ -17,7 +17,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
     const saved = snapshot.planning?.saved;
     const acting = snapshot.viewerId !== null &&
         (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
-    const available = !!snapshot.planning?.available && (!acting || !!saved);
+    const available = !!snapshot.planning?.available && (!acting || !!saved || editing);
     const open = editing && available;
     const [actions, setActions] = useState<PlannedAction[]>([]);
     const [quoted, setQuoted] = useState<{key: string; value: PlanningQuote} | null>(null);
@@ -94,7 +94,7 @@ function actionName(action: PlannedAction, snapshot: Snapshot): string {
         }
         case 'stabilize': return t(`plan.stabilize ${argument}`);
         case 'relieve-misery': return `${t('action.relieveMisery')} · ${argument} ${t('controls.spaces')}`;
-        case 'patronize': return `${t('action.patronize')} · ${t(`leader.${argument.toUpperCase().replace(/-/g, '_')}`)}`;
+        case 'patronize': return `${t('action.patronize')} · ${label(argument, 'leader')}`;
         default: return t(`action.${verb}`);
     }
 }

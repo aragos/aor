@@ -16,14 +16,15 @@ export async function checkUnplayedCards(page, web) {
         await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
         await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
         await page.wait(`!document.querySelector('.reference-dialog')`, 'popup dismissal');
-        assert.equal(await page.evaluate(`document.activeElement.matches('${opener}')`), true, 'Focus returns to the question mark');
+        assert.equal(await page.evaluate(`document.activeElement.matches('${opener}')`), true, 'Focus returns to the card-count link');
     };
     await page.send('Page.navigate', {url: web + game.links[0].path});
     await page.wait(`document.querySelector('#bid')`, 'live capital bid');
     await page.fill('#bid', '7');
     for (const width of [1440, 390]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: width < 700});
-        assert.equal(await page.evaluate(`document.querySelector('.epoch-progress ${opener}').textContent`), '?');
+        assert.match(await page.evaluate(`document.querySelector('.epoch-progress ${opener}').textContent`), /Epoch .*cards remaining/);
+        assert.equal(await page.evaluate(`document.querySelector('.epoch-progress .help-link')`), null, 'The counter is its own lookup link');
         await inspect();
         assert.deepEqual(await ids(), baseline.game.unplayedCards.map(card => card.id), 'Every public physical card appears, including held cards and duplicate commodities');
         assert.equal(await page.evaluate(`document.querySelector('.reference-dialog').scrollWidth <= document.querySelector('.reference-dialog').clientWidth`), true, 'List fits the popup');

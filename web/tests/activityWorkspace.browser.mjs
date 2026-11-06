@@ -20,7 +20,7 @@ export async function checkActivityWorkspace(page, web, baseline) {
         candidate.establishesMarker && candidate.blockers.length === 0);
     assert(offer, 'The live expansion offers a legal placement to prepare');
     const source = {...baseline.events.at(-1), kind: 'PLAY_CARD', actor: baseline.viewerId,
-        card: 'the-crusades', provinces: [], dice: [], target: null, amount: null, detail: null,
+        card: 'the-crusades', provinces: ['venice'], dice: [], target: null, amount: null, detail: null,
         competition: null, war: null, cashChanges: [], miseryChanges: [], tokenChanges: [],
         protectionCash: null, leaderRebate: null, drawReason: null, marketRoll: null, reliefPayment: null};
     let fixture = {...baseline, events: Array.from({length: 50}, (_, index) => ({...source, id: `workspace-event-${index}`}))};
@@ -102,6 +102,16 @@ export async function checkActivityWorkspace(page, web, baseline) {
     assert.equal(await page.evaluate(`document.activeElement.matches('.event-card')`), true, 'Closing inspection returns focus to its activity card');
     assert.equal(await selected(), 'true', 'Inspection and polling preserve the prepared placement');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${offer.destination}"][data-highlight-priority="4"]')`), true, 'Temporary card inspection preserves the prepared province border');
+    const historyProvince = fixture.game.catalog.provinces.find(province => province.id === 'venice');
+    const provinceLink = '[data-activity-province="venice"]';
+    assert.deepEqual(await page.evaluate(`[...document.querySelector('${provinceLink}').querySelectorAll('.commodity-name')].map(node => node.textContent.toUpperCase())`),
+        historyProvince.commodities, 'History includes every commodity beside its province');
+    await click(provinceLink);
+    await page.wait(`document.querySelector('#tab-map[aria-selected="true"]') && document.activeElement?.dataset.mapProvince === 'venice'`, 'History reveals and focuses its province on the map');
+    assert.equal(await page.evaluate(`document.querySelector('.primary-expansion').textContent`), draft,
+        'History province navigation preserves the prepared placement');
+    assert.equal(await page.evaluate(`window.uiCommands.length`), 0, 'History navigation sends no command');
+    await click('#tab-activity');
     await page.evaluate(`document.querySelector('.activity-list').scrollTop=220`);
     await viewport(1440, 980, false);
     await page.wait(`document.querySelector('.activity-pin')?.checkVisibility()`, 'Wide screens offer activity pinning');

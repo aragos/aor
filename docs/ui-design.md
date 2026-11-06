@@ -36,7 +36,8 @@ mechanics and [map design](map-design.md) owns spatial rendering.
   or object selection reopens the actions.
   The phone icon rail ends at the workspace; the action area below spans the whole table width.
   Keep Hide/Show actions the same height as its neighboring Undo control, with a text label.
-  Keep the decision title beside Undo above the status. Player summaries show the printed order box
+  Keep the decision title beside Undo above the status. Player summaries show the current score
+  (advance points + cash − misery; Chaos has no numeric score) and the printed order box
   beside pool/submission status; the reference owns the full position-to-box mapping.
 - Show deterministic effects inline before commitment: prices, named discounts, cash/misery
   endpoints, current → new shipping and limiting pool/shipping resources. Use one body text size
@@ -66,6 +67,8 @@ mechanics and [map design](map-design.md) owns spatial rendering.
   This list is distinct from the draw-pile size shown in the header.
   Live forecasts are distinct from actual payments; for example white circles affect current
   commodity forecasts, while payments retain their colored-marker rule.
+- Keep grouped action buttons equally tall when labels wrap. Attach action help to the button
+  border, clear of its label. The header’s remaining-card text opens its lookup directly.
 - Support keyboard, touch, visible focus, reduced motion and phone layouts. Every finite choice
   group has a named question. Roving map focus must allow Tab to reach confirmation. Preferences
   use browser storage with an in-memory fallback. Localize ordinary text; canonical syntax stays
@@ -86,6 +89,9 @@ releases the UI and reconciles an authorized snapshot; it never automatically re
 Distinguish browser drafts, server-saved private submissions and committed actions using owner receipts.
 Withdrawal retains an unsaved local amount, without restoring a saved submission.
 
+Province references in Activity show their commodities and open the map at that province without
+changing action drafts.
+
 Activity is one bounded log, in its workspace or pinned left block on wide screens. Pinning uses a
 labeled button above the log so its destination is visible without covering entries. Keep entry-time
 identities, causes, dice and resource endpoints stable as history grows. Group revealed token bids
@@ -103,8 +109,9 @@ filter/page. Keep one read/timer and refresh after visibility, resume or reconne
 
 Private plans distinguish unsaved input, saved-for-review work and explicit offline authorization.
 Put planning help on the related action buttons instead of adding separate plan headings.
-Offer new plans while waiting for a turn; turn arrival closes an unsaved preview and restores live
-controls. Existing saved plans remain available for review and explicit execution on the owner's turn.
+Offer new plans while waiting for a turn; keep an open draft through public updates and turn
+arrival, refreshing its quotes without discarding prepared choices. Existing saved plans remain
+available for review and explicit execution on the owner's turn.
 Show exact consequences, assumptions and cancellation. Saving never executes; draws or changed
 consequences pause for review. Editing confirms disarm. See [architecture](design.md#private-plans).
 
