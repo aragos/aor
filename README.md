@@ -19,6 +19,13 @@ File storage defaults to `.aor-data/`; use one server per directory. `AOR_DATA_D
 absolute path; `AOR_HTTP_PORT` changes the port. Keep private player links: lost credentials
 cannot be recovered. Hosted play uses Firebase accounts and PostgreSQL.
 
+To try the qualified Hard automata profile, create a local game with one human and three Hard seats,
+the Standard map, No Crusades in the initial deal, deck modification enabled and immediate Master Art
+discard enabled. Keep the creator's game tab open. This profile has passed automated comparisons;
+its strength against human players still needs playtesting. Other setups use compatible fallback
+policies. After updating the application, restart the local server and reload the creator's tab to
+use the current projections and worker.
+
 ## Find the owner
 
 Read only the guide relevant to the change; detailed rules and syntax are lookup references.
@@ -39,3 +46,10 @@ Read only the guide relevant to the change; detailed rules and syntax are lookup
 npm test --workspace web
 ./gradlew :core:jvmTest :server:fastTest checkKotlinFormat
 ```
+
+Offline training runs independently of the server and coding agents; see the
+[training workflow](docs/contributing.md#opponent-training) for building and supervising a run.
+Use [full-game strategy experiments](docs/contributing.md#full-game-strategy-experiments) to compare
+frozen candidates against mixed opponents, and the
+[commodity pilot](docs/contributing.md#automata-experiments) for focused continuation diagnostics.
+Experimental outputs require independent qualification before application adoption.

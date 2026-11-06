@@ -129,6 +129,64 @@ each human still consents. The host can inspect bot secrets/modify policy; worke
 rendering, not secrets. Replay needs neither policy nor model. [Training](contributing.md#opponent-training)
 is independent of production storage and promotes only compatible, evaluated models.
 
+### Offline policy selection and experiments
+
+Offline [training](../training/src/main/kotlin/dev/aragos/aor/training/) runs as a standalone executable,
+with no production storage or model service. Its matrix covers the complete player-count/variant
+product. Compact model assets are versioned by schema/rules/catalog. The
+[model loader](../ai/src/jsMain/kotlin/dev/aragos/aor/ai/BotExports.kt) accepts legacy single-model
+assets and a schema-1 bundle with an ordered `models` array of up to sixteen entries. It selects the
+first valid compatible entry; malformed entries are skipped, and no match uses the rule-based prior.
+Place a specialized entry before any broader matching fallback and retain legacy catalog entries for
+existing games.
+
+A scoped entry must declare both exact `rulesVersion` and `dataVersion`, plus a `configuration`
+matching the observation's player count, map, initial-card rule, deck modification and immediate
+Master Art discard. [BotConfiguration](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotModel.kt)
+owns this public setup contract: JSON uses enum names such as `STANDARD` and `NO_CRUSADES`, not
+training configuration identifiers. Missing observation setup cannot activate a scoped entry.
+Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
+choices only; it neither rewrites recorded commands nor requires a saved-game migration.
+
+[Full-game experiments](contributing.md#full-game-strategy-experiments) freeze the candidate,
+incumbent and opponent population, rotate the replacement seat and pair chance seeds. Low-dimensional
+search changes only named planning weights and uses separate screening and selection banks; its
+chosen candidate still requires independent confirmation. Training checks coverage explicitly and
+retains compatible fallbacks when promotion evidence is insufficient.
+[Contributing](contributing.md#opponent-training) owns operation and resource limits.
+
+Planning inputs remain projections of public facts and the acting seat's own hand. Current-route
+[expansion forecasts](../core/src/commonMain/kotlin/dev/aragos/aor/ExpansionForecastView.kt)
+support card timing and token purchases without authorizing future actions. Shared resource budgets
+constrain combinations; new white pieces never create an invented same-turn route. The controller
+reconstructs contextual stabilization penalties over the whole proposed purchase sequence.
+Optional learned corrections value commodity combinations, public area losses, interest costs and
+immediate Institutional Research savings. Normal advance category credits still begin next turn.
+Purchase plans account for cumulative interest receipts. A final-turn advance residual values printed
+points, quoted cash and immediate own misery changes; it remains an additive estimate, with later
+income, stabilization and sequential misery changes outside that residual.
+The server builds the seat-specific projections and candidate features. The browser evaluates those
+inputs and runs bounded planning; complete-game evaluation and parameter selection remain offline.
+Optional [leader timing forecasts](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotLeaderPlanning.kt)
+compare the existing shipping and advance planner with and without a leader's credit. Both arms use
+the same post-play cash and hand costs, so rebates and stabilization savings are counted once.
+The comparison respects eligibility, price floors and shipping expenditure; a separate retained
+option values unowned future discounts. Worthwhile own commodity receipts can precede the leader,
+allowing the next observation to revalue the actual budget. These bounded forecasts authorize no
+purchase during card play and assume no other player's future actions.
+Optional player-target metadata comes from authorized public card choices. A separately gated Hard
+correction uses the decision seed to break exact-score ties among the chosen card's opponent targets.
+It preserves the selected card and timing; disabled models and older observations retain their
+previous choices. The seed makes repeated evaluation of the same decision reproducible.
+
+The experimental `pilot` mode uses the same engine through resumable, forkable in-memory sessions.
+Its commodity teacher samples explicit known-information curriculum fixtures and trains a compact
+four-choice selector, including retaining baseline behavior. Fresh held-out continuations must show
+improvement before ordinary full games measure transfer without giving policies hidden state.
+Pilot models use a separate experimental schema; checkpoints and models stay in training storage and
+are not browser model assets. See the [experiment workflow](contributing.md#automata-experiments)
+for scope and qualification.
+
 ## Lifecycle and activity
 
 `GameOperations.kt` handles administrative closure; `GameAbandonment.kt` unanimous player consent.
