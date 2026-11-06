@@ -171,6 +171,8 @@ export interface BotAutomation {
 export interface BotJob {
     seat: string; difficulty: BotDifficulty; seed: number; decisionId: string;
     submissionVersion: string | null; observation: unknown;
+    /** Optional actor-safe purchase projection; its versioned schema belongs to the shared AI. */
+    purchase?: unknown;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;
