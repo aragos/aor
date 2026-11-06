@@ -42,3 +42,12 @@ server-authoritative games pause automated progression when no creator browser i
 Client hosting is for solo and trusted casual play: the host can inspect automated hands and modify
 its local policy. General future-turn scripts, midgame controller replacement, trusted competitive
 bot hosting and fully offline authority remain deferred.
+
+Automata improvements emphasize offline training and compact browser inference. The
+[full-game workflow](contributing.md#full-game-strategy-experiments) tunes economic evaluation and
+bounded planning on one four-player rules configuration. Each candidate requires independent
+complete-game confirmation before adoption within its qualified setup. Separate experimental
+continuation learners and the [commodity pilot](follow-ups.md#automata-training-pilot) retain their
+own validation gates and do not automatically replace the application policy. Qualification on one
+profile does not establish strength on other variants or against humans; human playtests remain
+required. This work preserves ordinary commands, player information boundaries and saved games.

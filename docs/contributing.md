@@ -110,10 +110,363 @@ it does not claim exhaustive coverage of all possible positions. `rounds.jsonl` 
 exploration, and `evaluation.json` records independent final comparison. A failed promotion retains
 the original model in `model.json`; `candidate.json` remains available for diagnosis.
 
-Publish a model only after reviewing `evaluation.json` and its coverage gates. Copy the validated
-`model.json` into `web/src/ai/model.json`, then build and check the web client. Model schema, rules and
-catalog metadata protect inference compatibility. The first implementation tunes contextual action
-evaluation and bounded resource planning; richer sampled search is tracked in [open work](follow-ups.md).
+Publish a model only after reviewing independent evaluation and its coverage gates. Limit its
+[browser bundle entry](design.md#automated-seats) to the qualified configurations and preserve
+compatible legacy entries, then build and check the web client. Schema, rules and catalog metadata
+protect inference compatibility; matching metadata alone establishes no playing-strength claim.
+
+## Full-game strategy experiments
+
+Use `arena` for a frozen complete-game comparison and `strategy-search` for a small search over
+`planning.*` weights. Both use ordinary engine play, HARD opponents, the same chance seeds
+on both sides of each comparison and a rotating replacement seat. Model paths resolve relative to
+the source JSON; `null` selects the built-in prior. Configuration identifiers are defined by
+[TrainingMatrix](../training/src/main/kotlin/dev/aragos/aor/training/TrainingMatrix.kt).
+
+External schema-one model weights override the built-in prior in both training and browser play.
+Use an explicit zero to disable a prior feature. The artifact writer preserves an in-memory
+policy's exact weights by writing those zeros; see the shared
+[model wire contract](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotModel.kt).
+
+After building, copy the **entire distribution** to a new directory before starting a long run:
+
+```sh
+mkdir -p .aor-training/executors
+cp -R training/build/install/training .aor-training/executors/strategy-v1
+```
+
+Keep that directory's `bin/` and `lib/` unchanged for active jobs and all resumes; copying only the
+launcher does not freeze the policy. Subsequent builds can use the ordinary build directory. Changed
+packaged code, model weights or source settings require a new experiment output directory.
+
+For example, save this as `.aor-training/search-spec.json`, alongside compatible frozen
+`baseline.json` and `historical.json` models. Bounds are illustrative and must be chosen before the
+run. The source contracts are [ArenaSpecification](../training/src/main/kotlin/dev/aragos/aor/training/StrategyArena.kt)
+and [StrategySearchSpecification](../training/src/main/kotlin/dev/aragos/aor/training/StrategySearch.kt):
+
+```json
+{
+  "schemaVersion": 1,
+  "purpose": "SCREENING",
+  "configurations": ["players-4/standard/no-crusades/deck-true/art-true"],
+  "candidate": "baseline.json",
+  "incumbent": "baseline.json",
+  "opponents": [null, "baseline.json", "historical.json"],
+  "pairsPerConfiguration": 16,
+  "seed": 310000,
+  "parameters": [
+    {"name": "planning.heldCommodity", "min": 0.0, "max": 2.0},
+    {"name": "planning.retainedCommodity", "min": 0.0, "max": 2.0}
+  ],
+  "candidates": 24,
+  "screeningPairs": 16,
+  "selectionPairs": 64,
+  "finalists": 4
+}
+```
+
+```sh
+python3 .aor-training/executors/strategy-v1/bin/train-opponents.py \
+  --mode strategy-search --source .aor-training/search-spec.json \
+  --output .aor-training/search --hours 6
+python3 .aor-training/executors/strategy-v1/bin/train-opponents.py \
+  --mode arena --source .aor-training/confirmation-spec.json \
+  --output .aor-training/confirmation --hours 6
+```
+
+Search replaces only the named weights, retaining all others from `candidate`. Bounds must include
+zero; candidate vectors include zero and midpoint anchors plus deterministic stratified samples.
+When the candidate budget has room, an in-range current parameter vector is retained as another
+anchor, so refinement can select the existing settings. A parameter can also specify an optional
+`linkedWeights` object, such as `{"planning.endgameAdvanceIncomeCorrection": -0.8}` on
+`planning.advanceIncomeCorrection`. Each linked weight equals its finite, nonzero multiplier times
+the sampled primary value; it adds no sampling dimension. Primary and linked targets must be
+distinct across the search, and both endpoints must stay within model weight limits. Zero disables
+the whole group, and a current anchor is eligible only if all existing linked values satisfy their
+relations exactly. Candidate records expose every replaced weight. Omitting links or using `{}`
+preserves the unlinked candidate vectors; `null` and non-object links are rejected.
+The optional search counts default to those shown above. Verify names against the implemented
+[economic feature definitions](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotEconomicProjection.kt)
+and the separate [expansion](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotExpansionPlanning.kt)
+and [advance sequence](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotAdvancePlanning.kt) contracts.
+The top finalists receive fresh selection games; frozen incumbent games are reused within each
+bank. `search.json` records both rankings and exact seed banks. `candidate.json` is an unqualified
+proposal. Its selection intervals are descriptive, including the winning candidate's interval.
+
+For direct compact token-head search, copy the frozen baseline and set every reserved
+`planning.tokenValue.*` coefficient to zero except `planning.tokenValue.enabled = 1`. Search only
+named existing [token feature definitions](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenValue.kt),
+including the [plan features](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenPlanProjection.kt),
+while retaining the chosen proposal policy and override rule. By default these are six legal
+proposals and a strict 0.02 margin. The all-zero coefficient anchor retains baseline choices exactly.
+These directly optimized coefficients define uncalibrated action-advantage scores; continuation-fitted
+coefficients instead estimate terminal composite advantage. Freeze the dimensions, bounds, links, opponent pool and acceptance criteria before games.
+Evaluate repeated use through full games and require independent confirmation before adoption.
+
+Two independent unit gates support token-action experiments. `planning.completeTokenAmounts = 1`
+adds every offered nonnegative quantity within cash and physical stock to the existing signed
+proposals. `planning.peacefulTokenMargin = 1` accepts a strictly positive head advantage without the
+usual margin only when the same feasible plan increases ordinary income without increasing unused
+tokens. Other choices still need an advantage above 0.02. The head must also be enabled. These gates
+preserve feature meanings and cash tradeoffs; they neither require maximum spending nor predict
+access unlocked by later purchases. Freeze each gate in the model before comparisons.
+
+`planning.leaderTiming = 1` enables the shared purchase-plan comparison described in
+[architecture](design.md#automated-seats). `planning.retainedLeader` weights the retained nominal
+discount option in model-score units per dollar after the remaining-horizon adjustment. Search that
+weight with the timing gate fixed, and compare against a separate frozen incumbent. Its zero-weight
+anchor still includes the timing correction; it is not a disabled-controller ablation. Older
+observations without forecast metadata retain ordinary card evaluation.
+
+Prepare `confirmation-spec.json` separately: retain the arena fields, set `candidate` to
+`search/candidate.json`, `purpose` to `CONFIRMATION`, `pairsPerConfiguration` to the predeclared final
+sample count (for example 512), and `seed` to 310002. Omit search-only fields. Search uses offsets
+310000 and 310001; reserve the next consecutive offset for confirmation. These banks are disjoint
+because arena seeds advance by 8191; arbitrary different offsets can overlap. Track prior banks and
+never reuse selection or previously inspected final seeds to qualify a changed candidate. Freeze the
+candidate, opponent pool and acceptance target before this independent comparison.
+
+Arena output contains `pair-*.json` and aggregate `evaluation.json`; search checkpoints each
+stage/candidate pair and incumbent game. Repeat the same command with `--resume` to reuse completed
+units, retaining the source, models and frozen distribution. `--status`, worker limits and cumulative
+resource allowances work as above. Neither mode publishes a model or establishes human playing
+strength; profile qualification and application checks remain separate.
+
+Correctness changes to the controller require fresh qualification even when model weights stay
+unchanged. A candidate selected under an older executor may be confirmed under a new frozen one;
+report that as transfer to the new controller and evaluate both sides under that same controller.
+Earlier results do not establish the strength of a changed executor. Separate small feature groups
+when searching so individual gains and interactions remain reviewable.
+
+Use `strategy-replay` to inspect a completed comparison without changing it:
+
+```sh
+python3 .aor-training/executors/strategy-v1/bin/train-opponents.py \
+  --mode strategy-replay --source .aor-training/confirmation-spec.json \
+  --pair .aor-training/confirmation/pair-0.json --index 0 --side candidate \
+  --output .aor-training/replays/candidate-0 --hours 1
+```
+
+The inspector runs one worker for at most one hour. `replay.json` includes canonical authority
+entries, the controlled seat's ordinary decision snapshots, chosen features, leading alternatives
+and nonzero feature counts. Scores shown are immediate linear values; HARD may choose a different
+first move through its bounded planner. The recorded pair preserves its original opponent lineup
+and requires exact terminal results, excluding elapsed time. Canonical entries separately replay to
+the identical final state. Keep authority outcomes separate from policy inputs: replay files include
+simulated private draws for verification. Such inspection explains examples; it does not estimate
+average strategy effects or replace fresh confirmation games.
+
+## Token-purchase continuation learning
+
+The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
+token-purchase decisions. Start from a frozen arena specification and add `trainingRoots`,
+`validationRoots`, `continuationReplicates` and `regularization`. The
+[pilot source contract](../training/src/main/kotlin/dev/aragos/aor/training/TokenValueData.kt)
+owns their bounds and defaults. Use a fresh output and freeze the entire executor distribution as
+for full-game searches:
+
+```sh
+python3 .aor-training/executors/token-value-v2/bin/train-opponents.py \
+  --mode token-value-pilot --source .aor-training/token-value-spec.json \
+  --output .aor-training/token-value-signal --hours 3
+```
+
+Each independently generated game contributes at most one controlled-seat root. The executor commits
+to its epoch and within-epoch ordinal before creating the game, stops at that decision, and records
+unreached or ineligible requests as skips. It never substitutes a root after inspecting later play.
+Historical reservoir checkpoints retain their distinct sampling provenance and remain readable
+with their matching frozen executors.
+All alternatives and continuation repetitions from a game remain in one split. Opponents select
+their sealed bids against the same root observation before the controlled amount is replaced. Negative bids spend
+cash to seek earlier order without receiving tokens; the proposal set includes them and zero.
+Forks preserve the actual hidden world. Additional continuation seeds vary future randomness and
+do not resample existing hands or the deck; treat the originating game as the independent unit.
+`continuationReplicates` accepts one through four, with two as the default. Every alternative uses
+the same ordered streams; average their paired reward differences before fitting or reporting an
+origin. Four repetitions double continuation work relative to two without adding independent games.
+The first two streams retain their existing seeds. Changing the repetition count requires a fresh
+output directory.
+
+The learner fits observed terminal-reward differences from the incumbent action, using only public
+and own-seat features. It does not label the best action in a particular hidden world as correct.
+The shared [token value head](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenValue.kt) owns
+features, the collector's six legal alternatives and the default override margin. Optional inference
+gates can expand quantity coverage and relax the margin for a feasible peaceful improvement, as
+described above; the continuation collector retains its bounded alternative set. Exported coefficients use the existing
+model format and require an explicit activation weight; absent or disabled heads retain ordinary
+play. Training and browser inference use the same feature construction.
+
+The `token-value-2` dataset contract retains the original 32 columns in their original order and
+appends seven columns describing a peaceful expansion plan constrained by the proposed token pool,
+marker stock and overseas slots. The shared feature owner defines their exact meanings, order and
+normalization. Older experimental datasets belong to their original frozen executors; retaining
+the earlier columns does not authorize reading an old dataset under the new contract. Resume
+fingerprints include the feature version and complete column order alongside code, models and
+settings, preventing silent reinterpretation.
+
+Begin with a smoke run, then a small training/validation batch. Validation selects regularization
+and measures whether the learned choices have useful continuation advantage; it is development
+evidence. The source candidate and incumbent must be the same frozen baseline. Scale only after
+inspecting action changes, independent-game results and label sparsity.
+Repeated use of the selector can differ from the single intervention used for its labels, so its
+frozen model still needs a fresh complete-game `arena` confirmation before application adoption.
+Resume only with unchanged code, source, models and feature contracts.
+
+## Automata experiments
+
+The standalone `pilot` mode runs a fixed four-player configuration: standard map, No Crusades
+initial cards, deck modification and immediate Master Art discard. It benchmarks the executor,
+generates sampled terminal-outcome labels and fits a small CPU neural model. Fresh held-out scenario
+validation must pass before the runner evaluates complete games.
+It does not publish a browser model or change saved games. The broader
+[plan](follow-ups.md#automata-training-pilot) tracks remaining qualification and broader experiments.
+
+Build the distribution, then launch the second round on the Mac using a new output directory:
+
+```sh
+./gradlew :training:installDist
+python3 training/build/install/training/bin/train-opponents.py \
+  --mode pilot \
+  --model .aor-training/strategic-four-player/model.json \
+  --output .aor-training/pilot-round-2 \
+  --benchmark-games 12 --positions 256 --samples 16 --pairs 512 \
+  --seed 20261106 --hours 12
+```
+
+The baseline path refers to a locally preserved training artifact, not a tracked repository file.
+On another machine, provide a compatible model explicitly. The pilot checks rules/catalog metadata,
+copies the baseline into its output and fingerprints the packaged code, model and experiment settings.
+Do not relabel an incompatible model. The supervisor selects bounded parallelism automatically;
+`--workers N` can reduce concurrency. The same CPU, memory and cumulative 72-hour limits apply as in
+ordinary training. The command stops when complete or when its time/resource budget is exhausted.
+
+Use `nohup` as described above for background execution. On macOS, prefix the Python command with
+`caffeinate -i` to keep the machine awake while the supervisor runs. Inspect progress with:
+
+```sh
+tail -f .aor-training/pilot-round-2/trainer.log
+python3 training/build/install/training/bin/train-opponents.py \
+  --output .aor-training/pilot-round-2 --status
+```
+
+To resume, repeat the launch command with `--resume`, retaining the seed and all four experiment
+counts. The original frozen model is retained; `--model` may be omitted on resume. Only resources and
+the requested remaining time may change. Complete position, validation and evaluation units are reused;
+an interrupted unit is recomputed. A changed binary requires a new output directory. Keep the installed
+distribution unchanged while a run is active. Small smoke runs can use `--benchmark-games 1
+--positions 8 --samples 2 --pairs 2` and a separate output; they do not establish playing strength.
+Such smoke runs deliberately stop before the tournament because they contain too few held-out
+scenarios to qualify. Changed curriculum and model schemas require a new output directory; preserve
+prior runs rather than resuming them with a new binary.
+
+Read these artifacts after completion:
+
+| Artifact | Meaning |
+| --- | --- |
+| `run.json`, `baseline.json` | Experiment identity, environment, acceptance target and frozen opponent |
+| `benchmark.json` | Warmed throughput and transition/policy timings; observation time is also broken into views, legal choices and features |
+| `position-*.json`, `teacher.json` | Scenario seeds, public feature vectors, sampled baseline/plan rewards and curriculum scope |
+| `student.json` | Experimental schema-2 network and diagnostics against the teacher's labels on separate scenario seeds |
+| `validation-*.json`, `validation.json` | Fresh paired continuation results, scenario-level uncertainty, family summaries, baseline fallback and tournament qualification |
+| `pair-*.json`, `evaluation.json` | Full-game results and uncertainty when validation passes, or an explicit reason for skipping the tournament |
+| `state.json`, `supervisor.json` | Resume identity, phase and resource/status information |
+
+The aggregate observation timing is retained alongside the new breakdown for comparison with earlier
+runs. It is not an additional cost to add to the view, choice and feature components.
+
+The teacher uses versioned established-position fixtures in epoch three, with publicly empty rival
+hands and a publicly determined remaining card multiset. It samples deck order and ordinary random
+outcomes, then plays each continuation to game end using the production engine. These are explicit
+curriculum fixtures, not claimed opening histories or a general belief sampler for arbitrary games.
+The curriculum varies cash and remaining-deck horizons, uses one to three cards in the acting hand,
+and includes three validated public advance/fleet profiles covering commerce, navigation and industry.
+Each scenario uses the same development profile for all seats; it does not yet represent arbitrary
+differences in opponents' development. Full-game transfer remains an experiment.
+
+The four choices are retain baseline behavior, play now, hold with ordinary expansion, and hold while
+prioritizing legal unopposed commodity expansion. The student uses observable features and retains
+baseline behavior unless another choice's predicted terminal composite reward exceeds it by more than
+0.02. This fixed margin is in the existing 0.8 win-share plus 0.2 rank-reward units, not win percentage
+points. The student does not yet learn arbitrary action sequences or a recurrent policy.
+
+With 256 positions, 204 scenarios provide fitting data and 52 are held out. Diagnostics in
+`student.json` compare the student with the previously sampled teacher labels. The separate
+`validation.json` gate runs fresh paired continuations for the student's already selected choice and
+the baseline on every held-out scenario. Those continuation samples do not participate in fitting or
+plan selection. At least 32 unique scenarios and two paired samples per scenario are required, and
+the paired 95% lower bound on the student's reward improvement must be positive. The interval uses a
+normal approximation across scenario means, so repeated rollouts do not count as additional independent
+positions. Family results and fallback frequency are descriptive; the gate applies to the complete
+predeclared held-out split.
+
+If validation fails or has insufficient coverage, the investigation completes without a tournament.
+`evaluation.json` records `skipped: true`, `experimentComplete: true`, zero games and the reason;
+`promoted` remains false. A successful process exit therefore need not mean that validation passed.
+
+Complete-game evaluation compares the baseline, a simple feature-based plan selector and the student,
+with fixed mixed opponents and rotated seats. Experimental plan selection is limited to epoch three;
+earlier epochs and unrelated choices retain baseline behavior. Holding one card still permits other
+cards to be played. Teacher results are confined to the known-information curriculum; there is no
+omniscient teacher in the full-game tournament. If validation passes, `--pairs 512` means 1,536
+complete games, since each lineup tests all three policies. A single pair has no confidence interval.
+
+The initial target is a ten-percentage-point replacement-seat win-share gain with a positive paired
+95% lower bound. Neither successful execution, a smaller label error nor passing the scenario gate
+proves that full-game target.
+`evaluation.json` always records `promoted: false`: review the results before any broader training
+or application integration. Qualification of other configurations and browser inference remains
+separate work.
+
+### Diagnose teacher and student choices
+
+Use `pilot-diagnose` to separate the quality of the sampled teacher's plans from the student's
+ability to select them. It reads a completed compatible pilot and writes a separate investigation;
+source and output directories must not overlap.
+
+```sh
+./gradlew :training:installDist
+caffeinate -i python3 training/build/install/training/bin/train-opponents.py \
+  --mode pilot-diagnose \
+  --source .aor-training/pilot-round-2 \
+  --output .aor-training/pilot-round-2-diagnostic \
+  --samples 32 --seed 20261107 --hours 2
+```
+
+Omit `caffeinate -i` on Linux. The same CPU, memory, elapsed-time and worker limits apply as for
+training. Repeat the command with `--resume` after interruption, retaining the source, sample count,
+seed and installed distribution. The source supplies the frozen baseline and student; this mode
+does not accept `--model`, retrain the network or run the full-game tournament.
+
+Before generating new outcomes, the investigation fixes each teacher choice using the original
+sampled plan rewards, with numerical ties within 1e-12 resolved in strategy order so a tied baseline
+is retained. This tolerance handles arithmetic roundoff, not uncertainty in the sampled rewards. It fixes
+the student's choices using the original network and prediction margin. All held-out scenarios are
+evaluated on negative continuation seeds, disjoint from the source experiment's nonnegative seed ranges. Each
+candidate uses the same initial conditions as its baseline comparison. The report compares teacher
+and student separately with the baseline, and compares teacher directly with student. Confidence
+intervals use scenario means, keeping repeated continuations within their scenario.
+
+The runner first reproduces archived baseline and student outcomes to check continuation compatibility.
+Its frozen plan and source fingerprint prevent a resumed investigation from mixing changed inputs.
+Read these artifacts in the diagnostic output:
+
+| Artifact | Meaning |
+| --- | --- |
+| `plan.json` | Frozen teacher/student choices, selected replay cases and source fingerprint |
+| `comparison-*.json` | Fresh per-scenario baseline, teacher and student outcomes |
+| `diagnostic.json` | Aggregate paired comparisons and scenario-level confidence intervals |
+| `replay-*.json` | Canonical entries, decision snapshots, terminal scores and replay verification |
+| `run.json`, `state.json`, `supervisor.json` | Execution identity, resumable progress and resource/status information |
+
+The investigation also replays the three largest student losses from the original validation and
+the largest gain as a comparison. Canonical entries and decision snapshots make these cases
+inspectable. These cases are selected for explanation; they do not replace the complete held-out
+set or independently estimate average playing strength. Keep source artifacts and diagnostic
+artifacts together when reviewing the result.
+
+This is an investigation of an already examined curriculum. Its fresh continuation results help
+locate planning or learning failures, but do not qualify a model for release or override the original
+validation gate. Further policy changes require a separately planned evaluation with new scenarios.
 
 ## Maintain documentation
 

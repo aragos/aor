@@ -44,6 +44,13 @@ runs them with server validation, persistence and randomness. They pause while n
 Online game creation requires 3–6 registered human players; automated opponents are unavailable.
 Keep each private player link: only credential hashes are stored, so lost links cannot be recovered.
 
+To try the qualified Hard automata profile, create a local game with one human and three Hard seats,
+the Standard map, No Crusades in the initial deal, deck modification enabled and immediate Master Art
+discard enabled. Keep the creator's game tab open. This profile has passed automated comparisons;
+its strength against human players still needs playtesting. Other setups use compatible fallback
+policies. After updating the application, restart the local server and reload the creator's tab to
+use the current projections and worker.
+
 Local storage defaults to `.aor-data/`. Use one server per directory; `AOR_DATA_DIR` selects an
 absolute path and `AOR_HTTP_PORT` changes the port. Hosted play uses Firebase accounts and
 PostgreSQL; see [deployment](docs/deployment.md) for configuration and compatibility procedures.
@@ -70,3 +77,11 @@ python3 training/build/install/training/bin/train-opponents.py --mode train --ou
 The supervisor enforces CPU, memory and elapsed-time limits and writes logs, coverage, resumable
 checkpoints and evaluation results. See [contributing](docs/contributing.md#opponent-training)
 for background execution, resuming and publishing a validated model.
+
+Use the [full-game strategy workflow](docs/contributing.md#full-game-strategy-experiments) to tune
+small groups of planning weights and confirm a frozen candidate against mixed opponents.
+
+For the focused commodity-planning pilot, use the
+[automata experiment workflow](docs/contributing.md#automata-experiments). It benchmarks simulation,
+trains a small policy from sampled continuations and checks fresh held-out scenarios before spending
+on a full-game tournament. It does not publish a new opponent.
