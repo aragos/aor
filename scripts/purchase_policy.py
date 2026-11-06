@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import copy
 from dataclasses import asdict, dataclass
+import gzip
 import hashlib
 import json
 import math
@@ -35,6 +36,21 @@ PARAMETERS = (
     "stateWeights", "stateBias", "actionWeights", "actionBias",
     "actorWeights", "valueWeights", "valueBias",
 )
+
+
+@dataclass(frozen=True)
+class PolicyContract:
+    """Explicit phase/version boundary; never inferred from untrusted model contents."""
+    encoder: str
+    actor: str
+    label: str
+    maxActions: int
+    frozenPurchase: bool = False
+    maxCommand: int = 200
+    trajectoryEncoding: str = "json-v1"
+
+
+PURCHASE_CONTRACT = PolicyContract(ENCODER_VERSION, ACTOR_VERSION, "purchase", 128)
 
 
 def require(condition, message):
@@ -72,6 +88,54 @@ def read_json(path):
     return json.loads(Path(path).read_text(), parse_constant=reject_constant)
 
 
+def read_game(path, contract):
+    if contract.trajectoryEncoding == "json-v1":
+        return read_json(path)
+    require(contract.trajectoryEncoding == "gzip-json-v1", "Unsupported trajectory encoding.")
+    maximum = 64 * 1024 * 1024
+    with gzip.open(path, "rb") as stream:
+        contents = stream.read(maximum + 1)
+    require(len(contents) <= maximum, "A card trajectory exceeds the 64 MiB expanded limit.")
+    def reject_constant(text):
+        raise ValueError(f"Nonfinite JSON number: {text}")
+    return json.loads(contents, parse_constant=reject_constant)
+
+
+def validate_purchase_audit(game):
+    """Validate the card collector's public diagnostic sidecar; never return fitting inputs."""
+    entries = game.get("purchaseAudit")
+    require(isinstance(entries, list) and len(entries) <= 12000,
+            "A card trajectory requires its bounded purchase audit list.")
+    previous = -1
+    for entry in entries:
+        require(isinstance(entry, dict) and set(entry) == {
+            "number", "turn", "decision", "command", "quotedPrice", "leaderCredits"},
+            "A purchase audit entry requires the declared public fields only.")
+        number_index = integer(entry["number"], "Purchase audit decision", 0, 11999)
+        require(number_index > previous, "Purchase audit decisions must increase strictly.")
+        previous = number_index
+        integer(entry["turn"], "Purchase audit turn", 1, 12000)
+        require(entry["decision"] in ("purchase-shipping", "purchase-advances"),
+                "Purchase audit entries must describe shipping or advance decisions.")
+        command = entry["command"]
+        require(isinstance(command, str) and command.strip() and len(command) <= 200
+                and "\n" not in command and "\r" not in command,
+                "A purchase audit command must be a bounded canonical string.")
+        integer(entry["quotedPrice"], "Purchase audit price", 0, 2**31 - 1)
+        credits = entry["leaderCredits"]
+        require(isinstance(credits, list) and len(credits) <= 128,
+                "Purchase audit leader credits must be a bounded list.")
+        for credit in credits:
+            require(isinstance(credit, dict) and set(credit) == {
+                "leaderCardId", "baseAmount", "writtenRecordBonus", "marginalPriceSaving"},
+                "A purchase audit leader credit requires the declared public fields only.")
+            require(isinstance(credit["leaderCardId"], str)
+                    and 1 <= len(credit["leaderCardId"]) <= 160,
+                    "A purchase audit credit requires a stable card identifier.")
+            for key in ("baseAmount", "writtenRecordBonus", "marginalPriceSaving"):
+                integer(credit[key], f"Purchase audit {key}", 0, 2**31 - 1)
+
+
 def atomic_json(path, value):
     """Publish one fsynced JSON object; a failed write preserves the previous file."""
     path = Path(path)
@@ -104,11 +168,11 @@ def names(value, label, maximum):
     return value
 
 
-def validate_model(model):
+def validate_model(model, *, contract=PURCHASE_CONTRACT):
     require(model.get("schemaVersion") == 1 and type(model["schemaVersion"]) is int,
             "Purchase model requires schemaVersion 1.")
-    require(model.get("encoderVersion") == ENCODER_VERSION,
-            "Purchase model encoder version is unsupported.")
+    require(model.get("encoderVersion") == contract.encoder,
+            f"{contract.label.capitalize()} model encoder version is unsupported.")
     require(model.get("hiddenSize") == HIDDEN and type(model["hiddenSize"]) is int,
             "Purchase model requires 64 hidden units.")
     require(model.get("baselineProbability") == 0.97,
@@ -128,9 +192,9 @@ def validate_model(model):
     return model
 
 
-def initialize(schema, seed):
+def initialize(schema, seed, *, contract=PURCHASE_CONTRACT):
     """Initialize from the complete catalog dictionary, never observed nonzero keys."""
-    require(schema.get("encoderVersion") == ENCODER_VERSION,
+    require(schema.get("encoderVersion") == contract.encoder,
             "The frozen feature dictionary requires the current encoder version.")
     states = names(schema.get("stateFeatureNames"), "State features", 8192)
     actions = names(schema.get("actionFeatureNames"), "Action features", 512)
@@ -139,14 +203,14 @@ def initialize(schema, seed):
         scale = 1.0 / math.sqrt(size)
         return [rng.uniform(-scale, scale) for _ in range(HIDDEN * size)]
     return validate_model({
-        "schemaVersion": 1, "encoderVersion": ENCODER_VERSION,
+        "schemaVersion": 1, "encoderVersion": contract.encoder,
         "hiddenSize": HIDDEN, "baselineProbability": 0.97,
         "stateFeatureNames": states, "actionFeatureNames": actions,
         "stateWeights": weights(len(states)), "stateBias": [0.0] * HIDDEN,
         "actionWeights": weights(len(actions)), "actionBias": [0.0] * HIDDEN,
         "actorWeights": [0.0] * HIDDEN, "valueWeights": [0.0] * HIDDEN,
         "valueBias": 0.0,
-    })
+    }, contract=contract)
 
 
 def sparse(values, allowed, label):
@@ -156,16 +220,18 @@ def sparse(values, allowed, label):
         number(value, label, -FEATURE_LIMIT, FEATURE_LIMIT)
 
 
-def validate_observation(observation, model):
-    require(observation.get("encoderVersion") == model["encoderVersion"],
+def validate_observation(observation, model, *, contract=PURCHASE_CONTRACT):
+    require(observation.get("encoderVersion") == model["encoderVersion"] == contract.encoder,
             "Observation and policy encoder versions must match.")
     sparse(observation.get("stateFeatures"), set(model["stateFeatureNames"]), "State")
     actions = observation.get("actions")
-    require(isinstance(actions, list) and 1 <= len(actions) <= 128,
-            "A purchase observation requires 1–128 legal actions.")
+    require(isinstance(actions, list) and 1 <= len(actions) <= contract.maxActions,
+            f"A {contract.label} observation requires 1–{contract.maxActions} legal actions.")
     commands = [action.get("command") for action in actions]
     require(all(isinstance(command, str) and command.strip()
-                and len(command) <= 200 and "\n" not in command for command in commands)
+                and len(command) <= contract.maxCommand and "\n" not in command
+                and (not contract.frozenPurchase or "\r" not in command)
+                for command in commands)
             and len(set(commands)) == len(commands), "Legal commands must be distinct strings.")
     require(commands == sorted(commands), "Legal commands must use canonical sorted order.")
     for action in actions:
@@ -179,10 +245,10 @@ def prior_probabilities(count, baseline):
     return [0.97 if index == baseline else 0.03 / (count - 1) for index in range(count)]
 
 
-def reference_forward(model, observation):
+def reference_forward(model, observation, *, contract=PURCHASE_CONTRACT):
     """Independent scalar Float64 oracle; values/probabilities use only safe features."""
-    validate_model(model)
-    validate_observation(observation, model)
+    validate_model(model, contract=contract)
+    validate_observation(observation, model, contract=contract)
     state = [observation["stateFeatures"].get(name, 0.0)
              for name in model["stateFeatureNames"]]
     hidden = [math.tanh(model["stateBias"][unit] + sum(
@@ -247,11 +313,12 @@ class _PreparedObservation:
     baseline_index: int
 
 
-class PurchasePolicy(nn.Module):
+class ResidualPolicy(nn.Module):
     """Compute each state's embedding once, then score a flattened legal-action batch."""
-    def __init__(self, model):
+    def __init__(self, model, contract):
         super().__init__()
-        self.template = copy.deepcopy(validate_model(model))
+        self.contract = contract
+        self.template = copy.deepcopy(validate_model(model, contract=contract))
         self.state_indices = {name: index for index, name in enumerate(model["stateFeatureNames"])}
         self.action_indices = {
             name: index for index, name in enumerate(model["actionFeatureNames"])}
@@ -270,14 +337,14 @@ class PurchasePolicy(nn.Module):
         for name in PARAMETERS:
             tensor = getattr(self, name).detach().cpu()
             model[name] = tensor.item() if name == "valueBias" else tensor.flatten().tolist()
-        return validate_model(model)
+        return validate_model(model, contract=self.contract)
 
     def prepare(self, observation):
         if isinstance(observation, _PreparedObservation):
             require(observation.dictionary == self.dictionary,
                     "Prepared inputs belong to a different feature dictionary.")
             return observation
-        validate_observation(observation, self.template)
+        validate_observation(observation, self.template, contract=self.contract)
         state = list(observation["stateFeatures"].items())
         actions = [(row * len(self.action_indices) + self.action_indices[name], value)
                    for row, action in enumerate(observation["actions"])
@@ -339,9 +406,15 @@ class PurchasePolicy(nn.Module):
         return log_probabilities, values
 
 
+class PurchasePolicy(ResidualPolicy):
+    """Backward-compatible purchase-only boundary around the shared numerical network."""
+    def __init__(self, model):
+        super().__init__(model, PURCHASE_CONTRACT)
+
+
 @dataclass(frozen=True)
 class UpdateConfig:
-    """maxSeconds bounds wall time since the first update start, including resume pauses."""
+    """maxSeconds includes resume pauses; batchSize also respects the 16384-action allocation cap."""
     learningRate: float = 0.0003
     epochs: int = 4
     batchSize: int = 64
@@ -387,12 +460,29 @@ def loss_for_rows(policy, rows, config):
     return actor + config.valueCoefficient * critic - config.entropyCoefficient * entropy
 
 
+def row_batches(rows, size):
+    """Preserve row order, bounding both decisions and total offered actions per allocation.
+
+    Purchase batches within the existing numerical limit remain exactly unchanged. Card states
+    can offer 1024 actions, so a configured decision batch may need several smaller updates.
+    """
+    start, actions = 0, 0
+    for index, row in enumerate(rows):
+        count = (row["_prepared"].action_count if "_prepared" in row
+                 else len(row["observation"]["actions"]))
+        if index > start and (index - start == size or actions + count > 16384):
+            yield rows[start:index]
+            start, actions = index, 0
+        actions += count
+    if start < len(rows):
+        yield rows[start:]
+
+
 def fit_epoch(policy, optimizer, rows, config, epoch, deadline):
     order = list(range(len(rows)))
     random.Random(config.seed + epoch).shuffle(order)
-    for start in range(0, len(order), config.batchSize):
+    for batch in row_batches([rows[index] for index in order], config.batchSize):
         require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
-        batch = [rows[index] for index in order[start:start + config.batchSize]]
         optimizer.zero_grad(set_to_none=True)
         loss = loss_for_rows(policy, batch, config)
         require(bool(torch.isfinite(loss)), "Purchase loss must remain finite.")
@@ -405,8 +495,7 @@ def fit_epoch(policy, optimizer, rows, config, epoch, deadline):
 def behavior_metrics(policy, behavior, rows, batch_size=64):
     totals = {"behaviorKl": 0.0, "priorKl": 0.0, "valueMse": 0.0}
     with torch.no_grad():
-        for start in range(0, len(rows), batch_size):
-            batch = rows[start:start + batch_size]
+        for batch in row_batches(rows, batch_size):
             observations = [row.get("_prepared", row["observation"]) for row in batch]
             current, values = policy(observations)
             old, _ = behavior(observations)
@@ -420,7 +509,7 @@ def behavior_metrics(policy, behavior, rows, batch_size=64):
     return {name: value / len(rows) for name, value in totals.items()}
 
 
-def read_collection(directory, model_path, model):
+def read_collection(directory, model_path, model, *, contract=PURCHASE_CONTRACT):
     """Completion guards run before opening any game outcomes; all behavior is recomputed."""
     directory = Path(directory)
     require((directory / "state.json").exists() and (directory / "finished.json").exists(),
@@ -448,8 +537,23 @@ def read_collection(directory, model_path, model):
             "Trajectories must use the exact supplied policy bytes.")
     for key in ("encoderVersion", "stateFeatureNames", "actionFeatureNames"):
         require(collection.get(key) == model[key], f"Collection {key} differs from policy.")
-    require(collection.get("actorVersion") == ACTOR_VERSION, "Actor version is unsupported.")
-    paths = [directory / f"game-{index}.json" for index in range(count)]
+    require(collection.get("actorVersion") == contract.actor, "Actor version is unsupported.")
+    frozen_purchase = None
+    if contract.frozenPurchase:
+        require(collection.get("trajectoryEncoding") == contract.trajectoryEncoding,
+                "Card collection requires the explicit gzip-json-v1 trajectory encoding.")
+        frozen_purchase = collection.get("frozenPurchasePolicy")
+        require(isinstance(frozen_purchase, dict)
+                and isinstance(frozen_purchase.get("path"), str)
+                and Path(frozen_purchase["path"]).is_absolute(),
+                "Card collection requires its frozen purchase policy provenance.")
+        frozen_path = directory / "frozen-purchase-policy.json"
+        require(frozen_path.is_file()
+                and file_digest(frozen_path) == frozen_purchase.get("sha256"),
+                "Frozen purchase policy snapshot differs from the collection manifest.")
+        validate_model(read_json(frozen_path))
+    suffix = ".json.gz" if contract.trajectoryEncoding == "gzip-json-v1" else ".json"
+    paths = [directory / f"game-{index}{suffix}" for index in range(count)]
     require(all(path.exists() for path in paths), "A completed collection is missing a game.")
     game_hashes = [file_digest(path) for path in paths]
     require(finished.get("gameSha256") == game_hashes,
@@ -457,15 +561,19 @@ def read_collection(directory, model_path, model):
     rows = []
     rewards = []
     origins = set()
-    behavior = PurchasePolicy(model)
+    behavior = ResidualPolicy(model, contract)
     for index, path in enumerate(paths):
-        game = read_json(path)
+        game = read_game(path, contract)
         require(game.get("index") == index and type(game["index"]) is int,
                 "Game index must match its checkpoint filename.")
         for key, expected in (("signature", signature), ("modelSha256", model_sha),
-                              ("encoderVersion", ENCODER_VERSION),
-                              ("actorVersion", ACTOR_VERSION)):
+                              ("encoderVersion", contract.encoder),
+                              ("actorVersion", contract.actor)):
             require(game.get(key) == expected, f"Game {key} must match frozen collection.")
+        if frozen_purchase is not None:
+            require(game.get("frozenPurchasePolicySha256") == frozen_purchase["sha256"],
+                    "Game frozen purchase policy differs from the collection manifest.")
+            validate_purchase_audit(game)
         origin = (game.get("configuration"), game.get("gameSeed"))
         require(isinstance(origin[0], str) and origin[0], "A game requires its configuration ID.")
         integer(origin[1], "Game seed", -(2**31), 2**31 - 1)
@@ -511,7 +619,8 @@ def read_collection(directory, model_path, model):
                 chosen = select(logp.exp().tolist(), selection_uniform(row["actorSeed"]))
                 if chosen != row["selectedIndex"]:
                     # A scalar fallback resolves vanishingly rare floating-point boundary cases.
-                    exact = reference_forward(model, row["observation"])["probabilities"]
+                    exact = reference_forward(model, row["observation"],
+                                              contract=contract)["probabilities"]
                     require(select(exact, selection_uniform(row["actorSeed"]))
                             == row["selectedIndex"],
                             "Recorded action differs from the frozen actor's seeded selector.")
@@ -519,6 +628,8 @@ def read_collection(directory, model_path, model):
                   "collectionSignature": signature,
                   "gameHashes": game_hashes,
                   "games": count, "gameMeanReward": sum(rewards) / len(rewards)}
+    if frozen_purchase is not None:
+        provenance["frozenPurchasePolicySha256"] = frozen_purchase["sha256"]
     return rows, provenance
 
 
@@ -568,17 +679,20 @@ def initial_checkpoint(identity, model):
             "deadlineEpochSeconds": identity["deadlineEpochSeconds"], "stopReason": None}
 
 
-def update(model_path, collection_path, config, output, resume=False, optimizer_from=None):
+def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
+           *, contract=PURCHASE_CONTRACT, entrypoint=None):
     config.validate()
     torch.set_num_threads(config.threads)
     torch.use_deterministic_algorithms(True)
-    model = validate_model(read_json(model_path))
-    rows, provenance = read_collection(collection_path, model_path, model)
-    identity = {"schemaVersion": 1, "actorVersion": ACTOR_VERSION,
+    model = validate_model(read_json(model_path), contract=contract)
+    rows, provenance = read_collection(collection_path, model_path, model, contract=contract)
+    identity = {"schemaVersion": 1, "actorVersion": contract.actor,
                 "modelSha256": file_digest(model_path), "data": provenance,
                 "config": asdict(config), "learnerSha256": file_digest(__file__),
                 "torchVersion": torch.__version__, "pythonVersion": sys.version,
                 "optimizerFromSha256": file_digest(optimizer_from) if optimizer_from else None}
+    if entrypoint is not None:
+        identity["entrypointSha256"] = file_digest(entrypoint)
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
     started_path = output / "epoch-started.json"
@@ -609,12 +723,12 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         output.mkdir(parents=True)
         atomic_json(output / "identity.json", identity)
         checkpoint = initial_checkpoint(identity, model)
-    started_marker = {"kind": "purchase-epoch-started", "identitySha256": digest(identity)}
+    started_marker = {"kind": f"{contract.label}-epoch-started", "identitySha256": digest(identity)}
     if started_path.exists():
         require(read_json(started_path) == started_marker,
                 "Existing epoch marker belongs to a different purchase update.")
-    policy = PurchasePolicy(checkpoint["model"])
-    behavior = PurchasePolicy(model)
+    policy = ResidualPolicy(checkpoint["model"], contract)
+    behavior = ResidualPolicy(model, contract)
     optimizer = torch.optim.Adam(policy.parameters(), lr=config.learningRate, foreach=False)
     if checkpoint["optimizer"] is not None:
         restore_optimizer(optimizer, checkpoint["optimizer"])
@@ -674,8 +788,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     return report
 
 
-def main(arguments=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(arguments=None, *, contract=PURCHASE_CONTRACT, entrypoint=None, toy_runner=None,
+         description=None):
+    parser = argparse.ArgumentParser(description=description or __doc__)
     modes = parser.add_subparsers(dest="mode", required=True)
     initialization = modes.add_parser("initialize")
     initialization.add_argument("--schema", type=Path, required=True)
@@ -695,7 +810,7 @@ def main(arguments=None):
     if options.mode == "initialize":
         require(not options.output.exists(), "Initial policy output already exists.")
         schema = read_json(options.schema)
-        model = initialize(schema, options.seed)
+        model = initialize(schema, options.seed, contract=contract)
         options.output.mkdir(parents=True)
         atomic_json(options.output / "policy.json", model)
         atomic_json(options.output / "schema.json", {
@@ -705,11 +820,15 @@ def main(arguments=None):
                   "sha256": file_digest(options.output / "policy.json"),
                   "schemaSourceSha256": file_digest(options.schema), "seed": options.seed,
                   "learnerSha256": file_digest(__file__), "torchVersion": torch.__version__}
+        if entrypoint is not None:
+            result["entrypointSha256"] = file_digest(entrypoint)
         atomic_json(options.output / "initialization.json", result)
     elif options.mode == "toy":
-        from purchase_policy_toy import run_toy
+        if toy_runner is None:
+            from purchase_policy_toy import run_toy
+            toy_runner = run_toy
         require(not options.output.exists(), "Toy output already exists.")
-        result = run_toy()
+        result = toy_runner()
         atomic_json(options.output / "report.json", result)
         require(result["passed"], "Delayed-sequence numerical check failed; inspect its report.")
     else:
@@ -718,7 +837,8 @@ def main(arguments=None):
                 "Explicit update seed disagrees with the configuration file.")
         config = UpdateConfig(**{**values, "seed": options.seed}).validate()
         result = update(options.model, options.collection, config, options.output,
-                        options.resume, options.optimizer_from)
+                        options.resume, options.optimizer_from,
+                        contract=contract, entrypoint=entrypoint)
     print(json.dumps(result, indent=2, allow_nan=False))
 
 

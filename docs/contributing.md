@@ -303,6 +303,45 @@ together and compute uncertainty over independent worlds. Reports, checkpoints a
 files stay in isolated experiment storage; they do not activate a browser model automatically.
 See [open learning work](follow-ups.md#autonomous-strategy-discovery) for broader strategy coverage.
 
+## Card policy learning
+
+The experimental card actor learns repeated choices within ordinary and final card windows. It
+controls every command currently offered by the bot projection, including playing another card while
+retaining a leader. These offers still use the existing bounded province combinations and protection
+amounts. Pass is available only when legal and ends the ordinary card window. Nested war resolutions,
+optional discards and other decisions retain the frozen HARD baseline.
+
+Every seat uses a separately frozen purchase actor for shipping and advances. This keeps card timing
+and its later purchases together throughout actual complete-game continuations. Card training updates
+only the card model. Printed Word receipts, protection payments and other immediate consequences come
+from authoritative ordinary-view quotes; nominal leader discounts are facts, not reward labels.
+
+Build the standalone trainer as above. A card collection source uses the purchase source's
+`configuration`, `games`, `seed`, `baseline` and `opponents` fields, plus mandatory
+`frozenPurchasePolicy`. Optional `policy` supplies the controlled card model; null uses exact baseline
+card choices. Optional `opponentCardPolicy` supplies a frozen card model for the rival seats. Each
+seat's baseline still supplies its own HARD recommendation and all decisions outside these actors.
+
+```sh
+python3 scripts/train-opponents.py --mode card-collect --source card-collection.json --output .aor-training/card-data --workers 6 --hours 2
+python3 scripts/card_policy.py initialize --schema .aor-training/card-data/collection.json --seed 74401 --output .aor-training/card-initial
+python3 scripts/card_policy.py update --source .aor-training/card-on-policy --model .aor-training/card-initial/policy.json --seed 74402 --output .aor-training/card-update
+```
+
+Card models have distinct actor and encoder versions. A zero residual starts at the same 97% baseline
+prior; the complete card dictionary is frozen before collection. Card records use explicit
+`trajectoryEncoding: gzip-json-v1` and atomic `game-N.json.gz` files. Completion hashes bind the
+compressed bytes. The manifest and each game bind the frozen purchase model independently. Only
+controlled-seat card decisions become learning rows; the separate `purchaseAudit` records public
+purchase consequences for diagnostics and is never a policy input or training target.
+
+Before scaling, measure independent-game coverage of retained leaders, alternative card plays,
+normal/final windows and later uses of discounts. Protection variants share the exploration budget,
+so total nonbaseline probability alone does not establish useful exploration. Human feedback positions
+are diagnostic cases, not independent strength evidence; unused discounts can still save stabilization
+costs or accompany cash rebates. Keep the existing browser policy until fresh complete-game and
+rival-population qualification succeeds.
+
 ## Token-purchase continuation learning
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
