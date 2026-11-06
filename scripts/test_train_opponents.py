@@ -111,6 +111,34 @@ class OptionsAndBudgetTest(unittest.TestCase):
                     flag, "1",
                 ])
 
+    def test_card_collection_preserves_the_specification_and_resource_budget(self):
+        options = training.parse_options([
+            "--mode", "card-collect", "--source", "/tmp/card-spec.json",
+            "--output", "/tmp/card-output", "--workers", "2",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB), 2)
+
+        arguments = training.trainer_arguments(options, budget, 1.5)
+
+        self.assertEqual(arguments, [
+            str(training.TRAINER), "--mode", "card-collect",
+            "--output", str(Path("/tmp/card-output").resolve()),
+            "--workers", "2", "--hours", "1.5",
+            "--source", str(Path("/tmp/card-spec.json").resolve()),
+        ])
+
+    def test_card_collection_requires_its_frozen_specification(self):
+        with self.assertRaises(SystemExit):
+            training.parse_options(["--mode", "card-collect"])
+
+    def test_card_collection_rejects_cli_changes_to_frozen_training_settings(self):
+        for flag in ("--seed", "--model", "--difficulty", "--rounds", "--samples"):
+            with self.subTest(flag=flag), self.assertRaises(SystemExit):
+                training.parse_options([
+                    "--mode", "card-collect", "--source", "/tmp/card-spec.json",
+                    flag, "1",
+                ])
+
     def test_replay_index_is_rejected_in_other_modes(self):
         with self.assertRaises(SystemExit):
             training.parse_options(["--mode", "pilot", "--index", "1"])
