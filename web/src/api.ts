@@ -21,6 +21,7 @@ export interface CardChoiceView {
     value: string | null; command: string | null;
     miseryChanges?: MiseryChangeView[]; miseryUncertainPlayers?: string[];
     cashChanges?: {player: string; before: number; after: number}[];
+    boardLosses?: {province: string; owner: string; markerControlLost: boolean; tokensRemoved: number}[];
     noEffect?: boolean;
 }
 export interface MiseryChangeView {player: string; fromValue: number | null; toValue: number | null}

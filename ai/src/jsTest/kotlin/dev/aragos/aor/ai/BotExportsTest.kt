@@ -76,6 +76,151 @@ class BotExportsTest {
         }
     }
 
+    @Test
+    fun aQualifiedConfigurationActivatesItsScopedModel() {
+        val selected = chooseBotMove(configuredObservation(), scopedModel(), "normal", 0)
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun aDifferentPlayerCountRetainsThePrior() {
+        val input =
+            configuredObservation(configuration().replace("\"playerCount\":4", "\"playerCount\":3"))
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aDifferentMapRetainsThePrior() {
+        val input = configuredObservation(configuration().replace("STANDARD", "EUROPEAN"))
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aDifferentInitialCardRuleRetainsThePrior() {
+        val input = configuredObservation(configuration().replace("NO_CRUSADES", "ANY"))
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aDifferentDeckModificationRetainsThePrior() {
+        val input =
+            configuredObservation(
+                configuration().replace("\"deckModification\":true", "\"deckModification\":false")
+            )
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aDifferentMasterArtRuleRetainsThePrior() {
+        val input =
+            configuredObservation(
+                configuration()
+                    .replace(
+                        "\"immediateMasterArtDiscard\":true",
+                        "\"immediateMasterArtDiscard\":false",
+                    )
+            )
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun missingObservationConfigurationCannotActivateAScopedModel() {
+        val selected = chooseBotMove(observation(), scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun malformedModelConfigurationFallsBackToThePrior() {
+        val model =
+            scopedModel(
+                configuration()
+                    .replace("\"deckModification\":true", "\"deckModification\":\"true\"")
+            )
+
+        val selected = chooseBotMove(configuredObservation(), model, "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aScopedModelMustDeclareItsCatalogAndRulesVersions() {
+        val model =
+            """{"schemaVersion":1,"configuration":${configuration()},"weights":{"cash":-1}}"""
+
+        val selected = chooseBotMove(configuredObservation(), model, "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aBundleRetainsItsLegacyModelForExistingCatalogGames() {
+        val legacy =
+            """{"schemaVersion":1,"rulesVersion":"$RULES_VERSION","dataVersion":"ah1996-catalog-15","weights":{"cash":-1}}"""
+        val bundle = """{"schemaVersion":1,"models":[${scopedModel()},$legacy]}"""
+        val input = observation().replace(DATA_VERSION, "ah1996-catalog-15")
+
+        val selected = chooseBotMove(input, bundle, "normal", 0)
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun aBundleFallsBackOutsideItsQualifiedCurrentConfiguration() {
+        val legacy =
+            """{"schemaVersion":1,"dataVersion":"ah1996-catalog-15","weights":{"cash":-1}}"""
+        val bundle = """{"schemaVersion":1,"models":[${scopedModel()},$legacy]}"""
+        val input = configuredObservation(configuration().replace("NO_CRUSADES", "ANY"))
+
+        val selected = chooseBotMove(input, bundle, "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun malformedBundleEntriesDoNotHideALaterQualifiedModel() {
+        val invalid = """{"schemaVersion":1,"weights":{"cash":"invalid"}}"""
+        val bundle = """{"schemaVersion":1,"models":[$invalid,${scopedModel()}]}"""
+
+        val selected = chooseBotMove(configuredObservation(), bundle, "normal", 0)
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun unsupportedBundleSchemasRetainThePrior() {
+        val bundle = """{"schemaVersion":2,"models":[${scopedModel()}]}"""
+
+        val selected = chooseBotMove(configuredObservation(), bundle, "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    private fun configuration(): String =
+        """{"playerCount":4,"map":"STANDARD","initialCard":"NO_CRUSADES","deckModification":true,"immediateMasterArtDiscard":true}"""
+
+    private fun configuredObservation(configuration: String = configuration()): String =
+        observation().replace("\"context\":{}", "\"context\":{},\"configuration\":$configuration")
+
+    private fun scopedModel(configuration: String = configuration()): String =
+        """{"schemaVersion":1,"rulesVersion":"$RULES_VERSION","dataVersion":"$DATA_VERSION","configuration":$configuration,"weights":{"cash":-1}}"""
+
     private fun observation(): String =
         """{
         "schemaVersion":1,"playerId":"p1","decision":"test","context":{},
