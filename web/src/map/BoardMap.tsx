@@ -178,11 +178,25 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
     const gesture = useRef<{x: number; y: number; distance: number; view: MapView} | null>(null);
     const suppressClick = useRef(false);
     const {picker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
-        selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection, selectedAction} = useMapSelection();
+        selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection, selectedAction, workspace} = useMapSelection();
     useLayoutEffect(() => {
         setHovered(''); setFocused(''); setDismissedProvince('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
     }, [focusRevision]);
+    const revealedInspection = useRef<typeof inspection>(null);
+    // Reveal each explicit inspection once; resizing or returning to Map must not steal focus.
+    useEffect(() => {
+        if (inspection?.kind !== 'province' || revealedInspection.current === inspection ||
+            workspace !== 'map' || !mapSize) return;
+        const shape = geometry.provinces[inspection.id];
+        if (!shape) return;
+        revealedInspection.current = inspection;
+        const [x, y] = shape.label;
+        setView(current => clampMapView({...current, x: x - current.w / 2, y: y - current.h / 2},
+            bounds, mapSize));
+        setTabProvince(inspection.id);
+        svg.current?.querySelector<SVGGElement>(`[data-map-province="${inspection.id}"]`)?.focus();
+    }, [inspection, geometry, mapSize, workspace]);
     const prefix = useId().replace(/:/g, '');
     const catalog = snapshot.game.catalog;
     const definitions = useMemo(() => new Map(catalog?.provinces.map(province => [province.id, province])), [catalog]);

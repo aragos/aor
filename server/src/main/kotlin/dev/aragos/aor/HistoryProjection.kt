@@ -81,7 +81,19 @@ internal object HistoryProjection {
                     )
                 }
         }
-        var revisionEntries = emptyList<String>()
+        events.addAll(stored.auditEvents())
+        return PlayerHistory(
+            state,
+            lines,
+            events.sortedBy { it.id.substringBefore(':').toIntOrNull() ?: 0 },
+        )
+    }
+
+    /** Public audit facts are shared by viewers; prefixes are bounded and local to this replay. */
+    internal fun auditEvents(stored: StoredGame): List<HistoryEventView> {
+        val events = mutableListOf<HistoryEventView>()
+        val revisionEntries = mutableListOf<String>()
+        val prefixes = ReplayPrefixes(stored.header, stored.revisions)
         var revisionState = GameState(stored.header)
         stored.revisions.forEach { revision ->
             val before = revisionState
@@ -118,21 +130,17 @@ internal object HistoryProjection {
             }
             val prefix =
                 revision.replaceFrom?.let {
-                    replay(stored.header, revisionEntries.take(it))
+                    val prefix = prefixes.restore(revisionEntries, it)
+                    revisionEntries.subList(it, revisionEntries.size).clear()
+                    prefix
                 } ?: revisionState
             revisionState =
                 revision.entries.fold(prefix) { current, text ->
-                    current.step(TextCodec.parse(text))
+                    prefixes.step(current, TextCodec.parse(text))
                 }
-            revisionEntries =
-                revisionEntries.take(revision.replaceFrom ?: revisionEntries.size) +
-                    revision.entries
+            revisionEntries.addAll(revision.entries)
         }
-        return PlayerHistory(
-            state,
-            lines,
-            events.sortedBy { it.id.substringBefore(':').toIntOrNull() ?: 0 },
-        )
+        return events.toList()
     }
 
     /**

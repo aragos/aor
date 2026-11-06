@@ -49,28 +49,27 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
     override fun read(id: String): StoredGame = database.read { connection ->
         val row = row(connection, id)
         if (connection.isReadOnly) {
-            synchronized(cache) {
-                cache[id]
-                    ?.takeIf { it.version == row.version }
-                    ?.let {
-                        return@read it.game
-                    }
+            cached(row)?.let {
+                return@read it
             }
         }
         val game = decode(connection, row)
         if (connection.isReadOnly) {
-            synchronized(cache) {
-                cache[id] = Cached(row.version, game)
-                if (cache.size > 32) cache.remove(cache.keys.first())
-            }
+            remember(id, Cached(row.version, game))
         }
         game
     }
 
-    override fun update(id: String, transform: (StoredGame) -> StoredGame): StoredGame =
-        database.write { connection ->
+    override fun update(id: String, transform: (StoredGame) -> StoredGame): StoredGame {
+        val ownsTransaction = !database.inTransaction
+        val updated = database.write { connection ->
             val row = row(connection, id, lock = true)
-            val current = decode(connection, row)
+            val current =
+                if (ownsTransaction) {
+                    cached(row) ?: decode(connection, row)
+                } else {
+                    decode(connection, row)
+                }
             val next = transform(current)
             require(next.id == id) { "An update cannot change the game ID." }
             require(next.revisions.take(current.revisions.size) == current.revisions) {
@@ -88,7 +87,24 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
             insertRevisions(connection, id, next.revisions.drop(current.revisions.size))
             writePlayers(connection, next)
             writeRow(connection, row, next, root)
-            next
+            Cached(row.version + 1, next)
+        }
+        // Only the transaction owner knows that commit succeeded. Ambient transactions bypass
+        // the cache, including reads of their own uncommitted updates and eventual rollbacks.
+        if (ownsTransaction) remember(id, updated)
+        return updated.game
+    }
+
+    private fun cached(row: Row): StoredGame? =
+        synchronized(cache) {
+            cache[row.id]?.takeIf { it.version == row.version }?.game
+        }
+
+    private fun remember(id: String, value: Cached) =
+        synchronized(cache) {
+            // A slower reader or writer may finish publication after a newer transaction commits.
+            if ((cache[id]?.version ?: 0) <= value.version) cache[id] = value
+            if (cache.size > 32) cache.remove(cache.keys.first())
         }
 
     override fun ids(after: String?, limit: Int): List<String> = database.read { connection ->

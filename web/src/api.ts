@@ -102,7 +102,7 @@ export interface ScoreView {
     total: number | null; winner: boolean;
 }
 export interface CardTurnEffects {
-    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; protectionCash: number; patronageClaimants: string[]}[];
+    leaders: {leader: string; owner: string; role: 'DISPLAY' | 'EXPOSED'; protectionCash: number; patronageClaimants: string[]; mongolEnhanced?: boolean}[];
     enlightenedRulers: string[]; military: {player: string; event: string}[];
     papalCategory: string | null; crusadesPlayed: boolean;
 }

@@ -78,7 +78,12 @@ export async function checkExpansionLayout(page, web, baseline) {
         const initial = await bounds();
         assert(Math.abs(initial.status.left - initial.pool.left) < 1 && Math.abs(initial.status.width - initial.pool.width) < 1,
             `Your move matches the pool summary width at ${width}px`);
-        if (mobile) assert(initial.review.height >= 150, `Phone review has readable space: ${JSON.stringify(initial)}`);
+        if (mobile) {
+            assert(initial.review.height >= 150, `Phone review has readable space: ${JSON.stringify(initial)}`);
+            const heights = await page.evaluate(`[...document.querySelectorAll('.decision-actions button:not(.help-link)')].map(button => button.getBoundingClientRect().height)`);
+            assert(heights.every(height => height >= 44), 'Compact actions retain touch-sized targets');
+            assert(Math.max(...heights) - Math.min(...heights) < 1, 'Compact grouped buttons remain equally tall');
+        }
         assert(initial.map.height >= 100 && initial.hand.bottom <= height, 'Map and hand stay visible');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-expansion-review-${width}.png`));
         await page.evaluate(`document.querySelector('.decision-scroll').scrollTop = 100000`);

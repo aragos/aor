@@ -96,12 +96,14 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
             const picked = playerPicker?.selected.includes(player.id) || (!!swap && selectedAction === swap);
             const person = (snapshot.accountId || snapshot.viewerId === null) ? player.name.replace(/^@/, '') : player.name;
             const orderBox = snapshot.game.orderBoxes[player.id];
+            const score = snapshot.game.scores.find(score => score.player === player.id);
+            const scoreValue = score ? score.total ?? t('game.chaos') : '—';
             const whiteMarkers = snapshot.game.board.filter(province => province.marker?.owner === player.id && province.marker.side === 'WHITE').length;
             return <details data-player={player.id} key={player.id} className={`player-summary ${player.id === snapshot.viewerId ? 'is-viewer' : ''} ${active ? 'is-active' : ''} ${eligible ? 'eligible-target' : ''} ${picked ? 'picked-target' : ''}`}>
                 <summary aria-pressed={eligible ? picked : undefined} onClick={event => {
                     if (event.target instanceof Element && event.target.closest('button, a')) return;
                     if (eligible) { if (swap) setSelectedAction(selectedAction === swap ? '' : swap); else playerPicker?.pick(player.id);}
-                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}${orderBox !== undefined ? `, ${t('order.box', {box: orderBox})}` : ''}${status ? `, ${status}` : ''}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}`}>
+                }} aria-label={`${playerName(snapshot, player.id)}, ${player.name}${orderBox !== undefined ? `, ${t('order.box', {box: orderBox})}` : ''}${status ? `, ${status}` : ''}, ${t('game.cash')} $${player.cash}, ${t('table.income')} ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}, ${t('game.misery')} ${player.misery ?? t('game.chaos')}, ${t('game.ships')} ${fleet}, ${player.handCount} ${t('game.cards')}, ${player.advances.length} ${t('game.advances')}, ${t('game.score')} ${scoreValue}`}>
                     <span className="player-identity"><Emblem player={player}/><span className="player-labels"><strong>{player.capital ? provinceName(player.capital) : person}</strong>
                         {player.capital && <span className="player-person" title={player.name}>{person}</span>}</span>
                         {player.id === snapshot.viewerId && <small>{t('table.you')}</small>}</span>
@@ -112,6 +114,7 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                         <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
                         <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')}/></span></span>
                     <span className="player-status-row">
+                        <span className="player-score"><span>{t('game.score')}</span><b>{scoreValue}</b></span>
                         {orderBox !== undefined && <span className="player-turn-order">{t('order.box', {box: orderBox})}
                             <HelpLink topic="turn-order" label={t('reference.turnOrder')}/></span>}
                         {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
@@ -226,6 +229,7 @@ export function PlayedLeaders({snapshot}: {snapshot: Snapshot}) {
             <button type="button" className="map-link" onClick={() => setInspection({kind: 'history-card', id: leaderReference(leader.leader)})}>{label(leader.leader, 'leader')}</button>
             {claim && <button type="button" className="secondary" aria-pressed={selectedAction === claim.command} onClick={() => setSelectedAction(claim.command)}>{t('action.patronize')}</button>}
             <p className="small"><PlayerLabel snapshot={snapshot} id={leader.owner}/></p>
+            {leader.mongolEnhanced && <p className="small leader-enhancement">{t('table.mongolEnhanced')}</p>}
             {credits && <><p className="leader-credits-label">{t(credits.usable ? 'table.yourLeaderCredits' : 'table.leaderCredits')}</p>
                 {credits.discounts.map(discount => <div className="leader-discount" key={discount.advance}>
                     <span>{advanceName(discount.advance)}</span><LeaderCredit amount={credits.usable ? discount.effectiveDiscount : discount.conditionalAmount}

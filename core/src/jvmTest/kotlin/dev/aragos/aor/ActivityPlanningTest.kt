@@ -60,6 +60,34 @@ class ActivityPlanningTest {
     }
 
     @Test
+    fun anotherPlayersPurchasesAndTurnArrivalPreservePlannedConsequences() {
+        val initial = state()
+        val actions =
+            listOf(
+                PlannedAction("purchase-shipping", "pass"),
+                PlannedAction("purchase-advances", "buy-advance A"),
+                PlannedAction("purchase-advances", "pass"),
+                PlannedAction("purchase-stabilization", "stabilize cash"),
+            )
+        val before = ActivityPlanning.preview(initial, owner, actions)
+        val arrived =
+            listOf("pass", "buy-advance A", "pass", "stabilize cash").fold(initial) {
+                current,
+                command ->
+                TurnEngine.normalise(
+                    TextCodec.parseCommand(command).applyTo(current, PlayerId("p1"))
+                )
+            }
+
+        val after = ActivityPlanning.preview(arrived, owner, actions)
+
+        assertThat(arrived.flow.actor).isEqualTo(owner)
+        assertThat(after.effects).isEqualTo(before.effects)
+        assertThat(after.boundary).isEqualTo(before.boundary)
+        assertThat(after.diagnostic).isNull()
+    }
+
+    @Test
     fun immediateAbilitiesAffectLaterPricesInTheSamePlan() {
         val actions =
             listOf(

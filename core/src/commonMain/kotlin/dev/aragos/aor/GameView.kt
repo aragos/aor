@@ -182,12 +182,7 @@ data class GameView(
                 deckRemaining = state.deck.size,
                 unplayedCards = if (decisionOnly) emptyList() else CardAvailability.unplayed(state),
                 endingTriggered = state.endingTriggered,
-                scores =
-                    if (state.stage == Stage.FINISHED) {
-                        ScoreView.finalScores(state)
-                    } else {
-                        emptyList()
-                    },
+                scores = ScoreView.from(state),
                 adjustments = state.adjustments,
                 effects = state.effects,
                 cathedralPairs = CathedralPairView.from(state),
@@ -572,7 +567,7 @@ data class ActivityView(
     }
 }
 
-/** Chaos has no numeric score and cannot win. Tied active scores produce multiple winners. */
+/** Public current totals; only a finished game declares winners. Chaos has no numeric score. */
 data class ScoreView(
     val player: PlayerId,
     val advancePoints: Int,
@@ -582,7 +577,7 @@ data class ScoreView(
     val winner: Boolean,
 ) {
     companion object {
-        internal fun finalScores(state: GameState): List<ScoreView> {
+        internal fun from(state: GameState): List<ScoreView> {
             val scores =
                 state.playerIds.map { id ->
                     val player = state.playerState(id)
@@ -597,6 +592,7 @@ data class ScoreView(
                         false,
                     )
                 }
+            if (state.stage != Stage.FINISHED) return scores
             val winningScore = scores.mapNotNull(ScoreView::total).maxOrNull()
             return scores.map { score ->
                 score.copy(winner = score.total != null && score.total == winningScore)

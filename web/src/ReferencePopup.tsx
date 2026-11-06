@@ -9,8 +9,9 @@ import {AccessLock, LockedAreaPattern, PlayerPiece, SatellitePattern} from './ma
 import {MiseryBox} from './MiseryBox';
 import ruleOptions from './ruleOptions.json';
 import {TurnOrderReference} from './TurnOrderReference';
-import {ReferenceGameContext} from './HelpLink';
+import {HelpLink, ReferenceGameContext} from './HelpLink';
 import {ReferenceTrackPlayers} from './ReferenceTrackPlayers';
+import {useMapSelection} from './map/MapSelection';
 
 interface ReferenceData {catalog: PublicCatalog}
 let publicReference: Promise<ReferenceData> | undefined;
@@ -39,6 +40,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
     commodityChoices?: readonly string[];
 }) {
     const current = useContext(ReferenceGameContext);
+    const {setInspection} = useMapSelection();
     const players = current?.players ?? [];
     const [topic, setTopic] = useState(initialTopic);
     const [reference, setReference] = useState<ReferenceData | null>(null);
@@ -66,7 +68,18 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                 <h2>{t('reference.unplayedCardsTitle')}</h2>
                 <p>{t('reference.unplayedCardsHint')}</p>
                 {current?.unplayedCards?.length ? <ul className="unplayed-card-list">
-                    {current.unplayedCards.map(card => <li key={card.id} data-unplayed-card={card.id}>{t(card.messageId)}</li>)}
+                    {current.unplayedCards.map(card => {
+                        const commodities = current.cardInspections.find(info => info.definition.id === card.id)?.commodities ?? [];
+                        const [firstCommodity] = commodities;
+                        return <li key={card.id} data-unplayed-card={card.id}>
+                            {firstCommodity ? <HelpLink compact={false} label={t(card.messageId)}
+                                topic={`commodity-${firstCommodity.toLowerCase()}`} commodityChoices={commodities}/>
+                                : <button type="button" className="reference-link" aria-haspopup="dialog"
+                                    onClick={() => setInspection({kind: 'history-card', id: card.id})}>
+                                    {t(card.messageId)}
+                                </button>}
+                        </li>;
+                    })}
                 </ul> : <p>{t('reference.noUnplayedCards')}</p>}
             </section>}
             {(topic === 'variants' || topic.startsWith('variant-')) && <section id="variants"><h2>{t("reference.game-variants")}</h2>{ruleOptions.filter(variant => !topic.startsWith('variant-') || variant.key === topic.slice(8)).map(variant => <article id={`variant-${variant.key}`} key={variant.key}>

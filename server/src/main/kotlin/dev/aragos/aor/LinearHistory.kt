@@ -54,14 +54,36 @@ internal object LinearHistory {
             .asReversed()
     }
 
-    fun validate(stored: StoredGame, player: PlayerId, from: Int) {
+    /**
+     * Returns the validated destination state without enumerating every other rewind target.
+     * [state], when supplied, is the caller's already replayed effective history of [stored].
+     * [prefixes] belongs to the same ordered replay and is accessed only after scope validation.
+     */
+    fun validate(
+        stored: StoredGame,
+        player: PlayerId,
+        from: Int,
+        state: GameState? = null,
+        prefixes: ReplayPrefixes? = null,
+    ): GameState {
         if (stored.status != GameStatus.ACTIVE) throw ServiceFailure(422, "GAME_INACTIVE")
         val lower =
-            HistoryEdits.editableFrom(stored, player)
+            HistoryEdits.editableFrom(stored, player, state)
                 ?: throw ServiceFailure(403, "HISTORY_EDIT_FORBIDDEN")
-        if (from == stored.effectiveEntries().size) throw ServiceFailure(422, "HISTORY_NO_CHANGE")
-        if (from < lower || targets(stored, player).none { it.entryCount == from }) {
+        val entries = stored.effectiveEntries()
+        if (from == entries.size) throw ServiceFailure(422, "HISTORY_NO_CHANGE")
+        if (
+            from !in lower until entries.size ||
+                TextCodec.parse(entries[from].text) !is Entry.Action
+        ) {
             throw ServiceFailure(422, "HISTORY_EDIT_BOUNDARY")
         }
+        val destination =
+            prefixes?.restore(entries.map(RecordedEntry::text), from)
+                ?: replay(stored.header, entries.take(from).map(RecordedEntry::text))
+        if (runCatching { requireCompletedTransaction(destination) }.isFailure) {
+            throw ServiceFailure(422, "HISTORY_EDIT_BOUNDARY")
+        }
+        return destination
     }
 }
