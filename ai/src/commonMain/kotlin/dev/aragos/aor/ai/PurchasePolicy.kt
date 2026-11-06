@@ -34,6 +34,24 @@ private fun requireFeatures(features: Map<String, Double>) {
     }
 }
 
+internal fun requirePurchaseProjection(
+    encoderVersion: String,
+    stateFeatures: Map<String, Double>,
+    actions: List<PurchaseAction>,
+) {
+    require(encoderVersion == PurchaseObservationEncoder.ENCODER_VERSION) {
+        "Unsupported purchase observation encoder version."
+    }
+    requireFeatures(stateFeatures)
+    val commands = actions.map(PurchaseAction::command)
+    require(actions.size in 1..128 && commands.distinct().size == actions.size) {
+        "A purchase observation requires one through 128 distinct offered actions."
+    }
+    require(commands == commands.sorted()) {
+        "Purchase actions must use canonical command order."
+    }
+}
+
 /** One actual offered command and its raw quote/identity features, never a macro sequence. */
 data class PurchaseAction(val command: String, val features: Map<String, Double>) {
     init {
@@ -52,21 +70,7 @@ data class PurchaseObservation(
     val baselineIndex: Int,
 ) {
     init {
-        require(encoderVersion == PurchaseObservationEncoder.ENCODER_VERSION) {
-            "Unsupported purchase observation encoder version."
-        }
-        requireFeatures(stateFeatures)
-        require(
-            actions.size in 1..128 &&
-                actions.map(PurchaseAction::command).distinct().size == actions.size
-        ) {
-            "A purchase observation requires one through 128 distinct offered actions."
-        }
-        require(
-            actions.map(PurchaseAction::command) == actions.map(PurchaseAction::command).sorted()
-        ) {
-            "Purchase actions must use canonical command order."
-        }
+        requirePurchaseProjection(encoderVersion, stateFeatures, actions)
         require(baselineIndex in actions.indices) {
             "The purchase baseline must be an offered action."
         }
@@ -166,6 +170,12 @@ data class PurchasePolicyChoice(
 /** Experimental purchase-only inference; existing BotPolicy behavior is deliberately separate. */
 object PurchasePolicy {
     const val ACTOR_VERSION = "aor-purchase-policy-1"
+
+    /**
+     * Separate purchase sampling from the ordinary bot's decision seed. This salt is the exact
+     * collection contract; neither seed nor the resulting random draw is a model feature.
+     */
+    fun actorSeed(botSeed: Int): Int = botSeed xor 0x6a09e667
 
     fun evaluate(
         observation: PurchaseObservation,

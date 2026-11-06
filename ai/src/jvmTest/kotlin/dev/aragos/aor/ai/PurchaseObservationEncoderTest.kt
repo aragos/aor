@@ -63,6 +63,31 @@ class PurchaseObservationEncoderTest {
     }
 
     @Test
+    fun anUnboundProjectionRetainsTheOrdinaryViewsPublicCardInventory() {
+        val state = fixture()
+        val ordinary = state.viewForPlayer(buyer)
+        val offered = BotObservations.from(state, buyer)
+        val expected =
+            ordinary.unplayedCards
+                .groupingBy { it.id }
+                .eachCount()
+                .mapKeys { (id, _) ->
+                    "unplayed.$id"
+                }
+                .mapValues { (_, count) -> count.toDouble() }
+
+        val projected = PurchaseObservationEncoder.project(ordinary, buyer, offered)
+
+        assertThat(expected).isNotEmpty()
+        assertThat(state.viewForDecision(buyer).unplayedCards).isEmpty()
+        assertThat(projected.stateFeatures.filterKeys { it.startsWith("unplayed.") })
+            .isEqualTo(expected)
+        assertThat(projected.actions.map(PurchaseAction::command))
+            .containsExactlyElementsIn(offered.candidates.map(BotCandidate::command).sorted())
+            .inOrder()
+    }
+
+    @Test
     fun aRealPrerequisitePurchaseExposesItsNewlyLegalSuccessor() {
         val state = fixture()
         val before = encode(state)
