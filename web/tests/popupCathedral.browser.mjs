@@ -36,7 +36,7 @@ export async function checkPopupCathedral(page, web) {
         page.ws.addEventListener('message', intercept);
         await page.send('Fetch.enable', {patterns: [{urlPattern: '*ReferencePopup.tsx*', requestStage: 'Request'}]});
         try {
-            await page.evaluate(`document.querySelector('.game-header .help-link').focus(); document.activeElement.click()`);
+            await page.evaluate(`document.querySelector('.game-header [data-help-topic="unplayed-cards"]').focus(); document.activeElement.click()`);
             await page.wait(`document.querySelector('.reference-dialog[open] [role=status]')`, 'loading stays in a modal');
             assert(paused, 'The first reference module download is held while checking layout');
             await settle();
@@ -48,7 +48,7 @@ export async function checkPopupCathedral(page, web) {
             assert.deepEqual(await layout(), before, 'Loaded popup keeps the table and map stable');
             await click('.reference-popup .close-detail');
             await page.wait(`!document.querySelector('.reference-dialog')`, 'popup closes');
-            assert.equal(await page.evaluate(`document.activeElement.matches('.game-header .help-link')`), true,
+            assert.equal(await page.evaluate(`document.activeElement.matches('.game-header [data-help-topic="unplayed-cards"]')`), true,
                 'Focus returns to the opener even after delayed loading');
             assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Reference preserves the live bid draft');
             assert.deepEqual(await layout(), before, 'Closing the first popup keeps layout stable');
