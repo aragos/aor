@@ -25,6 +25,8 @@ data class CardChoiceView(
     val cashChanges: List<CashChangeView> = emptyList(),
     /** The card can be consumed without an effect because it has no legal target. */
     val noEffect: Boolean = false,
+    /** Certain marker-control and existing-token losses for an authorized area-targeted effect. */
+    val boardLosses: List<CardBoardLossView> = emptyList(),
 )
 
 /** Viewer-specific credit; authorization to use a played leader is projected separately. */
@@ -125,6 +127,7 @@ internal object CardProjection {
         val choice: CardChoice,
         val preview: CardMiseryPreview,
         val noEffect: Boolean,
+        val boardLosses: List<CardBoardLossView>,
     )
 
     fun inspections(state: GameState, viewer: PlayerState?): List<CardInspectionView> {
@@ -169,6 +172,7 @@ internal object CardProjection {
                             choice,
                             CardMiseryPreview.from(context, resolution),
                             noEffect = resolution is CardResolution.NoEffect,
+                            boardLosses = CardBoardProjection.losses(state.board, resolution),
                         )
                     } catch (_: CardRuleViolation) {
                         null
@@ -191,13 +195,14 @@ internal object CardProjection {
         val choices =
             legal
                 .filterNot { (choice) -> pirate && choice != CardChoice.None }
-                .map { (choice, preview, noEffect) ->
+                .map { (choice, preview, noEffect, boardLosses) ->
                     choiceView(card.reference, choice)
                         .copy(
                             miseryChanges = preview.changes,
                             miseryUncertainPlayers = preview.uncertainPlayers,
                             cashChanges = preview.cashChanges,
                             noEffect = noEffect,
+                            boardLosses = boardLosses,
                         )
                 } +
                 listOfNotNull(
