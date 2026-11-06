@@ -235,7 +235,8 @@ The experimental purchase actor controls every shipping and advance decision thr
 All other decisions use its frozen HARD baseline. Actual engine transitions regenerate prerequisites,
 prices and legal actions after each choice. The initial residual policy gives the baseline action
 97% probability and shares the remaining probability across every other offered purchase; updates
-learn from terminal win share and rank. This is a development experiment, not a qualified browser model.
+learn from terminal win share and rank. Each trained model requires fresh complete-game qualification
+before browser activation.
 
 Build `:training:installDist` and create an isolated Python environment with the pinned dependencies
 in [purchase-policy-requirements.txt](../scripts/purchase-policy-requirements.txt). The numerical
@@ -246,6 +247,10 @@ A collection source is a JSON object with `schemaVersion: 1`, one `configuration
 `policy` (null for exact baseline data, otherwise an experimental purchase-policy path). Relative
 paths resolve beside that source. Both baseline and learned policies use HARD opponents. The
 replacement seat and lineup rotate as in the full-game arena; use the same bank for paired controls.
+Optional `opponentPurchasePolicy` supplies one frozen purchase actor for every other seat. Each rival
+keeps its corresponding `opponents` model for its prior recommendation and all other decisions.
+Only the controlled seat produces training records. An absent or null opponent actor preserves the
+original collection format; a present actor adds its own fingerprint and immutable snapshot.
 
 ```sh
 python3 scripts/train-opponents.py --mode purchase-collect --source purchase-collection.json --output .aor-training/purchase-data --workers 6 --hours 2
@@ -270,9 +275,25 @@ The update uses complete-game returns and a learned value baseline, clipped poli
 parameter gradients and a behavior-KL limit. Rejected epochs restore both parameters and optimizer.
 Use the same sampled selector for collection and evaluation; greedy selection is a separate policy.
 The shared [encoder and inference](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/PurchasePolicy.kt)
-run on JVM and JavaScript. Ordinary automata continue using their existing model bundle. Fresh
-whole-game qualification and browser integration remain required before a neural policy can replace it.
-See [open learning work](follow-ups.md#autonomous-strategy-discovery) for the bounded pilot and gates.
+run on JVM and JavaScript. Numerical updates prepare validated sparse inputs once and preserve the
+same Float64 arithmetic, optimizer state and portable model output.
+
+The browser's separate [purchase asset](../web/src/ai/purchaseModel.json) is optional. Its manifest
+binds the exact baseline weights, actor/encoder versions, rules, catalog and qualified setup. The
+[selector](../ai/src/jsMain/kotlin/dev/aragos/aor/ai/PurchaseBotExports.kt) caches the decoded actor,
+computes the ordinary baseline recommendation and binds it to the server's actor-safe projection.
+Unsupported scopes and unavailable or incompatible actors retain that baseline. Preserve sampled
+selection and deterministic retries; greedy inference or a changed baseline requires requalification.
+The supported scope is HARD shipping and advance purchases in four-player standard-map games with
+No Crusades, the deck modification and immediate Master Art discard enabled. Other decisions and
+setups continue using the compatible baseline.
+
+Freeze training budgets, checkpoint-selection rules and unused confirmation worlds before launch.
+Compare complete games against both the unchanged initialization and the qualified baseline, then
+test learned rival populations. When testing several seats or continuations in one world, keep them
+together and compute uncertainty over independent worlds. Reports, checkpoints and generated model
+files stay in isolated experiment storage; they do not activate a browser model automatically.
+See [open learning work](follow-ups.md#autonomous-strategy-discovery) for broader strategy coverage.
 
 ## Token-purchase continuation learning
 

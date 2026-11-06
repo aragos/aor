@@ -133,64 +133,37 @@ student and fresh held-out validation. Execution alone does not qualify a model 
 
 ### Autonomous strategy discovery
 
-The next broad experiment should learn decisions from complete games, with human suggestions used
-as diagnostic positions and hypotheses. The learner must be able to try actions and combinations
-that neither the current heuristic nor a human example recommends. Further scalar-weight searches
-remain useful controls, but cannot discover consequences absent from their authored features.
+Build on the [complete-game purchase learner](contributing.md#purchase-policy-learning). Human
+suggestions should supply diagnostic positions and hypotheses, while training explores legal choices
+and repeated combinations beyond those suggestions. Qualification against other automata does not
+establish a serious challenge for experienced humans.
 
-- Qualify the experimental [purchase learner](contributing.md#purchase-policy-learning), which
-  controls shipping and advance purchases throughout complete games and keeps the qualified policy
-  for other decisions. Apply each choice through the actual engine and
-  regenerate legal offers, including newly acquired prerequisites and changed prices. This first
-  milestone cannot discover better card timing or broader expansion actions. Keep its policy and
-  value boundary extensible so those phases can follow.
-- Encode raw public and own-seat facts from the ordinary acting-player view, alongside legal action
-  identities, costs and effects. Use stable domain identities, not transient hand references. Share
-  the state encoding across candidate actions and preserve portable inference. Neither the policy
-  nor value callback may receive authoritative game state or unrevealed simultaneous submissions.
-- Initialize from qualified choices, then constrain early policy updates and exploration so small
-  per-decision error rates do not compound into uncontrolled whole-game behavior. Keep support for
-  every offered purchase, measure deviations and sequence coverage, and compare complete games
-  against the unchanged initialization. Agreement with the teacher is only a starting condition.
-- Collect complete trajectories with the current learner acting repeatedly across the turn. Update
-  from terminal results using an on-policy method such as [PPO](https://arxiv.org/abs/1707.06347), then
-  collect new games with the updated learner. A learned value baseline aims to reduce gradient variance.
-  A one-action intervention followed by the old policy is not equivalent to deploying the learner
-  throughout a game. Lower training loss or agreement with the old policy is not evidence of strength.
-- Keep deliberate exploration of low-ranked legal alternatives and audit action coverage. Current
-  bounded candidate subsets and static top-ranked beams can exclude useful actions. Regenerate legal
-  choices after every transition so acquired prerequisites and capabilities expose their actual
-  continuations. Broaden combinatorial choices with a bounded, recorded sampling policy.
-- Rotate a learner seat against a frozen diverse opponent population, and retain historical and
-  independently developed opponents for evaluation. Expand population self-play after the first
-  learner shows improvement; repeatedly exploiting one familiar opponent does not establish robust
-  playing strength.
-- Begin with a 256-game correctness and throughput smoke. Include a controlled delayed-reward
-  sequence check that must improve through policy updates, rather than merely fitting teacher
-  choices, plus actual-engine prerequisite, repricing, privacy and replay checks. Stop before a
-  larger run if these fail or repeated exploration produces a clear whole-game collapse.
-- Provisionally budget 8,192 training games in batches of 256 and at most four development checkpoint
-  evaluations; revise that budget from measured smoke costs before opening fresh training data.
-  Freeze implementation, exploration, time limits, seed banks and whole-game improvement and stop
-  criteria before launch. Stop at the budget if improvement is absent; do not expand the search after
-  seeing validation results. Independently confirm one frozen selection on untouched full games
-  with the same action-selection rule used during collection. Training loss and the delayed-reward
-  check establish neither playing strength nor a serious human challenge.
-- Keep all game generation, numerical learning, candidate selection, budgets, checkpoints and reports
-  in ordinary code. No LLM calls are required per decision, game or update. LLM review should focus on
-  implementation, failed milestones and strategic reassessment, with compact reports and selected
-  replays rather than repeated manual scheduling.
-- Add expensive search teachers only after proving that they improve choices on fresh continuations.
-  Start with exact, visible economic sequences where useful. Arbitrary-root search across hidden
-  cards requires a sampler conditioned on the acting player's permitted history; the existing exact
-  session fork does not provide this. A useful learned policy/value model can later guide search and
-  learn from its improved decisions through [Expert Iteration](https://arxiv.org/abs/1705.08439).
-
-This proposal reuses the authoritative executor, replay verification, resource supervisor and paired
-arenas. The purchase controller, complete-game collector, CPU learner and portable inference now provide
-the first implementation. Their numerical checks do not establish playing strength; the older
-four-choice commodity student remains a separate experiment. Measure simulation,
-encoding, fitting and inference costs separately before deciding whether the desktop GPU helps.
+- Evaluate the qualified purchase policy in human games and retain representative failures as
+  diagnostic positions. Distinguish improved purchase priorities from contextual planning, card
+  timing and expansion strength.
+- Extend repeated actor control to card timing, token commitments and expansion. Add versioned raw
+  observations and bounded legal-action coverage for each phase. A card-window pass ends that window;
+  testing retention while playing other cards requires continued control of the relevant decisions.
+- Expand population self-play and retain historical and independently developed rivals. Test several
+  learned automata together, balance seats across fresh worlds, and keep one world's counterfactual
+  roles or continuations together when estimating uncertainty.
+- Broaden supported setups only through separate qualification. Preserve the compatible baseline for
+  other player counts, variants and catalogs. Freeze compute budgets, exploration, checkpoint choice
+  and confirmation gates before opening fresh data; do not extend a failed search after validation.
+- Investigate whether full-tail action-return comparisons improve sample efficiency for rare choices.
+  Use actor-safe inputs and the frozen repeated policy for every continuation decision. Sample roots
+  prospectively, retain all sibling branches in one split, and compare against equal-compute learning.
+  Actual hidden worlds can supply noisy return targets; privileged per-world best-action labels or
+  hidden-aware continuations would teach a different, unavailable policy. Changing a fork's future
+  RNG does not resample its existing hands or deck.
+- Evaluate learned-value guidance for exact visible purchase sequences only with bounded search and
+  fresh action-ranking evidence. Search can amplify prediction error on unfamiliar states, and an
+  end-of-phase state may be outside the value encoder's trained domain. Broader hidden-information
+  search requires an actor-history-conditioned belief sampler. A verified teacher could support
+  [Expert Iteration](https://arxiv.org/abs/1705.08439).
+- Keep simulation, fitting, selection, budgets and reports in ordinary programs. Profile simulation,
+  encoding, fitting and inference separately before moving work to specialized hardware. Use LLM
+  review for failed milestones and strategic reassessment; no LLM calls are needed per game or update.
 
 ### Hardware experiment
 

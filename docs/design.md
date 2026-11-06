@@ -183,8 +183,17 @@ and shares a state embedding across action evaluation. A fixed HARD recommendati
 starting policy; a learned residual and value baseline train from repeated decisions in complete games.
 The authority and its chance stream stay outside the controller. Sealed decisions still use a common
 pre-submit state. Complete-game artifacts bind model, encoder, runtime and seed identities; their
-terminal labels are separate from actor inputs. Neural models use a separate experimental schema and
-have no automatic path into the browser's existing model bundle.
+terminal labels are separate from actor inputs. Neural models use a separate schema and require
+explicit qualification before browser activation.
+
+For supported HARD purchases, creator-only automation work includes a transient, baseline-free
+projection from the ordinary actor view. The decision-only view omits public unplayed cards and is
+insufficient for this encoder. The browser worker binds its actual baseline recommendation to the
+complete offered command list and uses the same seeded sampler as training. A separate optional asset
+binds the qualified setup and exact baseline; absent or incompatible assets and unsupported scopes
+retain ordinary behavior. The decoded actor is cached for the worker's lifetime. This projection is
+ephemeral work, so commands, saved games, recorded history and stale-operation fencing retain their
+existing contracts.
 
 The experimental `pilot` mode uses the same engine through resumable, forkable in-memory sessions.
 Its commodity teacher samples explicit known-information curriculum fixtures and trains a compact
