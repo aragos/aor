@@ -71,8 +71,10 @@ export async function checkSpectator(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('[data-province-outline][data-highlight-priority="1"]').length > 0`), true,
         'Spectators can inspect province connections using the map');
     await click('#tab-activity');
-    assert.equal(await page.evaluate(`document.querySelectorAll('[data-event-id]').length`), baseline.events.filter(event => event.kind !== 'PASS').length,
-        'Public activity remains available');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.activity-list [data-activity-member]')]
+        .map(entry => entry.dataset.activityMember).sort()`),
+        baseline.events.filter(event => event.kind !== 'PASS').map(event => event.id).sort(),
+        'Public activity retains every recorded event exactly once within its groups');
     await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS ?? '/private/tmp', 'aor-spectator-desktop.png'), 1280, 900);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
     await page.wait(`document.querySelector('#tab-players')`, 'mobile spectator players tab');

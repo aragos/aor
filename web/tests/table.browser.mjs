@@ -153,7 +153,10 @@ export async function checkTable(page, web, baseline) {
     await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     assert.equal(await page.evaluate(`document.querySelector('.table-activity .unread-badge, .table-activity h2, .table-activity h3')`), null, 'Activity has no heading or unread count');
     await show({revision:fixture.revision+1,events:updatedEvents});
-    assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.activity-list [data-event-id]')].map(entry=>entry.dataset.eventId)).size`), updatedEvents.filter(event=>event.kind!=='PASS').length, 'Repeated polling keeps stable unique activity entries');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.activity-list [data-activity-member]')]
+        .map(entry => entry.dataset.activityMember).sort()`),
+        updatedEvents.filter(event => event.kind !== 'PASS').map(event => event.id).sort(),
+        'Repeated polling retains every recorded event exactly once within activity groups');
     assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.command-dock > summary')`), true, 'Activity updates preserve focus');
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /−\$10/,
         'Activity includes the cash spent in its purchase entry');
