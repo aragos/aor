@@ -18,7 +18,7 @@ export function CardInspectionDialog({label, close, children, className = ''}: {
         };
     }, []);
     return <dialog ref={ref} className={`card-inspection-dialog ${className}`} aria-label={label}
-        onCancel={event => {event.preventDefault(); close();}}
+        onCancel={event => {event.preventDefault(); event.stopPropagation(); close();}}
         onClick={event => {
             if (event.target !== event.currentTarget) return;
             const bounds = event.currentTarget.getBoundingClientRect();

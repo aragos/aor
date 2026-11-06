@@ -22,6 +22,16 @@ data class BoardMapDefinition(
         provinces.associateBy(ProvinceDefinition::id)
     }
 
+    private val shippingGraphs: Map<Int, ShippingGraph> by lazy {
+        (3..capitalOrder.size).associateWith { playerCount -> ShippingGraph(this, playerCount) }
+    }
+
+    /** Static graphs are shared across states; copied map definitions own fresh graphs. */
+    internal fun shippingGraph(playerCount: Int): ShippingGraph =
+        requireNotNull(shippingGraphs[playerCount]) {
+            "This map supports three through ${capitalOrder.size} players."
+        }
+
     fun province(id: ProvinceId): ProvinceDefinition =
         requireNotNull(byId[id]) { "Unknown province on this map: $id." }
 

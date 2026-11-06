@@ -385,8 +385,9 @@ internal object GameDocuments {
         }
     }
 
-    private fun validateRevisions(game: StoredGame): GameState =
-        game.revisions.withIndex().fold(GameState(game.header)) { state, (index, revision) ->
+    private fun validateRevisions(game: StoredGame): GameState {
+        val prefixes = ReplayPrefixes(game.header, game.revisions)
+        return game.revisions.withIndex().fold(GameState(game.header)) { state, (index, revision) ->
             require(
                 revision.id == game.baseRevision + index + 1 &&
                     revision.parent ==
@@ -509,7 +510,7 @@ internal object GameDocuments {
                             "replacement operation."
                     }
                     AccountId(revision.adminAuthor)
-                    val restored = replay(game.header, revision.entries)
+                    val restored = prefixes.reset(revision.entries)
                     require(
                         revision.entries ==
                             revision.entries.map(TextCodec::parse).map(Entry::toText)
@@ -550,6 +551,17 @@ internal object GameDocuments {
                     ) {
                         "Linear game accepts only canonical empty-suffix rewinds."
                     }
+                    if (previous.undoPolicy == UndoPolicy.LINEAR_GAME) {
+                        // The fold has already validated this source state. Validate only the
+                        // requested destination instead of replaying every possible target.
+                        return@fold LinearHistory.validate(
+                            stored = previous,
+                            player = revision.author,
+                            from = revision.replaceFrom,
+                            state = state,
+                            prefixes = prefixes,
+                        )
+                    }
                     val actions =
                         HistoryEdits.retainedLines(
                             previous,
@@ -575,12 +587,11 @@ internal object GameDocuments {
                         "Edited history must preserve recorded outcomes and its canonical " +
                             "edit command."
                     }
-                    replay(
-                        game.header,
+                    prefixes.reset(
                         previous
                             .effectiveEntries()
                             .take(revision.replaceFrom)
-                            .map(RecordedEntry::text) + expected,
+                            .map(RecordedEntry::text) + expected
                     )
                 }
                 revision.undoPolicy != null && index > 0 -> {
@@ -597,11 +608,17 @@ internal object GameDocuments {
                     }
                     state
                 }
-                else -> validateRevision(state, index, revision)
+                else -> validateRevision(state, index, revision, prefixes)
             }
         }
+    }
 
-    private fun validateRevision(state: GameState, index: Int, revision: Revision): GameState {
+    private fun validateRevision(
+        state: GameState,
+        index: Int,
+        revision: Revision,
+        prefixes: ReplayPrefixes,
+    ): GameState {
         require(revision.author in state.playerIds) {
             "Revision authors must be registered players."
         }
@@ -617,7 +634,7 @@ internal object GameDocuments {
         require(revision.entries == entries.map(TextCodec::print)) {
             "Stored entries must use canonical text."
         }
-        val next = entries.fold(state) { current, entry -> current.step(entry) }
+        val next = entries.fold(state, prefixes::step)
         requireCompletedTransaction(next)
         return next
     }

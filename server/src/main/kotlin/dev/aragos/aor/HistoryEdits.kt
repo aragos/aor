@@ -35,34 +35,22 @@ data class UndoView(
 /** Reject the whole proposed revision on any scope, dependency or randomness mismatch. */
 internal object HistoryEdits {
     fun view(stored: StoredGame, player: PlayerId?): UndoView {
+        val linear = stored.undoPolicy == UndoPolicy.LINEAR_GAME
         val entries = stored.effectiveEntries()
         val lower = player?.let { editableFrom(stored, it) }
-        var state = GameState(stored.header)
-        val actions = buildList {
-            entries.forEachIndexed { index, recorded ->
-                val entry = TextCodec.parse(recorded.text)
-                if (lower != null && index >= lower && entry is Entry.Action) {
-                    add(
-                        EditableActionView(
-                            index,
-                            entry.actor,
-                            HistoryProjection.line(state, entry, player),
-                        )
-                    )
-                }
-                state = state.step(entry)
-            }
-        }
+        val actions = if (linear) emptyList() else editableActions(stored, player, lower)
         val target =
-            if (stored.undoPolicy == UndoPolicy.LINEAR_GAME && player != null)
+            if (linear && player != null) {
                 LinearHistory.targets(stored, player).firstOrNull()
-            else null
+            } else {
+                null
+            }
         val available =
-            player != null &&
+            !linear &&
+                player != null &&
                 (actions.lastOrNull()?.let { action ->
                     runCatching { replacement(stored, player, action.entry, emptyList()) }.isSuccess
                 } ?: false)
-        val linear = stored.undoPolicy == UndoPolicy.LINEAR_GAME
         return UndoView(
             stored.undoPolicy,
             if (linear) target != null else available,
@@ -74,7 +62,7 @@ internal object HistoryEdits {
                         it.administrativeAction == AdministrativeAction.UPGRADE
                 }
                 ?.id ?: 0,
-            if (linear) emptyList() else actions,
+            actions,
             when {
                 lower == null -> HistoryCapability.NONE
                 linear -> HistoryCapability.PREFIX_REWIND
@@ -83,6 +71,30 @@ internal object HistoryEdits {
             target,
             stored.revisions.any { it.command == "upgrade-linear-game" },
         )
+    }
+
+    private fun editableActions(
+        stored: StoredGame,
+        player: PlayerId?,
+        lower: Int?,
+    ): List<EditableActionView> {
+        if (lower == null) return emptyList()
+        var state = GameState(stored.header)
+        return buildList {
+            stored.effectiveEntries().forEachIndexed { index, recorded ->
+                val entry = TextCodec.parse(recorded.text)
+                if (index >= lower && entry is Entry.Action) {
+                    add(
+                        EditableActionView(
+                            index,
+                            entry.actor,
+                            HistoryProjection.line(state, entry, player),
+                        )
+                    )
+                }
+                state = state.step(entry)
+            }
+        }
     }
 
     fun undo(stored: StoredGame, player: PlayerId, target: Int? = null): StoredGame {
@@ -297,26 +309,37 @@ internal object HistoryEdits {
         return replacement
     }
 
-    internal fun editableFrom(stored: StoredGame, player: PlayerId): Int? {
+    /** [state], when supplied by revision validation, is the already replayed effective history. */
+    internal fun editableFrom(
+        stored: StoredGame,
+        player: PlayerId,
+        state: GameState? = null,
+    ): Int? {
         if (stored.undoPolicy == UndoPolicy.COMPETITIVE) return null
         val recorded = stored.effectiveEntries().map { TextCodec.parse(it.text) }
-        var state = GameState(stored.header)
-        var setupEnd: Int? = null
-        recorded.forEachIndexed { index, entry ->
-            state = state.step(entry)
-            if (setupEnd == null && state.turnNumber != null) setupEnd = index + 1
+        var setupState = GameState(stored.header)
+        val setupEnd = recorded.indexOfFirst { entry ->
+            setupState = setupState.step(entry)
+            setupState.turnNumber != null
         }
-        val setup = setupEnd ?: return null
+        if (setupEnd < 0) return null
+        val setup = setupEnd + 1
         if (
             stored.undoPolicy in setOf(UndoPolicy.FRIENDLY_GAME, UndoPolicy.LINEAR_GAME) &&
                 player == stored.header.creatorId
         ) {
             return setup
         }
-        val prompt = state.prompts().singleOrNull() as? Prompt.SinglePlayer
-        val owner = state.flow.actor ?: prompt?.player
-        if (owner != player || state.stage == Stage.FINISHED) return null
-        val activity = if (state.flow.actor == null) state.decisionStart else state.activityStart
+        val current = state ?: stored.state()
+        val prompt = current.prompts().singleOrNull() as? Prompt.SinglePlayer
+        val owner = current.flow.actor ?: prompt?.player
+        if (owner != player || current.stage == Stage.FINISHED) return null
+        val activity =
+            if (current.flow.actor == null) {
+                current.decisionStart
+            } else {
+                current.activityStart
+            }
         val lower = maxOf(setup, activity)
         if (stored.undoPolicy != UndoPolicy.REGULAR_TURN) return lower
         val boundary =

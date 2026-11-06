@@ -100,6 +100,13 @@ data class StoredGame(
         replay(header, effectiveEntries().map(RecordedEntry::text))
     }
 
+    private val cachedAuditEvents: List<HistoryEventView> by lazy {
+        HistoryProjection.auditEvents(this)
+    }
+
+    /** Entry-time public audit facts belong to this exact immutable revision history. */
+    internal fun auditEvents(): List<HistoryEventView> = cachedAuditEvents
+
     fun state(): GameState = cachedState
 }
 

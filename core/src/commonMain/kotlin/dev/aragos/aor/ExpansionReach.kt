@@ -313,19 +313,8 @@ object ExpansionReach {
         context: BoardRulesContext,
         from: ShippingSpace,
     ): Set<ShippingSpace> =
-        when (from) {
-            is ShippingSpace.Coast ->
-                neighbors(context.configuration.coastalConnections, from.province)
-                    .map { province -> ShippingSpace.Coast(province) }
-                    .toSet() +
-                    context.configuration.seaCoasts
-                        .filter { connection -> connection.province == from.province }
-                        .map { connection -> ShippingSpace.Sea(connection.sea) }
-            is ShippingSpace.Sea ->
-                context.configuration.seaCoasts
-                    .filter { connection -> connection.sea == from.sea }
-                    .map { connection -> ShippingSpace.Coast(connection.province) }
-                    .toSet()
+        context.configuration.let { configuration ->
+            configuration.map.shippingGraph(configuration.playerCount)[from]
         }
 
     private fun directShipping(base: ProvinceId, destination: ProvinceId): ExpansionRoute.Shipping =
