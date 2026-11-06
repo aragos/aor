@@ -171,7 +171,14 @@ object PurchaseObservationEncoder {
         seat: PlayerId,
         observation: BotObservation,
         baselineCommand: String,
-    ): PurchaseObservation {
+    ): PurchaseObservation = project(view, seat, observation).bindBaseline(baselineCommand)
+
+    /** Project ordinary actor facts independently of a separately loaded baseline model. */
+    fun project(
+        view: GameView,
+        seat: PlayerId,
+        observation: BotObservation,
+    ): PurchaseProjection {
         require(view.stage == Stage.PURCHASE && observation.decision in decisions) {
             "The experimental actor controls shipping and advance purchases only."
         }
@@ -286,10 +293,9 @@ object PurchaseObservationEncoder {
                     action(view, seat, TextCodec.parseCommand(candidate.command), ::role),
                 )
             }
-        return PurchaseObservation(
+        return PurchaseProjection(
             stateFeatures = state,
             actions = actions,
-            baselineIndex = actions.indexOfFirst { it.command == baselineCommand },
         )
     }
 
