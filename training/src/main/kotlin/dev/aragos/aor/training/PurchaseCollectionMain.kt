@@ -15,7 +15,7 @@ object PurchaseCollectionMain {
         val inputs =
             listOf(input.source, input.baseline.path) +
                 input.opponents.map { it.path } +
-                listOfNotNull(input.policyPath)
+                listOfNotNull(input.policyPath, input.opponentPurchasePolicy?.path)
         Files.createDirectories(options.output)
         val output = options.output.toRealPath()
         require(inputs.none { it.startsWith(output) }) {

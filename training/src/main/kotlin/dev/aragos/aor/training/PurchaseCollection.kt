@@ -1,8 +1,6 @@
 package dev.aragos.aor.training
 
-import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ai.BotDifficulty
-import dev.aragos.aor.ai.BotPolicy
 import dev.aragos.aor.ai.PurchaseObservation
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicy
@@ -58,47 +56,26 @@ internal class PurchaseCollector(
         val seat = input.seat(index)
         val records = mutableListOf<PurchaseDecisionRecord>()
         val controller =
-            object : SimulationController {
-                override fun controls(decision: String): Boolean =
-                    decision in setOf("purchase-shipping", "purchase-advances")
-
-                override fun choose(decision: SimulationDecision): String {
-                    val baseline =
-                        BotPolicy.choose(
-                            decision.observation,
-                            BotDifficulty.HARD,
-                            decision.seed,
-                            input.baseline.model,
-                        )
-                    val observation =
-                        PurchaseObservationEncoder.from(
-                            decision.view,
-                            PlayerId(decision.observation.playerId),
-                            decision.observation,
-                            baseline,
-                        )
-                    val actorSeed = samplingSeed(decision.seed)
-                    val chosen =
-                        input.policy?.let { PurchasePolicy.choose(observation, it, actorSeed) }
-                    val selected = chosen?.index ?: observation.baselineIndex
-                    records.add(
-                        PurchaseDecisionRecord(
-                            decision.number,
-                            actorSeed,
-                            decision.observation.decision,
-                            requireNotNull(decision.view.turnNumber) {
-                                "A purchase decision requires its actual game turn."
-                            },
-                            observation,
-                            selected,
-                            chosen?.logProbability,
-                            chosen?.value,
-                        )
-                    )
-                    return observation.actions[selected].command
-                }
+            PurchaseActorController(input.baseline.model, input.policy) {
+                records.add(it)
             }
         val opponents = input.opponentIndices(index)
+        val opponentControllers =
+            input.opponentPurchasePolicy?.let { actor ->
+                opponents
+                    .mapIndexedNotNull { player, opponent ->
+                        if (player == seat) {
+                            null
+                        } else {
+                            player to
+                                PurchaseActorController(
+                                    input.opponents[opponent].model,
+                                    actor.model,
+                                )
+                        }
+                    }
+                    .toMap()
+            } ?: emptyMap()
         val game =
             Simulation()
                 .play(
@@ -113,7 +90,7 @@ internal class PurchaseCollector(
                             )
                         },
                     deadlineNanos = deadlineNanos,
-                    controllers = mapOf(seat to controller),
+                    controllers = opponentControllers + (seat to controller),
                 )
         return PurchaseGameTrajectory(
             signature = signature,
@@ -134,12 +111,5 @@ internal class PurchaseCollector(
                     game.steps,
                 ),
         )
-    }
-
-    companion object {
-        /**
-         * A separate deterministic actor stream; neither this seed nor chance RNG enters features.
-         */
-        internal fun samplingSeed(baselineSeed: Int): Int = baselineSeed xor 0x6a09e667
     }
 }
