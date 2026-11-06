@@ -11,6 +11,30 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-value-pilot") }) {
+        TokenValuePilotMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "strategy-replay") }) {
+        StrategyReplayMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "strategy-search") }) {
+        StrategySearchMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "arena") }) {
+        StrategyArenaMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "pilot-diagnose") }) {
+        PilotDiagnosticMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "pilot") }) {
+        PilotMain.run(arguments.toList())
+        return
+    }
     if (arguments.contentEquals(arrayOf("--help"))) {
         println(
             """
@@ -19,6 +43,12 @@ fun main(arguments: Array<String>) {
             --mode coverage|train|evaluate  --output PATH  --hours HOURS (maximum 72)
             --workers N  --configurations 1..128  --seeds N  --seed N
             --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
+            --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
+            --mode pilot-diagnose --source PATH --output PATH --samples N --seed N
+            --mode arena --source COMPARISON_JSON --output PATH --hours HOURS --workers N
+            --mode strategy-search --source SEARCH_JSON --output PATH --hours HOURS --workers N
+            --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
+            --mode strategy-replay --source COMPARISON_JSON --output PATH --index N --side candidate|incumbent
             Reuse a train output directory to resume its original model and completed rounds.
             Outputs: trainer.log, coverage.json, checkpoint.json, candidate.json, model.json,
             evaluation.json, state.json and append-only games.jsonl/rounds.jsonl.

@@ -20,6 +20,73 @@ spec.loader.exec_module(training)
 
 
 class OptionsAndBudgetTest(unittest.TestCase):
+    def test_arena_requires_its_frozen_specification(self):
+        with self.assertRaises(SystemExit):
+            training.parse_options(["--mode", "arena"])
+
+    def test_arena_rejects_settings_outside_its_specification(self):
+        for flag in ("--pairs", "--samples", "--seed", "--model", "--rounds"):
+            with self.subTest(flag=flag), self.assertRaises(SystemExit):
+                training.parse_options(["--mode", "arena", "--source", "/tmp/spec.json", flag, "1"])
+
+    def test_search_specification_is_forwarded_to_the_trainer(self):
+        options = training.parse_options([
+            "--mode", "strategy-search", "--source", "/tmp/search.json",
+            "--output", "/tmp/search-output",
+        ])
+        self.assertEqual(options.mode, "strategy-search")
+        self.assertEqual(options.source, Path("/tmp/search.json").resolve())
+
+    def test_search_requires_its_frozen_specification(self):
+        with self.assertRaises(SystemExit):
+            training.parse_options(["--mode", "strategy-search"])
+
+    def test_token_value_pilot_forwards_only_its_frozen_specification_and_budget(self):
+        options = training.parse_options([
+            "--mode", "token-value-pilot", "--source", "/tmp/token-value-spec.json",
+            "--output", "/tmp/token-value-output", "--workers", "3",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB), 3)
+
+        arguments = training.trainer_arguments(options, budget, 2.5)
+
+        self.assertEqual(arguments[arguments.index("--mode") + 1], "token-value-pilot")
+        self.assertEqual(arguments[arguments.index("--source") + 1],
+                         str(Path("/tmp/token-value-spec.json").resolve()))
+        self.assertEqual(arguments[arguments.index("--workers") + 1], "3")
+        self.assertEqual(arguments[arguments.index("--hours") + 1], "2.5")
+
+    def test_token_value_pilot_requires_its_specification(self):
+        with self.assertRaises(SystemExit):
+            training.parse_options(["--mode", "token-value-pilot"])
+
+    def test_token_value_pilot_rejects_cli_overrides_of_frozen_settings(self):
+        for flag in ("--pairs", "--samples", "--seed", "--model", "--rounds"):
+            with self.subTest(flag=flag), self.assertRaises(SystemExit):
+                training.parse_options([
+                    "--mode", "token-value-pilot", "--source", "/tmp/token-value-spec.json",
+                    flag, "1",
+                ])
+
+    def test_strategy_replay_limits_the_single_inspection_job(self):
+        options = training.parse_options([
+            "--mode", "strategy-replay", "--source", "/tmp/spec.json",
+            "--output", "/tmp/replay", "--index", "2", "--side", "incumbent",
+            "--pair", "/tmp/pair-2.json",
+        ])
+
+        self.assertEqual(options.workers, 1)
+        self.assertEqual(options.hours, 1.0)
+        arguments = training.trainer_arguments(
+            options, training.resource_budget(training.Hardware(10, 64 * training.GIB), 1), 1.0)
+        self.assertEqual(arguments[arguments.index("--index") + 1], "2")
+        self.assertEqual(arguments[arguments.index("--side") + 1], "incumbent")
+        self.assertEqual(arguments[arguments.index("--pair") + 1], str(Path("/tmp/pair-2.json").resolve()))
+
+    def test_replay_index_is_rejected_in_other_modes(self):
+        with self.assertRaises(SystemExit):
+            training.parse_options(["--mode", "pilot", "--index", "1"])
+
     def test_worker_heap_and_cpu_limits_are_derived_from_actual_hardware(self):
         budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
 
@@ -61,6 +128,133 @@ class OptionsAndBudgetTest(unittest.TestCase):
         self.assertEqual(arguments[arguments.index("--rounds") + 1], "96")
         self.assertNotIn("--", arguments)
 
+    def test_pilot_flags_are_forwarded_with_resource_limits(self):
+        options = training.parse_options([
+            "--mode", "pilot", "--output", ".aor-training/pilot", "--model", "model.json",
+            "--workers", "4", "--seed", "17", "--benchmark-games", "8", "--positions", "64",
+            "--samples", "8", "--pairs", "512",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB), options.workers)
+
+        arguments = training.trainer_arguments(options, budget, 3.5)
+
+        for flag, expected in (("--mode", "pilot"), ("--workers", "4"), ("--hours", "3.5"),
+                               ("--seed", "17"), ("--benchmark-games", "8"), ("--positions", "64"),
+                               ("--samples", "8"), ("--pairs", "512"),
+                               ("--model", str(Path("model.json").resolve()))):
+            with self.subTest(flag=flag):
+                self.assertEqual(arguments[arguments.index(flag) + 1], expected)
+        self.assertNotIn("--", arguments)
+
+    def test_unspecified_pilot_counts_leave_defaults_to_the_trainer(self):
+        options = training.parse_options(["--mode", "pilot"])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
+
+        arguments = training.trainer_arguments(options, budget, 4)
+
+        for flag in ("--benchmark-games", "--positions", "--samples", "--pairs"):
+            self.assertNotIn(flag, arguments)
+
+    def test_diagnostic_flags_are_forwarded_with_resource_limits(self):
+        options = training.parse_options([
+            "--mode", "pilot-diagnose", "--source", ".aor-training/pilot-round-2",
+            "--output", ".aor-training/diagnostic", "--workers", "4", "--samples", "32",
+            "--seed", "20261107",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB), options.workers)
+
+        arguments = training.trainer_arguments(options, budget, 1.5)
+
+        for flag, expected in (
+                ("--mode", "pilot-diagnose"), ("--workers", "4"), ("--hours", "1.5"),
+                ("--samples", "32"), ("--seed", "20261107"),
+                ("--source", str(Path(".aor-training/pilot-round-2").resolve()))):
+            with self.subTest(flag=flag):
+                self.assertEqual(arguments[arguments.index(flag) + 1], expected)
+        self.assertNotIn("--model", arguments)
+
+    def test_unspecified_diagnostic_counts_leave_defaults_to_the_trainer(self):
+        options = training.parse_options([
+            "--mode", "pilot-diagnose", "--source", ".aor-training/pilot-round-2",
+        ])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
+
+        arguments = training.trainer_arguments(options, budget, 2)
+
+        self.assertNotIn("--samples", arguments)
+        self.assertNotIn("--seed", arguments)
+
+    def test_diagnostic_requires_a_source_pilot(self):
+        with patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                training.parse_options(["--mode", "pilot-diagnose"])
+
+    def test_diagnostic_rejects_options_that_would_change_the_source_experiment(self):
+        for flag, value in (
+                ("--model", "model.json"), ("--benchmark-games", "1"), ("--positions", "2"),
+                ("--pairs", "1"), ("--configurations", "1"), ("--seeds", "1"),
+                ("--rounds", "1"), ("--batch", "1"), ("--difficulty", "HARD")):
+            with self.subTest(flag=flag), patch("sys.stderr", new_callable=io.StringIO):
+                with self.assertRaises(SystemExit):
+                    training.parse_options([
+                        "--mode", "pilot-diagnose", "--source", ".aor-training/pilot-round-2",
+                        flag, value,
+                    ])
+
+    def test_source_is_rejected_outside_diagnostic_mode(self):
+        for mode in ("coverage", "train", "evaluate", "pilot"):
+            with self.subTest(mode=mode), patch("sys.stderr", new_callable=io.StringIO):
+                with self.assertRaises(SystemExit):
+                    training.parse_options(["--mode", mode, "--source", ".aor-training/pilot"])
+
+    def test_diagnostic_output_cannot_overlap_its_source(self):
+        for source, output in (("pilot", "pilot"), ("pilot", "pilot/diagnostic"),
+                               ("diagnostic/pilot", "diagnostic")):
+            with self.subTest(source=source, output=output), \
+                    patch("sys.stderr", new_callable=io.StringIO):
+                with self.assertRaises(SystemExit):
+                    training.parse_options([
+                        "--mode", "pilot-diagnose", "--source", source, "--output", output,
+                    ])
+
+    def test_pilot_counts_must_stay_within_their_supported_bounds(self):
+        for flag, minimum, maximum in (("--benchmark-games", 1, 10000), ("--positions", 2, 10000),
+                                       ("--samples", 1, 256), ("--pairs", 1, 100000)):
+            for value in ("0", "-1", str(minimum - 1), str(maximum + 1)):
+                with self.subTest(flag=flag, value=value), \
+                        patch("sys.stderr", new_callable=io.StringIO):
+                    with self.assertRaises(SystemExit):
+                        training.parse_options(["--mode", "pilot", flag, value])
+
+    def test_pilot_options_are_rejected_in_legacy_modes(self):
+        for mode in ("coverage", "train", "evaluate"):
+            for flag in ("--benchmark-games", "--positions", "--samples", "--pairs"):
+                with self.subTest(mode=mode, flag=flag), \
+                        patch("sys.stderr", new_callable=io.StringIO):
+                    with self.assertRaises(SystemExit):
+                        training.parse_options(["--mode", mode, flag, "2"])
+
+    def test_minimal_pilot_accepts_separate_training_and_validation_positions(self):
+        options = training.parse_options(["--mode", "pilot", "--positions", "2"])
+
+        self.assertEqual(options.positions, 2)
+
+    def test_legacy_tuning_options_are_rejected_in_pilot_mode(self):
+        for flag, value in (("--configurations", "1"), ("--seeds", "1"), ("--rounds", "1"),
+                            ("--batch", "1"), ("--difficulty", "HARD")):
+            with self.subTest(flag=flag), patch("sys.stderr", new_callable=io.StringIO):
+                with self.assertRaises(SystemExit):
+                    training.parse_options(["--mode", "pilot", flag, value])
+
+    def test_default_coverage_invocation_has_no_pilot_flags(self):
+        options = training.parse_options([])
+        budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
+
+        arguments = training.trainer_arguments(options, budget, 12)
+
+        self.assertEqual(arguments, [str(training.TRAINER), "--mode", "coverage", "--output",
+                                    str(options.output), "--workers", "6", "--hours", "12"])
+
     def test_native_resume_does_not_replace_the_original_training_baseline(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
@@ -81,6 +275,37 @@ class OptionsAndBudgetTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "state.json"):
                 training.trainer_arguments(options, budget, 12)
+
+    def test_pilot_resume_preserves_native_checkpoint_without_selecting_another_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            (output / "state.json").write_text("{}")
+            options = training.parse_options(["--mode", "pilot", "--output", directory, "--resume"])
+            budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
+
+            arguments = training.trainer_arguments(options, budget, 4)
+
+            self.assertNotIn("--model", arguments)
+            self.assertNotIn("--resume", arguments)
+            self.assertEqual(arguments[arguments.index("--mode") + 1], "pilot")
+
+    def test_diagnostic_resume_requires_its_own_checkpoint_and_retains_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "diagnostic"
+            output.mkdir()
+            (output / "state.json").write_text("{}")
+            source = Path(directory) / "pilot"
+            options = training.parse_options([
+                "--mode", "pilot-diagnose", "--source", str(source),
+                "--output", str(output), "--resume",
+            ])
+            budget = training.resource_budget(training.Hardware(10, 64 * training.GIB))
+
+            arguments = training.trainer_arguments(options, budget, 2)
+
+            self.assertEqual(arguments[arguments.index("--source") + 1], str(source.resolve()))
+            self.assertNotIn("--resume", arguments)
+            self.assertNotIn("--model", arguments)
 
     def test_inherited_jvm_options_cannot_override_the_supervisor_budget(self):
         hardware = training.Hardware(10, 64 * training.GIB)
