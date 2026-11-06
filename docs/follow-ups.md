@@ -138,8 +138,9 @@ as diagnostic positions and hypotheses. The learner must be able to try actions 
 that neither the current heuristic nor a human example recommends. Further scalar-weight searches
 remain useful controls, but cannot discover consequences absent from their authored features.
 
-- Start with a learner controlling every shipping and advance purchase throughout complete games;
-  keep the qualified policy for other decisions. Apply each choice through the actual engine and
+- Qualify the experimental [purchase learner](contributing.md#purchase-policy-learning), which
+  controls shipping and advance purchases throughout complete games and keeps the qualified policy
+  for other decisions. Apply each choice through the actual engine and
   regenerate legal offers, including newly acquired prerequisites and changed prices. This first
   milestone cannot discover better card timing or broader expansion actions. Keep its policy and
   value boundary extensible so those phases can follow.
@@ -186,8 +187,9 @@ remain useful controls, but cannot discover consequences absent from their autho
   learn from its improved decisions through [Expert Iteration](https://arxiv.org/abs/1705.08439).
 
 This proposal reuses the authoritative executor, replay verification, resource supervisor and paired
-arenas. A general policy interface, trajectory learner and portable inference format are new work;
-the existing four-choice commodity student is not a general action policy. Measure simulation,
+arenas. The purchase controller, complete-game collector, CPU learner and portable inference now provide
+the first implementation. Their numerical checks do not establish playing strength; the older
+four-choice commodity student remains a separate experiment. Measure simulation,
 encoding, fitting and inference costs separately before deciding whether the desktop GPU helps.
 
 ### Hardware experiment
