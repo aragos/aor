@@ -51,7 +51,7 @@ class TrainingArtifacts(val directory: Path) {
                 "schemaVersion" to model.schemaVersion,
                 "rulesVersion" to RULES_VERSION,
                 "dataVersion" to DATA_VERSION,
-                "weights" to model.weights.toSortedMap(),
+                "weights" to BotModels.serializedWeights(model).toSortedMap(),
             ),
         )
     }
@@ -72,8 +72,14 @@ class TrainingArtifacts(val directory: Path) {
         fun readModel(path: Path?): BotModel {
             if (path == null) return BotModels.default
             val root = ObjectMapper().readTree(path.toFile())
-            require(root["schemaVersion"]?.intValue() == 1) {
-                "The model must declare observation/model schema version 1."
+            val schema = root["schemaVersion"]
+            require(
+                schema != null &&
+                    schema.isIntegralNumber &&
+                    schema.canConvertToInt() &&
+                    schema.intValue() == 1
+            ) {
+                "The model must declare schemaVersion as the JSON integer 1."
             }
             require(root["rulesVersion"]?.asText()?.let { it == RULES_VERSION } != false) {
                 "The model was generated for a different rules version."
@@ -83,7 +89,7 @@ class TrainingArtifacts(val directory: Path) {
             }
             val weights = requireNotNull(root["weights"]) { "The model requires feature weights." }
             require(weights.isObject) { "Model weights must be an object." }
-            return BotModel(
+            return BotModels.fromSerializedWeights(
                 weights =
                     weights.properties().associate { (feature, weight) ->
                         require(weight.isNumber) { "Weight $feature must be numerical." }

@@ -5,6 +5,7 @@ import dev.aragos.aor.Entry
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameOutcome
 import dev.aragos.aor.GameState
+import dev.aragos.aor.GameView
 import dev.aragos.aor.HandCard
 import dev.aragos.aor.Player
 import dev.aragos.aor.PlayerId
@@ -13,8 +14,10 @@ import dev.aragos.aor.ScoreView
 import dev.aragos.aor.Stage
 import dev.aragos.aor.SystemNeed
 import dev.aragos.aor.TextCodec
+import dev.aragos.aor.ai.BotCandidate
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
+import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.BotPolicy
 import java.util.concurrent.CancellationException
@@ -22,6 +25,31 @@ import kotlin.random.Random
 
 /** A simulated policy has the same observation-only access as a browser-hosted opponent. */
 data class Competitor(val model: BotModel, val difficulty: BotDifficulty = BotDifficulty.NORMAL)
+
+/**
+ * Optional inspection sink, never a policy input. [seat] is the zero-based registration index.
+ * Decision views contain public information and only that seat's hand. Authority entries are
+ * delivered separately after replay verification, including private outcomes needed for replay.
+ */
+interface SimulationTrace {
+    val seat: Int
+
+    /**
+     * [number] and [commandEntryIndex] are zero-based. [snapshotEntryCount] identifies the common
+     * pre-batch state for sealed choices, before any action in that batch is committed.
+     */
+    fun decision(
+        number: Int,
+        snapshotEntryCount: Int,
+        commandEntryIndex: Int,
+        view: GameView,
+        observation: BotObservation,
+        chosen: BotCandidate,
+        model: BotModel,
+    )
+
+    fun verified(header: GameHeader, entries: List<String>)
+}
 
 /** Public coverage facts; no actual hidden hand or deck order is retained in training reports. */
 data class GameCoverage(
@@ -73,13 +101,18 @@ class Simulation(private val maxDecisions: Int = 12000) {
         competitors: List<Competitor>,
         deadlineNanos: Long = Long.MAX_VALUE,
         verifyReplay: Boolean = false,
+        trace: SimulationTrace? = null,
     ): SimulatedGame {
         require(competitors.size == configuration.playerCount) {
             "Every simulated seat requires one competitor."
         }
+        require(trace == null || trace.seat in competitors.indices) {
+            "A simulation trace requires a registered seat."
+        }
+        checkDeadline(deadlineNanos)
         val started = System.nanoTime()
         val random = Random(seed)
-        val entries = if (verifyReplay) mutableListOf<Entry>() else null
+        val entries = if (verifyReplay || trace != null) mutableListOf<Entry>() else null
         val players =
             (1..configuration.playerCount).map { number ->
                 Player(PlayerId("p$number"), "Training $number")
@@ -102,11 +135,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
         val features = mutableSetOf<String>()
         var step = 0
         while (state.stage != Stage.FINISHED) {
-            if (Thread.currentThread().isInterrupted || System.nanoTime() >= deadlineNanos) {
-                throw CancellationException(
-                    "The training run reached its deadline or was canceled."
-                )
-            }
+            checkDeadline(deadlineNanos)
             check(step < maxDecisions) {
                 "Game $seed (${configuration.id}) exceeded $maxDecisions decisions at " +
                     "${state.stage}: ${state.prompts()}."
@@ -123,7 +152,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                         error("Training authority must resolve system requests first.")
                 }
             // All sealed choices use the same pre-batch state, before any other amount is applied.
-            val actions = actors.map { actor ->
+            val actions = actors.mapIndexed { actorIndex, actor ->
                 val seat = players.indexOfFirst { it.id == actor }
                 val competitor = competitors[seat]
                 val observation = BotObservations.from(state, actor)
@@ -135,6 +164,22 @@ class Simulation(private val maxDecisions: Int = 12000) {
                         seed = seed xor (step * 65537 + seat * 8191),
                         model = competitor.model,
                     )
+                if (trace != null && trace.seat == seat) {
+                    val snapshotEntryCount =
+                        checkNotNull(entries) {
+                                "A traced simulation requires canonical entry recording."
+                            }
+                            .size
+                    trace.decision(
+                        number = step + actorIndex,
+                        snapshotEntryCount = snapshotEntryCount,
+                        commandEntryIndex = snapshotEntryCount + actorIndex,
+                        view = state.viewForDecision(actor),
+                        observation = observation,
+                        chosen = candidate,
+                        model = competitor.model,
+                    )
+                }
                 decisions[observation.decision] = (decisions[observation.decision] ?: 0) + 1
                 families[candidate.family] = (families[candidate.family] ?: 0) + 1
                 val action = TextCodec.parseAction(candidate.command, state, actor = actor)
@@ -166,11 +211,14 @@ class Simulation(private val maxDecisions: Int = 12000) {
             epochs.add(state.currentEpoch.number)
         }
         if (entries != null) {
+            val canonical = entries.map(Entry::toText)
             val replayed =
-                entries.fold(GameState(state.header)) { current, entry ->
-                    current.step(TextCodec.parse(entry.toText()))
+                canonical.fold(GameState(state.header)) { current, entry ->
+                    checkDeadline(deadlineNanos)
+                    current.step(TextCodec.parse(entry))
                 }
             check(replayed == state) { "A generated game must replay to the identical state." }
+            trace?.verified(state.header, canonical)
         }
         return SimulatedGame(
             configuration = configuration.id,
@@ -188,6 +236,12 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 ),
             elapsedMillis = (System.nanoTime() - started) / 1_000_000,
         )
+    }
+
+    private fun checkDeadline(deadlineNanos: Long) {
+        if (Thread.currentThread().isInterrupted || System.nanoTime() >= deadlineNanos) {
+            throw CancellationException("The training run reached its deadline or was canceled.")
+        }
     }
 
     private fun resolve(

@@ -63,23 +63,43 @@ def parse_options(arguments):
         epilog=("Examples:\n"
                 "  %(prog)s --mode train --output .aor-training/run --hours 48\n"
                 "  %(prog)s --mode train --output .aor-training/run --resume\n"
+                "  %(prog)s --mode pilot --model MODEL --output .aor-training/pilot --hours 4\n"
+                "  %(prog)s --mode pilot-diagnose --source PILOT --output DIAGNOSTIC --hours 2\n"
                 "  %(prog)s --output .aor-training/run --status\n"
                 "Background: nohup python3 %(prog)s --mode train --hours 48 "
                 ">.aor-training-supervisor.log 2>&1 &\n"
                 "Follow trainer output with tail -f OUTPUT/trainer.log. "
                 "Send SIGTERM to the supervisor PID for graceful shutdown."),
     )
-    parser.add_argument("--mode", choices=("coverage", "train", "evaluate"), default="coverage")
+    parser.add_argument("--mode", choices=("coverage", "train", "evaluate", "pilot", "pilot-diagnose",
+                                         "arena", "strategy-search", "strategy-replay",
+                                         "token-value-pilot"),
+                        default="coverage")
     parser.add_argument("--output", type=Path, default=Path(".aor-training/run"))
     parser.add_argument("--hours", type=float, default=12.0)
     parser.add_argument("--workers", type=int)
     parser.add_argument("--model", type=Path)
+    parser.add_argument("--source", type=Path,
+                        help="Completed pilot directory or frozen experiment JSON specification.")
+    parser.add_argument("--index", type=int, help="Arena pair index to inspect in strategy-replay.")
+    parser.add_argument("--pair", type=Path,
+                        help="Recorded arena pair whose lineup and outcome a replay must reproduce.")
+    parser.add_argument("--side", choices=("candidate", "incumbent"),
+                        help="Replacement-seat policy to inspect in strategy-replay.")
     parser.add_argument("--configurations", type=int)
     parser.add_argument("--seeds", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--rounds", type=int)
     parser.add_argument("--batch", type=int)
     parser.add_argument("--difficulty", choices=("EASY", "NORMAL", "HARD"))
+    parser.add_argument("--benchmark-games", type=int,
+                        help="Pilot benchmark games; the trainer supplies the default.")
+    parser.add_argument("--positions", type=int,
+                        help="Pilot scenario positions; the trainer supplies the default.")
+    parser.add_argument("--samples", type=int,
+                        help="Pilot chance samples per position; the trainer supplies the default.")
+    parser.add_argument("--pairs", type=int,
+                        help="Pilot paired evaluation games; the trainer supplies the default.")
     parser.add_argument("--resume", action="store_true", help="Require native resumable state.json.")
     parser.add_argument("--status", action="store_true", help="Show durable status without launching.")
     options = parser.parse_args(arguments)
@@ -87,15 +107,55 @@ def parse_options(arguments):
         parser.error("--hours must be finite, positive and at most 72.")
     for name, minimum, maximum in (
             ("configurations", 1, 128), ("seeds", 1, 1000), ("seed", 0, 100_000_000),
-            ("rounds", 0, 100000), ("batch", 1, 128)):
+            ("rounds", 0, 100000), ("batch", 1, 128),
+            ("benchmark_games", 1, 10000), ("positions", 2, 10000),
+            ("samples", 1, 256), ("pairs", 1, 100000)):
         value = getattr(options, name)
         if value is not None and not minimum <= value <= maximum:
-            parser.error(f"--{name} must be between {minimum} and {maximum}.")
+            parser.error(f"--{name.replace('_', '-')} must be between {minimum} and {maximum}.")
+    pilot_options = ("benchmark_games", "positions", "samples", "pairs")
+    legacy_options = ("configurations", "seeds", "rounds", "batch", "difficulty")
+    if options.mode == "strategy-replay":
+        forbidden = legacy_options + pilot_options + ("model", "seed")
+        if options.source is None or options.index is None:
+            parser.error("strategy-replay requires --source PATH and --index N.")
+        if not 0 <= options.index <= 99999:
+            parser.error("Replay index must be between zero and 99999.")
+        if options.workers not in (None, 1):
+            parser.error("strategy-replay uses exactly one worker.")
+        options.workers = 1
+        options.hours = min(options.hours, 1.0)
+    elif options.mode in ("arena", "strategy-search", "token-value-pilot"):
+        forbidden = legacy_options + pilot_options + ("model", "seed")
+        if options.source is None:
+            parser.error(f"{options.mode} requires --source PATH to a frozen specification.")
+    elif options.mode == "pilot-diagnose":
+        forbidden = legacy_options + ("model", "benchmark_games", "positions", "pairs")
+        if options.source is None:
+            parser.error("pilot-diagnose requires --source PATH to a completed pilot.")
+    elif options.mode == "pilot":
+        forbidden = legacy_options + ("source",)
+    else:
+        forbidden = pilot_options + ("source",)
+    if options.mode != "strategy-replay":
+        forbidden += ("index", "side", "pair")
+    for name in forbidden:
+        if getattr(options, name) is not None:
+            parser.error(f"--{name.replace('_', '-')} is not available in {options.mode} mode.")
     if options.workers is not None and options.workers < 1:
         parser.error("--workers must be positive.")
     options.output = options.output.expanduser().resolve()
     if options.model is not None:
         options.model = options.model.expanduser().resolve()
+    if options.source is not None:
+        options.source = options.source.expanduser().resolve()
+        if (options.source == options.output or options.source in options.output.parents
+                or options.output in options.source.parents):
+            parser.error("Source and output paths must not overlap.")
+    if options.pair is not None:
+        options.pair = options.pair.expanduser().resolve()
+        if options.pair == options.output or options.output in options.pair.parents:
+            parser.error("Replay output must not contain its recorded pair source.")
     return options
 
 
@@ -215,10 +275,13 @@ def trainer_arguments(options, budget, remaining_hours):
                  "--workers", str(budget.workers), "--hours", str(remaining_hours)]
     if model is not None:
         arguments += ["--model", str(model)]
-    for name in ("configurations", "seeds", "seed", "rounds", "batch", "difficulty"):
+    if options.source is not None:
+        arguments += ["--source", str(options.source)]
+    for name in ("configurations", "seeds", "seed", "rounds", "batch", "difficulty",
+                 "benchmark_games", "positions", "samples", "pairs", "index", "side", "pair"):
         value = getattr(options, name)
         if value is not None:
-            arguments += ["--" + name, str(value)]
+            arguments += ["--" + name.replace("_", "-"), str(value)]
     return arguments
 
 
