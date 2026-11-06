@@ -204,6 +204,7 @@ export interface Snapshot {
         activity: {actor: string | null; decisionPlayer: string | null; choice: string | null; purchaseStep: string | null; startEntry: number; decisionEntry: number; competitionProvince?: string | null} | null;
         voids: {armorAndStirrups: boolean; crusades: boolean; papalDecree: boolean};
         advanceOffers: AdvanceOfferView[];
+        cathedralPairs?: {owner: string; opponent: string; used: boolean}[];
         patronageOffers?: {command: string; payer: string; recipient: string; cost: number; payerCashAfter: number; recipientCashAfter: number}[];
         adjustmentOffers?: {command: string; commodities: string[]; cost: number; cashAfter: number}[];
         cardPurchaseOffer?: {cost: number; cashAfter: number; blockers: string[]} | null;

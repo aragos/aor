@@ -116,6 +116,40 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
         document(connection, row(connection, id)).toString()
     }
 
+    override fun armedPlanIds(after: String?, limit: Int): List<String> =
+        database.read { connection ->
+            require(limit > 0) { "A plan-recovery page requires a positive limit." }
+            val cursor = after?.let(::key)
+            connection
+                .prepareStatement(
+                    """
+                    SELECT id FROM games
+                    WHERE (?::uuid IS NULL OR id > ?::uuid)
+                        AND EXISTS (
+                            SELECT 1 FROM jsonb_each(
+                                CASE WHEN jsonb_typeof(document->'plans') = 'object'
+                                    THEN document->'plans' ELSE '{}'::jsonb END
+                            ) AS plan
+                            WHERE plan.value->>'armed' = 'true'
+                        )
+                    ORDER BY id LIMIT ?
+                    """
+                        .trimIndent()
+                )
+                .use { statement ->
+                    statement.setObject(1, cursor)
+                    statement.setObject(2, cursor)
+                    statement.setInt(3, limit)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                add(rows.getString("id"))
+                            }
+                        }
+                    }
+                }
+        }
+
     override fun checkpoint(
         id: String,
         expectedRevision: Int,

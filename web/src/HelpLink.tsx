@@ -3,6 +3,7 @@ import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {t} from './messages';
 import type {PlayerView, PublicCatalog, Snapshot} from './api';
+import {CardInspectionDialog} from './CardInspectionDialog';
 
 export const ReferenceCatalogContext = createContext<PublicCatalog | null>(null);
 
@@ -38,8 +39,14 @@ export function HelpLink({topic = '', label = 'Help', compact = true, commodityC
         data-help-topic={topic} aria-label={`Help: ${label}`} title={label} aria-haspopup="dialog"
         onClick={event => {event.preventDefault(); event.stopPropagation(); setOpen(true);}}>
         {compact ? '?' : label}
-    </button>{open && createPortal(<Suspense fallback={<p role="status">{t('reference.loading')}</p>}>
-        <ReferencePopup initialTopic={topic} close={() => setOpen(false)} catalog={catalog}
-            commodityChoices={commodityChoices}/>
-    </Suspense>, document.body)}</>;
+    </button>{open && createPortal(<CardInspectionDialog label={t('reference.help-and-reference')}
+        close={() => setOpen(false)} className="reference-dialog">
+        <Suspense fallback={<>
+            <button type="button" className="close-detail" aria-label={t('table.close')} onClick={() => setOpen(false)}>×</button>
+            <p role="status">{t('reference.loading')}</p>
+        </>}>
+            <ReferencePopup initialTopic={topic} close={() => setOpen(false)} catalog={catalog}
+                commodityChoices={commodityChoices}/>
+        </Suspense>
+    </CardInspectionDialog>, document.body)}</>;
 }

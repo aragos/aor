@@ -8,7 +8,6 @@ import {CommodityReference} from './CommodityReference';
 import {AccessLock, LockedAreaPattern, PlayerPiece, SatellitePattern} from './map/MapSymbols';
 import {MiseryBox} from './MiseryBox';
 import ruleOptions from './ruleOptions.json';
-import {CardInspectionDialog} from './CardInspectionDialog';
 import {TurnOrderReference} from './TurnOrderReference';
 import {ReferenceGameContext} from './HelpLink';
 import {ReferenceTrackPlayers} from './ReferenceTrackPlayers';
@@ -55,8 +54,7 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
         return () => {active = false;};
     }, [needsCatalog, gameCatalog]);
     const catalog = gameCatalog ?? reference?.catalog;
-    return <CardInspectionDialog label={t('reference.help-and-reference')} close={close} className="reference-dialog">
-        <div className="reference-popup" data-help-content={topic}>
+    return <div className="reference-popup" data-help-content={topic}>
             <button type="button" className="close-detail" aria-label={t('table.close')} onClick={close}>×</button>
             {topic && <button type="button" className="reference-link" onClick={() => setTopic('')}>{t('reference.help-topics')}</button>}
             {!topic && <><h2>{t('reference.help-and-reference')}</h2>
@@ -146,6 +144,5 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
             {topic === 'plans' && <section id="plans"><h2>{t('plan.helpTitle')}</h2>
                 <p>{t('plan.helpSaving')}</p><p>{t('plan.helpPreview')}</p><p>{t('plan.helpAutomatic')}</p><p>{t('plan.helpBoundaries')}</p>
             </section>}
-        </div>
-    </CardInspectionDialog>;
+        </div>;
 }

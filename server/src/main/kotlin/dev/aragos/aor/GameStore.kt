@@ -24,6 +24,23 @@ interface GameStore {
 interface ManagedGameStore : GameStore {
     fun ids(after: String? = null, limit: Int = Int.MAX_VALUE): List<String>
 
+    /** Armed plans or unreadable metadata, without decoding or replaying unrelated games. */
+    fun armedPlanIds(after: String? = null, limit: Int = Int.MAX_VALUE): List<String> =
+        ids(after)
+            .asSequence()
+            .filter { id ->
+                try {
+                    json.readTree(document(id))["plans"]?.properties()?.any { plan ->
+                        plan.value["armed"]?.asBoolean() == true
+                    } == true
+                } catch (_: Exception) {
+                    // Let recovery report this game without preventing other plans from running.
+                    true
+                }
+            }
+            .take(limit)
+            .toList()
+
     /** Lists use rebuildable engine projections; authorization scope is supplied by the service. */
     fun listGames(
         viewer: AccountId,

@@ -11,6 +11,82 @@ class BoardGameTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun cathedralTrackingIncludesEveryOwnerNonOwnerPairForEveryViewer() {
+        val state =
+            expansion(
+                advances =
+                    mapOf(
+                        p1 to setOf(AdvanceId.CATHEDRAL),
+                        p2 to setOf(AdvanceId.CATHEDRAL),
+                    )
+            )
+
+        val views = listOf(state.publicView()) + listOf(p1, p2, p3).map(state::viewForPlayer)
+
+        views.forEach { view ->
+            assertThat(view.cathedralPairs)
+                .containsExactly(
+                    CathedralPairView(p1, p3, false),
+                    CathedralPairView(p2, p3, false),
+                )
+        }
+    }
+
+    @Test
+    fun cathedralTrackingMarksOnlyTheUsedOpponentAfterAnAttack() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        val conquered = state.act("cathedral")
+
+        assertThat(conquered.publicView().cathedralPairs)
+            .containsExactly(
+                CathedralPairView(p1, p2, true),
+                CathedralPairView(p1, p3, false),
+            )
+    }
+
+    @Test
+    fun cathedralTrackingRecordsTheDefenderAsOwner() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p2 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        val defended = state.act("cathedral", p2)
+
+        assertThat(defended.publicView().cathedralPairs)
+            .containsExactly(
+                CathedralPairView(p2, p1, true),
+                CathedralPairView(p2, p3, false),
+            )
+    }
+
+    @Test
+    fun passingCathedralLeavesBothTrackedPairsUnused() {
+        val state =
+            expansion(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p1 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        val passed = state.act("pass")
+
+        assertThat(passed.publicView().cathedralPairs)
+            .containsExactly(
+                CathedralPairView(p1, p2, false),
+                CathedralPairView(p1, p3, false),
+            )
+    }
+
+    @Test
     fun canonicalBoardCommandsRoundTrip() {
         val commands =
             listOf(

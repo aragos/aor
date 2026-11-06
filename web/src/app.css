@@ -467,6 +467,9 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 
 .card-inspection-dialog { width: min(38rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 1.25rem; border: 1px solid #b5c6ac; border-radius: 9px; color: var(--ink); background: var(--surface); box-shadow: 0 15px 55px #142a3140; overflow: auto; }
 .card-inspection-dialog::backdrop { background: #142a3155; }
+.cathedral-usage { margin-block: 1rem; }
+.cathedral-usage h3 { margin-bottom: .35rem; }
+.cathedral-usage [data-cathedral-used="true"] { font-weight: 700; color: var(--blocker); }
 .card-inspection-dialog .object-decision { border: 0; padding: 0; margin: 0; }
 .card-inspection-dialog .close-detail { top: -.4rem; right: -.4rem; }
 .card-inspection-dialog h2 { padding-right: 2rem; }

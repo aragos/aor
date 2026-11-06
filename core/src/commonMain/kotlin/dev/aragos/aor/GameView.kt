@@ -87,6 +87,8 @@ data class GameView(
     val scores: List<ScoreView> = emptyList(),
     val adjustments: Map<Commodity, List<CommodityAdjustment>> = emptyMap(),
     val effects: CardTurnEffects = CardTurnEffects(),
+    /** Owner/non-owner pairs and their public usage in the current game turn. */
+    val cathedralPairs: List<CathedralPairView> = emptyList(),
     val activeWar: WarState? = null,
     val warCession: WarCessionView? = null,
     val markerPlacement: MarkerPlacementView? = null,
@@ -188,6 +190,7 @@ data class GameView(
                     },
                 adjustments = state.adjustments,
                 effects = state.effects,
+                cathedralPairs = CathedralPairView.from(state),
                 activeWar = state.activeWar,
                 warCession = WarCessionView.from(state),
                 markerPlacement =

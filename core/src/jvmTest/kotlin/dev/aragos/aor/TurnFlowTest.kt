@@ -293,6 +293,37 @@ class TurnFlowTest {
     }
 
     @Test
+    fun nextGameTurnResetsPublicCathedralTracking() {
+        val initial = allDrawn()
+        val owner =
+            initial
+                .playerState(p1)
+                .copy(
+                    advances =
+                        PlayerAdvances(
+                            listOf(AdvanceAcquisition(AdvanceId.CATHEDRAL, turnNumber = 1))
+                        )
+                )
+        val state =
+            initial
+                .copy(
+                    stage = Stage.INCOME,
+                    players = initial.players + (p1 to owner),
+                    flow = TurnFlow(cathedralUses = setOf(p1 to p2)),
+                )
+                .normalise()
+
+        val nextTurn = state.play("!roll shortage 1 1 6", "!roll shortage 1 2 6")
+
+        assertThat(nextTurn.turnNumber).isEqualTo(2)
+        assertThat(nextTurn.publicView().cathedralPairs)
+            .containsExactly(
+                CathedralPairView(p1, p2, false),
+                CathedralPairView(p1, p3, false),
+            )
+    }
+
+    @Test
     fun incomeIsFollowedByANewPrivatePurchaseRound() {
         val state =
             allDrawn()

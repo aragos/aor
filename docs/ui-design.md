@@ -25,6 +25,9 @@ mechanics and [map design](map-design.md) owns spatial rendering.
 - Keep inspection, eligibility, draft selection and commitment distinct. Cards, advances, players
   and provinces are their own controls. Reference popups restore focus and preserve prepared work.
   Tapping an expanded player box again closes its details.
+  Load reference content inside the dialog so the first lookup cannot change the page's scroll area.
+  Cathedral's advance details show public owner/non-owner usage pairs for the current game turn;
+  accepted updates and history changes refresh the tracker, and the next game turn resets it.
   Help owns printed lookup data, variants and non-obvious app behavior; card/advance details stay
   with their objects. Avoid parallel inspectors, repeated panels and rule walkthroughs in Help.
 - Show the actor, question, relevant resources and one waiting status beside the action. Open the

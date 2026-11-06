@@ -120,7 +120,9 @@ to exact previewed consequences and can execute while offline.
 Private plan writes check public revision and owner version; arming also checks the preview token.
 Cancellation and execution serialize under the game lock. Disarm/delete can tolerate intervening
 public appends if the owner receipt is unchanged. Editing an armed plan requires confirmed disarm.
-The durable worker scans after startup and every five seconds; reads and replay never execute plans.
+The durable worker scans armed-plan metadata after startup and every five seconds, decoding only
+games with recovery work; unrelated legacy documents do not produce plan-recovery warnings.
+Reads and replay never execute plans.
 
 Validate a whole deterministic segment before committing it. Append ordinary owner-authored command
 revisions and consumed progress atomically. Stop at an activity boundary, missing answer or authority
