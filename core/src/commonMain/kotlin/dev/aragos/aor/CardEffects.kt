@@ -763,10 +763,23 @@ object CardRules {
         basis: CommodityHoldingBasis = CommodityHoldingBasis.COLOURED_MARKERS,
     ): Int {
         val count = commodityHoldings(context, player, commodity, basis).size
-        if (count == 0) return 0
         val adjustment = context.adjustments[commodity]?.firstOrNull()?.payoutOffset ?: 0
-        val industry = if (AdvanceId.INDUSTRY in context.player(player).advances) 1 else 0
-        return (count + adjustment + industry).coerceAtLeast(0)
+        return commodityPayoutBox(
+            marketCount = count,
+            industry = AdvanceId.INDUSTRY in context.player(player).advances,
+            adjustmentOffset = adjustment,
+        )
+    }
+
+    /**
+     * Pure payout box for a nonnegative marker count. [adjustmentOffset] is the first queued
+     * shortage/surplus offset, from -1 through 1. Industry and adjustments never pay a non-owner.
+     */
+    fun commodityPayoutBox(marketCount: Int, industry: Boolean, adjustmentOffset: Int): Int {
+        require(marketCount >= 0) { "Commodity market count must be nonnegative." }
+        require(adjustmentOffset in -1..1) { "Commodity adjustment offset must be -1, 0 or 1." }
+        if (marketCount == 0) return 0
+        return (marketCount + adjustmentOffset + if (industry) 1 else 0).coerceAtLeast(0)
     }
 }
 
