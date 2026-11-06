@@ -431,7 +431,7 @@ p { line-height: 1.55; } a { color: #245c50; text-underline-offset: 3px; } label
 .unplayed-card-list .reference-link { margin: 0; font-size: inherit; text-align: left; }
 .button-with-help { display: inline-flex; align-items: stretch; gap: .25rem; min-width: 0; vertical-align: middle; }
 .button-with-help > button:not(.help-link) { flex: 1; min-width: 0; }
-.button-with-help > .help-link { width: 28px; height: 28px; border: 1px solid #8caa94; border-radius: 50%; background: var(--surface); }
+.button-with-help > .help-link { width: 28px; height: 28px; justify-content: flex-start; align-items: flex-start; padding: .15rem .25rem; font-size: .6rem; }
 /* Keep the help hit target outside the adjacent action as well as its visible marker. */
 .button-with-help > .help-link::after { content: none; }
 .decision-actions > .decision-action-target > .button-with-help { display: flex; }
