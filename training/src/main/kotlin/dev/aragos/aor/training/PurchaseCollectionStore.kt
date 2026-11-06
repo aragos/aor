@@ -80,6 +80,9 @@ internal class PurchaseCollectionStore(
                 },
             )
         }
+        input.opponentPurchasePolicy?.let {
+            snapshot("opponent-purchase-policy.json", it.path, it.sha256)
+        }
         Files.list(directory).use { paths ->
             paths
                 .filter { it.fileName.toString().startsWith("game-") }
@@ -205,7 +208,16 @@ internal class PurchaseCollectionStore(
                 "controlledSeat" to "index % playerCount",
                 "opponentRotation" to "(index / playerCount + seat) % opponentCount",
                 "reward" to ".8 * winShare + .2 * rankReward",
-            )
+            ) +
+            (input.opponentPurchasePolicy?.let {
+                mapOf(
+                    "opponentPurchasePolicy" to
+                        mapOf(
+                            "path" to it.path.toString(),
+                            "sha256" to it.sha256,
+                        )
+                )
+            } ?: emptyMap())
 
     private fun immutableJson(name: String, value: Any) {
         val expected = PurchaseJson.mapper.valueToTree<JsonNode>(value)
