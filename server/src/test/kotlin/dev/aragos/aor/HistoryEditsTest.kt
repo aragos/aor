@@ -337,6 +337,74 @@ class HistoryEditsTest(private val postgres: Boolean) {
     }
 
     @Test
+    fun linearValidationAcceptsExactlyTheAdvertisedTargetsForEachPlayer() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        fixture.placeOne()
+        fixture.send(0, "buy-expansion-card")
+        val source = fixture.stored()
+        val entryCount = source.effectiveEntries().size
+
+        source.header.players.forEach { player ->
+            val targets = LinearHistory.targets(source, player.id).map(RewindTarget::entryCount)
+            val accepted =
+                (-1..entryCount + 1).filter { from ->
+                    runCatching { LinearHistory.validate(source, player.id, from) }.isSuccess
+                }
+
+            assertThat(accepted).containsExactlyElementsIn(targets)
+        }
+    }
+
+    @Test
+    fun linearStoredRewindRejectsPartialSimultaneousBatches() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val source = fixture.stored()
+        val partial =
+            source.effectiveEntries().indexOfFirst { it.text.contains(": buy-tokens ") } + 1
+        val tampered =
+            source.copy(
+                revisions =
+                    source.revisions +
+                        Revision(
+                            id = source.revision + 1,
+                            parent = source.revision,
+                            author = source.header.creatorId,
+                            command = "undo $partial",
+                            entries = emptyList(),
+                            replaceFrom = partial,
+                        )
+            )
+
+        val failure = assertFailsWith<ServiceFailure> { GameDocuments.validate(tampered) }
+
+        assertThat(failure.code).isEqualTo("HISTORY_EDIT_BOUNDARY")
+    }
+
+    @Test
+    fun repeatedStoredRewindsReplayAndContinueAfterReopening() {
+        val fixture = fixture(UndoPolicy.LINEAR_GAME)
+        val initial = fixture.stored()
+        repeat(8) {
+            fixture.placeOne()
+            fixture.send(0, "undo")
+        }
+        val source = fixture.stored()
+        val reopened = fixture.reopened()
+        val before = reopened.get(source.id, fixture.token(0))
+
+        val continued = reopened.submit(source.id, fixture.token(0), source.revision, "pass")
+
+        assertThat(before.game)
+            .isEqualTo(
+                fixture.service.getRevision(source.id, fixture.token(0), initial.revision).game
+            )
+        val after = fixture.stored()
+        assertThat(after.revisions.dropLast(1)).isEqualTo(source.revisions)
+        assertThat(after.revision).isEqualTo(source.revision + 1)
+        assertThat(fixture.reopened().get(source.id, fixture.token(0))).isEqualTo(continued)
+    }
+
+    @Test
     fun friendlyMigrationPreservesEarlierSuffixEditsPrivateStateAndExactArchive() {
         val fixture = fixture(UndoPolicy.FRIENDLY_GAME)
         fixture.placeOne()

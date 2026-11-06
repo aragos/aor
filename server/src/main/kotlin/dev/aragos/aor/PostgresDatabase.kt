@@ -136,6 +136,12 @@ class PostgresDatabase(val settings: PostgresSettings) : StorageTransactions, Au
         )
     private val active = ThreadLocal<Connection>()
 
+    /**
+     * An enclosing transaction owns publication; repositories must not cache its tentative writes.
+     */
+    internal val inTransaction: Boolean
+        get() = active.get() != null
+
     init {
         try {
             Flyway.configure()

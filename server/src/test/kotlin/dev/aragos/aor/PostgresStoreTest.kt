@@ -9,6 +9,88 @@ import kotlin.test.assertFailsWith
 
 class PostgresStoreTest {
     @Test
+    fun ownedWritesReuseTheGenerationCheckedCommittedState(): Unit =
+        PostgresFixture().use { fixture ->
+            val game = fixture.service().create(listOf("Alice", "Bob", "Carol"))
+            val cached = fixture.store.read(game.gameId)
+
+            fixture.store.update(game.gameId) { current ->
+                assertThat(current).isSameInstanceAs(cached)
+                current
+            }
+        }
+
+    @Test
+    fun committedWritesRetainTheirValidatedStateForSubsequentReads() =
+        PostgresFixture().use { fixture ->
+            val game = fixture.service().create(listOf("Alice", "Bob", "Carol"))
+
+            val committed =
+                fixture.store.update(game.gameId) { current ->
+                    GameDriver(FixedRandom()).submit(current, PlayerId("p1"), "bid-capital 12")
+                }
+
+            assertThat(fixture.store.read(game.gameId)).isSameInstanceAs(committed)
+        }
+
+    @Test
+    fun evictedGamesReconstructTheirCommittedState() =
+        PostgresFixture().use { fixture ->
+            val service = fixture.service()
+            val game = service.create(listOf("Alice", "Bob", "Carol"))
+            service.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
+            val committed = fixture.store.read(game.gameId)
+            repeat(33) {
+                val other = service.create(listOf("Alice", "Bob", "Carol"))
+                fixture.store.read(other.gameId)
+            }
+
+            val recovered = fixture.store.read(game.gameId)
+
+            assertThat(recovered).isNotSameInstanceAs(committed)
+            assertThat(recovered).isEqualTo(committed)
+        }
+
+    @Test
+    fun cachedWritersRetainAnotherInstancesUnrevealedBid() =
+        PostgresFixture().use { fixture ->
+            val first = fixture.service()
+            val game = first.create(listOf("Alice", "Bob", "Carol"))
+            fixture.store.read(game.gameId)
+            fixture.reopened().submit(game.gameId, token(game, 0), 2, "bid-capital 12")
+
+            first.submit(game.gameId, token(game, 1), 2, "bid-capital 8")
+
+            val committed = fixture.store.read(game.gameId)
+            assertThat(committed.pendingBids).containsExactly(PlayerId("p1"), 12, PlayerId("p2"), 8)
+            assertThat(committed.revision).isEqualTo(2)
+        }
+
+    @Test
+    fun aFailedOwnedWriteDoesNotPublishItsTentativeCacheEntry() =
+        PostgresFixture().use { fixture ->
+            val service = fixture.service()
+            val game = service.create(listOf("Alice", "Bob", "Carol"))
+            val cached = fixture.store.read(game.gameId)
+            fixture.database.write { connection ->
+                connection.createStatement().use { statement ->
+                    statement.execute(
+                        "ALTER TABLE games ADD CONSTRAINT injected_failure " +
+                            "CHECK (document->'pendingBids'->>'p1' IS NULL)"
+                    )
+                }
+            }
+
+            val failure =
+                assertFailsWith<ServiceFailure> {
+                    service.submit(game.gameId, token(game, 0), 2, "bid-capital 12")
+                }
+
+            assertThat(failure.code).isEqualTo("STORAGE_UNAVAILABLE")
+            assertThat(fixture.store.read(game.gameId)).isSameInstanceAs(cached)
+        }
+
+    @Test
     fun cachedReadersObservePrivateReplacementsAtAnUnchangedPublicRevision() =
         PostgresFixture().use { fixture ->
             val writer = fixture.service()

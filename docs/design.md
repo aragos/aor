@@ -41,6 +41,15 @@ mutation, including private writes without a public revision change. Repeatable 
 checked caches preserve consistency across processes. File storage requires one writer per directory.
 Failed writes leave state and receipts unchanged; no automatic retry may generate replacement outcomes.
 
+Warm PostgreSQL instances retain validated game state across committed writes, checking the storage
+generation under the row lock before reuse. A write publishes its cache entry only after its own
+transaction commits; enclosing transactions bypass the cache. Restarts and eviction reconstruct and
+validate the log. Immutable game histories share only public entry-time audit facts across viewers;
+private history is projected for each authorized reader. Bounded replay checkpoints accelerate old
+rewinds, discard superseded suffixes and fall back to ordinary replay after eviction. Static shipping
+adjacency is shared by the exact map definition and starting player count; advances, ownership and
+capacity remain live rule inputs.
+
 [PostgresDatabase.kt](../server/src/main/kotlin/dev/aragos/aor/PostgresDatabase.kt) and
 [Flyway migrations](../server/src/main/resources/db/migration/) own schema evolution. Never change an
 applied migration. Database schema updates and explicit game-engine upgrades are separate operations.
