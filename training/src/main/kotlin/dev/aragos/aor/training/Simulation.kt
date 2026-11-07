@@ -29,13 +29,18 @@ data class Competitor(val model: BotModel, val difficulty: BotDifficulty = BotDi
 /**
  * One ordinary actor-visible decision. [number] is the zero-based game command index and [seed] is
  * the unchanged baseline-policy seed, not the authority's chance stream or a learned feature.
+ * [batchStartNumber] identifies the common pre-commit seed base for a sealed batch. It differs from
+ * [number] for later actors in that batch and is provenance, never an observation feature.
  */
-data class SimulationDecision(
+data class SimulationDecision
+@JvmOverloads
+constructor(
     val number: Int,
     val seat: Int,
     val seed: Int,
     val view: GameView,
     val observation: BotObservation,
+    val batchStartNumber: Int = number,
 )
 
 /** Explicit experiment-only policy extension; null retains the ordinary baseline command. */
@@ -196,6 +201,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                                     "An explicit controller requires the ordinary decision view."
                                 },
                             observation = observation,
+                            batchStartNumber = step,
                         )
                     )
                 val candidate =
