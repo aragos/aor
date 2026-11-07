@@ -153,6 +153,19 @@ class ExperimentDriverTest(unittest.TestCase):
                 if expected:
                     self.assertEqual(command[command.index('--batch-size') + 1], '8')
 
+    def test_collection_batching_is_opt_in_and_uses_its_own_setting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = experiment.Window.__new__(experiment.Window)
+            window.lab, window.scripts, window.runtime = root, root / 'bin', root / 'lib'
+            window.deadline = 100000
+            window.protocol = {'collection': {'batchSize': 8}}
+            with patch.object(experiment, 'completed_native', side_effect=[False, True]), \
+                    patch.object(window, 'execute') as execute:
+                window.native('collect', 'collection', {}, 60)
+            command = execute.call_args.args[1]
+            self.assertEqual('8', command[command.index('--batch-size') + 1])
+
     def test_evaluation_batch_setting_rejects_boolean_and_out_of_range_values(self):
         window = experiment.Window.__new__(experiment.Window)
         for value in (True, 0, 65, '8'):

@@ -138,6 +138,24 @@ student and fresh held-out validation. Execution alone does not qualify a model 
   matrix, coverage, diverse independent opponents, human evaluation and measured difficulty separation.
   Retain a compatible fallback outside qualified configurations and for incompatible model assets.
 
+### Broader card-root acquisition
+
+Evaluate whether broader prospectively sampled card decisions provide more useful training signal
+than repeated continuation branches from a small number of early roots. The separate
+[breadth driver](../scripts/card_advantage_breadth_experiment.py) keeps F and the qualified purchase
+actor fixed: training observes F plus one uniformly sampled non-F proposal, while development and
+validation observe every proposal. Missing action labels remain unobserved, never zero targets.
+All rows from a world retain one split, and future chance is paired within each comparison.
+
+Freeze the root schedule, world banks, consumed-world throughput/parity proof and original clock
+before collecting. Count coverage on nontrivial roots, report skipped and trivial roots separately,
+and stop without replacement worlds if coverage or time is insufficient. The full eight-unit model
+is the sole candidate; the fitted action-priority control cannot replace it after validation.
+Require the fixed local advantage/concentration gate and lower error than zero prediction before
+fresh complete-game screening, independent confirmation and repeated-opponent robustness. A local
+fit improvement alone does not establish stronger play, and no experimental driver activates assets.
+Collection batching retains per-origin atomic records, fixed allocation and the original deadline.
+
 ### Autonomous strategy discovery
 
 Build on the [complete-game purchase learner](contributing.md#purchase-policy-learning). Human

@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import dev.aragos.aor.ai.CardObservation
 
 /** Named development roles; descendants never leave their original world's split. */
@@ -60,6 +61,8 @@ internal data class CardAdvantageReturns(val actionIndex: Int, val outcomeIds: L
 
 /**
  * Separate exact decision states; observation hashes identify JVM JSON bytes, not a Python codec.
+ * Schema 1 omits acquisition fields and observes all proposals. Schema 2 keeps the complete
+ * proposal set but labels only [observedActionIndices]; omitted actions have unknown returns.
  */
 internal data class CardAdvantageGroup(
     val id: String,
@@ -76,7 +79,41 @@ internal data class CardAdvantageGroup(
     val replicate: Int? = null,
     val continuationIndex: Int? = null,
     val prefixCanonicalSha256: String? = null,
-)
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val observedActionIndices: List<Int>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val acquisition: CardAdvantageAcquisition? = null,
+) {
+    init {
+        require((observedActionIndices == null) == (acquisition == null)) {
+            "Observed actions and acquisition metadata must be present together."
+        }
+        if (observedActionIndices != null && acquisition != null) {
+            require(
+                kind == "root" &&
+                    parentActionIndex == null &&
+                    replicate == null &&
+                    prefixCanonicalSha256 == null
+            ) {
+                "Explicit acquisition belongs only to an independent root."
+            }
+            require(
+                observedActionIndices == observedActionIndices.distinct().sorted() &&
+                    referenceIndex in observedActionIndices &&
+                    observedActionIndices.all { it in proposalIndices } &&
+                    observedActionIndices ==
+                        acquisition.observedIndices(proposalIndices, referenceIndex)
+            ) {
+                "Observed root actions must preserve their acquisition and full proposal indices."
+            }
+            require(
+                acquisition.seed == botSeed &&
+                    returns.map { it.actionIndex } == observedActionIndices
+            ) {
+                "Observed returns must preserve the root's absolute seed and declared action mask."
+            }
+        }
+    }
+}
 
 /** Only complete origins are persisted; hidden authority state and canonical entries are absent. */
 internal data class CardAdvantageOrigin(
