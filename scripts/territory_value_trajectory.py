@@ -169,6 +169,11 @@ class ValueCollection:
             decodedIndices=indices,bundleSha256=self.bundle['sha256'],
             frozenCardPurchaseBundleSha256=self.frozen['sha256'],originCoverage=self.origins,readerSha256=sha(__file__))
         self.baseline_sha=sha(baseline);unchanged(self.pins)
+        # Keep the already validated feature tensors alongside their exact immutable row identity.
+        # Consumers may share these read-only inputs; every collection is still decoded/checked.
+        origins={game.reference['index']:game.origin for game in self.games}
+        self.prepared={(origins[row['originIndex']],row['number']):row['_prepared']
+                       for phase in PHASES for row in self.rows[phase]}
 
     def _snapshot(self,original,name):
         require(pin(self.directory/name,self.pins).read_bytes()==Path(original).read_bytes(),'Territory snapshot changed: '+name)
@@ -374,19 +379,20 @@ def rebuild_replay(payload,config,pins,baseline_sha,frozen_sha):
     for ref in payload['replay']['games']:
         key=(ref['directory'],ref['bundlePath'])
         groups.setdefault(key,[]).append(ref)
-    loaded={}
+    loaded={};prepared={}
     for (directory,bundle),refs in groups.items():
         collection=ValueCollection(directory,bundle,indices=sorted(ref['index'] for ref in refs))
         require(collection.baseline_sha==baseline_sha and collection.frozen['sha256']==frozen_sha,
                 'Replay cannot change the F baseline or frozen card/purchase environment.')
         pins.update(collection.pins)
+        prepared.update(collection.prepared)
         for game in collection.games:loaded[(directory,game.reference['index'])]=game
     games=[]
     for ref in payload['replay']['games']:
         game=loaded[(ref['directory'],ref['index'])]
         require(game.reference==ref,'Retained replay file/hash/source index changed.')
         games.append(game)
-    replay.append(games)
+    replay.append(games,prepared=prepared)
     require(replay.counts()==payload['replay']['phaseRows'] and len(replay.games)==len(games)
             and not replay.evicted_games,'Saved replay exceeds its whole-game capacity.')
     replay.seen_origins=set(payload['replay']['seenOrigins'])
@@ -455,7 +461,7 @@ def update_pair(directory,bundle_path,config,output,*,checkpoint_path=None,resum
         replay=rebuild_replay(previous,config,pins,collection.baseline_sha,collection.frozen['sha256'])
         previous_count=previous['optimizationUpdate'];old_steps=previous['optimizerSteps']
     before_evictions=replay.evicted_games
-    replay.append(collection.games)
+    replay.append(collection.games,prepared=collection.prepared)
     require(all(n==0 or replay.rows(p) for p,n in new_counts.items()),'A positive-step phase lost its replay.')
     nonempty=any(new_counts.values());update_number=previous_count+int(nonempty)
     identity=dict(kind='territory-double-q-update',schemaVersion=1,config=asdict(config),

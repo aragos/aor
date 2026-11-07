@@ -255,7 +255,14 @@ class Replay:
     def counts(self):
         return {phase: len(self.rows(phase)) for phase in PHASES}
 
-    def append(self, games):
+    def append(self, games, *, prepared=None):
+        """Copy raw episodes; optionally retain their reader-owned immutable sparse inputs.
+
+        Supplied tensors were built while validating these exact observations. They contain
+        no model weights or gradients and must remain read-only. Raw observations are still
+        defensively copied; current actor dictionary compatibility is checked by prepare().
+        This cache is process-local and is never serialized or trusted instead of file checks.
+        """
         games = list(games)
         for game in games:
             validate_episode(game)
@@ -264,12 +271,26 @@ class Replay:
         b.require(len({x.origin for x in games}) == len(games) and len({x.gameSeed for x in games}) == len(games)
                   and not ({x.origin for x in games} & self.seen_origins)
                   and not ({x.gameSeed for x in games} & self.seen_seeds), "Replay origins/world seeds cannot be recollected.")
+        incoming = {(row.origin,row.number):row for game in games for row in game.transitions}
+        if prepared is not None:
+            b.require(set(prepared) == set(incoming), "Prepared replay inputs must cover exactly the incoming owned rows.")
+            for key,item in prepared.items():
+                observation = incoming[key].observation
+                b.require(isinstance(item,b._PreparedObservation)
+                          and item.action_count == len(observation['actions'])
+                          and item.baseline_index == observation['baselineIndex'],
+                          "Prepared replay inputs must retain the actual offered-action layout.")
+                b.require(not any(tensor.requires_grad for tensor in
+                          (item.state_indices,item.state_values,item.action_indices,item.action_values)),
+                          "Prepared replay features cannot retain a model gradient graph.")
         for game in games:
             self.games.append(copy.deepcopy(game))
             self.seen_origins.add(game.origin); self.seen_seeds.add(game.gameSeed)
             while len(self.games) > self.game_capacity or max(self.counts().values()) > self.row_capacity:
                 self.games.popleft(); self.evicted_games += 1
-        self.prepared = {}
+        retained = {(row.origin,row.number) for game in self.games for row in game.transitions}
+        self.prepared = {key:item for key,item in {**self.prepared,**(prepared or {})}.items()
+                         if key in retained}
         self._sample_rows = None
 
     def prepare_backups(self, target_steps):
@@ -284,8 +305,9 @@ class Replay:
         self._target_steps, self._sample_rows = target_steps, views
 
     def prepare(self, actors):
-        """Update-local immutable sparse tensors; weights never enter this cache."""
-        self.prepared={(row.origin,row.number):actors[row.phase].encoder.prepare(row.observation)
+        """Reuse validated sparse inputs; the existing dictionary guard still runs for every row."""
+        self.prepared={(row.origin,row.number):actors[row.phase].encoder.prepare(
+                           self.prepared.get((row.origin,row.number),row.observation))
                        for game in self.games for row in game.transitions}
         return sum(tensor.numel()*tensor.element_size() for item in self.prepared.values()
                    for tensor in (item.state_indices,item.state_values,item.action_indices,item.action_values))
