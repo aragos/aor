@@ -182,6 +182,51 @@ class ActualBackendIdentity(unittest.TestCase):
             self.assertIsNone(identity['optimizerFromSha256'])
 
 
+class ReferenceSchedule(unittest.TestCase):
+    def profile(self, values):
+        return dict(trainingProfile=driver.PROFILE, cardReferenceVersion=driver.REFERENCE_VERSION,
+                    cardReferenceCoefficients=values)
+
+    def test_original_profile_has_explicit_backend_zero_defaults(self):
+        self.assertIsNone(driver.reference_coefficients({}))
+        config = driver.update_config(1)
+        self.assertEqual(0., config['cardReferenceKlCoefficient'])
+        self.assertEqual(driver.REFERENCE_VERSION, config['cardReferenceVersion'])
+        self.assertEqual(driver.backend.asdict(driver.backend.UpdateConfig(**dict(driver.analysis.PPO, seed=74601))), config)
+
+    def test_prospective_schedule_selects_exact_update_without_outcomes(self):
+        values = [.1] * 16 + [0.] * 16
+        self.assertEqual(values, driver.reference_coefficients(self.profile(values)))
+        self.assertEqual(.1, driver.update_config(16, values)['cardReferenceKlCoefficient'])
+        self.assertEqual(0., driver.update_config(17, values)['cardReferenceKlCoefficient'])
+        self.assertEqual(74632, driver.update_config(32, values)['seed'])
+
+    def test_unfrozen_malformed_schedule_rejects(self):
+        for values in ([.1] * 31, [0.] * 32, [True] * 32, [float('nan')] * 32, [-.1] * 32):
+            with self.subTest(values=values[:1]), self.assertRaisesRegex(ValueError, '32 finite'):
+                driver.reference_coefficients(self.profile(values))
+        with self.assertRaisesRegex(ValueError, 'no extra'):
+            driver.reference_coefficients({'cardReferenceCoefficients': [.1] * 32})
+
+
+class DiagnosticReporting(unittest.TestCase):
+    def test_early_exploration_report_retains_diagnostics_without_eligibility_or_stop(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / 'request.json'
+            request = dict(stage='development', seeds=[], controls='controls', controlsSource='controls.json',
+                candidate='candidate', candidateSource='candidate.json', base={}, initial='initial',
+                model='model', priority='priority', output=str(root / 'report.json'), diagnosticOnlyCheckpoint=True)
+            put(path, request)
+            with patch.object(driver.analysis, 'analyze_development_completed',
+                              return_value=dict(eligible=True, harmful=True)):
+                driver.analyze_request(path)
+            report = driver.read(root / 'report.json')
+            self.assertFalse(report['eligible']); self.assertFalse(report['harmful'])
+            self.assertTrue(report['diagnosticEligible']); self.assertTrue(report['diagnosticHarmDetected'])
+            self.assertEqual('diagnostic-only exploration', report['checkpointUse'])
+
+
 class FixedSchedule(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
@@ -193,9 +238,9 @@ class FixedSchedule(unittest.TestCase):
             put(self.root/f'development-{i:02}-report.json',{'complete':i})
 
     def lifecycle(self,harm=None,movement=True,eligible=True):
-        def report(stage,name,output,model,controls=None):
+        def report(stage,name,output,model,controls=None,diagnostic_only=False):
             if stage=='confirmation':return {'passed':True}
-            index=int(name[-2:]);return dict(harmful=index==harm,eligible=eligible,
+            index=int(name[-2:]);return dict(harmful=index==harm,eligible=eligible(index) if callable(eligible) else eligible,
                 versus={'f':{'pooled':{'winShare':{'mean':index/100}}}})
         return [patch.object(self.window,'collect',return_value=('collection',{})),
             patch.object(self.window,'update',return_value={}),
@@ -231,6 +276,25 @@ class FixedSchedule(unittest.TestCase):
         result,mocks=self.run_fake(eligible=False)
         self.assertEqual('trajectory-no-eligible-checkpoint',result['disposition'])
         self.assertFalse(any(call.args[0]=='confirmation' for call in mocks[4].call_args_list))
+
+    def test_exploration_early_harm_is_diagnostic_but_late_harm_stops(self):
+        self.window.selection_milestones = (24, 32)
+        result, mocks = self.run_fake(harm=16)
+        self.assertEqual(32, result['finalist']['batch'])
+        development = [call for call in mocks[3].call_args_list if call.args[0] == 'development']
+        self.assertEqual([True, True, False, False], [call.kwargs['diagnostic_only'] for call in development])
+
+    def test_exploration_cannot_select_early_checkpoint_even_if_report_says_eligible(self):
+        self.window.selection_milestones = (24, 32)
+        result, mocks = self.run_fake(eligible=lambda index: index in (8, 16))
+        self.assertEqual('trajectory-no-eligible-checkpoint', result['disposition'])
+        self.assertFalse(any(call.args[0] == 'confirmation' for call in mocks[4].call_args_list))
+
+    def test_exploration_harm_at24_stops_without_confirmation(self):
+        self.window.selection_milestones = (24, 32)
+        result, mocks = self.run_fake(harm=24)
+        self.assertEqual('trajectory-development-harm', result['disposition'])
+        self.assertEqual(24, mocks[0].call_count)
 
     def test_stage_deadline_is_not_renewed_on_resume(self):
         first=self.window.stage_clock('test',{'model':'fixed'},300,False)

@@ -42,8 +42,8 @@ def validate_bank(stage, seeds):
             'Use the exact complete distinct signed-integer trajectory evaluation bank.')
 
 
-def make_source(stage, seeds, models, base, priority):
-    """A cached three-control bank, one checkpoint bank, or the four-arm final bank."""
+def make_source(stage, seeds, models, base, priority, vanilla=None):
+    """Cached controls, one checkpoint, or all final arms; optional vanilla is frozen beforehand."""
     validate_bank(stage, seeds)
     needed = {'initial'} if stage == 'controls' else {'candidate'} if stage == 'development' else {'initial', 'candidate'}
     require(set(models) == needed, 'Evaluation models must match the exact requested stage.')
@@ -55,7 +55,10 @@ def make_source(stage, seeds, models, base, priority):
                 'priority64': {'kind': 'advantage', 'path': str(Path(priority).resolve(strict=True))}}
     registry.update({name: dict(kind='card-actor', path=str(Path(path).resolve(strict=True)))
                      for name, path in models.items()})
-    arms = ARMS[:3] if stage == 'controls' else ('candidate',) if stage == 'development' else ARMS
+    all_arms = (*ARMS[:-1], 'vanilla', 'candidate') if vanilla is not None else ARMS
+    if vanilla is not None and stage != 'development':
+        registry['vanilla'] = dict(kind='card-actor', path=str(Path(vanilla).resolve(strict=True)))
+    arms = all_arms[:-1] if stage == 'controls' else ('candidate',) if stage == 'development' else all_arms
     jobs = []
     for world, seed in enumerate(seeds):
         seat = world % 4
@@ -90,24 +93,29 @@ def intervals(values):
     return result
 
 
-def analyze(stage, seeds, records):
-    require(stage in ('development', 'confirmation'), 'Statistics require all four arms.')
+def analyze(stage, seeds, records, vanilla=False, require_vanilla_superiority=False):
+    require(type(vanilla) is bool and type(require_vanilla_superiority) is bool
+            and (not require_vanilla_superiority or vanilla),
+            'Vanilla superiority requires the declared frozen fifth arm.')
+    arms = (*ARMS[:-1], 'vanilla', 'candidate') if vanilla else ARMS
+    controls = arms[:-1]
+    require(stage in ('development', 'confirmation'), 'Statistics require every declared arm.')
     validate_bank(stage, seeds)
-    expected = {(seed, index % 4, arm) for index, seed in enumerate(seeds) for arm in ARMS}
+    expected = {(seed, index % 4, arm) for index, seed in enumerate(seeds) for arm in arms}
     actual = [(row['seed'], row['controlledSeat'], row['arm']) for row in records]
     require(len(actual) == len(expected) and set(actual) == expected
             and all(type(row['seed']) is int and type(row['controlledSeat']) is int for row in records),
             'Every complete world, rotating seat and arm must occur exactly once.')
     rows = {(row['seed'], row['controlledSeat'], row['arm']): terminal_metrics(row) for row in records}
     deltas = [[rows[seed, index % 4, 'candidate'][metric] - rows[seed, index % 4, arm][metric]
-               for arm in ARMS[:3] for metric in METRICS] for index, seed in enumerate(seeds)]
+               for arm in controls for metric in METRICS] for index, seed in enumerate(seeds)]
     uncertainty = intervals(deltas)
     versus = {}
-    for arm_index, arm in enumerate(ARMS[:3]):
+    for arm_index, arm in enumerate(controls):
         sections = [{metric: population[arm_index * len(METRICS) + metric_index]
                      for metric_index, metric in enumerate(METRICS)} for population in uncertainty]
         versus[arm] = dict(pooled=sections[0], populations=dict(zip(POPULATIONS, sections[1:])))
-    pooled = {arm: versus[arm]['pooled']['winShare'] for arm in ARMS[:3]}
+    pooled = {arm: versus[arm]['pooled']['winShare'] for arm in controls}
     report = dict(kind='card-trajectory-analysis', schemaVersion=1, stage=stage,
                   independentWorlds=len(seeds), executions=len(records), versus=versus,
                   bootstrap=dict(BOOTSTRAP, unit='paired whole world', method='stratified percentile-linear',
@@ -117,9 +125,16 @@ def analyze(stage, seeds, records):
                           'their intervals are not independent confirmation or selection-adjusted.',
                           'Rank and composite reward are descriptive; every playing-strength gate uses win share.',
                           'Both previously failed card payoff-reversal gates remain unresolved.'])
+    if vanilla:
+        report['vanillaSuperiorityRequired'] = require_vanilla_superiority
+        report['limits'].append(
+            'The frozen vanilla checkpoint completed the same 32 updates; superiority is required.'
+            if require_vanilla_superiority else
+            'The frozen vanilla run stopped before 32 updates; its unequal-budget comparison is descriptive only.')
     if stage == 'development':
         report['eligible'] = (pooled['f']['mean'] >= DEVELOPMENT['minimumGainVsF']
-                              and pooled['initial']['mean'] > 0 and pooled['priority64']['mean'] > 0)
+                              and pooled['initial']['mean'] > 0 and pooled['priority64']['mean'] > 0
+                              and (not require_vanilla_superiority or pooled['vanilla']['mean'] > 0))
         report['harmful'] = pooled['f']['mean'] < -.10 and pooled['f']['upper95'] < 0
     else:
         populations = [versus['f']['populations'][name]['winShare'] for name in POPULATIONS]
@@ -128,6 +143,8 @@ def analyze(stage, seeds, records):
                      lower95VsPriority=pooled['priority64']['lower95'] > 0,
                      nonnegativePopulationMeans=all(value['mean'] >= 0 for value in populations),
                      boundedPopulationLoss=all(value['lower95'] > -.03 for value in populations))
+        if require_vanilla_superiority:
+            gates['lower95VsVanilla'] = pooled['vanilla']['lower95'] > 0
         report.update(gates=gates, passed=all(gates.values()))
     return report
 
@@ -210,10 +227,10 @@ def decode(bound):
     return result
 
 
-def finish_analysis(stage, seeds, bounds):
+def finish_analysis(stage, seeds, bounds, vanilla=False, require_vanilla_superiority=False):
     # Every source completion was checked by the caller before reaching decode().
     records = [row for bound in bounds for row in decode(bound)]
-    report = analyze(stage, seeds, records)
+    report = analyze(stage, seeds, records, vanilla, require_vanilla_superiority)
     for bound in bounds:
         require(all(sha(bound['directory'] / name) == value for name, value in bound['metadataHashes'].items())
                 and all(sha(bound['directory'] / row['file']) == row['sha256'] for row in bound['entries'])
@@ -226,15 +243,18 @@ def finish_analysis(stage, seeds, bounds):
 
 
 def analyze_development_completed(seeds, controls_dir, controls_source, candidate_dir, candidate_source,
-                                  base, initial, model, priority):
-    controls = make_source('controls', seeds, {'initial': initial}, base, priority)
+                                  base, initial, model, priority, vanilla=None,
+                                  require_vanilla_superiority=False):
+    controls = make_source('controls', seeds, {'initial': initial}, base, priority, vanilla)
     candidate = make_source('development', seeds, {'candidate': model}, base, priority)
     bounds = [bind_completed(controls_dir, controls_source, controls),
               bind_completed(candidate_dir, candidate_source, candidate)]
-    return finish_analysis('development', seeds, bounds)
+    return finish_analysis('development', seeds, bounds, vanilla is not None, require_vanilla_superiority)
 
 
-def analyze_completed(stage, seeds, native_dir, source_path, base, initial, model, priority):
-    require(stage == 'confirmation', 'Standalone final analysis requires the four-arm fresh bank.')
-    expected = make_source(stage, seeds, {'initial': initial, 'candidate': model}, base, priority)
-    return finish_analysis(stage, seeds, [bind_completed(native_dir, source_path, expected)])
+def analyze_completed(stage, seeds, native_dir, source_path, base, initial, model, priority,
+                      vanilla=None, require_vanilla_superiority=False):
+    require(stage == 'confirmation', 'Standalone final analysis requires the complete fresh bank.')
+    expected = make_source(stage, seeds, {'initial': initial, 'candidate': model}, base, priority, vanilla)
+    return finish_analysis(stage, seeds, [bind_completed(native_dir, source_path, expected)],
+                           vanilla is not None, require_vanilla_superiority)
