@@ -152,6 +152,21 @@ candidate, and it does not relax the previous gates. A local fit improvement alo
 stronger play, and no experimental driver activates assets.
 Collection batching retains per-origin atomic records, fixed allocation and the original deadline.
 
+### Continuation target diagnostic
+
+Before further card-policy fitting, use the separate
+[continuation diagnostic](../scripts/card_continuation_experiment.py) to distinguish action effects
+that persist across own continuation policies from effects that depend on F's later decisions.
+Capture roots prospectively under F, then compare the same two initial actions and four paired chance
+streams under own-F and own-priority tails. Opponents and the purchase policy remain frozen. An
+alternative tail must not change root selection or the pre-root trajectory.
+
+Freeze the complete input bank and original time allowance before collection. Verify every compressed
+record first; the analyzer reads only training roots, freezes its fixed ridge coefficients, then
+opens validation and applies the declared coverage, cross-stream persistence and prediction guards.
+Its output is a diagnostic classification, not a deployable policy or permission to collect more
+worlds. Inadequate coverage or elapsed time does not permit replacement roots or a renewed clock.
+
 ### Autonomous strategy discovery
 
 Build on the [complete-game purchase learner](contributing.md#purchase-policy-learning). Human
