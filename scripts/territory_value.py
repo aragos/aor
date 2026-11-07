@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 import copy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import math
 import random
 import time
@@ -36,6 +36,7 @@ class UpdateConfig:
     replayRowsPerPhase: int = 16384
     replayGames: int = 4096
     targetSyncEveryUpdates: int = 4
+    targetSteps: int = 1
     gamma: float = 1.0
     epsilon: float = .20
     maximumAbsQ: float = 10.0
@@ -44,9 +45,11 @@ class UpdateConfig:
     def validate(self):
         b.integer(self.seed, "Replay sampling seed", -(2**31), 2**31-1)
         b.number(self.maxSeconds, "Original update allowance", 0.001, 10800)
+        b.require(type(self.targetSteps) is int and self.targetSteps in (1, 16),
+                  "The fixed return horizon must be either1 or16 actual owned decisions.")
         fixed = asdict(UpdateConfig())
         b.require(all(value == fixed[key] for key, value in asdict(self).items()
-                      if key not in ("seed", "maxSeconds")), "Linear-Q algorithm settings are fixed and versioned.")
+                      if key not in ("seed", "maxSeconds", "targetSteps")), "Linear-Q algorithm settings are fixed and versioned.")
         return self
 
 
@@ -211,6 +214,28 @@ def validate_episode(episode):
         previous = row.number
 
 
+def backup_transitions(episode, target_steps):
+    """Return sampled target views without changing stored one-step transitions.
+
+    The horizon counts actual owned learned decisions across both phases, not engine commands
+    or turns. Only the last actual row has a reward, so a terminal-truncated suffix receives
+    that return exactly once. Otherwise its reward remains zero and Double-Q evaluates the
+    actual endpoint's legal offers. The uncorrected intervening behavior prefix is off-policy;
+    these targets are not claimed to be unbiased optimal-control returns.
+    """
+    b.require(type(target_steps) is int and target_steps in (1, 16), "Unsupported Q target horizon.")
+    validate_episode(episode)
+    if target_steps == 1:
+        return episode.transitions
+    rows = episode.transitions
+    result = []
+    for index, row in enumerate(rows):
+        end = min(index + target_steps, len(rows))
+        result.append(replace(row, reward=episode.reward if end == len(rows) else 0.,
+                              successor=None if end == len(rows) else rows[end-1].successor))
+    return tuple(result)
+
+
 class Replay:
     """Whole-game FIFO, capped by both phase row counts and number of retained games."""
     def __init__(self, row_capacity=16384, game_capacity=4096):
@@ -219,6 +244,8 @@ class Replay:
         self.row_capacity, self.game_capacity = row_capacity, game_capacity
         self.games = deque()
         self.prepared = {}
+        self._sample_rows = None
+        self._target_steps = 1
         self.seen_origins, self.seen_seeds = set(), set()
         self.evicted_games = 0
 
@@ -243,6 +270,18 @@ class Replay:
             while len(self.games) > self.game_capacity or max(self.counts().values()) > self.row_capacity:
                 self.games.popleft(); self.evicted_games += 1
         self.prepared = {}
+        self._sample_rows = None
+
+    def prepare_backups(self, target_steps):
+        """Cache each same-game suffix once per replay/horizon; never rescan on minibatch draws."""
+        b.require(type(target_steps) is int and target_steps in (1, 16), "Unsupported Q target horizon.")
+        if self._sample_rows is not None and target_steps == self._target_steps:
+            return
+        views = {phase: [] for phase in PHASES}
+        for game in self.games:
+            for row in backup_transitions(game, target_steps):
+                views[row.phase].append(row)
+        self._target_steps, self._sample_rows = target_steps, views
 
     def prepare(self, actors):
         """Update-local immutable sparse tensors; weights never enter this cache."""
@@ -252,7 +291,8 @@ class Replay:
                    for tensor in (item.state_indices,item.state_values,item.action_indices,item.action_values))
 
     def sample(self, phase, count, rng):
-        rows = self.rows(phase)
+        self.prepare_backups(self._target_steps)
+        rows = self._sample_rows[phase]
         b.require(rows, "A positive-step phase requires retained replay transitions.")
         return [rows[rng.randrange(len(rows))] for _ in range(count)]
 
@@ -307,6 +347,7 @@ def fit_pair(online, optimizers, lagged, replay, new_counts, update_number, conf
     b.integer(update_number, "Joint Q update number", 1, 1000000)
     b.require(set(online) == set(optimizers) == set(lagged) == set(new_counts) == set(PHASES),
               "Both typed online/target/Adam views are required atomically.")
+    replay.prepare_backups(config.targetSteps)
     selectors, evaluators = snapshot(online), snapshot(lagged)
     pins = {p: (b.digest(selectors[p].artifact()), b.digest(evaluators[p].artifact())) for p in PHASES}
     candidates = {p: copy.deepcopy(online[p]) for p in PHASES}

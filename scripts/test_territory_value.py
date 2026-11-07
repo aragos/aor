@@ -166,4 +166,73 @@ class MathTests(unittest.TestCase):
             self.assertTrue(b.torch.equal(before,after.grad))
 
 
+class ReturnHorizonTests(unittest.TestCase):
+    def setUp(self):b.torch.set_num_threads(1)
+
+    def test_only_fixed_integer_horizons_are_allowed(self):
+        for value in (1,16):self.assertEqual(value,q.UpdateConfig(targetSteps=value).validate().targetSteps)
+        for value in (0,2,17,True,1.,16.):
+            with self.assertRaises(ValueError):q.UpdateConfig(targetSteps=value).validate()
+
+    def test_default_one_step_retains_original_transition_objects(self):
+        episode=game(phases=('token','expansion','token'))
+        self.assertIs(episode.transitions,q.backup_transitions(episode,q.UpdateConfig().targetSteps))
+
+    def test_terminal_offsets_one_fifteen_sixteen_never_query_networks(self):
+        for count in (1,15,16):
+            episode=game(phases=('expansion',)*count,reward=.4)
+            first=q.backup_transitions(episode,16)[0]
+            self.assertEqual(.4,first.reward);self.assertIsNone(first.successor)
+            with patch.object(q,'evaluate',side_effect=AssertionError('Terminal target must not query a model')):
+                self.assertEqual([.4],q.targets([first],{},{}).tolist())
+
+    def test_mixed_phase_endpoint_uses_actual_sixteenth_successor(self):
+        episode=game(phases=('token','expansion')*9)
+        first=q.backup_transitions(episode,16)[0]
+        endpoint=episode.transitions[16]
+        self.assertEqual(q.Successor(episode.origin,endpoint.number,endpoint.phase,endpoint.observation),first.successor)
+        self.assertEqual(0.,first.reward)
+        selector,target=object(),object()
+        def values(actor,observations):
+            self.assertEqual([endpoint.observation],observations)
+            return [b.torch.tensor([.9,.1] if actor is selector else [.2,.8],dtype=b.DTYPE,requires_grad=True)]
+        with patch.object(q,'evaluate',side_effect=values):
+            result=q.targets([first],{'token':selector},{'token':target})
+        self.assertEqual([.2],result.tolist());self.assertFalse(result.requires_grad)
+
+    def test_late_start_truncates_at_terminal_without_mutating_stored_rows(self):
+        episode=game(phases=('expansion',)*20,reward=.4);before=copy.deepcopy(episode)
+        view=q.backup_transitions(episode,16)[7]
+        self.assertEqual(.4,view.reward);self.assertIsNone(view.successor)
+        self.assertIs(view.observation,episode.transitions[7].observation)
+        self.assertEqual(before,episode)
+
+    def test_invalid_origin_or_unfinished_sequence_cannot_make_a_suffix(self):
+        episode=game(phases=('token','expansion','token'))
+        altered=replace(episode.transitions[1],origin='other')
+        with self.assertRaises(ValueError):q.backup_transitions(replace(episode,transitions=(episode.transitions[0],altered,episode.transitions[2])),16)
+        with self.assertRaises(ValueError):q.backup_transitions(replace(episode,transitions=episode.transitions[:-1]),16)
+
+    def test_cache_preserves_sampling_rng_order_and_invalidates_on_fifo_append(self):
+        replay=q.Replay(game_capacity=1);replay.append([game(1,('token','expansion','expansion'))])
+        replay.prepare_backups(16)
+        actual=random.Random(91);expected=random.Random(91);raw=replay.rows('expansion')
+        with patch.object(q,'backup_transitions',side_effect=AssertionError('No repeated suffix scans')):
+            selected=replay.sample('expansion',20,actual)
+        self.assertEqual([raw[expected.randrange(len(raw))].number for _ in range(20)],[row.number for row in selected])
+        self.assertEqual(actual.getstate(),expected.getstate())
+        replay.append([game(2)])
+        self.assertEqual(['2'],[row.origin for row in replay.sample('token',1,actual)])
+        self.assertEqual(['2'],[row.origin for row in replay.rows('token')])
+
+    def test_terminal_calibration_stays_on_actual_last_rows_only(self):
+        replay=q.Replay();replay.append([game()]);replay.prepare_backups(16)
+        self.assertIsNone(replay.sample('token',1,random.Random(1))[0].successor)
+        self.assertIsNotNone(replay.rows('token')[0].successor)
+        models=actors();replay.prepare(models)
+        result=q.numerical_guard(models,q.snapshot(models),replay,q.UpdateConfig(targetSteps=16),time.monotonic()+10)
+        self.assertEqual(0,result['values']['online']['token']['terminalSelectedCount'])
+        self.assertEqual(1,result['values']['online']['expansion']['terminalSelectedCount'])
+
+
 if __name__=='__main__':unittest.main()
