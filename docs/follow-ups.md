@@ -576,10 +576,25 @@ blocks separately from fully completed epochs, so zero completed epochs can stil
 accepted parameter changes. Resume reconstructs only uncommitted work under the original deadline.
 The default whole-epoch mode retains its schema 1 identity and numerical behavior.
 
-The next joint-learning stage should collect card and purchase decisions from one frozen
-behavior bundle and fit both actors from those same complete games. Preserve each actor's
-row mean and raw terminal-return-minus-recorded-value advantage; do not normalize advantages
-or pool phases. Publish both models and Adam states together. The two-head synthetic prototype
-uses a new uniform-reference purchase objective only in its LAB adapter; an equivalent
-production objective and numerical checks are prerequisites for a real joint-game pilot.
-Token commitments and expansion remain a separate capability.
+Qualify the [joint card/purchase learner](contributing.md#joint-card-and-purchase-learning)
+through fresh complete-game comparisons. Separate improvement from each actor and their
+interaction with a paired factorial; compare against the playable policy and historical rivals.
+Accepted updates, synthetic coordination and gains over a weak starting pair do not establish
+that the combined policy is ready for human play.
+
+The [token/expansion learner](contributing.md#token-and-expansion-learning) adds control over
+investment and its later use while retaining an explicit frozen card/purchase environment.
+Before scaling its full-game budget, require recovery on a contingent-investment task: an
+earlier action must enable a later choice whose payoff can change. Distinguish shared-network
+interference from insufficient visits to that branch. More accepted PPO steps alone cannot
+repair a policy that correctly rejects the investment under its currently weak continuation.
+Test successor-action value learning or coherent trajectory exploration as separate algorithms,
+with sampled legal transitions, explicit target/replay contracts and fixed admission budgets.
+
+Measure low-stock turn-order bidding positions before extending token proposals. The current
+offered set includes stock-bounded signed amounts and full-cash endpoints; legal intermediate
+bids above available stock can be absent. Learning cannot discover a command outside that set.
+Keep action-coverage changes separate from learner comparisons. After a territory candidate
+exists, compare exact F territory, stochastic initialization, each individual actor and both
+together against frozen F and learned territory rivals. Subsequent qualification must also
+test transfer across card/purchase environments and actual human sessions.
