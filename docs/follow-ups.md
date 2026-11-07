@@ -145,8 +145,11 @@ before collecting. Count coverage on nontrivial roots, report skipped and trivia
 and stop without replacement worlds if coverage or time is insufficient. The full eight-unit model
 is the sole candidate; the fitted action-priority control cannot replace it after validation.
 Require the fixed local advantage/concentration gate and lower error than zero prediction before
-fresh complete-game screening, independent confirmation and repeated-opponent robustness. A local
-fit improvement alone does not establish stronger play, and no experimental driver activates assets.
+fresh complete-game screening, independent confirmation and repeated-opponent robustness. Only after
+those gates pass, require a positive paired 95% lower bound against the exact frozen 64-unit
+action-priority policy on a separate 1024-world bank. This comparator does not become an alternate
+candidate, and it does not relax the previous gates. A local fit improvement alone does not establish
+stronger play, and no experimental driver activates assets.
 Collection batching retains per-origin atomic records, fixed allocation and the original deadline.
 
 ### Autonomous strategy discovery
