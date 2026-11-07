@@ -1,5 +1,6 @@
 """Fixed two-cycle, two-context delayed sequence check; no actual games or fitting choices."""
 import argparse
+from dataclasses import replace
 from pathlib import Path
 import time
 import torch
@@ -44,12 +45,12 @@ def sequences(policy,reversed_payoff):
                        'reward':reward(context,first,second,reversed_payoff)})
     return result
 
-def run(output):
+def run(output,config=a.CONFIG):
     output=Path(output);a.require(not output.exists(),'Toy evidence requires a fresh directory.')
     output.mkdir(parents=True);torch.set_num_threads(1);torch.use_deterministic_algorithms(True)
-    protocol={'kind':'two-cycle-card-advantage-correctness','config':a.asdict(a.CONFIG),'maximumSeconds':600,
+    protocol={'kind':'two-cycle-card-advantage-correctness','config':a.asdict(config),'maximumSeconds':600,
               'trainingOriginsPerCycle':128,'developmentOriginsPerCycle':64,'cyclesPerDirection':2,
-              'seeds':list(a.SEEDS),'schema':SCHEMA,'success':'Both visible contexts execute their correct complete sequence after two cycles, for both stationary and reversed payoffs.',
+              'seeds':list(config.seeds),'schema':SCHEMA,'success':'Both visible contexts execute their correct complete sequence after two cycles, for both stationary and reversed payoffs.',
               'noActualGames':True,'freshInitializationEachCycle':True,
               'sourceHashes':{str(p.resolve()):common.file_digest(p) for p in (Path(__file__),Path(a.__file__),Path(fit.__file__))}}
     common.atomic_json(output/'protocol.json',protocol);deadline=time.time()+600;started=time.monotonic()
@@ -62,7 +63,7 @@ def run(output):
                     a.require(float(training[1][0].targets[1])==0. and float(training[1][2].targets[1])==1.,
                               'Compound sequence credit must not leak into first-action targets.')
                 identity={'protocolSha256':common.file_digest(output/'protocol.json'),'reversedPayoff':reverse,'cycle':cycle}
-                artifact,members=fit.fit_ensemble(SCHEMA,training,development,output/f"{'reverse' if reverse else 'stationary'}-{cycle}",identity,deadline)
+                artifact,members=fit.fit_ensemble(SCHEMA,training,development,output/f"{'reverse' if reverse else 'stationary'}-{cycle}",identity,deadline,config=config)
                 common.atomic_json(output/f"{'reverse' if reverse else 'stationary'}-{cycle}.json",artifact)
                 policy=a.Ensemble(artifact);outcomes=sequences(policy,reverse)
                 record={'reversedPayoff':reverse,'cycle':cycle,'members':members,'sequences':outcomes,
@@ -82,6 +83,7 @@ def run(output):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,required=True)
-    args=parser.parse_args();result=run(args.output)
+    parser.add_argument('--active-hidden',type=int,default=a.HIDDEN)
+    args=parser.parse_args();result=run(args.output,replace(a.CONFIG,activeHidden=args.active_hidden))
     if not result['passed']:raise SystemExit(1)
 if __name__=='__main__':main()
