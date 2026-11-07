@@ -45,6 +45,13 @@ def python_runtime():
 
 PROFILE = 'physical-card-reference-1'
 REFERENCE_VERSION = 'aor-card-physical-reference-1'
+CONTINUATION_PROFILE = 'vanilla-continuation-1'
+VANILLA32_SHA = '9ca29345acb4cf900d9d28861249695a69f5638174da9db4c81187ca1aacc719'
+CONTINUATION_TRAINING = dict(analysis.TRAINING, initialLifetimeUpdates=32,
+    rivalSchedule='odd batches F; even batches frozen vanilla32; all purchase32')
+CONTINUATION_DEVELOPMENT = dict(analysis.DEVELOPMENT, minimumGainVsVanilla=.03,
+    progressRule='new accepted epoch and current policy SHA differs from vanilla32; original-prior KL is an additional guard')
+CONTINUATION_CONFIRMATION = dict(analysis.CONFIRMATION, minimumGainVsVanilla=.03)
 REFERENCE_COEFFICIENTS = [.1] * 16 + [0.] * 16
 EXPLORATION_DEVELOPMENT = dict(analysis.DEVELOPMENT, selectionMilestones=[24, 32],
     harmStopMilestones=[24, 32], diagnosticOnlyMilestones=[8, 16])
@@ -57,13 +64,14 @@ def reference_coefficients(protocol):
         require('cardReferenceCoefficients' not in protocol and 'vanillaComparator' not in protocol,
                 'The original trajectory profile has no extra schedule or comparator.')
         return None
-    require(profile == PROFILE and protocol.get('cardReferenceVersion') == REFERENCE_VERSION,
+    require(profile in (PROFILE, CONTINUATION_PROFILE) and protocol.get('cardReferenceVersion') == REFERENCE_VERSION,
             'Unsupported physical-card reference training profile.')
     values = protocol.get('cardReferenceCoefficients')
+    expected = [0.] * 32 if profile == CONTINUATION_PROFILE else REFERENCE_COEFFICIENTS
     require(isinstance(values, list) and len(values) == 32
             and all(type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1 for value in values)
-            and values == REFERENCE_COEFFICIENTS,
-            'Freeze exactly 32 finite coefficients: .10 for updates 1–16, then zero for 17–32.')
+            and values == expected,
+            'Freeze exactly 32 finite coefficients matching the declared training profile.')
     return values
 
 
@@ -76,11 +84,14 @@ def update_config(index, coefficients=None):
     return backend.asdict(backend.UpdateConfig(**values))
 
 
-def training_source(base, offset, model):
-    return dict(base, games=256, seed=offset, opponents=[base['baseline']]*4, policy=str(model))
+def training_source(base, offset, model, opponent_model=None):
+    source = dict(base, games=256, seed=offset, opponents=[base['baseline']]*4, policy=str(model))
+    if opponent_model is not None:
+        source['opponentCardPolicy'] = str(opponent_model)
+    return source
 
 
-def completed_training(directory, source, seeds, model_path):
+def completed_training(directory, source, seeds, model_path, opponent_model=None):
     """Bind all compressed games before any outcomes; stream compact training provenance only."""
     directory, source, model_path = Path(directory), Path(source), Path(model_path)
     if not (directory / 'finished.json').exists(): return None
@@ -94,9 +105,8 @@ def completed_training(directory, source, seeds, model_path):
             and manifest['source'] == str(source.resolve()) and manifest['sourceSha256'] == sha(source)
             and (directory / 'source.json').read_bytes() == source.read_bytes()
             and manifest['games'] == done['games'] == spec['games'] == len(seeds)
-            and manifest['seed'] == spec['seed'] and manifest['seeds'] == seeds
-            and manifest.get('opponentCardPolicy') is None,
-            'Training must be the exact complete declared F-rival card collection.')
+            and manifest['seed'] == spec['seed'] and manifest['seeds'] == seeds,
+            'Training must be the exact complete declared card collection.')
     def snapshot(path, name):
         path=Path(path).resolve(strict=True)
         require((directory / name).read_bytes() == path.read_bytes(), 'A frozen training snapshot changed: '+name)
@@ -105,6 +115,13 @@ def completed_training(directory, source, seeds, model_path):
             and manifest['frozenPurchasePolicy'] == snapshot(spec['frozenPurchasePolicy'],'frozen-purchase-policy.json')
             and manifest['opponents'] == [snapshot(path,f'opponent-{index}.json') for index,path in enumerate(spec['opponents'])],
             'Training baseline, purchase32 or rival identities changed.')
+    if opponent_model is None:
+        require(spec.get('opponentCardPolicy') is None and manifest.get('opponentCardPolicy') is None,
+                'F-rival batches cannot silently activate a learned opponent.')
+    else:
+        require(Path(spec['opponentCardPolicy']).resolve() == Path(opponent_model).resolve()
+                and manifest.get('opponentCardPolicy') == snapshot(opponent_model, 'opponent-card-policy.json'),
+                'The complete batch must use the exact frozen opponent actor snapshot.')
     require(Path(spec['policy']).resolve() == model_path.resolve()
             and manifest['policy'] == str(model_path.resolve())
             and manifest['modelSha256'] == snapshot(model_path,'policy.json')['sha256'],
@@ -162,16 +179,76 @@ def completed_update(output, expected, collected, input_model):
     return report
 
 
+def validate_continuation_checkpoint(model_path, checkpoint_path, identity_path, completion_path):
+    """Validate the original update32 model, PPO identity and exact restorable Adam carry."""
+    checkpoint_path, identity_path, completion_path = map(Path, (checkpoint_path, identity_path, completion_path))
+    require(checkpoint_path.name == 'checkpoint.json' and identity_path == checkpoint_path.parent/'identity.json'
+            and completion_path == checkpoint_path.parent/'finished.json',
+            'Continuation starts from the original co-located update32 evidence.')
+    model = card.validate_model(read(model_path))
+    identity, completion = read(identity_path), read(completion_path)
+    payload = backend.read_checkpoint(checkpoint_path)
+    require(identity['schemaVersion'] == 1 and identity['actorVersion'] == card.ACTOR_VERSION
+            and identity['config'] == dict(analysis.PPO, seed=74632)
+            and identity['data']['games'] == 256 and identity['optimizerFromSha256'] is not None
+            and payload['model'] == model and completion['outputModelSha256'] == sha(model_path),
+            'The start must retain original vanilla32 PPO configuration, model and carried optimizer lineage.')
+    expected = {key:value for key,value in identity.items() if key != 'deadlineEpochSeconds'}
+    collected = dict(data=identity['data'], decisions=completion['decisions'])
+    completed_update(checkpoint_path.parent, expected, collected, model_path)
+    backend.torch.set_num_threads(1)
+    policy = backend.ResidualPolicy(model, card.CONTRACT)
+    optimizer = backend.torch.optim.Adam(policy.parameters(), lr=analysis.PPO['learningRate'], foreach=False)
+    defaults = [{key:value for key,value in group.items() if key != 'params'}
+                for group in backend.encode_optimizer(optimizer)['param_groups']]
+    backend.restore_optimizer(optimizer, payload['optimizer'])
+    require([{key:value for key,value in group.items() if key != 'params'}
+             for group in backend.encode_optimizer(optimizer)['param_groups']] == defaults,
+            'Original Adam hyperparameters must match the unchanged PPO optimizer.')
+    require(len(optimizer.state) == len(list(policy.parameters())), 'Original Adam must retain every parameter state.')
+    for parameter, state in optimizer.state.items():
+        require(set(state) == {'step','exp_avg','exp_avg_sq'}
+                and state['step'].numel() == 1 and state['step'].item() >= 0
+                and all(backend.torch.isfinite(value).all().item() for value in state.values())
+                and all(state[key].shape == parameter.shape and state[key].dtype == parameter.dtype
+                        for key in ('exp_avg','exp_avg_sq')),
+                'Original Adam tensors must be finite and match their actor parameters.')
+    require(backend.encode_optimizer(optimizer) == payload['optimizer'],
+            'Restoring the original Adam state must preserve its exact encoded values.')
+    return payload
+
+
+def continuation_progress(progress, current_model, starting_model):
+    """Existing prior KL is not evidence that continuation training changed its initial actor."""
+    value = dict(progress)
+    changed = sha(current_model) != sha(starting_model)
+    value.update(continuationUpdates=progress['completedUpdates'], lifetimeUpdates=32+progress['completedUpdates'],
+        startingModelSha256=sha(starting_model), currentModelSha256=sha(current_model),
+        newAcceptedEpochs=progress['totalAcceptedEpochs'], newPolicyBytesChanged=changed,
+        originalPriorKlIsContinuationMovementEvidence=False,
+        noProgress=progress['noProgress'] or progress['totalAcceptedEpochs'] == 0 or not changed)
+    return value
+
+
 def analyze_request(path):
     request=read(path)
     args=(request['seeds'],Path(request['controls']),Path(request['controlsSource']),
           Path(request['candidate']),Path(request['candidateSource']),request['base'],
           Path(request['initial']),Path(request['model']),Path(request['priority'])) if request['stage']=='development' else None
     options = dict(vanilla=request.get('vanilla'),
-                   require_vanilla_superiority=request.get('requireVanillaSuperiority', False))
+                   require_vanilla_superiority=request.get('requireVanillaSuperiority', False),
+                   minimum_vanilla_gain=request.get('minimumGainVsVanilla', 0.))
     report=analysis.analyze_development_completed(*args, **options) if args else analysis.analyze_completed(
         'confirmation',request['seeds'],Path(request['candidate']),Path(request['candidateSource']),
         request['base'],Path(request['initial']),Path(request['model']),Path(request['priority']), **options)
+    if 'checkpoint' in request:
+        checkpoint = request['checkpoint']
+        require(set(checkpoint) == {'continuationUpdate','lifetimeUpdate'}
+                and type(checkpoint['continuationUpdate']) is int
+                and checkpoint['continuationUpdate'] in analysis.MILESTONES
+                and checkpoint['lifetimeUpdate'] == 32 + checkpoint['continuationUpdate'],
+                'Continuation evaluation must identify its exact new and lifetime update counts.')
+        report['checkpoint'] = checkpoint
     if request.get('diagnosticOnlyCheckpoint', False):
         require(request['stage'] == 'development', 'Only early development checkpoints are diagnostic-only.')
         report.update(checkpointUse='diagnostic-only exploration',
@@ -189,16 +266,19 @@ class TrajectoryWindow(experiment.Window):
                 'Unsupported repeated card trajectory protocol.')
         recipe=read(self.pin(self.protocol['recipeDraft']))
         self.coefficients = reference_coefficients(self.protocol)
+        self.continuation = self.protocol.get('trainingProfile') == CONTINUATION_PROFILE
         require(self.coefficients == reference_coefficients(recipe)
                 and all(self.protocol.get(key) == recipe.get(key) for key in
-                        ('trainingProfile', 'cardReferenceVersion', 'vanillaComparator', 'explorationEvidence')),
+                        ('trainingProfile', 'cardReferenceVersion', 'vanillaComparator', 'explorationEvidence',
+                         'continuationStart', 'barrierDisposition')),
                 'The prospective exploration schedule, comparator and evidence must match the frozen recipe.')
         self.vanilla = None
         self.vanilla_superiority = False
-        self.selection_milestones = (24, 32) if self.coefficients is not None else analysis.MILESTONES
-        expected=dict(training=analysis.TRAINING,ppo=analysis.PPO,development=(
+        self.selection_milestones = (24, 32) if self.protocol.get('trainingProfile') == PROFILE else analysis.MILESTONES
+        expected=dict(training=CONTINUATION_TRAINING if self.continuation else analysis.TRAINING,
+            ppo=analysis.PPO,development=(CONTINUATION_DEVELOPMENT if self.continuation else
             EXPLORATION_DEVELOPMENT if self.coefficients is not None else analysis.DEVELOPMENT),
-            confirmation=analysis.CONFIRMATION,bootstrap=analysis.BOOTSTRAP,resources=RESOURCES,
+            confirmation=CONTINUATION_CONFIRMATION if self.continuation else analysis.CONFIRMATION,bootstrap=analysis.BOOTSTRAP,resources=RESOURCES,
             evaluation=EVALUATION,originRequests={})
         require(all(self.protocol[key]==recipe[key]==value for key,value in expected.items())
                 and self.protocol['configuration']==recipe['configuration']
@@ -235,7 +315,7 @@ class TrajectoryWindow(experiment.Window):
         initial=card.validate_model(read(self.initial))
         require(initial['baselineProbability']==.97 and initial['actorWeights']==[0.]*64
                 and initial['valueWeights']==[0.]*64 and initial['valueBias']==0.,
-                'Start from the unchanged97% recommendation prior, without optimizer warm start.')
+                'Retain the unchanged97% recommendation prior as the original initial-actor control.')
         initialization=read(self.pin(prior['initialization']));binding=read(self.pin(prior['initialCompletion']))
         require(initialization['seed']==74401 and initialization['sha256']==binding['policySha256']==INITIAL_SHA,
                 'Reuse the original verified stationary-smoke initialization.')
@@ -253,8 +333,14 @@ class TrajectoryWindow(experiment.Window):
         for name in ('originalToyReport','productionToyReport'):
             require(read(self.pin(prior[name]))['passed'] is False, 'Preserve both original reversal failures.')
         self.pin(prior['productionToyProtocol'])
+        self.start_model = self.initial
+        self.start_checkpoint = None
         if self.coefficients is not None:
-            self.verify_exploration()
+            self.verify_vanilla()
+            if self.continuation:
+                self.verify_continuation()
+            else:
+                self.verify_exploration()
         self.java=self.protocol['javaRuntime']
         require(sha(self.java['executable'])==self.java['sha256']
                 and str((Path(os.environ.get('JAVA_HOME',''))/'bin/java').resolve())==self.java['executable'],
@@ -264,7 +350,7 @@ class TrajectoryWindow(experiment.Window):
                      Path(self.java['executable'])]:
             require(self.preflight['pins'].get(str(path.resolve()))==sha(path), 'Executed runtime/input not pinned: '+str(path))
 
-    def verify_exploration(self):
+    def verify_vanilla(self):
         comparator = self.protocol['vanillaComparator']
         self.vanilla = self.pin(comparator)
         evidence = read(self.pin(comparator['evidence']))
@@ -284,6 +370,8 @@ class TrajectoryWindow(experiment.Window):
         require(all(model[key] == initial[key] for key in ('encoderVersion', 'stateFeatureNames', 'actionFeatureNames')),
                 'The frozen vanilla comparator must share the exact actor dictionaries.')
         self.vanilla_superiority = comparator['superiorityRequired']
+
+    def verify_exploration(self):
         proof = read(self.pin(self.protocol['explorationEvidence']))
         require(proof['kind'] == 'card-reference-profile-evidence' and proof['passed'] is True
                 and proof['referenceVersion'] == REFERENCE_VERSION and proof['sourcePins']
@@ -291,9 +379,39 @@ class TrajectoryWindow(experiment.Window):
                         for path, value in proof['sourcePins'].items()),
                 'Physical-card exploration requires pinned passing backend/toy evidence.')
 
+    def verify_continuation(self):
+        comparator = self.protocol['vanillaComparator']
+        evidence = read(self.pin(comparator['evidence']))
+        require(comparator['batch'] == 32 and comparator['superiorityRequired'] is True
+                and sha(self.vanilla) == VANILLA32_SHA,
+                'Continuation must start from the exact frozen vanilla32 actor, not another checkpoint.')
+        start = self.protocol['continuationStart']
+        require(set(start) == {'checkpoint','identity','completion'}, 'Bind the complete original optimizer start evidence.')
+        paths = {key:self.pin(entry) for key,entry in start.items()}
+        require(all(evidence['sourcePins'].get(str(path.resolve())) == sha(path) for path in paths.values()),
+                'Optimizer start evidence must belong to the fully audited vanilla32 lineage.')
+        validate_continuation_checkpoint(self.vanilla, paths['checkpoint'], paths['identity'], paths['completion'])
+        barrier = self.protocol['barrierDisposition']
+        require(set(barrier) == {'result','status','preflight','protocol'}, 'Bind the complete prior barrier disposition.')
+        bound = {key:self.pin(entry) for key,entry in barrier.items()}
+        result,status,preflight,protocol = (read(bound[key]) for key in ('result','status','preflight','protocol'))
+        failed = {'trajectory-no-probability-movement','trajectory-development-harm',
+                  'trajectory-no-eligible-checkpoint','trajectory-independent-qualification-failed',
+                  'trajectory-original-budget-exhausted'}
+        require(result['disposition'] in failed and result['browserActivated'] is False
+                and result.get('confirmationPassed') is not True and status['stage'] == 'finished'
+                and all(status.get(key) == value for key,value in result.items())
+                and result['preflightSha256'] == sha(bound['preflight'])
+                and preflight['windowSha256'] == sha(bound['protocol'])
+                and protocol['trainingProfile'] == PROFILE,
+                'A completed nonqualified barrier trial is required; never overlap or replace a qualified result.')
+        self.start_model = self.vanilla
+        self.start_checkpoint = paths['checkpoint']
+
+
 
     def model(self,index):
-        return self.initial if index==0 else self.lab/f'update-{index:02}/policy.json'
+        return getattr(self,'start_model',self.initial) if index==0 else self.lab/f'update-{index:02}/policy.json'
 
     def stage_clock(self,name,inputs,seconds,progressed):
         path=self.lab/(name+'-clock.json');binding=path.with_suffix('.binding.json')
@@ -309,8 +427,9 @@ class TrajectoryWindow(experiment.Window):
 
     def collect(self,index):
         name=f'training-{index:02}';source=self.lab/(name+'-source.json');output=self.lab/name;model=self.model(index-1)
-        document(source,training_source(self.base,self.offsets[name],model))
-        completed=completed_training(output,source,self.banks[name],model)
+        rival = self.vanilla if getattr(self,'continuation',False) and index % 2 == 0 else None
+        document(source,training_source(self.base,self.offsets[name],model,rival))
+        completed=completed_training(output,source,self.banks[name],model,rival)
         if completed is not None:return output,completed
         seconds=analysis.TRAINING['maximumCollectionSeconds']
         deadline=self.stage_clock(name,dict(sourceSha256=sha(source),modelSha256=sha(model)),seconds,
@@ -323,13 +442,13 @@ class TrajectoryWindow(experiment.Window):
             '-cp',str(self.runtime/'*'),'dev.aragos.aor.training.TrainingMainKt','--mode','card-collect',
             '--source',str(source),'--output',str(output),'--workers','6','--hours',str(remaining/3600)]
         self.execute(name,command,seconds,deadline)
-        completed=completed_training(output,source,self.banks[name],model)
+        completed=completed_training(output,source,self.banks[name],model,rival)
         require(completed is not None,'Card collection must finish completely before PPO sees any trajectories.')
         return output,completed
 
     def update(self,index,collection,collected):
         name=f'update-{index:02}';output=self.lab/name;model=self.model(index-1)
-        carry=self.lab/f'update-{index-1:02}/checkpoint.json' if index>1 else None
+        carry=self.lab/f'update-{index-1:02}/checkpoint.json' if index>1 else getattr(self,'start_checkpoint',None)
         if carry:
             checkpoint=backend.read_checkpoint(carry)
             require(checkpoint['model']==read(model) and isinstance(checkpoint['optimizer'],dict),
@@ -364,13 +483,18 @@ class TrajectoryWindow(experiment.Window):
         source=analysis.make_source(stage,seeds,models,self.base,self.priority,getattr(self,'vanilla',None))
         return self.native('evaluate',name,source,EVALUATION['maximumSecondsPerStage'])
 
-    def analyze(self,stage,name,output,model,controls=None,diagnostic_only=False):
+    def analyze(self,stage,name,output,model,controls=None,diagnostic_only=False,update_index=None):
         path=self.lab/(name+'-analysis.json');report_path=self.lab/(name+'-report.json')
         request=dict(stage=stage,seeds=self.banks[stage],candidate=str(output),candidateSource=str(self.lab/(output.name+'-source.json')),
             base=self.base,initial=str(self.initial),model=str(model),priority=str(self.priority),output=str(report_path))
         if diagnostic_only:request['diagnosticOnlyCheckpoint']=True
         if getattr(self,'vanilla',None) is not None:
             request.update(vanilla=str(self.vanilla),requireVanillaSuperiority=self.vanilla_superiority)
+        if getattr(self,'continuation',False):
+            require(type(update_index) is int and update_index in analysis.MILESTONES,
+                    'Continuation evaluation needs its explicit checkpoint number.')
+            request.update(minimumGainVsVanilla=.03,
+                checkpoint=dict(continuationUpdate=update_index,lifetimeUpdate=32+update_index))
         if controls:request.update(controls=str(controls),controlsSource=str(self.lab/(controls.name+'-source.json')))
         document(path,request);binding=report_path.with_suffix('.binding.json')
         if not binding.exists():
@@ -387,6 +511,8 @@ class TrajectoryWindow(experiment.Window):
         for index in range(1,33):
             collection,collected=self.collect(index);updates.append(self.update(index,collection,collected))
             progress=analysis.progress(updates)
+            if getattr(self,'continuation',False):
+                progress=continuation_progress(progress,self.model(index),self.start_model)
             document(self.lab/f'progress-{index:02}.json',progress)
             self.status('update-complete',batch=index,trainingGames=index*256,progress=progress)
             if index==16 and progress['noProgress']:
@@ -395,8 +521,9 @@ class TrajectoryWindow(experiment.Window):
                 if controls is None:controls=self.evaluate_stage('controls','development-controls')
                 output=self.evaluate_stage('development',f'development-{index:02}',self.model(index))
                 allowed = index in getattr(self,'selection_milestones',analysis.MILESTONES)
-                report=self.analyze('development',f'development-{index:02}',output,self.model(index),controls,
-                                    diagnostic_only=not allowed)
+                options = dict(diagnostic_only=not allowed)
+                if getattr(self,'continuation',False):options['update_index']=index
+                report=self.analyze('development',f'development-{index:02}',output,self.model(index),controls,**options)
                 reports[index]=report
                 if allowed and report['harmful']:
                     return self.finish('trajectory-development-harm',policyPromotion=False,completedUpdates=index)
@@ -406,9 +533,12 @@ class TrajectoryWindow(experiment.Window):
         if selected is None:return self.finish('trajectory-no-eligible-checkpoint',policyPromotion=False)
         finalist=dict(batch=selected,model=str(self.model(selected)),modelSha256=sha(self.model(selected)),
                       developmentReportSha256=sha(self.lab/f'development-{selected:02}-report.json'))
+        if getattr(self,'continuation',False):
+            finalist.update(continuationUpdate=selected,lifetimeUpdate=32+selected)
         document(self.lab/'finalist.json',finalist)
         output=self.evaluate_stage('confirmation','confirmation',self.model(selected))
-        report=self.analyze('confirmation','confirmation',output,self.model(selected))
+        options = dict(update_index=selected) if getattr(self,'continuation',False) else {}
+        report=self.analyze('confirmation','confirmation',output,self.model(selected),**options)
         return self.finish('qualified-for-integration' if report['passed'] else 'trajectory-independent-qualification-failed',
             finalist=finalist,confirmationPassed=report['passed'],policyPromotion=False)
 
