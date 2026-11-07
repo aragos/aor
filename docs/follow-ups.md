@@ -152,6 +152,9 @@ establish a serious challenge for experienced humans.
   every continuation. Measure meaningful retention and alternative-card exploration, including
   prerequisite blockers, cash competition, Printed Word receipts and Patronage benefits to rivals.
   A card-window pass ends that window; playing another card can retain the leader without passing.
+  Count visits to complete useful sequences, not just card identities or nonbaseline decisions.
+  Verify exploration and recovery separately from numerical correctness before scaling training;
+  entropy regularization at visited states does not ensure that rare successor states are reached.
 - Extend repeated actor control to token commitments and expansion. Add versioned raw observations
   and bounded legal-action coverage for each phase, preserving independently qualified policies.
 - Expand population self-play and retain historical and independently developed rivals. Test several
@@ -166,6 +169,13 @@ establish a serious challenge for experienced humans.
   Actual hidden worlds can supply noisy return targets; privileged per-world best-action labels or
   hidden-aware continuations would teach a different, unavailable policy. Changing a fork's future
   RNG does not resample its existing hands or deck.
+  For a short forced sequence, collect the complete actor-safe observation and legal choices at each
+  forced child decision, together with paired ordinary-policy and alternative continuations from
+  that same child. Keep a root action's ordinary-continuation return separate from a compound
+  sequence return: the first action alone cannot reproduce a benefit that requires a later pass.
+  Fit expected action advantages across independent worlds and test a frozen selector on new worlds
+  before repeated-use full-game qualification. Leader rebates, later discounts and stabilization
+  savings explain observed paths; none alone establishes an improvement in playing strength.
 - Evaluate learned-value guidance for exact visible purchase sequences only with bounded search and
   fresh action-ranking evidence. Search can amplify prediction error on unfamiliar states, and an
   end-of-phase state may be outside the value encoder's trained domain. Broader hidden-information
