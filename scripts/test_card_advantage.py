@@ -48,14 +48,14 @@ class Checks(unittest.TestCase):
     self.assertGreater(float(network.outputWeights.grad.norm()),0)
  def test_equal_origin_group_and_action_weighting(self):
     network=a.Network(SCHEMA,a.initialize(SCHEMA,1));origins=[[group(1.),group(0.)],[group(0.)]]
-    self.assertAlmostEqual(float(a.loss(network,origins)),.25)
+    self.assertAlmostEqual(float(a.loss(network,origins).detach()),.25)
  def test_duplicate_child_groups_do_not_multiply_group_weight(self):
     obs=observation();child=observation(-1)
     records=[{'observation':obs,'seed':0,'targets':[0.,0.],'replicates':4,'id':'root'}]+[
       {'observation':child,'seed':0,'targets':[0.,1.],'replicates':1,'id':f'child-{i}'} for i in range(4)]
     groups=data.merge_groups(records,SCHEMA,0)
     self.assertEqual(len(groups),2);self.assertEqual(groups[1].replicates,4)
-    self.assertAlmostEqual(float(a.loss(a.Network(SCHEMA,a.initialize(SCHEMA,1)),[groups])),.5)
+    self.assertAlmostEqual(float(a.loss(a.Network(SCHEMA,a.initialize(SCHEMA,1)),[groups]).detach()),.5)
  def test_different_seed_remains_distinct_decision_group(self):
     records=[{'observation':observation(),'seed':s,'targets':[0.,1.],'replicates':1,'id':str(s)} for s in (0,1)]
     self.assertEqual(len(data.merge_groups(records,SCHEMA,0)),2)
@@ -64,6 +64,18 @@ class Checks(unittest.TestCase):
     masked=a.Network(SCHEMA,member)([a.prepare(observation(),0,SCHEMA,ablation=True)])[0]
     exported=a.Network(SCHEMA,a.materialize_ablation(member,SCHEMA))([group()])[0]
     self.assertTrue(torch.equal(masked,exported))
+ def test_action_priority_control_cannot_use_changing_context_or_quotes(self):
+    member=a.initialize(SCHEMA,7);member['outputWeights']=[.1]*64
+    network=a.Network(SCHEMA,a.materialize_ablation(member,SCHEMA))
+    changed=observation(-1);changed['actions'][1]['features']['effect.role.0.cashDelta']=-12.
+    first=network([group()])[0]
+    second=network([a.prepare(changed,0,SCHEMA)])[0]
+    self.assertTrue(torch.equal(first,second))
+ def test_action_priority_constant_permits_zero_head_learning(self):
+    network=a.Network(SCHEMA,a.initialize(SCHEMA,84501))
+    g=a.prepare(observation(),0,SCHEMA,[0.,1.],ablation=True)
+    a.loss(network,[[g]]).backward()
+    self.assertGreater(float(network.outputWeights.grad.norm()),0.)
  def test_normal_guard_avoids_evaluation(self):
     ensemble=a.Ensemble(a.bundle(SCHEMA,[a.initialize(SCHEMA,s) for s in a.SEEDS]));obs=observation();obs['stateFeatures']['cardWindow.normal']=0
     with patch.object(a.Network,'forward',side_effect=AssertionError('must not evaluate')):
@@ -71,6 +83,16 @@ class Checks(unittest.TestCase):
  def test_unknown_model_fields_rejected(self):
     artifact=a.bundle(SCHEMA,[a.initialize(SCHEMA,s) for s in a.SEEDS]);artifact['members'][0]['actorBias']=0
     with self.assertRaisesRegex(ValueError,'unexpected'):a.validate_bundle(artifact)
+ def test_additive_version_one_artifact_is_rejected(self):
+    artifact=a.bundle(SCHEMA,[a.initialize(SCHEMA,s) for s in a.SEEDS]);artifact['selectorVersion']='aor-card-advantage-1'
+    with self.assertRaisesRegex(ValueError,'Unsupported advantage selector'):a.validate_bundle(artifact)
+ def test_explicit_interaction_reverses_same_actions_with_public_context(self):
+    member=a.initialize(SCHEMA,1)
+    for key in a.MEMBER_KEYS:member[key]=0. if key=='outputBias' else [0.]*len(member[key])
+    member['stateWeights'][1]=1.;member['actionWeights'][0]=1.;member['outputWeights'][0]=1.
+    model=a.Ensemble(a.bundle(SCHEMA,[member]*3))
+    self.assertEqual(model.choose(observation(1),0)['index'],1)
+    self.assertEqual(model.choose(observation(-1),0)['index'],0)
  def test_frequency_missing_family_falls_back(self):
     control=a.frequency_control(1.,0.)
     self.assertEqual(a.frequency_choice(control,observation(),4),0)

@@ -17,13 +17,13 @@ class CardAdvantageExportsTest {
 
         for (member in 0..2) {
             assertTrue(
-                abs((result.memberValues[member][0] as Double) - 0.47323910035471933) < 1.0e-12
+                abs((result.memberValues[member][0] as Double) - 0.3866194497989705) < 1.0e-12
             )
             assertTrue(
-                abs((result.memberValues[member][1] as Double) - 0.6155699600507891) < 1.0e-12
+                abs((result.memberValues[member][1] as Double) - 0.4654413563564786) < 1.0e-12
             )
         }
-        assertTrue(abs((result.meanAdvantages[1] as Double) - 0.1423308596960698) < 1.0e-12)
+        assertTrue(abs((result.meanAdvantages[1] as Double) - 0.07882190655750809) < 1.0e-12)
         assertEquals("play held", result.command as String)
         assertTrue(result.overridden as Boolean)
     }
@@ -60,6 +60,46 @@ class CardAdvantageExportsTest {
     }
 
     @Test
+    fun equalInteractionValuesKeepTheCanonicalCommandTieBreak() {
+        val input =
+            """{
+            "encoderVersion":"aor-card-observation-1","baselineIndex":0,
+            "stateFeatures":{"cardWindow.normal":1},
+            "actions":[{"command":"pass","features":{}},
+                {"command":"play first","features":{"left":1}},
+                {"command":"play second","features":{"right":1}}]
+        }"""
+        val result =
+            JSON.parse<dynamic>(
+                evaluateCardAdvantage(input, bundle(List(3) { valueMember(0.8, 0.8) }), 17)
+            )
+
+        assertEquals(result.meanAdvantages[1] as Double, result.meanAdvantages[2] as Double)
+        assertEquals("play first", result.command as String)
+    }
+
+    @Test
+    fun oneSignedStateUnitReversesTheSameActionPreference() {
+        val network =
+            """{
+            "stateWeights":${vector(128, mapOf(1 to 1.0))},"stateBias":${vector()},
+            "actionWeights":${vector(128, mapOf(0 to 0.6))},"actionBias":${vector()},
+            "outputWeights":${vector(values = mapOf(0 to 1.0))},"outputBias":0
+        }"""
+        val model = bundle(List(3) { network })
+        val positive = JSON.parse<dynamic>(evaluateCardAdvantage(observation(), model, 17))
+        val negative =
+            JSON.parse<dynamic>(
+                evaluateCardAdvantage(observation().replace("\"root\":1", "\"root\":-1"), model, 17)
+            )
+
+        assertEquals("play held", positive.command as String)
+        assertEquals("pass", negative.command as String)
+        assertTrue(abs((positive.meanAdvantages[1] as Double) - 0.10085138583319275) < 1.0e-12)
+        assertTrue(abs((negative.meanAdvantages[1] as Double) + 0.10085138583319275) < 1.0e-12)
+    }
+
+    @Test
     fun finalAndMissingWindowMetadataUseFWithoutScoring() {
         for (state in listOf("\"cardWindow.final\":1", "\"unknown\":1")) {
             val input = observation().replace("\"cardWindow.normal\":1,\"root\":1", state)
@@ -76,7 +116,7 @@ class CardAdvantageExportsTest {
         assertFailsWith<IllegalArgumentException> {
             evaluateCardAdvantage(
                 observation(),
-                model().replace("aor-card-advantage-1", "aor-card-policy-1"),
+                model().replace("aor-card-advantage-2", "aor-card-policy-1"),
                 17,
             )
         }
@@ -94,6 +134,17 @@ class CardAdvantageExportsTest {
             evaluateCardAdvantage(
                 observation(),
                 model().replace("\"schemaVersion\":1", "\"schemaVersion\":true"),
+                17,
+            )
+        }
+    }
+
+    @Test
+    fun additiveHeadVersionOneIsRejectedEvenWithIdenticalArrayShapes() {
+        assertFailsWith<IllegalArgumentException> {
+            evaluateCardAdvantage(
+                observation(),
+                model().replace("aor-card-advantage-2", "aor-card-advantage-1"),
                 17,
             )
         }
@@ -233,7 +284,7 @@ class CardAdvantageExportsTest {
     private fun bundle(members: List<String>): String =
         """{
         "schemaVersion":1,"encoderVersion":"aor-card-observation-1",
-        "selectorVersion":"aor-card-advantage-1","proposalVersion":"aor-card-proposals-1",
+        "selectorVersion":"aor-card-advantage-2","proposalVersion":"aor-card-proposals-1",
         "hiddenSize":64,"margin":0.02,
         "stateFeatureNames":["cardWindow.normal","root"],
         "actionFeatureNames":["left","right"],"members":[${members.joinToString()}]
@@ -250,9 +301,9 @@ class CardAdvantageExportsTest {
 
     private fun valueMember(left: Double, right: Double): String =
         """{
-        "stateWeights":${vector(128)},"stateBias":${vector()},
+        "stateWeights":${vector(128)},"stateBias":${vector(values = mapOf(0 to atanh(0.5)))},
         "actionWeights":${vector(128, mapOf(0 to atanh(ln(left / (1.0 - left)) / 2.0), 1 to atanh(ln(right / (1.0 - right)) / 2.0)))},
-        "actionBias":${vector()},"outputWeights":${vector(values = mapOf(0 to 2.0))},"outputBias":0
+        "actionBias":${vector()},"outputWeights":${vector(values = mapOf(0 to 4.0))},"outputBias":0
     }"""
 
     private fun frequencyModel(pass: Double = 0.25, other: Double = 0.5): String =
