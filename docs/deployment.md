@@ -48,6 +48,8 @@ heap/bounded direct memory and no writable application volume. Database URLs all
 [AGENTS.md](../AGENTS.md#verification-and-release) owns promotion and live verification. A merge to
 `main` alone does not deploy. CI runs source tests/catalogs/browser checks and production-container
 build/SQL smoke in parallel; `verify` requires both. The container covers web typecheck/bundling.
+Push checks run on `main`; promotion to `release` reuses that exact commit's successful checks.
+Pull requests and scheduled/manual release verification still run.
 Require `verify` where the plan permits; direct CI checks are not enforced branch protection
 (the private repository's plan previously returned 403).
 
