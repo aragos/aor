@@ -40,6 +40,7 @@ internal data class CardAdvantageEvaluationPolicy(
     val sha256: String?,
     val advantage: CardAdvantageModel? = null,
     val frequency: CardFrequencyModel? = null,
+    val economy: JointEconomyPolicy? = null,
 ) {
     fun metadata(): Map<String, Any?> =
         mapOf("kind" to kind, "path" to path?.toString(), "sha256" to sha256)
@@ -77,7 +78,10 @@ internal data class CardAdvantageEvaluationInput(
                     CardAdvantagePolicy.SELECTOR_VERSION,
                     CardProposals.VERSION,
                 )
-                .joinToString("\n")
+                .joinToString("\n") +
+                if (policies.values.any { it.economy != null }) {
+                    "\n${JointEconomyPolicy.VERSION}"
+                } else ""
         )
 
     fun manifest(): Map<String, Any?> =
@@ -106,7 +110,10 @@ internal data class CardAdvantageEvaluationInput(
                 ),
             "policies" to policies.mapValues { it.value.metadata() },
             "jobs" to jobs,
-        )
+        ) +
+            if (policies.values.any { it.economy != null }) {
+                mapOf("economyVersion" to JointEconomyPolicy.VERSION)
+            } else emptyMap()
 
     companion object {
         fun read(path: Path): CardAdvantageEvaluationInput {
@@ -152,6 +159,20 @@ internal data class CardAdvantageEvaluationInput(
                                     model.path,
                                     model.sha256,
                                     advantage = model.model,
+                                )
+                            } else if (kind == "economy") {
+                                val file = source.parent.resolve(text).normalize().toRealPath()
+                                val fingerprint = PurchaseJson.hash(file)
+                                val model = TrainingArtifacts.readModel(file)
+                                val economy = JointEconomyPolicy(environment.baseline.model, model)
+                                require(PurchaseJson.hash(file) == fingerprint) {
+                                    "An economy model changed while being read."
+                                }
+                                CardAdvantageEvaluationPolicy(
+                                    kind,
+                                    file,
+                                    fingerprint,
+                                    economy = economy,
                                 )
                             } else {
                                 require(kind == "frequency") {
@@ -243,12 +264,17 @@ internal class CardAdvantageEvaluator(
             "Evaluation index must belong to its frozen source."
         }
         val job = input.jobs[index]
-        val controllers =
+        val controllers: Map<Int, SimulationController> =
             (0..3).associateWith { seat ->
                 val name = if (seat == job.seat) job.policy else job.rivals[seat]
                 val policy =
                     requireNotNull(input.policies[name]) { "A role requires a declared policy." }
-                CardAdvantageController(input.environment, policy.advantage, policy.frequency)
+                policy.economy?.let { JointEconomyController(input.environment, it) }
+                    ?: CardAdvantageController(
+                        input.environment,
+                        policy.advantage,
+                        policy.frequency,
+                    )
             }
         val game =
             Simulation()
