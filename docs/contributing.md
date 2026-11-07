@@ -372,6 +372,13 @@ preserves failed or incomplete evidence, never fits a partial collection, and do
 browser models. Read `window-result.json` and the stage reports for the outcome. Qualification remains
 specific to the declared setup and rival population; it does not establish human-level strength.
 
+The native supervisor `card-advantage-run.py --mode evaluate` accepts optional `--batch-size 1..64`
+to reuse one JVM and its parsed models across several explicit game indices. The default is 1;
+collection remains one origin per JVM. Freeze the batch size before launch: resume retains that
+allocation and the original stage deadline. A batch shares one remaining allowance, while every
+game keeps its own validated atomic record. An interrupted batch preserves completed games for
+resume; the stage is complete only after every declared game has been verified.
+
 ## Token-purchase continuation learning
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
