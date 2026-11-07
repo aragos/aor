@@ -144,6 +144,45 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(0,result['optimizationUpdate']);self.assertFalse(result['targetSynchronized'])
         self.assertEqual({'token':0,'expansion':0},result['optimizerSteps']);t.read_completed(self.root/'out')
 
+    def test_multistep_horizon_is_persisted_and_carried_exactly(self):
+        config=t.q.UpdateConfig(seed=103,targetSteps=16);first=self.root/'first'
+        t.update_pair(self.directory,self.bundle,config,first)
+        self.assertEqual(16,t.read(first/'identity.json')['config']['targetSteps'])
+        models={p:first/(p+'-policy.json') for p in t.PHASES}
+        frozen=t.read(self.directory/'source.json')['frozenCardPurchaseBundle']
+        directory,bundle=fixture(self.root/'next',models,frozen_path=frozen,seed=31)
+        t.update_pair(directory,bundle,config,self.root/'second',checkpoint_path=first/'checkpoint.json')
+        _,identity,_=t.read_completed(self.root/'second',config)
+        self.assertEqual(16,identity['config']['targetSteps'])
+
+    def test_carry_cannot_change_return_horizon_before_fitting(self):
+        for previous_horizon,next_horizon in ((1,16),(16,1)):
+            first=self.root/('first'+str(previous_horizon))
+            t.update_pair(self.directory,self.bundle,t.q.UpdateConfig(seed=103,targetSteps=previous_horizon),first)
+            models={p:first/(p+'-policy.json') for p in t.PHASES}
+            frozen=t.read(self.directory/'source.json')['frozenCardPurchaseBundle']
+            directory,bundle=fixture(self.root/('next'+str(previous_horizon)),models,frozen_path=frozen,seed=31)
+            with patch.object(t.q,'fit_pair',side_effect=AssertionError('No fit after changed horizon')):
+                with self.assertRaisesRegex(ValueError,'cannot change the learning algorithm'):
+                    t.update_pair(directory,bundle,t.q.UpdateConfig(seed=103,targetSteps=next_horizon),
+                                  self.root/('out'+str(previous_horizon)),checkpoint_path=first/'checkpoint.json')
+
+    def test_legacy_missing_horizon_normalizes_to_one_without_rewriting_identity(self):
+        output=self.root/'old';done=self.update(output)
+        identity=t.read(output/'identity.json');identity['config'].pop('targetSteps')
+        started=t.read(output/'started.json');started['config'].pop('targetSteps')
+        put(output/'identity.json',identity);put(output/'started.json',started)
+        payload=b.read_checkpoint(output/'checkpoint.json');payload['identitySha256']=b.digest(identity)
+        put(output/'checkpoint.json',dict(sha256=b.digest(payload),payload=payload))
+        done['identitySha256']=b.digest(identity)
+        done['outputHashes']={path:t.sha(path) for path in done['outputHashes']};put(output/'finished.json',done)
+        identity_sha=t.sha(output/'identity.json')
+        with patch.object(t.q,'fit_pair',side_effect=AssertionError('Legacy completed reuse must not fit')):
+            self.assertEqual(done,self.update(output,resume=True))
+        self.assertEqual(identity_sha,t.sha(output/'identity.json'))
+        with self.assertRaisesRegex(ValueError,'cannot change the learning algorithm'):
+            t.read_completed(output,t.q.UpdateConfig(targetSteps=16))
+
     def test_validation_interruption_has_original_attempt_marker_and_no_retry(self):
         output=self.root/'out'
         with patch.object(t,'ValueCollection',side_effect=RuntimeError('validation interrupted')):

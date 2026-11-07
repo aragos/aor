@@ -584,6 +584,15 @@ repair a policy that correctly rejects the investment under its currently weak c
 Test successor-action value learning or coherent trajectory exploration as separate algorithms,
 with sampled legal transitions, explicit target/replay contracts and fixed admission budgets.
 
+Check reward propagation against the full game's decision horizon before scaling a value learner.
+With frozen one-step targets synchronized every four updates, 32 updates provide only eight
+explicit backup generations. Generalization can move values elsewhere, but that is not evidence
+that the learner has assigned terminal credit to early investments. The optional sixteen-step
+profile needs both a delayed-reward propagation check and the contingent-investment reversal
+regression, because longer uncorrected returns also include more exploratory behavior. Measure
+mature replay resources and an actual update before fixing the complete-game budget. Keep the
+final policy comparison independent of those consumed-world operational checks.
+
 Measure low-stock turn-order bidding positions before extending token proposals. The current
 offered set includes stock-bounded signed amounts and full-cash endpoints; legal intermediate
 bids above available stock can be absent. Learning cannot discover a command outside that set.

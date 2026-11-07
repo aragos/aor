@@ -423,7 +423,7 @@ def update_pair(directory,bundle_path,config,output,*,checkpoint_path=None,resum
         _,identity,done=read_completed(output,config)
         require(identity['collectionDirectory']==str(Path(directory).resolve())
                 and identity['behaviorBundlePath']==str(Path(bundle_path).resolve())
-                and identity['config']==asdict(config)
+                and asdict(q.UpdateConfig(**identity['config']).validate())==asdict(config)
                 and identity['previousCheckpoint']==(str(Path(checkpoint_path).resolve()) if checkpoint_path else None),
                 'Completed Q reuse requires exactly the original request.')
         return done
