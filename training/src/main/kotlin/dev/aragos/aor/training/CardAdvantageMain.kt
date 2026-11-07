@@ -156,7 +156,9 @@ internal object CardAdvantageMain {
         val batchEvaluator = batchDeadline?.let { CardAdvantageEvaluator(input, it) }
         val inputs =
             listOf(input.source, input.environment.baseline.path, input.environment.purchase.path) +
-                input.policies.values.flatMap { it.jointBundle?.files() ?: listOfNotNull(it.path) }
+                input.policies.values.flatMap {
+                    it.territoryBundle?.files() ?: it.jointBundle?.files() ?: listOfNotNull(it.path)
+                }
         for (index in indices) {
             if (batchDeadline != null) checkDeadline(batchDeadline)
             job(options, index, "game", inputs, batchDeadline) { path, deadline ->

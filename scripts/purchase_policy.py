@@ -67,6 +67,14 @@ class PolicyContract:
 
 
 PURCHASE_CONTRACT = PolicyContract(ENCODER_VERSION, ACTOR_VERSION, "purchase", 128)
+TOKEN_CONTRACT = PolicyContract("aor-token-observation-1", "aor-token-policy-1", "token", 128,
+                                trajectoryEncoding="gzip-json-v1")
+EXPANSION_CONTRACT = PolicyContract("aor-expansion-observation-1", "aor-expansion-policy-1", "expansion", 1024,
+                                    trajectoryEncoding="gzip-json-v1")
+OFFERED_REFERENCE_CONTRACTS = {
+    "aor-token-offered-reference-1": TOKEN_CONTRACT,
+    "aor-expansion-offered-reference-1": EXPANSION_CONTRACT,
+}
 
 
 def require(condition, message):
@@ -544,6 +552,43 @@ def validate_purchase_reference(objective, contract, update_mode):
     require(update_mode == CHECKED_PREFIX_MODE,
             "The purchase offered-action reference requires checked-prefix updates.")
 
+
+@dataclass(frozen=True)
+class OfferedReferenceObjective:
+    """Explicit territory-only mean KL(uniform authoritative offered commands || policy).
+
+    Token and expansion objectives have separate versions. No action is invented, grouped or
+    removed; N offered commands each receive reference mass1/N. This changes only training,
+    never inference, the .97 prior, behavior probabilities or terminal-return advantages.
+    None disables the objective and adds no fields to legacy fit identities.
+    """
+    version: str
+    coefficient: float = 0.10
+
+    def validate(self, contract):
+        require(self.version in OFFERED_REFERENCE_CONTRACTS
+                and OFFERED_REFERENCE_CONTRACTS[self.version] == contract,
+                "Offered reference version must match its exact token or expansion contract.")
+        number(self.coefficient, "Offered reference coefficient", 0, 1)
+        require(self.coefficient > 0, "Use no offered reference objective to disable it.")
+        return self
+
+    @classmethod
+    def from_json(cls, value):
+        require(isinstance(value, dict) and set(value) == {"version", "coefficient"},
+                "Offered reference requires exactly version and coefficient.")
+        result = cls(**value)
+        require(result.version in OFFERED_REFERENCE_CONTRACTS, "Unsupported offered reference version.")
+        return result.validate(OFFERED_REFERENCE_CONTRACTS[result.version])
+
+
+def validate_offered_reference(objective, contract, update_mode):
+    if objective is None:
+        return
+    require(isinstance(objective, OfferedReferenceObjective), "Offered reference must be explicitly typed.")
+    objective.validate(contract)
+    require(update_mode == CHECKED_PREFIX_MODE, "Territory references require checked-prefix updates.")
+
 def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
     ratio = torch.exp(log_probability - old_log_probability)
     return -torch.minimum(ratio * advantage, torch.clamp(ratio, 1 - clip, 1 + clip) * advantage)
@@ -574,19 +619,25 @@ def ordinary_loss_for_rows(policy, rows, config):
 
 
 
-def loss_for_rows(policy, rows, config, *, purchase_reference=None):
+def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_reference=None):
+    require(purchase_reference is None or offered_reference is None,
+            "A typed actor cannot use two offered reference objectives.")
+    if offered_reference is not None:
+        require(isinstance(offered_reference, OfferedReferenceObjective), "Offered reference must be explicitly typed.")
+        offered_reference.validate(policy.contract)
     if purchase_reference is not None:
         require(isinstance(purchase_reference, PurchaseReferenceObjective),
                 "Purchase reference must be an explicit typed objective.")
         purchase_reference.validate(policy.contract)
     ordinary = ordinary_loss_for_rows(policy, rows, config)
-    if purchase_reference is None:
+    if purchase_reference is None and offered_reference is None:
         return ordinary
     # Match the reviewed LAB objective's separate forward and operation order exactly.
     # Raw terminal return minus recorded value advantages remain in the ordinary PPO loss.
     logps, _ = policy([row.get("_prepared", row["observation"]) for row in rows])
     penalty = torch.stack([-logp.mean() - math.log(logp.numel()) for logp in logps]).mean()
-    return ordinary + purchase_reference.coefficient * penalty
+    objective = purchase_reference if purchase_reference is not None else offered_reference
+    return ordinary + objective.coefficient * penalty
 
 def row_batches(rows, size):
     """Preserve row order, bounding both decisions and total offered actions per allocation.
@@ -618,11 +669,15 @@ def epoch_batches(rows, config, epoch):
     return row_batches([rows[index] for index in order], config.batchSize)
 
 
-def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None):
+def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None, offered_reference=None):
     require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
     optimizer.zero_grad(set_to_none=True)
-    loss = (loss_for_rows(policy, batch, config) if purchase_reference is None else
-            loss_for_rows(policy, batch, config, purchase_reference=purchase_reference))
+    if offered_reference is not None:
+        loss = loss_for_rows(policy, batch, config, purchase_reference=purchase_reference,
+                             offered_reference=offered_reference)
+    else:
+        loss = (loss_for_rows(policy, batch, config) if purchase_reference is None else
+                loss_for_rows(policy, batch, config, purchase_reference=purchase_reference))
     require(bool(torch.isfinite(loss)), "Purchase loss must remain finite.")
     loss.backward()
     nn.utils.clip_grad_norm_(policy.parameters(), config.maxGradientNorm,
@@ -650,7 +705,7 @@ def checked_block_bounds(rows, config, cursor):
 
 
 def fit_checked_block(policy, optimizer, behavior, rows, config, cursor, deadline,
-                      *, purchase_reference=None):
+                      *, purchase_reference=None, offered_reference=None):
     """Attempt at most eight minibatches, retaining both parameters and Adam only on acceptance.
 
     Cursor epochs are zero-based; offset counts actual action-bounded minibatches in that epoch's
@@ -661,12 +716,18 @@ def fit_checked_block(policy, optimizer, behavior, rows, config, cursor, deadlin
     cursor. Callers must atomically persist accepted model, Adam, cursor and counters together.
     """
     validate_purchase_reference(purchase_reference, policy.contract, CHECKED_PREFIX_MODE)
+    validate_offered_reference(offered_reference, policy.contract, CHECKED_PREFIX_MODE)
+    require(purchase_reference is None or offered_reference is None,
+            "A typed actor cannot use two offered reference objectives.")
     batches, next_cursor = checked_block_bounds(rows, config, cursor)
     before, old_optimizer = copy.deepcopy(policy.state_dict()), copy.deepcopy(optimizer.state_dict())
     attempted, metrics, reason = 0, None, None
     try:
         for batch in batches:
-            if purchase_reference is None:
+            if offered_reference is not None:
+                fit_minibatch(policy, optimizer, batch, config, deadline,
+                              offered_reference=offered_reference)
+            elif purchase_reference is None:
                 fit_minibatch(policy, optimizer, batch, config, deadline)
             else:
                 fit_minibatch(policy, optimizer, batch, config, deadline,
@@ -913,6 +974,13 @@ def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
                 "A purchase reference checkpoint must identify the purchase actor.")
         validate_purchase_reference(objective, PURCHASE_CONTRACT, identity["updateMode"])
         config.validate(PURCHASE_CONTRACT)
+    if "offeredReferenceObjective" in identity:
+        objective = OfferedReferenceObjective.from_json(identity["offeredReferenceObjective"])
+        contract = OFFERED_REFERENCE_CONTRACTS[objective.version]
+        require(identity.get("actorVersion") == contract.actor and "purchaseReferenceObjective" not in identity,
+                "Territory reference checkpoint must identify exactly its own actor objective.")
+        validate_offered_reference(objective, contract, identity["updateMode"])
+        config.validate(contract)
     history = checkpoint.get("history")
     require(isinstance(history, list), "Checked-prefix history must be an ordered block list.")
     cursor, steps, blocks, last_metrics, stop = {"epoch": 0, "minibatchOffset": 0}, 0, 0, None, None
@@ -962,7 +1030,7 @@ def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
 
 def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
            *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE,
-           purchase_reference=None, collection_reader=None):
+           purchase_reference=None, collection_reader=None, offered_reference=None):
     """Fit one typed actor; optional readers own completed-data/likelihood validation.
 
     A custom reader has read_collection's signature and returns rows plus provenance containing
@@ -972,6 +1040,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     require(update_mode in (LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE), "Unsupported PPO update mode.")
     config.validate(contract)
     validate_purchase_reference(purchase_reference, contract, update_mode)
+    validate_offered_reference(offered_reference, contract, update_mode)
+    require(purchase_reference is None or offered_reference is None,
+            "A typed actor cannot use two offered reference objectives.")
     require(collection_reader is None or (callable(collection_reader) and entrypoint is not None),
             "A custom typed collection reader requires an explicit owning entrypoint.")
     torch.set_num_threads(config.threads)
@@ -1004,6 +1075,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         identity["updateMode"] = CHECKED_PREFIX_MODE
     if purchase_reference is not None:
         identity["purchaseReferenceObjective"] = asdict(purchase_reference)
+    if offered_reference is not None:
+        identity["offeredReferenceObjective"] = asdict(offered_reference)
     if reader_source is not None:
         identity["collectionReaderSource"] = reader_source
     output = Path(output)
@@ -1069,6 +1142,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
             atomic_json(started_path, started_marker)
         if update_mode == CHECKED_PREFIX_MODE:
             options = {} if purchase_reference is None else {"purchase_reference": purchase_reference}
+            if offered_reference is not None:
+                options["offered_reference"] = offered_reference
             block = fit_checked_block(policy, optimizer, behavior, rows, config,
                                       checkpoint["cursor"], deadline, **options)
             checkpoint["history"].append(block)
@@ -1120,6 +1195,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                       **validate_checked_prefix_checkpoint(checkpoint, identity, rows))
     if purchase_reference is not None:
         report["purchaseReferenceObjective"] = asdict(purchase_reference)
+    if offered_reference is not None:
+        report["offeredReferenceObjective"] = asdict(offered_reference)
     atomic_json(output / "finished.json", report)
     return report
 

@@ -73,7 +73,7 @@ def parse_options(arguments):
     )
     parser.add_argument("--mode", choices=("coverage", "train", "evaluate", "pilot", "pilot-diagnose",
                                          "arena", "strategy-search", "strategy-replay",
-                                         "token-value-pilot", "purchase-collect", "card-collect", "joint-collect"),
+                                         "token-value-pilot", "purchase-collect", "card-collect", "joint-collect", "territory-collect"),
                         default="coverage")
     parser.add_argument("--output", type=Path, default=Path(".aor-training/run"))
     parser.add_argument("--hours", type=float, default=12.0)
@@ -125,7 +125,7 @@ def parse_options(arguments):
             parser.error("strategy-replay uses exactly one worker.")
         options.workers = 1
         options.hours = min(options.hours, 1.0)
-    elif options.mode in ("arena", "strategy-search", "token-value-pilot", "purchase-collect", "card-collect", "joint-collect"):
+    elif options.mode in ("arena", "strategy-search", "token-value-pilot", "purchase-collect", "card-collect", "joint-collect", "territory-collect"):
         forbidden = legacy_options + pilot_options + ("model", "seed")
         if options.source is None:
             parser.error(f"{options.mode} requires --source PATH to a frozen specification.")
