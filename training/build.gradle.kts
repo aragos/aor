@@ -27,6 +27,8 @@ distributions {
                     "card_advantage_breadth_experiment.py",
                     "card_continuation_experiment.py",
                     "card_continuation_analysis.py",
+                    "card_policy_coupling_experiment.py",
+                    "card_policy_coupling_analysis.py",
                     "card_advantage_capacity.py",
                     "card_advantage_evaluation.py",
                     "card_advantage_train.py",

@@ -17,6 +17,7 @@ fun main(arguments: Array<String>) {
                 listOf(
                     listOf("--mode", "card-advantage-collect"),
                     listOf("--mode", "card-advantage-evaluate"),
+                    listOf("--mode", "card-policy-coupling"),
                 )
         }
     ) {
