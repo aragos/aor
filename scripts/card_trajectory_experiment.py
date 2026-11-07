@@ -1,5 +1,6 @@
 """Bounded repeated card-PPO signal using the unchanged actor, collector and numerical backend.
 
+An optional frozen physical-card reference profile changes training only.
 One original three-hour clock covers 32 complete batches, deterministic optimizer carry,
 four fixed development checkpoints and one optional fresh confirmation. Reversal failures
 remain explicit. Neither parameter movement nor a passed development gate activates a policy.
@@ -40,6 +41,39 @@ HELPERS = ('card_trajectory_experiment.py', 'card_trajectory_analysis.py', 'card
 def python_runtime():
     return dict(executable=str(Path(sys.executable).absolute()), executableSha256=sha(sys.executable),
                 version=sys.version, numpyVersion=analysis.np.__version__, torchVersion=backend.torch.__version__)
+
+
+PROFILE = 'physical-card-reference-1'
+REFERENCE_VERSION = 'aor-card-physical-reference-1'
+REFERENCE_COEFFICIENTS = [.1] * 16 + [0.] * 16
+EXPLORATION_DEVELOPMENT = dict(analysis.DEVELOPMENT, selectionMilestones=[24, 32],
+    harmStopMilestones=[24, 32], diagnosticOnlyMilestones=[8, 16])
+
+
+def reference_coefficients(protocol):
+    """An explicit prospective schedule; no adaptation to rewards or milestone outcomes."""
+    profile = protocol.get('trainingProfile')
+    if profile is None:
+        require('cardReferenceCoefficients' not in protocol and 'vanillaComparator' not in protocol,
+                'The original trajectory profile has no extra schedule or comparator.')
+        return None
+    require(profile == PROFILE and protocol.get('cardReferenceVersion') == REFERENCE_VERSION,
+            'Unsupported physical-card reference training profile.')
+    values = protocol.get('cardReferenceCoefficients')
+    require(isinstance(values, list) and len(values) == 32
+            and all(type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1 for value in values)
+            and values == REFERENCE_COEFFICIENTS,
+            'Freeze exactly 32 finite coefficients: .10 for updates 1–16, then zero for 17–32.')
+    return values
+
+
+def update_config(index, coefficients=None):
+    require(type(index) is int and 1 <= index <= 32, 'Update index must be in 1..32.')
+    values = dict(analysis.PPO, seed=analysis.TRAINING['updateSeeds'][index-1])
+    if coefficients is not None:
+        values.update(cardReferenceKlCoefficient=coefficients[index-1], cardReferenceVersion=REFERENCE_VERSION)
+    # Backend-owned defaults are explicit in the immutable update identity, including zero regularization.
+    return backend.asdict(backend.UpdateConfig(**values))
 
 
 def training_source(base, offset, model):
@@ -133,9 +167,16 @@ def analyze_request(path):
     args=(request['seeds'],Path(request['controls']),Path(request['controlsSource']),
           Path(request['candidate']),Path(request['candidateSource']),request['base'],
           Path(request['initial']),Path(request['model']),Path(request['priority'])) if request['stage']=='development' else None
-    report=analysis.analyze_development_completed(*args) if args else analysis.analyze_completed(
+    options = dict(vanilla=request.get('vanilla'),
+                   require_vanilla_superiority=request.get('requireVanillaSuperiority', False))
+    report=analysis.analyze_development_completed(*args, **options) if args else analysis.analyze_completed(
         'confirmation',request['seeds'],Path(request['candidate']),Path(request['candidateSource']),
-        request['base'],Path(request['initial']),Path(request['model']),Path(request['priority']))
+        request['base'],Path(request['initial']),Path(request['model']),Path(request['priority']), **options)
+    if request.get('diagnosticOnlyCheckpoint', False):
+        require(request['stage'] == 'development', 'Only early development checkpoints are diagnostic-only.')
+        report.update(checkpointUse='diagnostic-only exploration',
+            diagnosticEligible=report['eligible'], diagnosticHarmDetected=report['harmful'],
+            eligible=False, harmful=False)
     output=Path(request['output']);document(output,report)
     document(output.with_suffix('.binding.json'),dict(requestSha256=sha(path),reportSha256=sha(output)))
 
@@ -147,7 +188,16 @@ class TrajectoryWindow(experiment.Window):
         require(self.protocol['kind']=='card-trajectory-window' and self.protocol['schemaVersion']==1,
                 'Unsupported repeated card trajectory protocol.')
         recipe=read(self.pin(self.protocol['recipeDraft']))
-        expected=dict(training=analysis.TRAINING,ppo=analysis.PPO,development=analysis.DEVELOPMENT,
+        self.coefficients = reference_coefficients(self.protocol)
+        require(self.coefficients == reference_coefficients(recipe)
+                and all(self.protocol.get(key) == recipe.get(key) for key in
+                        ('trainingProfile', 'cardReferenceVersion', 'vanillaComparator', 'explorationEvidence')),
+                'The prospective exploration schedule, comparator and evidence must match the frozen recipe.')
+        self.vanilla = None
+        self.vanilla_superiority = False
+        self.selection_milestones = (24, 32) if self.coefficients is not None else analysis.MILESTONES
+        expected=dict(training=analysis.TRAINING,ppo=analysis.PPO,development=(
+            EXPLORATION_DEVELOPMENT if self.coefficients is not None else analysis.DEVELOPMENT),
             confirmation=analysis.CONFIRMATION,bootstrap=analysis.BOOTSTRAP,resources=RESOURCES,
             evaluation=EVALUATION,originRequests={})
         require(all(self.protocol[key]==recipe[key]==value for key,value in expected.items())
@@ -203,6 +253,8 @@ class TrajectoryWindow(experiment.Window):
         for name in ('originalToyReport','productionToyReport'):
             require(read(self.pin(prior[name]))['passed'] is False, 'Preserve both original reversal failures.')
         self.pin(prior['productionToyProtocol'])
+        if self.coefficients is not None:
+            self.verify_exploration()
         self.java=self.protocol['javaRuntime']
         require(sha(self.java['executable'])==self.java['sha256']
                 and str((Path(os.environ.get('JAVA_HOME',''))/'bin/java').resolve())==self.java['executable'],
@@ -211,6 +263,34 @@ class TrajectoryWindow(experiment.Window):
                      Path(self.base['baseline']),Path(self.base['frozenPurchasePolicy']),Path(sys.executable),
                      Path(self.java['executable'])]:
             require(self.preflight['pins'].get(str(path.resolve()))==sha(path), 'Executed runtime/input not pinned: '+str(path))
+
+    def verify_exploration(self):
+        comparator = self.protocol['vanillaComparator']
+        self.vanilla = self.pin(comparator)
+        evidence = read(self.pin(comparator['evidence']))
+        batch = comparator['batch']
+        require(type(batch) is int and 1 <= batch <= 32
+                and type(comparator['superiorityRequired']) is bool
+                and comparator['superiorityRequired'] == (batch == 32)
+                and evidence['kind'] == 'completed-card-trajectory-comparator'
+                and evidence['passed'] is True and evidence['batch'] == batch
+                and evidence['modelSha256'] == sha(self.vanilla)
+                and evidence['selection'] == 'highest successfully completed update after final disposition'
+                and evidence['sourcePins'] and all(sha(path) == value == self.preflight['pins'].get(str(Path(path).resolve()))
+                    for path, value in evidence['sourcePins'].items()),
+                'Use the exact last completed vanilla update, never an outcome-selected checkpoint.')
+        model = card.validate_model(read(self.vanilla))
+        initial = read(self.initial)
+        require(all(model[key] == initial[key] for key in ('encoderVersion', 'stateFeatureNames', 'actionFeatureNames')),
+                'The frozen vanilla comparator must share the exact actor dictionaries.')
+        self.vanilla_superiority = comparator['superiorityRequired']
+        proof = read(self.pin(self.protocol['explorationEvidence']))
+        require(proof['kind'] == 'card-reference-profile-evidence' and proof['passed'] is True
+                and proof['referenceVersion'] == REFERENCE_VERSION and proof['sourcePins']
+                and all(sha(path) == value == self.preflight['pins'].get(str(Path(path).resolve()))
+                        for path, value in proof['sourcePins'].items()),
+                'Physical-card exploration requires pinned passing backend/toy evidence.')
+
 
     def model(self,index):
         return self.initial if index==0 else self.lab/f'update-{index:02}/policy.json'
@@ -254,7 +334,7 @@ class TrajectoryWindow(experiment.Window):
             checkpoint=backend.read_checkpoint(carry)
             require(checkpoint['model']==read(model) and isinstance(checkpoint['optimizer'],dict),
                     'Carry Adam only from the exact preceding model checkpoint.')
-        config=dict(analysis.PPO,seed=analysis.TRAINING['updateSeeds'][index-1])
+        config=update_config(index,getattr(self,'coefficients',None))
         config_path=self.lab/(name+'-config.json');document(config_path,config)
         expected=dict(schemaVersion=1,actorVersion=card.ACTOR_VERSION,modelSha256=sha(model),data=collected['data'],
             config=config,learnerSha256=sha(self.scripts/'purchase_policy.py'),entrypointSha256=sha(self.scripts/'card_policy.py'),
@@ -281,13 +361,16 @@ class TrajectoryWindow(experiment.Window):
     def evaluate_stage(self,stage,name,model=None):
         seeds=self.banks['confirmation' if stage=='confirmation' else 'development']
         models={'initial':self.initial} if stage=='controls' else {'candidate':model} if stage=='development' else {'initial':self.initial,'candidate':model}
-        source=analysis.make_source(stage,seeds,models,self.base,self.priority)
+        source=analysis.make_source(stage,seeds,models,self.base,self.priority,getattr(self,'vanilla',None))
         return self.native('evaluate',name,source,EVALUATION['maximumSecondsPerStage'])
 
-    def analyze(self,stage,name,output,model,controls=None):
+    def analyze(self,stage,name,output,model,controls=None,diagnostic_only=False):
         path=self.lab/(name+'-analysis.json');report_path=self.lab/(name+'-report.json')
         request=dict(stage=stage,seeds=self.banks[stage],candidate=str(output),candidateSource=str(self.lab/(output.name+'-source.json')),
             base=self.base,initial=str(self.initial),model=str(model),priority=str(self.priority),output=str(report_path))
+        if diagnostic_only:request['diagnosticOnlyCheckpoint']=True
+        if getattr(self,'vanilla',None) is not None:
+            request.update(vanilla=str(self.vanilla),requireVanillaSuperiority=self.vanilla_superiority)
         if controls:request.update(controls=str(controls),controlsSource=str(self.lab/(controls.name+'-source.json')))
         document(path,request);binding=report_path.with_suffix('.binding.json')
         if not binding.exists():
@@ -311,12 +394,15 @@ class TrajectoryWindow(experiment.Window):
             if index in analysis.MILESTONES:
                 if controls is None:controls=self.evaluate_stage('controls','development-controls')
                 output=self.evaluate_stage('development',f'development-{index:02}',self.model(index))
-                report=self.analyze('development',f'development-{index:02}',output,self.model(index),controls)
+                allowed = index in getattr(self,'selection_milestones',analysis.MILESTONES)
+                report=self.analyze('development',f'development-{index:02}',output,self.model(index),controls,
+                                    diagnostic_only=not allowed)
                 reports[index]=report
-                if report['harmful']:
+                if allowed and report['harmful']:
                     return self.finish('trajectory-development-harm',policyPromotion=False,completedUpdates=index)
         require(set(reports)==set(analysis.MILESTONES),'Selection requires all four completed fixed checkpoints.')
-        selected=analysis.select(reports)
+        selected=analysis.select({index:report for index,report in reports.items()
+            if index in getattr(self,'selection_milestones',analysis.MILESTONES)})
         if selected is None:return self.finish('trajectory-no-eligible-checkpoint',policyPromotion=False)
         finalist=dict(batch=selected,model=str(self.model(selected)),modelSha256=sha(self.model(selected)),
                       developmentReportSha256=sha(self.lab/f'development-{selected:02}-report.json'))

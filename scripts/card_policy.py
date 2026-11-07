@@ -3,6 +3,12 @@
 The card contract has its own versions and complete dictionary. The shared numerical backend
 retains the purchase network's Float64 arithmetic, 64 hidden units and .97 HARD prior. It never
 updates the purchase policy carried by a completed card collection.
+
+The optional aor-card-physical-reference-1 training regularizer assigns equal mass to each
+physical hand card and offered Pass, divided among that card's offered commands. It adds
+cardReferenceKlCoefficient * mean_decision KL(reference || pi) without changing the .97 prior,
+sampling, inference, terminal reward, or the zero-coefficient loss. Its experiment coefficient
+is pinned in update configuration, not in the portable model.
 """
 
 import purchase_policy as backend
@@ -10,6 +16,7 @@ import purchase_policy as backend
 
 ACTOR_VERSION = "aor-card-policy-1"
 ENCODER_VERSION = "aor-card-observation-1"
+EXPLORATION_REFERENCE_VERSION = backend.CARD_REFERENCE_VERSION
 CONTRACT = backend.PolicyContract(ENCODER_VERSION, ACTOR_VERSION, "card", 1024,
                                   frozenPurchase=True, maxCommand=2000,
                                   trajectoryEncoding="gzip-json-v1")
@@ -30,6 +37,14 @@ def validate_model(model):
 
 def reference_forward(model, observation):
     return backend.reference_forward(model, observation, contract=CONTRACT)
+
+
+def reference_distribution(observation):
+    """Return actor-safe physical-card/Pass reference masses in complete offered action order."""
+    backend.require(observation.get("encoderVersion") == ENCODER_VERSION,
+                    "Card reference requires the card observation encoder.")
+    return backend.card_reference_probabilities(
+        [action["command"] for action in observation["actions"]])
 
 
 def read_collection(directory, model_path, model):
