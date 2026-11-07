@@ -420,6 +420,15 @@ sequence preflight and unchanged-game batching proof. Stop on failed gates inste
 widths, changing rewards or extending confirmation. Distinguish evidence of better generalization,
 stronger complete-game play and useful contextual planning; none automatically implies the others.
 
+Before another expensive card-policy collection, test whether the existing actor-safe action quotes
+and fixed public-context interactions support a direct paired value model. The
+[linear diagnostic](../scripts/card_linear_value.py) uses training-only RMS scaling, no intercept,
+equal-origin weights and a fixed three-value ridge grid selected on development data. Its raw-action
+control already includes state-dependent quotes. Only the contextual representation may advance;
+require lower development error than zero and the control, plus positive selected-action advantage.
+This diagnostic does not qualify either model for play. A passing model needs a distinct inference
+contract, fresh complete-game comparisons and the usual browser and saved-game checks.
+
 ### Hardware experiment
 
 Start the pilot on the current Mac: executor profiling, branching, teacher validation, dataset
