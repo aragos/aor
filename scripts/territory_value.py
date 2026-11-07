@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, replace
 import math
 import random
 import time
+from typing import Literal
 
 import purchase_policy as b
 
@@ -23,6 +24,14 @@ PARAMETERS = ("stateWeights", "stateBias", "actionWeights", "actionBias", "outpu
 MODEL_FIELDS = set(PARAMETERS) | {"schemaVersion", "architecture", "encoderVersion", "hiddenSize",
                                 "stateFeatureNames", "actionFeatureNames"}
 MAGNITUDE_LIMIT = 1e6
+TargetSteps = Literal[1, 16, "terminal"]
+
+
+def validate_target_steps(value: TargetSteps) -> TargetSteps:
+    b.require((type(value) is int and value in (1, 16))
+              or (type(value) is str and value == "terminal"),
+              "The return horizon must be integer1, integer16 or the explicit string 'terminal'.")
+    return value
 
 
 @dataclass(frozen=True)
@@ -36,7 +45,7 @@ class UpdateConfig:
     replayRowsPerPhase: int = 16384
     replayGames: int = 4096
     targetSyncEveryUpdates: int = 4
-    targetSteps: int = 1
+    targetSteps: TargetSteps = 1
     gamma: float = 1.0
     epsilon: float = .20
     maximumAbsQ: float = 10.0
@@ -45,8 +54,7 @@ class UpdateConfig:
     def validate(self):
         b.integer(self.seed, "Replay sampling seed", -(2**31), 2**31-1)
         b.number(self.maxSeconds, "Original update allowance", 0.001, 10800)
-        b.require(type(self.targetSteps) is int and self.targetSteps in (1, 16),
-                  "The fixed return horizon must be either1 or16 actual owned decisions.")
+        validate_target_steps(self.targetSteps)
         fixed = asdict(UpdateConfig())
         b.require(all(value == fixed[key] for key, value in asdict(self).items()
                       if key not in ("seed", "maxSeconds", "targetSteps")), "Linear-Q algorithm settings are fixed and versioned.")
@@ -214,7 +222,7 @@ def validate_episode(episode):
         previous = row.number
 
 
-def backup_transitions(episode, target_steps):
+def backup_transitions(episode, target_steps: TargetSteps):
     """Return sampled target views without changing stored one-step transitions.
 
     The horizon counts actual owned learned decisions across both phases, not engine commands
@@ -222,11 +230,17 @@ def backup_transitions(episode, target_steps):
     that return exactly once. Otherwise its reward remains zero and Double-Q evaluates the
     actual endpoint's legal offers. The uncorrected intervening behavior prefix is off-policy;
     these targets are not claimed to be unbiased optimal-control returns.
+
+    Explicit "terminal" views assign the complete episode's recorded return once per sampled
+    transition and never bootstrap. They describe that recorded continuation, not a claim about
+    the current greedy policy. Original one-step rows remain the calibration/storage authority.
     """
-    b.require(type(target_steps) is int and target_steps in (1, 16), "Unsupported Q target horizon.")
+    validate_target_steps(target_steps)
     validate_episode(episode)
     if target_steps == 1:
         return episode.transitions
+    if target_steps == "terminal":
+        return tuple(replace(row, reward=episode.reward, successor=None) for row in episode.transitions)
     rows = episode.transitions
     result = []
     for index, row in enumerate(rows):
@@ -272,9 +286,9 @@ class Replay:
         self.prepared = {}
         self._sample_rows = None
 
-    def prepare_backups(self, target_steps):
+    def prepare_backups(self, target_steps: TargetSteps):
         """Cache each same-game suffix once per replay/horizon; never rescan on minibatch draws."""
-        b.require(type(target_steps) is int and target_steps in (1, 16), "Unsupported Q target horizon.")
+        validate_target_steps(target_steps)
         if self._sample_rows is not None and target_steps == self._target_steps:
             return
         views = {phase: [] for phase in PHASES}

@@ -422,13 +422,21 @@ hash-bound origin identities. Checkpoints bind replay membership, online and tar
 separate Adam states and synchronization counters before publishing the next complete pair.
 The implementation preserves the earlier PPO models and collectors as distinct contracts.
 
-`UpdateConfig.targetSteps` selects one or sixteen actual owned decisions. One is the default.
+`UpdateConfig.targetSteps` selects one or sixteen actual owned decisions, or the explicit
+string `"terminal"`. One is the default.
 The sixteen-step profile follows the recorded sequence across both phases, stops at the real
 terminal row, and otherwise bootstraps from the recorded endpoint's legal offers. It counts
 neither engine commands nor turns. The intervening actions come from the collection policy,
 so these uncorrected targets can carry behavior-policy bias. Checkpoints retain the selected
 horizon; carrying a model and optimizer into a different horizon is rejected. Stored replay
 rows and terminal calibration retain their original one-step meaning.
+
+The terminal profile assigns the complete game's recorded return to each sampled action and
+does not bootstrap. It estimates returns under the recorded continuation policy; it does not
+make those returns optimal-action labels. Comparing targets on the same recorded experience
+requires an explicit offline experiment that separates the behavior actor from the fitted
+actor. The ordinary update command still requires each new collection to use the preceding
+published pair, including when terminal targets are selected.
 
 Action values are finite estimates, not probabilities: they may lie outside the terminal
 reward range. An explicit numerical guard stops excessive growth without clipping targets.
