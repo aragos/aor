@@ -120,6 +120,86 @@ class ExperimentDriverTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'identity changed'):
                 experiment.completed_fit(root, root, {}, root)
 
+    def test_finish_publishes_result_and_status_without_duplicate_preflight_keyword(self):
+        with tempfile.TemporaryDirectory() as directory:
+            window = experiment.Window.__new__(experiment.Window)
+            window.lab = Path(directory)
+            window.deadline = 1234
+            window.preflight_hash = 'fixed-preflight'
+            result = window.finish('independent-qualification-failed', primaryPassed=False,
+                                   robustnessPassed=True)
+            self.assertEqual(experiment.read(window.lab / 'window-result.json'), result)
+            status = experiment.read(window.lab / 'window-status.json')
+            self.assertEqual(status['stage'], 'finished')
+            self.assertEqual(status['preflightSha256'], 'fixed-preflight')
+            self.assertFalse(status['browserActivated'])
+
+    def test_optional_evaluation_batching_keeps_default_and_collection_commands_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = experiment.Window.__new__(experiment.Window)
+            window.lab = root
+            window.scripts = root / 'bin'
+            window.runtime = root / 'lib'
+            window.deadline = 100000
+            for mode, batch, expected in [('evaluate', None, False), ('evaluate', 8, True),
+                                          ('collect', 8, False)]:
+                window.protocol = {} if batch is None else {'evaluation': {'batchSize': batch}}
+                with patch.object(experiment, 'completed_native', side_effect=[False, True]), \
+                     patch.object(window, 'execute') as execute:
+                    window.native(mode, mode + str(batch), {}, 60)
+                command = execute.call_args.args[1]
+                self.assertEqual('--batch-size' in command, expected)
+                if expected:
+                    self.assertEqual(command[command.index('--batch-size') + 1], '8')
+
+    def test_evaluation_batch_setting_rejects_boolean_and_out_of_range_values(self):
+        window = experiment.Window.__new__(experiment.Window)
+        for value in (True, 0, 65, '8'):
+            window.protocol = {'evaluation': {'batchSize': value}}
+            with self.assertRaisesRegex(ValueError, 'integer'):
+                window.native('evaluate', 'unused', {}, 60)
+
+    def test_legacy_fit_config_defaults_to_64_and_compact_requires_explicit_eight(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            collection, fit, scripts = (root / name for name in ('collection', 'fit', 'bin'))
+            for path in (collection, fit, scripts):
+                path.mkdir()
+            completed_collection(collection)
+            for name in ('card_advantage_train.py', 'card_advantage.py',
+                         'card_advantage_data.py', 'purchase_policy.py'):
+                (scripts / name).write_text(name)
+            protocol = {'fit': dict(learningRate=.003, weightDecay=.0001, gradientNormLimit=1.,
+                wholeOriginsPerBatch=16, epochs=64, checkpoints=[8, 16, 32, 64],
+                initializationSeeds=[84501, 84502, 84503], threads=1, maximumSecondsPerCycle=2700)}
+            names = {'collection.json', 'finished.json', 'source.json', 'baseline.json',
+                     'frozen-purchase-policy.json', 'origin-0.json.gz'}
+            identity = {'collection': {'source': str(collection.resolve()), 'signature': 'fixed',
+                'fileHashes': {name: experiment.sha(collection / name) for name in names}},
+                'sourceHashes': {str(path.resolve()): experiment.sha(path) for path in scripts.iterdir()},
+                'config': experiment.fit_config(protocol)}
+            del identity['config']['activeHidden']
+            for name in ('full.json', 'action-priority.json', 'frequency-control.json'):
+                (fit / name).write_text('{}')
+            def save():
+                experiment.document(fit / 'identity.json', identity, immutable=False)
+                digest = hashlib.sha256(json.dumps(identity, sort_keys=True,
+                    separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+                report = {'identitySha256': digest, 'models': {name: {
+                    'sha256': experiment.sha(fit / (name + '.json'))} for name in ('full', 'action-priority')},
+                    'frequencyControlSha256': experiment.sha(fit / 'frequency-control.json')}
+                experiment.document(fit / 'finished.json', report, immutable=False)
+                return report
+            report = save()
+            self.assertEqual(experiment.completed_fit(fit, collection, protocol, scripts), report)
+            protocol['fit']['activeHidden'] = 8
+            with self.assertRaisesRegex(ValueError, 'frozen recipe'):
+                experiment.completed_fit(fit, collection, protocol, scripts)
+            identity['config']['activeHidden'] = 8
+            report = save()
+            self.assertEqual(experiment.completed_fit(fit, collection, protocol, scripts), report)
+
     def test_missing_preflight_prevents_any_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
