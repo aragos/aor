@@ -19,6 +19,7 @@ ENCODER = 'aor-card-observation-1'
 SELECTOR = 'aor-card-advantage-2'
 PROPOSAL = 'aor-card-proposals-1'
 FREQUENCY = 'aor-card-frequency-1'
+ACQUISITION = 'aor-card-acquisition-1'
 HIDDEN = 64
 MARGIN = .02
 SEEDS = (84501, 84502, 84503)
@@ -142,6 +143,18 @@ def proposals(observation, seed):
         candidates = groups[names[i]]; chosen.add(candidates[rng.bounded(len(candidates))])
     return sorted(chosen)
 
+def acquisition(observation, seed, sampled):
+    """Acquire labels without changing S; this independent stream never enters policy inputs."""
+    require(type(sampled) is bool, 'Acquisition mode must be a boolean.')
+    indices = proposals(observation, seed); baseline = observation['baselineIndex']
+    alternatives = [index for index in indices if index != baseline]
+    selected = (alternatives[Stream(seed, 0x5be0cd19).bounded(len(alternatives))]
+                if sampled and alternatives else None)
+    observed = sorted((baseline, selected)) if selected is not None else ([baseline] if sampled else indices)
+    return observed, {'version': ACQUISITION, 'kind': 'uniform-non-f' if sampled else 'exhaustive',
+                      'seed': seed, 'sampledActionIndex': selected,
+                      'probability': 1.0/len(alternatives) if selected is not None else 1.0}
+
 def identity_feature(name):
     """Action identity/explicit choice parameters only; excludes quoted/state-derived effects."""
     return name.startswith(('kind.', 'card.', 'cardKind.', 'choice.', 'target.')) or name == 'protection'
@@ -161,11 +174,22 @@ class Group:
     identifier: str
     observation: dict
     seed: int
+    observed: tuple = ()
     sourceGroups: tuple = ()
     replicates: int = 1
     def nontrivial(self): return len(self.indices) > 1
+    def observed_pairs(self):
+        return [i for i, present in enumerate(self.observed) if present and i != self.baseline]
+    def require_dense_targets(self):
+        require(len(self.observed) == len(self.indices) and all(self.observed),
+                'Dense evaluation requires an observed target for every proposed action.')
 
-def prepare(observation, seed, schema, targets=None, identifier='', ablation=False):
+def prepare(observation, seed, schema, targets=None, identifier='', ablation=False, observed=None):
+    """Prepare full S; absent targets mean inference, never invented zero training labels.
+
+    Explicit sampled targets use an observed mask and NaN at every unobserved position.
+    The reference difference is known to be zero even when no outcomes were requested.
+    """
     validate_schema(schema)
     common.validate_observation(observation, schema, contract=card_policy.CONTRACT)
     indices = proposals(observation, seed)
@@ -175,13 +199,25 @@ def prepare(observation, seed, schema, targets=None, identifier='', ablation=Fal
     actions = torch.tensor([[observation['actions'][i]['features'].get(name, 0.0)
                             if not ablation or identity_feature(name) else 0.0
                             for name in schema['actionFeatureNames']] for i in indices], dtype=torch.float64)
-    expected = [0.0]*len(indices) if targets is None else list(targets)
-    require(len(expected) == len(indices), 'Paired targets must match the proposal set.')
-    for value in expected: common.number(value, 'Paired reward difference', -1, 1)
     b = indices.index(observation['baselineIndex'])
+    if targets is None:
+        require(observed is None, 'Inference without targets cannot declare observed outcome labels.')
+        expected = [0.0 if i == b else math.nan for i in range(len(indices))]
+        mask = tuple(i == b for i in range(len(indices)))
+    else:
+        expected = list(targets)
+        mask = tuple(True for _ in indices) if observed is None else tuple(observed)
+    require(len(expected) == len(indices), 'Paired targets must match the proposal set.')
+    require(len(mask) == len(indices) and all(type(present) is bool for present in mask),
+            'Observed target flags must be booleans matching the full proposal set.')
+    require(mask[b], 'The known F reference target must be observed.')
+    for value, present in zip(expected, mask):
+        if present: common.number(value, 'Paired reward difference', -1, 1)
+        else: require(type(value) is float and math.isnan(value),
+                      'An unobserved target must be NaN, never a fabricated numeric label.')
     require(abs(expected[b]) < 1e-12, 'The F reference must have zero paired advantage.')
     return Group(state, actions, b, tuple(indices), tuple(observation['actions'][i]['command'] for i in indices),
-                 torch.tensor(expected, dtype=torch.float64), identifier, copy.deepcopy(observation), seed)
+                 torch.tensor(expected, dtype=torch.float64), identifier, copy.deepcopy(observation), seed, mask)
 
 class Network(nn.Module):
     def __init__(self, schema, member):
@@ -205,16 +241,16 @@ class Network(nn.Module):
         return list(values.split([len(g.indices) for g in groups]))
 
 def loss(network, origins):
-    """Equal original worlds, then nontrivial groups, then non-reference action pairs."""
-    active = [[g for g in origin if g.nontrivial()] for origin in origins]
+    """Equal worlds, then groups, then observed non-F pairs; uniform acquisition needs no IPW."""
+    active = [[g for g in origin if g.observed_pairs()] for origin in origins]
     active = [groups for groups in active if groups]
-    require(active, 'A loss batch requires at least one nontrivial origin.')
+    require(active, 'A loss batch requires at least one observed non-reference target.')
     predictions = iter(network([g for groups in active for g in groups])); origin_losses = []
     for groups in active:
         values=[]
         for group in groups:
             q = next(predictions); delta = q-q[group.baseline]
-            mask = [i for i in range(len(q)) if i != group.baseline]
+            mask = group.observed_pairs()
             values.append(((delta[mask]-group.targets[mask])**2).mean())
         origin_losses.append(torch.stack(values).mean())
     return torch.stack(origin_losses).mean()

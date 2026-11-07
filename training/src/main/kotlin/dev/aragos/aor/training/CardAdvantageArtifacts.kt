@@ -13,6 +13,7 @@ internal object CardAdvantageArtifacts {
 
     fun validate(node: JsonNode, input: CardAdvantageCollectionInput, index: Int) {
         val request = input.origins[index]
+        val plan = input.collection
         PurchaseJson.fields(
             node,
             setOf(
@@ -33,7 +34,7 @@ internal object CardAdvantageArtifacts {
             ),
         )
         require(
-            integer(node, "schemaVersion") == 1 &&
+            integer(node, "schemaVersion") == input.schemaVersion &&
                 node.required("signature").asText() == input.signature() &&
                 integer(node, "index") == index &&
                 integer(node, "seed") == request.seed &&
@@ -55,8 +56,8 @@ internal object CardAdvantageArtifacts {
         require(
             observationsNode.isObject &&
                 outcomes.isObject &&
-                outcomes.size() <= 52 &&
-                groups.size <= 13
+                outcomes.size() <= (plan?.let { 4 * it.replicates } ?: 52) &&
+                groups.size <= (if (plan == null) 13 else 1)
         ) {
             "Advantage origin payloads exceed their fixed bound."
         }
@@ -77,6 +78,9 @@ internal object CardAdvantageArtifacts {
                 groups.isNotEmpty()
         ) {
             "An advantage origin must be complete or explicitly skipped."
+        }
+        require(plan == null || observationsNode.size() == 1) {
+            "A root-only origin must contain exactly its one safe observation."
         }
         val observations =
             observationsNode.properties().associate { (hash, document) ->
@@ -147,7 +151,7 @@ internal object CardAdvantageArtifacts {
                     "replicate",
                     "continuationIndex",
                     "prefixCanonicalSha256",
-                ),
+                ) + if (plan == null) emptySet() else setOf("observedActionIndices", "acquisition"),
             )
             val observation =
                 requireNotNull(observations[group.required("observationSha256").asText()]) {
@@ -178,9 +182,43 @@ internal object CardAdvantageArtifacts {
             require(integer(group, "continuationIndex") == pi && pi in proposals) {
                 "Stored continuation reuse must match the exact frozen selector and seed."
             }
+            val observed =
+                if (plan == null) proposals
+                else {
+                    val acquisition =
+                        CardAdvantageAcquisition.select(
+                            proposals,
+                            observation.baselineIndex,
+                            seed,
+                            sampled = request.split in plan.sampledSplits,
+                        )
+                    val expected = acquisition.observedIndices(proposals, observation.baselineIndex)
+                    val recorded =
+                        PurchaseJson.array(
+                                group.required("observedActionIndices"),
+                                "observedActionIndices",
+                            )
+                            .map { PurchaseJson.integer(it, "observed action index") }
+                    require(
+                        recorded == expected &&
+                            group.required("acquisition") ==
+                                PurchaseJson.mapper.valueToTree<JsonNode>(acquisition)
+                    ) {
+                        "Observed actions and acquisition must match the deterministic full-S sampler."
+                    }
+                    expected
+                }
             val returns = PurchaseJson.array(group.required("returns"), "returns")
-            require(returns.map { integer(it, "actionIndex") } == proposals) {
-                "All and only the shared proposals require targets."
+            require(returns.map { integer(it, "actionIndex") } == observed) {
+                "All and only the declared observed proposals require targets."
+            }
+            if (plan != null) {
+                val ids = returns.flatMap { row ->
+                    PurchaseJson.strings(row.required("outcomeIds"), "outcomeIds")
+                }
+                require(ids.distinct().size == ids.size) {
+                    "Root-only action/stream pairs require distinct complete outcomes."
+                }
             }
             val child = group.required("kind").asText() == "child"
             require(child || group.required("kind").asText() == "root") {
@@ -216,8 +254,8 @@ internal object CardAdvantageArtifacts {
             returns.forEach { row ->
                 PurchaseJson.fields(row, setOf("actionIndex", "outcomeIds"))
                 val ids = PurchaseJson.strings(row.required("outcomeIds"), "outcomeIds")
-                require(ids.size == if (child) 1 else 4) {
-                    "Roots require four paired streams and exact children require one."
+                require(ids.size == if (child) 1 else plan?.replicates ?: 4) {
+                    "Action returns must preserve the collection's declared paired stream count."
                 }
                 ids.forEachIndexed { replicate, id ->
                     val outcome =

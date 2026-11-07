@@ -22,6 +22,7 @@ def prediction_metrics(network, origins):
     errors=[];zero=[]
     with torch.no_grad():
         for origin in origins:
+            for group in origin: group.require_dense_targets()
             groups=[g for g in origin if g.nontrivial()]
             if not groups: continue
             origin_error=[];origin_zero=[]
@@ -34,7 +35,9 @@ def prediction_metrics(network, origins):
     return {'origins':len(errors),'mse':sum(errors)/len(errors),'zeroMse':sum(zero)/len(zero)}
 
 def epoch(network, optimizer, origins, seed, iteration, config, deadline):
-    indices=list(range(len(origins)));random.Random(seed*100003+iteration).shuffle(indices)
+    indices=[i for i,origin in enumerate(origins) if any(g.observed_pairs() for g in origin)]
+    a.require(indices,'A training epoch requires an origin with an observed non-reference target.')
+    random.Random(seed*100003+iteration).shuffle(indices)
     total=0.
     for start in range(0,len(indices),config.originsPerBatch):
         a.require(time.time()<deadline,'The original inclusive fit deadline elapsed.')
@@ -44,7 +47,7 @@ def epoch(network, optimizer, origins, seed, iteration, config, deadline):
         value.backward();gradient=torch.nn.utils.clip_grad_norm_(network.parameters(),config.maxGradientNorm)
         a.require(bool(torch.isfinite(gradient)), 'Paired gradient became nonfinite.')
         optimizer.step();total+=float(value.detach())*len(batch)
-    return total/len(origins)
+    return total/len(indices)
 
 def fit_member(schema, training, development, seed, config, output, identity, deadline):
     output=Path(output);output.mkdir(exist_ok=True)
@@ -83,7 +86,8 @@ def fit_member(schema, training, development, seed, config, output, identity, de
     return best,{'seed':seed,'selectedEpoch':checkpoint['bestEpoch'],'developmentMse':checkpoint['bestLoss']}
 
 def ablated(origins,schema):
-    return [[a.prepare(g.observation,g.seed,schema,g.targets.tolist(),g.identifier,True) for g in origin] for origin in origins]
+    return [[a.prepare(g.observation,g.seed,schema,g.targets.tolist(),g.identifier,True,
+                       observed=g.observed) for g in origin] for origin in origins]
 
 def fit_ensemble(schema,training,development,output,identity,deadline,ablation=False,config=a.CONFIG):
     output=Path(output);output.mkdir(exist_ok=True)
@@ -96,10 +100,11 @@ def fit_ensemble(schema,training,development,output,identity,deadline,ablation=F
     return a.bundle(schema,members),reports
 
 def local_metrics(ensemble,origins,control=None):
-    per_origin=[];prediction=[];zero=[]
+    per_origin=[];prediction=[];zero=[];nontrivial_decisions=0
     with torch.no_grad():
         for origin in origins:
             if not origin: continue
+            for group in origin: group.require_dense_targets()
             selected=[];nontrivial_error=[];nontrivial_zero=[];overrides=0;passes=0
             values=[member(origin) for member in ensemble.members]
             for j,g in enumerate(origin):
@@ -110,6 +115,7 @@ def local_metrics(ensemble,origins,control=None):
                 passes+=int(i!=g.baseline and g.commands[i]=='pass')
                 mask=[k for k in range(len(g.indices)) if k!=g.baseline]
                 if mask:
+                    nontrivial_decisions+=1
                     mean=torch.stack([v[j]-v[j][g.baseline] for v in values]).mean(0)
                     nontrivial_error.append(float(((mean[mask]-g.targets[mask])**2).mean()))
                     nontrivial_zero.append(float((g.targets[mask]**2).mean()))
@@ -126,7 +132,8 @@ def local_metrics(ensemble,origins,control=None):
         'upper95':mean+1.96*se if se is not None else None,'overriddenOrigins':overridden,
         'positiveOrigins':len(positives),'largestPositiveOriginFraction':fraction,
         'predictionMse':sum(prediction)/len(prediction) if prediction and control is None else None,
-        'zeroPredictionMse':sum(zero)/len(zero) if zero else None,'perOrigin':per_origin,
+        'zeroPredictionMse':sum(zero)/len(zero) if zero else None,
+        'nontrivialOrigins':len(zero),'nontrivialDecisions':nontrivial_decisions,'perOrigin':per_origin,
         'localGatePassed':mean>1e-12 and overridden>=16 and fraction is not None and fraction<=.25,
         'strengthQualified':False}
 
