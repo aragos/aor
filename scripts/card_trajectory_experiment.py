@@ -159,6 +159,9 @@ def completed_update(output, expected, collected, input_model):
     if not (output/'finished.json').exists():return None
     identity, report=read(output/'identity.json'),read(output/'finished.json')
     payload=backend.read_checkpoint(output/'checkpoint.json')
+    require(payload.get('schemaVersion') == report.get('schemaVersion') == 1
+            and 'updateMode' not in identity,
+            'Legacy completion requires whole-epoch schema1; checked prefixes need their own validator.')
     require({key:value for key,value in identity.items() if key!='deadlineEpochSeconds'}==expected
             and type(identity.get('deadlineEpochSeconds')) in (int,float)
             and math.isfinite(identity['deadlineEpochSeconds']), 'Completed PPO inputs/runtime/carry identity changed.')

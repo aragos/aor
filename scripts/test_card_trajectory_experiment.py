@@ -103,14 +103,14 @@ class UpdateLineage(unittest.TestCase):
         self.collected=driver.completed_training(*self.args);self.output=self.root/'update';self.output.mkdir()
         self.expected=dict(modelSha256=driver.sha(self.args[3]),optimizerFromSha256='fixed-adam',data=self.collected['data'])
         self.identity=dict(self.expected,deadlineEpochSeconds=time.time()+100)
-        self.payload=dict(identitySha256=driver.backend.digest(self.identity),deadlineEpochSeconds=self.identity['deadlineEpochSeconds'],
+        self.payload=dict(schemaVersion=1,identitySha256=driver.backend.digest(self.identity),deadlineEpochSeconds=self.identity['deadlineEpochSeconds'],
             model=driver.read(self.args[3]),optimizer={'state':{}},epoch=0,history=[],stopReason='behavior-kl-limit',elapsedSeconds=1.)
         self.save()
 
     def save(self):
         put(self.output/'identity.json',self.identity);put(self.output/'policy.json',self.payload['model'])
         driver.backend.save_checkpoint(self.output/'checkpoint.json',self.payload)
-        put(self.output/'finished.json',dict(identitySha256=driver.backend.digest(self.identity),
+        put(self.output/'finished.json',dict(schemaVersion=1,identitySha256=driver.backend.digest(self.identity),
             inputModelSha256=self.expected['modelSha256'],outputModelSha256=driver.sha(self.output/'policy.json'),
             games=2,decisions=2,gameMeanReward=.3,acceptedEpochs=self.payload['epoch'],history=self.payload['history'],
             stopReason=self.payload['stopReason'] or 'epochs-complete',elapsedSeconds=1.,strengthClaim=False))

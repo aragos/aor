@@ -4,6 +4,13 @@ The portable model uses fixed named dictionaries, Float64, one shared 64-unit
 state embedding, and a residual actor over the qualified policy's 97% prior.
 No hidden state, counterfactual labels, or authored dense rewards enter fitting.
 PyTorch owns differentiation; the independent stdlib forward is a wire oracle.
+
+Updates default to the legacy whole-epoch KL rollback. Explicit --update-mode
+aor-ppo-checked-prefix-1 commits eight-minibatch blocks (or an epoch remainder),
+checking cumulative KL on the entire collection against its original behavior.
+Its schema-2 checkpoints retain partial-epoch model and Adam progress together;
+resume preserves the original deadline and starts at the next uncommitted block.
+Portable models and inference are unchanged; prefix acceptance is not strength evidence.
 """
 
 from __future__ import annotations
@@ -539,18 +546,85 @@ def row_batches(rows, size):
         yield rows[start:]
 
 
-def fit_epoch(policy, optimizer, rows, config, epoch, deadline):
+LEGACY_UPDATE_MODE = "aor-ppo-epoch-1"
+CHECKED_PREFIX_MODE = "aor-ppo-checked-prefix-1"
+CHECKED_PREFIX_MINIBATCHES = 8
+
+
+def epoch_batches(rows, config, epoch):
+    """The original deterministic shuffle and action-bounded minibatch partition."""
     order = list(range(len(rows)))
     random.Random(config.seed + epoch).shuffle(order)
-    for batch in row_batches([rows[index] for index in order], config.batchSize):
+    return row_batches([rows[index] for index in order], config.batchSize)
+
+
+def fit_minibatch(policy, optimizer, batch, config, deadline):
+    require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
+    optimizer.zero_grad(set_to_none=True)
+    loss = loss_for_rows(policy, batch, config)
+    require(bool(torch.isfinite(loss)), "Purchase loss must remain finite.")
+    loss.backward()
+    nn.utils.clip_grad_norm_(policy.parameters(), config.maxGradientNorm,
+                             error_if_nonfinite=True)
+    optimizer.step()
+
+
+def fit_epoch(policy, optimizer, rows, config, epoch, deadline):
+    for batch in epoch_batches(rows, config, epoch):
+        fit_minibatch(policy, optimizer, batch, config, deadline)
+
+
+def checked_block_bounds(rows, config, cursor):
+    require(isinstance(cursor, dict) and set(cursor) == {"epoch", "minibatchOffset"},
+            "Checked-prefix cursor requires epoch and minibatchOffset.")
+    epoch = integer(cursor["epoch"], "Cursor epoch", 0, config.epochs - 1)
+    offset = integer(cursor["minibatchOffset"], "Cursor minibatch offset", 0, len(rows))
+    batches = list(epoch_batches(rows, config, epoch))
+    require(offset < len(batches) and offset % CHECKED_PREFIX_MINIBATCHES == 0,
+            "Checked-prefix cursor must identify an uncommitted block boundary.")
+    end = min(offset + CHECKED_PREFIX_MINIBATCHES, len(batches))
+    next_cursor = ({"epoch": epoch + 1, "minibatchOffset": 0} if end == len(batches)
+                   else {"epoch": epoch, "minibatchOffset": end})
+    return batches[offset:end], next_cursor
+
+
+def fit_checked_block(policy, optimizer, behavior, rows, config, cursor, deadline):
+    """Attempt at most eight minibatches, retaining both parameters and Adam only on acceptance.
+
+    Cursor epochs are zero-based; offset counts actual action-bounded minibatches in that epoch's
+    original deterministic shuffle. An epoch remainder is a shorter block. The behavior actor must
+    remain the ORIGINAL collection actor throughout the update. Every check uses ALL collection
+    rows, never the block alone or a rolling reference. This function performs no checkpoint I/O.
+    Exceptions restore the block before propagating; timeout and KL rejection return an unchanged
+    cursor. Callers must atomically persist accepted model, Adam, cursor and counters together.
+    """
+    batches, next_cursor = checked_block_bounds(rows, config, cursor)
+    before, old_optimizer = copy.deepcopy(policy.state_dict()), copy.deepcopy(optimizer.state_dict())
+    attempted, metrics, reason = 0, None, None
+    try:
+        for batch in batches:
+            fit_minibatch(policy, optimizer, batch, config, deadline)
+            attempted += 1
+        metrics = behavior_metrics(policy, behavior, rows, config.batchSize)
+        require(all(math.isfinite(value) for value in metrics.values()),
+                "Checked-prefix whole-collection metrics must remain finite.")
         require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
-        optimizer.zero_grad(set_to_none=True)
-        loss = loss_for_rows(policy, batch, config)
-        require(bool(torch.isfinite(loss)), "Purchase loss must remain finite.")
-        loss.backward()
-        nn.utils.clip_grad_norm_(policy.parameters(), config.maxGradientNorm,
-                                 error_if_nonfinite=True)
-        optimizer.step()
+        if metrics["behaviorKl"] > config.maxBehaviorKl:
+            reason = "behavior-kl-limit"
+    except BaseException as failure:
+        policy.load_state_dict(before)
+        optimizer.load_state_dict(old_optimizer)
+        if not isinstance(failure, ValueError) or "elapsed-time budget" not in str(failure):
+            raise
+        reason = "time-budget"
+    if reason is not None:
+        policy.load_state_dict(before)
+        optimizer.load_state_dict(old_optimizer)
+    accepted = reason is None
+    return {"accepted": accepted, "cursor": dict(cursor),
+            "nextCursor": next_cursor if accepted else dict(cursor),
+            "attemptedSteps": attempted, "acceptedSteps": attempted if accepted else 0,
+            "metrics": metrics, "stopReason": reason}
 
 
 def behavior_metrics(policy, behavior, rows, batch_size=64):
@@ -735,13 +809,83 @@ def read_checkpoint(path):
 
 
 def initial_checkpoint(identity, model):
-    return {"schemaVersion": 1, "identitySha256": digest(identity), "epoch": 0,
-            "model": model, "optimizer": None, "history": [], "elapsedSeconds": 0.0,
-            "deadlineEpochSeconds": identity["deadlineEpochSeconds"], "stopReason": None}
+    checkpoint = {"schemaVersion": 1, "identitySha256": digest(identity), "epoch": 0,
+                  "model": model, "optimizer": None, "history": [], "elapsedSeconds": 0.0,
+                  "deadlineEpochSeconds": identity["deadlineEpochSeconds"], "stopReason": None}
+    if identity.get("updateMode") == CHECKED_PREFIX_MODE:
+        checkpoint.update(schemaVersion=2, updateMode=CHECKED_PREFIX_MODE,
+                          cursor={"epoch": 0, "minibatchOffset": 0},
+                          acceptedSteps=0, acceptedBlocks=0)
+    return checkpoint
 
+
+
+def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
+    """Validate schema-2 progress and return the summary required by prefix-aware orchestration.
+
+    `rows` are the validated ORIGINAL collection, in its stored order. `epoch`/acceptedEpochs
+    count only completed epochs, so zero epochs does NOT imply an unchanged actor. Accepted
+    minibatch and block counts apply to this update only, excluding carried Adam steps. Legacy
+    schema-1 completed-update validators must not interpret these checkpoints or reports.
+    """
+    require(identity.get("updateMode") == CHECKED_PREFIX_MODE
+            and checkpoint.get("schemaVersion") == 2
+            and checkpoint.get("updateMode") == CHECKED_PREFIX_MODE,
+            "Checked-prefix validation requires the explicit mode and schema-2 checkpoint.")
+    require(checkpoint.get("identitySha256") == digest(identity)
+            and checkpoint.get("deadlineEpochSeconds") == identity.get("deadlineEpochSeconds"),
+            "Checked-prefix checkpoint identity or original deadline changed.")
+    config = UpdateConfig(**identity["config"]).validate()
+    history = checkpoint.get("history")
+    require(isinstance(history, list), "Checked-prefix history must be an ordered block list.")
+    cursor, steps, blocks, last_metrics, stop = {"epoch": 0, "minibatchOffset": 0}, 0, 0, None, None
+    for entry in history:
+        require(stop is None and isinstance(entry, dict) and set(entry) == {
+            "accepted", "cursor", "nextCursor", "attemptedSteps", "acceptedSteps", "metrics",
+            "stopReason"}, "Checked-prefix history cannot continue after a rejected block.")
+        require(type(entry["accepted"]) is bool and entry["cursor"] == cursor,
+                "Checked-prefix block starts at an inconsistent cursor.")
+        batches, next_cursor = checked_block_bounds(rows, config, cursor)
+        attempted = integer(entry["attemptedSteps"], "Attempted minibatches", 0, len(batches))
+        accepted_steps = integer(entry["acceptedSteps"], "Accepted minibatches", 0, len(batches))
+        metrics = entry["metrics"]
+        if metrics is not None:
+            require(isinstance(metrics, dict)
+                    and set(metrics) == {"behaviorKl", "priorKl", "valueMse"},
+                    "Checked-prefix metrics require whole-collection KL and value error.")
+            for name, value in metrics.items():
+                number(value, name, -1e-12 if name.endswith("Kl") else 0)
+        if entry["accepted"]:
+            require(attempted == accepted_steps == len(batches)
+                    and entry["nextCursor"] == next_cursor and entry["stopReason"] is None
+                    and metrics is not None and metrics["behaviorKl"] <= config.maxBehaviorKl,
+                    "Accepted block must complete its bounded steps under the original KL cap.")
+            cursor, last_metrics = next_cursor, metrics
+            steps += accepted_steps
+            blocks += 1
+        else:
+            stop = entry["stopReason"]
+            require(accepted_steps == 0 and entry["nextCursor"] == cursor
+                    and stop in ("time-budget", "behavior-kl-limit"),
+                    "Rejected block must preserve the last accepted cursor and retain no steps.")
+            if stop == "behavior-kl-limit":
+                require(attempted == len(batches) and metrics is not None
+                        and metrics["behaviorKl"] > config.maxBehaviorKl,
+                        "KL rejection requires a complete block exceeding the original cap.")
+    require(checkpoint.get("cursor") == cursor and checkpoint.get("epoch") == cursor["epoch"]
+            and checkpoint.get("stopReason") == stop,
+            "Checked-prefix checkpoint cursor or stop reason differs from its history.")
+    require(integer(checkpoint.get("acceptedSteps"), "Checkpoint accepted steps", 0, len(rows) * config.epochs) == steps
+            and integer(checkpoint.get("acceptedBlocks"), "Checkpoint accepted blocks", 0, len(rows) * config.epochs) == blocks,
+            "Checked-prefix accepted counters differ from committed history.")
+    number(checkpoint.get("elapsedSeconds"), "Checkpoint elapsed seconds", 0)
+    return {"acceptedSteps": steps, "acceptedBlocks": blocks, "completedEpochs": cursor["epoch"],
+            "cursor": cursor, "partialEpochAccepted": cursor["minibatchOffset"] > 0,
+            "lastAcceptedMetrics": last_metrics}
 
 def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
-           *, contract=PURCHASE_CONTRACT, entrypoint=None):
+           *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE):
+    require(update_mode in (LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE), "Unsupported PPO update mode.")
     config.validate(contract)
     torch.set_num_threads(config.threads)
     torch.use_deterministic_algorithms(True)
@@ -758,9 +902,12 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 "optimizerFromSha256": file_digest(optimizer_from) if optimizer_from else None}
     if entrypoint is not None:
         identity["entrypointSha256"] = file_digest(entrypoint)
+    if update_mode == CHECKED_PREFIX_MODE:
+        identity["updateMode"] = CHECKED_PREFIX_MODE
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
-    started_path = output / "epoch-started.json"
+    started_path = output / ("block-started.json" if update_mode == CHECKED_PREFIX_MODE
+                             else "epoch-started.json")
     if resume:
         require((output / "identity.json").exists(), "Resume requires an existing update identity.")
         previous_identity = read_json(output / "identity.json")
@@ -788,7 +935,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         output.mkdir(parents=True)
         atomic_json(output / "identity.json", identity)
         checkpoint = initial_checkpoint(identity, model)
-    started_marker = {"kind": f"{contract.label}-epoch-started", "identitySha256": digest(identity)}
+    if update_mode == CHECKED_PREFIX_MODE:
+        validate_checked_prefix_checkpoint(checkpoint, identity, rows)
+    started_kind = "block" if update_mode == CHECKED_PREFIX_MODE else "epoch"
+    started_marker = {"kind": f"{contract.label}-{started_kind}-started",
+                      "identitySha256": digest(identity)}
     if started_path.exists():
         require(read_json(started_path) == started_marker,
                 "Existing epoch marker belongs to a different purchase update.")
@@ -814,6 +965,18 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     while checkpoint["epoch"] < config.epochs and checkpoint["stopReason"] is None:
         if not started_path.exists():
             atomic_json(started_path, started_marker)
+        if update_mode == CHECKED_PREFIX_MODE:
+            block = fit_checked_block(policy, optimizer, behavior, rows, config,
+                                      checkpoint["cursor"], deadline)
+            checkpoint["history"].append(block)
+            checkpoint.update(cursor=block["nextCursor"], epoch=block["nextCursor"]["epoch"],
+                              acceptedSteps=checkpoint["acceptedSteps"] + block["acceptedSteps"],
+                              acceptedBlocks=checkpoint["acceptedBlocks"] + int(block["accepted"]),
+                              stopReason=block["stopReason"], model=policy.artifact(),
+                              optimizer=encode_optimizer(optimizer),
+                              elapsedSeconds=prior_elapsed + time.monotonic() - started)
+            save_checkpoint(checkpoint_path, checkpoint)
+            continue
         before = copy.deepcopy(policy.state_dict())
         old_optimizer = copy.deepcopy(optimizer.state_dict())
         try:
@@ -849,6 +1012,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
               "elapsedSeconds": checkpoint["elapsedSeconds"],
               "lossWeighting": "Uniform decision mean; whole-game outcomes are report units.",
               "strengthClaim": False}
+    if update_mode == CHECKED_PREFIX_MODE:
+        report.update(schemaVersion=2, updateMode=CHECKED_PREFIX_MODE,
+                      **validate_checked_prefix_checkpoint(checkpoint, identity, rows))
     atomic_json(output / "finished.json", report)
     return report
 
@@ -869,6 +1035,9 @@ def main(arguments=None, *, contract=PURCHASE_CONTRACT, entrypoint=None, toy_run
     fitting.add_argument("--output", type=Path, required=True)
     fitting.add_argument("--resume", action="store_true")
     fitting.add_argument("--optimizer-from", type=Path)
+    fitting.add_argument("--update-mode", choices=(LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE),
+                         default=LEGACY_UPDATE_MODE,
+                         help="Versioned KL rollback/checkpoint unit; default retains whole epochs.")
     toy = modes.add_parser("toy")
     toy.add_argument("--output", type=Path, required=True)
     options = parser.parse_args(arguments)
@@ -903,7 +1072,7 @@ def main(arguments=None, *, contract=PURCHASE_CONTRACT, entrypoint=None, toy_run
         config = UpdateConfig(**{**values, "seed": options.seed}).validate()
         result = update(options.model, options.collection, config, options.output,
                         options.resume, options.optimizer_from,
-                        contract=contract, entrypoint=entrypoint)
+                        contract=contract, entrypoint=entrypoint, update_mode=options.update_mode)
     print(json.dumps(result, indent=2, allow_nan=False))
 
 

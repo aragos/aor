@@ -51,9 +51,10 @@ def read_collection(directory, model_path, model):
     return backend.read_collection(directory, model_path, model, contract=CONTRACT)
 
 
-def update(model_path, collection_path, config, output, resume=False, optimizer_from=None):
+def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
+           *, update_mode=backend.LEGACY_UPDATE_MODE):
     return backend.update(model_path, collection_path, config, output, resume, optimizer_from,
-                          contract=CONTRACT, entrypoint=__file__)
+                          contract=CONTRACT, entrypoint=__file__, update_mode=update_mode)
 
 
 def main(arguments=None):
