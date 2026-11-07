@@ -196,6 +196,17 @@ separately fingerprinted purchase actor for every seat and records only the cont
 decisions for learning. Public purchase consequences form a separate diagnostic audit, never model
 inputs or targets. Nested resolutions and other decisions retain their corresponding HARD baseline.
 
+The offline [card advantage learner](../scripts/card_advantage_train.py) instead fits paired terminal
+return differences between offered actions and a frozen HARD reference. Its separately versioned
+[selector](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/CardAdvantagePolicy.kt) uses three compact
+networks with explicit state–action interactions. It chooses from the same bounded physical-card
+proposals used during collection, with a fixed margin and unanimous positive advantage; otherwise it
+retains the reference. Only normal card windows are supported. Root and next-decision interventions
+have distinct actor-safe observations and labels, and repeated policy-improvement cycles recollect
+under their frozen continuation. Hidden authority state remains in the executor. Complete-game
+qualification and explicit browser integration are required before a trained artifact can be used
+in ordinary play; the experiment driver does not activate policies.
+
 For supported HARD purchases, creator-only automation work includes a transient, baseline-free
 projection from the ordinary actor view. The decision-only view omits public unplayed cards and is
 insufficient for this encoder. The browser worker binds its actual baseline recommendation to the
