@@ -26,6 +26,8 @@ GIB = 1024 ** 3
 STOP = threading.Event()
 SPACE_LOCK = threading.Lock()
 LAST_SPACE_CHECK = 0.
+NATIVE_MODES = {'collect': 'card-advantage-collect', 'evaluate': 'card-advantage-evaluate',
+                'coupling': 'card-policy-coupling'}
 
 
 def require(value, message):
@@ -68,7 +70,7 @@ def document(path, value, immutable=True):
 
 def options(arguments=None):
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--mode', choices=('collect', 'evaluate'), required=True)
+    p.add_argument('--mode', choices=tuple(NATIVE_MODES), required=True)
     p.add_argument('--source', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--runtime', type=Path, help='Installed training/lib directory; default sibling installation.')
@@ -158,7 +160,7 @@ def clock(value, identity):
 def snapshots(value, manifest):
     sources = {'source.json': {'path': str(value.source), 'sha256': manifest['sourceSha256']},
                'baseline.json': manifest['baseline'], 'frozen-purchase-policy.json': manifest['frozenPurchasePolicy']}
-    if value.mode == 'collect' and manifest['continuation'] is not None:
+    if value.mode in ('collect', 'coupling') and manifest['continuation'] is not None:
         sources['continuation.json'] = manifest['continuation']
     if value.mode == 'evaluate':
         for name, policy in manifest['policies'].items():
@@ -171,7 +173,7 @@ def snapshots(value, manifest):
 
 
 def record(value, index):
-    prefix = 'origin' if value.mode == 'collect' else 'game'
+    prefix = 'origin' if value.mode in ('collect', 'coupling') else 'game'
     path = value.output / f'{prefix}-{index}.json.gz'
     return path, path.with_suffix(path.suffix + '.binding.json')
 
@@ -187,7 +189,7 @@ def launch_native(value, base, selection, log_name, deadline):
     """One owned process, with the original deadline covering every index in its selection."""
     require(not STOP.is_set() and time.time() < deadline, 'Original deadline elapsed or another worker failed.')
     resources(value.data_root)
-    command = base + ['--mode', 'card-advantage-' + value.mode, '--source', str(value.source),
+    command = base + ['--mode', NATIVE_MODES[value.mode], '--source', str(value.source),
         '--output', str(value.output), *selection, '--hours', str((deadline - time.time()) / 3600)]
     with (value.output / log_name).open('ab') as log:
         child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -253,14 +255,14 @@ def run(value):
                 'A fresh output may not adopt unrelated or unbound prior evidence.')
     document(identity_path, identity)
     deadline = clock(value, identity)
-    manifest = json.loads(subprocess.check_output(base + ['--mode', 'card-advantage-' + value.mode,
+    manifest = json.loads(subprocess.check_output(base + ['--mode', NATIVE_MODES[value.mode],
         '--source', str(value.source), '--describe', 'true'], text=True, timeout=30))
     require(manifest['sourceSha256'] == identity['sourceSha256'], 'Native source identity differs.')
     inputs = snapshots(value, manifest)
     document(value.output / 'collection.json', manifest)
-    jobs = manifest['origins'] if value.mode == 'collect' else manifest['jobs']
+    jobs = manifest['origins'] if value.mode in ('collect', 'coupling') else manifest['jobs']
     count = len(jobs)
-    prefix = 'origin' if value.mode == 'collect' else 'game'
+    prefix = 'origin' if value.mode in ('collect', 'coupling') else 'game'
     require({p.name for p in value.output.glob(prefix + '-*.json.gz')} <= {f'{prefix}-{i}.json.gz' for i in range(count)},
             'Output contains an unexpected world/job index.')
     completed = []
@@ -287,7 +289,7 @@ def run(value):
         require(all(sha(path) == expected for path, expected in inputs.items()), 'Frozen source/policy bytes changed during execution.')
         rows = [binding(value, i) for i in range(count)]
         result = {'kind': manifest['kind'], 'signature': manifest['signature']}
-        if value.mode == 'collect':
+        if value.mode in ('collect', 'coupling'):
             result.update(origins=count, originSha256=[row['sha256'] for row in rows])
         else:
             result.update(games=count, files=rows)
