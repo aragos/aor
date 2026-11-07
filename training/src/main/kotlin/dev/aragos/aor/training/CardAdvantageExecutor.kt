@@ -1,8 +1,11 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.Entry
 import dev.aragos.aor.GameState
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Prompt
+import dev.aragos.aor.Stage
+import dev.aragos.aor.TextCodec
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.BotPolicy
@@ -97,6 +100,56 @@ internal class CardAdvantageExecutor(
                 actor to command
             }
             .toMap()
+    }
+
+    /**
+     * Complete and replay a paired tail without changing absolute policy seeds or sealed batches.
+     */
+    fun finish(
+        session: ExperimentSession,
+        rootState: GameState,
+        rootNumber: Int,
+        replicate: Int,
+    ): CardAdvantageOutcome {
+        while (session.state.stage != Stage.FINISHED) {
+            val number = rootNumber + session.decisions
+            check(number)
+            session.apply(commands(session.state, number), deadlineNanos)
+        }
+        val canonical = session.entries.map(Entry::toText)
+        val replay =
+            canonical.fold(rootState) { state, entry ->
+                check(rootNumber + session.decisions)
+                state.step(TextCodec.parse(entry))
+            }
+        check(replay == session.state) {
+            "Every complete advantage tail must replay through ordinary authoritative entries."
+        }
+        val game =
+            SimulatedGame(
+                input.environment.configuration.id,
+                request.seed,
+                rootNumber + session.decisions,
+                session.state.publicView().scores,
+                GameCoverage(
+                    emptyMap(),
+                    emptyMap(),
+                    emptySet(),
+                    emptySet(),
+                    emptySet(),
+                    emptySet(),
+                ),
+                0L,
+            )
+        return CardAdvantageOutcome(
+            game.reward(request.seat),
+            game.winShare(request.seat),
+            game.rankReward(request.seat),
+            game.scores.map(PilotReplayScore::from),
+            game.steps,
+            CardAdvantageExecutor.chanceSeed(request.seed, replicate),
+            CardAdvantageExecutor.hash(canonical),
+        )
     }
 
     companion object {

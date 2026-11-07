@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.CardObservation
 
 /** Named development roles; descendants never leave their original world's split. */
@@ -42,6 +43,44 @@ internal data class CardAdvantageRequest(
         }
         require(opponentUsesCandidate.size == 4 && !opponentUsesCandidate[seat]) {
             "Rival continuation flags require four seats with the controlled seat false."
+        }
+    }
+
+    companion object {
+        fun read(row: JsonNode): CardAdvantageRequest {
+            PurchaseJson.fields(
+                row,
+                setOf(
+                    "index",
+                    "split",
+                    "seed",
+                    "seat",
+                    "epoch",
+                    "cohort",
+                    "ordinal",
+                    "opponentUsesCandidate",
+                ),
+            )
+            return CardAdvantageRequest(
+                index = PurchaseJson.integer(row.required("index"), "index"),
+                split = PurchaseJson.text(row.required("split"), "split"),
+                seed = PurchaseJson.integer(row.required("seed"), "seed"),
+                seat = PurchaseJson.integer(row.required("seat"), "seat"),
+                epoch = PurchaseJson.integer(row.required("epoch"), "epoch"),
+                cohort = PurchaseJson.text(row.required("cohort"), "cohort"),
+                ordinal = PurchaseJson.integer(row.required("ordinal"), "ordinal"),
+                opponentUsesCandidate =
+                    PurchaseJson.array(
+                            row.required("opponentUsesCandidate"),
+                            "opponentUsesCandidate",
+                        )
+                        .map {
+                            require(it.isBoolean) {
+                                "Rival continuation flags must be JSON booleans."
+                            }
+                            it.booleanValue()
+                        },
+            )
         }
     }
 }
