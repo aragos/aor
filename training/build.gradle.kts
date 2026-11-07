@@ -17,7 +17,18 @@ application {
 distributions {
     main {
         contents {
-            from(rootProject.file("scripts/train-opponents.py")) {
+            from(rootProject.file("scripts")) {
+                include(
+                    "train-opponents.py",
+                    "card-advantage-run.py",
+                    "card_advantage_experiment.py",
+                    "card_advantage_evaluation.py",
+                    "card_advantage_train.py",
+                    "card_advantage_data.py",
+                    "card_advantage.py",
+                    "card_policy.py",
+                    "purchase_policy.py",
+                )
                 into("bin")
             }
         }

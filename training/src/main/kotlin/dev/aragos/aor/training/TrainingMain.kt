@@ -11,6 +11,18 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (
+        arguments.toList().windowed(2).any {
+            it in
+                listOf(
+                    listOf("--mode", "card-advantage-collect"),
+                    listOf("--mode", "card-advantage-evaluate"),
+                )
+        }
+    ) {
+        CardAdvantageMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "card-collect") }) {
         CardCollectionMain.run(arguments.toList())
         return
@@ -58,6 +70,9 @@ fun main(arguments: Array<String>) {
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
+            card-advantage-run.py --mode collect|evaluate --source JSON --output PATH --hours HOURS
+            Native advantage worker: --mode card-advantage-collect|card-advantage-evaluate --source JSON
+              --output PATH --index N --hours HOURS, or --describe true for metadata only.
             --mode strategy-replay --source COMPARISON_JSON --output PATH --index N --side candidate|incumbent
             Reuse a train output directory to resume its original model and completed rounds.
             Outputs: trainer.log, coverage.json, checkpoint.json, candidate.json, model.json,
