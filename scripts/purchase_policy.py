@@ -11,6 +11,10 @@ checking cumulative KL on the entire collection against its original behavior.
 Its schema-2 checkpoints retain partial-epoch model and Adam progress together;
 resume preserves the original deadline and starts at the next uncommitted block.
 Portable models and inference are unchanged; prefix acceptance is not strength evidence.
+
+Purchase checked-prefix updates may explicitly supply --purchase-reference-objective with
+{"version":"aor-purchase-offered-reference-1","coefficient":0.1}. This adds mean-decision
+KL(uniform offered actions || policy) to training only. Omit it for unchanged PPO semantics.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 import gzip
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -42,6 +47,7 @@ FEATURE_LIMIT = 16.0
 RESIDUAL_LIMIT = 20.0
 DTYPE = torch.float64
 CARD_REFERENCE_VERSION = "aor-card-physical-reference-1"
+PURCHASE_REFERENCE_VERSION = "aor-purchase-offered-reference-1"
 PARAMETERS = (
     "stateWeights", "stateBias", "actionWeights", "actionBias",
     "actorWeights", "valueWeights", "valueBias",
@@ -499,12 +505,50 @@ class UpdateConfig:
         return self.validate_reference(contract)
 
 
+
+@dataclass(frozen=True)
+class PurchaseReferenceObjective:
+    """Training-only KL(uniform offered commands || pi), with no action grouping or prior change.
+
+    Every authoritative offered purchase action, including Pass when offered, gets mass 1/N.
+    The positive coefficient multiplies a mean over purchase decisions. None disables this
+    objective and preserves the original configuration/identity. It is supported only by the
+    explicitly selected checked-prefix update, independently of card physical-group reference.
+    """
+    version: str = PURCHASE_REFERENCE_VERSION
+    coefficient: float = 0.10
+
+    def validate(self, contract):
+        require(self.version == PURCHASE_REFERENCE_VERSION,
+                "Unsupported purchase offered-action reference version.")
+        require(contract == PURCHASE_CONTRACT,
+                "The purchase offered-action reference requires the typed purchase contract.")
+        number(self.coefficient, "Purchase reference coefficient", 0, 1)
+        require(self.coefficient > 0, "Use no purchase reference objective to disable it.")
+        return self
+
+    @classmethod
+    def from_json(cls, value):
+        require(isinstance(value, dict) and set(value) == {"version", "coefficient"},
+                "Purchase reference objective requires exactly version and coefficient.")
+        return cls(**value).validate(PURCHASE_CONTRACT)
+
+
+def validate_purchase_reference(objective, contract, update_mode):
+    if objective is None:
+        return
+    require(isinstance(objective, PurchaseReferenceObjective),
+            "Purchase reference must be an explicit typed objective.")
+    objective.validate(contract)
+    require(update_mode == CHECKED_PREFIX_MODE,
+            "The purchase offered-action reference requires checked-prefix updates.")
+
 def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
     ratio = torch.exp(log_probability - old_log_probability)
     return -torch.minimum(ratio * advantage, torch.clamp(ratio, 1 - clip, 1 + clip) * advantage)
 
 
-def loss_for_rows(policy, rows, config):
+def ordinary_loss_for_rows(policy, rows, config):
     config.validate_reference(policy.contract)
     probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
@@ -527,6 +571,21 @@ def loss_for_rows(policy, rows, config):
         divergences.append(reference_kl(logp, reference))
     return loss + config.cardReferenceKlCoefficient * torch.stack(divergences).mean()
 
+
+
+def loss_for_rows(policy, rows, config, *, purchase_reference=None):
+    if purchase_reference is not None:
+        require(isinstance(purchase_reference, PurchaseReferenceObjective),
+                "Purchase reference must be an explicit typed objective.")
+        purchase_reference.validate(policy.contract)
+    ordinary = ordinary_loss_for_rows(policy, rows, config)
+    if purchase_reference is None:
+        return ordinary
+    # Match the reviewed LAB objective's separate forward and operation order exactly.
+    # Raw terminal return minus recorded value advantages remain in the ordinary PPO loss.
+    logps, _ = policy([row.get("_prepared", row["observation"]) for row in rows])
+    penalty = torch.stack([-logp.mean() - math.log(logp.numel()) for logp in logps]).mean()
+    return ordinary + purchase_reference.coefficient * penalty
 
 def row_batches(rows, size):
     """Preserve row order, bounding both decisions and total offered actions per allocation.
@@ -558,10 +617,11 @@ def epoch_batches(rows, config, epoch):
     return row_batches([rows[index] for index in order], config.batchSize)
 
 
-def fit_minibatch(policy, optimizer, batch, config, deadline):
+def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None):
     require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
     optimizer.zero_grad(set_to_none=True)
-    loss = loss_for_rows(policy, batch, config)
+    loss = (loss_for_rows(policy, batch, config) if purchase_reference is None else
+            loss_for_rows(policy, batch, config, purchase_reference=purchase_reference))
     require(bool(torch.isfinite(loss)), "Purchase loss must remain finite.")
     loss.backward()
     nn.utils.clip_grad_norm_(policy.parameters(), config.maxGradientNorm,
@@ -588,7 +648,8 @@ def checked_block_bounds(rows, config, cursor):
     return batches[offset:end], next_cursor
 
 
-def fit_checked_block(policy, optimizer, behavior, rows, config, cursor, deadline):
+def fit_checked_block(policy, optimizer, behavior, rows, config, cursor, deadline,
+                      *, purchase_reference=None):
     """Attempt at most eight minibatches, retaining both parameters and Adam only on acceptance.
 
     Cursor epochs are zero-based; offset counts actual action-bounded minibatches in that epoch's
@@ -598,12 +659,17 @@ def fit_checked_block(policy, optimizer, behavior, rows, config, cursor, deadlin
     Exceptions restore the block before propagating; timeout and KL rejection return an unchanged
     cursor. Callers must atomically persist accepted model, Adam, cursor and counters together.
     """
+    validate_purchase_reference(purchase_reference, policy.contract, CHECKED_PREFIX_MODE)
     batches, next_cursor = checked_block_bounds(rows, config, cursor)
     before, old_optimizer = copy.deepcopy(policy.state_dict()), copy.deepcopy(optimizer.state_dict())
     attempted, metrics, reason = 0, None, None
     try:
         for batch in batches:
-            fit_minibatch(policy, optimizer, batch, config, deadline)
+            if purchase_reference is None:
+                fit_minibatch(policy, optimizer, batch, config, deadline)
+            else:
+                fit_minibatch(policy, optimizer, batch, config, deadline,
+                              purchase_reference=purchase_reference)
             attempted += 1
         metrics = behavior_metrics(policy, behavior, rows, config.batchSize)
         require(all(math.isfinite(value) for value in metrics.values()),
@@ -836,6 +902,12 @@ def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
             and checkpoint.get("deadlineEpochSeconds") == identity.get("deadlineEpochSeconds"),
             "Checked-prefix checkpoint identity or original deadline changed.")
     config = UpdateConfig(**identity["config"]).validate()
+    if "purchaseReferenceObjective" in identity:
+        objective = PurchaseReferenceObjective.from_json(identity["purchaseReferenceObjective"])
+        require(identity.get("actorVersion") == ACTOR_VERSION,
+                "A purchase reference checkpoint must identify the purchase actor.")
+        validate_purchase_reference(objective, PURCHASE_CONTRACT, identity["updateMode"])
+        config.validate(PURCHASE_CONTRACT)
     history = checkpoint.get("history")
     require(isinstance(history, list), "Checked-prefix history must be an ordered block list.")
     cursor, steps, blocks, last_metrics, stop = {"epoch": 0, "minibatchOffset": 0}, 0, 0, None, None
@@ -884,13 +956,34 @@ def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
             "lastAcceptedMetrics": last_metrics}
 
 def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
-           *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE):
+           *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE,
+           purchase_reference=None, collection_reader=None):
+    """Fit one typed actor; optional readers own completed-data/likelihood validation.
+
+    A custom reader has read_collection's signature and returns rows plus provenance containing
+    its source readerSha256. Both its inspectable implementation file and the explicit entrypoint
+    are bound independently. Default readers/objectives add no fields to legacy identities.
+    """
     require(update_mode in (LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE), "Unsupported PPO update mode.")
     config.validate(contract)
+    validate_purchase_reference(purchase_reference, contract, update_mode)
+    require(collection_reader is None or (callable(collection_reader) and entrypoint is not None),
+            "A custom typed collection reader requires an explicit owning entrypoint.")
     torch.set_num_threads(config.threads)
     torch.use_deterministic_algorithms(True)
     model = validate_model(read_json(model_path), contract=contract)
-    rows, provenance = read_collection(collection_path, model_path, model, contract=contract)
+    reader = read_collection if collection_reader is None else collection_reader
+    reader_source = None
+    if collection_reader is not None:
+        source = inspect.getsourcefile(collection_reader)
+        require(source is not None and Path(source).is_file(),
+                "A custom collection reader must have an inspectable implementation source file.")
+        reader_source = {"path": str(Path(source).resolve()), "sha256": file_digest(source)}
+    rows, provenance = reader(collection_path, model_path, model, contract=contract)
+    if reader_source is not None:
+        require(file_digest(reader_source["path"]) == reader_source["sha256"]
+                and provenance.get("readerSha256") == reader_source["sha256"],
+                "Custom collection reader source must stay fixed and match its provenance.")
     if config.cardReferenceKlCoefficient > 0:
         for row in rows:
             row["_cardReference"] = torch.tensor(card_reference_probabilities(
@@ -904,6 +997,10 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         identity["entrypointSha256"] = file_digest(entrypoint)
     if update_mode == CHECKED_PREFIX_MODE:
         identity["updateMode"] = CHECKED_PREFIX_MODE
+    if purchase_reference is not None:
+        identity["purchaseReferenceObjective"] = asdict(purchase_reference)
+    if reader_source is not None:
+        identity["collectionReaderSource"] = reader_source
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
     started_path = output / ("block-started.json" if update_mode == CHECKED_PREFIX_MODE
@@ -966,8 +1063,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         if not started_path.exists():
             atomic_json(started_path, started_marker)
         if update_mode == CHECKED_PREFIX_MODE:
+            options = {} if purchase_reference is None else {"purchase_reference": purchase_reference}
             block = fit_checked_block(policy, optimizer, behavior, rows, config,
-                                      checkpoint["cursor"], deadline)
+                                      checkpoint["cursor"], deadline, **options)
             checkpoint["history"].append(block)
             checkpoint.update(cursor=block["nextCursor"], epoch=block["nextCursor"]["epoch"],
                               acceptedSteps=checkpoint["acceptedSteps"] + block["acceptedSteps"],
@@ -1015,6 +1113,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     if update_mode == CHECKED_PREFIX_MODE:
         report.update(schemaVersion=2, updateMode=CHECKED_PREFIX_MODE,
                       **validate_checked_prefix_checkpoint(checkpoint, identity, rows))
+    if purchase_reference is not None:
+        report["purchaseReferenceObjective"] = asdict(purchase_reference)
     atomic_json(output / "finished.json", report)
     return report
 
@@ -1035,6 +1135,8 @@ def main(arguments=None, *, contract=PURCHASE_CONTRACT, entrypoint=None, toy_run
     fitting.add_argument("--output", type=Path, required=True)
     fitting.add_argument("--resume", action="store_true")
     fitting.add_argument("--optimizer-from", type=Path)
+    fitting.add_argument("--purchase-reference-objective", type=Path,
+                         help="Explicit version/coefficient JSON; purchase checked-prefix updates only.")
     fitting.add_argument("--update-mode", choices=(LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE),
                          default=LEGACY_UPDATE_MODE,
                          help="Versioned KL rollback/checkpoint unit; default retains whole epochs.")
@@ -1070,9 +1172,12 @@ def main(arguments=None, *, contract=PURCHASE_CONTRACT, entrypoint=None, toy_run
         require("seed" not in values or values["seed"] == options.seed,
                 "Explicit update seed disagrees with the configuration file.")
         config = UpdateConfig(**{**values, "seed": options.seed}).validate()
+        objective = (PurchaseReferenceObjective.from_json(read_json(options.purchase_reference_objective))
+                     if options.purchase_reference_objective else None)
         result = update(options.model, options.collection, config, options.output,
                         options.resume, options.optimizer_from,
-                        contract=contract, entrypoint=entrypoint, update_mode=options.update_mode)
+                        contract=contract, entrypoint=entrypoint, update_mode=options.update_mode,
+                        purchase_reference=objective)
     print(json.dumps(result, indent=2, allow_nan=False))
 
 
