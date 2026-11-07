@@ -297,9 +297,10 @@ class Window:
                         child.wait(timeout=5)
 
     def native(self, mode, name, source, seconds):
-        batch_size = self.protocol.get('evaluation', {}).get('batchSize', 1) if mode == 'evaluate' else 1
+        section = 'evaluation' if mode == 'evaluate' else 'collection'
+        batch_size = self.protocol.get(section, {}).get('batchSize', 1)
         require(type(batch_size) is int and 1 <= batch_size <= 64,
-                'Evaluation batch size must be an integer from 1 through 64.')
+                'Native batch size must be an integer from 1 through 64.')
         path = self.lab / (name + '-source.json')
         document(path, source)
         output = self.lab / name

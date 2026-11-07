@@ -1,4 +1,4 @@
-"""Evaluation batching boundaries using opaque records and mocked native execution only."""
+"""Collection and evaluation batching boundaries using opaque records and mocked native execution only."""
 import importlib.util
 import json
 from pathlib import Path
@@ -73,12 +73,11 @@ class AdvantageBatchSupervisorTest(unittest.TestCase):
         self.assertEqual(self.options(mode='collect').batch_size, 1)
         self.assertEqual(self.options(batch_size=64).batch_size, 64)
 
-    def test_cli_rejects_collection_batching_and_outside_bounds(self):
+    def test_cli_allows_collection_batching_but_rejects_outside_bounds(self):
         for size in (0, -1, 65):
             with self.assertRaisesRegex(ValueError, 'Batch size'):
                 self.options(batch_size=size)
-        with self.assertRaisesRegex(ValueError, 'Batch size'):
-            self.options(mode='collect', batch_size=2)
+        self.assertEqual(self.options(mode='collect', batch_size=8).batch_size, 8)
 
     def test_singleton_chunk_keeps_original_index_flag_and_log_name(self):
         def native(value, base, selection, log_name, deadline):
@@ -163,6 +162,38 @@ class AdvantageBatchSupervisorTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'refusing overwrite'):
             self.run_stage(native)
         self.assertEqual((self.output / 'started.json').read_bytes(), old_clock)
+
+    def test_collection_batch_completion_retains_ordered_origin_hashes(self):
+        self.value.mode = 'collect'
+        self.manifest.update(kind='card-advantage-collect', origins=[{'index':i} for i in range(3)], continuation=None)
+        self.manifest.pop('jobs'); self.manifest.pop('policies')
+        def native(value, base, selection, log_name, deadline):
+            self.publish(self.indices(selection))
+        self.run_stage(native)
+        finished = run.read(self.output / 'finished.json')
+        self.assertEqual(3, finished['origins'])
+        self.assertEqual([run.sha(self.output / f'origin-{i}.json.gz') for i in range(3)], finished['originSha256'])
+        self.assertNotIn('files', finished)
+        self.assertEqual(2, run.read(self.output / 'execution.json')['batchSize'])
+
+    def test_collection_batch_partial_prefix_resumes_without_clock_renewal(self):
+        self.value.mode = 'collect'
+        self.manifest.update(kind='card-advantage-collect', origins=[{'index':i} for i in range(3)], continuation=None)
+        self.manifest.pop('jobs'); self.manifest.pop('policies')
+        def interrupted(value, base, selection, log_name, deadline):
+            self.publish([self.indices(selection)[0]])
+            raise RuntimeError('interrupted collection')
+        with self.assertRaisesRegex(RuntimeError, 'interrupted collection'):
+            self.run_stage(interrupted)
+        clock = (self.output / 'started.json').read_bytes()
+        self.assertFalse((self.output / 'finished.json').exists())
+        run.STOP.clear()
+        def resumed(value, base, selection, log_name, deadline):
+            self.assertEqual(json.loads(clock)['deadline'], deadline)
+            self.publish(self.indices(selection))
+        self.run_stage(resumed)
+        self.assertEqual(clock, (self.output / 'started.json').read_bytes())
+        self.assertEqual(3, run.read(self.output / 'finished.json')['origins'])
 
     def test_default_stage_keeps_original_execution_identity_shape(self):
         self.value.batch_size = 1

@@ -3,7 +3,7 @@
 
 Six single-core JVMs share an immutable source and original deadline. Complete records are atomic,
 gzip-compressed and hashed; outcomes are never decoded by this operational supervisor.
-Evaluation can opt into batches of up to 64 games per JVM; collection always uses one origin.
+Collection and evaluation can opt into batches of up to 64 complete records per JVM.
 """
 import argparse
 import concurrent.futures
@@ -74,7 +74,7 @@ def options(arguments=None):
     p.add_argument('--runtime', type=Path, help='Installed training/lib directory; default sibling installation.')
     p.add_argument('--workers', type=int, default=6)
     p.add_argument('--batch-size', type=int, default=1,
-                   help='Evaluation games per JVM, 1–64; collection requires 1. Default 1 preserves single-job execution.')
+                   help='Complete origins or games per JVM, 1–64. Default 1 preserves single-job execution.')
     p.add_argument('--hours', type=float, required=True)
     p.add_argument('--deadline-epoch', type=float, required=True, help='Original workflow deadline, never renewed on resume.')
     p.add_argument('--data-root', type=Path, required=True, help='Whole experiment directory subject to4GiB data cap.')
@@ -89,8 +89,7 @@ def options(arguments=None):
     require(value.runtime.is_dir(), 'Runtime must be the exact installed training/lib directory.')
     max_workers = min(6, max(1, int((os.cpu_count() or 1) * .8) - 2))
     require(1 <= value.workers <= max_workers, f'Use1–{max_workers} single-core JVM workers.')
-    require(1 <= value.batch_size <= 64 and (value.mode == 'evaluate' or value.batch_size == 1),
-            'Batch size must be 1–64 for evaluation and exactly 1 for collection.')
+    require(1 <= value.batch_size <= 64, 'Batch size must be 1–64 for collection or evaluation.')
     require(math.isfinite(value.hours) and 0 < value.hours <= 12, 'Stage hours must be finite and within(0,12].')
     require(math.isfinite(value.deadline_epoch) and value.deadline_epoch <= time.time() + 12 * 3600 + 5,
             'The original workflow deadline must be finite and at most12hours ahead.')
@@ -219,13 +218,12 @@ def execute(value, base, index, deadline):
 
 
 def execute_batch(value, base, indices, deadline):
-    """Keep per-game bindings; a failed batch leaves completed native records resumable."""
+    """Keep per-record bindings; a failed batch leaves completed native records resumable."""
     require(1 <= len(indices) <= 64 and len(set(indices)) == len(indices)
             and all(type(index) is int and index >= 0 for index in indices),
             'A batch requires 1–64 distinct job indices.')
     if len(indices) == 1:
         return [execute(value, base, indices[0], deadline)]
-    require(value.mode == 'evaluate', 'Only evaluation jobs may share a native process.')
     pending = []
     for index in indices:
         path, bound = record(value, index)
@@ -237,7 +235,7 @@ def execute_batch(value, base, indices, deadline):
         launch_native(value, base, ['--indices', ','.join(map(str, pending))],
                f'worker-batch-{indices[0]}-{indices[-1]}.log', deadline)
     require(all(record(value, index)[0].exists() for index in indices),
-            'A successful batch must publish every requested game record.')
+            'A successful batch must publish every requested complete record.')
     return [binding(value, index) for index in indices]
 
 
