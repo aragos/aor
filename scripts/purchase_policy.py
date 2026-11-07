@@ -152,11 +152,12 @@ def validate_purchase_audit(game):
                 integer(credit[key], f"Purchase audit {key}", 0, 2**31 - 1)
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, *, compact=False):
     """Publish one fsynced JSON object; a failed write preserves the previous file."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = json.dumps(value, indent=2, allow_nan=False).encode() + b"\n"
+    formatting = {"separators": (",", ":")} if compact else {"indent": 2}
+    data = json.dumps(value, allow_nan=False, **formatting).encode() + b"\n"
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "wb") as stream:
@@ -864,7 +865,11 @@ def restore_optimizer(optimizer, encoded):
 
 
 def save_checkpoint(path, payload):
-    atomic_json(path, {"sha256": digest(payload), "payload": payload})
+    # Prefix updates publish after every accepted block. Compact JSON uses the accelerated
+    # encoder while retaining the same payload/checksum, atomic write and old-reader support.
+    # Legacy checkpoints keep their exact existing bytes; either formatting remains readable.
+    atomic_json(path, {"sha256": digest(payload), "payload": payload},
+                compact=payload.get("schemaVersion") == 2)
 
 
 def read_checkpoint(path):
