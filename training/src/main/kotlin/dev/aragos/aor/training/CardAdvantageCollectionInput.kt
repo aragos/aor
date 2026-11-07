@@ -16,6 +16,7 @@ internal data class CardAdvantageCollectionInput(
     val environment: CardAdvantageEnvironment,
     val continuation: CardAdvantageSnapshot?,
     val origins: List<CardAdvantageRequest>,
+    val collection: CardRootPairCollection? = null,
 ) {
     init {
         require(origins.size in 1..4096 && origins.map { it.index } == origins.indices.toList()) {
@@ -32,10 +33,13 @@ internal data class CardAdvantageCollectionInput(
         }
     }
 
+    val schemaVersion: Int
+        get() = if (collection == null) 1 else 2
+
     fun signature(): String =
         trainingSignature(
             listOf(
-                    "card-advantage-collect-1",
+                    "card-advantage-collect-$schemaVersion",
                     source.toString(),
                     sourceSha256,
                     environment.baseline.sha256,
@@ -52,7 +56,7 @@ internal data class CardAdvantageCollectionInput(
     fun manifest(): Map<String, Any?> =
         mapOf(
             "kind" to "card-advantage-collect",
-            "schemaVersion" to 1,
+            "schemaVersion" to schemaVersion,
             "signature" to signature(),
             "rulesVersion" to RULES_VERSION,
             "dataVersion" to DATA_VERSION,
@@ -78,17 +82,19 @@ internal data class CardAdvantageCollectionInput(
             "stateFeatureNames" to environment.dictionary.stateFeatureNames,
             "actionFeatureNames" to environment.dictionary.actionFeatureNames,
             "origins" to origins,
-            "replicates" to 4,
-            "maxTailsPerOrigin" to 52,
+            "replicates" to (collection?.replicates ?: 4),
+            "maxTailsPerOrigin" to (collection?.let { 4 * it.replicates } ?: 52),
             "observationHashCodec" to
                 "SHA-256 of JVM Jackson observation bytes; opaque outside JVM",
-        )
+        ) + (collection?.let { mapOf("collection" to it) } ?: emptyMap())
 
     companion object {
         fun read(path: Path): CardAdvantageCollectionInput {
             val source = path.toRealPath()
             val hash = PurchaseJson.hash(source)
             val node = PurchaseJson.read(source)
+            val version = PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion")
+            require(version in 1..2) { "Advantage collection requires schemaVersion 1 or 2." }
             PurchaseJson.fields(
                 node,
                 setOf(
@@ -98,11 +104,8 @@ internal data class CardAdvantageCollectionInput(
                     "frozenPurchasePolicy",
                     "continuation",
                     "origins",
-                ),
+                ) + if (version == 2) setOf("collection") else emptySet(),
             )
-            require(PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") == 1) {
-                "Advantage collection requires schemaVersion 1."
-            }
             val environment = CardAdvantageEnvironment.read(source, node)
             val continuation =
                 node
@@ -150,7 +153,16 @@ internal data class CardAdvantageCollectionInput(
             require(PurchaseJson.hash(source) == hash) {
                 "Advantage source changed while being read."
             }
-            return CardAdvantageCollectionInput(source, hash, environment, continuation, requests)
+            val collection =
+                if (version == 2) CardRootPairCollection.read(node.required("collection")) else null
+            return CardAdvantageCollectionInput(
+                source,
+                hash,
+                environment,
+                continuation,
+                requests,
+                collection,
+            )
         }
     }
 }

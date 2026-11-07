@@ -8,8 +8,8 @@ import java.nio.file.StandardOpenOption
 import java.util.concurrent.CancellationException
 
 /**
- * Bounded native jobs. Optional evaluation batches share parsed models and one deadline, while each
- * game retains its own immutable record. The supervisor owns whole-stage completion hashes.
+ * Bounded native jobs. Optional batches share parsed models and one deadline, while each game
+ * retains its own immutable record. The supervisor owns whole-stage completion hashes.
  */
 internal object CardAdvantageMain {
     fun run(arguments: List<String>) {
@@ -18,28 +18,37 @@ internal object CardAdvantageMain {
     }
 
     private fun collect(options: CardAdvantageOptions) {
+        val batchDeadline = options.indices?.let { deadline(options.hours) }
         val input = CardAdvantageCollectionInput.read(options.source)
         if (options.describe) {
             println(PurchaseJson.mapper.writeValueAsString(input.manifest()))
             return
         }
-        val index =
-            requireNotNull(options.index) { "Collection requires an explicit origin index." }
-        require(index in input.origins.indices) { "Origin index is outside its frozen source." }
-        job(
-            options,
-            index,
-            "origin",
+        val indices =
+            options.indices
+                ?: listOf(
+                    requireNotNull(options.index) {
+                        "Collection requires an explicit origin index."
+                    }
+                )
+        require(indices.all { it in input.origins.indices }) {
+            "Every origin index must belong to its frozen source before any batch work starts."
+        }
+        val inputs =
             listOf(input.source, input.environment.baseline.path, input.environment.purchase.path) +
-                listOfNotNull(input.continuation?.path),
-        ) { path, deadline ->
-            val document =
-                CardTrajectoryFiles.readIfPresent(path)
-                    ?: PurchaseJson.mapper.valueToTree<JsonNode>(
-                        CardAdvantageCollector(input, deadline).collect(index)
-                    )
-            CardAdvantageArtifacts.validate(document, input, index)
-            CardTrajectoryFiles.save(path, document)
+                listOfNotNull(input.continuation?.path)
+        for (index in indices) {
+            if (batchDeadline != null) checkDeadline(batchDeadline)
+            job(options, index, "origin", inputs, batchDeadline) { path, deadline ->
+                if (batchDeadline != null) checkDeadline(batchDeadline)
+                val document =
+                    CardTrajectoryFiles.readIfPresent(path)
+                        ?: PurchaseJson.mapper.valueToTree<JsonNode>(
+                            CardAdvantageCollector(input, deadline).collect(index)
+                        )
+                CardAdvantageArtifacts.validate(document, input, index)
+                CardTrajectoryFiles.save(path, document)
+            }
         }
     }
 
@@ -115,7 +124,7 @@ internal object CardAdvantageMain {
 
     private fun checkDeadline(deadlineNanos: Long) {
         if (Thread.currentThread().isInterrupted || System.nanoTime() >= deadlineNanos) {
-            throw CancellationException("The evaluation batch exhausted its original allowance.")
+            throw CancellationException("The native batch exhausted its original allowance.")
         }
     }
 }
@@ -127,7 +136,7 @@ internal data class CardAdvantageOptions(
     val output: Path?,
     val index: Int?,
     val hours: Double,
-    /** Explicit source indices, never seeds; evaluation-only, unique and limited to 64 games. */
+    /** Explicit source indices, never seeds; unique and limited to 64 complete native jobs. */
     val indices: List<Int>? = null,
 ) {
     companion object {
@@ -176,7 +185,7 @@ internal data class CardAdvantageOptions(
                 values["--indices"]?.let { text ->
                     val parts = text.split(',')
                     require(parts.size in 1..64 && parts.all { it.matches(Regex("[0-9]+")) }) {
-                        "Evaluation batches require one through 64 comma-separated nonnegative indices."
+                        "Native batches require one through 64 comma-separated nonnegative indices."
                     }
                     val parsed = parts.map { part ->
                         requireNotNull(part.toIntOrNull()) {
@@ -188,8 +197,8 @@ internal data class CardAdvantageOptions(
                     }
                     parsed
                 }
-            require(indices == null || mode == "card-advantage-evaluate" && index == null) {
-                "Use --indices only for evaluation and never together with --index."
+            require(indices == null || index == null) {
+                "Use either --indices or --index, never both."
             }
             val hours = values["--hours"]?.toDouble() ?: 0.0
             require(

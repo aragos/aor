@@ -56,16 +56,16 @@ class CardAdvantageBatchTest {
     }
 
     @Test
-    fun collectionAndMixedSelectionFlagsRejectBatchMode() {
+    fun collectionAcceptsBatchModeAndMixedSelectionFlagsRemainRejected() {
         CardAdvantageFixture().use { fixture ->
             val output = fixture.directory.resolve("out")
-            assertFailsWith<IllegalArgumentException> {
+            val collection =
                 CardAdvantageOptions.parse(
                     arguments(fixture.source, output, "0").map {
                         if (it == "card-advantage-evaluate") "card-advantage-collect" else it
                     }
                 )
-            }
+            assertThat(collection.indices).containsExactly(0)
             assertFailsWith<IllegalArgumentException> {
                 CardAdvantageOptions.parse(
                     arguments(fixture.source, output, "0") + listOf("--index", "0")

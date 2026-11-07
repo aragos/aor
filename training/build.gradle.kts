@@ -24,6 +24,7 @@ distributions {
                     "card_advantage_experiment.py",
                     "card_advantage_compact_experiment.py",
                     "card_advantage_priority_experiment.py",
+                    "card_advantage_breadth_experiment.py",
                     "card_advantage_capacity.py",
                     "card_advantage_evaluation.py",
                     "card_advantage_train.py",

@@ -32,7 +32,10 @@ internal class CardAdvantageCollector(
         val chosen: String,
     )
 
-    private class Trace(private val request: CardAdvantageRequest) : SimulationTrace {
+    private class Trace(
+        private val request: CardAdvantageRequest,
+        private val allowTrivial: Boolean,
+    ) : SimulationTrace {
         override val seat: Int = request.seat
         var root: Root? = null
         var ordinal = 0
@@ -55,7 +58,11 @@ internal class CardAdvantageCollector(
             )
                 return
             ordinal++
-            if (root != null || ordinal < request.ordinal || !eligible(view, observation, request))
+            if (
+                root != null ||
+                    ordinal < request.ordinal ||
+                    !eligible(view, observation, request, allowTrivial)
+            )
                 return
             check(snapshotEntryCount == commandEntryIndex) {
                 "An ordinary card root requires a single-player batch."
@@ -85,7 +92,7 @@ internal class CardAdvantageCollector(
         }
         val request = input.origins[index]
         val executor = CardAdvantageExecutor(input, request, deadlineNanos)
-        val trace = Trace(request)
+        val trace = Trace(request, allowTrivial = input.collection != null)
         val backbone =
             Simulation()
                 .play(
@@ -102,6 +109,7 @@ internal class CardAdvantageCollector(
                 )
         val identity =
             CardAdvantageOrigin(
+                schemaVersion = input.schemaVersion,
                 signature = input.signature(),
                 index = index,
                 split = request.split,
@@ -131,6 +139,9 @@ internal class CardAdvantageCollector(
             "The replayed root must preserve its actual continuation policy and seed."
         }
         val snapshot = ExperimentSession(rootState, seed = 0L, recordEntries = true)
+        if (input.collection != null) {
+            return rootPairs(identity, rootState, actor, root, snapshot, executor)
+        }
         val observations = linkedMapOf<String, CardObservation>()
         val groups = mutableListOf<CardAdvantageGroup>()
         val outcomes = linkedMapOf<String, CardAdvantageOutcome>()
@@ -260,6 +271,74 @@ internal class CardAdvantageCollector(
         )
     }
 
+    private fun rootPairs(
+        identity: CardAdvantageOrigin,
+        rootState: GameState,
+        actor: PlayerId,
+        root: Node,
+        snapshot: ExperimentSession,
+        executor: CardAdvantageExecutor,
+    ): CardAdvantageOrigin {
+        val plan = requireNotNull(input.collection) { "Root pairs require their explicit plan." }
+        val acquisition =
+            CardAdvantageAcquisition.select(
+                root.proposals,
+                root.observation.baselineIndex,
+                root.botSeed,
+                sampled = executor.request.split in plan.sampledSplits,
+            )
+        val observed = acquisition.observedIndices(root.proposals, root.observation.baselineIndex)
+        val outcomes = linkedMapOf<String, CardAdvantageOutcome>()
+        val returns = observed.map { actionIndex ->
+            val ids =
+                (0 until plan.replicates).map { replicate ->
+                    executor.check(root.number)
+                    val branch =
+                        snapshot.fork(
+                            CardAdvantageExecutor.chanceSeed(executor.request.seed, replicate)
+                        )
+                    branch.apply(
+                        mapOf(actor to root.observation.actions[actionIndex].command),
+                        deadlineNanos,
+                    )
+                    val id = "root-$actionIndex-$replicate"
+                    outcomes[id] = finish(branch, rootState, root.number, executor, replicate)
+                    id
+                }
+            CardAdvantageReturns(actionIndex, ids)
+        }
+        check(
+            snapshot.state == rootState && snapshot.decisions == 0 && snapshot.entries.isEmpty()
+        ) {
+            "Paired root interventions must leave the original state and chance stream unchanged."
+        }
+        val hash = CardAdvantageExecutor.hash(root.observation)
+        return identity.copy(
+            status = "collected",
+            skipReason = null,
+            observations = mapOf(hash to root.observation),
+            groups =
+                listOf(
+                    CardAdvantageGroup(
+                        id = "root",
+                        kind = "root",
+                        observationSha256 = hash,
+                        number = root.number,
+                        botSeed = root.botSeed,
+                        turn = root.turn,
+                        epoch = root.epoch,
+                        proposalIndices = root.proposals,
+                        referenceIndex = root.observation.baselineIndex,
+                        returns = returns,
+                        continuationIndex = root.continuationIndex,
+                        observedActionIndices = observed,
+                        acquisition = acquisition,
+                    )
+                ),
+            outcomes = outcomes.toMap(),
+        )
+    }
+
     private fun node(
         state: GameState,
         actor: PlayerId,
@@ -366,14 +445,17 @@ internal class CardAdvantageCollector(
             view: GameView,
             observation: BotObservation,
             request: CardAdvantageRequest,
+            allowTrivial: Boolean = false,
         ): Boolean {
             val groups =
                 observation.candidates
                     .filter { it.family == "play" }
                     .mapNotNull { it.group }
                     .toSet()
-            if (groups.isEmpty() || observation.candidates.none { it.command == "pass" })
-                return false
+            if (observation.candidates.none { it.command == "pass" }) return false
+            if (groups.isEmpty()) {
+                return allowTrivial && request.cohort == AdvantageCohort.GENERIC.wire
+            }
             if (request.cohort == AdvantageCohort.GENERIC.wire) return true
             val leader =
                 view.hand.any {
