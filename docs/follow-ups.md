@@ -209,7 +209,7 @@ branches. Reuse the existing runner, simulator, encoders and browser integration
 
 These are ceilings, not requirements to keep working on a failed approach. Reserve the final three
 hours for qualification, integration and handoff; do not start another collection after hour 8.
-Admit a collection only when its full time cap plus 30 minutes for fitting still fits before hour 9. An
+Admit a collection only when its full time cap plus 45 minutes for fitting still fits before hour 9. An
 incomplete cycle cannot supply a convenient partial training set. A completed, eligible P1 can remain
 the finalist if cycle 2 times out; otherwise finish with a diagnosis. No unplanned third cycle or
 additional confirmation samples belong to this window.
