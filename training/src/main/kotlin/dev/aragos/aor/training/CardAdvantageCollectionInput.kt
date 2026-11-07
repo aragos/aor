@@ -115,41 +115,8 @@ internal data class CardAdvantageCollectionInput(
                         environment.readAdvantage(source, PurchaseJson.text(it, "continuation"))
                     }
             val requests =
-                PurchaseJson.array(node.required("origins"), "origins").map { row ->
-                    PurchaseJson.fields(
-                        row,
-                        setOf(
-                            "index",
-                            "split",
-                            "seed",
-                            "seat",
-                            "epoch",
-                            "cohort",
-                            "ordinal",
-                            "opponentUsesCandidate",
-                        ),
-                    )
-                    CardAdvantageRequest(
-                        index = PurchaseJson.integer(row.required("index"), "index"),
-                        split = PurchaseJson.text(row.required("split"), "split"),
-                        seed = PurchaseJson.integer(row.required("seed"), "seed"),
-                        seat = PurchaseJson.integer(row.required("seat"), "seat"),
-                        epoch = PurchaseJson.integer(row.required("epoch"), "epoch"),
-                        cohort = PurchaseJson.text(row.required("cohort"), "cohort"),
-                        ordinal = PurchaseJson.integer(row.required("ordinal"), "ordinal"),
-                        opponentUsesCandidate =
-                            PurchaseJson.array(
-                                    row.required("opponentUsesCandidate"),
-                                    "opponentUsesCandidate",
-                                )
-                                .map {
-                                    require(it.isBoolean) {
-                                        "Rival continuation flags must be JSON booleans."
-                                    }
-                                    it.booleanValue()
-                                },
-                    )
-                }
+                PurchaseJson.array(node.required("origins"), "origins")
+                    .map(CardAdvantageRequest::read)
             require(PurchaseJson.hash(source) == hash) {
                 "Advantage source changed while being read."
             }

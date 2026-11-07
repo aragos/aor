@@ -142,7 +142,7 @@ def completed_native(directory, source):
     check_model(manifest['baseline'], specification['baseline'], 'baseline.json')
     check_model(manifest['frozenPurchasePolicy'], specification['frozenPurchasePolicy'],
                 'frozen-purchase-policy.json')
-    if manifest['kind'] == 'card-advantage-collect':
+    if manifest['kind'] in ('card-advantage-collect', 'card-continuation-diagnostic'):
         require(manifest['origins'] == specification['origins'],
                 'Completed root requests differ from the prospective source.')
         if specification['continuation'] is None:

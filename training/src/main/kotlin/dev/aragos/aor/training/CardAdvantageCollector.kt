@@ -3,17 +3,11 @@ package dev.aragos.aor.training
 import dev.aragos.aor.AdvanceId
 import dev.aragos.aor.CardKind
 import dev.aragos.aor.Entry
-import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameState
 import dev.aragos.aor.GameView
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
-import dev.aragos.aor.TextCodec
-import dev.aragos.aor.ai.BotCandidate
-import dev.aragos.aor.ai.BotDifficulty
-import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotObservation
-import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.CardAdvantagePolicy
 import dev.aragos.aor.ai.CardObservation
 import dev.aragos.aor.ai.CardProposals
@@ -25,57 +19,6 @@ internal class CardAdvantageCollector(
     private val input: CardAdvantageCollectionInput,
     private val deadlineNanos: Long,
 ) {
-    private data class Root(
-        val number: Int,
-        val entries: Int,
-        val observation: BotObservation,
-        val chosen: String,
-    )
-
-    private class Trace(
-        private val request: CardAdvantageRequest,
-        private val allowTrivial: Boolean,
-    ) : SimulationTrace {
-        override val seat: Int = request.seat
-        var root: Root? = null
-        var ordinal = 0
-        lateinit var header: GameHeader
-        lateinit var entries: List<String>
-
-        override fun decision(
-            number: Int,
-            snapshotEntryCount: Int,
-            commandEntryIndex: Int,
-            view: GameView,
-            observation: BotObservation,
-            chosen: BotCandidate,
-            model: BotModel,
-        ) {
-            if (
-                view.stage != Stage.PLAY_CARDS ||
-                    observation.decision != "play-cards" ||
-                    view.currentEpoch != request.epoch
-            )
-                return
-            ordinal++
-            if (
-                root != null ||
-                    ordinal < request.ordinal ||
-                    !eligible(view, observation, request, allowTrivial)
-            )
-                return
-            check(snapshotEntryCount == commandEntryIndex) {
-                "An ordinary card root requires a single-player batch."
-            }
-            root = Root(number, snapshotEntryCount, observation, chosen.command)
-        }
-
-        override fun verified(header: GameHeader, entries: List<String>) {
-            this.header = header
-            this.entries = entries
-        }
-    }
-
     private data class Node(
         val observation: CardObservation,
         val number: Int,
@@ -92,21 +35,7 @@ internal class CardAdvantageCollector(
         }
         val request = input.origins[index]
         val executor = CardAdvantageExecutor(input, request, deadlineNanos)
-        val trace = Trace(request, allowTrivial = input.collection != null)
-        val backbone =
-            Simulation()
-                .play(
-                    configuration = input.environment.configuration,
-                    seed = request.seed,
-                    competitors =
-                        List(4) {
-                            Competitor(input.environment.baseline.model, BotDifficulty.HARD)
-                        },
-                    deadlineNanos = deadlineNanos,
-                    verifyReplay = true,
-                    trace = trace,
-                    controllers = executor.controllers,
-                )
+        val capture = CardAdvantageRootCapture(input, deadlineNanos).capture(index, executor)
         val identity =
             CardAdvantageOrigin(
                 schemaVersion = input.schemaVersion,
@@ -118,24 +47,17 @@ internal class CardAdvantageCollector(
                 status = "skipped",
                 skipReason = "requested-root-not-reached",
                 request = request,
-                backboneDecisions = backbone.steps,
-                backboneCanonicalSha256 = CardAdvantageExecutor.hash(trace.entries),
+                backboneDecisions = capture.backboneDecisions,
+                backboneCanonicalSha256 = capture.backboneCanonicalSha256,
                 observations = emptyMap(),
                 groups = emptyList(),
                 outcomes = emptyMap(),
             )
-        val captured = trace.root ?: return identity
-        val rootState =
-            trace.entries.take(captured.entries).fold(GameState(trace.header)) { state, text ->
-                executor.check(captured.number)
-                state.step(TextCodec.parse(text))
-            }
-        val actor = rootState.playerIds[request.seat]
-        check(BotObservations.from(rootState, actor) == captured.observation) {
-            "The recorded root observation must regenerate exactly."
-        }
+        val captured = capture.root ?: return identity
+        val rootState = captured.state
+        val actor = captured.actor
         val root = node(rootState, actor, captured.number, executor)
-        check(root.observation.actions[root.continuationIndex].command == captured.chosen) {
+        check(root.observation.actions[root.continuationIndex].command == captured.chosenCommand) {
             "The replayed root must preserve its actual continuation policy and seed."
         }
         val snapshot = ExperimentSession(rootState, seed = 0L, recordEntries = true)
@@ -157,7 +79,7 @@ internal class CardAdvantageCollector(
             check(id !in outcomes && outcomes.size < 52) {
                 "An advantage origin may execute at most 52 distinct complete tails."
             }
-            outcomes[id] = finish(session, rootState, captured.number, executor, replicate)
+            outcomes[id] = executor.finish(session, rootState, captured.number, replicate)
             return id
         }
         val rootReturns =
@@ -302,7 +224,7 @@ internal class CardAdvantageCollector(
                         deadlineNanos,
                     )
                     val id = "root-$actionIndex-$replicate"
-                    outcomes[id] = finish(branch, rootState, root.number, executor, replicate)
+                    outcomes[id] = executor.finish(branch, rootState, root.number, replicate)
                     id
                 }
             CardAdvantageReturns(actionIndex, ids)
@@ -390,54 +312,6 @@ internal class CardAdvantageCollector(
             session.apply(executor.commands(session.state, number), deadlineNanos)
         }
         return null
-    }
-
-    private fun finish(
-        session: ExperimentSession,
-        rootState: GameState,
-        rootNumber: Int,
-        executor: CardAdvantageExecutor,
-        replicate: Int,
-    ): CardAdvantageOutcome {
-        while (session.state.stage != Stage.FINISHED) {
-            val number = rootNumber + session.decisions
-            executor.check(number)
-            session.apply(executor.commands(session.state, number), deadlineNanos)
-        }
-        val canonical = session.entries.map(Entry::toText)
-        val replay =
-            canonical.fold(rootState) { state, entry ->
-                executor.check(rootNumber + session.decisions)
-                state.step(TextCodec.parse(entry))
-            }
-        check(replay == session.state) {
-            "Every complete advantage tail must replay through ordinary authoritative entries."
-        }
-        val game =
-            SimulatedGame(
-                input.environment.configuration.id,
-                executor.request.seed,
-                rootNumber + session.decisions,
-                session.state.publicView().scores,
-                GameCoverage(
-                    emptyMap(),
-                    emptyMap(),
-                    emptySet(),
-                    emptySet(),
-                    emptySet(),
-                    emptySet(),
-                ),
-                0L,
-            )
-        return CardAdvantageOutcome(
-            game.reward(executor.request.seat),
-            game.winShare(executor.request.seat),
-            game.rankReward(executor.request.seat),
-            game.scores.map(PilotReplayScore::from),
-            game.steps,
-            CardAdvantageExecutor.chanceSeed(executor.request.seed, replicate),
-            CardAdvantageExecutor.hash(canonical),
-        )
     }
 
     companion object {

@@ -19,6 +19,15 @@ internal object CardAdvantageMain {
 
     private fun collect(options: CardAdvantageOptions) {
         val batchDeadline = options.indices?.let { deadline(options.hours) }
+        val sourceVersion =
+            PurchaseJson.integer(
+                PurchaseJson.read(options.source).required("schemaVersion"),
+                "schemaVersion",
+            )
+        if (sourceVersion == 3) {
+            collectDiagnostic(options, batchDeadline)
+            return
+        }
         val input = CardAdvantageCollectionInput.read(options.source)
         if (options.describe) {
             println(PurchaseJson.mapper.writeValueAsString(input.manifest()))
@@ -47,6 +56,44 @@ internal object CardAdvantageMain {
                             CardAdvantageCollector(input, deadline).collect(index)
                         )
                 CardAdvantageArtifacts.validate(document, input, index)
+                CardTrajectoryFiles.save(path, document)
+            }
+        }
+    }
+
+    private fun collectDiagnostic(options: CardAdvantageOptions, batchDeadline: Long?) {
+        val input = CardContinuationDiagnosticInput.read(options.source)
+        if (options.describe) {
+            println(PurchaseJson.mapper.writeValueAsString(input.manifest()))
+            return
+        }
+        val indices =
+            options.indices
+                ?: listOf(
+                    requireNotNull(options.index) {
+                        "A diagnostic requires an explicit origin index."
+                    }
+                )
+        require(indices.all { it in input.origins.indices }) {
+            "Every diagnostic index must belong to its source before any batch work starts."
+        }
+        val inputs =
+            listOf(
+                input.source,
+                input.environment.baseline.path,
+                input.environment.purchase.path,
+                input.priority.path,
+            )
+        for (index in indices) {
+            if (batchDeadline != null) checkDeadline(batchDeadline)
+            job(options, index, "origin", inputs, batchDeadline) { path, deadline ->
+                if (batchDeadline != null) checkDeadline(batchDeadline)
+                val document =
+                    CardTrajectoryFiles.readIfPresent(path)
+                        ?: PurchaseJson.mapper.valueToTree<JsonNode>(
+                            CardContinuationCollector(input, deadline).collect(index)
+                        )
+                CardContinuationArtifacts.validate(document, input, index)
                 CardTrajectoryFiles.save(path, document)
             }
         }
