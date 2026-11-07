@@ -8,6 +8,8 @@ import dev.aragos.aor.ai.CardAdvantageModel
 import dev.aragos.aor.ai.CardAdvantagePolicy
 import dev.aragos.aor.ai.CardFrequencyModel
 import dev.aragos.aor.ai.CardObservationEncoder
+import dev.aragos.aor.ai.CardPolicy
+import dev.aragos.aor.ai.CardPolicyModel
 import dev.aragos.aor.ai.CardProposals
 import java.nio.file.Path
 
@@ -41,9 +43,23 @@ internal data class CardAdvantageEvaluationPolicy(
     val advantage: CardAdvantageModel? = null,
     val frequency: CardFrequencyModel? = null,
     val economy: JointEconomyPolicy? = null,
+    val cardActor: CardPolicyModel? = null,
 ) {
     fun metadata(): Map<String, Any?> =
         mapOf("kind" to kind, "path" to path?.toString(), "sha256" to sha256)
+
+    /** Registry adapters share the collector's actor, purchase prior and decision scope exactly. */
+    fun controller(environment: CardAdvantageEnvironment): SimulationController =
+        when {
+            economy != null -> JointEconomyController(environment, economy)
+            cardActor != null ->
+                CardActorController(
+                    environment.baseline.model,
+                    cardActor,
+                    environment.purchase.model,
+                )
+            else -> CardAdvantageController(environment, advantage, frequency)
+        }
 }
 
 /** Named frozen policy registry and explicit world/role/arm jobs. */
@@ -79,9 +95,12 @@ internal data class CardAdvantageEvaluationInput(
                     CardProposals.VERSION,
                 )
                 .joinToString("\n") +
-                if (policies.values.any { it.economy != null }) {
+                (if (policies.values.any { it.economy != null }) {
                     "\n${JointEconomyPolicy.VERSION}"
-                } else ""
+                } else "") +
+                (if (policies.values.any { it.cardActor != null }) {
+                    "\n${CardPolicy.ACTOR_VERSION}"
+                } else "")
         )
 
     fun manifest(): Map<String, Any?> =
@@ -111,9 +130,12 @@ internal data class CardAdvantageEvaluationInput(
             "policies" to policies.mapValues { it.value.metadata() },
             "jobs" to jobs,
         ) +
-            if (policies.values.any { it.economy != null }) {
+            (if (policies.values.any { it.economy != null }) {
                 mapOf("economyVersion" to JointEconomyPolicy.VERSION)
-            } else emptyMap()
+            } else emptyMap()) +
+            (if (policies.values.any { it.cardActor != null }) {
+                mapOf("cardActorVersion" to CardPolicy.ACTOR_VERSION)
+            } else emptyMap())
 
     companion object {
         fun read(path: Path): CardAdvantageEvaluationInput {
@@ -159,6 +181,27 @@ internal data class CardAdvantageEvaluationInput(
                                     model.path,
                                     model.sha256,
                                     advantage = model.model,
+                                )
+                            } else if (kind == "card-actor") {
+                                val file = source.parent.resolve(text).normalize().toRealPath()
+                                val fingerprint = PurchaseJson.hash(file)
+                                val model = CardPolicyInput.read(file)
+                                require(
+                                    model.stateFeatureNames ==
+                                        environment.dictionary.stateFeatureNames &&
+                                        model.actionFeatureNames ==
+                                            environment.dictionary.actionFeatureNames
+                                ) {
+                                    "An evaluation card actor must retain this setup's complete dictionaries."
+                                }
+                                require(PurchaseJson.hash(file) == fingerprint) {
+                                    "An evaluation card actor changed while being read."
+                                }
+                                CardAdvantageEvaluationPolicy(
+                                    kind,
+                                    file,
+                                    fingerprint,
+                                    cardActor = model,
                                 )
                             } else if (kind == "economy") {
                                 val file = source.parent.resolve(text).normalize().toRealPath()
@@ -269,12 +312,7 @@ internal class CardAdvantageEvaluator(
                 val name = if (seat == job.seat) job.policy else job.rivals[seat]
                 val policy =
                     requireNotNull(input.policies[name]) { "A role requires a declared policy." }
-                policy.economy?.let { JointEconomyController(input.environment, it) }
-                    ?: CardAdvantageController(
-                        input.environment,
-                        policy.advantage,
-                        policy.frequency,
-                    )
+                policy.controller(input.environment)
             }
         val game =
             Simulation()

@@ -507,3 +507,19 @@ pass for the exact runtime before admission. All stages share one nonrenewable t
 six single-core workers and batches of eight, with per-game atomic records and the existing
 completion barrier. A failed selection or confirmation ends the experiment without additional
 samples, new candidates or automatic browser activation.
+
+#### Repeated card-policy training signal
+
+The [trajectory driver](../scripts/card_trajectory_experiment.py) tests the existing card actor
+and PPO update over 32 complete batches of 256 games. It retains the original 97% recommendation
+prior, every offered card choice, exact model/Adam checkpoint carry, and the frozen F/purchase32
+policies elsewhere. This tests a larger stationary training run; neither earlier payoff-reversal
+failure is repaired or reclassified.
+
+Freeze four development checkpoints and reuse one paired control bank for F, the unchanged
+initial actor and the priority card comparator. Stop for the declared harmful-play or insufficient
+probability-movement conditions; accepted epochs alone do not establish stronger play. Only one
+eligible checkpoint can reach the fresh four-arm confirmation bank. All training, fitting and
+evaluation share one original three-hour clock, with compressed complete-game records, fixed input
+hashes and a 4 GiB data cap. A missing checkpoint, changed input or exhausted budget must preserve
+evidence and stop progression. No result automatically changes the browser policy.
