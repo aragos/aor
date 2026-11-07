@@ -23,13 +23,13 @@ h1 { font-size: clamp(2.5rem, 5.6vw, 4.4rem); letter-spacing: -.045em; margin: 1
 .home-cta { display: inline-flex; align-items: center; justify-content: center; gap: 1.75rem; min-height: 48px; margin-top: 2rem; padding: .8rem 1.4rem; border-radius: 7px; background: #245c50; color: #fffef8; text-decoration: none; font-weight: 600; }
 .home-cta:hover { background: #32705f; }
 .home-account-note { margin-top: .8rem; color: #52665b; font-size: .85rem; }
-.home-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5rem; padding-block: 2.5rem; border-top: 1px solid #cbd3c4; border-bottom: 1px solid #cbd3c4; }
-.home-feature-number { color: #52665b; font-size: .8rem; }
-.home-features h2 { margin: .8rem 0 1rem; font-size: 1.45rem; }
+.home-features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2.5rem; padding-block: 2.5rem; border-top: 1px solid #cbd3c4; border-bottom: 1px solid #cbd3c4; }
+.home-features h2 { margin: 0 0 1rem; font-size: 1.45rem; }
 .home-features p, .home-getting-started p { color: #52665b; }
 .home-getting-started { padding-block: 3rem; max-width: 720px; }
 .home-getting-started h2 { font-size: 1.85rem; margin: 0 0 1rem; }
 .home-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding-block: 1rem 2rem; color: #52665b; font-size: .85rem; }
+.home-fan-note { max-width: 36rem; }
 .home-footer nav { display: flex; gap: 1.5rem; }
 @media (max-width: 680px) {
     .home-header, main, .home-footer { width: calc(100% - 2.5rem); }
@@ -38,7 +38,5 @@ h1 { font-size: clamp(2.5rem, 5.6vw, 4.4rem); letter-spacing: -.045em; margin: 1
     .home-intro { padding-block: 2.5rem; }
     .home-description { font-size: 1.05rem; }
     .home-features { grid-template-columns: 1fr; gap: 2rem; padding-block: 2rem; }
-    .home-feature-number { float: left; margin-right: 1rem; line-height: 1.65rem; }
-    .home-features h2 { margin-top: 0; }
     .home-getting-started { padding-block: 2rem; }
 }

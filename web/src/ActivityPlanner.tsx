@@ -15,19 +15,27 @@ export type QuotePlan = (actions: PlannedAction[]) => Promise<PlanningQuote>;
 export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?: QuotePlan) {
     const [editing, setOpen] = useState(false);
     const saved = snapshot.planning?.saved;
+    const cardPurchase = snapshot.game.stage === 'BUY_CARD' &&
+        !saved?.actions.some(action => !['buy-card', 'pass'].includes(action.command));
     const acting = snapshot.viewerId !== null &&
         (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
     const available = !!snapshot.planning?.available && (!acting || !!saved || editing);
-    const open = editing && available;
+    const open = editing && available && !cardPurchase;
     const [actions, setActions] = useState<PlannedAction[]>([]);
     const [quoted, setQuoted] = useState<{key: string; value: PlanningQuote} | null>(null);
     const [error, setError] = useState('');
     const [baseVersion, setBaseVersion] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [choosingCard, setChoosingCard] = useState(false);
+    const cardRequest = useRef<object | null>(null);
     const request = useRef(quote);
     request.current = quote;
     const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.status}:${snapshot.game.turnNumber}:${snapshot.game.stage}:${snapshot.undo?.editRevision}`;
     useEffect(() => {setOpen(false); setActions([]); setQuoted(null); setError(''); setBaseVersion(null); setSaving(false);}, [scope]);
+    useEffect(() => {
+        setChoosingCard(false);
+        return () => {cardRequest.current = null;};
+    }, [scope]);
     useEffect(() => {if (!available) setOpen(false);}, [available]);
     const key = JSON.stringify([snapshot.revision, actions]);
     useEffect(() => {
@@ -70,15 +78,70 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
         setActions(current => [...current, {decision: preview.preview.decision!, command}]);
         return true;
     }
+    async function chooseCardPurchase(command: 'buy-card' | 'pass') {
+        if (!write || cardRequest.current) return;
+        const pending = {};
+        cardRequest.current = pending; setChoosingCard(true);
+        try {
+            let view = snapshot.planning;
+            if (view?.saved?.armed) {
+                const disarmed = await write('DISARM', undefined, undefined, view.version);
+                if (cardRequest.current !== pending || !disarmed?.planning || disarmed.planning.saved?.armed) return;
+                view = disarmed.planning;
+            }
+            const accepted = await write('SAVE', [{decision: 'buy-card', command}], undefined,
+                view?.version ?? null);
+            if (cardRequest.current !== pending) return;
+            const next = accepted?.planning;
+            const version = accepted?.planWriteReceipt?.version;
+            if (!next?.canArm || !next.previewToken || !version || next.version !== version) return;
+            await write(next.canExecute ? 'EXECUTE' : 'ARM', undefined, next.previewToken, version);
+        } finally {
+            if (cardRequest.current === pending) {
+                cardRequest.current = null; setChoosingCard(false);
+            }
+        }
+    }
     const displayed = preview ?? quoted?.value;
     const effective: Snapshot = open && displayed ? {
         ...snapshot, game: displayed.preview.game, legalChoices: displayed.preview.choices,
         prompt: displayed.preview.decision ? {messageId: `prompt.${displayed.preview.decision}`, players: [snapshot.viewerId!]} : null,
     } : snapshot;
     return {open, actions, preview, error, dirty, effective, edit, operate, append,
+        cardPurchase, chooseCardPurchase, choosingCard,
         conflict: open && baseVersion !== (snapshot.planning?.version ?? null) && !saving,
         close: () => setOpen(false), removeFrom: (index: number) => setActions(current => current.slice(0, index)),
-        loading: open && !preview, supported: !!write && !!quote && available};
+        loading: choosingCard || open && !preview, supported: !!write && !!quote && available};
+}
+
+function CardPurchasePlanner({snapshot, planner, busy}: {
+    snapshot: Snapshot; planner: ReturnType<typeof useActivityPlanner>; busy: boolean;
+}) {
+    const view = snapshot.planning!;
+    const saved = view.saved;
+    const acting = snapshot.prompt?.players.includes(snapshot.viewerId!);
+    const offer = snapshot.game.cardPurchaseOffer;
+    const choice = saved?.actions[0]?.command;
+    if (!choice && (acting || !offer || offer.blockers.length > 0)) return null;
+    const disabled = busy || planner.choosingCard;
+    const buyLabel = t('plan.buyCardOnTurn', {cost: offer?.cost ?? '—'});
+    const passLabel = t('plan.passOnTurn');
+    return <section className="card-purchase-planner" aria-label={t('table.prompt.buy-card')}>
+        {!acting && <>
+            <p>{t('plan.cardChoiceTiming')}</p>
+            {offer && offer.blockers.length === 0 && <p>{t('plan.cashAfterCard', {cash: offer.cashAfter})}</p>}
+            <DecisionAction disabled={disabled || !view.canArm || !offer || offer.blockers.length > 0 || saved?.armed && choice === 'buy-card'}
+                aria-pressed={!!saved?.armed && choice === 'buy-card'} onClick={() => {void planner.chooseCardPurchase('buy-card');}}>{buyLabel}</DecisionAction>
+            <DecisionAction className="secondary" disabled={disabled || !view.canArm || saved?.armed && choice === 'pass'}
+                aria-pressed={!!saved?.armed && choice === 'pass'} onClick={() => {void planner.chooseCardPurchase('pass');}}>{passLabel}</DecisionAction>
+        </>}
+        {choice && <>
+            <p role="status">{t(saved?.armed ? 'plan.cardChoiceScheduled' : 'plan.cardChoiceNeedsReview',
+                {choice: choice === 'buy-card' ? buyLabel : passLabel})}</p>
+            <button type="button" className="secondary" disabled={disabled}
+                onClick={() => {void planner.operate('DELETE');}}>{t('plan.cancelCardChoice')}</button>
+        </>}
+    </section>;
 }
 
 function actionName(action: PlannedAction, snapshot: Snapshot): string {
@@ -103,6 +166,7 @@ export function ActivityPlanner({snapshot, planner, busy}: {
     snapshot: Snapshot; planner: ReturnType<typeof useActivityPlanner>; busy: boolean;
 }) {
     if (!planner.supported) return null;
+    if (planner.cardPurchase) return <CardPurchasePlanner snapshot={snapshot} planner={planner} busy={busy}/>;
     const view = snapshot.planning!;
     const saved = view.saved;
     const preview = planner.open ? planner.preview?.preview : view.preview;

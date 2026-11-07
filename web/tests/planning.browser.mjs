@@ -71,12 +71,12 @@ export async function checkParallelPlanning(page, web) {
     const initial = await game.snapshot(game.links[1]);
     assert.equal(initial.game.stage, 'PURCHASE');
     let navigation = 0;
-    async function visit(seat) {
+    async function visit(seat, selector = '.activity-planner') {
         const previous = await page.evaluate('performance.timeOrigin');
         const url = new URL(game.links[seat].path, web);
         url.searchParams.set('planning-check', String(++navigation));
         await page.send('Page.navigate', {url: url.href});
-        await page.wait(`performance.timeOrigin !== ${previous} && document.querySelector('.activity-planner')`, 'live planner');
+        await page.wait(`performance.timeOrigin !== ${previous} && document.querySelector(${JSON.stringify(selector)})`, 'live planner');
     }
     async function waitPlan(count) {
         await page.wait(`document.querySelectorAll('.plan-actions li').length === ${count} && [...document.querySelectorAll('.decision-actions button')].some(b=>b.textContent === 'Save for review' && !b.disabled) && !document.querySelector('.activity-planner .error')`, `plan with ${count} actions`);
@@ -242,16 +242,59 @@ export async function checkParallelPlanning(page, web) {
     for (const link of game.links) await game.send(link, 'pass');
     for (let seat = 0; seat < 3; seat++) await game.send(game.links[seat], `buy-tokens ${seat - 2}`);
     if ((await game.snapshot(game.links[0])).game.stage === 'DRAW_CARD') await game.send(game.links[0], 'pass');
-    await visit(2);
-    await page.click('Prepare a plan');
-    await page.wait(`[...document.querySelectorAll('.simple-action')].some(b => b.textContent.includes('Buy card') && !b.disabled)`, 'planned card offer');
-    await page.evaluate(`[...document.querySelectorAll('.simple-action')].find(b=>b.textContent.includes('Buy card')).click()`);
-    await waitPlan(1);
-    await assertCompactPlan();
-    await page.click('Save for review');
-    await page.wait(`[...document.querySelectorAll('button')].some(b => b.textContent === 'Execute automatically on my turn' && !b.disabled)`, 'card authorization');
-    await page.click('Execute automatically on my turn');
+    await visit(0, '.decision-status.is-ready');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-planner, .card-purchase-planner')`), null,
+        'The active player buys or passes directly without a planner');
+    assert.equal(await page.evaluate(`document.querySelector('.simple-action').textContent`), 'Buy card · $10');
+    assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), 'Pass');
+    await visit(2, '.card-purchase-planner');
+    const cardChoice = text => `[...document.querySelectorAll('.decision-actions button')].find(button => button.textContent === ${JSON.stringify(text)})`;
+    const buyCard = 'Buy card · $10';
+    for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        assert.equal(await page.evaluate(`document.querySelector('.activity-planner')`), null,
+            'Card purchases have no general plan editor');
+        assert.equal(await page.evaluate(`document.querySelectorAll('.decision-actions button').length`), 2,
+            'Waiting players have only Buy/Pass, without save or execute confirmations');
+        assert.equal(await page.evaluate(`document.querySelector('.card-purchase-planner').textContent.includes('even while offline')`), true,
+            'One-click choices explain their automatic timing');
+        assert.match(await page.evaluate(`document.querySelector('.card-purchase-planner').textContent`),
+            /Cash after buying/);
+        assert(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`));
+        await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-card-purchase-waiting-${width}.png`), width, height, mobile);
+    }
+    const beforeChoice = await game.snapshot(game.links[2]);
+    await page.click('Pass');
+    await page.wait(`${cardChoice('Pass')}?.getAttribute('aria-pressed') === 'true'`, 'Pass schedules in one click');
+    const passChoice = await game.snapshot(game.links[2]);
+    assert.deepEqual(passChoice.planning.saved.actions, [{decision: 'buy-card', command: 'pass'}]);
+    assert.deepEqual(passChoice.history, beforeChoice.history, 'Choosing while waiting commits no game action');
+    await page.reload();
+    await page.wait(`${cardChoice('Pass')}?.getAttribute('aria-pressed') === 'true'`, 'The scheduled choice survives reload');
+    await page.click(buyCard);
+    await page.wait(`${cardChoice(buyCard)}?.getAttribute('aria-pressed') === 'true'`, 'Buy replaces Pass in one click');
+    await page.click('Cancel choice');
+    await page.wait(`!document.querySelector('.card-purchase-planner [role="status"]') && !${cardChoice(buyCard)}?.disabled`, 'Cancellation restores the two choices');
+    assert.equal((await game.snapshot(game.links[2])).planning.saved, null);
+    await page.evaluate(`(() => {
+        const nativeFetch = window.fetch;
+        window.fetch = async (input, init) => {
+            if (String(input).endsWith('/plans') && init?.body && JSON.parse(init.body).operation === 'ARM') {
+                window.fetch = nativeFetch;
+                return new Response(JSON.stringify({code: 'STALE_PLAN_PREVIEW'}), {status: 409});
+            }
+            return nativeFetch(input, init);
+        };
+    })()`);
+    await page.click(buyCard);
+    await page.wait(`document.querySelector('.card-purchase-planner [role="status"]')?.textContent.includes('Not scheduled') && !${cardChoice(buyCard)}?.disabled`,
+        'A rejected authorization leaves an explicit, retryable unscheduled choice');
+    assert.equal((await game.snapshot(game.links[2])).planning.saved.armed, false);
+    await page.click(buyCard);
+    await page.wait(`${cardChoice(buyCard)}?.getAttribute('aria-pressed') === 'true'`, 'Buy schedules without a second confirmation');
+    await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-card-purchase-scheduled-phone.png'), 390, 844, true);
     const beforeDraw = await game.snapshot(game.links[2]);
+    assert.deepEqual(beforeDraw.planning.saved.actions, [{decision: 'buy-card', command: 'buy-card'}]);
     await page.send('Page.navigate', {url: 'about:blank'});
     await game.send(game.links[0], 'pass');
     const afterDraw = await game.snapshot(game.links[2]);

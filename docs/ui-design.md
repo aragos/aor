@@ -87,6 +87,9 @@ Plans distinguish drafts, saved review and explicit offline authority. Help live
 Offer new plans while waiting; preserve open drafts through public updates/turn arrival, refreshing
 quotes without discarding choices. Saved plans stay reviewable/executable on the owner's turn. Show consequences, assumptions and cancellation; saving never executes,
 draws/changed consequences pause, editing confirms disarm. [Architecture](design.md#private-plans) owns execution.
+Card purchases offer one Buy/Pass choice while waiting, scheduling it directly with cancellation;
+on the player's turn, ordinary Buy/Pass actions commit directly. Existing plans that include discards
+remain reviewable through the full planner.
 
 Undo first withdraws unrevealed submissions; otherwise Linear game reviews server-offered targets and
 removed public actions/random events, cleared submissions and paused plans. Earlier targets live under

@@ -101,14 +101,15 @@ function EventContent({event, track, onInspectCard, cardInspections, marketRoll 
     const actor = event.actor ? eventPlayer(event, event.actor) : null;
     const target = event.target ? eventPlayer(event, event.target) : null;
     const cardId = event.card;
+    const cardInspection = cardInspections?.find(card => card.definition.id === cardId);
     const continuesCompetition = event.competition && cause && ['ATTACK', 'PLACE'].includes(cause.kind);
     return <div className="activity-content">
         {!marketRoll && <div className="event-summary">
             {actor && !continuesCompetition && <span className="activity-actor"><CapitalLabel capital={actor.capital}><strong>{eventName(event, actor.id)}</strong></CapitalLabel></span>}
             {!continuesCompetition && <span>{t(`activity.${event.kind}`)}</span>}
             {!continuesCompetition && event.provinces.map(province => <ActivityProvince key={province} id={province} catalog={track}/>)}
-            {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard} inspection={cardInspections?.find(card => card.definition.id === cardId)}/>}
-            {event.commodity && <Commodity commodity={event.commodity}/>}
+            {cardId && <ActivityCard cardId={cardId} onInspectCard={onInspectCard} inspection={cardInspection}/>}
+            {event.commodity && cardInspection?.definition.kind !== 'commodity' && <Commodity commodity={event.commodity}/>}
             {event.advance && <span className="event-entity">{advanceName(event.advance)}</span>}
             {eventAmount(event) !== null && (!continuesCompetition || event.amount !== cause.amount) && <strong>{eventAmount(event)}</strong>}
             {target && <span className="activity-actor">→ <CapitalLabel capital={target.capital}>{eventName(event, target.id)}</CapitalLabel></span>}

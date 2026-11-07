@@ -12,7 +12,7 @@ try {
     const content = await page.evaluate('document.body.innerText');
     assert.match(content, /AoR online/);
     assert.match(content, /strategy board game/);
-    assert.match(content, /3–6 players/);
+    assert.match(content, /3–6 players/i);
     assert.match(content, /Games are saved as you play/);
     assert.equal(await page.evaluate(`document.querySelector('form, input[type=password]')`), null);
     assert.equal(await page.evaluate(`document.querySelector('a[href="/privacy.html"]').textContent`), 'Privacy policy');
