@@ -38,6 +38,10 @@ class FitConfig:
     seeds: tuple = SEEDS
     threads: int = 1
     maxSeconds: int = 2700
+    activeHidden: int = HIDDEN
+
+    def __post_init__(self):
+        common.integer(self.activeHidden, 'Active hidden width', 1, HIDDEN)
 
 CONFIG = FitConfig()
 
@@ -72,12 +76,29 @@ def validate_bundle(bundle):
     for member in bundle['members']: validate_member(member, bundle)
     return bundle
 
-def initialize(schema, seed):
+def initialize(schema, seed, active_hidden=HIDDEN):
+    """Draw the original full initializer, then zero unused units without changing active draws."""
+    common.integer(active_hidden, 'Active hidden width', 1, HIDDEN)
     validate_schema(schema); rng = random.Random(seed)
     def weights(size): return [rng.uniform(-1/math.sqrt(size), 1/math.sqrt(size)) for _ in range(HIDDEN*size)]
-    return {'stateWeights': weights(len(schema['stateFeatureNames'])), 'stateBias': [0.0]*HIDDEN,
+    member = {'stateWeights': weights(len(schema['stateFeatureNames'])), 'stateBias': [0.0]*HIDDEN,
             'actionWeights': weights(len(schema['actionFeatureNames'])), 'actionBias': [0.0]*HIDDEN,
             'outputWeights': [0.0]*HIDDEN, 'outputBias': 0.0}
+    for key, width in (('stateWeights', len(schema['stateFeatureNames'])),
+                       ('actionWeights', len(schema['actionFeatureNames']))):
+        member[key][active_hidden*width:] = [0.0]*((HIDDEN-active_hidden)*width)
+    return member
+
+def validate_padding(member, schema, active_hidden):
+    """Inactive product units must remain exactly zero; the shared output bias is still active."""
+    common.integer(active_hidden, 'Active hidden width', 1, HIDDEN)
+    for key in MEMBER_KEYS:
+        if key == 'outputBias': continue
+        width = (len(schema['stateFeatureNames']) if key == 'stateWeights' else
+                 len(schema['actionFeatureNames']) if key == 'actionWeights' else 1)
+        require(all(value == 0.0 for value in member[key][active_hidden*width:]),
+                'Inactive hidden units must remain exactly zero: ' + key)
+    return member
 
 def bundle(schema, members):
     return validate_bundle({'schemaVersion': 1, 'encoderVersion': ENCODER, 'selectorVersion': SELECTOR,
