@@ -22,7 +22,19 @@ enum class TerritoryPhase(
 
     companion object {
         fun fromEncoder(version: String): TerritoryPhase =
-            requireNotNull(entries.singleOrNull { it.encoderVersion == version }) {
+            TerritoryEncoder.fromVersion(version).phase
+    }
+}
+
+/** Input versions are independent of phase and network architecture. PPO remains on version 1. */
+enum class TerritoryEncoder(val version: String, val phase: TerritoryPhase) {
+    TOKEN_1(TerritoryPhase.TOKEN.encoderVersion, TerritoryPhase.TOKEN),
+    EXPANSION_1(TerritoryPhase.EXPANSION.encoderVersion, TerritoryPhase.EXPANSION),
+    EXPANSION_2("aor-expansion-observation-2", TerritoryPhase.EXPANSION);
+
+    companion object {
+        fun fromVersion(version: String): TerritoryEncoder =
+            requireNotNull(entries.singleOrNull { it.version == version }) {
                 "Unsupported territory observation encoder: $version."
             }
     }
@@ -62,15 +74,10 @@ internal fun requireTerritoryProjection(
     stateFeatures: Map<String, Double>,
     actions: List<TerritoryAction>,
 ) {
-    require(TerritoryPhase.entries.any { it.encoderVersion == encoderVersion }) {
-        "Unsupported territory observation encoder version."
-    }
+    val phase = TerritoryPhase.fromEncoder(encoderVersion)
     requireFeatures(stateFeatures)
     val commands = actions.map(TerritoryAction::command)
-    require(
-        actions.size in 1..TerritoryPhase.fromEncoder(encoderVersion).maxActions &&
-            commands.distinct().size == actions.size
-    ) {
+    require(actions.size in 1..phase.maxActions && commands.distinct().size == actions.size) {
         "A territory observation requires a bounded complete set of distinct offered actions."
     }
     require(commands == commands.sorted()) {

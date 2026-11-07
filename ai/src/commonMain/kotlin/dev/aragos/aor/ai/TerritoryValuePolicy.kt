@@ -26,11 +26,15 @@ data class TerritoryValueModel(
         require(schemaVersion == 1 && architecture == TerritoryValuePolicy.ARCHITECTURE) {
             "Unsupported territory action-value model schema or architecture."
         }
-        require(TerritoryPhase.entries.any { it.encoderVersion == encoderVersion }) {
-            "Territory action values require a known token or expansion encoder."
-        }
+        TerritoryEncoder.fromVersion(encoderVersion)
         require(hiddenSize == 64) { "Territory action values require exactly 64 hidden units." }
         TerritoryFeatureDictionary(stateFeatureNames, actionFeatureNames)
+        require(
+            encoderVersion != TerritoryEncoder.EXPANSION_2.version ||
+                stateFeatureNames.containsAll(ExpansionObservationEncoder.cathedralUsageNames)
+        ) {
+            "Expansion encoder 2 requires every public Cathedral usage column."
+        }
         require(
             stateWeights.size == hiddenSize * stateFeatureNames.size &&
                 actionWeights.size == hiddenSize * actionFeatureNames.size &&
