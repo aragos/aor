@@ -6,8 +6,9 @@ import kotlin.math.tanh
 
 /**
  * One Float64 action-value network. Matrices have 64 rows and dictionary-size columns in flat
- * row-major order. h=tanh(stateBias+Ws*x), z=tanh(h+actionBias+Wa*a), and
- * q=sigmoid(outputBias+outputWeights*z). There is no action prior or residual clipping.
+ * row-major order. h=tanh(stateBias+Ws*x), g=tanh(actionBias+Wa*a), and
+ * q=sigmoid(outputBias+sum(outputWeights*h*g)). The signed state/action interaction allows a unit's
+ * action preference to reverse with visible context. There is no action prior or clipping.
  *
  * Training identifies differences q(s,a)-q(s,F), not the absolute q values. Despite its bounded
  * sigmoid output, q is not a calibrated probability of winning or a calibrated terminal value.
@@ -46,7 +47,9 @@ data class CardAdvantageNetwork(
 /**
  * A separate wire contract from CardPolicy v1: three independently initialized q networks with
  * shared frozen dictionaries and the fixed 0.02 advantage margin. No purchase or residual-policy
- * artifact can be reinterpreted as this selector. Profile qualification remains the caller's job.
+ * artifact can be reinterpreted as this selector. Version 1 additive-head artifacts are rejected;
+ * the unchanged array shapes do not imply compatible mathematics. Profile qualification remains the
+ * caller's job.
  */
 data class CardAdvantageModel(
     val schemaVersion: Int = 1,
@@ -69,7 +72,7 @@ data class CardAdvantageModel(
             "Unsupported card advantage schema, encoder, selector or proposal version."
         }
         require(hiddenSize == 64 && margin == 0.02 && members.size == 3) {
-            "Card advantage version 1 requires three 64-unit networks and the 0.02 margin."
+            "Card advantage version 2 requires three 64-unit networks and the 0.02 margin."
         }
         CardFeatureDictionary(stateFeatureNames, actionFeatureNames)
         require(
@@ -136,7 +139,7 @@ data class CardAdvantageChoice(
 
 /** Normal-window experimental control; existing purchase and card-policy behavior is untouched. */
 object CardAdvantagePolicy {
-    const val SELECTOR_VERSION = "aor-card-advantage-1"
+    const val SELECTOR_VERSION = "aor-card-advantage-2"
     private const val MARGIN = 0.02
 
     /**
@@ -194,9 +197,9 @@ object CardAdvantagePolicy {
                         network.outputBias +
                             hidden.indices.sumOf { row ->
                                 network.outputWeights[row] *
+                                    hidden[row] *
                                     tanh(
-                                        hidden[row] +
-                                            network.actionBias[row] +
+                                        network.actionBias[row] +
                                             dot(
                                                 network.actionWeights,
                                                 row,

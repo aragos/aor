@@ -21,10 +21,10 @@ class CardAdvantagePolicyTest {
         val evaluation = CardAdvantagePolicy.evaluate(observation, model(), 17)
 
         evaluation.memberValues.forEach { values ->
-            assertThat(values[0]).isWithin(1.0e-12).of(0.47323910035471933)
-            assertThat(values[1]).isWithin(1.0e-12).of(0.6155699600507891)
+            assertThat(values[0]).isWithin(1.0e-12).of(0.3866194497989705)
+            assertThat(values[1]).isWithin(1.0e-12).of(0.4654413563564786)
         }
-        assertThat(evaluation.meanAdvantages[1]).isWithin(1.0e-12).of(0.1423308596960698)
+        assertThat(evaluation.meanAdvantages[1]).isWithin(1.0e-12).of(0.07882190655750809)
         assertThat(CardAdvantagePolicy.select(observation, evaluation).command)
             .isEqualTo("play held")
     }
@@ -160,25 +160,11 @@ class CardAdvantagePolicyTest {
         val network =
             member()
                 .copy(
-                    stateWeights =
-                        List(128) {
-                            when (it) {
-                                1 -> 1.0
-                                3 -> -1.0
-                                else -> 0.0
-                            }
-                        },
+                    stateWeights = List(128) { if (it == 1) 1.0 else 0.0 },
                     stateBias = List(64) { 0.0 },
-                    actionWeights = List(128) { if (it == 0 || it == 2) 0.6 else 0.0 },
+                    actionWeights = List(128) { if (it == 0) 0.6 else 0.0 },
                     actionBias = List(64) { 0.0 },
-                    outputWeights =
-                        List(64) {
-                            when (it) {
-                                0 -> 1.0
-                                1 -> -1.0
-                                else -> 0.0
-                            }
-                        },
+                    outputWeights = List(64) { if (it == 0) 1.0 else 0.0 },
                     outputBias = 0.0,
                 )
         val contextualModel = model().copy(members = List(3) { network })
@@ -186,9 +172,35 @@ class CardAdvantagePolicyTest {
             observation.copy(stateFeatures = observation.stateFeatures + ("root" to -1.0))
 
         assertThat(CardAdvantagePolicy.choose(observation, contextualModel, 17).command)
-            .isEqualTo("pass")
-        assertThat(CardAdvantagePolicy.choose(opposite, contextualModel, 17).command)
             .isEqualTo("play held")
+        assertThat(CardAdvantagePolicy.choose(opposite, contextualModel, 17).command)
+            .isEqualTo("pass")
+        assertThat(CardAdvantagePolicy.evaluate(observation, contextualModel, 17).meanAdvantages[1])
+            .isWithin(1.0e-12)
+            .of(0.10085138583319275)
+        assertThat(CardAdvantagePolicy.evaluate(opposite, contextualModel, 17).meanAdvantages[1])
+            .isWithin(1.0e-12)
+            .of(-0.10085138583319275)
+    }
+
+    @Test
+    fun zeroStateEmbeddingCannotInventAnActionOnlyPreference() {
+        val network = member().copy(stateWeights = List(128) { 0.0 }, stateBias = List(64) { 0.0 })
+
+        val evaluation =
+            CardAdvantagePolicy.evaluate(
+                observation,
+                model().copy(members = List(3) { network }),
+                17,
+            )
+
+        assertThat(evaluation.memberAdvantages)
+            .containsExactly(
+                listOf(0.0, 0.0),
+                listOf(0.0, 0.0),
+                listOf(0.0, 0.0),
+            )
+        assertThat(CardAdvantagePolicy.select(observation, evaluation).overridden).isFalse()
     }
 
     @Test
@@ -219,6 +231,13 @@ class CardAdvantagePolicyTest {
             model().copy(actionFeatureNames = listOf("left"))
         }
         assertFailsWith<IllegalArgumentException> { member().copy(outputBias = Double.NaN) }
+    }
+
+    @Test
+    fun additiveHeadVersionOneCannotBeReinterpretedAsAnInteractionModel() {
+        assertFailsWith<IllegalArgumentException> {
+            model().copy(selectorVersion = "aor-card-advantage-1")
+        }
     }
 
     @Test
