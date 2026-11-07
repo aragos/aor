@@ -393,6 +393,23 @@ confirmation attempt, change the prepared recipe, reuse old validation as a gate
 browser policy. The [capacity analysis](../scripts/card_advantage_capacity.py) compares equally
 weighted original worlds; narrower models and lower prediction error alone do not establish strength.
 
+The [action-priority evaluation driver](../scripts/card_advantage_priority_experiment.py) evaluates
+one already-fitted C1 control after the compact model fails its common-development gate. It performs
+no new fitting. Freeze the exact candidate, an outcome-free frequency calibration on original C1
+development observations, fresh world banks and a separate three-hour clock before running:
+
+```sh
+python3 .aor-training/executors/card-priority/bin/card_advantage_priority_experiment.py \
+  --lab .aor-training/card-priority --protocol .aor-training/card-priority/window.json
+```
+
+The paired 256-world screen has a thirty-minute cap and advances only with a mean win-share gain
+of at least two percentage points. Its confidence interval is descriptive. Passing leads to the existing independent
+strength and repeated-opponent gates, with no additional samples after a failure. Evaluation uses
+six workers and batches of eight only with the byte-identical, parity-profiled native runtime.
+Resume preserves the original clock and completed per-game evidence; no result activates a browser
+model. The driver-local screen leaves existing experiment stage definitions unchanged.
+
 ## Token-purchase continuation learning
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
