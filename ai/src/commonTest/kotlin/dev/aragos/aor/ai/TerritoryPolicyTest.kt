@@ -9,6 +9,14 @@ import kotlin.test.assertNotEquals
 /** The same numerical and signed-seed fixtures execute on JVM and JavaScript. */
 class TerritoryPolicyTest {
     @Test
+    fun expansionTwoDoesNotSilentlyChangeTheExistingPpoContract() {
+        assertFailsWith<IllegalArgumentException> {
+            model(TerritoryPhase.EXPANSION)
+                .copy(encoderVersion = TerritoryEncoder.EXPANSION_2.version)
+        }
+    }
+
+    @Test
     fun zeroActorKeepsTheExactPriorForBothTypedPhases() {
         for (phase in TerritoryPhase.entries) {
             val result =

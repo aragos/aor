@@ -143,6 +143,14 @@ object TokenObservationEncoder {
  */
 object ExpansionObservationEncoder {
     const val ENCODER_VERSION = "aor-expansion-observation-1"
+    internal val cathedralUsageNames =
+        (0..5).flatMap { owner ->
+            (0..5)
+                .filter { it != owner }
+                .map { opponent ->
+                    "cathedral.used.role.$owner.role.$opponent"
+                }
+        }
     private val amounts =
         listOf(
             "cost",
@@ -174,9 +182,18 @@ object ExpansionObservationEncoder {
             "unknownCard",
         )
 
-    fun dictionary(catalog: PublicCatalog): TerritoryFeatureDictionary =
-        TerritoryFeatureDictionary(
-            RawActorState.dictionary(catalog, listOf(TerritoryPhase.EXPANSION.decision)),
+    /** Version 2 adds public current-turn Cathedral usage; version 1 is byte-for-byte unchanged. */
+    fun dictionary(
+        catalog: PublicCatalog,
+        encoder: TerritoryEncoder = TerritoryEncoder.EXPANSION_1,
+    ): TerritoryFeatureDictionary {
+        require(encoder.phase == TerritoryPhase.EXPANSION) {
+            "An expansion dictionary requires an expansion encoder."
+        }
+        val raw = RawActorState.dictionary(catalog, listOf(TerritoryPhase.EXPANSION.decision))
+        return TerritoryFeatureDictionary(
+            if (encoder == TerritoryEncoder.EXPANSION_2) (raw + cathedralUsageNames).sorted()
+            else raw,
             (amounts +
                     flags +
                     listOf("pass", "place", "attack", "reduce", "buyCard").map { "kind.$it" } +
@@ -185,13 +202,18 @@ object ExpansionObservationEncoder {
                 .distinct()
                 .sorted(),
         )
+    }
 
     fun from(
         view: GameView,
         seat: PlayerId,
         observation: BotObservation,
         baselineCommand: String,
+        encoder: TerritoryEncoder = TerritoryEncoder.EXPANSION_1,
     ): TerritoryObservation {
+        require(encoder.phase == TerritoryPhase.EXPANSION) {
+            "Expansion observations require an expansion encoder."
+        }
         require(
             view.stage == Stage.EXPANSION &&
                 observation.decision == TerritoryPhase.EXPANSION.decision &&
@@ -307,9 +329,23 @@ object ExpansionObservationEncoder {
                 features.add("cashAfter", self.cash / 200.0)
                 TerritoryAction(candidate.command, features.values.toMap())
             }
+        val raw = RawActorState.from(view, seat, observation.decision)
+        val state =
+            if (encoder == TerritoryEncoder.EXPANSION_2) {
+                buildMap {
+                    putAll(raw)
+                    view.cathedralPairs
+                        .filter { it.used }
+                        .forEach { pair ->
+                            val owner = RawActorState.role(view, seat, pair.owner)
+                            val opponent = RawActorState.role(view, seat, pair.opponent)
+                            put("cathedral.used.$owner.$opponent", 1.0)
+                        }
+                }
+            } else raw
         return TerritoryObservation(
-            ENCODER_VERSION,
-            RawActorState.from(view, seat, observation.decision),
+            encoder.version,
+            state,
             actions,
             actions.indexOfFirst { it.command == baselineCommand },
         )

@@ -20,10 +20,25 @@ ARCHITECTURE = "aor-territory-linear-q-1"
 SELECTORS = {phase: "aor-" + phase + "-value-policy-1" for phase in PHASES}
 SALTS = {"token": 0x243f6a88, "expansion": 0x85a308d3}
 CONTRACTS = {"token": b.TOKEN_CONTRACT, "expansion": b.EXPANSION_CONTRACT}
+EXPANSION_ENCODER_2 = "aor-expansion-observation-2"
+EXPANSION_CONTRACT_2 = replace(b.EXPANSION_CONTRACT, encoder=EXPANSION_ENCODER_2)
+CATHEDRAL_USAGE_FEATURES = tuple(sorted(
+    f"cathedral.used.role.{owner}.role.{opponent}"
+    for owner in range(6) for opponent in range(6) if owner != opponent))
 PARAMETERS = ("stateWeights", "stateBias", "actionWeights", "actionBias", "outputWeights", "outputBias")
 MODEL_FIELDS = set(PARAMETERS) | {"schemaVersion", "architecture", "encoderVersion", "hiddenSize",
                                 "stateFeatureNames", "actionFeatureNames"}
 MAGNITUDE_LIMIT = 1e6
+
+
+def contract_for(phase, encoder_version):
+    """Q-only input opt-in; never relabel the shared PPO contracts or legacy observations."""
+    b.require(phase in PHASES, "Unknown territory Q phase.")
+    if phase == 'expansion' and encoder_version == EXPANSION_ENCODER_2:
+        return EXPANSION_CONTRACT_2
+    contract = CONTRACTS[phase]
+    b.require(encoder_version == contract.encoder, "Unsupported typed Q encoder version.")
+    return contract
 TargetSteps = Literal[1, 16, "terminal"]
 
 
@@ -69,13 +84,16 @@ def finite_values(values):
 def validate_model(model, phase):
     b.require(phase in PHASES and isinstance(model, dict) and set(model) == MODEL_FIELDS,
               "A typed Q model requires the exact distinct linear-Q field set.")
+    contract_for(phase, model['encoderVersion'])
     b.require(type(model['schemaVersion']) is int and model['schemaVersion'] == 1
               and model['architecture'] == ARCHITECTURE
-              and model['encoderVersion'] == CONTRACTS[phase].encoder
               and type(model['hiddenSize']) is int and model['hiddenSize'] == 64,
               "Unsupported typed Q architecture, encoder or hidden size.")
     states = b.names(model['stateFeatureNames'], "Q state features", 8192)
     actions = b.names(model['actionFeatureNames'], "Q action features", 512)
+    if model['encoderVersion'] == EXPANSION_ENCODER_2:
+        b.require(set(CATHEDRAL_USAGE_FEATURES) <= set(states),
+                  "Expansion encoder2 requires every public Cathedral usage column.")
     sizes = dict(stateWeights=64*len(states), stateBias=64, actionWeights=64*len(actions),
                  actionBias=64, outputWeights=64)
     for name, size in sizes.items():
@@ -87,7 +105,7 @@ def validate_model(model, phase):
 
 
 def initialize(schema, seed, phase):
-    old = b.initialize(schema, seed, contract=CONTRACTS[phase])
+    old = b.initialize(schema, seed, contract=contract_for(phase, schema.get('encoderVersion')))
     model = {key: old[key] for key in ("encoderVersion", "hiddenSize", "stateFeatureNames", "actionFeatureNames",
                                       "stateWeights", "stateBias", "actionWeights", "actionBias")}
     return validate_model(dict(model, schemaVersion=1, architecture=ARCHITECTURE,
@@ -96,7 +114,7 @@ def initialize(schema, seed, phase):
 
 def reference_forward(model, observation, phase):
     validate_model(model, phase)
-    b.validate_observation(observation, model, contract=CONTRACTS[phase])
+    b.validate_observation(observation, model, contract=contract_for(phase, model['encoderVersion']))
     x = [observation['stateFeatures'].get(name, 0.) for name in model['stateFeatureNames']]
     h = [math.tanh(model['stateBias'][i] + sum(model['stateWeights'][i*len(x)+j]*v
                                              for j, v in enumerate(x))) for i in range(64)]
@@ -120,7 +138,8 @@ class ActionValue(b.nn.Module):
                          if key not in ('architecture', 'outputWeights', 'outputBias')}
         encoder_model.update(baselineProbability=.97, actorWeights=[0.]*64,
                              valueWeights=[0.]*64, valueBias=0.)
-        object.__setattr__(self, 'encoder', b.ResidualPolicy(encoder_model, CONTRACTS[phase]))
+        object.__setattr__(self, 'encoder', b.ResidualPolicy(
+            encoder_model, contract_for(phase, model['encoderVersion'])))
         for name in PARAMETERS:
             value = b.torch.tensor(model[name], dtype=b.DTYPE)
             if name == 'stateWeights': value = value.reshape(64, len(model['stateFeatureNames']))

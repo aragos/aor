@@ -17,13 +17,18 @@ b=t.backend
 def put(path,value):b.atomic_json(path,value)
 
 
-def fixture(root,models=None,frozen_path=None,seed=13,empty=False):
+def fixture(root,models=None,frozen_path=None,seed=13,empty=False,expansion2=False):
     root=Path(root).resolve()
     directory,bundle=ppo_fixture(root,frozen_path=frozen_path)
     own=t.read(bundle)
     paths={}
     for phase in t.PHASES:
         if models is None:
+            if phase=='expansion' and expansion2:
+                schema=t.read(root/phase/'schema.json')
+                schema.update(encoderVersion=t.q.EXPANSION_ENCODER_2,
+                    stateFeatureNames=sorted(schema['stateFeatureNames']+list(t.q.CATHEDRAL_USAGE_FEATURES)))
+                put(root/phase/'schema.json',schema)
             t.initialize_model(root/phase/'schema.json',103,phase,root/('q-'+phase))
             paths[phase]=root/('q-'+phase)/'policy.json'
         else:paths[phase]=Path(models[phase])
@@ -52,6 +57,9 @@ def fixture(root,models=None,frozen_path=None,seed=13,empty=False):
                 row.pop('actorSeed');row.pop('behaviorLogProbability');row.pop('behaviorValue')
                 row['botSeed']=t.bot_seed(game['gameSeed'],row['batchStartNumber'],index)
                 row['selectorSeed']=t.signed(row['botSeed']^t.q.SALTS[phase])
+                row['observation']['encoderVersion']=t.read(paths[phase])['encoderVersion']
+                if phase=='expansion' and expansion2:
+                    row['observation']['stateFeatures']['cathedral.used.role.0.role.1']=1.
                 values=t.q.reference_forward(t.read(paths[phase]),row['observation'],phase)
                 probabilities=t.q.probabilities(values,row['observation'])
                 row['selectedIndex']=b.select(probabilities,b.selection_uniform(row['selectorSeed']))
