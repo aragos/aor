@@ -93,10 +93,13 @@ def intervals(values):
     return result
 
 
-def analyze(stage, seeds, records, vanilla=False, require_vanilla_superiority=False):
+def analyze(stage, seeds, records, vanilla=False, require_vanilla_superiority=False, minimum_vanilla_gain=0.):
     require(type(vanilla) is bool and type(require_vanilla_superiority) is bool
             and (not require_vanilla_superiority or vanilla),
             'Vanilla superiority requires the declared frozen fifth arm.')
+    require(type(minimum_vanilla_gain) in (int, float) and math.isfinite(minimum_vanilla_gain)
+            and minimum_vanilla_gain >= 0 and (minimum_vanilla_gain == 0 or require_vanilla_superiority),
+            'A positive vanilla gain gate requires its frozen superiority comparator.')
     arms = (*ARMS[:-1], 'vanilla', 'candidate') if vanilla else ARMS
     controls = arms[:-1]
     require(stage in ('development', 'confirmation'), 'Statistics require every declared arm.')
@@ -127,14 +130,19 @@ def analyze(stage, seeds, records, vanilla=False, require_vanilla_superiority=Fa
                           'Both previously failed card payoff-reversal gates remain unresolved.'])
     if vanilla:
         report['vanillaSuperiorityRequired'] = require_vanilla_superiority
+        if minimum_vanilla_gain > 0:
+            report['minimumGainVsVanilla'] = minimum_vanilla_gain
         report['limits'].append(
+            'The frozen vanilla checkpoint has 32 updates; the candidate is trained beyond that checkpoint.'
+            if minimum_vanilla_gain > 0 else
             'The frozen vanilla checkpoint completed the same 32 updates; superiority is required.'
             if require_vanilla_superiority else
             'The frozen vanilla run stopped before 32 updates; its unequal-budget comparison is descriptive only.')
     if stage == 'development':
         report['eligible'] = (pooled['f']['mean'] >= DEVELOPMENT['minimumGainVsF']
                               and pooled['initial']['mean'] > 0 and pooled['priority64']['mean'] > 0
-                              and (not require_vanilla_superiority or pooled['vanilla']['mean'] > 0))
+                              and (not require_vanilla_superiority or pooled['vanilla']['mean'] > 0)
+                              and (minimum_vanilla_gain == 0 or pooled['vanilla']['mean'] >= minimum_vanilla_gain))
         report['harmful'] = pooled['f']['mean'] < -.10 and pooled['f']['upper95'] < 0
     else:
         populations = [versus['f']['populations'][name]['winShare'] for name in POPULATIONS]
@@ -145,6 +153,8 @@ def analyze(stage, seeds, records, vanilla=False, require_vanilla_superiority=Fa
                      boundedPopulationLoss=all(value['lower95'] > -.03 for value in populations))
         if require_vanilla_superiority:
             gates['lower95VsVanilla'] = pooled['vanilla']['lower95'] > 0
+        if minimum_vanilla_gain > 0:
+            gates['minimumGainVsVanilla'] = pooled['vanilla']['mean'] >= minimum_vanilla_gain
         report.update(gates=gates, passed=all(gates.values()))
     return report
 
@@ -227,10 +237,10 @@ def decode(bound):
     return result
 
 
-def finish_analysis(stage, seeds, bounds, vanilla=False, require_vanilla_superiority=False):
+def finish_analysis(stage, seeds, bounds, vanilla=False, require_vanilla_superiority=False, minimum_vanilla_gain=0.):
     # Every source completion was checked by the caller before reaching decode().
     records = [row for bound in bounds for row in decode(bound)]
-    report = analyze(stage, seeds, records, vanilla, require_vanilla_superiority)
+    report = analyze(stage, seeds, records, vanilla, require_vanilla_superiority, minimum_vanilla_gain)
     for bound in bounds:
         require(all(sha(bound['directory'] / name) == value for name, value in bound['metadataHashes'].items())
                 and all(sha(bound['directory'] / row['file']) == row['sha256'] for row in bound['entries'])
@@ -244,17 +254,18 @@ def finish_analysis(stage, seeds, bounds, vanilla=False, require_vanilla_superio
 
 def analyze_development_completed(seeds, controls_dir, controls_source, candidate_dir, candidate_source,
                                   base, initial, model, priority, vanilla=None,
-                                  require_vanilla_superiority=False):
+                                  require_vanilla_superiority=False, minimum_vanilla_gain=0.):
     controls = make_source('controls', seeds, {'initial': initial}, base, priority, vanilla)
     candidate = make_source('development', seeds, {'candidate': model}, base, priority)
     bounds = [bind_completed(controls_dir, controls_source, controls),
               bind_completed(candidate_dir, candidate_source, candidate)]
-    return finish_analysis('development', seeds, bounds, vanilla is not None, require_vanilla_superiority)
+    return finish_analysis('development', seeds, bounds, vanilla is not None, require_vanilla_superiority,
+                           minimum_vanilla_gain)
 
 
 def analyze_completed(stage, seeds, native_dir, source_path, base, initial, model, priority,
-                      vanilla=None, require_vanilla_superiority=False):
+                      vanilla=None, require_vanilla_superiority=False, minimum_vanilla_gain=0.):
     require(stage == 'confirmation', 'Standalone final analysis requires the complete fresh bank.')
     expected = make_source(stage, seeds, {'initial': initial, 'candidate': model}, base, priority, vanilla)
     return finish_analysis(stage, seeds, [bind_completed(native_dir, source_path, expected)],
-                           vanilla is not None, require_vanilla_superiority)
+                           vanilla is not None, require_vanilla_superiority, minimum_vanilla_gain)

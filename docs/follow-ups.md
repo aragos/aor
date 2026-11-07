@@ -548,3 +548,21 @@ label that comparison descriptive because training budgets differ, retaining the
 F/initial/priority gates. The maximum is 15,360 executions on 9,472 fresh worlds within the same
 three-hour limit. Fixed optimizer seeds hold numerical randomness settings constant; fresh
 trajectories mean this is a comparison of resulting policies, not a single-factor causal test.
+
+
+A conditional `vanilla-continuation-1` profile may extend the exact vanilla32 actor only after the
+physical-card-reference trial finishes without qualification. It carries the original model and
+Adam checkpoint into 32 further updates, with zero reference coefficient throughout. Whole odd
+training batches face F; even batches face frozen vanilla32. Every seat retains F priors and
+purchase32. Existing routing and snapshot tests cover that optional rival actor; native code and
+inference remain unchanged.
+
+Label these as continuation updates 1–32 and lifetime updates 33–64. At continuation update 16,
+require a newly accepted epoch and actor bytes different from vanilla32; inherited KL against
+the original recommendation prior does not establish new learning. All four development
+checkpoints may qualify, requiring at least three percentage points over vanilla32 alongside
+the original gates. Final confirmation also requires that three-point gain and a positive lower
+95% confidence bound versus vanilla32, plus every existing F/initial/priority/population gate.
+Keep the same three-hour budget and 15,360-execution ceiling. This is the last isolated card
+budget extension; failure leads to reconsidering the architecture, with no automatic activation,
+replacement checkpoint or sample topup.
