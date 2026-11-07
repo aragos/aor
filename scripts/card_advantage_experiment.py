@@ -179,6 +179,17 @@ def completed_native(directory, source):
     return True
 
 
+def fit_config(protocol):
+    """Normalize the optional capacity setting while preserving the original 64-unit recipe."""
+    settings = protocol['fit']
+    return dict(learningRate=settings['learningRate'], weightDecay=settings['weightDecay'],
+                maxGradientNorm=settings['gradientNormLimit'],
+                originsPerBatch=settings['wholeOriginsPerBatch'], epochs=settings['epochs'],
+                checkpoints=settings['checkpoints'], seeds=settings['initializationSeeds'],
+                threads=settings['threads'], maxSeconds=settings['maximumSecondsPerCycle'],
+                activeHidden=settings.get('activeHidden', 64))
+
+
 def completed_fit(fit, collection, protocol, scripts):
     """A passing local gate belongs to this exact complete collection and learner."""
     report = read(fit / 'finished.json')
@@ -206,13 +217,8 @@ def completed_fit(fit, collection, protocol, scripts):
     require(identity['sourceHashes'] == {str((scripts / name).resolve()): sha(scripts / name)
                                         for name in learner_files},
             'Completed fit used a different numerical implementation.')
-    settings = protocol['fit']
-    expected_config = dict(learningRate=settings['learningRate'], weightDecay=settings['weightDecay'],
-                           maxGradientNorm=settings['gradientNormLimit'],
-                           originsPerBatch=settings['wholeOriginsPerBatch'], epochs=settings['epochs'],
-                           checkpoints=settings['checkpoints'], seeds=settings['initializationSeeds'],
-                           threads=settings['threads'], maxSeconds=settings['maximumSecondsPerCycle'])
-    require(identity['config'] == expected_config, 'Completed fit used a different frozen recipe.')
+    actual_config = dict(identity['config'], activeHidden=identity['config'].get('activeHidden', 64))
+    require(actual_config == fit_config(protocol), 'Completed fit used a different frozen recipe.')
     require(all(sha(fit / (name + '.json')) == report['models'][name]['sha256']
                 for name in ('full', 'action-priority'))
             and sha(fit / 'frequency-control.json') == report['frequencyControlSha256'],
@@ -248,8 +254,8 @@ class Window:
         self.runtime = self.scripts.parent / 'lib'
 
     def status(self, stage, **details):
-        value = dict(stage=stage, updatedAt=time.time(), deadline=self.deadline,
-                     preflightSha256=self.preflight_hash, **details)
+        value = {**details, 'stage': stage, 'updatedAt': time.time(), 'deadline': self.deadline,
+                 'preflightSha256': self.preflight_hash}
         document(self.lab / 'window-status.json', value, immutable=False)
         print(json.dumps(value), flush=True)
 
@@ -291,6 +297,9 @@ class Window:
                         child.wait(timeout=5)
 
     def native(self, mode, name, source, seconds):
+        batch_size = self.protocol.get('evaluation', {}).get('batchSize', 1) if mode == 'evaluate' else 1
+        require(type(batch_size) is int and 1 <= batch_size <= 64,
+                'Evaluation batch size must be an integer from 1 through 64.')
         path = self.lab / (name + '-source.json')
         document(path, source)
         output = self.lab / name
@@ -300,6 +309,8 @@ class Window:
                    '--mode', mode, '--source', str(path), '--output', str(output),
                    '--runtime', str(self.runtime), '--workers', '6', '--hours', str(seconds / 3600),
                    '--deadline-epoch', str(self.deadline), '--data-root', str(self.lab)]
+        if batch_size != 1:
+            command.extend(['--batch-size', str(batch_size)])
         clock = read(output / 'started.json') if (output / 'started.json').exists() else None
         # The native supervisor owns exact stage timing; give shutdown a small outer grace.
         deadline = clock['deadline'] + 15 if clock else time.time() + seconds + 15
