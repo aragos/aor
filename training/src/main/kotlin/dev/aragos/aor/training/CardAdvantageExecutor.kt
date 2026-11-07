@@ -53,7 +53,11 @@ internal class CardAdvantageExecutor(
         )
     }
 
-    fun commands(state: GameState, batchStart: Int): Map<PlayerId, String> {
+    fun commands(
+        state: GameState,
+        batchStart: Int,
+        seeds: CardPolicySeedProvider? = null,
+    ): Map<PlayerId, String> {
         check(batchStart)
         val prompt = state.prompts().single()
         val actors =
@@ -66,7 +70,17 @@ internal class CardAdvantageExecutor(
             .mapIndexed { offset, actor ->
                 val seat = state.playerIds.indexOf(actor)
                 val observation = BotObservations.from(state, actor)
-                val seed = policySeed(request.seed, batchStart, seat)
+                val seed =
+                    seeds?.seed(
+                        batchStart + offset,
+                        batchStart,
+                        requireNotNull(state.turnNumber) {
+                            "Tail sampling requires an actual turn."
+                        },
+                        state.stage,
+                        observation.decision,
+                        seat,
+                    ) ?: policySeed(request.seed, batchStart, seat)
                 val controller =
                     requireNotNull(controllers[seat]) {
                         "Every seat requires its frozen controller."
@@ -103,18 +117,22 @@ internal class CardAdvantageExecutor(
     }
 
     /**
-     * Complete and replay a paired tail without changing absolute policy seeds or sealed batches.
+     * Complete and replay a paired tail. The default keeps absolute policy seeds and four-stream
+     * provenance unchanged; a separately versioned diagnostic may supply its policy seed provider
+     * and explicit chance start. Neither extension changes authority transitions or sealed batches.
      */
     fun finish(
         session: ExperimentSession,
         rootState: GameState,
         rootNumber: Int,
         replicate: Int,
+        seeds: CardPolicySeedProvider? = null,
+        chanceSeed: Long = CardAdvantageExecutor.chanceSeed(request.seed, replicate),
     ): CardAdvantageOutcome {
         while (session.state.stage != Stage.FINISHED) {
             val number = rootNumber + session.decisions
             check(number)
-            session.apply(commands(session.state, number), deadlineNanos)
+            session.apply(commands(session.state, number, seeds), deadlineNanos)
         }
         val canonical = session.entries.map(Entry::toText)
         val replay =
@@ -147,7 +165,7 @@ internal class CardAdvantageExecutor(
             game.rankReward(request.seat),
             game.scores.map(PilotReplayScore::from),
             game.steps,
-            CardAdvantageExecutor.chanceSeed(request.seed, replicate),
+            chanceSeed,
             CardAdvantageExecutor.hash(canonical),
         )
     }

@@ -14,7 +14,11 @@ import java.util.concurrent.CancellationException
 internal object CardAdvantageMain {
     fun run(arguments: List<String>) {
         val options = CardAdvantageOptions.parse(arguments)
-        if (options.mode == "card-advantage-collect") collect(options) else evaluate(options)
+        when (options.mode) {
+            "card-advantage-collect" -> collect(options)
+            "card-policy-coupling" -> collectCoupling(options)
+            else -> evaluate(options)
+        }
     }
 
     private fun collect(options: CardAdvantageOptions) {
@@ -94,6 +98,40 @@ internal object CardAdvantageMain {
                             CardContinuationCollector(input, deadline).collect(index)
                         )
                 CardContinuationArtifacts.validate(document, input, index)
+                CardTrajectoryFiles.save(path, document)
+            }
+        }
+    }
+
+    private fun collectCoupling(options: CardAdvantageOptions) {
+        val batchDeadline = options.indices?.let { deadline(options.hours) }
+        val input = CardPolicyCouplingInput.read(options.source)
+        if (options.describe) {
+            println(PurchaseJson.mapper.writeValueAsString(input.manifest()))
+            return
+        }
+        val indices =
+            options.indices
+                ?: listOf(
+                    requireNotNull(options.index) {
+                        "A coupling diagnostic requires an explicit origin index."
+                    }
+                )
+        require(indices.all { it in input.origins.indices }) {
+            "Every coupling index must belong to its frozen source before any work starts."
+        }
+        val inputs =
+            listOf(input.source, input.environment.baseline.path, input.environment.purchase.path)
+        for (index in indices) {
+            if (batchDeadline != null) checkDeadline(batchDeadline)
+            job(options, index, "origin", inputs, batchDeadline) { path, deadline ->
+                if (batchDeadline != null) checkDeadline(batchDeadline)
+                val document =
+                    CardTrajectoryFiles.readIfPresent(path)
+                        ?: PurchaseJson.mapper.valueToTree<JsonNode>(
+                            CardPolicyCouplingCollector(input, deadline).collect(index)
+                        )
+                CardPolicyCouplingArtifacts.validate(document, input, index)
                 CardTrajectoryFiles.save(path, document)
             }
         }
@@ -210,7 +248,14 @@ internal data class CardAdvantageOptions(
                 "Advantage options may not repeat or contain unknown fields."
             }
             val mode = requireNotNull(values["--mode"]) { "Advantage mode is required." }
-            require(mode in setOf("card-advantage-collect", "card-advantage-evaluate")) {
+            require(
+                mode in
+                    setOf(
+                        "card-advantage-collect",
+                        "card-advantage-evaluate",
+                        "card-policy-coupling",
+                    )
+            ) {
                 "Unknown advantage execution mode."
             }
             val source =

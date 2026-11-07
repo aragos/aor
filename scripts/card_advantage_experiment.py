@@ -142,10 +142,16 @@ def completed_native(directory, source):
     check_model(manifest['baseline'], specification['baseline'], 'baseline.json')
     check_model(manifest['frozenPurchasePolicy'], specification['frozenPurchasePolicy'],
                 'frozen-purchase-policy.json')
-    if manifest['kind'] in ('card-advantage-collect', 'card-continuation-diagnostic'):
+    if manifest['kind'] in ('card-advantage-collect', 'card-continuation-diagnostic', 'card-policy-coupling'):
         require(manifest['origins'] == specification['origins'],
                 'Completed root requests differ from the prospective source.')
-        if specification['continuation'] is None:
+        if manifest['kind'] == 'card-policy-coupling':
+            require(specification['kind'] == manifest['kind'] and specification['schemaVersion'] == 1
+                    and specification['collection'] == manifest['collection'] ==
+                    {'kind': 'policy-seed-coupling-1', 'replicates': 8, 'schedules': ['L', 'G', 'S']}
+                    and manifest['continuation'] is None,
+                    'Coupling completion must preserve its separate source kind, plan and F continuation.')
+        elif specification['continuation'] is None:
             require(manifest['continuation'] is None, 'An F continuation cannot adopt another policy.')
         else:
             check_model(manifest['continuation'], specification['continuation'], 'continuation.json')
