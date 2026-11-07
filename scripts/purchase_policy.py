@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from collections import Counter
 from dataclasses import asdict, dataclass
 import gzip
 import hashlib
@@ -18,6 +19,7 @@ import math
 import os
 from pathlib import Path
 import random
+import re
 import sys
 import tempfile
 import time
@@ -32,6 +34,7 @@ HIDDEN = 64
 FEATURE_LIMIT = 16.0
 RESIDUAL_LIMIT = 20.0
 DTYPE = torch.float64
+CARD_REFERENCE_VERSION = "aor-card-physical-reference-1"
 PARAMETERS = (
     "stateWeights", "stateBias", "actionWeights", "actionBias",
     "actorWeights", "valueWeights", "valueBias",
@@ -412,9 +415,45 @@ class PurchasePolicy(ResidualPolicy):
         super().__init__(model, PURCHASE_CONTRACT)
 
 
+def card_reference_probabilities(commands):
+    """Equal mass per offered physical hand card and Pass, then per command within a card.
+
+    This uses the complete offered action list, including every target/protection variant of
+    the baseline's card. References identify physical cards, never stable card definitions.
+    Pass is a group only when offered. The reference changes the training objective only;
+    it is neither a sampling distribution nor an input feature.
+    """
+    require(isinstance(commands, (list, tuple)) and 1 <= len(commands) <= 1024,
+            "Card reference requires between 1 and 1024 offered commands.")
+    require(all(isinstance(command, str) and 1 <= len(command) <= 2000
+                and "\n" not in command and "\r" not in command for command in commands),
+            "Card reference commands must be bounded single-line strings.")
+    require(len(set(commands)) == len(commands), "Card reference commands must be distinct.")
+    groups = []
+    for command in commands:
+        if command == "pass":
+            groups.append("pass")
+            continue
+        match = re.fullmatch(r"play ([a-z][a-z0-9-]*)(?: .+)?", command)
+        require(match is not None, "Card reference requires offered Pass or play commands.")
+        groups.append("play " + match[1])
+    counts = Counter(groups)
+    return [1.0 / (len(counts) * counts[group]) for group in groups]
+
+
+def reference_kl(log_probability, reference):
+    """KL(reference || policy) for a fixed normalized reference and differentiable log pi."""
+    return (reference * (reference.log() - log_probability)).sum()
+
+
 @dataclass(frozen=True)
 class UpdateConfig:
-    """maxSeconds includes resume pauses; batchSize also respects the 16384-action allocation cap."""
+    """Fixed update identity, including the optional card-only physical-group KL objective.
+
+    maxSeconds includes resume pauses; batchSize respects the 16384-action allocation cap.
+    A zero cardReferenceKlCoefficient executes the original loss arithmetic exactly. A positive
+    value adds coefficient * mean_decision KL(reference || pi), independently of Shannon entropy.
+    """
     learningRate: float = 0.0003
     epochs: int = 4
     batchSize: int = 64
@@ -426,8 +465,19 @@ class UpdateConfig:
     seed: int = 17
     threads: int = 1
     maxSeconds: float = 900.0
+    cardReferenceKlCoefficient: float = 0.0
+    cardReferenceVersion: str = CARD_REFERENCE_VERSION
 
-    def validate(self):
+    def validate_reference(self, contract=None):
+        number(self.cardReferenceKlCoefficient, "cardReferenceKlCoefficient", 0, 1)
+        require(self.cardReferenceVersion == CARD_REFERENCE_VERSION,
+                "Unsupported card exploration reference version.")
+        require(self.cardReferenceKlCoefficient == 0 or contract is None
+                or contract.label == "card",
+                "A positive card reference KL coefficient is supported only for card updates.")
+        return self
+
+    def validate(self, contract=None):
         number(self.learningRate, "learningRate", 1e-8, 0.1)
         integer(self.epochs, "epochs", 1, 32)
         integer(self.batchSize, "batchSize", 1, 256)
@@ -439,7 +489,7 @@ class UpdateConfig:
         integer(self.seed, "seed", 0, 2**31 - 1)
         integer(self.threads, "threads", 1, 8)
         number(self.maxSeconds, "maxSeconds", 1, 86400)
-        return self
+        return self.validate_reference(contract)
 
 
 def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
@@ -448,6 +498,7 @@ def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
 
 
 def loss_for_rows(policy, rows, config):
+    config.validate_reference(policy.contract)
     probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
                           for logp, row in zip(probabilities, rows)])
@@ -457,7 +508,17 @@ def loss_for_rows(policy, rows, config):
     actor = clipped_policy_loss(chosen, old, advantages, config.clip).mean()
     critic = 0.5 * (values - returns).square().mean()
     entropy = torch.stack([-(value.exp() * value).sum() for value in probabilities]).mean()
-    return actor + config.valueCoefficient * critic - config.entropyCoefficient * entropy
+    loss = actor + config.valueCoefficient * critic - config.entropyCoefficient * entropy
+    if config.cardReferenceKlCoefficient == 0:
+        return loss
+    divergences = []
+    for logp, row in zip(probabilities, rows):
+        reference = row.get("_cardReference")
+        if reference is None:
+            reference = torch.tensor(card_reference_probabilities(
+                [action["command"] for action in row["observation"]["actions"]]), dtype=DTYPE)
+        divergences.append(reference_kl(logp, reference))
+    return loss + config.cardReferenceKlCoefficient * torch.stack(divergences).mean()
 
 
 def row_batches(rows, size):
@@ -681,11 +742,15 @@ def initial_checkpoint(identity, model):
 
 def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
            *, contract=PURCHASE_CONTRACT, entrypoint=None):
-    config.validate()
+    config.validate(contract)
     torch.set_num_threads(config.threads)
     torch.use_deterministic_algorithms(True)
     model = validate_model(read_json(model_path), contract=contract)
     rows, provenance = read_collection(collection_path, model_path, model, contract=contract)
+    if config.cardReferenceKlCoefficient > 0:
+        for row in rows:
+            row["_cardReference"] = torch.tensor(card_reference_probabilities(
+                [action["command"] for action in row["observation"]["actions"]]), dtype=DTYPE)
     identity = {"schemaVersion": 1, "actorVersion": contract.actor,
                 "modelSha256": file_digest(model_path), "data": provenance,
                 "config": asdict(config), "learnerSha256": file_digest(__file__),
