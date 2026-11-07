@@ -1,6 +1,7 @@
 """Finite equal-origin advantage fitting, frozen controls, and completed local diagnostics."""
 import argparse
 import copy
+from dataclasses import replace
 import math
 import json
 from pathlib import Path
@@ -54,9 +55,10 @@ def fit_member(schema, training, development, seed, config, output, identity, de
         a.require(checkpoint['identitySha256']==common.digest(identity),'Member checkpoint identity differs.')
     else:
         a.require(not (output/'epoch-started.json').exists(),'A started member lost its checkpoint; preserve evidence.')
-        checkpoint={'identitySha256':common.digest(identity),'epoch':0,'network':a.initialize(schema,seed),
+        checkpoint={'identitySha256':common.digest(identity),'epoch':0,'network':a.initialize(schema,seed,config.activeHidden),
                     'optimizer':None,'history':[],'bestEpoch':None,'bestLoss':None}
         common.save_checkpoint(path,checkpoint)
+    a.validate_padding(checkpoint['network'],schema,config.activeHidden)
     network=a.Network(schema,checkpoint['network'])
     optimizer=torch.optim.Adam(network.parameters(),lr=config.learningRate,weight_decay=config.weightDecay,foreach=False)
     if checkpoint['optimizer'] is not None: common.restore_optimizer(optimizer,checkpoint['optimizer'])
@@ -74,6 +76,7 @@ def fit_member(schema, training, development, seed, config, output, identity, de
                           history=checkpoint['history']+[record])
         common.save_checkpoint(path,checkpoint)
     best=common.read_json(output/f"epoch-{checkpoint['bestEpoch']}.json")
+    a.validate_padding(best,schema,config.activeHidden)
     immutable(output/'finished.json',{'identitySha256':common.digest(identity),'seed':seed,
         'selectedEpoch':checkpoint['bestEpoch'],'developmentMse':checkpoint['bestLoss'],
         'selectedNetworkSha256':common.file_digest(output/f"epoch-{checkpoint['bestEpoch']}.json")})
@@ -127,12 +130,12 @@ def local_metrics(ensemble,origins,control=None):
         'localGatePassed':mean>1e-12 and overridden>=16 and fraction is not None and fraction<=.25,
         'strengthQualified':False}
 
-def train(source,output,resume=False):
-    output=Path(output);torch.set_num_threads(a.CONFIG.threads);torch.use_deterministic_algorithms(True)
+def train(source,output,resume=False,config=a.CONFIG):
+    output=Path(output);torch.set_num_threads(config.threads);torch.use_deterministic_algorithms(True)
     dataset,provenance=data.read_collection(source,splits=('train','development'))
     a.require(dataset['train'] and dataset['development'],'Fitting requires training and development origins.')
     files=[Path(__file__),Path(a.__file__),Path(data.__file__),Path(common.__file__)]
-    identity={'kind':'card-advantage-fit','schemaVersion':1,'config':json.loads(json.dumps(a.asdict(a.CONFIG))),
+    identity={'kind':'card-advantage-fit','schemaVersion':1,'config':json.loads(json.dumps(a.asdict(config))),
               'collection':provenance,'sourceHashes':{str(p.resolve()):common.file_digest(p) for p in files},
               'torchVersion':torch.__version__}
     identity_path=output/'identity.json'
@@ -143,11 +146,11 @@ def train(source,output,resume=False):
         identity=old
     else:
         a.require(not output.exists(),'Fresh fitting requires an unused directory.')
-        output.mkdir(parents=True);deadline=time.time()+a.CONFIG.maxSeconds
+        output.mkdir(parents=True);deadline=time.time()+config.maxSeconds
         identity['deadlineEpochSeconds']=deadline;common.atomic_json(identity_path,identity)
     schema=provenance['schema'];models={};member_reports={}
     for mode,mask in [('full',False),('action-priority',True)]:
-        artifact,reports=fit_ensemble(schema,dataset['train'],dataset['development'],output/mode,identity,deadline,mask)
+        artifact,reports=fit_ensemble(schema,dataset['train'],dataset['development'],output/mode,identity,deadline,mask,config)
         immutable(output/f'{mode}.json',artifact);models[mode]=a.Ensemble(artifact);member_reports[mode]=reports
     control,calibration=a.calibrate_frequency(models['full'],dataset['development'])
     immutable(output/'frequency-control.json',control);immutable(output/'frequency-calibration.json',calibration)
@@ -165,6 +168,7 @@ def train(source,output,resume=False):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--resume',action='store_true')
-    args=p.parse_args();report=train(args.source,args.output,args.resume)
+    p.add_argument('--active-hidden',type=int,default=a.HIDDEN,help='Train this many units; export the remaining units as exact zeros in the unchanged 64-unit wire.')
+    args=p.parse_args();report=train(args.source,args.output,args.resume,replace(a.CONFIG,activeHidden=args.active_hidden))
     print(json.dumps({'finished':str(args.output/'finished.json'),'validation':{k:{n:v[n] for n in ('origins','meanSelectedAdvantage','overriddenOrigins','localGatePassed')} for k,v in report['validation'].items()}},indent=2))
 if __name__=='__main__':main()
