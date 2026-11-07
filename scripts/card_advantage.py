@@ -2,6 +2,8 @@
 
 Only actor-safe observations enter networks. Absolute sigmoid outputs are not calibrated
 values: the supervised objective identifies differences relative to ordinary F actions.
+Version two multiplies separately encoded state/action units, giving each action term an
+explicit context-dependent sign. Version-one additive networks are not compatible artifacts.
 """
 import copy
 from dataclasses import dataclass, asdict
@@ -14,7 +16,7 @@ import purchase_policy as common
 import card_policy
 
 ENCODER = 'aor-card-observation-1'
-SELECTOR = 'aor-card-advantage-1'
+SELECTOR = 'aor-card-advantage-2'
 PROPOSAL = 'aor-card-proposals-1'
 FREQUENCY = 'aor-card-frequency-1'
 HIDDEN = 64
@@ -27,7 +29,7 @@ require = common.require
 
 @dataclass(frozen=True)
 class FitConfig:
-    learningRate: float = .0003
+    learningRate: float = .003
     weightDecay: float = .0001
     maxGradientNorm: float = 1.0
     originsPerBatch: int = 16
@@ -123,6 +125,10 @@ def identity_feature(name):
     """Action identity/explicit choice parameters only; excludes quoted/state-derived effects."""
     return name.startswith(('kind.', 'card.', 'cardKind.', 'choice.', 'target.')) or name == 'protection'
 
+def ablation_state_feature(name):
+    """The eligible-scope constant prevents a dead zero-head product; it carries no context."""
+    return name == 'cardWindow.normal'
+
 @dataclass
 class Group:
     state: torch.Tensor
@@ -142,7 +148,8 @@ def prepare(observation, seed, schema, targets=None, identifier='', ablation=Fal
     validate_schema(schema)
     common.validate_observation(observation, schema, contract=card_policy.CONTRACT)
     indices = proposals(observation, seed)
-    state = torch.tensor([0.0 if ablation else observation['stateFeatures'].get(name, 0.0)
+    state = torch.tensor([0.0 if ablation and not ablation_state_feature(name)
+                          else observation['stateFeatures'].get(name, 0.0)
                           for name in schema['stateFeatureNames']], dtype=torch.float64)
     actions = torch.tensor([[observation['actions'][i]['features'].get(name, 0.0)
                             if not ablation or identity_feature(name) else 0.0
@@ -172,8 +179,8 @@ class Network(nn.Module):
         state = torch.stack([g.state for g in groups]); action = torch.cat([g.actions for g in groups])
         owners = torch.tensor([i for i,g in enumerate(groups) for _ in g.indices], dtype=torch.long)
         hidden = torch.tanh(state @ self.stateWeights.T + self.stateBias)
-        action_hidden = torch.tanh(hidden[owners] + action @ self.actionWeights.T + self.actionBias)
-        values = torch.sigmoid(action_hidden @ self.outputWeights + self.outputBias)
+        action_hidden = torch.tanh(action @ self.actionWeights.T + self.actionBias)
+        values = torch.sigmoid((hidden[owners] * action_hidden) @ self.outputWeights + self.outputBias)
         return list(values.split([len(g.indices) for g in groups]))
 
 def loss(network, origins):
@@ -216,8 +223,8 @@ def scalar_values(schema, member, group):
     hidden=[math.tanh(member['stateBias'][u]+sum(member['stateWeights'][u*len(state)+i]*x for i,x in enumerate(state))) for u in range(HIDDEN)]
     result=[]
     for action in actions:
-        z=[math.tanh(hidden[u]+member['actionBias'][u]+sum(member['actionWeights'][u*len(action)+i]*x for i,x in enumerate(action))) for u in range(HIDDEN)]
-        logit=member['outputBias']+sum(w*x for w,x in zip(member['outputWeights'],z))
+        z=[math.tanh(member['actionBias'][u]+sum(member['actionWeights'][u*len(action)+i]*x for i,x in enumerate(action))) for u in range(HIDDEN)]
+        logit=member['outputBias']+sum(w*h*x for w,h,x in zip(member['outputWeights'],hidden,z))
         result.append(1/(1+math.exp(-logit)) if logit>=0 else math.exp(logit)/(1+math.exp(logit)))
     return result
 
@@ -259,7 +266,11 @@ def calibrate_frequency(ensemble, origins):
         'probabilityNormalization':scale,'outcomeUse':False}
 
 def materialize_ablation(member, schema):
-    result=copy.deepcopy(member); result['stateWeights']=[0.0]*len(result['stateWeights'])
+    """Export a context-free control with only its fixed normal-window state input retained."""
+    result=copy.deepcopy(member); state_width=len(schema['stateFeatureNames'])
+    for unit in range(HIDDEN):
+        for column,name in enumerate(schema['stateFeatureNames']):
+            if not ablation_state_feature(name): result['stateWeights'][unit*state_width+column]=0.0
     width=len(schema['actionFeatureNames'])
     for unit in range(HIDDEN):
         for column,name in enumerate(schema['actionFeatureNames']):

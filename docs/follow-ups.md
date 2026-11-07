@@ -251,7 +251,9 @@ artifact as a different policy without a new selector identity. Keep the qualifi
 behavior unchanged. The selector should have a single inference implementation shared by JVM and JS.
 
 Fit `q(s,a) - q(s,b)` to the paired difference with squared error, using a bounded sigmoid action-value
-head. Weight each original world equally, then its decision groups and action pairs equally. Siblings
+head with explicit state–action interaction: `h=tanh(Ws*s+bs)`, `g=tanh(Wa*a+ba)` and
+`q=sigmoid(w*(h*g)+bias)`. The separately versioned selector rejects the earlier additive-head
+artifacts. Weight each original world equally, then its decision groups and action pairs equally. Siblings
 and chance replicas are dependent samples. Absolute q values are not identified by a difference loss
 and must not be described as calibrated win probabilities.
 
@@ -285,8 +287,9 @@ All descendants of an origin stay in one split. Preserve all action returns, inc
 ties; do not produce labels naming each hidden world's best action. Decode outcomes only after the
 declared collection completes and its completion hashes validate.
 
-Fit a matched action-priority ablation that omits state features and context-dependent action quotes,
-while retaining the same F reference and legal/proposal machinery. Also freeze a control calibrated
+Fit a matched action-priority ablation that omits varying state features and context-dependent action
+quotes, retaining only the constant normal-window input so its interaction head can learn. Keep the
+same F reference and legal/proposal machinery. Also freeze a control calibrated
 on development observations to match the candidate's overall override and Pass/other-card frequencies,
 using no learned state-dependent preferences. Do not recalibrate either control on validation or
 confirmation outcomes. Report realized frequencies, origin-weighted loss against zero advantage,
