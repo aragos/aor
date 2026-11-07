@@ -48,14 +48,17 @@ class Fixture:
             {'name':'breadth','seeds':[r['seed'] for r in self.requests]},
             {'name':breadth.SCREEN,'seeds':list(range(20000,20256))},
             {'name':'primary-confirmation','seeds':list(range(21000,22024))},
-            {'name':'rival-robustness','seeds':list(range(23000,23256))}]))
+            {'name':'rival-robustness','seeds':list(range(23000,23256))},
+            {'name':breadth.COMPARISON,'seeds':list(range(24000,25024))}]))
         start=time.time()-10;iso=lambda value:datetime.fromtimestamp(value,timezone.utc).isoformat()
         put(self.lab/'clock.json',dict(startedAt=iso(start),deadline=iso(start+18000),
             collectionAdmissionDeadline=iso(start+18000),latestNewCollection=iso(start),
             originalAllowanceSeconds=18000,renewOnResume=False))
         prior=self.root/'priority';put(prior/'preflight.json',{'readyForCollection':True})
+        put(prior/'candidate.json',{'fixed':'preceding priority64'})
         put(prior/'window-result.json',dict(preflightSha256=experiment.sha(prior/'preflight.json'),
-            disposition='priority-screen-gate-failed',browserActivated=False))
+            disposition='independent-qualification-failed',browserActivated=False,
+            finalist={'model':str(prior/'candidate.json'),'modelSha256':experiment.sha(prior/'candidate.json')}))
         profile=self.root/'profile';put(profile/'protocol.json',{'consumedWorlds':64})
         put(profile/'report.json',dict(passed=True,admitted=True,protocolSha256=experiment.sha(profile/'protocol.json'),
             worlds=64,newWorlds=0,compressedRecordsExactlyEqual=64,legacyRecordsExactlyEqualExceptSignature=2,
@@ -67,12 +70,14 @@ class Fixture:
             collection={'maximumSeconds':7200,'batchSize':8,'plan':breadth.PLAN},coverage=breadth.COVERAGE,
             fit=fit_recipe(),screen={'worlds':256,'minimumWinShareGain':.02,'maximumSeconds':1800},
             evaluation={'batchSize':8,'maximumSecondsPerStage':7200},localGate=breadth.LOCAL_GATE,
+            comparison={'worlds':1024,'positiveLower95':True,'maximumSeconds':7200},
             resources={'minimumDiskFreeBytes':8*1024**3,'maximumNewDataBytes':4*1024**3},
             prerequisites={'priorityPreflight':self.entry(prior/'preflight.json'),
-                'priorityResult':self.entry(prior/'window-result.json'),'opsProfile':self.entry(profile/'report.json'),
+                'priorityResult':self.entry(prior/'window-result.json'),'priorityCandidate':self.entry(prior/'candidate.json'),
+                'opsProfile':self.entry(profile/'report.json'),
                 'opsProtocol':self.entry(profile/'protocol.json')})
         draft={key:self.protocol[key] for key in ('configuration','collection','coverage','fit','screen',
-            'evaluation','localGate','resources','seedReservation','originRequests')}
+            'evaluation','localGate','comparison','resources','seedReservation','originRequests')}
         put(self.lab/'recipe.json',draft);self.protocol['recipeDraft']=self.entry(self.lab/'recipe.json');self.save()
 
     def entry(self,path):
@@ -155,6 +160,63 @@ class CoverageAndGateTest(unittest.TestCase):
                 breadth.local_gate({'validation':{'full':dict(metrics(),**changed)}})
 
 
+def comparison_rows():
+    seeds=list(range(1024))
+    rows=[dict(seed=seed,controlledSeat=index%4,arm=arm,
+        terminal=dict(winShare=0.,rankReward=0.,reward=0.))
+        for index,seed in enumerate(seeds) for arm in ('candidate','priority')]
+    return seeds,rows
+
+
+class PriorityComparisonTest(unittest.TestCase):
+    def test_sources_preserve_fixed_pair_roles_and_three_f_rivals(self):
+        source=breadth.comparison_source({},list(range(1024)),Path('/full'),Path('/priority'))
+        self.assertEqual(2048,len(source['jobs']))
+        for index,job in enumerate(source['jobs']):
+            self.assertEqual(index,job['index']);self.assertEqual(index//2,job['seed'])
+            self.assertEqual((index//2)%4,job['seat']);self.assertEqual(['baseline']*4,job['rivals'])
+            self.assertEqual(('candidate','priority')[index%2],job['policy'])
+        self.assertEqual('/priority',source['policies']['priority']['path'])
+        self.assertNotIn(breadth.COMPARISON,experiment.evaluation.STAGES)
+
+    def test_positive_mean_without_positive_lower_bound_fails(self):
+        seeds,rows=comparison_rows()
+        for row in rows:
+            win=float((row['seed']<100 and row['arm']=='candidate') or
+                      (100<=row['seed']<199 and row['arm']=='priority'))
+            row['terminal']=dict(winShare=win,rankReward=win,reward=win)
+        result=breadth.analyze_comparison(seeds,rows)
+        self.assertGreater(result['comparisons']['winShare']['mean'],0)
+        self.assertFalse(result['passed'])
+
+    def test_zero_lower_bound_is_not_a_pass(self):
+        seeds,rows=comparison_rows();result=breadth.analyze_comparison(seeds,rows)
+        self.assertEqual(0,result['comparisons']['winShare']['lower95']);self.assertFalse(result['passed'])
+
+    def test_comparison_adds_no_extra_mean_margin_and_retains_exact_pairing(self):
+        seeds,rows=comparison_rows()
+        for row in rows:
+            win=float(row['seed']<5 and row['arm']=='candidate')
+            row['terminal']=dict(winShare=win,rankReward=win,reward=win)
+        result=breadth.analyze_comparison(seeds,list(reversed(rows)))
+        self.assertEqual(5/1024,result['comparisons']['winShare']['mean'])
+        self.assertTrue(result['passed'])
+
+    def test_incomplete_duplicate_or_wrong_role_grid_is_rejected(self):
+        seeds,rows=comparison_rows()
+        for broken in (rows[:-1],rows[:-1]+rows[:1],[dict(rows[0],controlledSeat=3)]+rows[1:]):
+            with self.assertRaisesRegex(ValueError,'exactly once'):
+                breadth.analyze_comparison(seeds,broken)
+
+    def test_invalid_metrics_and_inconsistent_composite_are_rejected(self):
+        seeds,rows=comparison_rows()
+        for terminal in (dict(winShare=float('nan'),rankReward=0,reward=0),
+                         dict(winShare=1,rankReward=0,reward=1),
+                         dict(winShare=True,rankReward=1,reward=1)):
+            with self.assertRaises(ValueError):
+                breadth.analyze_comparison(seeds,[dict(rows[0],terminal=terminal)]+rows[1:])
+
+
 class BreadthDriverTest(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.fixture=Fixture(Path(self.temp.name))
@@ -191,6 +253,19 @@ class BreadthDriverTest(unittest.TestCase):
         entry=self.fixture.protocol['prerequisites']['priorityResult'];path=Path(entry['file'])
         value=experiment.read(path);value['disposition']='qualified-for-integration';put(path,value);self.fixture.repin(entry)
         self.fixture.window()
+
+    def test_preceding_priority_model_cannot_be_replaced_after_pinning(self):
+        entry=self.fixture.protocol['prerequisites']['priorityCandidate'];path=Path(entry['file'])
+        put(path,{'replacement':True});self.fixture.repin(entry)
+        with self.assertRaisesRegex(ValueError,'exact preceding priority finalist'):
+            self.fixture.window()
+
+    def test_comparator_requires_the_exact_recorded_path_even_for_identical_bytes(self):
+        entry=self.fixture.protocol['prerequisites']['priorityCandidate'];old=Path(entry['file'])
+        copy=self.fixture.lab/'copied-priority.json';copy.write_bytes(old.read_bytes())
+        self.fixture.protocol['prerequisites']['priorityCandidate']=self.fixture.entry(copy);self.fixture.save()
+        with self.assertRaisesRegex(ValueError,'exact preceding priority finalist'):
+            self.fixture.window()
 
     def test_collection_source_contains_only_root_pair_plan_and_f_population(self):
         window=self.fixture.window()
@@ -232,11 +307,47 @@ class BreadthDriverTest(unittest.TestCase):
         with patch.object(window,'collect',return_value=(window.lab/'breadth',covered)), \
                 patch.object(window,'fit',return_value=(fit,{'validation':{'full':metrics()}})), \
                 patch.object(window,'screen',return_value={'mayContinue':True}) as screen, \
-                patch.object(window,'evaluate',side_effect=[{'passed':True},{'passed':False}]) as evaluate:
+                patch.object(window,'evaluate',side_effect=[{'passed':True},{'passed':False}]) as evaluate, \
+                patch.object(window,'compare_priority') as comparison:
             result=window.run()
         screen.assert_called_once_with(fit/'full.json')
         self.assertTrue(all(call.args[1]['candidate']==fit/'full.json' for call in evaluate.call_args_list))
         self.assertEqual('independent-qualification-failed',result['disposition']);self.assertFalse(result['browserActivated'])
+        comparison.assert_not_called();self.assertIsNone(result['comparisonPassed'])
+
+
+    def test_comparison_failure_blocks_qualification_after_both_previous_gates_pass(self):
+        window=self.fixture.window();fit=self.fixture.fit_files()
+        covered={'passed':True,'counts':{'validation':{'origins':300}}}
+        with patch.object(window,'collect',return_value=(window.lab/'breadth',covered)), \
+                patch.object(window,'fit',return_value=(fit,{'validation':{'full':metrics()}})), \
+                patch.object(window,'screen',return_value={'mayContinue':True}), \
+                patch.object(window,'evaluate',return_value={'passed':True}), \
+                patch.object(window,'compare_priority',return_value={'passed':False}) as comparison:
+            result=window.run()
+        comparison.assert_called_once_with(fit/'full.json')
+        self.assertEqual('independent-qualification-failed',result['disposition'])
+        self.assertFalse(result['comparisonPassed']);self.assertFalse(result['browserActivated'])
+
+    def test_comparison_pass_qualifies_only_after_both_existing_gates(self):
+        window=self.fixture.window();fit=self.fixture.fit_files()
+        covered={'passed':True,'counts':{'validation':{'origins':300}}}
+        with patch.object(window,'collect',return_value=(window.lab/'breadth',covered)), \
+                patch.object(window,'fit',return_value=(fit,{'validation':{'full':metrics()}})), \
+                patch.object(window,'screen',return_value={'mayContinue':True}), \
+                patch.object(window,'evaluate',return_value={'passed':True}), \
+                patch.object(window,'compare_priority',return_value={'passed':True}):
+            result=window.run()
+        self.assertEqual('qualified-for-integration',result['disposition'])
+        self.assertTrue(result['comparisonPassed']);self.assertFalse(result['browserActivated'])
+
+    def test_incomplete_comparison_never_loads_terminal_rows(self):
+        window=self.fixture.window()
+        with patch.object(window,'native',side_effect=RuntimeError('partial comparison')), \
+                patch.object(experiment.evaluation,'load_completed') as load:
+            with self.assertRaisesRegex(RuntimeError,'partial comparison'):
+                window.compare_priority(Path('/frozen-full'))
+        load.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

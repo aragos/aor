@@ -28,6 +28,7 @@ COVERAGE = {'train': {'origins': 1800, 'epoch3': 400},
 LOCAL_GATE = {'minimumOverriddenOrigins': 16, 'maximumPositiveOriginFraction': .25,
               'requirePredictionBelowZero': True}
 SCREEN = 'priority-screen'
+COMPARISON = 'priority-comparison'
 
 
 def coverage(directory, source):
@@ -92,6 +93,46 @@ def local_gate(report):
                 actionPriorityRole='descriptive-only', intervalRole='descriptive-only')
 
 
+def comparison_source(base, seeds, candidate, priority):
+    """Compare the frozen policies in the same worlds and roles against three F rivals."""
+    jobs = [dict(index=2 * index + offset, seed=seed, seat=index % 4, arm=arm,
+                 policy=arm, rivals=['baseline'] * 4)
+            for index, seed in enumerate(seeds)
+            for offset, arm in enumerate(('candidate', 'priority'))]
+    return dict(base, policies={'baseline': {'kind': 'baseline'},
+        'candidate': {'kind': 'advantage', 'path': str(candidate)},
+        'priority': {'kind': 'advantage', 'path': str(priority)}}, jobs=jobs)
+
+
+def analyze_comparison(seeds, rows):
+    """Require a positive paired 95% lower bound over exactly 1024 independent worlds."""
+    require(len(seeds) == 1024 and len(set(seeds)) == 1024
+            and all(type(seed) is int for seed in seeds),
+            'Priority comparison requires 1024 distinct integer worlds.')
+    expected = {(seed, index % 4, arm) for index, seed in enumerate(seeds)
+                for arm in ('candidate', 'priority')}
+    actual = [(row['seed'], row['controlledSeat'], row['arm']) for row in rows]
+    require(len(actual) == len(expected) and set(actual) == expected,
+            'Priority comparison must contain every planned world, role and arm exactly once.')
+    for row in rows:
+        require(type(row['seed']) is int and type(row['controlledSeat']) is int,
+                'Priority comparison world and role identifiers must be integers, not booleans.')
+        terminal = row['terminal']
+        require(all(type(terminal[key]) in (int, float) and math.isfinite(terminal[key])
+                    and 0 <= terminal[key] <= 1 for key in experiment.evaluation.METRICS),
+                'Comparison terminal metrics must be finite and in [0,1].')
+        require(abs(terminal['reward'] - .8 * terminal['winShare']
+                    - .2 * terminal['rankReward']) < 1e-12,
+                'Comparison rewards must preserve the frozen composite definition.')
+    comparisons = {metric: experiment.evaluation.paired(rows, 'candidate', 'priority', metric)
+                   for metric in experiment.evaluation.METRICS}
+    return dict(kind='breadth-priority-comparison', schemaVersion=1, stage=COMPARISON,
+                independentWorlds=1024, executions=len(rows), comparisons=comparisons,
+                meanWinShares={arm: sum(row['terminal']['winShare'] for row in rows
+                                       if row['arm'] == arm) / 1024 for arm in ('candidate', 'priority')},
+                passed=comparisons['winShare']['lower95'] > 0, humanStrengthClaim=False)
+
+
 class BreadthWindow(experiment.Window):
     def __init__(self, lab, protocol_path):
         super().__init__(lab, protocol_path)
@@ -100,12 +141,13 @@ class BreadthWindow(experiment.Window):
                 and self.protocol.get('schemaVersion') == 1, 'Unsupported breadth experiment protocol.')
         draft = read(self.pin(self.protocol['recipeDraft']))
         for key in ('configuration', 'collection', 'coverage', 'fit', 'screen', 'evaluation',
-                    'localGate', 'resources', 'seedReservation', 'originRequests'):
+                    'localGate', 'comparison', 'resources', 'seedReservation', 'originRequests'):
             require(self.protocol[key] == draft[key], 'The predeclared breadth recipe changed: ' + key)
         require(self.protocol['collection'] == {'maximumSeconds': 7200, 'batchSize': 8, 'plan': PLAN}
                 and self.protocol['coverage'] == COVERAGE and self.protocol['localGate'] == LOCAL_GATE
                 and self.protocol['screen'] == {'worlds': 256, 'minimumWinShareGain': .02, 'maximumSeconds': 1800}
-                and self.protocol['evaluation'] == {'batchSize': 8, 'maximumSecondsPerStage': 7200},
+                and self.protocol['evaluation'] == {'batchSize': 8, 'maximumSecondsPerStage': 7200}
+                and self.protocol['comparison'] == {'worlds': 1024, 'positiveLower95': True, 'maximumSeconds': 7200},
                 'Breadth acquisition, coverage and complete-game gates are fixed before fresh worlds.')
         require(self.protocol['fit']['activeHidden'] == 8 and self.protocol['fit']['maximumSecondsPerCycle'] == 2700,
                 'Breadth fitting uses the fixed eight-unit model and 45-minute allowance.')
@@ -121,7 +163,8 @@ class BreadthWindow(experiment.Window):
             and request['split'] == ('train' if index < 3072 else 'development' if index < 3584 else 'validation')
             for index, request in enumerate(self.requests)),
             'Breadth requests must preserve the fixed global-index split, seat, epoch and ordinal schedule.')
-        sizes = {'breadth': 4096, SCREEN: 256, 'primary-confirmation': 1024, 'rival-robustness': 256}
+        sizes = {'breadth': 4096, SCREEN: 256, 'primary-confirmation': 1024,
+                 'rival-robustness': 256, COMPARISON: 1024}
         require(set(self.banks) == set(sizes) and all(len(self.banks[name]) == size for name, size in sizes.items())
                 and self.banks['breadth'] == [row['seed'] for row in self.requests],
                 'Every breadth stage must use its complete fixed world bank.')
@@ -147,6 +190,13 @@ class BreadthWindow(experiment.Window):
                 and previous['disposition'] in ('priority-screen-gate-failed', 'independent-qualification-failed', 'qualified-for-integration')
                 and previous['browserActivated'] is False,
                 'The complete prior priority result must be preserved for awareness, without requiring its failure.')
+        finalist = previous.get('finalist')
+        require(isinstance(finalist, dict) and 'model' in finalist and 'modelSha256' in finalist,
+                'Priority comparison requires a completed, frozen preceding finalist.')
+        self.priority_candidate = self.pin(prerequisites['priorityCandidate'])
+        require(self.priority_candidate == Path(finalist['model']).resolve(strict=True)
+                and sha(self.priority_candidate) == finalist['modelSha256'],
+                'The stronger comparator must retain the exact preceding priority finalist path and bytes.')
         proof = read(self.pin(prerequisites['opsProfile']))
         proof_protocol = self.pin(prerequisites['opsProtocol'])
         require(proof['passed'] is True and proof['admitted'] is True
@@ -203,10 +253,19 @@ class BreadthWindow(experiment.Window):
         document(self.lab / (SCREEN + '-report.json'), report)
         return report
 
+    def compare_priority(self, candidate):
+        source = comparison_source(self.base, self.banks[COMPARISON], candidate, self.priority_candidate)
+        output = self.native('evaluate', COMPARISON, source, 7200)
+        rows, provenance = experiment.evaluation.load_completed(output)
+        report = analyze_comparison(self.banks[COMPARISON], rows)
+        report['provenance'] = provenance
+        document(self.lab / (COMPARISON + '-report.json'), report)
+        return report
+
     def run(self):
         collection, coverage_report = self.collect()
         if not coverage_report['passed']:
-            return self.finish('breadth-coverage-failed')
+            return self.finish('breadth-coverage-failed', comparisonPassed=None)
         fit, report = self.fit(collection)
         require(report['validation']['full']['nontrivialOrigins'] == coverage_report['counts']['validation']['origins'],
                 'Full-model validation must cover every nontrivial held-out root.')
@@ -214,17 +273,21 @@ class BreadthWindow(experiment.Window):
         gate['fitCompletionSha256'] = sha(fit / 'finished.json')
         document(self.lab / 'breadth-local-gate.json', gate)
         if not gate['passed']:
-            return self.finish('breadth-local-gate-failed')
+            return self.finish('breadth-local-gate-failed', comparisonPassed=None)
         if not self.screen(fit / 'full.json')['mayContinue']:
-            return self.finish('breadth-screen-gate-failed')
+            return self.finish('breadth-screen-gate-failed', comparisonPassed=None)
         selection = dict(model=str(fit / 'full.json'), modelSha256=sha(fit / 'full.json'),
                          frequency=str(fit / 'frequency-control.json'), frequencySha256=sha(fit / 'frequency-control.json'))
         document(self.lab / 'finalist.json', selection)
         primary = self.evaluate('primary-confirmation', {'candidate': fit / 'full.json', 'frequency': fit / 'frequency-control.json'})
         robustness = self.evaluate('rival-robustness', {'candidate': fit / 'full.json'})
-        return self.finish('qualified-for-integration' if primary['passed'] and robustness['passed']
+        comparison = (self.compare_priority(fit / 'full.json')
+                      if primary['passed'] and robustness['passed'] else None)
+        comparison_passed = comparison['passed'] if comparison is not None else None
+        return self.finish('qualified-for-integration' if comparison_passed is True
                            else 'independent-qualification-failed', finalist=selection,
-                           primaryPassed=primary['passed'], robustnessPassed=robustness['passed'])
+                           primaryPassed=primary['passed'], robustnessPassed=robustness['passed'],
+                           comparisonPassed=comparison_passed)
 
 
 def main():
