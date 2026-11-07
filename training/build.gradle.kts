@@ -22,6 +22,8 @@ distributions {
                     "train-opponents.py",
                     "card-advantage-run.py",
                     "card_advantage_experiment.py",
+                    "card_advantage_compact_experiment.py",
+                    "card_advantage_capacity.py",
                     "card_advantage_evaluation.py",
                     "card_advantage_train.py",
                     "card_advantage_data.py",
