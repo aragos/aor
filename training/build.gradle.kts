@@ -31,6 +31,7 @@ distributions {
                     "card_policy_coupling_analysis.py",
                     "joint_economy_experiment.py",
                     "joint_economy.py",
+                    "joint_trajectory.py",
                     "card_trajectory_experiment.py",
                     "card_trajectory_analysis.py",
                     "card_advantage_capacity.py",
