@@ -2,9 +2,11 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.CardAction
+import dev.aragos.aor.ai.CardFeatureDictionary
 import dev.aragos.aor.ai.CardObservation
 import dev.aragos.aor.ai.CardObservationEncoder
 import dev.aragos.aor.ai.CardPolicy
+import dev.aragos.aor.ai.CardPolicyModel
 import kotlin.math.abs
 
 /** Cached trajectories must retain exact origin/policy identity and recomputable behavior facts. */
@@ -72,7 +74,9 @@ internal class CardTrajectoryValidation(
         require(numbers == numbers.distinct().sorted() && numbers.all { it in 0 until steps }) {
             "Card trajectory decisions must have distinct increasing game command indices."
         }
-        decisions.forEach { decision(it, index) }
+        decisions.forEach {
+            decision(it, input.seeds[index], input.seat(index), input.dictionary, input.policy)
+        }
         purchaseAudit(node.required("purchaseAudit"), steps, numbers.toSet())
     }
 
@@ -140,73 +144,6 @@ internal class CardTrajectoryValidation(
         }
     }
 
-    private fun decision(node: JsonNode, gameIndex: Int) {
-        PurchaseJson.fields(
-            node,
-            setOf(
-                "number",
-                "actorSeed",
-                "decision",
-                "turn",
-                "observation",
-                "selectedIndex",
-                "behaviorLogProbability",
-                "behaviorValue",
-            ),
-        )
-        require(node.required("decision").asText() == "play-cards") {
-            "Only ordinary or final card-play decisions belong to a card trajectory."
-        }
-        require(integer(node, "turn") > 0) {
-            "A collected card decision requires its actual game turn."
-        }
-        val seed = integer(node, "actorSeed")
-        val baselineSeed =
-            input.seeds[gameIndex] xor
-                (integer(node, "number") * 65537 + input.seat(gameIndex) * 8191)
-        require(seed == CardPolicy.actorSeed(baselineSeed)) {
-            "A card record must preserve its independently derived actor sampling seed."
-        }
-        val observation = observation(node.required("observation"))
-        require(
-            observation.stateFeatures.keys.all { it in input.dictionary.stateFeatureNames } &&
-                observation.actions.all { action ->
-                    action.features.keys.all { it in input.dictionary.actionFeatureNames }
-                }
-        ) {
-            "A card record contains a feature outside its frozen complete dictionary."
-        }
-        val selected = integer(node, "selectedIndex")
-        require(selected in observation.actions.indices) {
-            "A card action index must reference an offered command."
-        }
-        val policy = input.policy
-        if (policy == null) {
-            require(
-                selected == observation.baselineIndex &&
-                    node.required("behaviorLogProbability").isNull &&
-                    node.required("behaviorValue").isNull
-            ) {
-                "Baseline imitation must select its exact recommendation without invented behavior likelihoods."
-            }
-            return
-        }
-        val expected = CardPolicy.choose(observation, policy, seed)
-        require(selected == expected.index) {
-            "A cached card action must match the frozen actor and sampling seed."
-        }
-        close(
-            PurchaseJson.number(node.required("behaviorLogProbability"), "behaviorLogProbability"),
-            expected.logProbability,
-            "behavior log probability",
-        )
-        close(
-            PurchaseJson.number(node.required("behaviorValue"), "behaviorValue"),
-            expected.value,
-            "behavior value",
-        )
-    }
-
     private fun terminal(node: JsonNode, seat: Int): Int {
         PurchaseJson.fields(
             node,
@@ -272,6 +209,79 @@ internal class CardTrajectoryValidation(
     }
 
     companion object {
+        internal fun decision(
+            node: JsonNode,
+            gameSeed: Int,
+            seat: Int,
+            dictionary: CardFeatureDictionary,
+            policy: CardPolicyModel?,
+        ) {
+            PurchaseJson.fields(
+                node,
+                setOf(
+                    "number",
+                    "actorSeed",
+                    "decision",
+                    "turn",
+                    "observation",
+                    "selectedIndex",
+                    "behaviorLogProbability",
+                    "behaviorValue",
+                ),
+            )
+            require(node.required("decision").asText() == "play-cards") {
+                "Only ordinary or final card-play decisions belong to a card trajectory."
+            }
+            require(integer(node, "turn") > 0) {
+                "A collected card decision requires its actual game turn."
+            }
+            val seed = integer(node, "actorSeed")
+            val baselineSeed = gameSeed xor (integer(node, "number") * 65537 + seat * 8191)
+            require(seed == CardPolicy.actorSeed(baselineSeed)) {
+                "A card record must preserve its independently derived actor sampling seed."
+            }
+            val observation = observation(node.required("observation"))
+            require(
+                observation.stateFeatures.keys.all { it in dictionary.stateFeatureNames } &&
+                    observation.actions.all { action ->
+                        action.features.keys.all { it in dictionary.actionFeatureNames }
+                    }
+            ) {
+                "A card record contains a feature outside its frozen complete dictionary."
+            }
+            val selected = integer(node, "selectedIndex")
+            require(selected in observation.actions.indices) {
+                "A card action index must reference an offered command."
+            }
+            if (policy == null) {
+                require(
+                    selected == observation.baselineIndex &&
+                        node.required("behaviorLogProbability").isNull &&
+                        node.required("behaviorValue").isNull
+                ) {
+                    "Baseline imitation must select its exact recommendation without invented behavior likelihoods."
+                }
+                return
+            }
+            val expected = CardPolicy.choose(observation, policy, seed)
+            require(selected == expected.index) {
+                "A cached card action must match the frozen actor and sampling seed."
+            }
+            close(
+                PurchaseJson.number(
+                    node.required("behaviorLogProbability"),
+                    "behaviorLogProbability",
+                ),
+                expected.logProbability,
+                "behavior log probability",
+            )
+            close(
+                PurchaseJson.number(node.required("behaviorValue"), "behaviorValue"),
+                expected.value,
+                "behavior value",
+            )
+        }
+
         internal fun observation(node: JsonNode): CardObservation {
             PurchaseJson.fields(
                 node,
