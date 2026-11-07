@@ -52,9 +52,8 @@ def load_bundle(path,configuration,baseline_sha,frozen_sha,pins,controlled=True)
                 'A territory actor requires an exact model path and byte hash.')
         model_path=pin(resolve(value['path'],path.parent),pins)
         require(sha(model_path)==value['sha256'],'Territory actor differs from its bundle hash.')
-        contract=CONTRACTS[phase]
         model=q.validate_model(read(model_path),phase);models[phase]=model
-        descriptor[phase]=dict(path=str(model_path),sha256=sha(model_path),encoderVersion=contract.encoder,
+        descriptor[phase]=dict(path=str(model_path),sha256=sha(model_path),encoderVersion=model['encoderVersion'],
             selectorVersion=q.SELECTORS[phase],architecture=q.ARCHITECTURE,stateFeatureNames=model['stateFeatureNames'],actionFeatureNames=model['actionFeatureNames'])
     return descriptor,models
 
@@ -229,6 +228,21 @@ def initialize_model(schema_path, seed, phase, output):
         modelSha256=sha(output/'policy.json'),sourceHashes={str(Path(p).resolve()):sha(p)
             for p in (__file__,q.__file__,backend.__file__)}))
     return model
+
+
+def initialize_main(argv=None):
+    """Initialize from an explicitly exported versioned schema; never convert existing records."""
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    commands=parser.add_subparsers(dest='command',required=True)
+    initialize=commands.add_parser('initialize',help='Create a fresh typed Q model from its exact schema.')
+    initialize.add_argument('--schema',type=Path,required=True)
+    initialize.add_argument('--phase',choices=PHASES,required=True)
+    initialize.add_argument('--seed',type=int,required=True)
+    initialize.add_argument('--output',type=Path,required=True)
+    args=parser.parse_args(argv)
+    backend.torch.set_num_threads(1)
+    initialize_model(args.schema,args.seed,args.phase,args.output)
 
 
 def validate_initializer(path,phase,pins):
@@ -521,3 +535,7 @@ def update_pair(directory,bundle_path,config,output,*,checkpoint_path=None,resum
     require(time.monotonic()<deadline,'Q deadline expired before completion publication.')
     immutable_json(output/'finished.json',report)
     return report
+
+
+if __name__ == '__main__':
+    initialize_main()

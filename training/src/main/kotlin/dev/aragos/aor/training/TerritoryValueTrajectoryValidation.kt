@@ -142,7 +142,7 @@ internal class TerritoryValueTrajectoryValidation(
                 },
                 integer(encoded, "baselineIndex"),
             )
-        require(observation.encoderVersion == phase.encoderVersion) {
+        require(TerritoryPhase.fromEncoder(observation.encoderVersion) == phase) {
             "A territory row cannot cross typed phase boundaries."
         }
         val actor =

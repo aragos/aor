@@ -3,6 +3,7 @@ package dev.aragos.aor.training
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.ExpansionObservationEncoder
+import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryFeatureDictionary
 import dev.aragos.aor.ai.TerritoryPhase
 import dev.aragos.aor.ai.TerritoryValueModel
@@ -32,7 +33,9 @@ internal data class TerritoryValueBundle(
         )
     val expansionDictionary =
         ExpansionObservationEncoder.dictionary(
-            PublicCatalog.forPlayers(configuration.playerCount, configuration.rules)
+            PublicCatalog.forPlayers(configuration.playerCount, configuration.rules),
+            expansion?.model?.encoderVersion?.let(TerritoryEncoder::fromVersion)
+                ?: TerritoryEncoder.EXPANSION_1,
         )
 
     init {
@@ -53,7 +56,7 @@ internal data class TerritoryValueBundle(
                 actor == null ||
                     actor.path.isAbsolute &&
                         actor.sha256.matches(HASH) &&
-                        actor.model.encoderVersion == phase.encoderVersion &&
+                        TerritoryPhase.fromEncoder(actor.model.encoderVersion) == phase &&
                         actor.model.stateFeatureNames == dictionary.stateFeatureNames &&
                         actor.model.actionFeatureNames == dictionary.actionFeatureNames
             ) {
@@ -162,7 +165,7 @@ internal data class TerritoryValueBundle(
             mapOf(
                 "path" to actor.path.toString(),
                 "sha256" to actor.sha256,
-                "encoderVersion" to phase.encoderVersion,
+                "encoderVersion" to actor.model.encoderVersion,
                 "selectorVersion" to TerritoryValuePolicy.selectorVersion(phase),
                 "architecture" to actor.model.architecture,
                 "stateFeatureNames" to dictionary.stateFeatureNames,

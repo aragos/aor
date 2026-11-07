@@ -4,6 +4,7 @@ import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotPolicy
 import dev.aragos.aor.ai.ExpansionObservationEncoder
+import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TerritoryPhase
 import dev.aragos.aor.ai.TerritoryValuePolicy
@@ -81,6 +82,7 @@ internal class TerritoryValueController(
                         seat,
                         decision.observation,
                         recommendation,
+                        TerritoryEncoder.fromVersion(policy.encoderVersion),
                     )
             }
         val seed = TerritoryValuePolicy.selectorSeed(phase, decision.seed)
