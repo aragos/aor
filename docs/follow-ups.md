@@ -174,6 +174,21 @@ opens validation and applies the declared coverage, cross-stream persistence and
 Its output is a diagnostic classification, not a deployable policy or permission to collect more
 worlds. Inadequate coverage or elapsed time does not permit replacement roots or a renewed clock.
 
+### Policy randomness coupling diagnostic
+
+Use the separate [coupling diagnostic](../scripts/card_policy_coupling_experiment.py) to measure
+whether aligning policy samples by turn, stage, actor and decision occurrence reduces paired-return
+noise. Reuse the fixed first 64 completed continuation requests, with the same F backbone, two forced
+root actions, purchase actor and authority chance streams. Compare the original global-index schedule
+with independently hashed global-index and semantic schedules. Only the latter two isolate the
+coupling change under the intended stochastic policy kernel; legacy comparisons are descriptive.
+
+Reserve the additional future streams before execution, retaining intentional reuse of the first
+four streams. Require completed, hash-bound records and exact legacy replay before reporting the
+fixed whole-world variance-ratio bootstrap. The two-hour original clock, per-origin atomic files,
+batch allocation and data limits survive resume. Insufficient coverage or a failed variance guard
+does not authorize replacements, policy activation or another collection.
+
 ### Autonomous strategy discovery
 
 Build on the [complete-game purchase learner](contributing.md#purchase-policy-learning). Human
