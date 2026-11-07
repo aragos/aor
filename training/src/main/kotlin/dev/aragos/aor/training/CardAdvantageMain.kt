@@ -157,7 +157,10 @@ internal object CardAdvantageMain {
         val inputs =
             listOf(input.source, input.environment.baseline.path, input.environment.purchase.path) +
                 input.policies.values.flatMap {
-                    it.territoryBundle?.files() ?: it.jointBundle?.files() ?: listOfNotNull(it.path)
+                    it.territoryValueBundle?.files()
+                        ?: it.territoryBundle?.files()
+                        ?: it.jointBundle?.files()
+                        ?: listOfNotNull(it.path)
                 }
         for (index in indices) {
             if (batchDeadline != null) checkDeadline(batchDeadline)
