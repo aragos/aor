@@ -600,6 +600,14 @@ regression, because longer uncorrected returns also include more exploratory beh
 mature replay resources and an actual update before fixing the complete-game budget. Keep the
 final policy comparison independent of those consumed-world operational checks.
 
+If the longer-horizon learner remains numerically healthy but fails its fixed strength screen,
+compare terminal-return targets on exactly the same recorded experience before collecting more
+games. Preserve initialization, sampling order, replay membership and optimizer budget; distinguish
+the recorded behavior actor from the fitted actor explicitly. Require exact reproduction of the
+original update sequence in a control before changing targets, then compare the fixed final models
+on fresh paired worlds. This isolates target quality within the collected experience; it does not
+test exploration under the alternative learner or establish human-level strength.
+
 Measure low-stock turn-order bidding positions before extending token proposals. The current
 offered set includes stock-bounded signed amounts and full-cash endpoints; legal intermediate
 bids above available stock can be absent. Learning cannot discover a command outside that set.
