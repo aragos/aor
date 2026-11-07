@@ -559,3 +559,20 @@ the original gates. Final confirmation also requires that three-point gain and a
 Keep the same three-hour budget and 15,360-execution ceiling. This is the last isolated card
 budget extension; failure leads to reconsidering the architecture, with no automatic activation,
 replacement checkpoint or sample topup.
+
+
+The optional `aor-ppo-checked-prefix-1` update mode checks the entire original collection
+after each eight-minibatch block (or epoch remainder). Its KL reference remains the original
+behavior actor. Accept and checkpoint model parameters, Adam, cursor and counters together;
+reject only the offending block and stop the update. Schema 2 records accepted minibatches and
+blocks separately from fully completed epochs, so zero completed epochs can still contain
+accepted parameter changes. Resume reconstructs only uncommitted work under the original deadline.
+The default whole-epoch mode retains its schema 1 identity and numerical behavior.
+
+The next joint-learning stage should collect card and purchase decisions from one frozen
+behavior bundle and fit both actors from those same complete games. Preserve each actor's
+row mean and raw terminal-return-minus-recorded-value advantage; do not normalize advantages
+or pool phases. Publish both models and Adam states together. The two-head synthetic prototype
+uses a new uniform-reference purchase objective only in its LAB adapter; an equivalent
+production objective and numerical checks are prerequisites for a real joint-game pilot.
+Token commitments and expansion remain a separate capability.
