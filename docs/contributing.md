@@ -369,6 +369,32 @@ Use a fixed prospective recipe and fresh factorial evaluation to separate card g
 gains and their interaction. Synthetic coordination results and training losses do not establish
 game strength or authorize replacing the playable policy.
 
+### Token and expansion learning
+
+The experimental `territory-collect` mode learns token commitments and repeated expansion
+choices while holding an explicit card/purchase bundle fixed. Its
+[source contract](../training/src/main/kotlin/dev/aragos/aor/training/TerritoryCollectionInput.kt)
+binds both new actors, their rivals, the original F prior and the frozen card/purchase actors.
+The [encoders](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/TerritoryObservationEncoder.kt)
+retain every command in the current bot projection and use authoritative ordinary-view
+quotes. They do not add F's utility scores as features. Token offers are a bounded set of
+signed amounts and cash endpoints, rather than every possible integer bid. Expansion offers
+are regenerated after each action so shipping capacity, markers and remaining tokens stay current.
+
+```sh
+python3 scripts/train-opponents.py --mode territory-collect --source territory-collection.json --output .aor-training/territory-data --workers 6 --hours 2
+```
+
+The [territory updater](../scripts/territory_trajectory.py) retains both typed views of every
+complete game and publishes the two actors together. Its separately versioned offered-action
+references are explicit training objectives; existing card and purchase objectives are unchanged.
+Both actors learn from terminal game outcomes, with separate critics, row means and Adam states.
+
+Sealed token decisions record their actual simulator seed and batch-start number. Their global
+command number includes a batch offset and must not be used to reconstruct that seed. These fields
+are replay provenance, not actor features. Opponents' pending commitments remain private. Nested
+combat choices and decisions outside the declared actor scopes retain F.
+
 ### Paired card advantage experiments
 
 The separate [advantage collector](../training/src/main/kotlin/dev/aragos/aor/training/CardAdvantageCollectionInput.kt)
