@@ -342,6 +342,38 @@ are diagnostic cases, not independent strength evidence; unused discounts can st
 costs or accompany cash rebates. Keep the existing browser policy until fresh complete-game and
 rival-population qualification succeeds.
 
+### Joint card and purchase learning
+
+The experimental `joint-collect` mode records both typed actors from each complete game.
+Its [source contract](../training/src/main/kotlin/dev/aragos/aor/training/JointCollectionInput.kt)
+requires `schemaVersion: 1`, `kind: "joint-collect"`, `configuration`, `games`, `seed`,
+`baseline`, `bundle` and an `opponents` list of frozen bundle paths. Every
+[bundle](../training/src/main/kotlin/dev/aragos/aor/training/JointActorBundle.kt) binds its setup,
+F prior and exact card/purchase model bytes. A rival may explicitly use `card: null` for F
+card play; the learning seat requires both actors.
+
+```sh
+python3 scripts/train-opponents.py --mode joint-collect --source joint-collection.json --output .aor-training/joint-data --workers 6 --hours 2
+```
+
+The [joint updater](../scripts/joint_trajectory.py) reads the same completed origins and terminal
+labels for both phases, including games with an empty phase array. It keeps separate Adam states
+and fits both actors against their original behavior bundle before publishing the next pair.
+An entirely empty phase rejects the batch before either fit. Interrupted updates retain completed
+phase artifacts and resume with their original deadlines; they cannot publish half a bundle.
+
+Joint fits explicitly select `aor-ppo-checked-prefix-1`: every block of at most eight minibatches
+checks KL against the original behavior over the entire phase collection. A rejected block restores
+its model and Adam state while retaining earlier accepted blocks. Optional purchase exploration
+uses `PurchaseReferenceObjective` for KL from a uniform distribution over all offered actions,
+including Pass. Card exploration uses the separately versioned physical-card reference. These
+training objectives do not change inference, terminal rewards or default legacy update behavior.
+The two phase KL bounds are separate; they are not a bound on whole-game policy change.
+
+Use a fixed prospective recipe and fresh factorial evaluation to separate card gains, purchase
+gains and their interaction. Synthetic coordination results and training losses do not establish
+game strength or authorize replacing the playable policy.
+
 ### Paired card advantage experiments
 
 The separate [advantage collector](../training/src/main/kotlin/dev/aragos/aor/training/CardAdvantageCollectionInput.kt)

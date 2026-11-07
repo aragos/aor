@@ -24,6 +24,10 @@ fun main(arguments: Array<String>) {
         CardAdvantageMain.run(arguments.toList())
         return
     }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "joint-collect") }) {
+        JointCollectionMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "card-collect") }) {
         CardCollectionMain.run(arguments.toList())
         return
@@ -71,6 +75,7 @@ fun main(arguments: Array<String>) {
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
+            --mode joint-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             card-advantage-run.py --mode collect|evaluate --source JSON --output PATH --hours HOURS
               Optional evaluation-only --batch-size 1..64 shares one JVM across explicit games.
             Native advantage worker: --mode card-advantage-collect|card-advantage-evaluate --source JSON
