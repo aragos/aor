@@ -337,6 +337,36 @@ are diagnostic cases, not independent strength evidence; unused discounts can st
 costs or accompany cash rebates. Keep the existing browser policy until fresh complete-game and
 rival-population qualification succeeds.
 
+### Paired card advantage experiments
+
+The separate [advantage collector](../training/src/main/kotlin/dev/aragos/aor/training/CardAdvantageCollectionInput.kt)
+uses explicit prospective world/seat/epoch requests and paired complete-game continuations at a root
+and its next own normal card decision. Each child has its own observation and labels. All descendants
+stay in one original world's split; identical child inputs are averaged before decision-group
+weighting. The actor, proposal sampler and frozen continuation have independent versioned contracts.
+Final windows and nested resolutions retain the HARD reference, and all seats retain the frozen
+purchase actor.
+
+Build and freeze the complete distribution as above. It includes the native supervisor, numerical
+learner and [bounded experiment driver](../scripts/card_advantage_experiment.py). Use the pinned JDK
+21 and Python/PyTorch environment. A laboratory directory must contain its immutable window protocol,
+fresh seed reservations, explicit origin requests, frozen inputs and passing preflight evidence bound
+to the exact runtime. The driver rejects missing or mismatched preflight evidence before starting a
+game. With those artifacts prepared:
+
+```sh
+python3 .aor-training/executors/card-advantage/bin/card_advantage_experiment.py \
+  --lab .aor-training/card-advantage --protocol .aor-training/card-advantage/window-v2.json
+```
+
+Repeat the same command to resume; add `--status` to inspect the latest stage. Completed work keeps
+its original identities, while incomplete work keeps its original deadline. SIGTERM stops owned
+children. The driver enforces collection/fit limits, disk bounds, minimum context coverage, local
+development gates, independent paired-game confirmation and opponent-population robustness. It
+preserves failed or incomplete evidence, never fits a partial collection, and does not activate
+browser models. Read `window-result.json` and the stage reports for the outcome. Qualification remains
+specific to the declared setup and rival population; it does not establish human-level strength.
+
 ## Token-purchase continuation learning
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
