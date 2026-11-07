@@ -46,17 +46,27 @@ internal data class CardAdvantageEvaluationPolicy(
     val cardActor: CardPolicyModel? = null,
     val jointBundle: JointActorBundle? = null,
     val territoryBundle: TerritoryActorBundle? = null,
+    val territoryValueBundle: TerritoryValueBundle? = null,
 ) {
     fun metadata(): Map<String, Any?> =
         mapOf("kind" to kind, "path" to path?.toString(), "sha256" to sha256) +
             (jointBundle?.let { mapOf("bundle" to it.metadata()) } ?: emptyMap()) +
             (territoryBundle?.let {
                 mapOf("bundle" to it.metadata(), "frozenCardPurchaseBundle" to it.frozen.metadata())
+            } ?: emptyMap()) +
+            (territoryValueBundle?.let {
+                mapOf(
+                    "bundle" to it.metadata(),
+                    "frozenCardPurchaseBundle" to it.frozen.metadata(),
+                    "epsilon" to 0.0,
+                )
             } ?: emptyMap())
 
     /** Registry adapters share the collector's actor, purchase prior and decision scope exactly. */
     fun controller(environment: CardAdvantageEnvironment): SimulationController =
         when {
+            territoryValueBundle != null ->
+                territoryValueBundle.controller(environment.baseline, 0.0)
             territoryBundle != null -> territoryBundle.controller(environment.baseline)
             jointBundle != null -> jointBundle.controller(environment.baseline)
             economy != null -> JointEconomyController(environment, economy)
@@ -114,6 +124,9 @@ internal data class CardAdvantageEvaluationInput(
                 } else "") +
                 (if (policies.values.any { it.territoryBundle != null }) {
                     "\n${TerritoryActorBundle.VERSION}"
+                } else "") +
+                (if (policies.values.any { it.territoryValueBundle != null }) {
+                    "\n${TerritoryValueBundle.VERSION}"
                 } else "")
         )
 
@@ -155,6 +168,9 @@ internal data class CardAdvantageEvaluationInput(
             } else emptyMap()) +
             (if (policies.values.any { it.territoryBundle != null }) {
                 mapOf("territoryActorVersion" to TerritoryActorBundle.VERSION)
+            } else emptyMap()) +
+            (if (policies.values.any { it.territoryValueBundle != null }) {
+                mapOf("territoryValueVersion" to TerritoryValueBundle.VERSION)
             } else emptyMap())
 
     companion object {
@@ -194,12 +210,14 @@ internal data class CardAdvantageEvaluationInput(
                         } else {
                             PurchaseJson.fields(
                                 row,
-                                if (kind == "territory-bundle")
+                                if (kind == "territory-value-bundle")
+                                    setOf("kind", "path", "frozenCardPurchaseBundle", "epsilon")
+                                else if (kind == "territory-bundle")
                                     setOf("kind", "path", "frozenCardPurchaseBundle")
                                 else setOf("kind", "path"),
                             )
                             val text = PurchaseJson.text(row.required("path"), "path")
-                            if (kind == "territory-bundle") {
+                            if (kind == "territory-bundle" || kind == "territory-value-bundle") {
                                 val frozen =
                                     JointActorBundle.read(
                                         source.parent
@@ -213,19 +231,41 @@ internal data class CardAdvantageEvaluationInput(
                                         environment.configuration,
                                         environment.baseline,
                                     )
-                                val bundle =
-                                    TerritoryActorBundle.read(
-                                        source.parent.resolve(text).normalize(),
-                                        environment.configuration,
-                                        environment.baseline,
-                                        frozen,
+                                if (kind == "territory-value-bundle") {
+                                    require(
+                                        PurchaseJson.number(row.required("epsilon"), "epsilon") ==
+                                            0.0
+                                    ) {
+                                        "Territory action-value evaluation must explicitly use epsilon zero."
+                                    }
+                                    val bundle =
+                                        TerritoryValueBundle.read(
+                                            source.parent.resolve(text).normalize(),
+                                            environment.configuration,
+                                            environment.baseline,
+                                            frozen,
+                                        )
+                                    CardAdvantageEvaluationPolicy(
+                                        kind,
+                                        bundle.path,
+                                        bundle.sha256,
+                                        territoryValueBundle = bundle,
                                     )
-                                CardAdvantageEvaluationPolicy(
-                                    kind,
-                                    bundle.path,
-                                    bundle.sha256,
-                                    territoryBundle = bundle,
-                                )
+                                } else {
+                                    val bundle =
+                                        TerritoryActorBundle.read(
+                                            source.parent.resolve(text).normalize(),
+                                            environment.configuration,
+                                            environment.baseline,
+                                            frozen,
+                                        )
+                                    CardAdvantageEvaluationPolicy(
+                                        kind,
+                                        bundle.path,
+                                        bundle.sha256,
+                                        territoryBundle = bundle,
+                                    )
+                                }
                             } else if (kind == "advantage") {
                                 val model = environment.readAdvantage(source, text)
                                 CardAdvantageEvaluationPolicy(

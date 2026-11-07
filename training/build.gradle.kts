@@ -35,6 +35,8 @@ distributions {
                     "token_policy.py",
                     "expansion_policy.py",
                     "territory_trajectory.py",
+                    "territory_value.py",
+                    "territory_value_trajectory.py",
                     "card_trajectory_experiment.py",
                     "card_trajectory_analysis.py",
                     "card_advantage_capacity.py",

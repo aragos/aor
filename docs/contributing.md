@@ -395,6 +395,39 @@ command number includes a batch offset and must not be used to reconstruct that 
 are replay provenance, not actor features. Opponents' pending commitments remain private. Nested
 combat choices and decisions outside the declared actor scopes retain F.
 
+### Territory action-value learning
+
+The experimental `territory-value-collect` mode uses separately versioned linear-output
+[action-value models](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/TerritoryValuePolicy.kt).
+Its [source contract](../training/src/main/kotlin/dev/aragos/aor/training/TerritoryValueCollectionInput.kt)
+fixes the card/purchase continuation, both territory models and the exploration probability.
+Collection uses epsilon-greedy choices over actual offers; evaluation uses greedy choices.
+Equal values prefer the ordinary F recommendation, then canonical command order. An initial
+constant-value greedy model therefore reproduces F territory choices.
+
+```sh
+python3 scripts/train-opponents.py --mode territory-value-collect --source territory-value-collection.json --output .aor-training/territory-value-data --workers 6 --hours 2
+```
+
+The [learner](../scripts/territory_value_trajectory.py) joins each complete game's token and
+expansion records by their actual decision numbers. The next recorded owned decision is the
+successor, including repeated expansion and skipped phases. Intervening fixed-policy actions
+and chance events belong to that sampled transition. Only the last owned transition receives
+the terminal game reward; incomplete games cannot supply targets.
+
+Double-Q targets select a legal successor action with a frozen online model and evaluate that
+same action with a lagged target model. Both phases use the same frozen model pair throughout
+an update. Replay evicts complete games, samples phase transitions uniformly, and retains
+hash-bound origin identities. Checkpoints bind replay membership, online and target models,
+separate Adam states and synchronization counters before publishing the next complete pair.
+The implementation preserves the earlier PPO models and collectors as distinct contracts.
+
+Action values are finite estimates, not probabilities: they may lie outside the terminal
+reward range. An explicit numerical guard stops excessive growth without clipping targets.
+Measure collection, replay memory, fitting and checkpoint costs before freezing a full-game
+budget. Qualify the final policy on fresh games; synthetic recovery tests do not establish
+playing strength or authorize changing the browser policy.
+
 ### Paired card advantage experiments
 
 The separate [advantage collector](../training/src/main/kotlin/dev/aragos/aor/training/CardAdvantageCollectionInput.kt)
