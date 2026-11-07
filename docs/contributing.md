@@ -410,6 +410,29 @@ Collection uses epsilon-greedy choices over actual offers; evaluation uses greed
 Equal values prefer the ordinary F recommendation, then canonical command order. An initial
 constant-value greedy model therefore reproduces F territory choices.
 
+Fresh expansion Q training can explicitly opt into `aor-expansion-observation-2`. It adds
+thirty public current-turn Cathedral usage bits, indexed by owner/opponent roles relative to
+the acting player. Existing ownership features distinguish an unused Cathedral from a player
+without Cathedral. This separates attack contexts where an authoritative Cathedral declaration
+is still available from those where it has been spent; the dice-only attack probability remains
+unchanged. It adds information, not a preferred action or a guaranteed playing-strength gain.
+
+Export the complete dictionary without playing games, then initialize a fresh model:
+
+```sh
+training/build/install/training/bin/training --mode territory-value-schema --configuration players-4/standard/no-crusades/deck-true/art-true --encoder aor-expansion-observation-2 --output expansion-schema.json
+python3 scripts/territory_value_trajectory.py initialize --schema expansion-schema.json --phase expansion --seed 74702 --output expansion-initial
+```
+
+The same exporter accepts `aor-token-observation-1` and `aor-expansion-observation-1`.
+Use the resulting model's path and hash in the existing Q bundle. Its component encoder version
+selects native projection, collection validation and Python preparation; a token-v1/expansion-v2
+bundle is supported. V1 model/observation bytes, seeded choices and initialization remain exact.
+V1 expansion records cannot be relabelled or filled with zero usage bits for v2 training, and
+an optimizer carry must retain the exact preceding versioned model. Existing PPO, card, purchase
+and F policies retain their original inputs. No game-state, saved-game or rules version changes,
+model migration or live activation are involved.
+
 ```sh
 python3 scripts/train-opponents.py --mode territory-value-collect --source territory-value-collection.json --output .aor-training/territory-value-data --workers 6 --hours 2
 ```

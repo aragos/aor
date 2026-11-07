@@ -3,14 +3,18 @@ package dev.aragos.aor.training
 import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.TerritoryAction
+import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TerritoryPhase
 import dev.aragos.aor.ai.TerritoryValuePolicy
 import dev.aragos.aor.ai.TokenObservationEncoder
 
 /** The existing joint fixture supplies exactly the same frozen card/purchase continuation. */
-internal class TerritoryValueCollectionFixture(games: Int = 1, learnedRivals: Boolean = false) :
-    AutoCloseable {
+internal class TerritoryValueCollectionFixture(
+    games: Int = 1,
+    learnedRivals: Boolean = false,
+    expansionEncoder: TerritoryEncoder = TerritoryEncoder.EXPANSION_1,
+) : AutoCloseable {
     val joint = JointCollectionFixture(games, learnedRivals = true)
     val artifacts = joint.artifacts
     val output = joint.directory.resolve("territory-output")
@@ -22,13 +26,15 @@ internal class TerritoryValueCollectionFixture(games: Int = 1, learnedRivals: Bo
         for (phase in TerritoryPhase.entries) {
             val names =
                 if (phase == TerritoryPhase.TOKEN) TokenObservationEncoder.dictionary(catalog)
-                else ExpansionObservationEncoder.dictionary(catalog)
+                else ExpansionObservationEncoder.dictionary(catalog, expansionEncoder)
             artifacts.write(
                 "${phase.name.lowercase()}-policy.json",
                 mapOf(
                     "schemaVersion" to 1,
                     "architecture" to TerritoryValuePolicy.ARCHITECTURE,
-                    "encoderVersion" to phase.encoderVersion,
+                    "encoderVersion" to
+                        if (phase == TerritoryPhase.EXPANSION) expansionEncoder.version
+                        else phase.encoderVersion,
                     "hiddenSize" to 64,
                     "stateFeatureNames" to names.stateFeatureNames,
                     "actionFeatureNames" to names.actionFeatureNames,
@@ -99,7 +105,14 @@ internal class TerritoryValueCollectionFixture(games: Int = 1, learnedRivals: Bo
                 phase.decision,
                 1,
                 TerritoryObservation(
-                    phase.encoderVersion,
+                    requireNotNull(
+                            if (phase == TerritoryPhase.TOKEN) input.bundle.token
+                            else input.bundle.expansion
+                        ) {
+                            "The fixture has both Q models."
+                        }
+                        .model
+                        .encoderVersion,
                     emptyMap(),
                     listOf(
                         TerritoryAction(
