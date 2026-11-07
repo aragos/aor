@@ -44,13 +44,16 @@ internal data class CardAdvantageEvaluationPolicy(
     val frequency: CardFrequencyModel? = null,
     val economy: JointEconomyPolicy? = null,
     val cardActor: CardPolicyModel? = null,
+    val jointBundle: JointActorBundle? = null,
 ) {
     fun metadata(): Map<String, Any?> =
-        mapOf("kind" to kind, "path" to path?.toString(), "sha256" to sha256)
+        mapOf("kind" to kind, "path" to path?.toString(), "sha256" to sha256) +
+            (jointBundle?.let { mapOf("bundle" to it.metadata()) } ?: emptyMap())
 
     /** Registry adapters share the collector's actor, purchase prior and decision scope exactly. */
     fun controller(environment: CardAdvantageEnvironment): SimulationController =
         when {
+            jointBundle != null -> jointBundle.controller(environment.baseline)
             economy != null -> JointEconomyController(environment, economy)
             cardActor != null ->
                 CardActorController(
@@ -100,6 +103,9 @@ internal data class CardAdvantageEvaluationInput(
                 } else "") +
                 (if (policies.values.any { it.cardActor != null }) {
                     "\n${CardPolicy.ACTOR_VERSION}"
+                } else "") +
+                (if (policies.values.any { it.jointBundle != null }) {
+                    "\n${JointActorBundle.VERSION}"
                 } else "")
         )
 
@@ -135,6 +141,9 @@ internal data class CardAdvantageEvaluationInput(
             } else emptyMap()) +
             (if (policies.values.any { it.cardActor != null }) {
                 mapOf("cardActorVersion" to CardPolicy.ACTOR_VERSION)
+            } else emptyMap()) +
+            (if (policies.values.any { it.jointBundle != null }) {
+                mapOf("jointActorVersion" to JointActorBundle.VERSION)
             } else emptyMap())
 
     companion object {
@@ -181,6 +190,19 @@ internal data class CardAdvantageEvaluationInput(
                                     model.path,
                                     model.sha256,
                                     advantage = model.model,
+                                )
+                            } else if (kind == "joint-bundle") {
+                                val bundle =
+                                    JointActorBundle.read(
+                                        source.parent.resolve(text).normalize(),
+                                        environment.configuration,
+                                        environment.baseline,
+                                    )
+                                CardAdvantageEvaluationPolicy(
+                                    kind,
+                                    bundle.path,
+                                    bundle.sha256,
+                                    jointBundle = bundle,
                                 )
                             } else if (kind == "card-actor") {
                                 val file = source.parent.resolve(text).normalize().toRealPath()
