@@ -50,8 +50,7 @@ heap/bounded direct memory and no writable application volume. Database URLs all
 build/SQL smoke in parallel; `verify` requires both. The container covers web typecheck/bundling.
 Push checks run on `main`; promotion to `release` reuses that exact commit's successful checks.
 Pull requests and scheduled/manual release verification still run.
-Require `verify` where the plan permits; direct CI checks are not enforced branch protection
-(the private repository's plan previously returned 403).
+The `main` branch requires a pull request and the `verify` check.
 
 [Dependabot](../.github/dependabot.yml) and [dependency graph](../.github/workflows/dependency-graph.yml)
 own monitoring. [Patch auto-merge](../.github/workflows/patch-updates.yml) needs `AUTO_MERGE_PATCHES=true`,
