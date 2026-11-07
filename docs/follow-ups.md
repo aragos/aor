@@ -321,9 +321,10 @@ ensemble, proposal rules, margin and frequency control before opening final conf
 frequency control on 1,024 new paired worlds, rotating the controlled seat. All rivals use F cards
 and the qualified purchase actor in this primary bank. Require at least five percentage points of
 win-share improvement over the incumbent, with a positive paired 95% lower bound. Require a positive
-95% lower bound over the frequency control as a further activation requirement, establishing an
-advantage beyond changing action frequencies. An inconclusive result does not trigger more samples
-in the same window.
+95% lower bound over the frequency control as a further activation requirement. Realized action
+frequencies can diverge during repeated play, so beating this frozen control alone does not prove
+that gains arise from contextual planning. An inconclusive result does not trigger more samples in
+the same window.
 
 Use a separate 256-world robustness bank with every controlled role against three finalist rivals,
 comparing the finalist and the incumbent. Cluster all four roles by world. Require a nonnegative mean
@@ -377,6 +378,18 @@ token commitments and expansion with the learned card/purchase policy, then broa
 populations. If it fails, identify whether targets, representation, exploration or repeated-policy
 transfer failed and choose one falsifiable corrective experiment. Freeze new budgets and untouched
 confirmation worlds before that stage; preserve failed results and do not extend a consumed test bank.
+
+### Capacity correction after failed card qualification
+
+When the completed experiment shows overfitting and fails independent qualification, test one
+predeclared reduction to eight active units using the same cycle-1 training/development splits,
+optimizer, target, proposal sampler and incumbent fallback. Preserve the original 64-unit actor as
+a paired comparator. The previous validation outcomes informed this hypothesis and are development
+evidence; require fresh local and full-game banks. Do not pool targets from different continuations.
+Use the [bounded capacity driver](contributing.md#paired-card-advantage-experiments), its fixed
+sequence preflight and unchanged-game batching proof. Stop on failed gates instead of sweeping
+widths, changing rewards or extending confirmation. Distinguish evidence of better generalization,
+stronger complete-game play and useful contextual planning; none automatically implies the others.
 
 ### Hardware experiment
 
