@@ -8,7 +8,9 @@ Production is a Render Docker service, PostgreSQL 18 and Firebase email/password
 
 1. Register Firebase web app; enable Email/Password and Google, support email, enumeration protection
    and a 12-character minimum password policy. Configure verification/reset templates. Play requires
-   verified email and a unique registered handle.
+   verified email and a unique registered handle. Limit the public web API key to
+   `identitytoolkit.googleapis.com` and `securetoken.googleapis.com`; the administration CLI also
+   uses it, so browser-referrer restrictions would need a separate CLI key.
    The homepage at `/` describes the app without JavaScript or sign-in; `/play` opens sign-in or
    the game lobby. The public policy at `/privacy.html` is linked from all three pages. Keep its
    contact address and data practices current, and use that same URL in Google Auth Platform →
@@ -48,11 +50,17 @@ heap/bounded direct memory and no writable application volume. Database URLs all
 [AGENTS.md](../AGENTS.md#verification-and-release) owns promotion and live verification. A merge to
 `main` alone does not deploy. CI runs source tests/catalogs/browser checks and production-container
 build/SQL smoke in parallel; `verify` requires both. The container covers web typecheck/bundling.
-Require `verify` where the plan permits; direct CI checks are not enforced branch protection
-(the private repository's plan previously returned 403).
+Both `main` and `release` require the GitHub Actions `verify` check, including for administrators;
+force pushes and deletion are blocked. `main` requires a pull request with resolved conversations.
+As a single-maintainer repository it does not require an independent approval. `release` permits
+fast-forward promotion of an already verified commit without a separate pull request.
 
 [Dependabot](../.github/dependabot.yml) and [dependency graph](../.github/workflows/dependency-graph.yml)
-own monitoring. [Patch auto-merge](../.github/workflows/patch-updates.yml) needs `AUTO_MERGE_PATCHES=true`,
+own dependency monitoring; Kotlin/JS tooling has a separate `kotlin-js-store/yarn.lock`.
+GitHub secret scanning and push protection are enabled. CodeQL default setup scans Actions, Java/Kotlin,
+JavaScript/TypeScript and Python with the extended query suite. Workflow actions are pinned to commit
+SHAs and checkout credentials are not persisted.
+[Patch auto-merge](../.github/workflows/patch-updates.yml) needs `AUTO_MERGE_PATCHES=true`,
 `DEPENDENCY_MERGE_TOKEN`, GitHub auto-merge and classic protection requiring `verify`. Scope the bot token
 to contents/PR write and protection read; review major/minor updates.
 Weekly/manual runtime refresh needs `RENDER_API_KEY` and `RENDER_SERVICE_ID`: it verifies selected

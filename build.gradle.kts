@@ -1,11 +1,24 @@
 import org.gradle.process.CommandLineArgumentProvider
+import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnPlugin
+import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
 
 plugins {
     // this is necessary to avoid the plugins to be loaded multiple times
     // in each subproject's classloader
     alias(libs.plugins.kotlinJvm) apply false
     alias(libs.plugins.kotlinMultiplatform) apply false
-    alias(libs.plugins.ktor) apply false
+}
+
+// Kotlin/JS test tooling is generated separately from the web workspace lockfile.
+plugins.withType<YarnPlugin> {
+    extensions.configure<YarnRootExtension> {
+        resolution("body-parser", "1.20.9")
+        resolution("diff", "8.0.3")
+        resolution("follow-redirects", "1.16.2")
+        resolution("glob", "14.0.2")
+        resolution("minimatch", "11.0.1")
+        resolution("serialize-javascript", "7.1.3")
+    }
 }
 
 val kotlinFormatter =
