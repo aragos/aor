@@ -71,8 +71,10 @@ fun main(arguments: Array<String>) {
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             card-advantage-run.py --mode collect|evaluate --source JSON --output PATH --hours HOURS
+              Optional evaluation-only --batch-size 1..64 shares one JVM across explicit games.
             Native advantage worker: --mode card-advantage-collect|card-advantage-evaluate --source JSON
               --output PATH --index N --hours HOURS, or --describe true for metadata only.
+              Evaluation also accepts --indices N,N,... (at most 64) instead of --index.
             --mode strategy-replay --source COMPARISON_JSON --output PATH --index N --side candidate|incumbent
             Reuse a train output directory to resume its original model and completed rounds.
             Outputs: trainer.log, coverage.json, checkpoint.json, candidate.json, model.json,

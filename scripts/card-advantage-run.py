@@ -3,6 +3,7 @@
 
 Six single-core JVMs share an immutable source and original deadline. Complete records are atomic,
 gzip-compressed and hashed; outcomes are never decoded by this operational supervisor.
+Evaluation can opt into batches of up to 64 games per JVM; collection always uses one origin.
 """
 import argparse
 import concurrent.futures
@@ -72,6 +73,8 @@ def options(arguments=None):
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--runtime', type=Path, help='Installed training/lib directory; default sibling installation.')
     p.add_argument('--workers', type=int, default=6)
+    p.add_argument('--batch-size', type=int, default=1,
+                   help='Evaluation games per JVM, 1–64; collection requires 1. Default 1 preserves single-job execution.')
     p.add_argument('--hours', type=float, required=True)
     p.add_argument('--deadline-epoch', type=float, required=True, help='Original workflow deadline, never renewed on resume.')
     p.add_argument('--data-root', type=Path, required=True, help='Whole experiment directory subject to4GiB data cap.')
@@ -86,6 +89,8 @@ def options(arguments=None):
     require(value.runtime.is_dir(), 'Runtime must be the exact installed training/lib directory.')
     max_workers = min(6, max(1, int((os.cpu_count() or 1) * .8) - 2))
     require(1 <= value.workers <= max_workers, f'Use1–{max_workers} single-core JVM workers.')
+    require(1 <= value.batch_size <= 64 and (value.mode == 'evaluate' or value.batch_size == 1),
+            'Batch size must be 1–64 for evaluation and exactly 1 for collection.')
     require(math.isfinite(value.hours) and 0 < value.hours <= 12, 'Stage hours must be finite and within(0,12].')
     require(math.isfinite(value.deadline_epoch) and value.deadline_epoch <= time.time() + 12 * 3600 + 5,
             'The original workflow deadline must be finite and at most12hours ahead.')
@@ -179,15 +184,13 @@ def binding(value, index):
     return result
 
 
-def execute(value, base, index, deadline):
-    path, bound = record(value, index)
-    if path.exists() and bound.exists():
-        return binding(value, index)
+def launch_native(value, base, selection, log_name, deadline):
+    """One owned process, with the original deadline covering every index in its selection."""
     require(not STOP.is_set() and time.time() < deadline, 'Original deadline elapsed or another worker failed.')
     resources(value.data_root)
     command = base + ['--mode', 'card-advantage-' + value.mode, '--source', str(value.source),
-        '--output', str(value.output), '--index', str(index), '--hours', str((deadline - time.time()) / 3600)]
-    with (value.output / f'worker-{index}.log').open('ab') as log:
+        '--output', str(value.output), *selection, '--hours', str((deadline - time.time()) / 3600)]
+    with (value.output / log_name).open('ab') as log:
         child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
         try:
@@ -195,7 +198,7 @@ def execute(value, base, index, deadline):
                 require(not STOP.is_set() and time.time() < deadline, 'Original deadline elapsed or collection was canceled.')
                 resources(value.data_root)
                 time.sleep(.25)
-            require(child.returncode == 0, f'Native job{index} failed; inspect worker-{index}.log. No replacement world is allowed.')
+            require(child.returncode == 0, f'Native execution failed; inspect {log_name}. No replacement world is allowed.')
         finally:
             if child.poll() is None:
                 child.terminate()
@@ -204,8 +207,38 @@ def execute(value, base, index, deadline):
                 except subprocess.TimeoutExpired:
                     child.kill()
                     child.wait(timeout=5)
+
+
+def execute(value, base, index, deadline):
+    path, bound = record(value, index)
+    if path.exists() and bound.exists():
+        return binding(value, index)
+    launch_native(value, base, ['--index', str(index)], f'worker-{index}.log', deadline)
     require(path.exists(), 'A successful native worker must publish its whole immutable record.')
     return binding(value, index)
+
+
+def execute_batch(value, base, indices, deadline):
+    """Keep per-game bindings; a failed batch leaves completed native records resumable."""
+    require(1 <= len(indices) <= 64 and len(set(indices)) == len(indices)
+            and all(type(index) is int and index >= 0 for index in indices),
+            'A batch requires 1–64 distinct job indices.')
+    if len(indices) == 1:
+        return [execute(value, base, indices[0], deadline)]
+    require(value.mode == 'evaluate', 'Only evaluation jobs may share a native process.')
+    pending = []
+    for index in indices:
+        path, bound = record(value, index)
+        if path.exists() and bound.exists():
+            binding(value, index)
+        else:
+            pending.append(index)
+    if pending:
+        launch_native(value, base, ['--indices', ','.join(map(str, pending))],
+               f'worker-batch-{indices[0]}-{indices[-1]}.log', deadline)
+    require(all(record(value, index)[0].exists() for index in indices),
+            'A successful batch must publish every requested game record.')
+    return [binding(value, index) for index in indices]
 
 
 def run(value):
@@ -214,6 +247,8 @@ def run(value):
     base, native = runtime(value)
     identity = {'source': str(value.source), 'sourceSha256': sha(value.source), 'mode': value.mode,
                 'workers': value.workers, 'runtime': native}
+    if value.batch_size != 1:
+        identity['batchSize'] = value.batch_size
     identity_path = value.output / 'execution.json'
     if not identity_path.exists():
         require(not any(p.name not in {'.advantage.lock'} for p in value.output.iterdir()),
@@ -237,10 +272,12 @@ def run(value):
     progress('running')
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=value.workers) as pool:
-            futures = [pool.submit(execute, value, base, i, deadline) for i in range(count)]
+            chunks = [list(range(start, min(start + value.batch_size, count)))
+                      for start in range(0, count, value.batch_size)]
+            futures = [pool.submit(execute_batch, value, base, indices, deadline) for indices in chunks]
             try:
                 for future in concurrent.futures.as_completed(futures):
-                    completed.append(future.result())
+                    completed.extend(future.result())
                     progress('running')
                     print(json.dumps({'completed': len(completed), 'total': count, 'lastIndex': completed[-1]['index']}), flush=True)
             except BaseException:
