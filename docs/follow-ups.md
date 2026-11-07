@@ -178,6 +178,196 @@ establish a serious challenge for experienced humans.
   encoding, fitting and inference separately before moving work to specialized hardware. Use LLM
   review for failed milestones and strategic reassessment; no LLM calls are needed per game or update.
 
+#### Next implementation window: up to 12 hours
+
+The next window tests whether deliberately collected sequence outcomes can train stronger repeated
+card decisions. Its primary deliverable is a qualified, locally playable card-and-purchase candidate,
+or a preserved negative result that identifies the next bottleneck. Human-level play remains a goal
+requiring separate human evaluation. Keep the current four-player profile, qualified purchase actor,
+and production rules. Start with normal card windows; final windows and nested resolutions retain F.
+
+Use a new isolated implementation worktree derived from this branch. Preserve the completed purchase
+and card experiment checkouts, runtimes, models and archives. Commit cohesive collector, learner and
+inference changes separately. Do not merge, push, release or activate an unqualified model in shared
+branches. Reuse the existing runner, simulator, encoders and browser integration pattern.
+
+| Elapsed time from execution start | Work and decision |
+| --- | --- |
+| 0–0.5 h | Freeze interfaces, resource limits, proposal rules, dataset splits, fitting settings and fresh seed banks. Assign file ownership. |
+| 0.5–2.5 h | Implement collector, numerical learner and portable selector in parallel; run focused checks and the two-cycle sequence test. Commit and freeze the runtime. |
+| 2.5–5 h | Collect cycle 1, fit the ensemble, inspect completed local validation and run a repeated-use development screen. Stop this recipe on a correctness failure or clear harmful transfer. |
+| 5–8 h | If eligible, collect cycle 2 using P1 as the continuation, fit P2, and compare P1/P2 on one common fresh development bank. Freeze one finalist. |
+| 8–10 h | Run independent full-game confirmation and learned-rival checks. Prepare narrowly scoped browser integration while the qualification result is pending. |
+| 10–12 h | Activate only a qualified candidate in an isolated preview, finish browser/replay checks, archive evidence and review the next stage. |
+
+These are ceilings, not requirements to keep working on a failed approach. Reserve the final three
+hours for qualification, integration and handoff; do not start another collection after hour 8.
+Admit a collection only when its full time cap plus 30 minutes for fitting still fits before hour 9. An
+incomplete cycle cannot supply a convenient partial training set. A completed, eligible P1 can remain
+the finalist if cycle 2 times out; otherwise finish with a diagnosis. No unplanned third cycle or
+additional confirmation samples belong to this window.
+
+**Collector and decision contract.** Extend the existing branch collector and
+[simulation controller](../training/src/main/kotlin/dev/aragos/aor/training/Simulation.kt), rather than
+creating another experiment framework. Export the ordinary actor-safe observation at each root and
+at the next own ordinary card decision in the same window. Preserve the exact child state and RNG
+position for paired continuations; private authority histories remain executor-only.
+
+Define one versioned proposal function used by collection, JVM evaluation and browser inference.
+Its set S contains the exact F recommendation, offered Pass, and up to two other physical-card groups
+sampled uniformly, with one uniformly sampled offered command per group. Deduplicate commands, use
+canonical ordering, and bind the sampler and decision-seed derivation. Use physical hand references
+for groups and a separately salted deterministic sampling stream. Record F's explicit command and
+index; canonical ordering need not put F first. The seed is execution metadata,
+never a learned feature. Retain the existing bounded target/protection offers. Evaluate exactly S
+at runtime; do not silently widen deployment to actions excluded by this sampling rule.
+
+Evaluate every member of S at each sampled child too. Do not restrict child training to Pass/F while
+deploying a wider selector there. After each forced action, every subsequent eligible decision uses
+the frozen continuation policy; all seats retain the same qualified purchase actor. Nested decisions
+remain F. A suffix ends when its original normal window ends.
+
+For observation s, candidate a, F action b and frozen continuation pi, the target is the paired
+difference `R(a then pi) - R(b then pi)`, using the existing terminal reward
+`0.8 * winShare + 0.2 * rankReward`. A child intervention produces a separate row at that child's
+observation. Never assign a compound sequence's return to its first action under a different
+continuation. Different future streams may produce different child observations; average only
+identical observation/action pairs. Keep other rows separate and cluster them by their original world.
+
+Cycle 1 uses F card continuations. Cycle 2 uses frozen P1 for the controlled seat and a prospectively
+assigned, balanced mixture of F and P1 rival lineups. Freeze each lineup before branching. Keep F as
+the action-value reference in both cycles. Do not pool cycle-1 and cycle-2 return targets into one
+unconditioned loss: they describe different continuation policies. Parameter warm-starting is allowed.
+
+Use four paired future streams per world. With at most four root proposals and three non-Pass root
+actions, evaluating the full child proposal sets requires at most 52 distinct tails per origin:
+16 root tails plus 48 child tails minus 12 exact reuses. Reuse is valid only when observation, F
+recommendation, proposal version, decision seed, chosen action and child RNG position match the
+already computed frozen-policy continuation. Assert this identity; never expand the budget silently.
+
+**Learner and portable policy.** Reuse the sparse card encoder and 64-unit state/action representation.
+Add an explicit versioned advantage-selector contract; do not reinterpret a residual card-policy
+artifact as a different policy without a new selector identity. Keep the qualified purchase format and
+behavior unchanged. The selector should have a single inference implementation shared by JVM and JS.
+
+Fit `q(s,a) - q(s,b)` to the paired difference with squared error, using a bounded sigmoid action-value
+head. Weight each original world equally, then its decision groups and action pairs equally. Siblings
+and chance replicas are dependent samples. Absolute q values are not identified by a difference loss
+and must not be described as calibrated win probabilities.
+
+Use three predeclared initialization seeds, one fixed optimizer configuration and a small fixed
+checkpoint schedule. Select checkpoints by origin-weighted development loss, with an earlier-epoch
+tie break, then retain all three seeds in the ensemble. The deployed selector chooses the proposal
+with the highest mean advantage over F only when that advantage exceeds 0.02 and all three models
+predict a strictly positive advantage; otherwise choose F. Rank all proposals first, breaking exact
+ties by canonical command, then veto the winner if either condition fails; do not choose a lower-ranked
+eligible alternative. Agreement is a conservative rule, not a confidence
+interval. There is no 97% recommendation prior in this selector.
+
+Before real collection, test a two-context task where one context requires changing both actions
+from baseline A→A to B→B. Under F continuation, root B must initially have zero advantage while B's
+child choosing B has positive advantage. After the child is learned, recollection under P1 must make
+root B valuable; repeated P2 must execute the whole sequence. Include reversed payoffs and verify
+both contexts. Preserve the earlier failed PPO tests as separate evidence.
+
+**Data and development gates.** Reserve 256 fresh worlds for each cycle: 128 training, 64 development
+for checkpoint/control calibration, and 64 local validation. These local banks are development
+evidence, not the final strength test. Allocate requested normal-window roots across epochs and
+visible conditions, including playable leaders and owned Printed Word, and rotate all four seats.
+Choose roots prospectively, record skipped requests and never replace them after inspecting outcomes.
+Freeze the exact allocation before launch; coverage requirements are at least 96 training, 48
+development and 48 local-validation worlds. Require at least eight epoch-3 training worlds and four
+each in development and validation, plus four training and two each development/validation worlds
+with owned Printed Word and a playable leader. If a required
+context is missing, record the coverage failure instead of claiming the full scope is qualified.
+
+All descendants of an origin stay in one split. Preserve all action returns, including losses and
+ties; do not produce labels naming each hidden world's best action. Decode outcomes only after the
+declared collection completes and its completion hashes validate.
+
+Fit a matched action-priority ablation that omits state features and context-dependent action quotes,
+while retaining the same F reference and legal/proposal machinery. Also freeze a control calibrated
+on development observations to match the candidate's overall override and Pass/other-card frequencies,
+using no learned state-dependent preferences. Do not recalibrate either control on validation or
+confirmation outcomes. Report realized frequencies, origin-weighted loss against zero advantage,
+selected paired returns, uncertainty and coverage.
+
+Continue from local validation only with positive mean selected paired advantage, overrides in at
+least 16 independent validation worlds, and no single world contributing more than 25% of summed
+positive advantage. Include F/fallback decisions with zero selected advantage and average decision
+groups within each origin before computing means and concentration. Prediction loss and comparisons
+with the ablation are diagnostics; they cannot
+replace complete-game evidence. Use a 128-world repeated-policy development screen for P1. A mean
+win-share loss exceeding five percentage points with an upper 95% bound below zero stops progression
+to cycle 2. Other inconclusive results remain explicitly inconclusive.
+
+After cycle 2, evaluate eligible P1 and P2 on the same fresh 256-world repeated-policy development
+bank. Select by mean win share, preferring P1 when the difference is less than one percentage point.
+Do not compare raw means from the two cycles' different local-validation distributions. P2's F
+fallback can discard P1 improvements, so monotonic improvement is not assumed. Freeze the selected
+ensemble, proposal rules, margin and frequency control before opening final confirmation.
+
+**Independent qualification.** Compare the frozen finalist, current F-card/purchase baseline, and
+frequency control on 1,024 new paired worlds, rotating the controlled seat. All rivals use F cards
+and the qualified purchase actor in this primary bank. Require at least five percentage points of
+win-share improvement over the incumbent, with a positive paired 95% lower bound. Require a positive
+95% lower bound over the frequency control as a further activation requirement, establishing an
+advantage beyond changing action frequencies. An inconclusive result does not trigger more samples
+in the same window.
+
+Use a separate 256-world robustness bank with every controlled role against three finalist rivals,
+comparing the finalist and the incumbent. Cluster all four roles by world. Require a nonnegative mean
+win-share difference and a 95% lower bound above minus three percentage points. These banks require
+at most 5,120 game executions; any exact duplicate reuse must be specified before launch. They test
+the declared setup and rival population, not general human strength or an unrestricted league.
+
+**Verification and integration.** The collector owner verifies unchanged consumed-game replay,
+absolute decision seeds, sealed batches, exact child pairing, legal proposal membership and full-tail
+replay. The learner owner verifies target arithmetic, origin weights, the two-cycle task, ensemble
+selection and deterministic export. The inference owner verifies identical proposal sampling and
+numerical decisions across Python/JVM/JS, including F fallback and unsupported scopes. Encode each
+observation once and share it across the three networks; avoid scoring every legal target separately
+for each member when only S is needed.
+
+Run Kotlin formatting before its formatting check, serialize builds in each checkout, and run
+focused checks once per cohesive change. Before enabling a qualified preview, complete the required
+integrated checks and exercise actual browser decisions, legality, pause/reload/undo, stale-work
+rejection and representative saved-game replay/continuation. Measure cold and warm worker latency;
+keep an explicit budget in the frozen integration checklist. Never change the trained policy or
+sampler to meet that budget without requalification. Leave final windows, unsupported setups and
+incompatible artifacts on F. No remote deployment is part of this window.
+
+**Execution, resource use and agent work.** One local program should drive the fixed collection,
+fitting, development and confirmation stages, using the existing supervision primitives. Keep one
+immutable protocol per cycle, original nonrenewable deadlines, atomic whole-origin/checkpoint writes,
+completion hashes and owned-child cancellation. Record model/runtime/schema identities and fresh
+seed reservations once; avoid a new provenance or orchestration framework.
+
+Use at most six native workers, each with `ActiveProcessorCount=1` and a 1 GiB heap, and one numerical
+CPU thread with sequential ensemble fits. Cap cycle-1 collection at 120 minutes and cycle 2 at 150
+minutes, within the 12-hour window. The two cycles permit at most 26,624 tails plus 512 backbones.
+Check space before and during execution: preserve at least 8 GiB free and cap new experiment data at
+4 GiB. Compress whole-origin data and store identical model/observation payloads once by hash. Never
+truncate actions, observations or returns to meet a limit; stop with incomplete status instead.
+
+Assign three agents disjoint ownership: collector/executor, numerical learner, and portable
+inference/evaluation. The coordinator owns protocol decisions, shared interfaces, serialized builds,
+commits and milestone reviews. Exchange concise contracts and summaries rather than whole logs.
+Programs handle games, batches, fitting, retries, resource checks and progress records without LLM
+calls per move, game or update. Agents review contract completion, learning/transfer failures and
+qualification results. Keep brief user-facing progress updates while long local jobs run.
+
+Deliver committed code, pinned models/configurations, a compact status/result report, a resumable
+execution command, and an isolated preview only if qualified. Include predetermined held-out replay
+examples and a failure inventory; examples illustrate behavior and do not replace statistics.
+
+If this window finishes before the user returns, review the evidence and begin a separately bounded
+next stage without another permission request. If card learning qualifies, prioritize coordinating
+token commitments and expansion with the learned card/purchase policy, then broader opponent
+populations. If it fails, identify whether targets, representation, exploration or repeated-policy
+transfer failed and choose one falsifiable corrective experiment. Freeze new budgets and untouched
+confirmation worlds before that stage; preserve failed results and do not extend a consumed test bank.
+
 ### Hardware experiment
 
 Start the pilot on the current Mac: executor profiling, branching, teacher validation, dataset
