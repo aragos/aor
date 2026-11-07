@@ -374,6 +374,25 @@ allocation and the original stage deadline. A batch shares one remaining allowan
 game keeps its own validated atomic record. An interrupted batch preserves completed games for
 resume; the stage is complete only after every declared game has been verified.
 
+The [capacity correction driver](../scripts/card_advantage_compact_experiment.py) tests a separately
+frozen reduction from 64 to eight active hidden units after a failed independent qualification.
+The learner's `--active-hidden 8` retains the original initialization draws for those units and
+exports exact zeros for the others, preserving the existing selector format and F fallback.
+The previous validation set becomes development evidence. A new collection supplies the local gate,
+followed by fresh paired games against the original model and incumbent, then independent
+qualification. Its preflight also binds the fixed sequence toy and consumed-game batching proof.
+With that separate laboratory and its six-hour clock prepared:
+
+```sh
+python3 .aor-training/executors/card-compact/bin/card_advantage_compact_experiment.py \
+  --lab .aor-training/card-compact --protocol .aor-training/card-compact/window.json
+```
+
+Resume with the same command and original clock. The driver cannot select the old model for another
+confirmation attempt, change the prepared recipe, reuse old validation as a gate, or activate a
+browser policy. The [capacity analysis](../scripts/card_advantage_capacity.py) compares equally
+weighted original worlds; narrower models and lower prediction error alone do not establish strength.
+
 ## Token-purchase continuation learning
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
