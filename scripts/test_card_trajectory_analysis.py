@@ -115,6 +115,56 @@ class TrajectoryAnalysisTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'exactly once'):
                 analysis.analyze('development', seeds, altered)
 
+    def five_arm_records(self, stage, vanilla_wins):
+        seeds, rows = records(stage, lambda world, arm: arm == 'candidate' and world < 128)
+        rows += [dict(seed=seed, controlledSeat=index % 4, arm='vanilla',
+                      terminal=terminal(index % 4, vanilla_wins(index))) for index, seed in enumerate(seeds)]
+        return seeds, rows
+
+    def test_matched_vanilla_tie_blocks_development(self):
+        seeds, rows = self.five_arm_records('development', lambda world: world < 128)
+        report = analysis.analyze('development', seeds, rows, True, True)
+        self.assertFalse(report['eligible'])
+        self.assertEqual(0, report['versus']['vanilla']['pooled']['winShare']['mean'])
+
+    def test_matched_vanilla_tie_blocks_confirmation(self):
+        seeds, rows = self.five_arm_records('confirmation', lambda world: world < 128)
+        report = analysis.analyze('confirmation', seeds, rows, True, True)
+        self.assertTrue(report['gates']['minimumGainVsF'])
+        self.assertFalse(report['gates']['lower95VsVanilla'])
+        self.assertFalse(report['passed'])
+
+    def test_early_vanilla_comparison_is_descriptive_even_when_better(self):
+        seeds, rows = self.five_arm_records('confirmation', lambda world: True)
+        report = analysis.analyze('confirmation', seeds, rows, True, False)
+        self.assertTrue(report['passed'])
+        self.assertNotIn('lower95VsVanilla', report['gates'])
+        self.assertLess(report['versus']['vanilla']['pooled']['winShare']['mean'], 0)
+        self.assertIn('unequal-budget', report['limits'][-1])
+
+    def test_fifth_arm_must_be_complete_and_superiority_cannot_be_unbound(self):
+        seeds, rows = self.five_arm_records('development', lambda world: False)
+        with self.assertRaisesRegex(ValueError, 'exactly once'):
+            analysis.analyze('development', seeds, rows[:-1], True, True)
+        with self.assertRaisesRegex(ValueError, 'declared frozen'):
+            analysis.analyze('development', seeds, rows, False, True)
+
+    def test_optional_control_source_adds_only_one_exact_frozen_actor(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            args = bank_fixture(root)
+            seeds, _, _, _, _, base, initial, candidate, priority = args
+            legacy = analysis.make_source('controls', seeds, {'initial': initial}, base, priority)
+            extended = analysis.make_source('controls', seeds, {'initial': initial}, base, priority, candidate)
+            self.assertEqual(768, len(legacy['jobs']))
+            self.assertEqual(1024, len(extended['jobs']))
+            self.assertNotIn('vanilla', legacy['policies'])
+            self.assertEqual(dict(kind='card-actor', path=str(candidate)), extended['policies']['vanilla'])
+            self.assertEqual(['f', 'initial', 'priority64', 'vanilla'],
+                             [row['arm'] for row in extended['jobs'][:4]])
+            self.assertEqual(analysis.make_source('development', seeds, {'candidate': candidate}, base, priority),
+                             analysis.make_source('development', seeds, {'candidate': candidate}, base, priority, candidate))
+
     def test_last_accepted_kl_survives_rejected_and_zero_epoch_carry(self):
         reports = [dict(inputModelSha256='a', outputModelSha256='b', acceptedEpochs=1,
                         history=[dict(epoch=1, accepted=True, priorKl=.02),

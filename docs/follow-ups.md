@@ -523,3 +523,21 @@ eligible checkpoint can reach the fresh four-arm confirmation bank. All training
 evaluation share one original three-hour clock, with compressed complete-game records, fixed input
 hashes and a 4 GiB data cap. A missing checkpoint, changed input or exhausted budget must preserve
 evidence and stop progression. No result automatically changes the browser policy.
+
+
+The optional `physical-card-reference-1` profile uses the same collector, actor and inference,
+with a prospectively fixed training schedule: reference KL coefficient 0.10 for updates 1–16,
+then zero for updates 17–32. The reference gives equal mass to each offered physical card and
+Pass, then equal mass to that card's offered parameter variants. Model and Adam carry continue
+across the transition. The separate passing exploration toy motivates this test; it does not
+change the earlier failed controls or establish full-game strength.
+
+Evaluate checkpoints 8/16 diagnostically; eligibility and harmful-play stopping apply only to
+24/32 after reward-only consolidation. Keep the update-16 probability-movement guard. Before
+starting, freeze the last completed vanilla update after its final disposition, without ranking
+its outcomes. Always include it as a fifth paired arm. If it completed all 32 updates, require
+positive development gain and positive final lower 95% confidence bound against it. Otherwise
+label that comparison descriptive because training budgets differ, retaining the original
+F/initial/priority gates. The maximum is 15,360 executions on 9,472 fresh worlds within the same
+three-hour limit. Fixed optimizer seeds hold numerical randomness settings constant; fresh
+trajectories mean this is a comparison of resulting policies, not a single-factor causal test.
