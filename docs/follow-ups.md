@@ -489,3 +489,21 @@ zero-sum convergence guarantee does not establish optimality for this multiplaye
 
 User-authored future-turn scripts and midgame controller replacement remain deferred as defined in
 [scope](requirements.md); internal speculative planning does not authorize future command batches.
+
+#### Joint token and expansion priorities
+
+Test a small fixed set of economic weight changes before adding another learner architecture.
+The [joint economy driver](../scripts/joint_economy_experiment.py) screens the incumbent and
+14 predeclared perturbations on 64 fresh worlds, selects three on 192 separate worlds, and
+confirms one on 1,024 further worlds. Each stage caches one incumbent game per world. Rival
+populations alternate in blocks of four worlds so both cover every controlled registration seat.
+Candidates change only token buying and expansion; purchases retain the exact qualified F prior
+and purchase actor, and other decisions retain F. The original priority card model is an
+experimental rival, not a qualified replacement.
+
+Keep candidate weights, model identities, rival populations, paired gates and bootstrap fixed
+before the screen. Consumed-game incumbent parity and fixed-input behavioral feasibility must
+pass for the exact runtime before admission. All stages share one nonrenewable three-hour clock,
+six single-core workers and batches of eight, with per-game atomic records and the existing
+completion barrier. A failed selection or confirmation ends the experiment without additional
+samples, new candidates or automatic browser activation.
