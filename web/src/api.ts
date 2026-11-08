@@ -7,6 +7,7 @@ export interface ExpansionOfferView {
     blockers: string[]; partialPlacements: {tokens: number; resultingPool: number}[];
     missingAccess?: string[];
     greenDieWins?: number[] | null;
+    competitionWinProbability?: number | null;
     shipping: {used: number; capacity: number | null; required: number} | null;
     incomeBefore: number | null; incomeAfter: number | null;
     reachable: boolean;
@@ -45,6 +46,7 @@ export interface CardOfferView {
     miseryChanges?: MiseryChangeView[]; miseryUncertainPlayers?: string[];
 }
 export interface LeaderDiscountView {
+    rebate?: number;
     advance: string; printedAmount: number; conditionalAmount: number; writtenRecordBonus: number;
     effectiveDiscount: number; condition: string | null;
 }
@@ -135,6 +137,7 @@ export interface HistoryEventView {
         ratingSources: {advance: string; amount: number}[]} | null;
     drawReason: 'INITIAL_DEAL' | 'TURN_DRAW' | 'URBAN_ASCENDANCY' | 'EXPANSION_PURCHASE' | 'EXPANSION_BONUS' | 'SHORTAGE' | null;
     protectionCash: number | null; leaderRebate: number | null;
+    income?: {player: string; baseIncome: number; middleClassBonus: number; interestProfit: number}[];
     marketRoll: {total: number; commodities: string[]; adjustment: 'SHORTAGE' | 'SURPLUS'; cancelled: string[]} | null;
     competition: {attackerWon: boolean; defenders: string[]} | null;
     war: WarOutcomeView | null;
@@ -219,6 +222,7 @@ export interface Snapshot {
         commodityPayouts: CommodityPayoutView[]; cardOffers: CardOfferView[];
         cardInspections: CardInspectionView[];
         tokenPurchaseOffers: TokenPurchaseOfferView[]; shippingOffer: ShippingOfferView | null;
+        windmillOffer?: {player: string; victim: string; province: string; tokenCost: number; successProbability: number} | null;
         expansionCardCost?: number | null};
     prompt: {messageId: string; players: string[]} | null;
     legalChoices: {commands: string[]; bidMin: number | null; bidMax: number | null};

@@ -306,7 +306,7 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                     (SELECT jsonb_agg(m.seat) FROM game_players m
                         WHERE m.game_id = g.id AND m.needs_move) AS action_players,
                     CASE WHEN g.document->>'fileVersion' <> '7'
-                        OR g.document->'header'->>'rulesVersion' <> ?
+                        OR NOT (g.document->'header'->>'rulesVersion' = ANY (?))
                         OR NOT (g.document->'header'->>'dataVersion' = ANY (?)) THEN 'UNAVAILABLE'
                         ELSE g.listing_status END AS base_status,
                     g.stage
@@ -324,7 +324,10 @@ class PostgresGameStore(internal val database: PostgresDatabase) : ManagedGameSt
                 .trimIndent()
         val games =
             connection.prepareStatement(sql).use { statement ->
-                statement.setString(1, RULES_VERSION)
+                statement.setArray(
+                    1,
+                    connection.createArrayOf("text", arrayOf(RULES_VERSION, LEGACY_RULES_VERSION)),
+                )
                 statement.setArray(
                     2,
                     connection.createArrayOf(

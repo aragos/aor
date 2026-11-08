@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
-const val RULES_VERSION = "ah1996-three-epoch-4"
+const val RULES_VERSION = "ah1996-three-epoch-5"
+const val LEGACY_RULES_VERSION = "ah1996-three-epoch-4"
 const val DATA_VERSION = "ah1996-catalog-16"
 
 /**
@@ -27,6 +28,11 @@ data class GameHeader(
     val creatorId: PlayerId,
     val rulesVersion: String = RULES_VERSION,
     val dataVersion: String = DATA_VERSION,
+    /**
+     * First turn offering Renaissance before Draw Card. Upgrades retain historical timing and
+     * activate after the latest historical turn, preserving current and rewound recorded draws.
+     */
+    val drawRenaissanceFromTurn: Int = 1,
 ) {
     init {
         require(players.size in 3..6) { "A game requires 3 through 6 players." }
@@ -36,7 +42,12 @@ data class GameHeader(
         require(players.any { player -> player.id == creatorId }) {
             "The game creator must be a registered player."
         }
-        require(rulesVersion == RULES_VERSION) { "Unsupported rules version: $rulesVersion." }
+        require(rulesVersion in setOf(RULES_VERSION, LEGACY_RULES_VERSION)) {
+            "Unsupported rules version: $rulesVersion."
+        }
+        require(drawRenaissanceFromTurn > 0) {
+            "The Draw Card Renaissance activation turn must be positive."
+        }
         CatalogVersion.fromWire(dataVersion)
     }
 }

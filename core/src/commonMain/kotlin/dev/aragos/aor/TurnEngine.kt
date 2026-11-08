@@ -262,15 +262,20 @@ internal object TurnEngine {
                         purchaseStep = PurchaseStep.SHIPPING,
                     )
             )
+        val drawOrderMatters =
+            state.stage == Stage.DRAW_CARD &&
+                state.header.rulesVersion == RULES_VERSION &&
+                state.currentTurn() >= state.header.drawRenaissanceFromTurn
         val orderMatters =
-            state.stage in
-                setOf(
-                    Stage.BUY_CARD,
-                    Stage.PLAY_CARDS,
-                    Stage.PURCHASE,
-                    Stage.EXPANSION,
-                    Stage.FINAL_CARD_PLAY,
-                )
+            drawOrderMatters ||
+                state.stage in
+                    setOf(
+                        Stage.BUY_CARD,
+                        Stage.PLAY_CARDS,
+                        Stage.PURCHASE,
+                        Stage.EXPANSION,
+                        Stage.FINAL_CARD_PLAY,
+                    )
         val candidates =
             state.turnOrder.filter { id ->
                 orderMatters &&

@@ -11,13 +11,12 @@ function selectedCommodity(choice: CardChoiceView | undefined, commodities: stri
 }
 
 /** Explain the chosen play without resolving rules or inventing unprojected outcomes. */
-export function CardPlayEffects({snapshot, definition, choice, commodities, targets, protection}: {
+export function CardPlayEffects({snapshot, definition, choice, commodities, targets}: {
     snapshot: Snapshot;
     definition: CardDefinition;
     choice: CardChoiceView | undefined;
     commodities: string[];
     targets: string[];
-    protection: number | null;
 }) {
     const commodity = definition.kind === 'commodity' ? selectedCommodity(choice, commodities) : null;
     return <section className="card-play-effects" aria-label={t('card.playEffects')}>
@@ -33,6 +32,5 @@ export function CardPlayEffects({snapshot, definition, choice, commodities, targ
         {targets.length > 0 && <p>{t('card.targets')}: {targets.map((id, index) => <span key={id}>
             {index > 0 && ', '}<ProvinceLabel snapshot={snapshot} id={id}/>
         </span>)}</p>}
-        {protection !== null && protection > 0 && <p>{t('game.protection')}: ${protection}</p>}
     </section>;
 }

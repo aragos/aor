@@ -10,7 +10,7 @@ export const ReferenceCatalogContext = createContext<PublicCatalog | null>(null)
 /** Public live positions and card counts update open lookups without replacing action drafts. */
 export const ReferenceGameContext = createContext<{
     viewerId: string | null;
-    players: Pick<PlayerView, 'id' | 'name' | 'capital' | 'boardMarkers' | 'misery' | 'ships'>[];
+    players: Pick<PlayerView, 'id' | 'name' | 'capital' | 'boardMarkers' | 'misery' | 'ships' | 'advances'>[];
     turnOrder: string[];
     orderBoxes: Record<string, number>;
     commodityCards: Snapshot['game']['commodityCards'];

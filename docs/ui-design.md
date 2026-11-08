@@ -89,13 +89,16 @@ quotes without discarding choices. Saved plans stay reviewable/executable on the
 draws/changed consequences pause, editing confirms disarm. [Architecture](design.md#private-plans) owns execution.
 Card purchases offer one Buy/Pass choice while waiting, scheduling it directly with cancellation;
 on the player's turn, ordinary Buy/Pass actions commit directly. Existing plans that include discards
-remain reviewable through the full planner.
+remain reviewable through the full planner. Renaissance decisions allow scheduling card purchases;
+they delay execution. Planned relief declines remain visible, and active drafts offer an explicit
+Save and execute action.
 
 Undo first withdraws unrevealed submissions; otherwise Linear game reviews server-offered targets and
 removed public actions/random events, cleared submissions and paused plans. Earlier targets live under
 Commands. **Rewind to here** confirms; stale offers need fresh review/confirmation. Prior revisions are
 read-only. Help explains fresh rolls, restored draws, no redo/retained knowledge. Policy conversion
-refreshes capabilities/closes legacy editor but preserves valid drafts; actual rewind clears them.
+refreshes capabilities/closes legacy editor but preserves valid drafts. Rewinds across turn/phase
+boundaries clear drafts; same-phase undo preserves other players’ planning drafts.
 [Architecture](design.md#history-and-undo) owns scopes.
 
 Abandonment lives in collapsed Game options with one consent section. Proposing agrees; all seats must

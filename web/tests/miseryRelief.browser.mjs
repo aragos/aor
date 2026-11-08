@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {createGame} from './browser-support.mjs';
+import {pathToFileURL} from 'node:url';
+import {open, createGame} from './browser-support.mjs';
 
 export async function checkLiveMiseryRelief(page, web) {
     const game = await createGame(3);
@@ -46,6 +47,16 @@ export async function checkLiveMiseryRelief(page, web) {
                 continue;
             }
             if (affordable && !checkedPurchase) {
+                const saved = await fetch(`${process.env.MAP_API_URL}/api/games/${game.created.gameId}/plans`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${actor.token}`},
+                    body: JSON.stringify({expectedRevision: state.revision, expectedVersion: state.planning.version,
+                        operationId: crypto.randomUUID(), operation: 'SAVE', actions: []}),
+                });
+                assert(saved.ok, 'An empty review plan may be edited on the active relief decision');
+                await page.reload();
+                await page.wait(`document.querySelector('.activity-planner')`, 'saved relief plan');
+                await page.click('Edit plan');
+                await page.wait(`document.querySelector('.activity-planner[data-editing="true"]') && document.querySelector('#relief-spaces button:not(:disabled)')`, 'planned relief quote');
                 await page.evaluate(`document.querySelector('#relief-spaces button:not(:disabled)').click()`);
                 assert.equal((await game.snapshot(actor)).revision, state.revision, 'Choosing spaces only edits the draft');
                 await page.evaluate(`new Promise(resolve => setTimeout(resolve, 1200))`);
@@ -54,7 +65,11 @@ export async function checkLiveMiseryRelief(page, web) {
                 await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-relief-purchase-phone.png'), 390, 844, true);
                 assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
                 await page.evaluate(`document.querySelector('.relief-action').click()`);
-                await page.wait(`!document.querySelector('.relief-rating-summary')`, 'confirmed relief finishes purchasing');
+                await page.wait(`[...document.querySelectorAll('.decision-actions button')].some(button => button.textContent === 'Save and execute plan' && !button.disabled)`, 'explicit relief plan application');
+                assert.equal((await game.snapshot(actor)).revision, state.revision, 'Adding relief to a plan has no game effect');
+                assert.match(await page.evaluate(`document.querySelector('.plan-actions').textContent`), /Buy misery relief/);
+                await page.click('Save and execute plan');
+                await page.wait(`!document.querySelector('.relief-rating-summary') && !document.querySelector('.activity-planner[data-editing="true"]')`, 'confirmed relief finishes purchasing');
                 const after = await game.snapshot(actor);
                 assert.equal(after.revision, state.revision + 1, 'Purchase and progression use one command');
                 assert.equal(after.history.at(-1), `${actor.id}: relieve-misery ${affordable.spaces}`);
@@ -115,4 +130,10 @@ export async function checkLiveMiseryRelief(page, web) {
     assert(checkedPurchase, 'A live confirmed purchase finishes purchasing automatically');
     assert(checkedBlocked, 'Unaffordable live relief requires explicit Pass');
     console.log('Passed: live accumulated MR during advances, current-turn relief display, draft/polling preservation, one-command relief completion and explicit unaffordable Pass.');
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+    const page = await open(process.env.MAP_WEB_URL);
+    try { await checkLiveMiseryRelief(page, process.env.MAP_WEB_URL); }
+    finally { page.ws.close(); await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`); }
 }

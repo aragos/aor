@@ -25,6 +25,10 @@ fun createConfiguredGameService(environment: Map<String, String> = System.getenv
                 FileGameStore(Path.of(environment["AOR_DATA_DIR"] ?: ".aor-data").toAbsolutePath())
             else -> error("AOR_STORAGE must be postgres or file.")
         }
+    DrawRenaissanceMigration.run(store).forEach { id ->
+        LoggerFactory.getLogger("DrawRenaissanceMigration")
+            .info("Upgraded Draw Card Renaissance timing for game {}", id)
+    }
     LinearGameMigration.run(store).forEach { id ->
         LoggerFactory.getLogger("LinearGameMigration").info("Upgraded Linear game {}", id)
     }

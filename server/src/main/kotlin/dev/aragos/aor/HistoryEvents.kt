@@ -75,6 +75,14 @@ enum class CardDrawReason {
 /** Signed public cash movement caused by this entry, including automatic phase bookkeeping. */
 data class HistoryCashChangeView(val player: PlayerId, val amount: Int)
 
+/** Cash sources at collection time, before later spending or advance purchases. */
+data class HistoryIncomeView(
+    val player: PlayerId,
+    val baseIncome: Int,
+    val middleClassBonus: Int,
+    val interestProfit: Int,
+)
+
 /** Signed changes to a player's own pool and stock; never a physical transfer between players. */
 data class HistoryTokenChangeView(val player: PlayerId, val poolDelta: Int, val stockDelta: Int)
 
@@ -162,6 +170,7 @@ data class HistoryEventView(
     val leaderRebate: Int? = null,
     val marketRoll: HistoryMarketRollView? = null,
     val participants: List<HistoryParticipantView> = emptyList(),
+    val income: List<HistoryIncomeView> = emptyList(),
 )
 
 /** Public outcome from the committed board change, including Cathedral resolutions. */
@@ -296,6 +305,15 @@ internal object HistoryEvents {
                         cashChanges = cash,
                         miseryChanges = misery,
                         tokenChanges = tokens,
+                        income =
+                            receipt.income.map { payment ->
+                                HistoryIncomeView(
+                                    payment.player,
+                                    payment.quote.baseIncome,
+                                    payment.quote.middleClassBonus,
+                                    payment.quote.interestProfit,
+                                )
+                            },
                     )
                 )
             }

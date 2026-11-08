@@ -148,7 +148,7 @@ class ActivityPlansTest {
     }
 
     @Test
-    fun linearRewindDisarmsOfflinePlansAndPreventsImmediateReexecution() {
+    fun samePhaseLinearRewindPreservesOtherPlayersOfflinePlans() {
         val fixture = fileFixture(policy = UndoPolicy.LINEAR_GAME)
         fixture.toPurchase()
         fixture.plan(1, PlanOperation.SAVE, purchase)
@@ -158,13 +158,13 @@ class ActivityPlansTest {
         fixture.submit(0, "undo")
         fixture.service.recoverPlans { _, failure -> throw failure }
 
-        assertThat(fixture.view(1).planning?.saved?.armed).isFalse()
+        assertThat(fixture.view(1).planning?.saved?.armed).isTrue()
         assertThat(fixture.view(1).planning?.saved?.actions).isEqualTo(purchase)
-        assertThat(fixture.view(1).planning?.saved?.pause).isEqualTo(PlanPause.EDITED)
+        assertThat(fixture.view(1).planning?.saved?.pause).isNull()
     }
 
     @Test
-    fun historyEditsDisarmUnexecutedPlans() {
+    fun samePhaseUndoPreservesOtherPlayersUnexecutedPlans() {
         val fixture = fileFixture(policy = UndoPolicy.FRIENDLY_GAME)
         fixture.toPurchase()
         fixture.plan(1, PlanOperation.SAVE, purchase)
@@ -173,9 +173,27 @@ class ActivityPlansTest {
 
         fixture.submit(0, "undo")
 
-        assertThat(fixture.view(1).planning?.saved?.pause).isEqualTo(PlanPause.EDITED)
-        assertThat(fixture.view(1).planning?.saved?.armed).isFalse()
+        assertThat(fixture.view(1).planning?.saved?.pause).isNull()
+        assertThat(fixture.view(1).planning?.saved?.armed).isTrue()
         assertThat(fixture.view(1).planning?.saved?.actions).isEqualTo(purchase)
+    }
+
+    @Test
+    fun undoAcrossPhaseBoundaryDisarmsOtherPlayersPlans() {
+        val fixture = fileFixture(policy = UndoPolicy.LINEAR_GAME)
+        fixture.toPurchase()
+        fixture.submit(0, "undo")
+        val target = fixture.store.read(fixture.game.gameId).state().entryCount
+        fixture.submit(2, "pass")
+        fixture.plan(1, PlanOperation.SAVE, purchase)
+        fixture.plan(1, PlanOperation.ARM)
+        val before = fixture.view(1).planning
+
+        fixture.submit(0, "undo $target")
+
+        val after = fixture.view(1).planning
+        assertThat(after?.saved).isNull()
+        assertThat(after?.version).isNotEqualTo(before?.version)
     }
 
     @Test

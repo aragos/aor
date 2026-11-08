@@ -182,7 +182,13 @@ function EventConsequences({event, track, onInspectCard, cardInspections}: {
                     <span>{t('activity.tokensReceived', {tokens: purchase.tokensReceived})}</span>
                 </CashPayment>
             </span>)}
-            {cashChanges?.filter(change => change.player === player).map(change => <CashPayment key={change.player} event={event} player={change.player} amount={change.amount}/>)}
+            {cashChanges?.filter(change => change.player === player).map(change => <CashPayment key={change.player} event={event} player={change.player} amount={change.amount}>
+                {event.income?.filter(income => income.player === player).map(income => <span className="event-income-sources" key={income.player}>
+                    {t('activity.baseIncome')}: ${income.baseIncome}
+                    {income.middleClassBonus > 0 && <> · <strong>{advanceName('MIDDLE_CLASS')}</strong>: +${income.middleClassBonus}</>}
+                    {income.interestProfit > 0 && <> · <strong>{advanceName('INTEREST_PROFIT')}</strong>: +${income.interestProfit}</>}
+                </span>)}
+            </CashPayment>)}
             {event.miseryChanges?.filter(change => change.player === player).map(change => <span className="event-misery-change" key={change.player}>
                 <CapitalLabel capital={eventPlayer(event, change.player).capital}>{eventName(event, change.player)}</CapitalLabel>
                 <strong>{change.spaces < 0 ? '−' : '+'}{Math.abs(change.spaces)}</strong> {t('game.misery').toLowerCase()}

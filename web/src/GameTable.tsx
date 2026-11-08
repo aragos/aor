@@ -27,6 +27,7 @@ import {AppLogo} from './AppLogo';
 import {AccountControls} from './AccountControls';
 import {useActionResult} from './useActionResult';
 import {HelpLink, ReferenceCatalogContext, ReferenceGameContext} from './HelpLink';
+import {PersonalOptions, usePersonalOptions} from './PersonalOptions';
 import {useStoredSetting} from './preferences';
 import {AbandonmentStatus, AbandonmentTools} from './Abandonment';
 import type {WriteAbandonment} from './Abandonment';
@@ -46,6 +47,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     writePlan?: WritePlan; quotePlan?: QuotePlan; loadRewindTargets?: LoadRewindTargets; writeAbandonment?: WriteAbandonment;
     botControls?: ReactNode;
 }) {
+    const personalOptions = usePersonalOptions(liveSnapshot, requestBusy, sendCommand);
     const planner = useActivityPlanner(liveSnapshot, writePlan, quotePlan);
     const snapshot = planner.effective;
     const busy = requestBusy || planner.loading || !!liveSnapshot.planning?.saved?.armed;
@@ -100,7 +102,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         setWorkspace(activityPinned ? 'activity' : previousWorkspace.current);
     }
     const decisionKey = planner.open
-        ? `${liveSnapshot.gameId}:${liveSnapshot.viewerId}:${liveSnapshot.game.turnNumber}:${liveSnapshot.game.stage}:${liveSnapshot.undo?.editRevision}:plan:${planner.actions.length}:${snapshot.prompt?.messageId ?? ''}`
+        ? `${liveSnapshot.gameId}:${liveSnapshot.viewerId}:${liveSnapshot.game.turnNumber}:${liveSnapshot.game.stage}:plan:${planner.actions.length}:${snapshot.prompt?.messageId ?? ''}`
         : decisionIdentity(snapshot);
     const decisionScroll = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => {
@@ -195,6 +197,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
     const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : decisionTitle;
     const tools = <div className="table-tools">
+        <PersonalOptions options={personalOptions}/>
         <details className="table-configuration"><summary>{t('table.configuration')}</summary>
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}>
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>

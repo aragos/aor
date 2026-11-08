@@ -113,10 +113,7 @@ internal object ActivityPlans {
             preview = preview,
             receipts = game.planReceipts[owner].orEmpty(),
             executions = game.planExecutions[owner].orEmpty(),
-            canArm =
-                available &&
-                    (saved == null || inScope(saved, state)) &&
-                    state.flow.decisions.none { it.choice == "renaissance" },
+            canArm = available && (saved == null || inScope(saved, state)),
             canExecute =
                 available &&
                     (state.prompts().singleOrNull() as? Prompt.SinglePlayer)?.let {
@@ -254,14 +251,29 @@ internal object ActivityPlans {
             )
     }
 
-    fun disarm(game: StoredGame, pause: PlanPause): StoredGame {
+    /** Same-phase undo preserves other owners' intent; execution still checks consequences. */
+    fun afterUndo(before: StoredGame, after: StoredGame, owner: PlayerId): StoredGame {
+        val samePhase =
+            before.state().stage == after.state().stage &&
+                before.state().turnNumber == after.state().turnNumber
+        return if (samePhase) disarm(after, PlanPause.EDITED, onlyOwner = owner)
+        else disarm(after, PlanPause.EDITED)
+    }
+
+    fun disarm(game: StoredGame, pause: PlanPause, onlyOwner: PlayerId? = null): StoredGame {
         val disarmed =
             game.copy(
                 plans =
-                    game.plans.mapValues { (_, plan) ->
-                        plan.copy(signature = null, pause = pause)
+                    game.plans.mapValues { (owner, plan) ->
+                        if (onlyOwner == null || owner == onlyOwner)
+                            plan.copy(signature = null, pause = pause)
+                        else plan
                     },
-                planVersions = game.planVersions.mapValues { UUID.randomUUID().toString() },
+                planVersions =
+                    game.planVersions.mapValues { (owner, version) ->
+                        if (onlyOwner == null || owner == onlyOwner) UUID.randomUUID().toString()
+                        else version
+                    },
             )
         return if (game.status == GameStatus.ACTIVE) reconcile(disarmed) else disarmed
     }

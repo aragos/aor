@@ -6,6 +6,34 @@ import kotlin.test.assertFailsWith
 
 class LeaderRulesTest {
     @Test
+    fun projectedRebateUsesOwnedAdvanceAndPrintedWordWithoutWrittenRecordBonus() {
+        val discounts =
+            LeaderDiscountView.forLeader(
+                leader = LeaderId.CHARLEMAGNE,
+                advances =
+                    setOf(AdvanceId.PRINTED_WORD, AdvanceId.NATIONALISM, AdvanceId.WRITTEN_RECORD),
+                crusadesPlayed = false,
+                mongolEnhanced = false,
+            )
+
+        assertThat(discounts.single().rebate).isEqualTo(20)
+        assertThat(discounts.single().effectiveDiscount).isEqualTo(30)
+    }
+
+    @Test
+    fun projectedLeaderHasNoRebateWithoutPrintedWord() {
+        val discounts =
+            LeaderDiscountView.forLeader(
+                leader = LeaderId.CHARLEMAGNE,
+                advances = setOf(AdvanceId.NATIONALISM),
+                crusadesPlayed = false,
+                mongolEnhanced = false,
+            )
+
+        assertThat(discounts.single().rebate).isEqualTo(0)
+    }
+
+    @Test
     fun theFirstLeaderHasAnExplicitProtectedDisplayRole() {
         val result =
             CardRules.resolve(

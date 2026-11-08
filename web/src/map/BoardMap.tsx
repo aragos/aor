@@ -476,7 +476,7 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                                 if (definition) traverse(event, id, catalog.provinces.map(province => province.id), 'data-map-province');
                                 if (definition && (event.key === 'Enter'  || event.key === ' ')) {event.preventDefault(); suppressClick.current = false; choose(id);}
                             }}>
-                            <title>{provinceName(id)}{definition ? '' : ` · ${t('board.notUsed')}`}</title>
+                            <title>{provinceName(id)}{definition ? definition.commodities.map(commodity => ` · ${label(commodity, 'commodity')}`).join('') : ` · ${t('board.notUsed')}`}</title>
                             <path className="province-shape" d={shape.path}
                                 fill={!definition ? '#daddd1' : definition.satellite ? `url(#${prefix}-satellite)` : definition.commodities.length > 1 ? `url(#${prefix}-${id})` : commodityColors[definition.commodities[0]][0]}
                                 stroke="#777d6c" strokeWidth={1.4}/>

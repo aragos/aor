@@ -58,6 +58,8 @@ internal object GameDocuments {
                 creatorId = PlayerId(node.field("creatorId").string()),
                 rulesVersion = node.field("rulesVersion").string(),
                 dataVersion = node.field("dataVersion").string(),
+                drawRenaissanceFromTurn =
+                    node["drawRenaissanceFromTurn"]?.takeUnless(JsonNode::isNull)?.integer() ?: 1,
             )
         val credentialNode = root.field("credentials")
         require(credentialNode.isObject) {
@@ -461,6 +463,24 @@ internal object GameDocuments {
                                 consent
                     ) {
                         "Player consent requires a canonical eligible transition and unique operation receipt."
+                    }
+                    state
+                }
+                revision.storageArchive != null &&
+                    revision.command == "upgrade-draw-renaissance" -> {
+                    require(
+                        index > 0 &&
+                            game.header.rulesVersion == RULES_VERSION &&
+                            revision.author == game.header.creatorId &&
+                            revision.adminAuthor == "system-draw-renaissance" &&
+                            revision.administrativeAction == null &&
+                            revision.at > 0 &&
+                            revision.entries.isEmpty() &&
+                            revision.replaceFrom == null &&
+                            revision.undoPolicy == null &&
+                            revision.storageArchive.matches(ARCHIVE_PATTERN)
+                    ) {
+                        "A Draw Card Renaissance upgrade must archive its source and preserve history."
                     }
                     state
                 }

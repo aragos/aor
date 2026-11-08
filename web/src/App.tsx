@@ -4,6 +4,7 @@ import {ApiError, errorCode, request, requestSnapshot} from './api';
 import type {ApplicationConfig, BotDifficulty, CreatedGame, Snapshot, PlanningQuote} from './api';
 import {t} from './messages';
 import {defaultVariants, validVariants, Variants} from './Variants';
+import {usePersonalTheme} from './preferences';
 import {isUndoPolicy, useStoredSetting} from './preferences';
 import {ChoiceButtons} from './DecisionControls';
 import {HelpLink} from './HelpLink';
@@ -186,6 +187,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 }
 
 export function App() {
+    usePersonalTheme();
     const [config, setConfig] = useState<ApplicationConfig | null>(null);
     const [error, setError] = useState('');
     useEffect(() => {
