@@ -19,8 +19,7 @@ pre-release gate; wait for the exact commit instead of repeating the full suite 
 | Web | `npm test --workspace web`, `npm run build`, affected browser suites below |
 | Map / catalogs | [Geometry generation and validation](map-design.md#generate-and-validate-drawings), geometry tests and live placement/reload |
 
-Kotlin/JS tooling uses its own Yarn lockfile. After changing its resolutions, regenerate the
-manifest with `./gradlew rootPackageJson --rerun-tasks`, then run
+Kotlin/JS tooling uses its own Yarn lockfile. After changing its resolutions, run
 `./gradlew kotlinUpgradeYarnLock` and the tooling checks above.
 
 The formatter is pinned ktfmt, Kotlin language style; `.editorconfig` matches. Serialize Gradle builds

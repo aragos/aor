@@ -10,15 +10,24 @@ plugins {
 }
 
 // Kotlin/JS test tooling is generated separately from the web workspace lockfile.
+val kotlinJsToolingResolutions =
+    mapOf(
+        "body-parser" to "1.20.9",
+        "diff" to "8.0.3",
+        "follow-redirects" to "1.16.2",
+        "**/mocha/glob" to "14.0.2",
+        "**/mocha/minimatch" to "11.0.1",
+        "**/karma-webpack/minimatch" to "11.0.1",
+        "serialize-javascript" to "7.1.3",
+    )
+
 plugins.withType<YarnPlugin> {
     extensions.configure<YarnRootExtension> {
-        resolution("body-parser", "1.20.9")
-        resolution("diff", "8.0.3")
-        resolution("follow-redirects", "1.16.2")
-        resolution("**/mocha/glob", "14.0.2")
-        resolution("**/mocha/minimatch", "11.0.1")
-        resolution("**/karma-webpack/minimatch", "11.0.1")
-        resolution("serialize-javascript", "7.1.3")
+        kotlinJsToolingResolutions.forEach { (module, version) -> resolution(module, version) }
+    }
+    // Kotlin's manifest task otherwise reuses cached output after resolutions change.
+    tasks.named("rootPackageJson") {
+        inputs.property("toolingResolutions", kotlinJsToolingResolutions)
     }
 }
 
