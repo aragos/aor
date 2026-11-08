@@ -12,11 +12,15 @@ pre-release gate; wait for the exact commit instead of repeating the full suite 
 | --- | --- |
 | Kotlin / Gradle Kotlin | Finish `./gradlew formatKotlin`, then `./gradlew checkKotlinFormat` |
 | Rules / flow | `./gradlew :core:jvmTest --tests '*RelevantTest'`; include `:core:jsNodeTest` for shared replay/target changes |
+| Kotlin/JS tooling | `./gradlew :core:jsNodeTest :core:jsBrowserTest :ai:jsNodeTest :ai:jsBrowserTest` |
 | AI / training | `./gradlew :ai:jvmTest :ai:jsNodeTest :training:test`; Python supervisor tests under `scripts/` |
 | Service / persistence | `./gradlew :server:fastTest --tests '*RelevantTest'`; use `:server:test` for affected full-game HTTP acceptance |
 | Saved-game behavior | `CatalogCompatibilityTest`, `UpgradedGameCompatibilityTest` and representative pre-change saves loading, replaying and continuing |
 | Web | `npm test --workspace web`, `npm run build`, affected browser suites below |
 | Map / catalogs | [Geometry generation and validation](map-design.md#generate-and-validate-drawings), geometry tests and live placement/reload |
+
+Kotlin/JS tooling uses its own Yarn lockfile. After changing its resolutions, run
+`./gradlew kotlinUpgradeYarnLock` and the tooling checks above.
 
 The formatter is pinned ktfmt, Kotlin language style; `.editorconfig` matches. Serialize Gradle builds
 per checkout. Use canonical text-command fixtures for game flows; browser lifecycle fixtures use

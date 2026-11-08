@@ -7,6 +7,8 @@ ktfmt = "0.64"
 truth = "1.4.5"
 collectionsImmutable = "0.5.2"
 firebaseAdmin = "9.11.0"
+guava = "33.7.2-jre"
+opentelemetry = "1.67.0"
 postgresql = "42.7.14"
 hikari = "7.1.0"
 flyway = "13.12.0"
@@ -14,6 +16,8 @@ embeddedPostgres = "2.2.2"
 postgresBinaries = "18.6.0"
 
 [libraries]
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
@@ -39,4 +43,3 @@ ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.re
 [plugins]
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
