@@ -33,8 +33,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           # Scheduled workflows run on main; refreshes must verify the selected release.
           ref: >-
             ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -47,20 +48,25 @@ jobs:
           POSTGRES_TEST_PORT: ${{ job.services.postgres.ports['5432'] }}
         run: |
           echo "AOR_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:$POSTGRES_TEST_PORT/postgres?sslmode=disable" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-provider: basic
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '26'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :ai:jvmTest :ai:jsNodeTest :ai:jsBrowserProductionLibraryDistribution :training:test :server:test checkKotlinFormat
-      - uses: actions/setup-python@v7
+      - run: >-
+          ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :core:jsBrowserTest
+          :ai:jvmTest :ai:jsNodeTest :ai:jsBrowserTest :ai:jsBrowserProductionLibraryDistribution
+          :training:test :server:test checkKotlinFormat
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
       - name: Independent geometry and public option catalogs
@@ -97,15 +103,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           ref: >-
             ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
             && 'refs/heads/release' || github.sha }}
       - name: Record the commit under verification
         id: revision
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
       - name: Python tools
@@ -147,8 +154,9 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           ref: ${{ needs.verify.outputs.commit }}
       - name: Rebuild the deployed service with fresh base images
         env:

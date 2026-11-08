@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.kotlinJvm)
-    alias(libs.plugins.ktor)
+    application
 }
 
 group = "dev.aragos.aor"
@@ -79,6 +79,12 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.postgresql)
     implementation(libs.firebase.admin)
+    implementation(platform(libs.opentelemetry.bom))
+    constraints {
+        implementation(libs.guava) {
+            because("GHSA-xxph-c9ww-hj94: bound native collection deserialization allocations.")
+        }
+    }
     implementation(libs.ktor.serverBodyLimit)
     implementation(libs.ktor.serverCompression)
     implementation(libs.ktor.serverDefaultHeaders)

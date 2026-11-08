@@ -13,9 +13,8 @@ with their [README owners](../README.md#find-the-owner); no gameplay defaults aw
 - Verify deployed [Friendly-to-Linear migration](design.md#linear-game) on representative saves/both
   backends: prior edits/checkpoints, pending secrets/plans, concurrent writes, restart, idempotence and
   continued play. Record per-game outcomes/resolve failures before declaring rollout complete.
-- Enable required `verify`, security alerts and optional patch auto-merge where the plan permits;
-  previous protection API returned 403. Direct CI checks are not protection. Configure Render refresh
-  credentials if weekly rebuilds are wanted; see [maintenance](deployment.md#release-and-maintenance).
+- Configure optional patch auto-merge and Render refresh credentials if wanted; see
+  [maintenance](deployment.md#release-and-maintenance).
 
 ## Human review and maintenance
 
