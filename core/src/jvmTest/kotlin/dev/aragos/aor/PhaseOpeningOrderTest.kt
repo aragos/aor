@@ -87,7 +87,7 @@ class PhaseOpeningOrderTest {
     }
 
     @Test
-    fun tokenPurchasesRevealWithoutAWindowInDrawCard() {
+    fun tokenPurchasesRevealBeforeTheDrawCardRenaissanceWindow() {
         val purchasing =
             finalShortage()
                 .withAdvances(p1, AdvanceId.RENAISSANCE)
@@ -100,7 +100,7 @@ class PhaseOpeningOrderTest {
             }
 
         assertThat(revealed.stage).isEqualTo(Stage.DRAW_CARD)
-        assertThat(revealed.flow.decisions.none { it is RenaissanceDecision }).isTrue()
+        assertThat(revealed.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
         assertThat(revealed.players.values.map(PlayerState::poolTokens)).containsExactly(3, 2, 1)
         assertThat(revealed.players.values.map(PlayerState::cash)).containsExactly(37, 38, 39)
     }
@@ -109,6 +109,7 @@ class PhaseOpeningOrderTest {
     fun renaissanceOpensInEveryPhaseWhereOrderMatters() {
         val phases =
             listOf(
+                Stage.DRAW_CARD,
                 Stage.BUY_CARD,
                 Stage.PLAY_CARDS,
                 Stage.PURCHASE,
@@ -119,6 +120,48 @@ class PhaseOpeningOrderTest {
             val opened = game(phase).withAdvances(p1, AdvanceId.RENAISSANCE).normalise()
             assertThat(opened.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
         }
+    }
+
+    @Test
+    fun drawCardSwapChoosesTheNewFirstPlayerBeforeCancellationAndDrawing() {
+        val pending =
+            game(Stage.DRAW_CARD)
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .copy(adjustments = mapOf(Commodity.STONE to listOf(CommodityAdjustment.SHORTAGE)))
+                .normalise()
+
+        val swapped = pending.step(TextCodec.parse("p1: swap-order p2"))
+
+        assertThat(swapped.turnOrder).containsExactly(p2, p1, p3).inOrder()
+        assertThat(swapped.prompts()).containsExactly(Prompt.SinglePlayer(p2, "cancel-adjustment"))
+        assertThat(swapped.flow.drawn).isEmpty()
+        assertThat(swapped.flow.renaissanceUsed).containsExactly(p1)
+    }
+
+    @Test
+    fun upgradedGameRetainsHistoricalDrawTimingBeforeItsActivationTurn() {
+        val initial =
+            game(Stage.DRAW_CARD)
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .copy(adjustments = mapOf(Commodity.STONE to listOf(CommodityAdjustment.SHORTAGE)))
+        val historical = initial.copy(header = initial.header.copy(drawRenaissanceFromTurn = 3))
+
+        assertThat(historical.normalise().prompts())
+            .containsExactly(Prompt.SinglePlayer(p1, "cancel-adjustment"))
+        assertThat(historical.copy(turnNumber = 3).normalise().prompts())
+            .containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
+    }
+
+    @Test
+    fun legacyHeaderRetainsRecordedDrawTiming() {
+        val initial =
+            game(Stage.DRAW_CARD)
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .copy(adjustments = mapOf(Commodity.STONE to listOf(CommodityAdjustment.SHORTAGE)))
+        val legacy = initial.copy(header = initial.header.copy(rulesVersion = LEGACY_RULES_VERSION))
+
+        assertThat(legacy.normalise().prompts())
+            .containsExactly(Prompt.SinglePlayer(p1, "cancel-adjustment"))
     }
 
     @Test

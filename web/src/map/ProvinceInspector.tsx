@@ -100,6 +100,7 @@ export function ProvinceActions({snapshot, province, busy, submit}: {
                         <small>{establishesMarker ? t(uncertain ? 'table.uncertainMarker' : 'table.newMarker') : t(uncertain ? 'table.uncertainTokens' : 'action.place')}</small></span></div>
                 {!remainingPlacement && offer.incomeBefore !== null && offer.incomeAfter !== null && <p className="value-change"><span>{t('table.income')}</span><strong>${offer.incomeBefore} → ${offer.incomeAfter}</strong></p>}
                 <DestinationShipping shipping={offer.shipping} tokens={shippingTokens}/>
+                {uncertain && offer.competitionWinProbability != null && <p className="competition-odds">{t('competition.odds', {percent: Math.round(offer.competitionWinProbability * 1000) / 10})}</p>}
                 {uncertain && offer.greenDieWins && <p className="competition-green-die">
                     <span>{t(offer.greenDieWins.length ? 'order.greenWins' : 'order.greenCannotWin',
                         {faces: greenDieFaces(offer.greenDieWins)})}</span>

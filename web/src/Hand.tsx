@@ -189,8 +189,8 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                             </>}
                         </span>;
                     })}
-                    {discounts.map(discount => <span className="leader-discount" key={discount.advance}>
-                        <span>{advanceName(discount.advance)}</span>
+                    {discounts.map(discount => <span className={`leader-discount${(discount.rebate ?? 0) > 0 ? ' has-rebate' : ''}`} key={discount.advance}>
+                        <span>{advanceName(discount.advance)}{(discount.rebate ?? 0) > 0 && <strong className="leader-rebate"> · {t('card.advanceRebate', {amount: discount.rebate!})}</strong>}</span>
                         <LeaderCredit amount={discount.effectiveDiscount}
                             writtenRecordBonus={discount.writtenRecordBonus}
                             compact={sharedWrittenRecordBonus !== null}/>

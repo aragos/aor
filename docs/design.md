@@ -80,8 +80,8 @@ players retain discarded knowledge.
 
 Publish an attributed `undo N` revision (`replaceFrom=N`, empty suffix). Revisions increase and removed
 entry identities are never reused. Under the same lock, clear submissions/rotate receipts,
-disarm plans/rotate versions, expire out-of-scope work and invalidate previews. In-scope saved actions
-may remain unarmed drafts; execution receipts remain facts. Workers must not recreate undone play;
+disarm plans/rotate versions (only the undoing player’s plans when turn and phase are unchanged),
+expire out-of-scope work and invalidate previews. In-scope saved actions may remain unarmed drafts; execution receipts remain facts. Workers must not recreate undone play;
 stale/uncertain requests reconcile before new explicit confirmation.
 
 `LinearGameMigration.kt` converts legacy Friendly game policies with an archived, audited zero-entry

@@ -20,10 +20,13 @@ export async function checkActivityPayments(page, web, baseline) {
         {id: actor, name: 'Original actor with a recorded name near the length limit', capital: null},
         participants[1],
     ]};
+    const income = {...payment, id: 'income-receipts', kind: 'INCOME', actor: null, target: null,
+        cashChanges: [{player: actor, amount: 32}],
+        income: [{player: actor, baseIncome: 15, middleClassBonus: 10, interestProfit: 7}]};
     let revision = 25000;
     const earlier = Array.from({length: 10}, (_, index) => ({...payout, id: `earlier-${index}`}));
     const later = Array.from({length: 10}, (_, index) => ({...payout, id: `later-${index}`}));
-    const events = [payment, ...earlier, longPayment, ...later, payout];
+    const events = [payment, ...earlier, longPayment, ...later, payout, income];
     async function show(players = baseline.game.players) {
         const snapshot = {...baseline, revision: ++revision, events, game: {...baseline.game, players}};
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(snapshot)})`);
@@ -42,15 +45,24 @@ export async function checkActivityPayments(page, web, baseline) {
     assert(receipts.every(row => row.emblems === 1), 'Every cash receipt includes its recorded emblem');
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="cash-spent"] .event-cash-change').textContent`),
         /Venice\s*−\$10/, 'Spending uses the same explicit player label and signed amount');
+    const incomeSelector = '[data-event-id="income-receipts"] .event-cash-change';
+    assert.match(await page.evaluate(`document.querySelector('${incomeSelector}').textContent`),
+        /Venice\s*\+\$32.*Markets: \$15.*Middle Class: \+\$10.*Interest & Profit: \+\$7/s,
+        'Income explains the collected base income and each contributing advance');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('${incomeSelector} .event-income-sources strong')].map(node => node.textContent)`),
+        ['Middle Class', 'Interest & Profit'], 'Income advance names are highlighted');
     const styles = await page.evaluate(`[...document.querySelectorAll('.event-cash-change')].map(row => {
         const style = getComputedStyle(row); return [style.display, style.backgroundColor, style.borderColor, style.padding];
     })`);
     assert(styles.every(style => JSON.stringify(style) === JSON.stringify(styles[0])),
         'Actor receipts, other receipts, gains and payments use the same presentation');
     const recorded = await page.evaluate(`document.querySelector('[data-event-id="commodity-receipts"]').innerHTML`);
+    const recordedIncome = await page.evaluate(`document.querySelector('${incomeSelector}').innerHTML`);
     await show(baseline.game.players.map(player => ({...player, name: 'Changed current name', capital: 'barcelona'})));
     assert.equal(await page.evaluate(`document.querySelector('[data-event-id="commodity-receipts"]').innerHTML`), recorded,
         'Later player names and capitals cannot change payment labels or emblems');
+    assert.equal(await page.evaluate(`document.querySelector('${incomeSelector}').innerHTML`), recordedIncome,
+        'Later player state cannot change income source facts or identity');
 
     async function checkLayout(width, height, mobile) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});

@@ -35,6 +35,8 @@ data class LeaderDiscountView(
     val writtenRecordBonus: Int,
     val effectiveDiscount: Int,
     val condition: LeaderDiscountCondition?,
+    /** Immediate Printed Word cash for an already owned advance; excludes Written Record. */
+    val rebate: Int = 0,
 ) {
     companion object {
         internal fun forLeader(
@@ -53,6 +55,8 @@ data class LeaderDiscountView(
                     bonus,
                     amount + bonus,
                     discount.condition,
+                    if (AdvanceId.PRINTED_WORD in advances && discount.advance in advances) amount
+                    else 0,
                 )
             }
         }

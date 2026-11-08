@@ -2,6 +2,19 @@ import {hostedMessages} from './hostedMessages';
 
 export const en: Record<string, string> = {
     ...hostedMessages,
+    'plan.declineRelief': 'Decline misery relief',
+    'plan.editingNotice': 'Planning only: added choices take effect when the plan executes.',
+    'plan.saveAndExecute': 'Save and execute plan',
+    'options.personal': 'Personal options',
+    'options.darkMode': 'Dark mode',
+    'options.skipWindmill': "Don't prompt for Wind/Watermill",
+    'options.browser': 'Saved in this browser',
+    'activity.baseIncome': 'Markets',
+    'card.advanceRebate': '+${amount} rebate',
+    'commodity.industry': 'Industry · extra payout box when owning a market',
+    'competition.odds': '{percent}% chance of winning on dice, before Cathedral choices',
+    'windmill.quote': '{tokens} pool tokens · {percent}% chance of success',
+
     'bots.opponents': 'Automated opponents',
     'bots.number': 'Automated {number}',
     'bots.add': 'Add automated opponent',

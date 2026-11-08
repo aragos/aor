@@ -72,6 +72,14 @@ Push/PR runs do not refresh. Missing credentials disable refresh; monitor failur
 Never edit applied [Flyway migrations](../server/src/main/resources/db/migration/). New schemas must
 support overlapping old instances or require a maintenance cutover; schema updates cannot change rules.
 
+Rules v5 startup archives current-format rules v4 saves and enables pre-draw Renaissance from the
+turn after the latest recorded turn, including removed history (turn 1 for setup saves).
+Historical draws and the current turn retain their original timing until the persisted activation
+turn; see [engine replay](engine.md#replay-and-identity).
+Use a maintenance cutover when an older instance could still write: v4-only readers cannot load the
+upgraded header. Rollbacks require a v5-compatible reader or restoration of the complete preceding
+archive.
+
 ## Import file storage
 
 Stop the format-7 file server, privately copy its complete directory, configure SQL secrets and run:

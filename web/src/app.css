@@ -664,3 +664,97 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 @media (max-width: 700px) and (max-height: 700px) {
     .decision-actions button:not(.help-link) { padding-block: .2rem; }
 }
+
+/* Personal themes change interface surfaces; map commodities, capitals and dice retain their colors. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #e3e9df;
+    --muted: #b2beb1;
+    --surface: #222d29;
+    --border: #53665b;
+    --target: #9bcbea;
+    --target-fill: #243f4b;
+    --selected: #d8efd3;
+    --selected-fill: #34513f;
+    --focus: #edc764;
+    --resource: #b9dfac;
+    --resource-fill: #2d4230;
+    --resource-border: #66875a;
+    --blocker: #ffd3b5;
+    --blocker-fill: #483326;
+    --blocker-border: #c58f61;
+    --result-success-fill: #2c4231;
+    --result-success-border: #70965f;
+    --result-loss-fill: #472d31;
+    --result-loss-border: #c48783;
+    --result-pending-fill: #293d44;
+    --result-pending-border: #7a9ba7;
+    background: #151e1a;
+}
+:root[data-theme="dark"] :is(.game-table, .panel, .auth-card, .player-summary, .market-tile,
+    .inspection-panel, .advance-inspection-header, .card-inspection-dialog, .player-detail) {
+    color: var(--ink); background: var(--surface); border-color: var(--border);
+}
+:root[data-theme="dark"] :is(.player-overview, .workspace-side, .decision-panel, .table-hand,
+    .table-tools, .command-dock, .table-activity, .game-directory .game-row, #auth-mode) {
+    color: var(--ink); background: #1b2721; border-color: var(--border);
+}
+:root[data-theme="dark"] :is(input, select, textarea) {
+    color: var(--ink); background: #17221d; border-color: var(--border); accent-color: #a2cf91;
+}
+:root[data-theme="dark"] :is(button.secondary, .button.secondary, .hand-card, .advance-control,
+    .advance-inspection-header > .advance-letter, .event-entity, .event-card, .event-cash-change,
+    .commitment-preview, .create-registered .player-directory li, .reference-track-player.is-viewer) {
+    color: var(--ink); background: #29382f; border-color: var(--border);
+}
+:root[data-theme="dark"] .hand-card.event { background: #3c302a; }
+:root[data-theme="dark"] :is(.hand-card.leader, .leader-list article) {
+    color: var(--ink); background: #363b29; border-color: #8e875d;
+}
+:root[data-theme="dark"] :is(button.secondary:hover, .button.secondary:hover, .hand-card:hover,
+    .advance-tile:hover, .event-province:hover, .activity-content button.event-card:hover,
+    .help-link:hover, .reference-link:hover, .close-detail:hover, .game-list-tabs button:hover) {
+    color: var(--ink); background: #3d5042;
+}
+:root[data-theme="dark"] :is(button[aria-pressed="true"], .choice-buttons button[aria-pressed="true"],
+    .advance-control.owned, .advance-control.available, .payout-box.is-current, .reference-track li.is-current,
+    .game-directory .game-row.needs-action, .my-row, .order-track .is-viewer,
+    .workspace-tabs button[aria-selected="true"], .game-row-player.needs-action) {
+    color: var(--selected); background: var(--selected-fill); border-color: var(--resource-border);
+}
+:root[data-theme="dark"] :is(a, .advance-tile, .workspace-tabs button, .table-activity .activity-pin,
+    .game-header .account-controls button, .help-link, .reference-link, .close-detail, .player-handle,
+    .auth-reset, .map-link, .event-province, .event-card) { color: #b9dac6; }
+:root[data-theme="dark"] :is(.muted, .eyebrow, .player-person, .player-status, .player-identity small,
+    .player-turn-order, .game-brand p, .event-detail, .activity-list li > small, .reference-note,
+    .order-track caption, .order-track-player small, .game-row-stage, .game-row-description .game-row-players,
+    .player-advance-category h5, .hand-card .hand-leader-note, .discount-amount small,
+    .advance-price-compact > small, .price-details > summary, .unplayed-leaders, th,
+    .commitment-preview small, .map-orders details summary) { color: var(--muted); }
+:root[data-theme="dark"] :is(.income-value, .save-status, .advance-tile .advance-available,
+    .leader-discount strong) { color: var(--resource); }
+:root[data-theme="dark"] :is(.decision-status, .decision-status.is-ready, .interrupt-owner,
+    .military-summary, .recurring-badge) {
+    color: var(--resource); background: var(--resource-fill); border-color: var(--resource-border);
+}
+:root[data-theme="dark"] :is(.leader-role, .leader-exposed .leader-role, .burden-badge,
+    .adjustment-badges > span, .discard-request, .papal-decree-banner, .card-play-warning,
+    .leader-list .leader-in-box, .map-orders .consequence, .abandonment-status, .ending-notice,
+    .winner-announcement, .new-piece) {
+    color: #efdaa9; background: #453d27; border-color: #a48e57;
+}
+:root[data-theme="dark"] :is(.advance-tile .advance-discount, .advance-tile small,
+    .leader-list .leader-credits-label, .adjustment-badges, .ending-status) { color: #efdaa9; }
+:root[data-theme="dark"] :is(.table-configuration, .workspace-bar, .workspace-tabs, .object-decision,
+    .target-choices, .activity-list li, .event-consequences, .activity-following, .payout-box,
+    .bot-controls, .automated-opponents, th, td) { border-color: var(--border); }
+:root[data-theme="dark"] .event-die.die-white { color: #263f3d; }
+:root[data-theme="dark"] .event-die.die-green { color: #263f3d; }
+:root[data-theme="dark"] .map-viewport { border-color: var(--border); }
+.personal-options .check-label { align-items: start; line-height: 1.5; }
+.personal-options input[type="checkbox"] { flex: none; margin: 0; }
+
+.leader-discount.has-rebate { background: var(--resource-fill); border-radius: 3px; padding: .2rem; }
+.leader-rebate { color: var(--resource); }
+.competition-odds, .windmill-preview { color: var(--resource); }
+.commodity-industry { margin-block: .35rem; }

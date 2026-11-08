@@ -57,10 +57,15 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
         onClick={() => setSelectedAction('')}>{t('table.clearSelection')}</button>;
     return <div className="game-actions">
         {discarding && <p className="discard-request" role="status">{t('controls.masterArtDiscard')}</p>}
+        {snapshot.game.windmillOffer && <p className="windmill-preview">
+            <ProvinceLabel snapshot={snapshot} id={snapshot.game.windmillOffer.province}/>{' · '}
+            {t('windmill.quote', {tokens: snapshot.game.windmillOffer.tokenCost, percent: Math.round(snapshot.game.windmillOffer.successProbability * 1000) / 10})}
+        </p>}
         {snapshot.game.replacementToken && <ReplacementTokenContext snapshot={snapshot}/>}
         {snapshot.game.replacementToken && commands.includes('replace-event-tokens none') && <EventTokenReplacements snapshot={snapshot} busy={busy} submit={submit}/>}
         {commands.filter(command => simpleActions.includes(command)).map(command => <DecisionAction key={command} className="simple-action" disabled={busy} onClick={() => { void submit(command); }}>{label(command, 'action')}
             {command === 'stabilize cash' && <> · ${snapshot.game.stabilizationCost ?? '—'}</>}
+            {command === 'windmill' && snapshot.game.windmillOffer && <> · {snapshot.game.windmillOffer.tokenCost} {t('table.tokens')}</>}
             {command === 'buy-expansion-card' && <> · {snapshot.game.expansionCardCost ?? '—'} {t('table.tokens')}</>}
             {command === 'stabilize misery' && <> · <span className="misery-transition"><MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/> → <MiseryBox value={snapshot.game.stabilizationMisery} track={snapshot.game.catalog?.miseryTrack}/></span></>}</DecisionAction>)}
         {selectedAction && <div className="selected-action">

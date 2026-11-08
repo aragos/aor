@@ -7,8 +7,8 @@ import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkBottomHand} from './bottomHand.browser.mjs';
 import {checkTable} from './table.browser.mjs';
 
-async function purchaseGame() {
-    const game = await createGame(3, {undoPolicy: 'competitive'});
+async function purchaseGame(undoPolicy = 'competitive') {
+    const game = await createGame(3, {undoPolicy});
     for (let seat = 0; seat < 3; seat++) await game.send(game.links[seat], `bid-capital ${3 - seat}`);
     for (let step = 0; step < 30; step++) {
         const state = await game.snapshot(game.links[0]);
@@ -27,7 +27,7 @@ async function purchaseGame() {
 }
 
 async function checkPlanningTurnArrival(page, web) {
-    const game = await purchaseGame();
+    const game = await purchaseGame('linear-game');
     async function visit(seat) {
         const previous = await page.evaluate('performance.timeOrigin');
         const url = new URL(game.links[seat].path, web);
@@ -55,6 +55,13 @@ async function checkPlanningTurnArrival(page, web) {
     await page.evaluate(`document.querySelector('[data-advance="URBAN_ASCENDANCY"]').click()`);
     await page.wait(`document.querySelector('.decision-panel .advance-decision')`, 'prepared purchase choice');
     await page.evaluate(`window.arrivalDraft = document.querySelector('.decision-panel .advance-decision'); true`);
+    await game.send(game.links[0], 'pass');
+    await game.send(game.links[0], 'undo');
+    await page.wait(`document.querySelector('.activity-planner[data-editing="true"]') && !document.querySelector('.activity-planner [role="alert"]')`,
+        'another player undo retains the local plan');
+    assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision') === window.arrivalDraft`), true,
+        'Same-phase undo preserves another player’s mounted choice');
+
     for (const command of ['pass', 'buy-advance A', 'pass', 'stabilize cash']) await game.send(game.links[0], command);
     await page.wait(`document.querySelector('.decision-status.is-ready') && document.querySelector('.activity-planner[data-editing="true"]') && !document.querySelector('.decision-actions button:disabled')`,
         'turn arrival retains the unsaved preview with a refreshed quote');
@@ -64,6 +71,14 @@ async function checkPlanningTurnArrival(page, web) {
         'Other purchases and turn arrival preserve the mounted purchase draft');
     assert.equal((await game.snapshot(game.links[1])).planning.saved, null,
         'Turn arrival does not save or execute the browser draft');
+    await page.evaluate(`document.querySelector('.buy-advance-action').click()`);
+    await page.wait(`[...document.querySelectorAll('.decision-actions button')].some(button => button.textContent === 'Save and execute plan' && !button.disabled)`,
+        'an active draft offers explicit application');
+    await page.click('Save and execute plan');
+    await page.wait(`!document.querySelector('.activity-planner[data-editing="true"]')`, 'explicit application closes the draft');
+    const applied = await game.snapshot(game.links[1]);
+    assert(applied.history.includes(`${game.links[1].id}: buy-advance V`), 'The planned purchase is durably committed');
+
 }
 
 export async function checkParallelPlanning(page, web) {

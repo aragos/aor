@@ -20,6 +20,9 @@ data class ResourceEndpoints(
     val miseryAfter: MiseryStep,
 )
 
+/** Income is quoted before collection, so Interest & Profit retains its original cash cap. */
+data class IncomeReceipt(val player: PlayerId, val quote: IncomeQuote)
+
 data class EffectReceipt(
     val cause: AutomaticCause,
     val stage: Stage,
@@ -28,6 +31,7 @@ data class EffectReceipt(
     val advance: AdvanceId?,
     val orderBefore: List<PlayerId> = emptyList(),
     val orderAfter: List<PlayerId> = emptyList(),
+    val income: List<IncomeReceipt> = emptyList(),
 ) {
     companion object {
         internal fun between(
@@ -67,6 +71,22 @@ data class EffectReceipt(
                 },
                 before.turnOrder,
                 after.turnOrder,
+                if (cause == AutomaticCause.INCOME) {
+                    before.playerIds.mapNotNull { id ->
+                        val player = before.playerState(id)
+                        if (player.misery == MiseryStep.CHAOS) null
+                        else {
+                            IncomeReceipt(
+                                id,
+                                PlayerEconomy.incomeQuote(
+                                    player,
+                                    before.playerIds.size,
+                                    before.board.markerCount(id),
+                                ),
+                            )
+                        }
+                    }
+                } else emptyList(),
             )
     }
 }

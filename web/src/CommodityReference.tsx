@@ -1,6 +1,7 @@
 import {useContext} from 'react';
 import type {PublicCatalog} from './api';
 import {ReferenceGameContext} from './HelpLink';
+import {CapitalLabel} from './IdentityLabel';
 import {ReferenceTrackPlayers} from './ReferenceTrackPlayers';
 import {Commodity} from './TablePanels';
 import {label} from './labels';
@@ -41,6 +42,10 @@ export function CommodityReference({catalog, topic, choices, onSelect}: {
                 {counts.unplayed !== null && <p className="commodity-circulation">{t('reference.unplayedCards', {count: counts.unplayed})}</p>}
                 <p className="reference-note">{t('reference.cardCountExplanation')}</p>
             </>}
+            {players.filter(player => player.advances.includes('INDUSTRY')).map(player => <p className="commodity-industry" key={player.id}>
+                <CapitalLabel capital={player.capital}>{player.capital ? label(player.capital, 'province') : player.name}</CapitalLabel>
+                {' · '}{t('commodity.industry')}
+            </p>)}
             <ol className="payout-boxes" aria-label={t('reference.payoutBoxes', {commodity: label(commodity.id, 'commodity')})}>
                 {boxes.map(box => {
                     const occupants = players.filter(player => boxFor(player) === box);

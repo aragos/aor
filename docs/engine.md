@@ -34,6 +34,12 @@ Record actual dice, permutations, draws and transfers; replay never calls live a
 resolved configuration and freeze at `start` so changed defaults cannot alter saves. A changed prompt
 sequence can require a rules upgrade even if syntax is unchanged.
 
+Rules v5 offers Renaissance before Draw Card cancellation/draws. Rules v4 remains replayable;
+startup archives and upgrades current-format v4 saves with `drawRenaissanceFromTurn` set after the
+latest recorded turn (turn 1 during setup). This includes turns removed by historical rewinds.
+Earlier turns retain their recorded timing, so outcomes, live decisions and private work survive.
+The header's activation turn also governs replay and historical rewinds.
+
 Activity identifies one phase's work including interruptions. Replay-derived `activity.decisionEntry`
 identifies the presentation decision even when actor/prompt repeats; it is neither a revision nor a
 command. Private readiness does not replace it. Clients submit committed revision.

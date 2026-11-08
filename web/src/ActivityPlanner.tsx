@@ -17,7 +17,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
     const saved = snapshot.planning?.saved;
     const cardPurchase = snapshot.game.stage === 'BUY_CARD' &&
         !saved?.actions.some(action => !['buy-card', 'pass'].includes(action.command));
-    const acting = snapshot.viewerId !== null &&
+    const acting = snapshot.viewerId !== null && snapshot.prompt?.messageId !== 'prompt.renaissance' &&
         (snapshot.prompt?.players.includes(snapshot.viewerId) ?? false);
     const available = !!snapshot.planning?.available && (!acting || !!saved || editing);
     const open = editing && available && !cardPurchase;
@@ -30,7 +30,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
     const cardRequest = useRef<object | null>(null);
     const request = useRef(quote);
     request.current = quote;
-    const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.status}:${snapshot.game.turnNumber}:${snapshot.game.stage}:${snapshot.undo?.editRevision}`;
+    const scope = `${snapshot.gameId}:${snapshot.viewerId}:${snapshot.status}:${snapshot.game.turnNumber}:${snapshot.game.stage}`;
     useEffect(() => {setOpen(false); setActions([]); setQuoted(null); setError(''); setBaseVersion(null); setSaving(false);}, [scope]);
     useEffect(() => {
         setChoosingCard(false);
@@ -73,6 +73,20 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
             return !!accepted;
         } finally {setSaving(false);}
     }
+    async function saveAndExecute() {
+        if (!preview || !write || saving) return;
+        setSaving(true);
+        try {
+            const accepted = await write('SAVE', actions, undefined, baseVersion);
+            const view = accepted?.planning;
+            const version = accepted?.planWriteReceipt?.version;
+            if (!view || !version || version !== view.version) return;
+            setBaseVersion(version);
+            if (!view.canExecute || !view.previewToken) return;
+            const executed = await write('EXECUTE', undefined, view.previewToken, version);
+            if (executed) setOpen(false);
+        } finally { setSaving(false); }
+    }
     async function append(command: string) {
         if (!preview?.preview.decision || saved?.armed) return false;
         setActions(current => [...current, {decision: preview.preview.decision!, command}]);
@@ -107,7 +121,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
         ...snapshot, game: displayed.preview.game, legalChoices: displayed.preview.choices,
         prompt: displayed.preview.decision ? {messageId: `prompt.${displayed.preview.decision}`, players: [snapshot.viewerId!]} : null,
     } : snapshot;
-    return {open, actions, preview, error, dirty, effective, edit, operate, append,
+    return {open, actions, preview, error, dirty, effective, edit, operate, append, saveAndExecute, saving,
         cardPurchase, chooseCardPurchase, choosingCard,
         conflict: open && baseVersion !== (snapshot.planning?.version ?? null) && !saving,
         close: () => setOpen(false), removeFrom: (index: number) => setActions(current => current.slice(0, index)),
@@ -119,7 +133,7 @@ function CardPurchasePlanner({snapshot, planner, busy}: {
 }) {
     const view = snapshot.planning!;
     const saved = view.saved;
-    const acting = snapshot.prompt?.players.includes(snapshot.viewerId!);
+    const acting = snapshot.prompt?.messageId === 'prompt.buy-card' && snapshot.prompt.players.includes(snapshot.viewerId!);
     const offer = snapshot.game.cardPurchaseOffer;
     const choice = saved?.actions[0]?.command;
     if (!choice && (acting || !offer || offer.blockers.length > 0)) return null;
@@ -155,6 +169,7 @@ function actionName(action: PlannedAction, snapshot: Snapshot): string {
             const card = snapshot.game.hand.find(candidate => candidate.reference === argument);
             return `${t('action.discard')} · ${card ? t(card.definition.messageId) : t('plan.missingCard')}`;
         }
+        case 'pass': return t(action.decision === 'purchase-relief' ? 'plan.declineRelief' : 'action.pass');
         case 'stabilize': return t(`plan.stabilize ${argument}`);
         case 'relieve-misery': return `${t('action.relieveMisery')} · ${argument} ${t('controls.spaces')}`;
         case 'patronize': return `${t('action.patronize')} · ${label(argument, 'leader')}`;
@@ -173,10 +188,10 @@ export function ActivityPlanner({snapshot, planner, busy}: {
     const actions = planner.open ? planner.actions : saved?.actions ?? [];
     // Continuations still authorize execution; keep their original effect and removal indices.
     const visibleActions = actions.map((action, index) => ({action, index}))
-        .filter(({action}) => action.command !== 'pass');
+        .filter(({action}) => action.command !== 'pass' || action.decision === 'purchase-relief');
     const invalidContinuation = preview?.invalidIndex != null &&
         actions[preview.invalidIndex]?.command === 'pass';
-    const ready = !busy && (!planner.open || !!planner.preview);
+    const ready = !busy && !planner.saving && (!planner.open || !!planner.preview);
     const help = {topic: 'plans', label: t('plan.helpTitle')};
     return <section className="activity-planner" aria-label={t('plan.title')} data-editing={planner.open}>
         {(saved || planner.open && planner.dirty) && <p className="private-draft-status" role="status">{t(saved?.armed ? 'plan.armed' : planner.open && planner.dirty ? 'plan.unsaved' : 'plan.saved')}</p>}
@@ -204,10 +219,12 @@ export function ActivityPlanner({snapshot, planner, busy}: {
         {planner.error && <p className="error" role="alert">{t(`error.${planner.error}`)}</p>}
         {planner.conflict && <p className="blocker" role="status">{t('plan.changedElsewhere')}
             <button type="button" disabled={busy} onClick={() => {void planner.edit();}}>{t('plan.loadSaved')}</button></p>}
+        {planner.open && <p className="private-draft-status">{t('plan.editingNotice')}</p>}
         {planner.loading && <p role="status">{t('table.quotePending')}</p>}
         {!planner.open ? <ButtonHelp {...help}><button type="button" className="secondary" disabled={busy} onClick={() => {void planner.edit();}}>{t(saved ? 'plan.edit' : 'plan.prepare')}</button></ButtonHelp>
             : <button type="button" className="secondary" disabled={busy} onClick={planner.close}>{t('plan.close')}</button>}
         {saved?.armed ? <DecisionAction help={help} className="secondary" disabled={busy} onClick={() => {void planner.operate('DISARM');}}>{t('plan.cancelAutomatic')}</DecisionAction> : <>
+            {planner.open && view.canExecute && planner.dirty && <DecisionAction disabled={!ready || planner.conflict || !preview?.effects.length || preview.boundary === 'INVALID'} onClick={() => {void planner.saveAndExecute();}}>{t('plan.saveAndExecute')}</DecisionAction>}
             {planner.open && <DecisionAction help={help} disabled={!ready || planner.conflict} onClick={() => {void planner.operate('SAVE');}}>{t('plan.save')}</DecisionAction>}
             {saved && (!planner.open || !planner.dirty) && <DecisionAction disabled={!ready || planner.conflict || !view.canArm || !preview?.effects.length || preview.boundary === 'INVALID'}
                 help={help} onClick={() => {void planner.operate(view.canExecute ? 'EXECUTE' : 'ARM');}}>{t(view.canExecute ? 'plan.execute' : 'plan.automatic')}</DecisionAction>}

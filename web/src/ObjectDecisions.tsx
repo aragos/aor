@@ -80,7 +80,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
             <CardEventText definition={definition}/></>}
         {action && offer?.playable && definition.kind === 'leader' && <p className="card-play-credit-context">{t('card.leaderEffect')}</p>}
         {(info?.leaderDiscounts ?? offer?.leaderDiscounts)?.map(discount => <details key={discount.advance} className="leader-discount-detail">
-            <summary>{advanceName(discount.advance)} <LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/></summary>
+            <summary>{advanceName(discount.advance)}{(discount.rebate ?? 0) > 0 && <strong className="leader-rebate"> · {t('card.advanceRebate', {amount: discount.rebate!})}</strong>} <LeaderCredit amount={discount.effectiveDiscount} writtenRecordBonus={discount.writtenRecordBonus}/></summary>
             <dl className="detail-list"><div><dt>{t('table.printedDiscount')}</dt><dd>${discount.printedAmount}</dd></div>
                 <div><dt>{advanceName('written-record')}</dt><dd>${discount.writtenRecordBonus}</dd></div>
                 <div><dt>{t('table.conditionalDiscount')}</dt><dd>${discount.conditionalAmount}</dd></div></dl>
@@ -89,8 +89,7 @@ export function CardDecision({snapshot, busy, submit, mode = 'all', inspectedId,
         {offer?.blockers.map(blocker => <p className="blocker" role="alert" key={blocker}>{t(`error.${blocker}`)}</p>)}
         {action && offer?.playable && <DecisionForm onSubmit={async event => { event.preventDefault(); if (actionable && command) await submit(command); }}>
             <CardPlayEffects snapshot={snapshot} definition={definition} choice={resolutionChoice}
-                commodities={offer.commodities} targets={targets}
-                protection={needsProtection && validProtection ? amount : null}/>
+                commodities={offer.commodities} targets={targets}/>
             {!noChoice && finiteChoices.length > 0 && <fieldset className="target-choices"><legend>{t('controls.cardChoice')}</legend>
                 {finiteChoices.map(candidate => <button type="button" key={candidate.command} className="secondary"
                     aria-pressed={candidate.command === choice} onClick={() => { setChoice(candidate.command ?? ''); setProtection(''); }}>
