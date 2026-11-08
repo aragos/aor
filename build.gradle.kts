@@ -15,8 +15,9 @@ plugins.withType<YarnPlugin> {
         resolution("body-parser", "1.20.9")
         resolution("diff", "8.0.3")
         resolution("follow-redirects", "1.16.2")
-        resolution("glob", "14.0.2")
-        resolution("minimatch", "11.0.1")
+        resolution("**/mocha/glob", "14.0.2")
+        resolution("**/mocha/minimatch", "11.0.1")
+        resolution("**/karma-webpack/minimatch", "11.0.1")
         resolution("serialize-javascript", "7.1.3")
     }
 }

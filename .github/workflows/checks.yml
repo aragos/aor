@@ -60,7 +60,12 @@ jobs:
           node-version: '26'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :ai:jvmTest :ai:jsNodeTest :ai:jsBrowserProductionLibraryDistribution :training:test :server:test checkKotlinFormat
+      - run: >-
+          ./gradlew :core:jvmTest :core:compileKotlinJs :core:jsNodeTest :core:jsBrowserTest
+          :ai:jvmTest :ai:jsNodeTest :ai:jsBrowserTest :ai:jsBrowserProductionLibraryDistribution
+          :training:test :server:test checkKotlinFormat
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
