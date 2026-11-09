@@ -4,8 +4,9 @@
 Preparation freezes a training distribution, inputs, recipes, gates and disjoint game banks.
 The campaign controller owns locking, retries, process groups and resource ceilings. Native
 workers are direct children in that same process group and receive its remaining deadline.
-Token fitting disables only the supplied baseline's token head for its paired reference;
-development/final games retain the original incumbent. The optional frozen neural
+Replacement fitting disables only the supplied baseline's token head for its paired reference;
+opt-in correction fitting preserves the whole incumbent and learns a separate final token head.
+Development/final games retain the original incumbent. The optional frozen neural
 card/purchase/territory exploration diagnostic is separate. Expansion learning is not implemented.
 """
 
@@ -45,12 +46,34 @@ PROFILES = {
         "recipes": [(32, 16, 1), (96, 32, 2), (96, 32, 4)],
         "stageSeconds": [1800, 32400, 30, 7200],
     },
+    "correction": {
+        "maximumSeconds": 43200,
+        "diagnosticWorlds": 32,
+        "developmentPairs": 64,
+        "confirmationPairs": 256,
+        "recipes": [(64, 32, 2), (128, 64, 4)],
+        "stageSeconds": [1800, 32400, 30, 7200],
+    },
 }
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def learning_mode(value="REPLACEMENT"):
+    mode = value.upper()
+    require(mode in ("REPLACEMENT", "CORRECTION"), "Unknown token learning mode: " + value)
+    return mode
+
+
+def profile_name(requested, mode, replacement_default="smoke"):
+    selected = requested or ("correction" if mode == "CORRECTION" else replacement_default)
+    require(selected in PROFILES, "Unknown experiment profile: " + selected)
+    require((selected == "correction") == (mode == "CORRECTION"),
+            "Use --profile correction with --learning-mode correction; replacement profiles are separate.")
+    return selected
 
 
 def read(path):
@@ -191,7 +214,9 @@ def prepare(options):
             "--runtime must name the complete training distribution containing lib/training.jar.")
     require(root != runtime and runtime not in root.parents and root not in runtime.parents,
             "Prepared output and source runtime must not overlap.")
-    profile = PROFILES[options.profile]
+    mode = learning_mode(getattr(options, "learning_mode", "replacement"))
+    selected_profile = profile_name(options.profile, mode)
+    profile = PROFILES[selected_profile]
     require(1 <= options.workers <= 32, "Workers must be between one and 32.")
     maximum_seconds = options.maximum_seconds or profile["maximumSeconds"]
     require(30 <= maximum_seconds <= 259200, "Campaign allowance must be 30 seconds through 72 hours.")
@@ -220,9 +245,12 @@ def prepare(options):
         copy_input(path, root / "scripts" / path.name, provenance)
     baseline = copy_input(options.baseline, root / "inputs/baseline.json", provenance)
     training_baseline = root / "inputs/token-training-baseline.json"
-    training_model = read(baseline)
-    training_model["weights"]["planning.tokenValue.enabled"] = 0.0
-    document(training_baseline, training_model)
+    if mode == "CORRECTION":
+        shutil.copy2(baseline, training_baseline)
+    else:
+        training_model = read(baseline)
+        training_model["weights"]["planning.tokenValue.enabled"] = 0.0
+        document(training_baseline, training_model)
     opponents = [baseline]
     for index, path in enumerate(options.opponent):
         opponents.append(copy_input(path, root / f"inputs/opponent-{index}.json", provenance))
@@ -251,6 +279,8 @@ def prepare(options):
         native = arena_source(training_baseline, opponents, options.seed + 1, profile["developmentPairs"])
         native.update(trainingRoots=training, validationRoots=validation,
                       continuationReplicates=replicates, regularization=[0.001, 0.01, 0.1, 1.0])
+        if mode == "CORRECTION":
+            native["learningMode"] = mode
         document(source, native)
         recipes.append({"id": name, "source": str(source), "trainingRoots": training,
                         "validationRoots": validation, "continuationReplicates": replicates})
@@ -264,16 +294,25 @@ def prepare(options):
         }
     document(root / "provenance.json", provenance_doc)
     protocol = {
-        "schemaVersion": 1, "kind": "automata-token-experiment", "profile": options.profile,
+        "schemaVersion": 1, "kind": "automata-token-experiment", "profile": selected_profile,
+        "learningMode": mode,
         "preparedAt": datetime.now(timezone.utc).isoformat(), "configuration": CONFIGURATION,
-        "scope": ("Paired token action-advantage ridge with head-disabled training reference; "
+        "scope": ("Paired token correction ridge preserving the supplied incumbent; "
+                  "development/confirmation against the supplied incumbent. No expansion learning."
+                  if mode == "CORRECTION" else
+                  "Paired token action-advantage ridge with head-disabled training reference; "
                   "development/confirmation against the supplied incumbent. No expansion learning."),
         "diagnosticScope": "Frozen card/purchase/territory epsilon diagnostic only; never fitted here.",
         "python": {"executable": str(Path(sys.executable).resolve()), "version": sys.version,
                    "sha256": sha(sys.executable)},
         "java": identity, "runtime": str(root / "runtime"), "baseline": str(baseline),
+        "baselineSha256": sha(baseline),
         "trainingBaseline": str(training_baseline), "trainingBaselineSha256": sha(training_baseline),
-        "trainingReference": ("Only planning.tokenValue.enabled is set to zero for paired collection "
+        "trainingReference": ("The supplied incumbent bytes, including its original token head, remain "
+                              "unchanged for collection, continuation and all comparisons. A separate "
+                              "planning.tokenCorrection head learns the final token adjustment."
+                              if mode == "CORRECTION" else
+                              "Only planning.tokenValue.enabled is set to zero for paired collection "
                               "and the controlled seat's continuation; opponents retain supplied models. "
                               "The original incumbent bytes remain frozen for diagnostic/development/final games."),
         "opponents": [str(path) for path in opponents], "workers": options.workers,
@@ -287,11 +326,21 @@ def prepare(options):
             "selection": "Highest development paired reward mean strictly above zero; ties recipe id.",
             "confirmation": "One fresh bank; reward lower95 > 0, mean win-share delta >= 0, at least 32 worlds.",
         },
-        "minimumConfirmationPairs": 32, "productionActivation": False,
+        "minimumConfirmationPairs": 256 if mode == "CORRECTION" else 32, "productionActivation": False,
         "intervalMethod": "Approximate 95% normal interval over independent paired game worlds.",
         "confirmationReserveSeconds": stage_seconds[3],
-        "minimumRecipeAdmissionSeconds": 30 if options.profile == "smoke" else 300,
+        "minimumRecipeAdmissionSeconds": 30 if selected_profile == "smoke" else 300,
     }
+    if mode == "CORRECTION":
+        protocol["gates"].update(
+            scale=("First pilot has nonzero training labels, positive validation selected mean, "
+                   "positive independent development paired reward mean and nonnegative win-share mean "
+                   "over at least 64 worlds."),
+            selection=("Highest positive development paired reward mean with nonnegative win-share mean "
+                       "over at least 64 worlds; ties recipe id."),
+            confirmation=("One fresh bank; reward lower95 > 0, mean win-share delta >= 0, "
+                          "at least 256 worlds."),
+        )
     document(root / "protocol.json", protocol)
     inputs = {str(path.relative_to(root)): sha(path) for path in sorted(root.rglob("*")) if path.is_file()}
     inputs.update(identity["files"])
@@ -436,6 +485,18 @@ def pilot_signal(fit):
             and fit["validationRewardDifference"]["mean"] > 0)
 
 
+def development_signal(protocol, development):
+    return (development["mean"] > 0
+            and (protocol.get("learningMode", "REPLACEMENT") != "CORRECTION"
+                 or (development["count"] >= 64 and development["winShareDifference"]["mean"] >= 0)))
+
+
+def scale_signal(protocol, fit, development):
+    return (pilot_signal(fit)
+            and (protocol.get("learningMode", "REPLACEMENT") != "CORRECTION"
+                 or development_signal(protocol, development)))
+
+
 def recipe_admitted(protocol):
     minimum = protocol["minimumRecipeAdmissionSeconds"]
     return (remaining_seconds() >= minimum
@@ -512,9 +573,11 @@ def trials_stage(protocol, output):
                             and original["development"] == trial["development"],
                             "Cached duplicate must preserve the original paired development result.")
         elif index > 0 and (not scale or not recipe_admitted(protocol)):
-            trial = {"id": recipe["id"], "status": "not-admitted",
-                     "reason": ("The predeclared first-pilot paired validation signal gate failed."
-                                if not scale else "Original remaining allowance preserves confirmation reserve."),
+            reason = ("The predeclared first-pilot paired validation signal gate failed."
+                      if not scale else "Original remaining allowance preserves confirmation reserve.")
+            if not scale and protocol.get("learningMode") == "CORRECTION":
+                reason = "The predeclared first-pilot validation/development signal gate failed."
+            trial = {"id": recipe["id"], "status": "not-admitted", "reason": reason,
                      "recipe": descriptor}
             document(completed, trial)
         else:
@@ -545,7 +608,7 @@ def trials_stage(protocol, output):
                     native(protocol, "arena", source, trial_root / "development")
                     development = verify_arena(trial_root / "development", source)
                 trial = {"id": recipe["id"], "status": "duplicate" if duplicate else "evaluated",
-                         "scaleSignal": pilot_signal(fit), "development": development,
+                         "scaleSignal": scale_signal(protocol, fit, development), "development": development,
                          "candidate": str(pilot / "candidate.json"),
                          "candidateSha256": fingerprint,
                          "fitSha256": sha(pilot / "fit.json"),
@@ -572,9 +635,11 @@ def trials_stage(protocol, output):
             scale = trial.get("scaleSignal", False)
     document(output / "trials.json", {"schemaVersion": 1, "trials": trials})
     evaluated = sum(trial["status"] == "evaluated" for trial in trials)
+    continuation = ("unchanged supplied incumbent" if protocol.get("learningMode") == "CORRECTION"
+                    else "head-disabled training reference")
     return stage_result(output, "token-trials", evaluated > 0,
                         f"Completed {evaluated} token candidates; finite unpromising recipes stopped.",
-                        {"trials": trials, "continuation": "head-disabled training reference",
+                        {"trials": trials, "continuation": continuation,
                          "expansionLearning": False},
                         artifacts + [output / "trials.json"])
 
@@ -582,9 +647,12 @@ def trials_stage(protocol, output):
 def select_stage(protocol, output):
     trials = read(output / "trials.json")["trials"]
     eligible = [trial for trial in trials if trial["status"] == "evaluated"
-                and trial["development"]["mean"] > 0]
+                and development_signal(protocol, trial["development"])]
     if not eligible:
         return stage_result(output, "select", False,
+                            "No candidate passed the correction development reward/win-share gate; "
+                            "independent confirmation not opened."
+                            if protocol.get("learningMode") == "CORRECTION" else
                             "No positive development paired reward; independent confirmation not opened.")
     winner = min(eligible, key=lambda trial: (-trial["development"]["mean"], trial["id"]))
     require(sha(winner["candidate"]) == winner["candidateSha256"],
@@ -665,7 +733,9 @@ def main(arguments=None):
     prep.add_argument("--territory-value-bundle", type=Path)
     prep.add_argument("--frozen-card-purchase-bundle", type=Path)
     prep.add_argument("--frozen-purchase-policy", type=Path)
-    prep.add_argument("--profile", choices=PROFILES, default="smoke")
+    prep.add_argument("--profile", choices=PROFILES,
+                      help="Defaults to smoke for replacement and correction for correction learning.")
+    prep.add_argument("--learning-mode", choices=("replacement", "correction"), default="replacement")
     prep.add_argument("--seed", type=int, default=7_100_000,
                       help="Fresh arena offset namespace; caller must avoid previous experiments.")
     prep.add_argument("--workers", type=int, default=2)

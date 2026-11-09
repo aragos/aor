@@ -127,7 +127,7 @@ native registry kind `territory-value-exploration-bundle` records its actual eps
 the exploration diagnostic unavailable and runs the token-only campaign.
 
 The token trials fit action-minus-baseline terminal returns from paired continuations, with a
-predeclared screen before larger trials. Their training reference disables the supplied baseline's
+predeclared screen before larger trials. Legacy replacement training disables the supplied baseline's
 token-value head so the existing fitter can learn a replacement; whole-game development and
 confirmation compare against the original supplied baseline, including its existing head. The token
 pilot uses ordinary baseline card/purchase play, separately from the optional diagnostic's neural
@@ -137,6 +137,21 @@ development data may select a candidate; only the selected candidate reaches the
 confirmation bank. Unpromising experiments are recorded as scientific rejections. Successful
 execution, development improvement and independent confirmation are separate outcomes; none
 updates browser assets or demonstrates human-level strength.
+
+`--learning-mode correction` instead keeps the supplied incumbent intact throughout root collection,
+continuations and comparison. The original token-value head selects its normal action first; a
+separate optional `planning.tokenCorrection.*` head may override it only above the fixed 0.02
+predicted-advantage margin. Absent or zero correction weights retain the exact incumbent action.
+The correction profile uses a bounded screen followed by one larger trial; scaling requires
+positive whole-game development reward and nonnegative mean win-share, as well as its paired
+training/validation signal. Confirmation uses 256 fresh paired worlds. This learns token adjustments
+and retains ordinary baseline card/purchase play.
+
+The native `token-value-pilot` source accepts `learningMode: "CORRECTION"`; omitted mode preserves
+legacy replacement behavior. Mode participates in collection/checkpoint identity and fitted model
+metadata. Old origins without a mode remain replacement records and cannot be reused as correction
+records. The feature dictionary and origin schema remain compatible; no saved-game or rules
+upgrade is involved. Use the newly built executor when selecting this opt-in mode.
 
 Detach the launch command with `nohup` and redirect its output as described above. On macOS,
 `caffeinate -i` before the Python command keeps an otherwise idle machine awake. The local process
@@ -186,6 +201,13 @@ seed reservations for each series. `run/series-report.txt` summarizes completed 
 `run/campaign-report.txt` includes live stage progress. The controller's `--status` and `--resume`
 options work with `series.json` exactly as with a single campaign. Infrastructure failures stop
 the series instead of consuming new campaign seeds as retries.
+
+A series inherits its source campaign's learning mode. To change an old replacement campaign to
+correction learning, pass `--learning-mode correction --runtime training/build/install/training`
+to the series preparation command after rebuilding. The runtime override is required for that
+upgrade so an older executor cannot silently interpret the new source as a replacement run.
+The correction profile is selected automatically; mode, profile and chosen executor are frozen
+before any games run.
 
 ## Full-game strategy experiments
 

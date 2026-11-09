@@ -2,6 +2,8 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.aragos.aor.ai.BotModel
+import dev.aragos.aor.ai.BotTokenCorrection
 import dev.aragos.aor.ai.BotTokenValue
 import java.nio.file.Path
 import kotlin.math.abs
@@ -14,6 +16,29 @@ const val TOKEN_VALUE_MAX_CONTINUATION_REPLICATES = 4
 enum class TokenValueSelectionProtocol {
     RESERVOIR_V1,
     PRECOMMITTED_ORDINAL_V1,
+}
+
+/** Replacement fits an ordinary baseline; correction preserves its existing token-value head. */
+enum class TokenValueLearningMode {
+    REPLACEMENT,
+    CORRECTION;
+
+    fun withWeights(base: BotModel, coefficients: List<Double>): BotModel =
+        when (this) {
+            REPLACEMENT -> BotTokenValue.withWeights(base, coefficients)
+            CORRECTION -> BotTokenCorrection.withWeights(base, coefficients)
+        }
+
+    companion object {
+        internal fun read(value: JsonNode?): TokenValueLearningMode {
+            if (value == null) return REPLACEMENT
+            return requireNotNull(
+                entries.singleOrNull { value.isTextual && it.name == value.asText() }
+            ) {
+                "Token-value learningMode must be REPLACEMENT or CORRECTION."
+            }
+        }
+    }
 }
 
 /** Fixed before creating the game; ordinal counts controlled token decisions in this epoch. */
@@ -59,6 +84,7 @@ data class TokenValueSpecification(
     val validationRoots: Int = 32,
     val continuationReplicates: Int = 2,
     val regularization: List<Double> = listOf(0.001, 0.01, 0.1, 1.0),
+    val learningMode: TokenValueLearningMode = TokenValueLearningMode.REPLACEMENT,
 ) {
     init {
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
@@ -81,8 +107,14 @@ data class TokenValueSpecification(
         ) {
             "Token-value regularization requires one through sixteen distinct positive values."
         }
-        require(arena.candidate.weights[BotTokenValue.GATE] != 1.0) {
-            "Token-value collection requires a baseline with its token-value head disabled."
+        require(
+            learningMode == TokenValueLearningMode.CORRECTION ||
+                arena.candidate.weights[BotTokenValue.GATE] != 1.0
+        ) {
+            "Replacement collection requires a baseline with its token-value head disabled."
+        }
+        require(arena.candidate.weights[BotTokenCorrection.GATE] != 1.0) {
+            "Token-value collection requires a baseline with its correction head disabled."
         }
     }
 
@@ -125,7 +157,12 @@ data class TokenValueSpecification(
                 TOKEN_VALUE_ORIGIN_SCHEMA_VERSION,
                 TOKEN_VALUE_MEAN_ZERO_TOLERANCE,
             )
-            .joinToString("\n")
+            .joinToString("\n") +
+            if (learningMode == TokenValueLearningMode.REPLACEMENT) {
+                ""
+            } else {
+                "\nlearningMode=$learningMode"
+            }
 
     companion object {
         fun read(source: Path): TokenValueSpecification {
@@ -147,6 +184,7 @@ data class TokenValueSpecification(
                 integer("validationRoots", 32),
                 integer("continuationReplicates", 2),
                 ridge?.map(JsonNode::doubleValue) ?: listOf(0.001, 0.01, 0.1, 1.0),
+                TokenValueLearningMode.read(node["learningMode"]),
             )
         }
     }
@@ -203,7 +241,9 @@ data class TokenValueAlternative(
  * is serialized. A skipped origin keeps its seed/index and has no fitted row. Schema one preserves
  * legacy reservoir/fallback provenance. Schema two precommits epoch and ordinal before simulation;
  * [originDecisions] is the prefix length at a collected root, or full-game length for a skipped
- * request. Replicates and alternatives never become independent game counts.
+ * request. [learningMode] binds the incumbent used for both features and continuations; its absence
+ * in old checkpoints means replacement. Replicates and alternatives never become independent game
+ * counts.
  */
 data class TokenValueOrigin(
     val index: Int,
@@ -226,6 +266,7 @@ data class TokenValueOrigin(
     val selectionProtocol: TokenValueSelectionProtocol =
         TokenValueSelectionProtocol.PRECOMMITTED_ORDINAL_V1,
     val requestedOrdinal: Int? = null,
+    val learningMode: TokenValueLearningMode = TokenValueLearningMode.REPLACEMENT,
 ) {
     init {
         require(index >= 0 && requestedEpoch in 1..3 && originDecisions >= 0) {
@@ -385,6 +426,7 @@ data class TokenValueOrigin(
                     node["selectionProtocol"]?.asText()?.let(TokenValueSelectionProtocol::valueOf)
                         ?: TokenValueSelectionProtocol.RESERVOIR_V1,
                 requestedOrdinal = nullableInt("requestedOrdinal"),
+                learningMode = TokenValueLearningMode.read(node["learningMode"]),
             )
         }
     }
