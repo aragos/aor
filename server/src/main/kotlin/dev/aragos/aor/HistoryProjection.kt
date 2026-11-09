@@ -4,6 +4,7 @@ internal data class PlayerHistory(
     val state: GameState,
     val lines: List<String>,
     val events: List<HistoryEventView>,
+    val statistics: List<GameStatisticsPoint>,
 )
 
 /** History follows the same private audiences as live hands, including both sides of a trade. */
@@ -13,6 +14,7 @@ internal object HistoryProjection {
         var state = GameState(stored.header)
         var tokenBatch: TokenPurchaseBatch? = null
         val events = mutableListOf<HistoryEventView>()
+        val statistics = mutableListOf<GameStatisticsPoint>()
         val lines = buildList {
             for (recorded in stored.effectiveEntries()) {
                 val entry = TextCodec.parse(recorded.text)
@@ -65,6 +67,9 @@ internal object HistoryProjection {
                         )
                     )
                 }
+                if (after.turnNumber != null && after.turnNumber != state.turnNumber) {
+                    statistics.add(GameStatisticsPoint.from(after))
+                }
                 state = after
             }
             stored.revisions
@@ -81,11 +86,15 @@ internal object HistoryProjection {
                     )
                 }
         }
+        if (state.stage == Stage.FINISHED) {
+            statistics.add(GameStatisticsPoint.from(state))
+        }
         events.addAll(stored.auditEvents())
         return PlayerHistory(
             state,
             lines,
             events.sortedBy { it.id.substringBefore(':').toIntOrNull() ?: 0 },
+            statistics.toList(),
         )
     }
 

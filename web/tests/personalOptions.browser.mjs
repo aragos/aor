@@ -19,7 +19,7 @@ async function visitSeat(link, tag) {
 try {
     await page.wait(`document.querySelector('#bid') && document.querySelector('.personal-options')`, 'live options and bid');
     await page.fill('#bid', '7');
-    await click('.personal-options > summary');
+    await click('#tool-tab-personal');
     await click(dark);
     await page.wait(`document.documentElement.dataset.theme === 'dark'`, 'dark mode applies immediately');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Options preserve the bid draft');
@@ -28,7 +28,7 @@ try {
     const before = await game.snapshot(viewer);
     await page.reload();
     await page.wait(`document.querySelector('.personal-options') && document.documentElement.dataset.theme === 'dark'`, 'personal options survive reload');
-    await click('.personal-options > summary');
+    await click('#tool-tab-personal');
     assert.equal(await page.evaluate(`document.querySelector('${skip}').checked`), true);
     assert.equal((await game.snapshot(viewer)).revision, before.revision, 'Preferences have no game effect without an opportunity');
     for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
@@ -93,7 +93,7 @@ try {
     assert.equal((await game.snapshot(viewer)).revision, windmill.revision,
         'Viewing another player does not auto-decline the owner’s opportunity');
     await visitSeat(viewer, 'owner');
-    await page.wait(`document.querySelector('.command-dock summary small')?.textContent.endsWith('${windmill.revision + 1}')`, 'standing preference declines live opportunity');
+    await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.endsWith('${windmill.revision + 1}')`, 'standing preference declines live opportunity');
     const declined = await game.snapshot(viewer);
     assert.equal(declined.revision, windmill.revision + 1);
     assert.equal(declined.game.windmillOffer, null);
@@ -121,7 +121,7 @@ try {
     const reads = await page.evaluate('window.uiRequests');
     await page.wait(`window.uiRequests >= ${reads + 2}`, 'polling after rejection');
     assert.equal(await page.evaluate('window.uiCommands.length'), 2, 'Rejected or uncertain decisions are never silently retried');
-    await click('.personal-options > summary');
+    await click('#tool-tab-personal');
     await page.evaluate(`Storage.prototype.setItem = function() {throw new Error('Storage quota exceeded');};`);
     await click(dark);
     await page.wait(`document.documentElement.dataset.theme === 'light'`, 'quota failure uses updated memory rather than the older stored value');

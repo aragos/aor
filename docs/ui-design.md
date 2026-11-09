@@ -51,6 +51,9 @@ Paths are relative to [web/src](../web/src/).
   return without changing drafts. Keep draw-pile size separate and forecasts distinct from payouts.
 - Keep grouped action buttons equally tall when labels wrap; place help beside the button with a
   separate hit target outside its border.
+- Table tools use a stable tab row with a separate Close action; reselecting a tab keeps it open.
+  Content scrolls above the row on desktop and below it in the phone Players workspace. Personal
+  card-buy permission applies only to a live, owned, legal Urban Ascendancy purchase.
 - Support keyboard/touch, visible focus, reduced motion and phone widths. Name finite-choice questions;
   roving focus lets Tab reach confirmation. Localize ordinary text, never canonical syntax. Preferences
   use browser storage with an in-memory fallback. Tapping expanded player details closes them.
@@ -74,7 +77,10 @@ drafts; their text-sized commodities follow outside the link. Group related comm
 outcomes, revealed bids, and paired market rolls (including their draw rewards), preserving each
 entry's facts and audience. Keep independent automatic causes and phase milestones distinct. Put
 consequences below their cause, with each player's resource and order changes together. Only one's own
-submitted competition can open its result notice; expansion notices expire with expansion. Final scores can dismiss/reopen, preserving inspection.
+submitted competition can open its result notice; expansion notices expire with expansion. Final
+results can dismiss/reopen, preserving inspection. Scores rank numeric totals descending, with Chaos
+last. The Statistics tab charts public score, advance count, cash and misery at the start of each
+turn and at completion, with an exact-value table.
 
 Favicon action status works independently of rendering. Hidden tabs poll every five seconds for two
 minutes after engagement/change, then every 30 seconds; unchanged responses do not extend activity.

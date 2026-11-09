@@ -81,7 +81,7 @@ try {
     assert(inputs.every(input => input.observation.playerId !== initial.viewerId));
     assert(inputs.every(input => Object.keys(input).sort().join(',') === 'difficulty,id,observation,seed'), 'Workers receive no authorization, other-seat views or transport receipts');
 
-    await click('.table-configuration > summary');
+    await click('#tool-tab-configuration');
     await page.click('Pause automated opponents');
     await waitState(snapshot => snapshot.automation.paused, 'pause is durable');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Pausing does not clear a valid bid draft');
@@ -146,7 +146,7 @@ try {
 
     second = await open(web + path);
     await second.wait(`document.querySelector('.bot-controls')`, 'second StrictMode game mount');
-    await second.evaluate(`document.querySelector('.table-configuration').open = true`);
+    await second.evaluate(`document.querySelector('#tool-tab-configuration').click()`);
     await second.wait(`document.querySelector('.bot-controls').textContent.includes('another browser tab')`, 'single lease excludes a second tab');
     await second.click('Run automated opponents here');
     await page.send('Page.bringToFront');
@@ -195,7 +195,7 @@ try {
     await page.click('Resume automated opponents');
     await waitState(snapshot => !snapshot.automation.paused && snapshot.submitted.length === 2, 'resumption computes fresh private submissions');
 
-    await page.evaluate(`document.querySelector('.table-configuration').open = true`);
+    await page.evaluate(`document.querySelector('#tool-tab-configuration').click()`);
     await click('.abandon-game');
     await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('ends it immediately')`, 'solo abandonment explains the actual final consequence');
     assert.equal(await page.evaluate(`document.querySelector('dialog[open]').textContent.includes('all automated opponents')`), true);

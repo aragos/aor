@@ -252,18 +252,16 @@ export async function checkBottomHand(page, web, baseline) {
 
         assert.equal(await page.evaluate(`document.querySelector('.table-effects')`), null, 'Turn information has no bottom disclosure');
         if (mobile) await click('#tab-players');
-        for (const selector of ['.table-configuration', '.command-dock']) {
-            await assertControlReachable(page, `${selector} > summary`, `${viewport} auxiliary expander ${selector}`);
-            await click(`${selector} > summary`);
-            await page.wait(`document.querySelector('${selector}').open`, `${selector} opens`);
+        for (const selector of ['#tool-tab-configuration', '#tool-tab-commands']) {
+            await assertControlReachable(page, `${selector}`, `${viewport} auxiliary expander ${selector}`);
+            await click(`${selector}`);
+            await page.wait(`(document.querySelector('${selector}').getAttribute('aria-selected') === 'true')`, `${selector} opens`);
             await assertBottomHandVisible(page, `${viewport} open ${selector}`);
         }
         assert.equal(await page.evaluate(`document.querySelector('.command-private-hand, .command-dock [data-hand-card]')`), null, 'Commands do not repeat the private hand');
         await capture('tools');
-        for (const selector of ['.table-configuration', '.command-dock']) {
-            await click(`${selector} > summary`);
-            await page.wait(`!document.querySelector('${selector}').open`, `${selector} closes`);
-        }
+        await click('.tool-close');
+        await page.wait(`!document.querySelector('.tool-bar [aria-selected=true]')`, 'Tools close');
     }
 
     for (const [width,height,mobile] of [[1280,800,false],[390,844,true]]) {
@@ -317,14 +315,14 @@ export async function checkBottomHand(page, web, baseline) {
         await page.wait(`document.querySelector('.player-summary.is-viewer').open`, 'Viewer details open');
         await click('.player-summary:has(.player-detail:popover-open) > summary');
         await page.wait(`!document.querySelector('.player-detail:popover-open')`, 'Player detail closes before returning to tools');
-        await assertControlReachable(page, '.command-dock > summary', `${width} expanded hand and Commands`);
-        await click('.command-dock > summary');
-        await page.wait(`document.querySelector('.command-dock').open`, 'Commands open after closing player details with the hand expanded');
+        await assertControlReachable(page, '#tool-tab-commands', `${width} expanded hand and Commands`);
+        await click('#tool-tab-commands');
+        await page.wait(`(document.querySelector('#tool-tab-commands').getAttribute('aria-selected') === 'true')`, 'Commands open after closing player details with the hand expanded');
         await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
         if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-bottom-hand-${width}-expanded-and-tools.png`));
         await assertBottomHandVisible(page, `${width} expanded hand with Commands after player inspection`);
-        await click('.command-dock > summary');
-        await page.wait(`!document.querySelector('.command-dock').open`, 'Combined Commands closes');
+        await click('.tool-close');
+        await page.wait(`!(document.querySelector('#tool-tab-commands').getAttribute('aria-selected') === 'true')`, 'Combined Commands closes');
         await click('.hand-toggle');
     }
 

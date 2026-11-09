@@ -175,7 +175,13 @@ export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;
     observations: BotJob[]; operationReceipts?: string[];
 }
+/** Public start-of-turn positions, followed by the final position when finished. */
+export interface GameStatisticsPoint {
+    turnNumber: number; finished: boolean;
+    players: {player: string; score: number | null; advances: number; cash: number; misery: number | null}[];
+}
 export interface Snapshot {
+    statistics?: GameStatisticsPoint[];
     automation?: BotAutomation | null;
     planning?: PlanningView | null;
     planWriteReceipt?: {operationId: string; version: string} | null;
