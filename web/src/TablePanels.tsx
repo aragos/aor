@@ -24,7 +24,11 @@ export function Commodity({commodity}: {commodity: string}) {
 }
 
 /** The native top layer keeps expanded details outside the strip’s layout and clipping. */
-function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCatalog | null}) {
+function PlayerDetails({player, catalog, capitalBidOrder}: {
+    player: PlayerView;
+    catalog: PublicCatalog | null;
+    capitalBidOrder: number;
+}) {
     const ref = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => {
         const panel = ref.current;
@@ -64,6 +68,7 @@ function PlayerDetails({player, catalog}: {player: PlayerView; catalog: PublicCa
     const categories = [...new Set(advances?.map(advance => advance.category))];
     return <div ref={ref} className="player-detail" role="region" aria-label={player.name}>
         <dl className="detail-list">
+            {capitalBidOrder > 0 && <div className="player-capital-bid-order"><dt>{t('game.capitalBidOrder')}</dt><dd>{capitalBidOrder}</dd></div>}
             <div className="written-cash"><dt title={t('game.writtenCashHelp')}>{t('game.writtenCash')}</dt><dd>${player.writtenCash}</dd></div>
             {player.poolAvailable && <div className="player-pool-detail"><dt>{t('game.pool')}</dt><dd>{player.poolTokens}</dd></div>}
             <div><dt>{t('game.tokens')}</dt><dd>{player.stockTokens}</dd></div>
@@ -124,7 +129,8 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                         <b>{whiteMarkers}</b><small>{t('table.whiteMarkers')}</small>
                     </span>}
                     {eligible && <span className="target-status">{t(picked ? 'table.selectedTarget' : 'table.legalTarget')}</span>}
-                </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}/>
+                </summary><PlayerDetails player={player} catalog={snapshot.game.catalog}
+                    capitalBidOrder={snapshot.game.capitalOrder.indexOf(player.id) + 1}/>
             </details>;
         })}
     </div></section>;
