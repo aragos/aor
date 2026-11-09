@@ -79,6 +79,7 @@ internal class TokenValueCollector(
                 status = TokenValueOriginStatus.SKIPPED,
                 skipReason = backbone.skipReason ?: TokenValueSkipReason.REQUESTED_ROOT_NOT_REACHED,
                 requestedOrdinal = request.ordinal,
+                learningMode = specification.learningMode,
             )
         if (root == null) return provenance
         val alternatives =

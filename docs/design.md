@@ -232,6 +232,12 @@ inputs, cumulative deadlines and resumable stage receipts. A completed campaign 
 result; scientific rejection remains explicit and no result activates a production policy.
 Counterfactual continuations share an origin's hidden world only inside the simulator; fitted
 features remain actor-visible, and related branches stay in the same statistical partition.
+Optional [token corrections](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenCorrection.kt)
+preserve the incumbent's token head and add a separately fitted selector after its actual choice.
+Collection and continuations use that intact incumbent; correction coefficients estimate terminal
+differences from its chosen action, not differences from its uncalibrated head score. Zero or absent
+correction retains the incumbent exactly. The explicit learning mode binds experimental checkpoints;
+existing model assets and saved games retain their original behavior.
 See [campaign operation](contributing.md#unattended-automata-campaigns) for launch and recovery.
 
 ## Lifecycle and activity

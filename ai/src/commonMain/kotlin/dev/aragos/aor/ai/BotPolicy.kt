@@ -53,7 +53,8 @@ object BotPolicy {
             BotDifficulty.HARD -> {
                 val baseline = plan(observation, ranked, model, scores).candidate
                 if (observation.decision == "buy-tokens") {
-                    BotTokenValue.choose(observation, baseline, model)
+                    val incumbent = BotTokenValue.choose(observation, baseline, model)
+                    BotTokenCorrection.choose(observation, incumbent, model)
                 } else {
                     val deferred =
                         BotLeaderTiming.deferForCash(observation, baseline, model, ordinaryScores)

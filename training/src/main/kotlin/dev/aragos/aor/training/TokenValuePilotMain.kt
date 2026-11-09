@@ -74,6 +74,7 @@ object TokenValuePilotMain {
             mapOf(
                 "kind" to "token-value-pilot",
                 "signature" to signature,
+                "learningMode" to specification.learningMode,
                 "originSchemaVersion" to TOKEN_VALUE_ORIGIN_SCHEMA_VERSION,
                 "selectionProtocol" to TokenValueSelectionProtocol.PRECOMMITTED_ORDINAL_V1,
                 "meanDeltaZeroTolerance" to TOKEN_VALUE_MEAN_ZERO_TOLERANCE,
