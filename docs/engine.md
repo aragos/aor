@@ -40,6 +40,10 @@ latest recorded turn (turn 1 during setup). This includes turns removed by histo
 Earlier turns retain their recorded timing, so outcomes, live decisions and private work survive.
 The header's activation turn also governs replay and historical rewinds.
 
+Draw-three-keep-two is additive and disabled by default. Older creation revisions containing the
+original four options remain valid and retain the one-card setup and ordinary turn 1 draw. New
+creation revisions explicitly record the variant; returns and reshuffles replay without randomness.
+
 Activity identifies one phase's work including interruptions. Replay-derived `activity.decisionEntry`
 identifies the presentation decision even when actor/prompt repeats; it is neither a revision nor a
 command. Private readiness does not replace it. Clients submit committed revision.

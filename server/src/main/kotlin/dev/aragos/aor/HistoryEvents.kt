@@ -17,6 +17,7 @@ enum class HistoryEventKind {
     SWAP_ORDER,
     BUY_CARD,
     DISCARD_CARD,
+    RETURN_CARD,
     CANCEL_ADJUSTMENT,
     UPGRADE_SHIPS,
     BUY_ADVANCE,
@@ -525,6 +526,14 @@ internal object HistoryEvents {
             is TurnCommand.SwapOrder ->
                 event(HistoryEventKind.SWAP_ORDER).copy(target = command.target)
             TurnCommand.BuyCard -> event(HistoryEventKind.BUY_CARD)
+            is Command.ReturnCard ->
+                event(HistoryEventKind.RETURN_CARD)
+                    .copy(
+                        card =
+                            if (entry.actor == viewer)
+                                cardId(before, entry.actor, command.reference)
+                            else null
+                    )
             is TurnCommand.DiscardCard ->
                 event(HistoryEventKind.DISCARD_CARD)
                     .copy(

@@ -148,7 +148,7 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
             const inspected = inspection?.kind === 'card' && inspection.id === card.reference;
             const playable = !!finite || !!offer?.playable;
             const burden = snapshot.game.burdenReferences.includes(card.reference);
-            const status = finite ? t(finite.kind === 'discard' ? 'action.discard' : 'action.offerCard')
+            const status = finite ? t(finite.kind === 'return' ? 'action.return-card' : finite.kind === 'discard' ? 'action.discard' : 'action.offerCard')
                 : !playable ? t('hand.notPlayable') : null;
             return <div className="object-control" key={card.reference}>
                 <button type="button" data-hand-card={card.reference} aria-pressed={selected}

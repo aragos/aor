@@ -9,7 +9,6 @@ class TextCodecTest {
     fun retiredSyntaxIsRejectedBeforeItCanBecomeAReplayEntry() {
         for (text in
             listOf(
-                "return-card hand-1",
                 "written-record",
                 "written-record p2",
                 "adjust-market grain shortage",
@@ -29,6 +28,7 @@ class TextCodecTest {
                 "set-option deck-modification disabled",
                 "set-option deck-modification enabled",
                 "start",
+                "return-card hand-1",
                 "bid-capital 12",
                 "choose-capital venice",
                 "buy-tokens -2",
@@ -75,6 +75,8 @@ class TextCodecTest {
                 "p2: start",
                 "!shuffle anything",
                 "start extra",
+                "return-card",
+                "return-card hand-1 extra",
                 "bid-capital 1.5",
                 "bid-capital 9999999999999",
                 "bid-capital",

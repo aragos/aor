@@ -10,6 +10,7 @@ object TextCodec {
         return when (parts.first()) {
             "set-option" -> RuleOptionCommand.parse(arguments)
             "start" -> Command.Start.parse(arguments)
+            "return-card" -> Command.ReturnCard.parse(arguments)
             "bid-capital" -> Command.BidCapital.parse(arguments)
             "choose-capital" -> Command.ChooseCapital.parse(arguments)
             "buy-tokens" -> Command.BuyTokens.parse(arguments)

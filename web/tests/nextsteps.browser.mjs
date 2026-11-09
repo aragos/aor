@@ -71,7 +71,7 @@ export async function checkSetupEvidence(page, web) {
     assert.equal(configured.game.rules.deckModification,true);
     assert.equal(configured.game.rules.initialCard,'NO_EVENTS');
     assert.equal(configured.game.rules.immediateMasterArtDiscard,true);
-    assert.equal(configured.game.ruleOptions.length,4);
+    assert.equal(configured.game.ruleOptions.length,5);
     await page.send('Page.navigate',{url:web+creator.path});
     await page.wait(`document.querySelector('.game-table')`,'configured game');
     assert.equal(await page.evaluate(`document.querySelector('.rule-options')`),null,'Variants are selected with registration');

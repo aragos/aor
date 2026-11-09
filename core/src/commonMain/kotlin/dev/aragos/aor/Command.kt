@@ -30,6 +30,7 @@ sealed interface Command {
         override fun applyTo(state: GameState, actor: PlayerId): GameState {
             checkRule(state.stage == Stage.CONFIGURATION, ViolationCode.WRONG_PHASE)
             checkRule(actor == state.header.creatorId, ViolationCode.WRONG_PLAYER)
+            SetupDeal.validate(state)
             GameCatalog.requireResolvedFor(
                 state.playerIds.size,
                 state.rules,
@@ -41,6 +42,21 @@ sealed interface Command {
         fun parse(arguments: List<String>): Start {
             arguments.requireSize(0)
             return this
+        }
+    }
+
+    /** Returns one privately chosen physical card to the opening deck, without discarding it. */
+    data class ReturnCard(val reference: String) : Command {
+        override fun toText(): String = "return-card $reference"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState =
+            SetupDeal.returnCard(state, actor, reference)
+
+        companion object {
+            fun parse(arguments: List<String>): ReturnCard {
+                arguments.requireSize(1)
+                return ReturnCard(arguments.single())
+            }
         }
     }
 

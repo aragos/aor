@@ -161,9 +161,7 @@ data class GameState(
         if (pendingShuffle() != null) return null
         val owner =
             if (stage == Stage.INITIAL_DRAW) {
-                playerIds.firstOrNull { player ->
-                    playerState(player).hand.size < SetupDeal.cardsPerPlayer
-                } ?: return null
+                SetupDeal.nextPlayer(this) ?: return null
             } else {
                 (flow.decisions.lastOrNull() as? DrawDecision)?.owner ?: return null
             }

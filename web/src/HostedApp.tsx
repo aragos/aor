@@ -8,7 +8,7 @@ import type {Auth, User} from 'firebase/auth';
 import {errorCode, request, setAuthentication} from './api';
 import type {Account, ApplicationConfig, CreatedGame, GamePage, GameSummary, Session} from './api';
 import {ChoiceButtons} from './DecisionControls';
-import {defaultVariants, validVariants, Variants} from './Variants';
+import {defaultVariants, migrateVariants, validVariants, Variants} from './Variants';
 import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
 import {t} from './messages';
 import {useTurnFavicon} from './favicon';
@@ -152,7 +152,7 @@ function RegisteredGameForm({me}: {me: Account}) {
     const [players, setPlayers] = useState<Account[]>([me]);
     const [query, setQuery] = useState('');
     const [matches, setMatches] = useState<Account[]>([]);
-    const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants);
+    const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants, migrateVariants);
     const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');

@@ -39,6 +39,10 @@ enum class ViolationCode(val description: String) {
     INVALID_TURN_POSITION("Choose an available insertion position in the current turn-order tie."),
     UNAVAILABLE_CAPITAL("The selected capital is unavailable."),
     INVALID_OUTCOME("The system outcome does not match the pending request."),
+    INSUFFICIENT_INITIAL_CARDS(
+        "Draw three, keep two with commodities only supports at most five players."
+    ),
+    INVALID_CARD_RETURN("Choose one of your three opening cards to shuffle back into the deck."),
     UNSUPPORTED_OPTION("The requested game option is unsupported."),
     PLAYER_IN_CHAOS("A player in Chaos cannot perform this action."),
     ADVANCE_ALREADY_OWNED("The player already owns this advance."),

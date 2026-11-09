@@ -3,7 +3,7 @@ import type {FormEvent} from 'react';
 import {ApiError, errorCode, request, requestSnapshot} from './api';
 import type {ApplicationConfig, BotDifficulty, CreatedGame, Snapshot, PlanningQuote} from './api';
 import {t} from './messages';
-import {defaultVariants, validVariants, Variants} from './Variants';
+import {defaultVariants, migrateVariants, validVariants, Variants} from './Variants';
 import {usePersonalTheme} from './preferences';
 import {isUndoPolicy, useStoredSetting} from './preferences';
 import {ChoiceButtons} from './DecisionControls';
@@ -30,7 +30,7 @@ function CreateGame() {
     const [bots, setBots] = useState<BotDifficulty[]>([]);
     const humanNames = names.split('\n').map(value => value.trim()).filter(Boolean);
     const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
-    const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants);
+    const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants, migrateVariants);
     const [created, setCreated] = useState<CreatedGame | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
