@@ -36,7 +36,7 @@ Read only the guide relevant to the change; detailed rules and syntax are lookup
 | Rules, replay, catalogs (JVM/JS) | `core/` | [Engine](docs/engine.md), [rules](docs/rules.md), [commands](docs/commands.md) |
 | Authority, privacy, storage, history | `server/` | [Architecture](docs/design.md) |
 | Table and map | `web/` | [UI](docs/ui-design.md), [maps](docs/map-design.md) |
-| Opponent policies / offline simulation | `ai/`, `training/` | [Engine](docs/engine.md#opponent-policies), [training](docs/contributing.md#opponent-training) |
+| Opponent policies / offline simulation | `ai/`, `training/` | [Engine](docs/engine.md#opponent-policies), [training](docs/contributing.md#opponent-training), [unattended campaigns](docs/contributing.md#unattended-automata-campaigns) |
 | Hosting, release, recovery | `deployment/`, `render.yaml` | [Deployment](docs/deployment.md) |
 | Goals / outstanding work | | [Scope](docs/requirements.md), [follow-ups](docs/follow-ups.md) |
 
