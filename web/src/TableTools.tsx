@@ -4,7 +4,7 @@ import {t} from './messages';
 
 type Tool = 'personal' | 'configuration' | 'commands';
 
-/** A stable tab row and separate close action keep navigation targets fixed as content expands. */
+/** Stable tabs toggle their panels; an open panel also has a close action above its content. */
 export function TableTools({personal, configuration, commands, revision}: {
     personal: ReactNode; configuration: ReactNode; commands: ReactNode; revision: number;
 }) {
@@ -17,7 +17,7 @@ export function TableTools({personal, configuration, commands, revision}: {
                 {tabs.map((tab, index) => <button key={tab} type="button" role="tab"
                     id={`tool-tab-${tab}`} aria-controls={`tool-panel-${tab}`}
                     aria-selected={active === tab} tabIndex={active === tab || active === null && index === 0 ? 0 : -1}
-                    onClick={() => setActive(tab)} onKeyDown={event => {
+                    onClick={() => setActive(current => current === tab ? null : tab)} onKeyDown={event => {
                         const offset = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
                         const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[tabs.length - 1]
                             : offset ? tabs[(index + offset + tabs.length) % tabs.length] : null;
@@ -29,15 +29,17 @@ export function TableTools({personal, configuration, commands, revision}: {
                     {tab === 'commands' && <small>{t('game.revision')} {revision}</small>}
                 </button>)}
             </nav>
-            <button className="tool-close secondary" type="button" disabled={active === null}
+        </div>
+        <div className="tool-panels" hidden={active === null}>
+            {active !== null && <button className="tool-close secondary" type="button"
                 aria-label={t('table.closeTools')} onClick={() => {
                     document.getElementById(`tool-tab-${active}`)?.focus();
                     setActive(null);
-                }}>×</button>
-        </div>
-        <div className="tool-panels" hidden={active === null}>
-            {tabs.map(tab => <div key={tab} id={`tool-panel-${tab}`} role="tabpanel"
-                aria-labelledby={`tool-tab-${tab}`} hidden={active !== tab}>{content[tab]}</div>)}
+                }}>×</button>}
+            <div className="tool-panel-content">
+                {tabs.map(tab => <div key={tab} id={`tool-panel-${tab}`} role="tabpanel"
+                    aria-labelledby={`tool-tab-${tab}`} hidden={active !== tab}>{content[tab]}</div>)}
+            </div>
         </div>
     </div>;
 }

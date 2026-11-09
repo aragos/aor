@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {open} from './browser-support.mjs';
+import {assertTextContrast} from './contrast-support.mjs';
 
 export async function checkPortal(page, web) {
     await page.send('Page.navigate', {url: web + '/tests/portal-harness.html'});
@@ -53,6 +54,16 @@ export async function checkPortal(page, web) {
     await page.click('Add');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].find(button=>button.textContent==='Create game').disabled`), false);
     assert.equal(await page.evaluate(`document.querySelectorAll('.create-registered select').length`), 0, 'Creation options use visible buttons');
+    for (const theme of ['dark', 'light']) {
+        await page.evaluate(`document.documentElement.dataset.theme = '${theme}'`);
+        await assertTextContrast(page, `${theme} portal and player selection`);
+        if (theme === 'dark') {
+            await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'contrast-dark-portal.png'), 1280, 900);
+            await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'contrast-dark-portal-phone.png'), 390, 844, true);
+            await assertTextContrast(page, 'dark phone portal');
+            await page.send('Emulation.clearDeviceMetricsOverride');
+        }
+    }
     await page.click('Other games');
     await page.wait(`document.querySelector('.game-directory').textContent.includes('Eastern trade routes')`, 'public game directory');
     assert.equal(await page.evaluate(`document.querySelector('.game-directory').textContent.includes('@alice')`), false, 'Other games excludes memberships');

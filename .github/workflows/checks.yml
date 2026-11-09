@@ -82,7 +82,9 @@ jobs:
       # The parallel container job builds and typechecks the production client.
       - run: npm audit --audit-level=low
       - name: Browser interactions
-        run: npm run test:browser --workspace web -- home.browser.mjs map.browser.mjs history.browser.mjs bots.browser.mjs gameResults.browser.mjs
+        run: >-
+          npm run test:browser --workspace web -- home.browser.mjs map.browser.mjs
+          history.browser.mjs bots.browser.mjs gameResults.browser.mjs themeContrast.browser.mjs
         env:
           CHROME_BIN: /usr/bin/google-chrome
           AOR_BROWSER_TIMEOUT_MS: '600000'
