@@ -153,6 +153,32 @@ metadata. Old origins without a mode remain replacement records and cannot be re
 records. The feature dictionary and origin schema remain compatible; no saved-game or rules
 upgrade is involved. Use the newly built executor when selecting this opt-in mode.
 
+The [whole-game search adapter](../scripts/automata_policy_search.py) optimizes six correction
+weights directly through complete games. This evaluates repeated corrections under the resulting
+policy, whereas continuation labels evaluate one changed decision followed by incumbent play.
+The search scores are uncalibrated; the same strict 0.02 override threshold applies. All incumbent
+weights remain intact, and the zero-correction candidate must reproduce the incumbent's complete
+gameplay results exactly on the screening bank.
+
+```sh
+python3 scripts/automata_policy_search.py prepare --from-campaign .aor-training/correction-campaign --output .aor-training/policy-search --seed 91378023 --workers 4
+caffeinate -i python3 .aor-training/policy-search/scripts/automata_campaign.py --spec .aor-training/policy-search/campaign.json --output .aor-training/policy-search/run
+```
+
+Preparation verifies and copies a frozen correction campaign's executor and model inputs. The
+declared search tests 32 candidates on 64 paired worlds, then four finalists on a separate bank of
+256 worlds. Only a candidate with positive mean win-share and composite-reward differences on
+that selection bank receives confirmation on 512 fresh worlds. Both confirmation lower 95%
+bounds must exceed zero; selection intervals do not qualify a candidate. The incumbent remains
+the fallback even when zero correction is absent from the finalists. `--profile smoke` runs a tiny
+execution check that cannot qualify a candidate.
+
+The default ceiling is four hours, including one hour reserved for confirmation. The finite search
+stops earlier when its candidates are exhausted or its gate fails. It uses the same controller
+resource limits, input hashes, status reports and bounded resume contract as the continuation
+campaign. It does not start another search or activate a production model. Seed reservations cover
+the source campaign and the new banks; callers must also avoid other historical experiments.
+
 Detach the launch command with `nohup` and redirect its output as described above. On macOS,
 `caffeinate -i` before the Python command keeps an otherwise idle machine awake. The local process
 refreshes `run/campaign-report.txt` and `run/campaign-report.json` during execution and writes the
