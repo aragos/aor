@@ -162,6 +162,26 @@ documents that contract. This provides a finite, auditable search space for addi
 recipes without putting a language model in the execution loop. Changing that search space or
 adding a new algorithm remains a development task.
 
+For automatic follow-up campaigns, the [series adapter](../scripts/automata_series.py) prepares
+a finite queue of fresh-seed replications from an existing frozen campaign. It reserves disjoint
+worlds across the queue and source campaign, reuses the exploration diagnostic only in the first
+replication, and places all stages under one controller and one cumulative resource/time budget.
+It stops at the first confirmation pass for review or when the queue is exhausted. This repeats
+fixed recipes; it does not invent new methods or activate a candidate. Per-campaign confidence
+intervals are not corrected for multiple campaigns, so a pass is not a series-wide strength claim.
+
+```sh
+python3 scripts/automata_series.py prepare --from-campaign .aor-training/campaign-1 --output .aor-training/series-1 --seed 91376423 --campaigns 3 --workers 4
+caffeinate -i python3 .aor-training/series-1/scripts/automata_campaign.py --spec .aor-training/series-1/series.json --output .aor-training/series-1/run
+```
+
+Omit `caffeinate -i` on Linux. The default backstop is 24 hours; `--maximum-seconds` permits up to
+72 hours. A declaration supports at most ten campaigns, with three by default. Use new output and
+seed reservations for each series. `run/series-report.txt` summarizes completed campaigns;
+`run/campaign-report.txt` includes live stage progress. The controller's `--status` and `--resume`
+options work with `series.json` exactly as with a single campaign. Infrastructure failures stop
+the series instead of consuming new campaign seeds as retries.
+
 ## Full-game strategy experiments
 
 Use `arena` for a frozen complete-game comparison and `strategy-search` for a small search over
