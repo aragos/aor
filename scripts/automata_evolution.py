@@ -3,7 +3,8 @@
 
 At most four rounds explore five small policy modules around the current training
 parent. Selection may replace that provisional parent, but only one final model is
-opened against independent confirmation and held-out opponents. The existing
+opened against independent confirmation and held-out opponents. The archive profile
+instead races exact saved models once, without generating or fitting new policies. The existing
 campaign controller owns the original deadlines, process group and resource caps.
 Nothing in this program activates a policy or claims verified human strength.
 """
@@ -41,6 +42,8 @@ PROFILES = {
               "confirmationPairs": 4, "robustnessPairs": 4},
     "search": {"rounds": 4, "screeningPairs": 48, "selectionPairs": 192,
                "confirmationPairs": 1024, "robustnessPairs": 512},
+    "archive": {"rounds": 1, "screeningPairs": 512, "selectionPairs": 1024,
+                "confirmationPairs": 2048, "robustnessPairs": 1024},
 }
 BUNDLE_CONFIGURATION = {"playerCount": 4, "map": "STANDARD", "initialCard": "NO_CRUSADES",
                         "deckModification": True, "immediateMasterArtDiscard": True}
@@ -150,6 +153,17 @@ def model_key(path):
     return json.dumps(validate_model(read(path)), sort_keys=True, allow_nan=False)
 
 
+def archive_proposals(baseline, models):
+    """Keep each supplied checkpoint intact; only fresh game returns rank the archive."""
+    require(1 <= len(models) <= 16, "The archive profile requires one through sixteen seed models.")
+    keys = [model_key(path) for path in (baseline, *models)]
+    require(len(keys) == len(set(keys)), "Archive seed models must be distinct and different from the baseline.")
+    initial = read(baseline)["weights"]
+    return [{"candidateId": index, "module": "anchor" if index == 0 else "archive",
+             "changes": changed_weights(initial, read(path)["weights"]), "model": read(path)}
+            for index, path in enumerate((baseline, *models))]
+
+
 def prepare(options):
     source = options.from_campaign.expanduser().resolve(strict=True)
     original, old_runtime, old_hashes = search.source_inputs(source)
@@ -168,6 +182,11 @@ def prepare(options):
     banks = seed_banks(options.seed, profile, original["seedBanks"])
     baseline_model = read(original["baseline"])
     validate_model(baseline_model)
+    seed_models = getattr(options, "seed_model", [])
+    if options.profile == "archive":
+        archive_proposals(original["baseline"], seed_models)
+    else:
+        require(not seed_models, "Seed models require the archive profile.")
     bundle = read(options.purchase_bundle)
     require(bundle.get("configuration") == BUNDLE_CONFIGURATION
             and bundle.get("baseline", {}).get("weights") == baseline_model["weights"]
@@ -194,6 +213,8 @@ def prepare(options):
                  "automata_campaign.py", "train-opponents.py"):
         experiments.copy_input(Path(__file__).with_name(name), root / "scripts" / name, provenance)
     baseline = experiments.copy_input(original["baseline"], root / "inputs/baseline.json", provenance)
+    seeds = [experiments.copy_input(path, root / f"inputs/seed-model-{index}.json", provenance)
+             for index, path in enumerate(seed_models)]
     purchase_bundle = experiments.copy_input(options.purchase_bundle, root / "inputs/purchase-bundle.json", provenance)
     prior, policy = root / "inputs/purchase-prior.json", root / "inputs/purchase-policy.json"
     document(prior, bundle["baseline"])
@@ -217,14 +238,18 @@ def prepare(options):
         "frozenPurchaseSha256": {"baseline": sha(prior), "policy": sha(policy)},
         "opponents": list(map(str, opponents)), "robustOpponents": list(map(str, robust_opponents)),
         "workers": options.workers, "heapMiB": 1536, "seed": options.seed, "seedBanks": banks,
-        "sourceSeedBanks": original["seedBanks"], **profile, "finalists": 4,
-        "maximumCandidates": 21, "maximumConsecutiveFailures": 2, "initialRadius": 1.0,
+        "sourceSeedBanks": original["seedBanks"], **profile,
+        "seedModels": list(map(str, seeds)), "seedModelSha256": {str(path): sha(path) for path in seeds},
+        "finalists": 3 if options.profile == "archive" else 4,
+        "maximumCandidates": 17 if options.profile == "archive" else 21,
+        "maximumConsecutiveFailures": 2, "initialRadius": 1.0,
         "minimumRoundSeconds": 10 if options.profile == "smoke" else 300,
         "seedNote": "Disjoint from the supplied source campaign and every bank in this campaign; external historical banks are not certified.",
         "gates": {"evolve": "Different final parent and last accepted selection win-share AND composite mean > 0.",
-                  "confirm": "One final model versus original baseline; 1024 fresh worlds, both lower95 > 0.",
-                  "robustness": "Same final model versus original baseline; 512 fresh worlds with held-out opponents, both lower95 > 0; smoke never qualifies."},
-        "scope": "Five bounded policy modules; P32 purchase actor and its prior frozen for every seat.",
+                  "confirm": f"One final model versus original baseline; {profile['confirmationPairs']} fresh worlds, both lower95 > 0.",
+                  "robustness": f"Same final model versus original baseline; {profile['robustnessPairs']} fresh worlds with held-out opponents, both lower95 > 0; smoke never qualifies."},
+        "scope": ("One exact saved-model archive race" if options.profile == "archive" else "Five bounded policy modules")
+                 + "; P32 purchase actor and its prior frozen for every seat.",
         "productionActivation": False, "humanStrengthVerified": False,
         "intervalMethod": "Approximate 95% normal intervals over independent paired game worlds.",
     }
@@ -305,7 +330,7 @@ def verify_search(protocol, source, directory, pool, round_index):
             require(row["label"] == ("current" if candidate_id == 0 else f"sample-{candidate_id}")
                     and row["parameters"] == proposal["changes"]
                     and row["model"] == f"candidate-{candidate_id}.json"
-                    and read(directory / row["model"])["weights"] == dict(initial, **proposal["changes"]),
+                    and read(directory / row["model"])["weights"] == dict(initial, **proposal["model"]["weights"]),
                     "Native candidate differs from its frozen module proposal.")
             pairs = [read(directory / f"{bank}-candidate-{candidate_id}-pair-{index}.json")
                      for index in range(len(seeds))]
@@ -394,10 +419,14 @@ def evolve_stage(protocol, output):
         if not receipt_path.exists() and not source.exists() and experiments.remaining_seconds() < protocol["minimumRoundSeconds"]:
             stop = "Original evolve-stage allowance cannot admit another round; confirmation reserve retained."
             break
-        pool = proposals(read(parent), radius)
+        archived = protocol["profile"] == "archive"
+        pool = archive_proposals(parent, protocol["seedModels"]) if archived else proposals(read(parent), radius)
         paths = [directory / f"proposal-{row['candidateId']}.json" for row in pool]
         for path, row in zip(paths, pool):
-            document(path, row["model"])
+            if archived:
+                freeze_copy(([parent] + protocol["seedModels"])[row["candidateId"]], path)
+            else:
+                document(path, row["model"])
         descriptor = {"round": index, "parent": str(parent), "parentSha256": sha(parent), "radius": radius,
                       "proposals": [{key: value for key, value in row.items() if key != "model"}
                                     for row in pool]}
@@ -413,8 +442,8 @@ def evolve_stage(protocol, output):
             verify_receipt(directory, receipt)
             require(receipt["descriptor"] == descriptor, "Cached round differs from its adaptive parent.")
         else:
-            progress(output, f"Round {index + 1}/{protocol['rounds']}: evaluating {len(pool)} candidates across "
-                     "commodity, expansion, leader, events and token modules.", summaries)
+            modules = "the frozen archive" if archived else "commodity, expansion, leader, events and token modules"
+            progress(output, f"Round {index + 1}/{protocol['rounds']}: evaluating {len(pool)} candidates across {modules}.", summaries)
             native = directory / "search"
             experiments.native(protocol, "strategy-search", source, native,
                                extra=("--workers", str(protocol["workers"])))
@@ -424,11 +453,12 @@ def evolve_stage(protocol, output):
             summary = {"round": index, "radius": radius, "selected": selected_id,
                        "module": pool[selected_id]["module"], "selection": selected["overall"],
                        "accepted": transition["accepted"], "zeroAnchorParity": True,
-                       "decision": "provisional parent accepted" if transition["accepted"] else "rejected; radius halved",
+                       "decision": ("provisional parent accepted" if transition["accepted"] else
+                                    "rejected; archive race finished" if archived else "rejected; radius halved"),
                        "modules": {module: [{"candidateId": row["candidateId"], "overall": row["overall"]}
                                              for row in read(native / "search.json")["screening"]
                                              if pool[row["candidateId"]]["module"] == module]
-                                   for module in ("anchor", *MODULES, "token")}}
+                                   for module in (("anchor", "archive") if archived else ("anchor", *MODULES, "token"))}}
             document(directory / "summary.json", summary)
             receipt = {"descriptor": descriptor, "summary": summary, "transition": transition,
                        "artifacts": artifact_hashes(directory)}
@@ -465,8 +495,13 @@ def evolve_stage(protocol, output):
     return report_result(protocol, output, "evolve", passed, summary, selection, artifacts)
 
 
+def minimum_pairs(protocol, stage):
+    field = "confirmationPairs" if stage == "confirm" else "robustnessPairs"
+    return protocol.get(field, PROFILES[protocol["profile"]][field])
+
+
 def qualification_passes(protocol, metrics, stage):
-    minimum = 1024 if stage == "confirm" else 512
+    minimum = minimum_pairs(protocol, stage)
     return protocol["profile"] != "smoke" and all(
         metrics[name]["count"] >= minimum and metrics[name]["lower95"] is not None
         and metrics[name]["lower95"] > 0 for name in ("winShareDifference", "rewardDifference"))
@@ -508,7 +543,7 @@ def final_stage(protocol, output, stage):
     require(report["overall"]["pairs"] == len(seeds), "Final arena bank is incomplete.")
     search.verify_metrics(report["overall"], metrics)
     passed = qualification_passes(protocol, metrics, stage)
-    metrics.update(candidateSha256=selection["candidateSha256"], minimumPairs=1024 if stage == "confirm" else 512)
+    metrics.update(candidateSha256=selection["candidateSha256"], minimumPairs=minimum_pairs(protocol, stage))
     summary = (f"{name.capitalize()} passed both independent lower95 gates; "
                + ("same frozen model advances to held-out opponents." if stage == "confirm" else
                   "candidate is ready for offline review.") if passed else
@@ -534,6 +569,8 @@ def run_stage(options):
             and sha(protocol["purchaseBundle"]) == protocol["purchaseBundleSha256"]
             and all(sha(path) == protocol["frozenPurchaseSha256"][name]
                     for name, path in protocol["frozenPurchase"].items()), "Frozen incumbent or P32 actor changed.")
+    require(all(sha(path) == protocol["seedModelSha256"][path] for path in protocol.get("seedModels", [])),
+            "Frozen archive seed model changed.")
     output = options.output.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     result = evolve_stage(protocol, output) if options.stage == "evolve" else final_stage(protocol, output, options.stage)
@@ -550,6 +587,8 @@ def main(arguments=None):
     prep.add_argument("--purchase-bundle", type=Path, required=True)
     prep.add_argument("--opponent", type=Path, action="append", default=[])
     prep.add_argument("--robust-opponent", type=Path, action="append", required=True)
+    prep.add_argument("--seed-model", type=Path, action="append", default=[],
+                      help="Exact saved model for the archive profile; repeat for up to sixteen checkpoints.")
     prep.add_argument("--output", type=Path, required=True)
     prep.add_argument("--seed", type=int, required=True)
     prep.add_argument("--workers", type=int, default=4)
