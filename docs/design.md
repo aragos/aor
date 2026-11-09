@@ -237,6 +237,11 @@ score. Direct whole-game optimization may instead fit uncalibrated correction sc
 their repeated use across a complete game. Zero or absent correction retains the incumbent exactly.
 The explicit learning mode binds continuation checkpoints; existing model assets and saved games
 retain their original behavior.
+Adaptive whole-game experiments can preserve the qualified purchase actor and its immutable prior
+while changing ordinary decisions. This ownership is explicit in arena sources and checkpoint
+identity: an evolved ordinary model does not replace the prior used by the purchase encoder.
+Search selects training parents on development worlds; independent confirmation and held-out
+opponents precede a separate browser integration and human evaluation.
 See [campaign operation](contributing.md#unattended-automata-campaigns) for launch and recovery.
 
 ## Lifecycle and activity

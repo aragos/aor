@@ -103,25 +103,42 @@ enum class StrategySearchStage {
     SELECTION,
 }
 
-/** The arena candidate supplies unchanged weights; only [parameters] are replaced during search. */
+/**
+ * Search either sampled [parameters] or an ordered [explicitCandidates] pool. An explicit pool
+ * starts with the exact arena candidate as its unchanged anchor; its complete weights are included
+ * in the resume identity. Source model paths resolve relative to the search JSON's directory.
+ */
 data class StrategySearchSpecification(
     val arena: ArenaSpecification,
-    val parameters: List<StrategySearchParameter>,
+    val parameters: List<StrategySearchParameter> = emptyList(),
     val candidates: Int = 24,
     val screeningPairs: Int = 16,
     val selectionPairs: Int = 64,
     val finalists: Int = 4,
+    val explicitCandidates: List<BotModel>? = null,
 ) {
     init {
         require(arena.purpose == ArenaPurpose.SCREENING) {
             "Parameter search is selection data and requires SCREENING purpose."
         }
         require(arena.seed <= 99_999_998) { "Search seed must leave room for separate seed banks." }
-        require(
-            parameters.size in 1..32 &&
-                parameters.map { it.name }.distinct().size == parameters.size
-        ) {
-            "Search requires one through thirty-two distinct planning parameters."
+        if (explicitCandidates == null) {
+            require(
+                parameters.size in 1..32 &&
+                    parameters.map { it.name }.distinct().size == parameters.size
+            ) {
+                "Search requires one through thirty-two distinct planning parameters."
+            }
+        } else {
+            require(parameters.isEmpty()) {
+                "Explicit candidate models and sampled parameters are mutually exclusive."
+            }
+            require(explicitCandidates.size == candidates) {
+                "The explicit model count must match the declared candidate count."
+            }
+            require(explicitCandidates.firstOrNull() == arena.candidate) {
+                "Explicit candidate zero must exactly match the arena candidate anchor."
+            }
         }
         val targets = parameters.flatMap { listOf(it.name) + it.linkedWeights.keys }
         require(targets.distinct().size == targets.size) {
@@ -151,16 +168,23 @@ data class StrategySearchSpecification(
             seed = arena.seed + stage.ordinal,
         )
 
-    fun identity(): String =
-        listOf(
-                arena.identity(),
-                parameters.map { it.copy(linkedWeights = it.linkedWeights.toSortedMap()) },
-                candidates,
-                screeningPairs,
-                selectionPairs,
-                finalists,
-            )
-            .joinToString("\n")
+    fun identity(): String {
+        val legacy =
+            listOf(
+                    arena.identity(),
+                    parameters.map { it.copy(linkedWeights = it.linkedWeights.toSortedMap()) },
+                    candidates,
+                    screeningPairs,
+                    selectionPairs,
+                    finalists,
+                )
+                .joinToString("\n")
+        return if (explicitCandidates == null) {
+            legacy
+        } else {
+            "$legacy\nexplicitCandidates=${explicitCandidates.map { it.weights.toSortedMap() }}"
+        }
+    }
 
     companion object {
         fun read(source: Path): StrategySearchSpecification {
@@ -168,8 +192,27 @@ data class StrategySearchSpecification(
                 ObjectMapper()
                     .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY)
                     .readTree(source.toFile())
-            val parameters = node.required("parameters")
-            require(parameters.isArray) { "Search parameters must be an array." }
+            require(node.has("parameters") != node.has("candidateModels")) {
+                "Search source requires exactly one of parameters or candidateModels."
+            }
+            val parameters = node["parameters"]
+            require(parameters == null || parameters.isArray) {
+                "Search parameters must be an array."
+            }
+            val models = node["candidateModels"]
+            val explicitCandidates = models?.let { references ->
+                require(references.isArray && references.size() in 2..256) {
+                    "Explicit candidateModels must be an array of two through 256 model paths."
+                }
+                references.map { value ->
+                    require(value.isTextual && value.asText().isNotBlank()) {
+                        "Explicit candidate model references must be nonempty paths."
+                    }
+                    TrainingArtifacts.readModel(
+                        source.toAbsolutePath().parent.resolve(value.asText()).normalize()
+                    )
+                }
+            }
             fun integer(name: String, default: Int): Int {
                 val value = node[name] ?: return default
                 require(value.isIntegralNumber && value.canConvertToInt()) {
@@ -179,11 +222,12 @@ data class StrategySearchSpecification(
             }
             return StrategySearchSpecification(
                 arena = ArenaSpecification.read(source),
-                parameters = parameters.map(StrategySearchParameter.Companion::read),
-                candidates = integer("candidates", 24),
+                parameters = parameters?.map(StrategySearchParameter.Companion::read).orEmpty(),
+                candidates = integer("candidates", explicitCandidates?.size ?: 24),
                 screeningPairs = integer("screeningPairs", 16),
                 selectionPairs = integer("selectionPairs", 64),
                 finalists = integer("finalists", 4),
+                explicitCandidates = explicitCandidates,
             )
         }
     }
@@ -203,8 +247,27 @@ object StrategySearch {
      * vector is included when the candidate budget has room and its linked weights satisfy every
      * declared relation exactly. Linked weights are expanded after sampling; unlinked
      * specifications retain their original candidate vectors and random draws.
+     *
+     * Explicit pools retain supplied order and weights. Their values report only effective changes
+     * from the initial model, including zero for a removed nonzero coefficient.
      */
     fun candidates(specification: StrategySearchSpecification): List<StrategySearchCandidate> {
+        specification.explicitCandidates?.let { models ->
+            val initial = specification.arena.candidate.weights
+            return models.mapIndexed { index, model ->
+                val changed =
+                    (initial.keys + model.weights.keys)
+                        .sorted()
+                        .filter { (initial[it] ?: 0.0) != (model.weights[it] ?: 0.0) }
+                        .associateWith { model.weights[it] ?: 0.0 }
+                StrategySearchCandidate(
+                    id = index,
+                    label = if (index == 0) "current" else "sample-$index",
+                    values = changed,
+                    model = model,
+                )
+            }
+        }
         val parameters = specification.parameters.sortedBy { it.name }
         val zero = parameters.associate { it.name to 0.0 }
         val center = parameters.associate { it.name to (it.min + it.max) / 2.0 }
@@ -549,6 +612,7 @@ object StrategySearchMain {
         specification.arena.opponents.forEachIndexed { index, model ->
             artifacts.model(model, "opponent-$index.json")
         }
+        specification.arena.frozenPurchase?.snapshot(artifacts)
         val startPath = output.resolve("started-at.txt")
         val started =
             if (Files.exists(startPath)) Instant.parse(Files.readString(startPath).trim())
@@ -562,6 +626,7 @@ object StrategySearchMain {
         val deadline = System.nanoTime() + remaining
         val metadata =
             identity +
+                specification.arena.frozenPurchase?.metadata().orEmpty() +
                 mapOf(
                     "source" to source.toString(),
                     "configurations" to specification.arena.configurations.map { it.id },

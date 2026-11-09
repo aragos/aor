@@ -131,7 +131,8 @@ data class StrategyReplayDecision(
 
 /**
  * [score] is the immediate linear evaluation. HARD may prefer a different first move after its
- * bounded multi-action planning, so the chosen move need not have the largest immediate score.
+ * bounded multi-action planning, and an optional frozen purchase actor selects independently of
+ * these seat-model scores. The chosen move need not have the largest immediate score.
  */
 data class StrategyReplayCandidate(
     val command: String,
@@ -193,6 +194,10 @@ object StrategyReplays {
                         },
                     deadlineNanos = deadlineNanos,
                     trace = recording,
+                    controllers =
+                        specification.frozenPurchase
+                            ?.controllers(lineup.configuration.playerCount)
+                            .orEmpty(),
                 )
         val terminal = ArenaGame.from(game)
         pair?.verifyTerminal(terminal, side)
@@ -370,7 +375,10 @@ object StrategyReplayMain {
                 }
             }
         }
-        val identity = mapOf("kind" to "strategy-replay", "signature" to signature)
+        specification.frozenPurchase?.snapshot(artifacts)
+        val identity =
+            mapOf("kind" to "strategy-replay", "signature" to signature) +
+                specification.frozenPurchase?.metadata().orEmpty()
         if (artifacts.read("replay.json")?.required("replayVerified")?.booleanValue() == true) {
             artifacts.write("state.json", identity + mapOf("phase" to "complete"))
             if (artifacts.read("finished.json") == null) {
@@ -394,7 +402,11 @@ object StrategyReplayMain {
                     "startedAt" to Instant.now().toString(),
                     "workers" to 1,
                     "scoreMeaning" to
-                        "Immediate linear scores; HARD may choose a first move using bounded multi-action planning.",
+                        if (specification.frozenPurchase == null) {
+                            "Immediate linear scores; HARD may choose a first move using bounded multi-action planning."
+                        } else {
+                            "Immediate seat-model linear scores; the frozen purchase actor selects independently, and HARD may use bounded multi-action planning elsewhere."
+                        },
                     "scope" to
                         "Post-hoc inspection only; no fitting or promotion. Authority entries are separate from policy inputs.",
                 ),

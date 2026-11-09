@@ -87,6 +87,9 @@ data class TokenValueSpecification(
     val learningMode: TokenValueLearningMode = TokenValueLearningMode.REPLACEMENT,
 ) {
     init {
+        require(arena.frozenPurchase == null) {
+            "Token-value collection does not support an arena frozenPurchase environment."
+        }
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
             "A token-value pilot requires one SCREENING configuration."
         }
