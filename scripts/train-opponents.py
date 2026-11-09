@@ -392,10 +392,27 @@ class OwnedGroup:
         if self.reaped:
             return False
         try:
-            if os.getpgid(self.process.pid) != self.process.pid:
-                raise RuntimeError("The training child no longer owns its original process group.")
-            os.killpg(self.process.pid, number)
+            group = os.getpgid(self.process.pid)
         except ProcessLookupError:
+            # macOS getpgid rejects zombie leaders even while their unreaped PID still
+            # reserves the group. Verify that reservation before signalling descendants.
+            samples = sample_group(self.process.pid)
+            if (not any(row.pid == self.process.pid and row.state.startswith("Z")
+                        for row in samples)
+                    or not any(not row.state.startswith("Z") for row in samples)):
+                return False
+            group = self.process.pid
+        if group != self.process.pid:
+            raise RuntimeError("The training child no longer owns its original process group.")
+        try:
+            os.killpg(group, number)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            # The last descendant can exit between observation and killpg; macOS
+            # reports EPERM when the group contains only zombies.
+            if any(not row.state.startswith("Z") for row in sample_group(self.process.pid)):
+                raise
             return False
         return True
 
