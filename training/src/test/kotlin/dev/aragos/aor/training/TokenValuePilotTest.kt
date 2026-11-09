@@ -10,6 +10,7 @@ import dev.aragos.aor.TextCodec
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModels
 import dev.aragos.aor.ai.BotPolicy
+import dev.aragos.aor.ai.BotTokenCorrection
 import dev.aragos.aor.ai.BotTokenValue
 import java.nio.file.Files
 import java.util.concurrent.ExecutionException
@@ -19,6 +20,79 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class TokenValuePilotTest {
+    @Test
+    fun correctionFitPreservesTheEnabledIncumbentAndRecordsItsMode() {
+        val directory = Files.createTempDirectory("aor-token-correction-fit-")
+        try {
+            val baseline =
+                BotTokenValue.withWeights(
+                    BotModels.default,
+                    List(BotTokenValue.featureNames.size) { 0.25 },
+                )
+            val original = specification()
+            val specification =
+                original.copy(
+                    arena = original.arena.copy(candidate = baseline, incumbent = baseline),
+                    learningMode = TokenValueLearningMode.CORRECTION,
+                )
+            val artifacts = TrainingArtifacts(directory)
+            val fitted =
+                Tournaments(1, Long.MAX_VALUE).use { workers ->
+                    TokenValuePilotRunner(
+                            specification,
+                            artifacts,
+                            workers,
+                            Long.MAX_VALUE,
+                            collectOrigin = { origin(specification, it) },
+                        )
+                        .run()
+                }
+
+            assertThat(fitted.weights.filterKeys { !it.startsWith("planning.tokenCorrection.") })
+                .isEqualTo(baseline.weights)
+            assertThat(fitted.weights[BotTokenCorrection.GATE]).isEqualTo(1.0)
+            assertThat(fitted.weights[BotTokenCorrection.coefficientNames.first()])
+                .isGreaterThan(0.0)
+            assertThat(TrainingArtifacts.readModel(directory.resolve("candidate.json")))
+                .isEqualTo(fitted)
+            for (name in listOf("dataset.json", "fit.json", "origin-0.json")) {
+                assertThat(artifacts.read(name)?.required("learningMode")?.asText())
+                    .isEqualTo("CORRECTION")
+            }
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun correctionResumeRejectsReplacementOrigins() {
+        val directory = Files.createTempDirectory("aor-token-correction-checkpoint-")
+        try {
+            val original = specification()
+            val correction = original.copy(learningMode = TokenValueLearningMode.CORRECTION)
+            val artifacts = TrainingArtifacts(directory)
+            artifacts.write("origin-0.json", origin(original, 0))
+
+            val failure =
+                assertFailsWith<ExecutionException> {
+                    Tournaments(1, Long.MAX_VALUE).use { workers ->
+                        TokenValuePilotRunner(
+                                correction,
+                                artifacts,
+                                workers,
+                                Long.MAX_VALUE,
+                                collectOrigin = { origin(correction, it) },
+                            )
+                            .run()
+                    }
+                }
+
+            assertThat(failure.cause).hasMessageThat().contains("collection learning mode")
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
     @Test
     fun rootRequestsPrecommitEpochAndBoundedOrdinalFromAnIndependentSeed() {
         val specification = specification().copy(trainingRoots = 120, validationRoots = 120)
@@ -556,6 +630,7 @@ class TokenValuePilotTest {
                     ),
                 ),
             requestedOrdinal = request.ordinal,
+            learningMode = specification.learningMode,
         )
     }
 

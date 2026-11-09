@@ -8,6 +8,26 @@ import kotlin.test.assertEquals
 
 class BotTokenValueExportsTest {
     @Test
+    fun exportedCorrectionUsesTheIntactIncumbentAsItsFallback() {
+        val model =
+            """{"schemaVersion":1,"weights":{"points":1,"${BotTokenValue.GATE}":1,"${BotTokenPlanFeature.HELD_COMMODITY.key}":1,"${BotTokenCorrection.GATE}":1,"planning.tokenCorrection.v1.cost":-0.01}}"""
+
+        val choice = chooseBotMove(observation(heldAmount = 24), model, "hard", 0)
+
+        assertEquals("buy-tokens 24", choice)
+    }
+
+    @Test
+    fun exportedCorrectionCanOverrideTheIntactIncumbent() {
+        val model =
+            """{"schemaVersion":1,"weights":{"points":1,"${BotTokenValue.GATE}":1,"${BotTokenPlanFeature.HELD_COMMODITY.key}":1,"${BotTokenCorrection.GATE}":1,"planning.tokenCorrection.v1.cost":-1}}"""
+
+        val choice = chooseBotMove(observation(heldAmount = 24), model, "hard", 0)
+
+        assertEquals("buy-tokens 0", choice)
+    }
+
+    @Test
     fun exportedHardPolicyUsesTheLearnedTokenAdvantage() {
         val choice = chooseBotMove(observation(), model(gate = 1), "hard", 0)
 

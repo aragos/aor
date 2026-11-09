@@ -64,7 +64,16 @@ def prepare(options):
     require(not root.exists() or not any(root.iterdir()), "Prepare a new empty series directory.")
     require(source not in root.parents and root not in source.parents and root != source,
             "The series output must be separate from its frozen source campaign.")
-    profile = experiments.PROFILES[options.profile]
+    mode = experiments.learning_mode(getattr(options, "learning_mode", None)
+                                     or original.get("learningMode", "REPLACEMENT"))
+    runtime_override = getattr(options, "runtime", None)
+    require(mode != "CORRECTION" or original.get("learningMode", "REPLACEMENT") == "CORRECTION"
+            or runtime_override is not None,
+            "Upgrading a replacement source to correction requires --runtime with a correction-capable distribution.")
+    runtime = (runtime_override or Path(original["runtime"])).expanduser().resolve(strict=True)
+    runtime_hashes = experiments.distribution_hashes(runtime)
+    selected_profile = experiments.profile_name(options.profile, mode, "overnight")
+    profile = experiments.PROFILES[selected_profile]
     seeds = [options.seed + index * 10 for index in range(options.campaigns)]
     banks = [experiments.seed_banks(seed, profile) for seed in seeds]
     validate_seed_reservations(original["seedBanks"], banks)
@@ -82,17 +91,26 @@ def prepare(options):
                                   if policy["kind"] == "territory-value-exploration-bundle")
                              if diagnostic else None)
         experiments.prepare(SimpleNamespace(
-            output=child, runtime=Path(original["runtime"]), baseline=Path(original["baseline"]),
+            output=child, runtime=runtime, baseline=Path(original["baseline"]),
             java=original["java"]["executable"], opponent=[Path(path) for path in original["opponents"][1:]],
             territory_value_bundle=Path(diagnostic_policy["path"]) if diagnostic else None,
             frozen_card_purchase_bundle=Path(diagnostic_policy["frozenCardPurchaseBundle"]) if diagnostic else None,
             frozen_purchase_policy=Path(diagnostic["frozenPurchasePolicy"]) if diagnostic else None,
-            profile=options.profile, seed=seed, workers=options.workers,
+            profile=selected_profile, learning_mode=mode, seed=seed, workers=options.workers,
             maximum_seconds=options.maximum_seconds,
         ))
+        require(experiments.distribution_hashes(child / "runtime") == runtime_hashes,
+                "Series runtime changed during preparation.")
         children.append({"id": child_id, "directory": str(child), "seed": seed})
     plan = {"schemaVersion": 1, "kind": "automata-campaign-series", "children": children,
             "maximumCampaigns": options.campaigns, "sourceCampaign": str(source),
+            "sourceCampaignSha256": sha(source / "campaign.json"),
+            "sourceProtocolSha256": sha(source / "protocol.json"),
+            "sourceLearningMode": original.get("learningMode", "REPLACEMENT"),
+            "learningMode": mode, "profile": selected_profile,
+            "baselineSha256": sha(original["baseline"]),
+            "sourceRuntime": original["runtime"], "runtimeSource": str(runtime),
+            "runtimeSha256": runtime_hashes,
             "stopRule": "First confirmation pass stops for review; otherwise exhaust the finite queue.",
             "interpretation": "Fresh-seed replications of fixed recipes; not autonomous algorithm invention.",
             "confirmationCaveat": "Per-campaign intervals are unadjusted for multiple campaigns; no series-wide strength claim.",
@@ -182,7 +200,12 @@ def main(arguments=None):
     preparation.add_argument("--output", type=Path, required=True)
     preparation.add_argument("--seed", type=int, required=True)
     preparation.add_argument("--campaigns", type=int, default=3)
-    preparation.add_argument("--profile", choices=tuple(experiments.PROFILES), default="overnight")
+    preparation.add_argument("--profile", choices=tuple(experiments.PROFILES),
+                             help="Defaults to overnight for replacement and correction for correction learning.")
+    preparation.add_argument("--learning-mode", choices=("replacement", "correction"),
+                             help="Inherit the source mode unless overridden; legacy sources use replacement.")
+    preparation.add_argument("--runtime", type=Path,
+                             help="Override the source distribution; required when upgrading replacement to correction.")
     preparation.add_argument("--workers", type=int, default=4)
     preparation.add_argument("--maximum-seconds", type=int, default=86400)
     execution = commands.add_parser("stage")

@@ -145,6 +145,57 @@ class ExperimentTest(unittest.TestCase):
         self.assertEqual(2, run.call_count)
         self.assertEqual("not-admitted", result["metrics"]["trials"][1]["status"])
 
+    def run_screen(self, reward, win, validation=.1):
+        self.add_recipe("screen", 2)
+        self.add_recipe("larger", 4)
+        def native(protocol, mode, source, output, **unused):
+            if mode == "token-value-pilot":
+                self.fit(output, mean=validation)
+            else:
+                self.arena(source, output, delta=reward, win_delta=win)
+            return True
+        with mock.patch.object(experiment, "native", side_effect=native) as run:
+            result = experiment.trials_stage(self.protocol, self.output)
+        return result["metrics"]["trials"], run.call_count
+
+    def correction_protocol(self):
+        self.protocol.update(learningMode="CORRECTION", developmentPairs=64,
+                             confirmationPairs=256, minimumConfirmationPairs=256)
+
+    def test_positive_validation_cannot_scale_correction_after_negative_development(self):
+        self.correction_protocol()
+        trials, calls = self.run_screen(reward=-.347, win=.1)
+        self.assertEqual(2, calls)
+        self.assertFalse(trials[0]["scaleSignal"])
+        self.assertEqual("not-admitted", trials[1]["status"])
+
+    def test_correction_cannot_scale_after_negative_development_win_share(self):
+        self.correction_protocol()
+        trials, calls = self.run_screen(reward=.1, win=-.1)
+        self.assertEqual(2, calls)
+        self.assertFalse(trials[0]["scaleSignal"])
+        self.assertEqual("not-admitted", trials[1]["status"])
+
+    def test_correction_cannot_scale_without_positive_validation(self):
+        self.correction_protocol()
+        trials, calls = self.run_screen(reward=.1, win=0, validation=0)
+        self.assertEqual(2, calls)
+        self.assertFalse(trials[0]["scaleSignal"])
+        self.assertEqual("not-admitted", trials[1]["status"])
+
+    def test_positive_development_with_nonnegative_wins_admits_second_correction_recipe(self):
+        self.correction_protocol()
+        trials, calls = self.run_screen(reward=.1, win=0)
+        self.assertEqual(3, calls)
+        self.assertTrue(trials[0]["scaleSignal"])
+        self.assertEqual("duplicate", trials[1]["status"])
+
+    def test_legacy_scaling_still_uses_validation_without_development_gate(self):
+        trials, calls = self.run_screen(reward=-.347, win=-.1)
+        self.assertEqual(3, calls)
+        self.assertTrue(trials[0]["scaleSignal"])
+        self.assertEqual("duplicate", trials[1]["status"])
+
     def test_known_insufficient_origin_rejection_skips_scale(self):
         self.add_recipe("screen")
         self.add_recipe("larger", 2)
@@ -277,6 +328,15 @@ class ExperimentTest(unittest.TestCase):
 
     def test_nonpositive_development_does_not_open_confirmation(self):
         experiment.document(self.output / "trials.json", {"trials": [self.candidate_trial("zero", 0)]})
+        result = experiment.select_stage(self.protocol, self.output)
+        self.assertEqual("rejected", result["status"])
+        self.assertFalse((self.output / "confirmation-source.json").exists())
+
+    def test_negative_development_win_share_does_not_open_correction_confirmation(self):
+        self.correction_protocol()
+        trial = self.candidate_trial("negative-wins", .1)
+        trial["development"].update(count=64, winShareDifference={"mean": -.1})
+        experiment.document(self.output / "trials.json", {"trials": [trial]})
         result = experiment.select_stage(self.protocol, self.output)
         self.assertEqual("rejected", result["status"])
         self.assertFalse((self.output / "confirmation-source.json").exists())
@@ -427,6 +487,7 @@ class ExperimentTest(unittest.TestCase):
         with mock.patch.object(experiment, "java_identity", return_value=identity):
             campaign = experiment.prepare(options)
         protocol = experiment.read(options.output / "protocol.json")
+        self.assertEqual("REPLACEMENT", protocol["learningMode"])
         training = experiment.read(protocol["trainingBaseline"])
         expected = dict(original, weights=dict(original["weights"], **{"planning.tokenValue.enabled": 0.0}))
         self.assertEqual(expected, training)
@@ -435,6 +496,7 @@ class ExperimentTest(unittest.TestCase):
         self.assertEqual(experiment.sha(protocol["trainingBaseline"]), protocol["trainingBaselineSha256"])
         self.assertIn("inputs/token-training-baseline.json", campaign["inputs"])
         source = experiment.read(protocol["recipes"][0]["source"])
+        self.assertNotIn("learningMode", source)
         self.assertEqual(protocol["trainingBaseline"], source["candidate"])
         self.assertEqual(protocol["trainingBaseline"], source["incumbent"])
         self.assertEqual([protocol["baseline"]], source["opponents"])
@@ -443,6 +505,56 @@ class ExperimentTest(unittest.TestCase):
         experiment.select_stage(protocol, self.output)
         confirmation = experiment.read(self.output / "confirmation-source.json")
         self.assertEqual(protocol["baseline"], confirmation["incumbent"])
+
+    def test_correction_preserves_enabled_incumbent_bytes_and_declares_disjoint_banks(self):
+        original = {"schemaVersion": 1, "weights": {"planning.tokenValue.enabled": 1,
+                    "planning.tokenValue.coefficient": .7, "other.weight": 2.5}}
+        self.baseline.write_text(json.dumps(original, separators=(",", ":")))
+        baseline_bytes = self.baseline.read_bytes()
+        runtime = self.root / "distribution"
+        (runtime / "lib").mkdir(parents=True)
+        (runtime / "lib/training.jar").write_bytes(b"frozen-bytecode")
+        java = self.root / "java"
+        java.write_bytes(b"jdk")
+        identity = {"executable": str(java), "version": "JDK 21",
+                    "files": {str(java): experiment.sha(java)}}
+        options = argparse.Namespace(output=self.root / "prepared", runtime=runtime,
+                                     baseline=self.baseline, profile=None, learning_mode="correction",
+                                     java=str(java), seed=7100000, workers=1, maximum_seconds=900,
+                                     opponent=[], territory_value_bundle=None,
+                                     frozen_card_purchase_bundle=None, frozen_purchase_policy=None)
+        with mock.patch.object(experiment, "java_identity", return_value=identity):
+            campaign = experiment.prepare(options)
+        protocol = experiment.read(options.output / "protocol.json")
+        self.assertEqual("CORRECTION", protocol["learningMode"])
+        self.assertEqual("correction", protocol["profile"])
+        self.assertEqual(baseline_bytes, Path(protocol["baseline"]).read_bytes())
+        self.assertEqual(baseline_bytes, Path(protocol["trainingBaseline"]).read_bytes())
+        self.assertEqual(baseline_bytes, self.baseline.read_bytes())
+        self.assertEqual(protocol["baselineSha256"], protocol["trainingBaselineSha256"])
+        self.assertEqual(64, protocol["developmentPairs"])
+        self.assertEqual(256, protocol["confirmationPairs"])
+        self.assertEqual(256, protocol["minimumConfirmationPairs"])
+        self.assertEqual([(64, 32, 2), (128, 64, 4)],
+                         [(row["trainingRoots"], row["validationRoots"], row["continuationReplicates"])
+                          for row in protocol["recipes"]])
+        for recipe in protocol["recipes"]:
+            source = experiment.read(recipe["source"])
+            self.assertEqual("CORRECTION", source["learningMode"])
+            self.assertEqual(protocol["trainingBaseline"], source["candidate"])
+            self.assertEqual(protocol["trainingBaseline"], source["incumbent"])
+            self.assertEqual([protocol["baseline"]], source["opponents"])
+            self.assertEqual(experiment.sha(recipe["source"]),
+                             campaign["inputs"][str(Path(recipe["source"]).relative_to(options.output.resolve()))])
+            self.assertEqual(experiment.arena_seeds(source["seed"], recipe["trainingRoots"]),
+                             protocol["seedBanks"]["training"][:recipe["trainingRoots"]])
+            self.assertEqual(experiment.arena_seeds(source["seed"] + 1, recipe["validationRoots"]),
+                             protocol["seedBanks"]["validation"][:recipe["validationRoots"]])
+        experiment.validate_banks(protocol["seedBanks"])
+
+    def test_correction_profile_cannot_be_used_for_replacement_training(self):
+        with self.assertRaisesRegex(ValueError, "replacement profiles are separate"):
+            experiment.profile_name("correction", "REPLACEMENT")
 
 
 if __name__ == "__main__":

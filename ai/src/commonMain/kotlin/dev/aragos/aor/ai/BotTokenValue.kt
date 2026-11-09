@@ -76,7 +76,8 @@ object BotTokenValue {
                 actions.flatMap { action -> context.map { state -> "$action.$state" } })
             .map { "$FEATURE_PREFIX$it" } + BotTokenPlanFeature.entries.map { it.key }
 
-    internal fun reserved(name: String): Boolean = name.startsWith(PREFIX)
+    internal fun reserved(name: String): Boolean =
+        name.startsWith(PREFIX) || BotTokenCorrection.reserved(name)
 
     /** A complete feature vector, including explicit zeros, identifies this observation schema. */
     fun available(observation: BotObservation): Boolean =
@@ -153,7 +154,7 @@ object BotTokenValue {
         }
         return base.copy(
             weights =
-                base.weights.filterKeys { !reserved(it) } +
+                base.weights.filterKeys { !it.startsWith(PREFIX) } +
                     featureNames.zip(coefficients).toMap() +
                     (GATE to 1.0)
         )
