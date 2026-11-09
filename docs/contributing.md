@@ -203,6 +203,14 @@ An accepted result is a candidate for human evaluation. It does not establish hu
 or activate browser assets. Its hybrid policy keeps the original purchase prior separate from the
 new ordinary policy; a qualified browser adapter and parity checks are required before human play.
 
+Use `--profile archive` with repeated `--seed-model PATH` arguments to compare saved checkpoints
+instead of generating more mutations. This freezes one to sixteen distinct nonbaseline models,
+adds the original baseline as the unchanged anchor, and runs one race: 512 screening worlds,
+up to three finalists on 1,024 selection worlds, then 2,048 confirmation worlds and 1,024
+held-out-opponent worlds for the single winner. All banks must be fresh. Archive ranking is
+selection evidence, and the same independent improvement gates apply. This permits testing
+earlier checkpoints without assuming that the latest provisional parent is the strongest.
+
 Detach the launch command with `nohup` and redirect its output as described above. On macOS,
 `caffeinate -i` before the Python command keeps an otherwise idle machine awake. The local process
 refreshes `run/campaign-report.txt` and `run/campaign-report.json` during execution and writes the
