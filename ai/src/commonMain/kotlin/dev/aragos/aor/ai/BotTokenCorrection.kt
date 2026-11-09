@@ -1,7 +1,8 @@
 package dev.aragos.aor.ai
 
 /**
- * Optional second selector fitted to terminal return differences around the intact incumbent.
+ * Optional second selector around the intact incumbent. Continuation-fitted coefficients estimate
+ * terminal return differences; coefficients searched through full games are uncalibrated scores.
  * [BotTokenValue] first chooses its usual action, including its independent inference gates. This
  * selector compares the original six legal proposals around that actual choice, using the shared
  * feature differences and a fixed 0.02 margin. Incumbent head scores are never a return prior.
