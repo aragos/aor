@@ -179,6 +179,35 @@ resource limits, input hashes, status reports and bounded resume contract as the
 campaign. It does not start another search or activate a production model. Seed reservations cover
 the source campaign and the new banks; callers must also avoid other historical experiments.
 
+The [adaptive campaign](../scripts/automata_evolution.py) searches commodity timing, expansion,
+leader timing, events and the existing token head around the current policy. It retains the
+qualified purchase actor and its exact original prior throughout every seat's shipping and advance
+decisions. This is a different environment from the ordinary-purchase token experiments above.
+The purchase bundle's baseline and provenance must match the supplied frozen baseline.
+
+```sh
+python3 scripts/automata_evolution.py prepare --from-campaign .aor-training/correction-campaign --runtime training/build/install/training --purchase-bundle web/src/ai/purchaseModel.json --opponent /absolute/path/training-rival.json --robust-opponent /absolute/path/held-out-rival.json --output .aor-training/adaptive-search --seed 91379023 --workers 4
+caffeinate -i python3 .aor-training/adaptive-search/scripts/automata_campaign.py --spec .aor-training/adaptive-search/campaign.json --output .aor-training/adaptive-search/run
+```
+
+Each round includes an unchanged anchor and up to twenty proposals, screened on 48 paired worlds;
+four finalists receive 192 fresh selection worlds. Positive mean win-share and composite reward
+permit a provisional parent update. Failure narrows the perturbations. Two consecutive unsuccessful
+rounds or four total rounds end evolution. Exact unit gates remain discrete, untouched weights stay
+fixed, and accepted parents are training decisions rather than qualified improvements.
+
+One final candidate receives 1,024 fresh confirmation worlds against the original baseline, then
+512 separate robustness worlds against held-out rivals. Both stages require positive lower 95%
+bounds for win-share and composite reward. The default ceiling is twelve hours, split eight/two/two
+across evolution, confirmation and robustness. The finite controller owns resource limits, resume
+deadlines and immutable receipts; no language model participates in generation or selection.
+Smoke runs cannot qualify a candidate. Freeze distinct training and robustness opponent models
+before execution, and reserve all actual game seeds before opening any bank.
+
+An accepted result is a candidate for human evaluation. It does not establish human-level strength
+or activate browser assets. Its hybrid policy keeps the original purchase prior separate from the
+new ordinary policy; a qualified browser adapter and parity checks are required before human play.
+
 Detach the launch command with `nohup` and redirect its output as described above. On macOS,
 `caffeinate -i` before the Python command keeps an otherwise idle machine awake. The local process
 refreshes `run/campaign-report.txt` and `run/campaign-report.json` during execution and writes the
@@ -312,6 +341,19 @@ and [advance sequence](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotAdvanceP
 The top finalists receive fresh selection games; frozen incumbent games are reused within each
 bank. `search.json` records both rankings and exact seed banks. `candidate.json` is an unqualified
 proposal. Its selection intervals are descriptive, including the winning candidate's interval.
+
+Alternatively, `candidateModels: ["anchor.json", "proposal.json", ...]` supplies a fixed ordered
+pool instead of `parameters`. Candidate zero must exactly equal the source `candidate`; the count
+must match `candidates` when explicitly supplied. All model weights bind checkpoint identity.
+This mode reuses the same incumbent games, ranking and candidate archives, supporting local
+generation of centered perturbations and discrete controller alternatives.
+
+Arena and strategy-search sources may include `frozenPurchase: {"baseline": "prior.json",
+"policy": "purchase-policy.json"}` for the qualified four-player profile. Paths resolve relative
+to the source. Every seat uses this raw purchase actor and frozen prior, regardless of its ordinary
+model. Both files are hashed, archived and included in checkpoint identity. Omission preserves
+legacy behavior and identity. Token continuation collection rejects this option until it supports
+the same controller; it must not silently collect under a different purchase policy.
 
 For direct compact token-head search, copy the frozen baseline and set every reserved
 `planning.tokenValue.*` coefficient to zero except `planning.tokenValue.enabled = 1`. Search only

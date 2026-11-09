@@ -26,6 +26,7 @@ data class ArenaSpecification(
     val opponents: List<BotModel>,
     val pairsPerConfiguration: Int,
     val seed: Int,
+    val frozenPurchase: ArenaPurchasePolicy? = null,
 ) {
     init {
         require(
@@ -43,10 +44,11 @@ data class ArenaSpecification(
             "An arena requires 1–10000 pairs per configuration and at most 100000 pairs overall."
         }
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
+        frozenPurchase?.validate(configurations)
     }
 
     fun identity(): String =
-        listOf(
+        (listOf(
                 purpose,
                 configurations.map { it.id },
                 pairsPerConfiguration,
@@ -54,7 +56,7 @@ data class ArenaSpecification(
                 candidate.weights.toSortedMap(),
                 incumbent.weights.toSortedMap(),
                 opponents.map { it.weights.toSortedMap() },
-            )
+            ) + listOfNotNull(frozenPurchase?.identity()))
             .joinToString("\n")
 
     companion object {
@@ -87,6 +89,8 @@ data class ArenaSpecification(
                 opponents = node.required("opponents").map(::model),
                 pairsPerConfiguration = integer(node, "pairsPerConfiguration"),
                 seed = integer(node, "seed"),
+                frozenPurchase =
+                    node["frozenPurchase"]?.let { ArenaPurchasePolicy.read(source, it) },
             )
         }
 
@@ -177,6 +181,10 @@ object StrategyArena {
                             )
                         },
                     deadlineNanos = deadlineNanos,
+                    controllers =
+                        specification.frozenPurchase
+                            ?.controllers(lineup.configuration.playerCount)
+                            .orEmpty(),
                 )
         )
     }
@@ -314,6 +322,7 @@ object StrategyArenaMain {
         specification.opponents.forEachIndexed { index, model ->
             artifacts.ensureModelSnapshot(model, "opponent-$index.json")
         }
+        specification.frozenPurchase?.snapshot(artifacts)
         val startPath = output.resolve("started-at.txt")
         val started =
             if (Files.exists(startPath)) {
@@ -331,20 +340,21 @@ object StrategyArenaMain {
         val total = specification.configurations.size * specification.pairsPerConfiguration
         artifacts.write(
             "run.json",
-            mapOf(
-                "kind" to "strategy-arena",
-                "signature" to signature,
-                "purpose" to specification.purpose.name,
-                "source" to source.toString(),
-                "configurations" to specification.configurations.map { it.id },
-                "pairs" to total,
-                "seed" to specification.seed,
-                "workers" to workerCount,
-                "opponentModels" to specification.opponents.size,
-                "difficulty" to "HARD",
-                "startedAt" to started.toString(),
-                "promoted" to false,
-            ),
+            specification.frozenPurchase?.metadata().orEmpty() +
+                mapOf(
+                    "kind" to "strategy-arena",
+                    "signature" to signature,
+                    "purpose" to specification.purpose.name,
+                    "source" to source.toString(),
+                    "configurations" to specification.configurations.map { it.id },
+                    "pairs" to total,
+                    "seed" to specification.seed,
+                    "workers" to workerCount,
+                    "opponentModels" to specification.opponents.size,
+                    "difficulty" to "HARD",
+                    "startedAt" to started.toString(),
+                    "promoted" to false,
+                ),
         )
         var completed = 0
         val pairs =
@@ -373,18 +383,19 @@ object StrategyArenaMain {
             }
         artifacts.write(
             "evaluation.json",
-            mapOf(
-                "complete" to true,
-                "promoted" to false,
-                "humanStrengthVerified" to false,
-                "purpose" to specification.purpose.name,
-                "overall" to StrategyArena.report(pairs),
-                "byConfiguration" to
-                    pairs
-                        .groupBy { it.required("configuration").asText() }
-                        .mapValues { (_, group) -> StrategyArena.report(group) },
-                "intervalMethod" to "Normal approximation across independent paired game seeds",
-            ),
+            specification.frozenPurchase?.metadata().orEmpty() +
+                mapOf(
+                    "complete" to true,
+                    "promoted" to false,
+                    "humanStrengthVerified" to false,
+                    "purpose" to specification.purpose.name,
+                    "overall" to StrategyArena.report(pairs),
+                    "byConfiguration" to
+                        pairs
+                            .groupBy { it.required("configuration").asText() }
+                            .mapValues { (_, group) -> StrategyArena.report(group) },
+                    "intervalMethod" to "Normal approximation across independent paired game seeds",
+                ),
         )
         artifacts.write(
             "state.json",
