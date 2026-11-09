@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {createGame, open} from './browser-support.mjs';
+import {checkFinished} from './table.browser.mjs';
 
 const web = process.env.MAP_WEB_URL;
 const game = await createGame(3);
@@ -91,6 +92,8 @@ try {
     assert(finished.statistics.length > 1, 'Existing game history supplies turn statistics');
     assert.equal(finished.statistics.at(-1).finished, true);
     assert.deepEqual(finished.statistics.at(-1).players.map(player => player.score), finished.game.scores.map(score => score.total));
+    await checkFinished(page, web, finished);
+    await visit('about:blank');
     await visit(web + viewer.path);
     await page.wait(`document.querySelector('.final-scores-dialog[open]')`, 'live final popup');
     for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {

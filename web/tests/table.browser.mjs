@@ -10,7 +10,7 @@ export async function checkFinished(page, web, baseline) {
         scores:baseline.game.players.map(player=>({player:player.id,advancePoints:0,cash:player.cash,misery:null,total:null,winner:false})),
     }};
     await page.evaluate(`window.setUiSnapshot(${JSON.stringify(finished)})`);
-    await page.wait(`document.querySelectorAll('.final-scores tbody tr').length === ${baseline.game.players.length}`, 'visible final scores');
+    await page.wait(`document.querySelectorAll('#result-panel-scores tbody tr').length === ${baseline.game.players.length}`, 'visible final scores');
     assert.equal(await page.evaluate(`document.querySelectorAll('.header-stage .waiting-status, .player-summary .player-status').length`), 0, 'Completed game has no waiting indicators');
     assert.equal(await page.evaluate(`document.querySelector('.decision-heading .eyebrow').textContent`), 'Game complete');
     assert.equal(await page.evaluate(`document.querySelector('.final-scores-dialog').open`), true, 'Final scores open as a modal');

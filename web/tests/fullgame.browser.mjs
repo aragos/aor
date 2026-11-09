@@ -208,7 +208,7 @@ try {
     } else {
         assert(latest.game.scores.some(score => score.winner), 'Active final results identify a winner');
     }
-    await page.wait('document.querySelectorAll(".final-scores tbody tr").length === 3', 'all three visible final score rows');
+    await page.wait('document.querySelectorAll("#result-panel-scores tbody tr").length === 3', 'all three visible final score rows');
     await page.screenshot(join(artifacts, 'aor-fullgame-final.png'), 1440);
     console.log(`Complete visual game passed: ${trace.length} accepted actions, ${latest.game.turnNumber} turns, epochs ${[...epochs].join(',')}, ${latest.game.scores.length} final scores, ending ${chaosEnding ? 'Chaos' : 'deck exhaustion'}, final card round ${stages.has('FINAL_CARD_PLAY')}.`);
 } catch (error) {
