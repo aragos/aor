@@ -27,6 +27,7 @@ data class RuleOptionCommand(val key: String, val value: String) : Command {
     fun resolve(rules: RuleOptions): RuleOptions =
         when (key) {
             "deck-modification" -> rules.copy(deckModification = enabled())
+            "draw-three-keep-two" -> rules.copy(drawThreeKeepTwo = enabled())
             "initial-card" ->
                 rules.copy(
                     initialCard = option(InitialCardRule.entries, InitialCardRule::commandValue)

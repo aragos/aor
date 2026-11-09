@@ -20,7 +20,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     if (!player) return null;
     const commands = snapshot.legalChoices.commands;
     const finite = finiteDecisions(snapshot).map(offer => offer.command);
-    const choices = finite.filter(command => !/^(reduce-marker|discard-card|offer-card) /.test(command));
+    const choices = finite.filter(command => !/^(reduce-marker|return-card|discard-card|offer-card) /.test(command));
     const reductions = finite.filter(command => command.startsWith('reduce-marker '));
     const reduction = snapshot.game.markerReductionOffers?.find(offer => offer.command === selectedAction);
     const discarding = finite.some(command => command.startsWith('discard-card '));
@@ -35,9 +35,9 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             const commodity = shared ? t('table.goldIvory') : label(first.toUpperCase(), 'commodity');
             return `${t('action.cancel')} ${commodity} ${label(second.toUpperCase(), 'adjustment')} · $${cost ?? '—'}`;
         }
-        if (action === 'discard-card' || action === 'offer-card') {
+        if (action === 'return-card' || action === 'discard-card' || action === 'offer-card') {
             const card = snapshot.game.hand.find(card => card.reference === first);
-            const actionKey = action === 'discard-card' ? 'action.discard' : 'action.offerCard';
+            const actionKey = action === 'return-card' ? 'action.return-card' : action === 'discard-card' ? 'action.discard' : 'action.offerCard';
             return `${t(actionKey)} ${card ? t(card.definition.messageId) : first}`;
         }
         if (action === 'patronize') {
@@ -56,6 +56,7 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
     const clearSelection = <button type="button" className="secondary clear-action" disabled={busy}
         onClick={() => setSelectedAction('')}>{t('table.clearSelection')}</button>;
     return <div className="game-actions">
+        {finite.some(command => command.startsWith('return-card ')) && <p className="opening-request">{t('prompt.return-card')}</p>}
         {discarding && <p className="discard-request" role="status">{t('controls.masterArtDiscard')}</p>}
         {snapshot.game.windmillOffer && <p className="windmill-preview">
             <ProvinceLabel snapshot={snapshot} id={snapshot.game.windmillOffer.province}/>{' · '}
@@ -70,6 +71,9 @@ export function GameActions({snapshot, busy, submit}: ActionProps) {
             {command === 'stabilize misery' && <> · <span className="misery-transition"><MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/> → <MiseryBox value={snapshot.game.stabilizationMisery} track={snapshot.game.catalog?.miseryTrack}/></span></>}</DecisionAction>)}
         {selectedAction && <div className="selected-action">
             {!reduction && clearSelection}
+            {selectedAction.startsWith('return-card ') && <p className="opening-keep-review">
+                {t('controls.keepCards', {cards: snapshot.game.hand.filter(card => `return-card ${card.reference}` !== selectedAction).map(card => t(card.definition.messageId)).join(', ')})}
+            </p>}
             {reduction && <div className="reduction-preview" aria-live="polite">
                 <div className="reduction-review-heading"><p className="reduction-income">{t('table.income')}: ${reduction.incomeBefore} → ${reduction.incomeAfter}</p>{clearSelection}</div>
                 <p>{t('game.tokens')}: {reduction.stockBefore} → {reduction.stockAfter}</p>

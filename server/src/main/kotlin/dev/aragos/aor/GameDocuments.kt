@@ -707,10 +707,15 @@ internal object GameDocuments {
         }
         val configured = entries.fold(state) { current, entry -> current.step(entry) }
         val expected = initialConfiguration(revision.author, configured.rules)
+        // Existing saves recorded all four original options before this additive variant existed.
+        val originalOptions = expected.filterNot { entry ->
+            (entry.command as? RuleOptionCommand)?.key == "draw-three-keep-two"
+        }
+        val originalConfiguration = !configured.rules.drawThreeKeepTwo && entries == originalOptions
         require(
             revision.author == state.header.creatorId &&
                 action == expected.first() &&
-                entries == expected
+                (entries == expected || originalConfiguration)
         ) {
             "The initial revision must explicitly configure every resolved option."
         }

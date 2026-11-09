@@ -146,7 +146,8 @@ private views at the first decision; there is no separate Start setup action in 
     - Misery markers start at 0.
     - No player has ships.
 3. **Cards.** Shuffle epoch 1 and deal **one** card per player, applying any selected initial-deal
-   restriction ([§13](#13-variants)). Excluded cards remain available for later draws.
+   restriction ([§13](#13-variants)). The draw-three-keep-two variant instead provides both opening
+   cards before bidding. Excluded cards remain available for later draws.
 4. **Capital bid.**
     - Each player secretly writes a bid of $0–$40.
     - Players choose a capital in descending bid order, from the capitals in play. Ties are broken by die roll, and the
@@ -932,6 +933,12 @@ The baseline remains the reviewed AH1996 rules, with these independent choices r
 - **Initial card deal, mutually exclusive:** unrestricted (default), no Crusades, no events, or only
   commodities. Each player receives one card. No-events permits leaders; commodity-only excludes
   both events and leaders. Excluded cards remain in the deck for later draws.
+- **Draw three, keep two, off by default:** in registration order, each player draws three cards
+  satisfying the selected initial-deal filter and privately returns one. Shuffle it into the
+  remaining deck before dealing to the next player, including after the last return. Everyone keeps
+  two before capital bids: these replace both the initial card and the ordinary turn 1 draw. All
+  later draws work normally. Commodities only supports at most five players with this variant,
+  because six kept hands plus a third candidate would require 13 eligible physical cards.
 - **Immediate Master Art discard, off by default:** buying Master Art immediately offers its
   optional discard, in addition to the ordinary Buy Card phase ability.
 - **European map, off by default:** start from the standard board, remove Smolensk and its incident

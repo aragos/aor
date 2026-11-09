@@ -173,7 +173,7 @@ fun Application.module(
                     if (options == null) {
                         RuleOptions()
                     } else {
-                        if (!options.isObject || options.size() > 4) {
+                        if (!options.isObject) {
                             throw ServiceFailure(400, "INVALID_REQUEST")
                         }
                         options.properties().fold(RuleOptions()) { configured, (key, value) ->

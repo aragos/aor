@@ -3,6 +3,7 @@ package dev.aragos.aor
 /** Why the authority must permute the supplied physical cards. */
 enum class ShufflePurpose {
     INITIAL_DECK,
+    SETUP_RETURN,
     NEXT_EPOCH,
 }
 
@@ -72,6 +73,13 @@ internal fun GameState.applyShuffle(cards: List<String>): GameState {
     return when (request.purpose) {
         ShufflePurpose.INITIAL_DECK ->
             copy(stage = Stage.INITIAL_DRAW, deck = cards.toList(), deckHistory = history)
+        ShufflePurpose.SETUP_RETURN ->
+            copy(
+                stage =
+                    if (SetupDeal.nextPlayer(this) == null) Stage.BIDDING else Stage.INITIAL_DRAW,
+                deck = cards.toList(),
+                deckHistory = history,
+            )
         ShufflePurpose.NEXT_EPOCH ->
             copy(
                 currentEpoch =

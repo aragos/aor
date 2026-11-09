@@ -11,6 +11,7 @@ class RuleOptionsTest {
             RuleOptions(
                 deckModification = true,
                 initialCard = InitialCardRule.NO_EVENTS,
+                drawThreeKeepTwo = true,
                 immediateMasterArtDiscard = true,
                 map = MapRule.EUROPEAN,
             )
@@ -24,6 +25,7 @@ class RuleOptionsTest {
             .containsExactly(
                 "deck-modification",
                 "initial-card",
+                "draw-three-keep-two",
                 "immediate-master-art-discard",
                 "map",
             )

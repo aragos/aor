@@ -2,7 +2,7 @@ import type {Snapshot} from './api';
 
 export type DecisionSubject = {kind: 'card' | 'leader' | 'player' | 'commodity' | 'province' | 'loss'; id: string};
 export interface FiniteDecision {
-    kind: 'discard' | 'trade' | 'patronage' | 'order-swap' | 'cancellation' | 'secondary';
+    kind: 'return' | 'discard' | 'trade' | 'patronage' | 'order-swap' | 'cancellation' | 'secondary';
     subject: DecisionSubject;
     command: string;
 }
@@ -14,6 +14,7 @@ export function finiteDecisions(snapshot: Snapshot): FiniteDecision[] {
     return snapshot.legalChoices.commands.flatMap((command): FiniteDecision[] => {
         const [action, subject] = command.split(' ');
         switch (action) {
+            case 'return-card': return [{kind: 'return', subject: {kind: 'card', id: subject}, command}];
             case 'discard-card': return [{kind: 'discard', subject: {kind: 'card', id: subject}, command}];
             case 'offer-card': return [{kind: 'trade', subject: {kind: 'card', id: subject}, command}];
             case 'patronize': return [{kind: 'patronage', subject: {kind: 'leader', id: subject}, command}];

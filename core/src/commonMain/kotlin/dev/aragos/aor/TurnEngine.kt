@@ -209,7 +209,9 @@ internal object TurnEngine {
                         }
                         state = state.copy(flow = state.flow.copy(cancelComplete = true))
                     }
-                    if (actor !in state.flow.drawn) {
+                    if (state.rules.drawThreeKeepTwo && state.turnNumber == 1) {
+                        state = finishActor(state)
+                    } else if (actor !in state.flow.drawn) {
                         state =
                             state
                                 .copy(flow = state.flow.copy(drawn = state.flow.drawn + actor))

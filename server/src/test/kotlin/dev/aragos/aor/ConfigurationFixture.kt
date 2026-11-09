@@ -5,6 +5,7 @@ internal fun defaultConfigurationText(creator: PlayerId = PlayerId("p1")): List<
     listOf(
             "deck-modification disabled",
             "initial-card any",
+            "draw-three-keep-two disabled",
             "immediate-master-art-discard disabled",
             "map standard",
         )

@@ -34,8 +34,45 @@ class ReplayContractTest {
                 "p3: place 2 granada",
                 "p1: set-option initial-card commodity-only",
                 "p2: swap-order p1",
+                "p1: set-option draw-three-keep-two enabled",
+                "p1: return-card hand-1",
             )
         assertEquals(commands, commands.map { TextCodec.parse(it).toText() })
+    }
+
+    @Test
+    fun selectedOpeningReplaysOnEveryTarget() {
+        val entries = mutableListOf<String>()
+        var state = GameState(header)
+        fun accept(line: String) {
+            state = state.step(TextCodec.parse(line))
+            entries.add(line)
+        }
+        accept("p1: set-option draw-three-keep-two enabled")
+        accept("p1: set-option initial-card no-events")
+        accept("p1: start")
+        repeat(30) {
+            when (val prompt = state.prompts().single()) {
+                is Prompt.System ->
+                    when (val need = prompt.need) {
+                        is SystemNeed.Shuffle ->
+                            accept(Entry.Shuffle(need.cards.reversed()).toText())
+                        is SystemNeed.Draw ->
+                            accept(
+                                GameOutcome.Draw(need.player, need.reference, need.card).toText()
+                            )
+                        else -> error("Opening requires only shuffles and draws.")
+                    }
+                is Prompt.SinglePlayer ->
+                    accept(
+                        "${prompt.player}: ${state.legalChoices(prompt.player).commands.first()}"
+                    )
+                is Prompt.MultiPlayer -> Unit
+            }
+        }
+        assertEquals(Stage.BIDDING, state.stage)
+        assertEquals(listOf(2, 2, 2), state.players.values.map { it.hand.size })
+        assertEquals(state, replay(header, entries))
     }
 
     @Test
