@@ -511,6 +511,44 @@ def sample(pid=10, cpu=0, rss=1024, state="R"):
 
 
 class OwnedGroupTest(unittest.TestCase):
+    def test_macos_zombie_leader_retains_its_owned_descendants(self):
+        process = Mock(pid=10)
+        owned = training.OwnedGroup(process)
+        with patch.object(training.os, "getpgid", side_effect=ProcessLookupError), \
+                patch.object(training, "sample_group", return_value=[
+                    sample(state="Z"), sample(pid=11)]), \
+                patch.object(training.os, "killpg") as kill:
+            self.assertTrue(owned.send(signal.SIGKILL))
+
+        kill.assert_called_once_with(10, signal.SIGKILL)
+        process.wait.assert_not_called()
+        process.poll.assert_not_called()
+
+    def test_zombie_only_group_does_not_need_a_signal(self):
+        owned = training.OwnedGroup(Mock(pid=10))
+        with patch.object(training.os, "getpgid", side_effect=ProcessLookupError), \
+                patch.object(training, "sample_group", return_value=[sample(state="Z")]), \
+                patch.object(training.os, "killpg") as kill:
+            self.assertFalse(owned.send(signal.SIGKILL))
+
+        kill.assert_not_called()
+
+    def test_last_descendant_exiting_before_signal_is_already_cleaned_up(self):
+        owned = training.OwnedGroup(Mock(pid=10))
+        with patch.object(training.os, "getpgid", return_value=10), \
+                patch.object(training, "sample_group", return_value=[sample(state="Z")]), \
+                patch.object(training.os, "killpg", side_effect=PermissionError):
+            self.assertFalse(owned.send(signal.SIGKILL))
+
+    def test_missing_unreaped_leader_cannot_authorize_a_group_signal(self):
+        owned = training.OwnedGroup(Mock(pid=10))
+        with patch.object(training.os, "getpgid", side_effect=ProcessLookupError), \
+                patch.object(training, "sample_group", return_value=[sample(pid=11)]), \
+                patch.object(training.os, "killpg") as kill:
+            self.assertFalse(owned.send(signal.SIGKILL))
+
+        kill.assert_not_called()
+
     def test_signals_target_only_the_live_owned_group_and_stop_after_reaping(self):
         process = Mock(pid=10)
         process.wait.return_value = 0
