@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {open, createGame} from './browser-support.mjs';
+import {assertTextContrast} from './contrast-support.mjs';
 
 export async function checkHosted(page, web, artifacts) {
     const fixture = await createGame(3);
@@ -83,6 +84,19 @@ export async function checkHosted(page, web, artifacts) {
             await page.wait(`document.querySelector('.google-sign-in img').complete`, 'Google button artwork');
             await page.screenshot(join(artifacts, 'hosted-sign-in.png'), 1280, 900);
             assert.equal(await page.evaluate(`document.querySelector('.google-sign-in img').naturalWidth > 0`), true);
+            for (const theme of ['dark', 'light']) {
+                await page.evaluate(`document.documentElement.dataset.theme = '${theme}'`);
+                await assertTextContrast(page, `${theme} sign-in`);
+                await page.click('Create account');
+                await assertTextContrast(page, `${theme} sign-up`);
+                if (theme === 'dark') {
+                    await page.screenshot(join(artifacts, 'contrast-dark-sign-up.png'), 1280, 900);
+                    await page.screenshot(join(artifacts, 'contrast-dark-sign-up-phone.png'), 390, 844, true);
+                    await assertTextContrast(page, 'dark phone sign-up');
+                    await page.send('Emulation.clearDeviceMetricsOverride');
+                }
+                await page.click('Sign in');
+            }
         });
         await check('Switching account mode preserves the email and password draft', async () => {
             await page.fill('input[type=email]', 'player@example.com');
