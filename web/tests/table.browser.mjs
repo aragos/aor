@@ -10,7 +10,7 @@ export async function checkFinished(page, web, baseline) {
         scores:baseline.game.players.map(player=>({player:player.id,advancePoints:0,cash:player.cash,misery:null,total:null,winner:false})),
     }};
     await page.evaluate(`window.setUiSnapshot(${JSON.stringify(finished)})`);
-    await page.wait(`document.querySelectorAll('.final-scores tbody tr').length === ${baseline.game.players.length}`, 'visible final scores');
+    await page.wait(`document.querySelectorAll('#result-panel-scores tbody tr').length === ${baseline.game.players.length}`, 'visible final scores');
     assert.equal(await page.evaluate(`document.querySelectorAll('.header-stage .waiting-status, .player-summary .player-status').length`), 0, 'Completed game has no waiting indicators');
     assert.equal(await page.evaluate(`document.querySelector('.decision-heading .eyebrow').textContent`), 'Game complete');
     assert.equal(await page.evaluate(`document.querySelector('.final-scores-dialog').open`), true, 'Final scores open as a modal');
@@ -84,7 +84,7 @@ export async function checkTable(page, web, baseline) {
     };
     const beforePoll = await mapFrame();
     await show({revision: fixture.revision + 1});
-    await page.wait(`document.querySelector('.command-dock > summary small').textContent.trim() === 'Revision ${fixture.revision}'`, 'polled revision rendered');
+    await page.wait(`document.querySelector('#tool-tab-commands small').textContent.trim() === 'Revision ${fixture.revision}'`, 'polled revision rendered');
     assert.equal(await page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').getAttribute('aria-pressed')`), 'true', 'Selection survives polling');
     assert.deepEqual(await mapFrame(), beforePoll, 'Viewport size and camera survive polling');
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Polling never submits a draft');
@@ -147,7 +147,7 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelector('.activity-list').checkVisibility()`), false, 'Closed activity remains hidden during polling');
     await page.evaluate(`document.querySelector('#tab-activity').click()`);
     await page.wait(`document.querySelector('.activity-list').checkVisibility()`, 'activity reopened');
-    await page.evaluate(`document.querySelector('.command-dock > summary').focus()`);
+    await page.evaluate(`document.querySelector('#tool-tab-commands').focus()`);
     const updatedEvents=[...events,{...nextEvent,id:'fixture-activity-2'}];
     await show({revision:fixture.revision+1,events:updatedEvents});
     await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
@@ -157,7 +157,7 @@ export async function checkTable(page, web, baseline) {
         .map(entry => entry.dataset.activityMember).sort()`),
         updatedEvents.filter(event => event.kind !== 'PASS').map(event => event.id).sort(),
         'Repeated polling retains every recorded event exactly once within activity groups');
-    assert.equal(await page.evaluate(`document.activeElement===document.querySelector('.command-dock > summary')`), true, 'Activity updates preserve focus');
+    assert.equal(await page.evaluate(`document.activeElement===document.querySelector('#tool-tab-commands')`), true, 'Activity updates preserve focus');
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /−\$10/,
         'Activity includes the cash spent in its purchase entry');
     assert.match(await page.evaluate(`document.querySelector('[data-event-id="fixture-activity-1"]').textContent`), /\+2 misery.*20 → 40/,
@@ -254,7 +254,7 @@ export async function checkDecisionFamilies(page, web, baseline) {
             game: {...baseline.game, stage, expansionOffers: [], cardOffers: [],
                 activity: {actor: other, decisionPlayer: viewer, choice, purchaseStep: null, startEntry: revision}, ...game}};
         await page.evaluate(`window.setUiSnapshot(${JSON.stringify(snapshot)})`);
-        await page.wait(`document.querySelector('.command-dock > summary small')?.textContent.trim() === 'Revision ${revision}'`, choice + ' fixture rendered');
+        await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.trim() === 'Revision ${revision}'`, choice + ' fixture rendered');
         return snapshot;
     }
     const finite = [

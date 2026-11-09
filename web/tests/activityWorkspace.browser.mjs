@@ -27,7 +27,7 @@ export async function checkActivityWorkspace(page, web, baseline) {
     async function poll() {
         fixture = {...fixture, revision: fixture.revision + 1};
         await page.evaluate(`window.setUiSnapshot(${JSON.stringify(fixture)})`);
-        await page.wait(`document.querySelector('.command-dock > summary small')?.textContent.trim() === 'Revision ${fixture.revision}'`, 'Activity application polling');
+        await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.trim() === 'Revision ${fixture.revision}'`, 'Activity application polling');
         await waitForMap(page, fixture);
     }
     const click = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);

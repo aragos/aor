@@ -30,7 +30,7 @@ try {
     async function poll() {
         fixture = {...fixture, revision: fixture.revision + 1};
         await page.evaluate(`window.setUiSnapshot(${JSON.stringify(fixture)})`);
-        await page.wait(`document.querySelector('.command-dock > summary small')?.textContent.trim() === 'Revision ${fixture.revision}'`, 'Accepted display snapshot');
+        await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.trim() === 'Revision ${fixture.revision}'`, 'Accepted display snapshot');
     }
     await poll();
     for (const score of baseline.game.scores) {

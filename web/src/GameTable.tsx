@@ -7,6 +7,7 @@ import {t} from './messages';
 import {DecisionActions, PlanningActions} from './DecisionActions';
 import {Controls} from './Controls';
 import {CommandDock} from './CommandDock';
+import {TableTools} from './TableTools';
 import {Activity, ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
 import {FinalScores} from './FullGamePanels';
@@ -56,7 +57,6 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     const [expansionPass, setExpansionPass] = useState<number | null>(null);
     const [rewindTarget, setRewindTarget] = useState<RewindTarget | null>(null);
     useEffect(() => {if (liveSnapshot.status && liveSnapshot.status !== 'ACTIVE') setRewindTarget(null);}, [liveSnapshot.status]);
-    const [commandsOpen, setCommandsOpen] = useState(false);
     const [mapControlsHost, setMapControlsHost] = useState<HTMLDivElement | null>(null);
     const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
     const finished = snapshot.game.stage === 'FINISHED';
@@ -196,18 +196,16 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             values={{province: <ProvinceLabel snapshot={snapshot} id={competitionProvince}/>}}/>
         : prompt ? label(prompt, 'table.prompt') : t('game.waiting');
     const decision = inactive ? t('hosted.gameStatus', {status: t(`gameStatus.${snapshot.status}`)}) : finished ? t('game.finalScores') : decisionTitle;
-    const tools = <div className="table-tools">
-        <PersonalOptions options={personalOptions}/>
-        <details className="table-configuration"><summary>{t('table.configuration')}</summary>
+    const tools = <TableTools revision={snapshot.revision} personal={<PersonalOptions options={personalOptions}/>}
+        configuration={<div className="table-configuration">
             <dl className="detail-list">{snapshot.game.ruleOptions.map(option => <div key={option.key}>
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
             {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
             {botControls}
-        </details>
-        {!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
-            open={commandsOpen} onToggle={setCommandsOpen} loadRewindTargets={loadRewindTargets} reviewRewind={setRewindTarget}/>}
-    </div>;
+        </div>}
+        commands={!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
+            loadRewindTargets={loadRewindTargets} reviewRewind={setRewindTarget}/>}/>;
     return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
         <ReferenceGameContext.Provider value={{viewerId: liveSnapshot.viewerId,
             players: liveSnapshot.game.players.every(player => player.capital !== null) ? liveSnapshot.game.players : [], turnOrder: liveSnapshot.game.turnOrder,

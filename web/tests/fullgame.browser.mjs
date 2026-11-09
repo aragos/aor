@@ -38,7 +38,7 @@ async function show(link, revision) {
         currentPlayer = link.id;
     }
     await page.send('Page.bringToFront');
-    await page.wait(`document.querySelector('.player-summary.is-viewer summary')?.getAttribute('aria-label')?.includes(${JSON.stringify(link.name + ',')}) && document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + revision)}`, `${link.name} at revision ${revision}`);
+    await page.wait(`document.querySelector('.player-summary.is-viewer summary')?.getAttribute('aria-label')?.includes(${JSON.stringify(link.name + ',')}) && document.querySelector('#tool-tab-commands small')?.textContent.trim() === ${JSON.stringify('Revision ' + revision)}`, `${link.name} at revision ${revision}`);
 }
 
 function choose(state) {
@@ -182,7 +182,7 @@ try {
             : `document.querySelector('.save-status')?.textContent === 'Saved'`;
         const accepted = pending
             ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Submitted' && (${savedStatus})`
-            : `document.querySelector('.command-dock summary small')?.textContent.trim() === ${JSON.stringify('Revision ' + expectedRevision)}`;
+            : `document.querySelector('#tool-tab-commands small')?.textContent.trim() === ${JSON.stringify('Revision ' + expectedRevision)}`;
         await page.wait(`(${accepted}) || document.querySelector('.decision-panel .error')`, `accepted visual action ${command}`);
         const error = await page.evaluate('document.querySelector(".decision-panel .error")?.textContent ?? null');
         assert.equal(error, null, `Visual action rejected: ${command}`);
@@ -197,7 +197,7 @@ try {
             const expected = `${actor.id}: ${command}`;
             assert(latest.history.slice(state.history.length).some(line => line === expected || line.startsWith(expected + ' [')), `Control committed its exact canonical action: ${command}`);
         }
-        assert.equal(await page.evaluate('document.querySelector(".command-dock").open'), false, 'Game never uses the command console');
+        assert.equal(await page.evaluate('(document.querySelector("#tool-tab-commands").getAttribute("aria-selected") === "true")'), false, 'Game never uses the command console');
         trace.at(-1).accepted = true;
     }
     assert.equal(latest.game.stage, 'FINISHED', 'The complete visual game reaches results');
@@ -208,7 +208,7 @@ try {
     } else {
         assert(latest.game.scores.some(score => score.winner), 'Active final results identify a winner');
     }
-    await page.wait('document.querySelectorAll(".final-scores tbody tr").length === 3', 'all three visible final score rows');
+    await page.wait('document.querySelectorAll("#result-panel-scores tbody tr").length === 3', 'all three visible final score rows');
     await page.screenshot(join(artifacts, 'aor-fullgame-final.png'), 1440);
     console.log(`Complete visual game passed: ${trace.length} accepted actions, ${latest.game.turnNumber} turns, epochs ${[...epochs].join(',')}, ${latest.game.scores.length} final scores, ending ${chaosEnding ? 'Chaos' : 'deck exhaustion'}, final card round ${stages.has('FINAL_CARD_PLAY')}.`);
 } catch (error) {

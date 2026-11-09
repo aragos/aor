@@ -30,24 +30,24 @@ export async function checkMainView(page) {
         assert.equal(await page.evaluate(`document.querySelectorAll('.market-tile .owner-payout').length`), 0, 'Setup has no premature payout forecasts');
         assert.equal(await page.evaluate(`document.querySelector('.table-effects')`), null, 'Turn information has no bottom disclosure');
         if (mobile) await page.evaluate(`document.querySelector('#tab-players').click()`);
-        for (const selector of ['.table-configuration', '.command-dock']) {
-            await page.evaluate(`document.querySelector('${selector} > summary').scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'})`);
+        for (const selector of ['#tool-tab-configuration', '#tool-tab-commands']) {
+            await page.evaluate(`document.querySelector('${selector}').scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'})`);
             assert.equal(await page.evaluate(`(() => {
-                const summary=document.querySelector('${selector} > summary');
+                const summary=document.querySelector('${selector}');
                 const rect=summary.getBoundingClientRect();
                 const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
                 return rect.top>=0 && rect.bottom<=innerHeight && rect.height>=24 && summary.contains(hit);
             })()`), true, 'Game options and Commands remain readable and reachable');
         }
-        await page.evaluate(`document.querySelector('.table-configuration > summary').click()`);
-        await page.wait(`document.querySelector('.table-configuration').open`, 'Game options opens');
+        await page.evaluate(`document.querySelector('#tool-tab-configuration').click()`);
+        await page.wait(`document.querySelector('#tool-tab-configuration').getAttribute('aria-selected') === 'true'`, 'Game options opens');
         assert.equal(await page.evaluate(`document.querySelectorAll('.table-configuration a').length`), 0,
             'In-game options contain settings without navigation links');
         assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.table-configuration button')].map(button => button.className)`),
             ['secondary abandon-game'], 'Abandonment is the only action tucked into Game options');
         assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
         if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-main-view-${width}.png`));
-        await page.evaluate(`document.querySelector('.table-configuration > summary').click(); document.querySelector('#tab-map').click()`);
+        await page.evaluate(`document.querySelector('.tool-close').click(); document.querySelector('#tab-map').click()`);
     }
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
     await page.evaluate(`document.querySelector('#tab-map').focus()`);

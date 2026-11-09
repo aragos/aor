@@ -577,7 +577,10 @@ data class ScoreView(
     val winner: Boolean,
 ) {
     companion object {
-        internal fun from(state: GameState): List<ScoreView> {
+        /**
+         * Projects public scores using the same scoring contract for live and historical states.
+         */
+        fun from(state: GameState): List<ScoreView> {
             val scores =
                 state.playerIds.map { id ->
                     val player = state.playerState(id)

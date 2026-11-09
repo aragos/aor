@@ -137,5 +137,9 @@ continues. Decline, withdrawal, edits, policy upgrades, closure and completion e
 Unanimity atomically abandons without scoring/private revelation, clears submissions, rotates receipts
 and disarms plans. UUID receipts reconcile retries, including archived checkpoints.
 
+Public statistics sample authoritative scores, advance counts, cash and misery at the start of each
+turn and at completion during the existing effective-history replay. They require no new stored data
+and exclude discarded rewind suffixes.
+
 Activity preserves entry-time facts/identities as history grows; only explicit edits replace affected
 entries. Separate direct-action and automatic-phase receipts, even when resource changes cancel.

@@ -48,6 +48,7 @@ data class GameSnapshot(
     val submissionReceipts: List<String>,
     val history: List<String>,
     val events: List<HistoryEventView>,
+    val statistics: List<GameStatisticsPoint>,
     val undo: UndoView,
     val status: GameStatus,
     val accountId: String?,
@@ -611,6 +612,7 @@ class GameService(
             submissionReceipts = stored.submissionReceipts[player].orEmpty(),
             history = history.lines,
             events = history.events,
+            statistics = history.statistics,
             undo =
                 HistoryEdits.view(stored, player).let {
                     if (stored.status == GameStatus.ACTIVE) it

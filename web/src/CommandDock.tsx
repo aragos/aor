@@ -15,9 +15,8 @@ type HistoryIdentifiers = 'capitals' | 'names' | 'ids';
 const isHistoryIdentifiers = (value: unknown): value is HistoryIdentifiers =>
     value === 'capitals' || value === 'names' || value === 'ids';
 
-export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory, loadRewindTargets, reviewRewind}: {
+export function CommandDock({snapshot, busy, submit, editHistory, loadRewindTargets, reviewRewind}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
-    open: boolean; onToggle: (open: boolean) => void;
     loadRewindTargets?: LoadRewindTargets; reviewRewind?: (target: RewindTarget) => void;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
 }) {
@@ -27,8 +26,7 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
         identifiers === 'capitals' ? playerName(snapshot, player.id) : identifiers === 'names' ? player.name : player.id]));
     const format = (line: string) => displayHistoryLine(line, aliases);
     const undoPolicy = snapshot.undo?.policy.toLowerCase().replace(/_/g, '-');
-    return <details className="command-dock" open={open} onToggle={event => onToggle(event.currentTarget.open)}>
-        <summary>{t('table.commands')} <small>{t('game.revision')} {snapshot.revision}</small></summary>
+    return <div className="command-dock">
         {snapshot.game.stage !== 'FINISHED' && (!snapshot.status || snapshot.status === 'ACTIVE') && <form className="console" onSubmit={async event => {
             event.preventDefault();
             if (await submit(command)) setCommand(current => current === command ? '' : current);
@@ -45,5 +43,5 @@ export function CommandDock({snapshot, busy, submit, open, onToggle, editHistory
         <p>{t('history.identifiers')}</p><ChoiceButtons label={t('history.identifiers')} id="history-identifiers" value={identifiers} onChange={setIdentifiers}
             choices={(['capitals', 'names', 'ids'] as const).map(value => ({value, label: t(`history.identifiers.${value}`)}))}/>
         <pre>{snapshot.history.map(format).join('\n')}</pre>
-    </details>;
+    </div>;
 }

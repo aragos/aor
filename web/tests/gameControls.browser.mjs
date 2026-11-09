@@ -36,14 +36,14 @@ try {
         assert.equal(await page.evaluate(`document.querySelector('.abandon-game').checkVisibility()`), false,
             'Abandonment takes no space while Game options is closed');
         assert.equal(await page.evaluate(`document.querySelector('.abandon-game').closest('.table-configuration') !== null`), true);
-        await click('.table-configuration > summary');
+        await click('#tool-tab-configuration');
         await page.evaluate(`document.querySelector('.abandon-game').focus(); document.activeElement.click()`);
         await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('Request abandonment')`, 'Abandonment confirmation opens through Game options');
         assert.equal((await game.snapshot(link)).abandonment, null, 'Opening confirmation does not propose abandonment');
         await page.click('Back');
         await page.wait(`!document.querySelector('dialog[open]')`, 'Abandonment confirmation closes');
         assert.equal(await page.evaluate(`document.activeElement.matches('.abandon-game')`), true, 'Closing confirmation restores focus to its opener');
-        await click('.table-configuration > summary');
+        await click('.tool-close');
         if (mobile) await click('#tab-map');
         assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Reviewing abandonment preserves the bid draft');
     }
@@ -72,7 +72,7 @@ try {
             const command = choices.find(command => command.startsWith('buy-advance '));
             if (command) {
                 const advance = current.game.catalog.advances.find(advance => advance.letter === command.split(' ')[1]);
-                await page.wait(`document.querySelector('.command-dock summary small').textContent.endsWith('${current.revision}')`, 'live purchase polling');
+                await page.wait(`document.querySelector('#tool-tab-commands small').textContent.endsWith('${current.revision}')`, 'live purchase polling');
                 await click(`[data-advance="${advance.id}"]`);
                 await page.wait(`document.querySelector('.advance-purchase-benefits')`, 'compact purchase review');
                 assert.equal(await page.evaluate(`document.querySelectorAll('.advance-relief-rating').length`), 0, 'Selected purchase replaces generic MR summary');
@@ -97,7 +97,7 @@ try {
     let state = await game.snapshot(link);
     assert.equal(state.game.stage, 'EXPANSION');
     assert.equal(state.game.activity.actor, link.id);
-    await page.wait(`document.querySelector('.command-dock summary small').textContent.endsWith('${state.revision}')`, 'expansion polling');
+    await page.wait(`document.querySelector('#tool-tab-commands small').textContent.endsWith('${state.revision}')`, 'expansion polling');
     await click('.pass-action');
     await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('Pass anyway')`, 'pass review for reachable marker');
     assert.equal((await game.snapshot(link)).revision, state.revision, 'Opening pass review does not commit');
@@ -106,9 +106,9 @@ try {
     assert.equal((await game.snapshot(link)).revision, state.revision);
 
     const drawn = await game.send(link, 'buy-expansion-card');
-    await page.wait(`document.querySelector('.command-dock summary small').textContent.endsWith('${drawn.revision}') && document.querySelector('.undo-action:not([disabled])')`, 'linear undo after random draw');
+    await page.wait(`document.querySelector('#tool-tab-commands small').textContent.endsWith('${drawn.revision}') && document.querySelector('.undo-action:not([disabled])')`, 'linear undo after random draw');
     await page.click('Undo');
-    await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('This removes random outcomes')`, 'rewind consequence review');
+    await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('New rolls and random selections may change')`, 'rewind consequence review');
     assert.equal((await game.snapshot(link)).revision, drawn.revision);
     await page.click('Rewind to here');
     await page.wait(`!document.querySelector('dialog[open]')`, 'rewind accepted');

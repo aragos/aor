@@ -47,7 +47,7 @@ export async function checkMobileTable(page, web, baseline) {
             await click('#tab-players');
             assert.equal(await page.evaluate(`document.querySelector('#workspace-players').checkVisibility()`), true);
             assert.equal(await page.evaluate(`document.querySelectorAll('.player-overview').length`), 1);
-            assert.equal(await page.evaluate(`document.querySelector('#workspace-players .table-configuration').checkVisibility()`), true);
+            assert.equal(await page.evaluate(`document.querySelector('#tool-tab-configuration').checkVisibility()`), true);
             await page.send('Emulation.setTouchEmulationEnabled', {enabled: true});
             async function tapPlayer() {
                 const point = await page.evaluate(`(() => {
@@ -79,7 +79,7 @@ export async function checkMobileTable(page, web, baseline) {
             await page.evaluate(`document.querySelector('#tab-players').dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp', bubbles: true}))`);
             assert.equal(await page.evaluate(`document.activeElement.id`), 'tab-activity', 'Vertical arrow keys navigate the icon rail');
             await click('#tab-players');
-            await click('.command-dock > summary');
+            await click('#tool-tab-commands');
             await page.fill('#command', 'pass');
             await page.evaluate(`window.preResizeCommand = document.querySelector('#command'); true`);
             await page.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 900, deviceScaleFactor: 1, mobile: false});
@@ -89,7 +89,7 @@ export async function checkMobileTable(page, web, baseline) {
             await page.wait(`document.querySelector('#tab-players')`, 'Phone tools return');
             await click('#tab-players');
             assert.equal(await page.evaluate(`document.querySelector('#command').value`), 'pass', 'Returning to phone preserves the command draft');
-            await click('.command-dock > summary');
+            await click('.tool-close');
         } else {
             assert.equal(await page.evaluate(`document.querySelector('.player-overview').checkVisibility()`), true);
             assert.equal(await page.evaluate(`document.querySelector('#tab-players')`), null);
