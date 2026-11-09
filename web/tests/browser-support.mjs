@@ -158,7 +158,9 @@ export async function resetBrowserSession(cdpUrl, origins) {
         const closed = await fetch(`${cdpUrl}/json/close/${target.id}`, {
             signal: AbortSignal.timeout(cdpTimeoutMs),
         });
-        assert(closed.ok, `Could not close browser target ${target.id}: ${closed.status}`);
+        // Closing an opener can also close a popup listed in the same snapshot.
+        assert(closed.ok || closed.status === 404,
+            `Could not close browser target ${target.id}: ${closed.status}`);
     }
     // Close active documents before clearing their storage so polling/unload cannot restore it.
     const page = await Page.connect(resetTarget.webSocketDebuggerUrl);
