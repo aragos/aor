@@ -191,6 +191,35 @@ test('suite reset clears origin storage and closes leftover pages', async contex
         'Old pages close before storage is cleared, preventing unload and polling writes');
 });
 
+test('suite reset clears storage when a listed page has already closed', async context => {
+    context.mock.method(globalThis, 'fetch', async url => {
+        if (url.endsWith('/json/close/old')) return {ok: false, status: 404};
+        return {ok: true, json: async () => url.endsWith('/json/list')
+            ? [{type: 'page', id: 'old'}]
+            : {id: 'reset', webSocketDebuggerUrl: 'ws://reset'}};
+    });
+    const commands = [];
+    context.mock.method(Page, 'connect', async () => ({
+        send: async (...args) => {commands.push(args);},
+        ws: {close() {}},
+    }));
+    await resetBrowserSession('http://chrome', ['http://web']);
+    assert.deepEqual(commands, [
+        ['Storage.clearDataForOrigin', {origin: 'http://web', storageTypes: 'all'}],
+    ]);
+});
+
+test('suite reset rejects other failures closing a listed page', async context => {
+    context.mock.method(globalThis, 'fetch', async url => {
+        if (url.endsWith('/json/close/old')) return {ok: false, status: 500};
+        return {ok: true, json: async () => url.endsWith('/json/list')
+            ? [{type: 'page', id: 'old'}]
+            : {id: 'reset', webSocketDebuggerUrl: 'ws://reset'}};
+    });
+    await assert.rejects(resetBrowserSession('http://chrome', ['http://web']),
+        /Could not close browser target old: 500/);
+});
+
 test('suite reset closes the CDP socket when clearing storage fails', async context => {
     context.mock.method(globalThis, 'fetch', async url => ({ok: true, json: async () =>
         url.endsWith('/json/list') ? [] : ({id: 'reset', webSocketDebuggerUrl: 'ws://page'})}));

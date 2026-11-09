@@ -46,6 +46,8 @@ export async function checkTurnOrder(page, web) {
         await page.wait(`typeof window.setMapSnapshot === 'function'`, 'StrictMode table harness');
         await page.evaluate(`window.setMapSnapshot(${JSON.stringify(state)})`);
         await page.wait(`document.querySelector('[data-help-topic="income-track"]')`, 'table reference controls');
+        assert.equal(await page.evaluate(`document.querySelector('.player-capital-bid-order')`), null,
+            'Player details do not assign capital bid positions before bidding resolves');
         await page.evaluate(`document.querySelector('[data-help-topic="income-track"]').click()`);
         await page.wait(`document.querySelector('.reference-popup > .reference-link')`, 'neighboring income reference');
         await page.evaluate(`document.querySelector('.reference-popup > .reference-link').click()`);
@@ -63,6 +65,24 @@ export async function checkTurnOrder(page, web) {
     await page.send('Page.navigate', {url: web + viewer.path});
     await page.wait(`document.querySelector('#bid')`, 'live token purchase');
     await page.fill('#bid', '7');
+    await page.send('Page.bringToFront');
+    for (const [width, height] of [[1280, 900], [390, 844]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile: width < 700});
+        await page.wait(`document.querySelector('.workspace-tabs').getAttribute('aria-orientation') === '${width < 700 ? 'vertical' : 'horizontal'}'`, 'player workspace reflows');
+        await page.evaluate(`document.querySelector('#tab-players')?.click()`);
+        await page.wait(`document.querySelector('.player-summary.is-viewer > summary').checkVisibility()`, 'player summary is visible');
+        await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
+        await page.wait(`document.querySelector('.player-summary.is-viewer .player-detail:popover-open')`, 'capital bid order details');
+        for (const [index, player] of game.links.entries()) {
+            assert.equal(await page.evaluate(`document.querySelector('[data-player="${player.id}"] .player-capital-bid-order dd').textContent`),
+                String(index + 1), 'Expanded details show the resolved capital bid position');
+        }
+        await page.evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
+        await page.viewportScreenshot(join(artifacts, `capital-bid-order-${width}.png`));
+        await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
+        await page.wait(`!document.querySelector('.player-detail:popover-open')`, 'second tap closes player details');
+        assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Player inspection preserves the token purchase draft');
+    }
     const originalLocation = await page.evaluate('location.href');
     await openHelp(help);
     assert.equal(await page.evaluate(`document.querySelectorAll('${popup} .order-track-player').length`), 0);
@@ -115,6 +135,8 @@ export async function checkTurnOrder(page, web) {
     await page.evaluate(`window.setMapSnapshot(${JSON.stringify(swapped)})`);
     await page.wait(`document.querySelector('${popup} .is-viewer')?.dataset.orderBox === '6'`, 'open lookup follows changed order');
     assert.match(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-turn-order').textContent`), /^Box 6/);
+    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .player-capital-bid-order dd').textContent`), '1',
+        'Capital bid order stays fixed when turn order changes');
     await page.screenshot(join(artifacts, 'turn-order-current-desktop.png'), 1280, 900);
     await escape();
     assert.equal(await page.evaluate(`window.mapCommands.length`), 0, 'Reference never submits a game action');
