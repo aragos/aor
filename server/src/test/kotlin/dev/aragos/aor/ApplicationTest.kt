@@ -94,6 +94,29 @@ class ApplicationTest {
     }
 
     @Test
+    fun creationAcceptsAllFiveVariantsThroughHttp() = withGame {
+        val rules = RuleOptions(initialCard = InitialCardRule.NO_EVENTS, drawThreeKeepTwo = true)
+        val options = rules.configurationCommands().associate { it.key to it.value }
+        val response =
+            client.post("/api/games") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    json.writeValueAsString(
+                        mapOf("players" to listOf("Alice", "Bob", "Carol"), "options" to options)
+                    )
+                )
+            }
+        assertThat(response.status).isEqualTo(HttpStatusCode.Created)
+        val created = json.readTree(response.bodyAsText())
+        val token = created["links"][0]["path"].asText().substringAfter("#token=")
+        val view = client.get("/api/games/${created["gameId"].asText()}") { bearerAuth(token) }
+        val snapshot = json.readTree(view.bodyAsText())
+        assertThat(snapshot["game"]["stage"].asText()).isEqualTo("SETUP_RETURN")
+        assertThat(snapshot["game"]["hand"].size()).isEqualTo(3)
+        assertThat(snapshot["game"]["ruleOptions"].size()).isEqualTo(5)
+    }
+
+    @Test
     fun creationStartsSetupAndFreezesTheSelectedVariants() = withGame {
         val own = json.readTree(view(0).bodyAsText())
         val rejected = command(0, 2, "set-option deck-modification enabled")

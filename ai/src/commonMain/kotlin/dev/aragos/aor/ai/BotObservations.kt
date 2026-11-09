@@ -405,6 +405,7 @@ private class ObservationProjection(
                 add("cards", 1.0)
                 add("misery", stabilizationIncrease())
             }
+            "return-card",
             "discard-card",
             "offer-card" -> {
                 val card = view.hand.single { it.reference == parts[1] }

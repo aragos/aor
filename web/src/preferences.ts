@@ -6,6 +6,8 @@ export const isBoolean = (value: unknown): value is boolean => typeof value === 
 export const isUndoPolicy = (value: unknown): value is string => typeof value === 'string' && ['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].includes(value);
 export const isGameFilter = (value: unknown): value is string => typeof value === 'string' && ['ongoing', 'my-move', 'finished', 'cancelled', 'abandoned', 'unavailable', 'all'].includes(value);
 
+const unchanged = (value: unknown): unknown => value;
+
 const memory = new Map<string, string>();
 const listeners = new Map<string, Set<() => void>>();
 const storageKey = (key: string) => `aor.setting.${key}`;
@@ -16,16 +18,16 @@ function storedValue(key: string): string | null {
 }
 
 function decodedValue<T>(key: string, stored: string | null, initial: T,
-    accept: (value: unknown) => value is T): T {
+    accept: (value: unknown) => value is T, migrate: (value: unknown) => unknown): T {
     try {
         const value: unknown = JSON.parse(stored ?? 'null');
-        const migrated = key === 'undo-policy' && value === 'friendly-game' ? 'linear-game' : value;
+        const migrated = key === 'undo-policy' && value === 'friendly-game' ? 'linear-game' : migrate(value);
         return accept(migrated) ? migrated : initial;
     } catch { return initial; }
 }
 
 /** Browser preferences share updates across mounted controls and fall back to memory without storage. */
-export function useStoredSetting<T>(key: string, initial: T, accept: (value: unknown) => value is T) {
+export function useStoredSetting<T>(key: string, initial: T, accept: (value: unknown) => value is T, migrate: (value: unknown) => unknown = unchanged) {
     const subscribe = useCallback((notify: () => void) => {
         const observers = listeners.get(key) ?? new Set<() => void>();
         observers.add(notify); listeners.set(key, observers);
@@ -41,16 +43,16 @@ export function useStoredSetting<T>(key: string, initial: T, accept: (value: unk
         };
     }, [key]);
     const serialized = useSyncExternalStore(subscribe, () => storedValue(key), () => null);
-    const value = useMemo(() => decodedValue(key, serialized, initial, accept),
-        [key, serialized, initial, accept]);
+    const value = useMemo(() => decodedValue(key, serialized, initial, accept, migrate),
+        [key, serialized, initial, accept, migrate]);
     const setValue = useCallback((next: SetStateAction<T>) => {
-        const previous = decodedValue(key, storedValue(key), initial, accept);
+        const previous = decodedValue(key, storedValue(key), initial, accept, migrate);
         const updated = typeof next === 'function' ? (next as (value: T) => T)(previous) : next;
         const serialized = JSON.stringify(updated);
         memory.set(key, serialized);
         try { localStorage.setItem(storageKey(key), serialized); } catch { /* Memory remains usable. */ }
         listeners.get(key)?.forEach(notify => notify());
-    }, [key, initial, accept]);
+    }, [key, initial, accept, migrate]);
     return [value, setValue] as const;
 }
 

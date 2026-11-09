@@ -6,6 +6,12 @@ import ruleOptions from './ruleOptions.json';
 
 /** Generated from RuleOptionView; exportRuleOptions and CI enforce the domain source of truth. */
 export const defaultVariants: Record<string, string> = Object.fromEntries(ruleOptions.map(option => [option.key, option.value]));
+/** Add the new default without resetting previously chosen filters, maps or other variants. */
+export function migrateVariants(value: unknown): unknown {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+    return {'draw-three-keep-two': 'disabled', ...value};
+}
+
 export function validVariants(value: unknown): value is Record<string, string> {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
     const options = value as Record<string, unknown>;

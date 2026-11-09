@@ -9,6 +9,7 @@ data class RuleOptionView(val key: String, val value: String, val choices: List<
                     when (command.key) {
                         "initial-card" -> InitialCardRule.entries.map(InitialCardRule::commandValue)
                         "deck-modification",
+                        "draw-three-keep-two",
                         "immediate-master-art-discard" -> listOf("disabled", "enabled")
                         "map" -> MapRule.entries.map(MapRule::commandValue)
                         else -> error("A configured rule needs public choices: ${command.key}.")

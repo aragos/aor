@@ -33,6 +33,7 @@ letters are uppercase. Arguments are whitespace-separated, without quoting or co
 | Command | Who and when; parameter constraints |
 | --- | --- |
 | `start` | Automatically recorded for the creator during game creation; freezes configuration and requests the opening shuffle and draws. Retained for engine replay. |
+| `return-card <reference>` | Draw-three-keep-two opening choice; return one of your three cards for a recorded shuffle into the deck, keeping two before capital bids. |
 | `bid-capital <amount>` | Each player during private capital bidding; integer $0–$40. Bids reveal together. |
 | `choose-capital <capital>` | Current capital chooser; the capital must remain available. |
 | `buy-tokens <amount>` | Each active player during private Order of Play. Pays the absolute amount, including negative bids; only positive amounts buy pool tokens, capped by stock. Must be affordable in full. |
@@ -66,10 +67,12 @@ an application game after creation.
 | --- | --- |
 | `deck-modification` | `disabled`, `enabled`: exchange `war` and `timber-2-1` between decks 1 and 2 |
 | `initial-card` | `any`, `no-crusades`, `no-events`, `commodity-only`; one mutually exclusive opening-deal restriction |
+| `draw-three-keep-two` | `disabled`, `enabled`; keep two opening cards instead of one, replacing the ordinary turn 1 draw |
 | `immediate-master-art-discard` | `disabled`, `enabled` |
 | `map` | `standard` (default), `european`; selects provinces, connections and board drawing |
 
-Initial-deal exclusions remain in the deck for later draws. No preset, improved setup, alternate
+Initial-deal exclusions remain in the deck for later draws. Draw-three-keep-two preserves this filter;
+commodities only is limited to five players with that variant. No preset, improved setup, alternate
 advance table, St. Gall support toggle or rebuilt-marker-bonus option is supported. Event-rebuilt
 markers use the baseline exclusion from the expansion bonus. See [rules §13](rules.md#13-variants).
 

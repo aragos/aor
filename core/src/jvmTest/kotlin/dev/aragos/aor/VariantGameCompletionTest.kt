@@ -109,6 +109,7 @@ class VariantGameCompletionTest {
         val presets =
             listOf(
                 "deck-modification enabled",
+                "draw-three-keep-two enabled",
                 "initial-card no-events",
                 "initial-card no-crusades",
                 "initial-card commodity-only",

@@ -6,6 +6,7 @@ data class RuleOptions(
     val initialCard: InitialCardRule = InitialCardRule.ANY,
     val immediateMasterArtDiscard: Boolean = false,
     val map: MapRule = MapRule.STANDARD,
+    val drawThreeKeepTwo: Boolean = false,
 ) {
     /** Physical cards assigned to an epoch before recycled discards are added. */
     fun cardsForEpoch(epoch: Epoch): List<String> {
@@ -20,6 +21,7 @@ data class RuleOptions(
         listOf(
             RuleOptionCommand("deck-modification", deckModification.commandValue()),
             RuleOptionCommand("initial-card", initialCard.commandValue),
+            RuleOptionCommand("draw-three-keep-two", drawThreeKeepTwo.commandValue()),
             RuleOptionCommand(
                 "immediate-master-art-discard",
                 immediateMasterArtDiscard.commandValue(),

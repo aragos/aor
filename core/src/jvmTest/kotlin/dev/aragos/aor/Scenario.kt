@@ -109,6 +109,7 @@ internal data class Scenario(val state: GameState, val lines: List<String> = emp
 
     private fun phaseCommand(actor: PlayerId, choices: List<String>): String =
         when (state.stage) {
+            Stage.SETUP_RETURN,
             Stage.CAPITAL_CHOICE,
             Stage.TURN_ORDER_TIE -> choices.first()
             Stage.DRAW_CARD -> "pass"
