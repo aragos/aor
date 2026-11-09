@@ -33,10 +33,12 @@ internal class TokenValuePilotRunner(
     private val artifacts: TrainingArtifacts,
     private val workers: Tournaments,
     private val deadlineNanos: Long,
-    private val metadata: Map<String, Any> = emptyMap(),
+    metadata: Map<String, Any> = emptyMap(),
     private val collectOrigin: (Int) -> TokenValueOrigin =
         TokenValueCollector(specification, deadlineNanos)::collect,
 ) {
+    private val metadata = metadata + ("learningMode" to specification.learningMode)
+
     fun run(): BotModel {
         artifacts.write("state.json", metadata + mapOf("phase" to "collecting"))
         var completed = 0
@@ -115,7 +117,11 @@ internal class TokenValuePilotRunner(
         val fits =
             specification.regularization.mapIndexed { index, regularization ->
                 val coefficients = TokenValueRidge.fit(examples, regularization, deadlineNanos)
-                val model = BotTokenValue.withWeights(specification.arena.candidate, coefficients)
+                val model =
+                    specification.learningMode.withWeights(
+                        specification.arena.candidate,
+                        coefficients,
+                    )
                 artifacts.model(model, "ridge-$index.json")
                 TokenValueFit(
                     regularization,
@@ -129,7 +135,11 @@ internal class TokenValuePilotRunner(
             fits.minWith(
                 compareBy<TokenValueFit> { it.validationMse }.thenByDescending { it.regularization }
             )
-        val model = BotTokenValue.withWeights(specification.arena.candidate, selected.coefficients)
+        val model =
+            specification.learningMode.withWeights(
+                specification.arena.candidate,
+                selected.coefficients,
+            )
         artifacts.model(model, "candidate.json")
         val advantages = selected.validation.map(TokenValueSelection::observedAdvantage)
         val positives = advantages.filter { it > 0.0 }
@@ -177,6 +187,9 @@ internal class TokenValuePilotRunner(
     }
 
     private fun validateOrigin(origin: TokenValueOrigin, index: Int) {
+        require(origin.learningMode == specification.learningMode) {
+            "A token-value checkpoint must match its collection learning mode."
+        }
         val expected = specification.lineup(index)
         val request = specification.rootRequest(index)
         require(

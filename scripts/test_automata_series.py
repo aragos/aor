@@ -134,7 +134,8 @@ class SeriesTest(unittest.TestCase):
             series.gate(options)
         self.assertFalse((self.output / "results/campaign-01-gate.json").exists())
 
-    def test_preparation_flattens_children_and_pins_absolute_inputs(self):
+    def prepare_fixture(self, source_mode="replacement", requested_mode=None, legacy=False,
+                        override_runtime=False):
         runtime = self.root / "runtime"
         (runtime / "lib").mkdir(parents=True)
         (runtime / "lib/training.jar").write_bytes(b"test-bytecode")
@@ -145,14 +146,32 @@ class SeriesTest(unittest.TestCase):
                     "files": {str(java): experiments.sha(java)}}
         source, prepared = self.root / "source", self.root / "prepared"
         original = SimpleNamespace(output=source, runtime=runtime, baseline=baseline,
-                                   profile="smoke", java=str(java), seed=7100000, workers=1,
+                                   profile=None, learning_mode=source_mode,
+                                   java=str(java), seed=7100000, workers=1,
                                    maximum_seconds=900, opponent=[], territory_value_bundle=None,
                                    frozen_card_purchase_bundle=None, frozen_purchase_policy=None)
         options = SimpleNamespace(from_campaign=source, output=prepared, seed=7101000,
-                                  campaigns=2, profile="smoke", workers=1, maximum_seconds=900)
+                                  campaigns=2, profile=None, workers=1, maximum_seconds=900,
+                                  learning_mode=requested_mode)
+        if override_runtime:
+            replacement_runtime = self.root / "correction-runtime"
+            (replacement_runtime / "lib").mkdir(parents=True)
+            (replacement_runtime / "lib/training.jar").write_bytes(b"correction-bytecode")
+            options.runtime = replacement_runtime
         with mock.patch.object(experiments, "java_identity", return_value=identity):
             experiments.prepare(original)
+            if legacy:
+                protocol = experiments.read(source / "protocol.json")
+                protocol.pop("learningMode")
+                experiments.document(source / "protocol.json", protocol, immutable=False)
+                spec = experiments.read(source / "campaign.json")
+                spec["inputs"]["protocol.json"] = experiments.sha(source / "protocol.json")
+                experiments.document(source / "campaign.json", spec, immutable=False)
             series.prepare(options)
+        return source, prepared
+
+    def test_preparation_flattens_children_and_pins_absolute_inputs(self):
+        source, prepared = self.prepare_fixture()
         spec = experiments.read(prepared / "series.json")
         controller.validate_spec(spec, self.output)
         stages = {stage["id"]: stage for stage in spec["stages"]}
@@ -162,6 +181,65 @@ class SeriesTest(unittest.TestCase):
         self.assertEqual(["campaign-01-gate"], stages["campaign-02-gate"]["dependsOn"])
         self.assertTrue(all(Path(path).is_absolute() for path in spec["inputs"]))
         self.assertEqual(900, spec["limits"]["maximumSeconds"])
+
+    def test_series_inherits_correction_mode_and_reserves_all_actual_worlds(self):
+        source, prepared = self.prepare_fixture(source_mode="correction")
+        original = experiments.read(source / "protocol.json")
+        plan = experiments.read(prepared / "series-plan.json")
+        self.assertEqual("CORRECTION", plan["learningMode"])
+        self.assertEqual("CORRECTION", plan["sourceLearningMode"])
+        self.assertEqual(experiments.sha(source / "campaign.json"), plan["sourceCampaignSha256"])
+        self.assertEqual(experiments.sha(source / "protocol.json"), plan["sourceProtocolSha256"])
+        self.assertEqual(experiments.sha(original["baseline"]), plan["baselineSha256"])
+        children = [experiments.read(Path(child["directory"]) / "protocol.json")
+                    for child in plan["children"]]
+        for child in children:
+            self.assertEqual("CORRECTION", child["learningMode"])
+            self.assertEqual("correction", child["profile"])
+            self.assertEqual(2, len(child["recipes"]))
+            self.assertEqual(64, child["developmentPairs"])
+            self.assertEqual(256, child["confirmationPairs"])
+            self.assertEqual(Path(original["baseline"]).read_bytes(),
+                             Path(child["trainingBaseline"]).read_bytes())
+            self.assertTrue(all(experiments.read(recipe["source"])["learningMode"] == "CORRECTION"
+                                for recipe in child["recipes"]))
+        series.validate_seed_reservations(original["seedBanks"],
+                                          [child["seedBanks"] for child in children])
+
+    def test_legacy_source_without_mode_defaults_to_existing_replacement_profile(self):
+        source, prepared = self.prepare_fixture(legacy=True)
+        plan = experiments.read(prepared / "series-plan.json")
+        self.assertEqual("REPLACEMENT", plan["learningMode"])
+        self.assertEqual("REPLACEMENT", plan["sourceLearningMode"])
+        child = experiments.read(Path(plan["children"][0]["directory"]) / "protocol.json")
+        self.assertEqual("overnight", child["profile"])
+        self.assertEqual(48, child["developmentPairs"])
+        self.assertEqual([(32, 16, 1), (96, 32, 2), (96, 32, 4)],
+                         [(row["trainingRoots"], row["validationRoots"], row["continuationReplicates"])
+                          for row in child["recipes"]])
+        self.assertTrue(all("learningMode" not in experiments.read(recipe["source"])
+                            for recipe in child["recipes"]))
+
+    def test_explicit_correction_upgrade_uses_and_pins_new_runtime(self):
+        source, prepared = self.prepare_fixture(requested_mode="correction", legacy=True,
+                                               override_runtime=True)
+        original = experiments.read(source / "protocol.json")
+        plan = experiments.read(prepared / "series-plan.json")
+        self.assertEqual("REPLACEMENT", plan["sourceLearningMode"])
+        self.assertEqual("CORRECTION", plan["learningMode"])
+        self.assertEqual(original["runtime"], plan["sourceRuntime"])
+        self.assertEqual(str(self.root / "correction-runtime"), plan["runtimeSource"])
+        self.assertEqual(experiments.distribution_hashes(self.root / "correction-runtime"),
+                         plan["runtimeSha256"])
+        for child in plan["children"]:
+            protocol = experiments.read(Path(child["directory"]) / "protocol.json")
+            self.assertEqual("CORRECTION", protocol["learningMode"])
+            self.assertEqual(b"correction-bytecode",
+                             (Path(protocol["runtime"]) / "lib/training.jar").read_bytes())
+
+    def test_correction_upgrade_requires_an_explicit_capable_runtime(self):
+        with self.assertRaisesRegex(ValueError, "requires --runtime"):
+            self.prepare_fixture(requested_mode="correction", legacy=True)
 
 
 if __name__ == "__main__":
