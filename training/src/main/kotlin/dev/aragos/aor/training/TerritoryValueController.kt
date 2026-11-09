@@ -40,8 +40,8 @@ internal class TerritoryValueController(
     private val continuation = bundle.frozen.controller(baseline)
 
     init {
-        require(epsilon == 0.0 || epsilon == TerritoryValuePolicy.COLLECTION_EPSILON) {
-            "Native territory values require explicit greedy evaluation or .2 collection exploration."
+        require(epsilon.isFinite() && epsilon in 0.0..1.0) {
+            "Native territory value exploration epsilon must be finite and within [0,1]."
         }
     }
 

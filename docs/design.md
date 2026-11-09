@@ -221,6 +221,16 @@ Pilot models use a separate experimental schema; checkpoints and models stay in 
 are not browser model assets. See the [experiment workflow](contributing.md#automata-experiments)
 for scope and qualification.
 
+The local [campaign controller](../scripts/automata_campaign.py) runs a frozen sequence of
+experiments without language-model calls. The [campaign adapter](../scripts/automata_experiments.py)
+owns the scientific decisions: exploration diagnostics, bounded token-value trials, development
+selection and fresh confirmation. The controller owns process groups, resource limits, immutable
+inputs, cumulative deadlines and resumable stage receipts. A completed campaign is an execution
+result; scientific rejection remains explicit and no result activates a production policy.
+Counterfactual continuations share an origin's hidden world only inside the simulator; fitted
+features remain actor-visible, and related branches stay in the same statistical partition.
+See [campaign operation](contributing.md#unattended-automata-campaigns) for launch and recovery.
+
 ## Lifecycle and activity
 
 `GameOperations.kt` handles administrative closure; `GameAbandonment.kt` unanimous player consent.
