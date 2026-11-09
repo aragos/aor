@@ -43,7 +43,7 @@ class EvolutionTest(unittest.TestCase):
                 "opponents": [str(self.baseline)], "robustOpponents": [str(self.baseline)],
                 "seed": 7200000, "seedBanks": evolution.seed_banks(7200000, profile_values, {}),
                 "initialRadius": 1.0, "maximumConsecutiveFailures": 2,
-                "minimumRoundSeconds": 10, "finalists": 4, "workers": 4,
+                "minimumRoundSeconds": 10, "finalists": 3 if profile == "archive" else 4, "workers": 4,
                 "seedNote": "Source worlds excluded.", "intervalMethod": "Paired intervals.",
                 "frozenPurchase": {"baseline": str(prior), "policy": str(policy)},
                 "frozenPurchaseSha256": {"baseline": experiments.sha(prior), "policy": experiments.sha(policy)}}
@@ -135,8 +135,10 @@ class EvolutionTest(unittest.TestCase):
                         self.assertFalse(evolution.qualification_passes({"profile": "search"}, value, stage))
             self.assertFalse(evolution.qualification_passes({"profile": "smoke"}, metrics(count=count), stage))
 
-    def run_evolution(self, outcomes, profile="search"):
+    def run_evolution(self, outcomes, profile="search", seed_models=()):
         protocol = self.protocol(profile)
+        if seed_models:
+            protocol["seedModels"] = list(map(str, seed_models))
         output = self.root / "run"
         output.mkdir(exist_ok=True)
         selected = [{"candidateId": candidate, "overall": metrics(win, reward)}
@@ -261,6 +263,74 @@ class EvolutionTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "P32 bundle"):
             self.prepare(options, original, identity)
 
+    def archived_models(self):
+        proposals = evolution.proposals(self.model)
+        models = [self.root / f"archive-{index}.json" for index in range(3)]
+        for path, candidate in zip(models, (1, 6, 11)):
+            experiments.document(path, proposals[candidate]["model"])
+        return models
+
+    def test_archive_preparation_freezes_distinct_saved_models_with_hash_provenance(self):
+        options, original, identity = self.preparation_inputs()
+        models = self.archived_models()
+        options.profile, options.seed_model = "archive", models
+        campaign = self.prepare(options, original, identity)
+        protocol = experiments.read(options.output / "protocol.json")
+        self.assertEqual(1, protocol["rounds"])
+        self.assertEqual(3, protocol["finalists"])
+        self.assertEqual((512, 1024, 2048, 1024), tuple(protocol[key] for key in (
+            "screeningPairs", "selectionPairs", "confirmationPairs", "robustnessPairs")))
+        provenance = experiments.read(options.output / "provenance.json")["copiedInputs"]
+        for source, frozen in zip(models, protocol["seedModels"]):
+            self.assertEqual(source.read_bytes(), Path(frozen).read_bytes())
+            self.assertEqual(experiments.sha(source), protocol["seedModelSha256"][frozen])
+            self.assertEqual(experiments.sha(source), campaign["inputs"][str(Path(frozen).relative_to(options.output))])
+            self.assertIn({"source": str(source), "copy": frozen, "sha256": experiments.sha(source)}, provenance)
+
+    def test_archive_rejects_missing_duplicate_baseline_or_excess_seed_models(self):
+        options, original, identity = self.preparation_inputs()
+        models = self.archived_models()
+        for paths in ([], [models[0], models[0]], [self.baseline], models * 6):
+            rejected = argparse.Namespace(**dict(vars(options), profile="archive", seed_model=paths))
+            with self.subTest(paths=paths), self.assertRaisesRegex(ValueError, "seed models"):
+                self.prepare(rejected, original, identity)
+        self.assertFalse(options.output.exists())
+
+    def test_seed_models_are_forbidden_in_standard_profiles(self):
+        options, original, identity = self.preparation_inputs()
+        for profile in ("smoke", "search"):
+            rejected = argparse.Namespace(**dict(vars(options), profile=profile, seed_model=[self.baseline]))
+            with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, "archive profile"):
+                self.prepare(rejected, original, identity)
+
+    def test_archive_race_freezes_the_selected_checkpoint_without_generating_new_models(self):
+        models = self.archived_models()
+        with mock.patch.object(evolution, "proposals", side_effect=AssertionError("Archive must not generate models")):
+            _, output, result, calls = self.run_evolution([(1, .1, .2)], "archive", models)
+        self.assertEqual(1, calls)
+        self.assertEqual("passed", result["status"])
+        self.assertEqual(models[0].read_bytes(), (output / "selected/candidate.json").read_bytes())
+        self.assertNotEqual(models[-1].read_bytes(), (output / "selected/candidate.json").read_bytes())
+        for index, source in enumerate((self.baseline, *models)):
+            self.assertEqual(source.read_bytes(), (output / f"rounds/round-0/proposal-{index}.json").read_bytes())
+        summary = experiments.read(output / "rounds/round-0/summary.json")
+        self.assertEqual("archive", summary["module"])
+        self.assertEqual({"anchor", "archive"}, set(summary["modules"]))
+
+    def test_archive_zero_mean_does_not_admit_a_final_candidate(self):
+        _, output, result, calls = self.run_evolution([(1, 0, .2)], "archive", self.archived_models())
+        self.assertEqual(1, calls)
+        self.assertEqual("rejected", result["status"])
+        self.assertFalse((output / "confirmation-source.json").exists())
+
+    def test_archive_final_gates_require_the_larger_declared_banks(self):
+        protocol = self.protocol("archive")
+        for stage, count in (("confirm", 2048), ("robustness", 1024)):
+            with self.subTest(stage=stage):
+                self.assertEqual(count, evolution.minimum_pairs(protocol, stage))
+                self.assertFalse(evolution.qualification_passes(protocol, metrics(count=count - 1), stage))
+                self.assertTrue(evolution.qualification_passes(protocol, metrics(count=count), stage))
+
     def frozen_purchase_report(self, protocol, directory):
         result = {}
         for name, path in protocol["frozenPurchase"].items():
@@ -345,6 +415,13 @@ class EvolutionTest(unittest.TestCase):
         protocol, source, directory, pool = self.search_fixture()
         selected = evolution.verify_search(protocol, source, directory, pool, 0)
         self.assertEqual(1, selected["candidateId"])
+
+    def test_native_search_preserves_explicit_zero_weights_in_an_exact_saved_model(self):
+        protocol, source, directory, pool = self.search_fixture()
+        pool[1]["model"]["weights"]["planning.retainedLeader"] = 0.0
+        for name in ("candidate-1.json", "candidate.json"):
+            experiments.document(directory / name, pool[1]["model"], immutable=False)
+        self.assertEqual(1, evolution.verify_search(protocol, source, directory, pool, 0)["candidateId"])
 
     def test_native_search_rejects_changed_anchor_gameplay_without_return_changes(self):
         protocol, source, directory, pool = self.search_fixture()
