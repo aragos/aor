@@ -20,6 +20,8 @@ distributions {
             from(rootProject.file("scripts")) {
                 include(
                     "train-opponents.py",
+                    "automata_campaign.py",
+                    "automata_experiments.py",
                     "card-advantage-run.py",
                     "card_advantage_experiment.py",
                     "card_advantage_compact_experiment.py",

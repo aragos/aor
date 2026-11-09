@@ -96,6 +96,77 @@ diagnostic `candidate.json`. Schema/rules/catalog metadata protects inference co
 matching metadata alone establishes no playing-strength claim. Broader qualification remains
 [open work](follow-ups.md).
 
+## Unattended automata campaigns
+
+The [controller](../scripts/automata_campaign.py) and [experiment adapter](../scripts/automata_experiments.py)
+run locally without an LLM, API key, or Python numerical packages. Use Python 3.9+ and JDK 21 on
+macOS or Linux. They reuse the native simulation, token-value fitter and whole-game arena.
+The campaign is bounded by elapsed time, resident memory, output size and free disk space.
+
+Build once, then prepare a new directory from an explicit compatible baseline model:
+
+```sh
+./gradlew :training:installDist
+python3 scripts/automata_experiments.py prepare --runtime training/build/install/training --baseline /absolute/path/baseline.json --output .aor-training/campaign-1 --profile overnight
+python3 .aor-training/campaign-1/scripts/automata_campaign.py --spec .aor-training/campaign-1/campaign.json --output .aor-training/campaign-1/run
+```
+
+Preparation copies the executor, campaign scripts and model inputs, then fingerprints the frozen
+files and declares distinct training, validation, development and confirmation seed banks. Keep
+the prepared directory unchanged. Use `--profile smoke` for a small integration run before a long
+campaign; its results do not establish playing strength. `prepare --help` lists resource and seed
+options. Parallel campaigns need distinct output directories and seed reservations.
+
+To include the territory exploration diagnostic, add all three preparation options:
+`--territory-value-bundle`, `--frozen-card-purchase-bundle` and `--frozen-purchase-policy`.
+The diagnostic compares the same territory model at exploration probabilities 0, .02 and .2,
+holding its card/purchase continuation and rival population fixed. An initial constant-value model
+provides a particularly interpretable comparison with ordinary greedy territory play. The explicit
+native registry kind `territory-value-exploration-bundle` records its actual epsilon; ordinary
+`territory-value-bundle` evaluation still requires zero. Without these inputs, preparation declares
+the exploration diagnostic unavailable and runs the token-only campaign.
+
+The token trials fit action-minus-baseline terminal returns from paired continuations, with a
+predeclared screen before larger trials. Their training reference disables the supplied baseline's
+token-value head so the existing fitter can learn a replacement; whole-game development and
+confirmation compare against the original supplied baseline, including its existing head. The token
+pilot uses ordinary baseline card/purchase play, separately from the optional diagnostic's neural
+continuation. Its results therefore do not establish improvement to the qualified neural
+card/purchase combination. Validation and
+development data may select a candidate; only the selected candidate reaches the reserved fresh
+confirmation bank. Unpromising experiments are recorded as scientific rejections. Successful
+execution, development improvement and independent confirmation are separate outcomes; none
+updates browser assets or demonstrates human-level strength.
+
+Detach the launch command with `nohup` and redirect its output as described above. On macOS,
+`caffeinate -i` before the Python command keeps an otherwise idle machine awake. The local process
+refreshes `run/campaign-report.txt` and `run/campaign-report.json` during execution and writes the
+final outcome even when no candidate survives:
+
+```sh
+python3 .aor-training/campaign-1/scripts/automata_campaign.py --output .aor-training/campaign-1/run --status
+python3 .aor-training/campaign-1/scripts/automata_campaign.py --spec .aor-training/campaign-1/campaign.json --output .aor-training/campaign-1/run --resume
+```
+
+SIGTERM the controller PID to stop its owned process group. Resume preserves the original campaign
+and stage deadlines, completed results and declared attempt limits. It refuses changed inputs,
+runtime or accepted result files. Expired budgets require a new campaign, not a renewed clock.
+Do not launch a duplicate while an old child group is still alive. Resource checks are sampled,
+and commands must keep their descendants in the owned process group. Independent game/root
+checkpoints preserve completed work; an interrupted in-flight game may need recomputation.
+
+The campaign stops when no eligible declared experiments remain, even if time is still available.
+Duplicate candidate bytes reuse their development comparison, failed signal gates stop larger
+recipes, and only one selected candidate receives fresh confirmation. The time ceiling is a
+backstop; `--maximum-seconds` can extend it up to 72 hours without adding trials or renewing clocks.
+Trial receipts report elapsed time, collected roots and continuation outcomes alongside measured
+development effects. These are workload diagnostics, not a promise of strength gained per hour.
+
+The controller also accepts declared command stages with structured result files; its module
+documents that contract. This provides a finite, auditable search space for additional learning
+recipes without putting a language model in the execution loop. Changing that search space or
+adding a new algorithm remains a development task.
+
 ## Full-game strategy experiments
 
 Use `arena` for a frozen complete-game comparison and `strategy-search` for a small search over
