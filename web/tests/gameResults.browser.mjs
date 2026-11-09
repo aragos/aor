@@ -43,13 +43,17 @@ try {
     for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         if (mobile) {await page.wait(`document.querySelector('#tab-players')`, 'phone tools'); await click('#tab-players');}
+        assert.equal(await page.evaluate(`document.querySelector('.tool-close')`), null, 'Closed tools have no close button');
         for (const tool of ['personal', 'configuration', 'commands']) {
             await page.evaluate(`document.querySelector('#tool-tab-${tool}').scrollIntoView({block:'nearest'})`);
             const point = await page.evaluate(`(() => {const r = document.querySelector('#tool-tab-${tool}').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
-            for (let tap = 0; tap < 2; tap++) {
+            for (let tap = 0; tap < 3; tap++) {
+                const selected = tap !== 1;
                 await page.send('Input.dispatchMouseEvent', {type: 'mousePressed', ...point, button: 'left', clickCount: 1});
                 await page.send('Input.dispatchMouseEvent', {type: 'mouseReleased', ...point, button: 'left', clickCount: 1});
-                await page.wait(`document.querySelector('#tool-tab-${tool}').getAttribute('aria-selected') === 'true'`, 'same point retains the selected tool');
+                await page.wait(`document.querySelector('#tool-tab-${tool}').getAttribute('aria-selected') === '${selected}'`, 'same point toggles the selected tool');
+                assert.equal(await page.evaluate(`document.querySelector('.tool-panels').hidden`), !selected);
+                assert.equal(await page.evaluate(`Boolean(document.querySelector('.tool-close'))`), selected);
             }
             assert.equal(await page.evaluate(`document.querySelectorAll('.tool-bar [aria-selected=true]').length`), 1);
             assert.equal(await page.evaluate(`document.querySelectorAll('.tool-panels [role=tabpanel]:not([hidden])').length`), 1);
@@ -59,12 +63,34 @@ try {
         await click('#tool-tab-personal');
         await click('#tool-tab-commands');
         assert.equal(await page.evaluate(`document.querySelector('#command').value`), 'pass', 'Switching tabs preserves drafts');
+        await click('#tool-tab-commands');
+        await click('#tool-tab-commands');
+        assert.equal(await page.evaluate(`document.querySelector('#command').value`), 'pass', 'Closing and reopening a tab preserves drafts');
+        if (mobile) await page.evaluate(`document.querySelector('.tool-bar').scrollIntoView({block:'start'})`);
+        assert.equal(await page.evaluate(`(() => {
+            const close = document.querySelector('.tool-close').getBoundingClientRect();
+            const panels = document.querySelector('.tool-panels').getBoundingClientRect();
+            const content = document.querySelector('.tool-panel-content').getBoundingClientRect();
+            return close.left === panels.left && close.top === panels.top && close.bottom <= content.top &&
+                close.width >= 44 && close.height >= 44 && close.bottom <= innerHeight;
+        })()`), true, 'Close stays in the upper-left corner above scrolling content with a reachable touch target');
+        await page.evaluate(`document.querySelector('.tool-panel-content').scrollTop = 10000`);
         await capture(`tools-tabs-${width}`);
+        const closePoint = await page.evaluate(`(() => {
+            const button = document.querySelector('.tool-close');
+            const bounds = button.getBoundingClientRect();
+            const x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2;
+            return {reachable: button.contains(document.elementFromPoint(x, y)),
+                bounds: bounds.toJSON(), hit: document.elementFromPoint(x, y)?.outerHTML};
+        })()`);
+        assert.equal(closePoint.reachable, true, 'Close remains reachable after scrolling long content: ' + JSON.stringify(closePoint));
         await page.evaluate(`document.querySelector('#tool-tab-personal').focus(); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));`);
         assert.equal(await page.evaluate('document.activeElement.id'), 'tool-tab-configuration', 'Tool tabs support roving keyboard focus');
         await click('.tool-close');
         assert.equal(await page.evaluate('document.activeElement.id'), 'tool-tab-configuration', 'Closing tools restores focus');
         assert.equal(await page.evaluate(`document.querySelector('.tool-panels').hidden`), true);
+        assert.equal(await page.evaluate(`document.querySelector('.tool-close')`), null, 'Closing removes the close button');
+        assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Closing tools preserves the live decision draft');
     }
     await visit('about:blank');
     const opportunity = await continueGame(state => state.prompt?.messageId === 'prompt.buy-card' &&

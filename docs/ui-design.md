@@ -51,7 +51,8 @@ Paths are relative to [web/src](../web/src/).
   return without changing drafts. Keep draw-pile size separate and forecasts distinct from payouts.
 - Keep grouped action buttons equally tall when labels wrap; place help beside the button with a
   separate hit target outside its border.
-- Table tools use a stable tab row with a separate Close action; reselecting a tab keeps it open.
+- Table tools use a stable tab row; reselecting the active tab closes it. Open panels also show a
+  Close action in the upper left, above the scrolling content; closed panels show no Close action.
   Content scrolls above the row on desktop and below it in the phone Players workspace. Personal
   card-buy permission applies only to a live, owned, legal Urban Ascendancy purchase.
 - Support keyboard/touch, visible focus, reduced motion and phone widths. Name finite-choice questions;
