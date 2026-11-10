@@ -366,6 +366,13 @@ model. Both files are hashed, archived and included in checkpoint identity. Omis
 legacy behavior and identity. Token continuation collection rejects this option until it supports
 the same controller; it must not silently collect under a different purchase policy.
 
+Direct arenas may also supply `candidatePolicy` and `incumbentPolicy` inside `frozenPurchase`.
+Each optional path replaces the actor only for the evaluated seat on that side; all rival seats
+retain `policy`, and every seat retains the same purchase `baseline`. Omitted roles use `policy`.
+Explicit roles have separate hashes and immutable snapshots, and canonical replay uses the same
+side-specific actor. This permits comparing learned purchase actors with identical ordinary models.
+Weight-only strategy search rejects these overrides because its cache identifies ordinary models.
+
 For direct compact token-head search, copy the frozen baseline and set every reserved
 `planning.tokenValue.*` coefficient to zero except `planning.tokenValue.enabled = 1`. Search only
 named existing [token feature definitions](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenValue.kt),
@@ -451,6 +458,12 @@ Optional `opponentPurchasePolicy` supplies one frozen purchase actor for every o
 keeps its corresponding `opponents` model for its prior recommendation and all other decisions.
 Only the controlled seat produces training records. An absent or null opponent actor preserves the
 original collection format; a present actor adds its own fingerprint and immutable snapshot.
+
+Optional `sharedPurchaseBaseline` supplies a separate prior model for every purchase controller,
+including rivals. Ordinary decisions still use `baseline` and the respective `opponents` models.
+This permits continuing a qualified purchase actor after improving ordinary strategy without changing
+its recommendation input. A supplied prior must be a model path; its hash, immutable snapshot and
+collection identity bind the training rows. Omission preserves the original per-seat prior behavior.
 
 ```sh
 python3 scripts/train-opponents.py --mode purchase-collect --source purchase-collection.json --output .aor-training/purchase-data --workers 6 --hours 2

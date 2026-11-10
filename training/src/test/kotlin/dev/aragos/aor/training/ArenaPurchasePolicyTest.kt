@@ -5,11 +5,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.AdvanceId
-import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModels
 import dev.aragos.aor.ai.BotPolicy
-import dev.aragos.aor.ai.PurchaseObservationEncoder
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -17,7 +15,7 @@ import kotlin.test.assertFailsWith
 class ArenaPurchasePolicyTest {
     @Test
     fun absentPurchaseEnvironmentPreservesTheLegacyIdentity() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val source = PurchaseJson.read(fixture.source) as ObjectNode
             source.remove("frozenPurchase")
             fixture.artifacts.write("arena.json", source)
@@ -43,7 +41,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun policyFileBytesBindTheArenaAndInheritedSearchIdentity() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val before = fixture.specification
             val path = fixture.directory.resolve("policy.json")
             Files.writeString(path, Files.readString(path) + "\n")
@@ -58,7 +56,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun purchasePriorBytesBindTheArenaIdentityIndependentlyOfCandidateWeights() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val before = fixture.specification
             val path = fixture.directory.resolve("baseline.json")
             Files.writeString(path, Files.readString(path) + "\n")
@@ -72,7 +70,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun purchaseEnvironmentRejectsUnsupportedConfigurations() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val specification = fixture.specification
 
             val failure =
@@ -86,7 +84,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun purchaseEnvironmentRejectsAChangedDictionary() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val policy = PurchaseJson.read(fixture.directory.resolve("policy.json")) as ObjectNode
             (policy["stateFeatureNames"] as ArrayNode).set(
                 0,
@@ -102,7 +100,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun snapshotsRestoreMissingEvidenceAndRecordExactFileHashes() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val frozen = fixture.frozen
             val output = TrainingArtifacts(fixture.directory.resolve("output"))
             frozen.snapshot(output)
@@ -123,7 +121,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun changedSnapshotCannotOverwriteExistingEvidence() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val output = TrainingArtifacts(fixture.directory.resolve("output"))
             val path = output.directory.resolve("frozen-purchase-policy.json")
             Files.writeString(path, "different evidence")
@@ -163,7 +161,7 @@ class ArenaPurchasePolicyTest {
 
     @Test
     fun tokenCollectionRejectsAnUnsupportedFrozenPurchaseEnvironment() {
-        Fixture().use { fixture ->
+        ArenaPurchaseFixture().use { fixture ->
             val failure =
                 assertFailsWith<IllegalArgumentException> {
                     TokenValueSpecification.read(fixture.source)
@@ -172,74 +170,6 @@ class ArenaPurchasePolicyTest {
             assertThat(failure)
                 .hasMessageThat()
                 .contains("does not support an arena frozenPurchase")
-        }
-    }
-
-    private class Fixture : AutoCloseable {
-        val directory = Files.createTempDirectory("aor-arena-purchase-")
-        val artifacts = TrainingArtifacts(directory)
-        val source = directory.resolve("arena.json")
-        val configuration =
-            TrainingMatrix.configurations.single {
-                it.id == "players-4/standard/no-crusades/deck-true/art-true"
-            }
-
-        init {
-            artifacts.model(BotModels.default, "baseline.json")
-            val dictionary =
-                PurchaseObservationEncoder.dictionary(
-                    PublicCatalog.forPlayers(configuration.playerCount, configuration.rules)
-                )
-            artifacts.write(
-                "policy.json",
-                mapOf(
-                    "schemaVersion" to 1,
-                    "encoderVersion" to PurchaseObservationEncoder.ENCODER_VERSION,
-                    "hiddenSize" to 64,
-                    "baselineProbability" to .97,
-                    "stateFeatureNames" to dictionary.stateFeatureNames,
-                    "actionFeatureNames" to dictionary.actionFeatureNames,
-                    "stateWeights" to List(64 * dictionary.stateFeatureNames.size) { 0.0 },
-                    "stateBias" to List(64) { 0.0 },
-                    "actionWeights" to List(64 * dictionary.actionFeatureNames.size) { 0.0 },
-                    "actionBias" to List(64) { 0.0 },
-                    "actorWeights" to List(64) { 0.0 },
-                    "valueWeights" to List(64) { 0.0 },
-                    "valueBias" to 0.0,
-                ),
-            )
-            artifacts.write(
-                "arena.json",
-                mapOf(
-                    "schemaVersion" to 1,
-                    "purpose" to "SCREENING",
-                    "configurations" to listOf(configuration.id),
-                    "candidate" to null,
-                    "incumbent" to null,
-                    "opponents" to listOf(null),
-                    "pairsPerConfiguration" to 1,
-                    "seed" to 71,
-                    "frozenPurchase" to
-                        mapOf("baseline" to "baseline.json", "policy" to "policy.json"),
-                ),
-            )
-        }
-
-        val specification: ArenaSpecification
-            get() = ArenaSpecification.read(source)
-
-        val frozen: ArenaPurchasePolicy
-            get() =
-                requireNotNull(specification.frozenPurchase) { "The fixture requires its actor." }
-
-        fun search(arena: ArenaSpecification): StrategySearchSpecification =
-            StrategySearchSpecification(
-                arena,
-                listOf(StrategySearchParameter("planning.navigationReplacement", -1.0, 1.0)),
-            )
-
-        override fun close() {
-            directory.toFile().deleteRecursively()
         }
     }
 
@@ -255,7 +185,7 @@ class ArenaPurchasePolicyTest {
 
     companion object {
         private val games by lazy {
-            Fixture().use { fixture ->
+            ArenaPurchaseFixture().use { fixture ->
                 val specification = fixture.specification
                 val mutated =
                     BotModels.default.copy(
