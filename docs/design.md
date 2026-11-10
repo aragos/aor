@@ -151,7 +151,11 @@ training configuration identifiers. Missing observation setup cannot activate a 
 Legacy assets and observations omitting `drawThreeKeepTwo` mean false; enabling it cannot activate
 an existing scoped model qualified without that option.
 Bot observations retain the game's recorded rules version, including supported rules-4 saves.
-Rules-4 model qualification does not transfer to new rules-5 games; those use compatible fallbacks.
+Rules-4 model qualification does not transfer to new rules-5 games. The purchase asset uses an
+ordered schema-1 `models` bundle with explicitly qualified entries for each rules version; legacy
+single-asset files remain supported. Each entry retains its frozen prior and ordinary-model binding.
+Current-rules entries carry independent complete-game qualification; missing or incompatible entries
+use the ordinary fallback.
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 

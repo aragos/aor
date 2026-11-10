@@ -65,14 +65,14 @@ class PurchasePolicyScopeTest {
     }
 
     @Test
-    fun theNewRulesVersionRemainsOutsideTheQualifiedActorScope() {
+    fun independentlyQualifiedCurrentRulesSupportPurchaseProjection() {
         val supported =
             PurchasePolicyScope.supports(
                 observation().copy(rulesVersion = RULES_VERSION),
                 BotDifficulty.HARD,
             )
 
-        assertThat(supported).isFalse()
+        assertThat(supported).isTrue()
     }
 
     @Test

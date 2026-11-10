@@ -8,6 +8,55 @@ import kotlin.test.assertFailsWith
 
 class PurchaseBotExportsTest {
     @Test
+    fun currentRulesSelectTheirIndependentlyQualifiedBundleEntry() {
+        val current = asset().replace("three-epoch-4", "three-epoch-5")
+        val bundle = """{"schemaVersion":1,"models":[${hybridAsset()},$current]}"""
+        val selector = PurchaseBotSelector(baseline(), bundle)
+
+        val command =
+            selector.choose(
+                observation().replace("three-epoch-4", "three-epoch-5"),
+                projection(),
+                "HARD",
+                0x6a09e667,
+            )
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun legacyGamesKeepTheirOriginalPurchaseEntryInAMixedVersionBundle() {
+        val current = hybridAsset().replace("three-epoch-4", "three-epoch-5")
+        val bundle = """{"schemaVersion":1,"models":[$current,${asset()}]}"""
+        val selector = PurchaseBotSelector(baseline(), bundle)
+
+        val command = selector.choose(observation(), projection(), "HARD", 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun invalidPurchaseBundleEntriesDoNotDisableAValidFollowingEntry() {
+        val bundle = """{"schemaVersion":1,"models":[null,{},${asset()}]}"""
+        val selector = PurchaseBotSelector(baseline(), bundle)
+
+        val command = selector.choose(observation(), projection(), "HARD", 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun currentOnlyPurchaseBundlesCannotChangeLegacyGames() {
+        val current = asset().replace("three-epoch-4", "three-epoch-5")
+        val selector =
+            PurchaseBotSelector(baseline(), """{"schemaVersion":1,"models":[$current]}""")
+
+        val command = selector.choose(observation(), projection(), "HARD", 0x6a09e667)
+
+        assertEquals("pass", command)
+    }
+
+    @Test
     fun activeActorSamplesTheCollectorSeedStreamInsteadOfTakingTheLargestProbability() {
         val selector = PurchaseBotSelector(baseline(), asset())
 

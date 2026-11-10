@@ -74,10 +74,11 @@ test('the actual shipped asset retains the prior outside the current qualified p
 test('every shipped current-catalog model explicitly limits itself to the qualified setup', () => {
     const current = (shipped.models ?? [shipped]).filter(model => model.dataVersion === 'ah1996-catalog-16');
 
-    assert.equal(current.length, 1);
+    assert.deepEqual(current.map(model => model.rulesVersion),
+        ['ah1996-three-epoch-5', 'ah1996-three-epoch-4']);
     for (const model of current) {
-        assert.deepEqual(model.configuration, configuration);
-        assert.equal(model.rulesVersion, 'ah1996-three-epoch-4');
+        assert.deepEqual({drawThreeKeepTwo: false, ...model.configuration},
+            {drawThreeKeepTwo: false, ...configuration});
     }
 });
 
