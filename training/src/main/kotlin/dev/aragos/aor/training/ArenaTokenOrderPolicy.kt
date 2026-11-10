@@ -33,9 +33,24 @@ internal data class ArenaTokenRole(
     }
 }
 
-/** Explicit evaluated-seat token roles; every rival retains its ordinary token policy. */
-class ArenaTokenOrderPolicy private constructor(private val roles: Map<ArenaSide, ArenaTokenRole>) {
-    internal fun validate(configurations: List<TrainingConfiguration>) {
+/** Fixed rival controls are indexed by the source opponent model, never by its rotating seat. */
+internal enum class ArenaTokenOpponentSelector {
+    ORDINARY,
+    FIXED_16_TO_15,
+    /** Subtract two from the actual ordinary bid only when that exact command is offered. */
+    ORDINARY_MINUS_TWO,
+}
+
+/** Explicit evaluated-seat roles and an optional policy for each ordinary opponent model. */
+class ArenaTokenOrderPolicy
+private constructor(
+    private val roles: Map<ArenaSide, ArenaTokenRole>,
+    private val opponentSelectors: List<ArenaTokenOpponentSelector>?,
+) {
+    internal fun validate(configurations: List<TrainingConfiguration>, opponentCount: Int) {
+        require(opponentSelectors == null || opponentSelectors.size == opponentCount) {
+            "Token opponent selectors must contain exactly one entry per ordinary opponent model."
+        }
         val models = roles.values.mapNotNull { it.input?.model }
         if (models.isEmpty()) return
         require(
@@ -59,15 +74,58 @@ class ArenaTokenOrderPolicy private constructor(private val roles: Map<ArenaSide
     internal fun identity(): String {
         val legacy = roles.values.all { it.selector == ArenaTokenSelector.MODEL }
         val prefix = "${TokenOrderPolicy.SELECTOR_VERSION}:${TokenOrderPolicy.PROPOSAL_VERSION}:"
-        return if (legacy) {
-            prefix +
-                roles.entries.joinToString(":") { (side, role) -> "$side=${role.input?.sha256}" }
-        } else {
-            "token-order-arena-selectors-1:$prefix" +
-                roles.entries.joinToString(":") { (side, role) ->
-                    "$side=${role.selector}:${role.input?.sha256 ?: "none"}"
-                }
+        val evaluated =
+            if (legacy) {
+                prefix +
+                    roles.entries.joinToString(":") { (side, role) ->
+                        "$side=${role.input?.sha256}"
+                    }
+            } else {
+                "token-order-arena-selectors-1:$prefix" +
+                    roles.entries.joinToString(":") { (side, role) ->
+                        "$side=${role.selector}:${role.input?.sha256 ?: "none"}"
+                    }
+            }
+        return evaluated +
+            (opponentSelectors?.joinToString(
+                prefix = ":opponent-selectors-1:",
+                separator = ",",
+            ) {
+                it.name
+            } ?: "")
+    }
+
+    internal fun opponentControllers(
+        playerCount: Int,
+        controlledSeat: Int,
+        opponentIndices: List<Int>?,
+        opponents: List<BotModel>,
+    ): Map<Int, SimulationController> {
+        val selectors = opponentSelectors ?: return emptyMap()
+        val indices =
+            requireNotNull(opponentIndices) {
+                "Token opponent selectors require the arena's explicit opponent-index lineup."
+            }
+        require(indices.size == playerCount && indices.all { it in opponents.indices }) {
+            "A token opponent lineup must map every registered seat to an ordinary opponent model."
         }
+        return indices
+            .mapIndexedNotNull { seat, index ->
+                if (seat == controlledSeat) return@mapIndexedNotNull null
+                val controller =
+                    when (selectors[index]) {
+                        ArenaTokenOpponentSelector.ORDINARY -> null
+                        ArenaTokenOpponentSelector.FIXED_16_TO_15 ->
+                            TokenOrderController(
+                                opponents[index],
+                                ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_15, null),
+                            )
+                        ArenaTokenOpponentSelector.ORDINARY_MINUS_TWO ->
+                            TokenMinusTwoController(opponents[index])
+                    }
+                controller?.let { seat to it }
+            }
+            .toMap()
     }
 
     internal fun controller(side: ArenaSide?, baseline: BotModel): SimulationController? {
@@ -81,6 +139,9 @@ class ArenaTokenOrderPolicy private constructor(private val roles: Map<ArenaSide
         mapOf(
             "tokenOrder" to
                 buildMap {
+                    opponentSelectors?.let {
+                        put("opponentSelectors", it.map { selector -> selector.name })
+                    }
                     roles.forEach { (side, role) ->
                         role.input?.let { input ->
                             put(
@@ -119,16 +180,31 @@ class ArenaTokenOrderPolicy private constructor(private val roles: Map<ArenaSide
             PurchaseJson.fields(
                 node,
                 emptySet(),
-                ArenaSide.entries.flatMap { listOf(modelField(it), selectorField(it)) }.toSet(),
+                ArenaSide.entries.flatMap { listOf(modelField(it), selectorField(it)) }.toSet() +
+                    "opponentSelectors",
             )
             val roles =
                 ArenaSide.entries
                     .mapNotNull { side -> readRole(source, node, side)?.let { side to it } }
                     .toMap()
-            require(roles.isNotEmpty()) {
+            val opponents =
+                node["opponentSelectors"]?.let { values ->
+                    require(values.isArray && !values.isEmpty) {
+                        "Token opponent selectors must be a nonempty array."
+                    }
+                    values.map { value ->
+                        val name = PurchaseJson.text(value, "opponent selector")
+                        requireNotNull(
+                            ArenaTokenOpponentSelector.entries.singleOrNull { it.name == name }
+                        ) {
+                            "Token opponent selector must be ORDINARY, FIXED_16_TO_15 or ORDINARY_MINUS_TWO."
+                        }
+                    }
+                }
+            require(roles.isNotEmpty() || opponents != null) {
                 "A token-order arena overlay requires at least one explicit selector or model role."
             }
-            return ArenaTokenOrderPolicy(roles)
+            return ArenaTokenOrderPolicy(roles, opponents)
         }
 
         private fun readRole(source: Path, node: JsonNode, side: ArenaSide): ArenaTokenRole? {
@@ -190,5 +266,19 @@ internal class TokenOrderController(
         val amount = selected.substringAfter("buy-tokens ").toLong()
         val baselineAmount = ordinary.substringAfter("buy-tokens ").toLong()
         return if (amount - baselineAmount in listOf(-1L, 1L)) selected else ordinary
+    }
+}
+
+/** Diagnostic rival only; uses its own ordinary head and never clips to an unoffered amount. */
+private class TokenMinusTwoController(private val baseline: BotModel) : SimulationController {
+    override fun controls(decision: String): Boolean = decision == "buy-tokens"
+
+    override fun choose(decision: SimulationDecision): String {
+        val ordinary =
+            BotPolicy.choose(decision.observation, BotDifficulty.HARD, decision.seed, baseline)
+        val amount = ordinary.substringAfter("buy-tokens ").toLong() - 2L
+        val alternative = "buy-tokens $amount"
+        return if (decision.observation.candidates.any { it.command == alternative }) alternative
+        else ordinary
     }
 }

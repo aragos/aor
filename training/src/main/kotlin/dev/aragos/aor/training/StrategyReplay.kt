@@ -210,6 +210,7 @@ object StrategyReplays {
                             lineup.seat,
                             side.arenaSide,
                             side.model(specification),
+                            opponentIndices,
                         ),
                 )
         val terminal = ArenaGame.from(game)

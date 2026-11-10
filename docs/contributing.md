@@ -958,6 +958,15 @@ into experiment identity and metadata; model roles retain immutable snapshots. T
 decisions record `ordinaryTokenBaseline`, including the ordinary policy's token heads, separately
 from immediate linear scores. These controls do not change collection, fitting or browser play.
 
+An optional `tokenOrder.opponentSelectors` array assigns one role per entry of the ordinary
+`opponents` pool, in that exact model-index order. Arena and replay map those indices through each
+rotated lineup, excluding the evaluated seat. Entries are `ORDINARY`, `FIXED_16_TO_15`, or the
+rival-only diagnostic `ORDINARY_MINUS_TWO` (actual ordinary token-head choice minus two, only if
+that exact amount is offered). Every rival keeps its own ordinary baseline and the shared Purchase
+actor/prior. Explicit arrays bind identity and metadata; omission preserves existing roles and
+identity. Search and root collection reject these arena-only roles.
+
+
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
 token-purchase decisions. Start from a frozen arena specification and add `trainingRoots`,
 `validationRoots`, `continuationReplicates` and `regularization`. The

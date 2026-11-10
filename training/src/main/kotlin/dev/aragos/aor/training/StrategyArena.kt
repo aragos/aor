@@ -56,7 +56,7 @@ data class ArenaSpecification(
         }
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
         frozenPurchase?.validate(configurations)
-        tokenOrder?.validate(configurations)
+        tokenOrder?.validate(configurations, opponents.size)
     }
 
     fun identity(): String =
@@ -78,26 +78,34 @@ data class ArenaSpecification(
                 ))
             .joinToString("\n")
 
-    /** Phase-disjoint overlays retain their own priors and never replace a rival's token policy. */
+    /**
+     * Phase-disjoint overlays retain each seat's actual ordinary token baseline and Purchase prior.
+     */
     internal fun controllers(
         playerCount: Int,
         controlledSeat: Int,
         side: ArenaSide?,
         ordinary: BotModel,
+        opponentIndices: List<Int>? = null,
     ): Map<Int, SimulationController> {
         val purchase = frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
-        val token = tokenOrder?.controller(side, ordinary) ?: return purchase
-        val previous = purchase[controlledSeat]
-        val combined =
-            object : SimulationController {
-                override fun controls(decision: String): Boolean =
-                    token.controls(decision) || previous?.controls(decision) == true
+        val policy = tokenOrder ?: return purchase
+        val evaluated = policy.controller(side, ordinary)
+        val tokens =
+            policy.opponentControllers(playerCount, controlledSeat, opponentIndices, opponents) +
+                listOfNotNull(evaluated?.let { controlledSeat to it }).toMap()
+        return purchase +
+            tokens.mapValues { (seat, token) ->
+                val previous = purchase[seat]
+                object : SimulationController {
+                    override fun controls(decision: String): Boolean =
+                        token.controls(decision) || previous?.controls(decision) == true
 
-                override fun choose(decision: SimulationDecision): String? =
-                    if (token.controls(decision.observation.decision)) token.choose(decision)
-                    else previous?.choose(decision)
+                    override fun choose(decision: SimulationDecision): String? =
+                        if (token.controls(decision.observation.decision)) token.choose(decision)
+                        else previous?.choose(decision)
+                }
             }
-        return purchase + (controlledSeat to combined)
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
@@ -356,6 +364,7 @@ object StrategyArena {
                             lineup.seat,
                             side,
                             model,
+                            lineup.opponentIndices,
                         ),
                 )
         )
