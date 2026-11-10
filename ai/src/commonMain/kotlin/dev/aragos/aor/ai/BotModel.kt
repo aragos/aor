@@ -4,6 +4,7 @@ import dev.aragos.aor.CardChoice
 import dev.aragos.aor.CardCommand
 import dev.aragos.aor.CatalogVersion
 import dev.aragos.aor.InitialCardRule
+import dev.aragos.aor.LEGACY_RULES_VERSION
 import dev.aragos.aor.MapRule
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.RULES_VERSION
@@ -20,8 +21,9 @@ enum class BotDifficulty {
 
 /**
  * Exact public setup on which a downloaded model is qualified. JSON uses enum names for [map] and
- * [initialCard], and booleans for the two switches. Rules/catalog versions remain separate model
- * compatibility checks. Missing configuration metadata cannot qualify a scoped model.
+ * [initialCard], and booleans for rule switches. Missing [drawThreeKeepTwo] in legacy JSON means
+ * false. Rules/catalog versions remain separate model compatibility checks. Missing configuration
+ * metadata cannot qualify a scoped model.
  */
 data class BotConfiguration(
     val playerCount: Int,
@@ -29,6 +31,7 @@ data class BotConfiguration(
     val initialCard: InitialCardRule,
     val deckModification: Boolean,
     val immediateMasterArtDiscard: Boolean,
+    val drawThreeKeepTwo: Boolean = false,
 ) {
     init {
         require(playerCount in 3..6) { "A bot configuration requires three through six players." }
@@ -92,7 +95,9 @@ data class BotObservation(
             "Advance planning facts must belong to offered advance candidates."
         }
         requireReserveShortfallBasis(reserveShortfallBasis)
-        require(rulesVersion == RULES_VERSION) { "Unsupported bot rules version: $rulesVersion." }
+        require(rulesVersion in setOf(RULES_VERSION, LEGACY_RULES_VERSION)) {
+            "Unsupported bot rules version: $rulesVersion."
+        }
         require(
             leaderPlanning == null ||
                 decision == "play-cards" &&

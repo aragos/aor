@@ -1,6 +1,7 @@
 package dev.aragos.aor.ai
 
 import dev.aragos.aor.DATA_VERSION
+import dev.aragos.aor.LEGACY_RULES_VERSION
 import dev.aragos.aor.RULES_VERSION
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,6 +82,89 @@ class BotExportsTest {
         val selected = chooseBotMove(configuredObservation(), scopedModel(), "normal", 0)
 
         assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun aLegacyGameRetainsItsMatchingLegacyModel() {
+        val input = configuredObservation().replace(RULES_VERSION, LEGACY_RULES_VERSION)
+        val model = scopedModel().replace(RULES_VERSION, LEGACY_RULES_VERSION)
+
+        val selected = chooseBotMove(input, model, "normal", 0)
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun aCurrentRulesGameCannotActivateALegacyQualifiedModel() {
+        val model = scopedModel().replace(RULES_VERSION, LEGACY_RULES_VERSION)
+
+        val selected = chooseBotMove(configuredObservation(), model, "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun aLegacyModelAcceptsAnExplicitlyDisabledOpeningSelectionVariant() {
+        val input = configuredObservation(openingConfiguration("false"))
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun anExplicitlyDisabledOpeningSelectionScopeAcceptsLegacyObservations() {
+        val model = scopedModel(openingConfiguration("false"))
+
+        val selected = chooseBotMove(configuredObservation(), model, "normal", 0)
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun theOpeningSelectionVariantCannotActivateALegacyScopedModel() {
+        val input = configuredObservation(openingConfiguration("true"))
+
+        val selected = chooseBotMove(input, scopedModel(), "normal", 0)
+
+        assertEquals("cash-choice", selected)
+    }
+
+    @Test
+    fun anExplicitlyQualifiedOpeningSelectionModelMatchesThatVariant() {
+        val configuration = openingConfiguration("true")
+
+        val selected =
+            chooseBotMove(
+                configuredObservation(configuration),
+                scopedModel(configuration),
+                "normal",
+                0,
+            )
+
+        assertEquals("points-choice", selected)
+    }
+
+    @Test
+    fun malformedOpeningSelectionScopesCannotActivateAModel() {
+        val selections =
+            listOf("null", "1", "\"false\"").map { invalid ->
+                chooseBotMove(
+                    configuredObservation(),
+                    scopedModel(openingConfiguration(invalid)),
+                    "normal",
+                    0,
+                )
+            }
+
+        assertEquals(listOf("cash-choice", "cash-choice", "cash-choice"), selections)
+    }
+
+    @Test
+    fun malformedObservedOpeningSelectionRulesAreRejected() {
+        assertFailsWith<IllegalArgumentException> {
+            chooseBotMove(configuredObservation(openingConfiguration("\"true\"")), "", "normal", 0)
+        }
     }
 
     @Test
@@ -214,6 +298,9 @@ class BotExportsTest {
 
     private fun configuration(): String =
         """{"playerCount":4,"map":"STANDARD","initialCard":"NO_CRUSADES","deckModification":true,"immediateMasterArtDiscard":true}"""
+
+    private fun openingConfiguration(value: String): String =
+        configuration().dropLast(1) + ",\"drawThreeKeepTwo\":$value}"
 
     private fun configuredObservation(configuration: String = configuration()): String =
         observation().replace("\"context\":{}", "\"context\":{},\"configuration\":$configuration")

@@ -134,8 +134,8 @@ is independent of production storage and promotes only compatible, evaluated mod
 ### Offline policy selection and experiments
 
 Offline [training](../training/src/main/kotlin/dev/aragos/aor/training/) runs as a standalone executable,
-with no production storage or model service. Its matrix covers the complete player-count/variant
-product. Compact model assets are versioned by schema/rules/catalog. The
+with no production storage or model service. Its historical 128-configuration matrix keeps
+draw-three-keep-two disabled. Compact model assets are versioned by schema/rules/catalog. The
 [model loader](../ai/src/jsMain/kotlin/dev/aragos/aor/ai/BotExports.kt) accepts legacy single-model
 assets and a schema-1 bundle with an ordered `models` array of up to sixteen entries. It selects the
 first valid compatible entry; malformed entries are skipped, and no match uses the rule-based prior.
@@ -143,10 +143,15 @@ Place a specialized entry before any broader matching fallback and retain legacy
 existing games.
 
 A scoped entry must declare both exact `rulesVersion` and `dataVersion`, plus a `configuration`
-matching the observation's player count, map, initial-card rule, deck modification and immediate
-Master Art discard. [BotConfiguration](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotModel.kt)
+matching the observation's player count, map, initial-card rule, deck modification, immediate
+Master Art discard and draw-three-keep-two option.
+[BotConfiguration](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotModel.kt)
 owns this public setup contract: JSON uses enum names such as `STANDARD` and `NO_CRUSADES`, not
 training configuration identifiers. Missing observation setup cannot activate a scoped entry.
+Legacy assets and observations omitting `drawThreeKeepTwo` mean false; enabling it cannot activate
+an existing scoped model qualified without that option.
+Bot observations retain the game's recorded rules version, including supported rules-4 saves.
+Rules-4 model qualification does not transfer to new rules-5 games; those use compatible fallbacks.
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 

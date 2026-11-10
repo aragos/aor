@@ -61,90 +61,131 @@ class BotAutomationTest(private val postgres: Boolean) {
 
     @Test
     fun qualifiedHardPurchaseWorkContainsCompleteOrdinaryActorFactsWithoutABaseline() =
-        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
-            fixture ->
-            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
-            val state = fixture.service.store.read(fixture.game.gameId).state()
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+                val state = fixture.service.store.read(fixture.game.gameId).state()
 
-            val job = fixture.claim().observations.single()
+                val job = fixture.claim().observations.single()
 
-            val purchase =
-                requireNotNull(job.purchase) { "Qualified HARD work needs purchase facts." }
-            assertThat(job.seat).isEqualTo(PlayerId("p4"))
-            assertThat(purchase)
-                .isEqualTo(
-                    PurchaseObservationEncoder.project(
-                        state.viewForPlayer(job.seat),
-                        job.seat,
-                        job.observation,
+                val purchase =
+                    requireNotNull(job.purchase) { "Qualified HARD work needs purchase facts." }
+                assertThat(job.seat).isEqualTo(PlayerId("p4"))
+                assertThat(purchase)
+                    .isEqualTo(
+                        PurchaseObservationEncoder.project(
+                            state.viewForPlayer(job.seat),
+                            job.seat,
+                            job.observation,
+                        )
                     )
-                )
-            assertThat(purchase.stateFeatures.keys.any { it.startsWith("unplayed.") }).isTrue()
-            assertThat(purchase.actions.map { it.command })
-                .containsExactlyElementsIn(job.observation.candidates.map { it.command }.sorted())
-                .inOrder()
-            val wire = json.readTree(json.writeValueAsString(job))["purchase"]
-            assertThat(wire.fieldNames().asSequence().toSet())
-                .containsExactly("encoderVersion", "stateFeatures", "actions")
-            assertThat(wire["stateFeatures"].all { it.isNumber }).isTrue()
-            assertThat(wire["actions"].all { action -> action["features"].all { it.isNumber } })
-                .isTrue()
-        }
+                assertThat(purchase.stateFeatures.keys.any { it.startsWith("unplayed.") }).isTrue()
+                assertThat(purchase.actions.map { it.command })
+                    .containsExactlyElementsIn(
+                        job.observation.candidates.map { it.command }.sorted()
+                    )
+                    .inOrder()
+                val wire = json.readTree(json.writeValueAsString(job))["purchase"]
+                assertThat(wire.fieldNames().asSequence().toSet())
+                    .containsExactly("encoderVersion", "stateFeatures", "actions")
+                assertThat(wire["stateFeatures"].all { it.isNumber }).isTrue()
+                assertThat(wire["actions"].all { action -> action["features"].all { it.isNumber } })
+                    .isTrue()
+            }
 
     @Test
     fun qualifiedHardShippingWorkContainsItsActualLegalOffers() =
-        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
-            fixture ->
-            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.SHIPPING)
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.preparePurchase(PlayerId("p4"), PurchaseStep.SHIPPING)
 
-            val job = fixture.claim().observations.single()
+                val job = fixture.claim().observations.single()
 
-            assertThat(job.observation.decision).isEqualTo("purchase-shipping")
-            assertThat(job.purchase?.actions?.map { it.command })
-                .containsExactlyElementsIn(job.observation.candidates.map { it.command }.sorted())
-                .inOrder()
-        }
+                assertThat(job.observation.decision).isEqualTo("purchase-shipping")
+                assertThat(job.purchase?.actions?.map { it.command })
+                    .containsExactlyElementsIn(
+                        job.observation.candidates.map { it.command }.sorted()
+                    )
+                    .inOrder()
+            }
 
     @Test
     fun acceptedAdvanceRegeneratesTheNextPurchaseProjection() =
-        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
-            fixture ->
-            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
-            val work = fixture.claim()
-            val before = work.observations.single()
-            val advance = before.observation.candidates.single { it.command == "buy-advance A" }
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+                val work = fixture.claim()
+                val before = work.observations.single()
+                val advance = before.observation.candidates.single { it.command == "buy-advance A" }
 
-            val after =
-                fixture
-                    .submit(work, before, advance.command, UUID.randomUUID().toString())
-                    .observations
-                    .single()
+                val after =
+                    fixture
+                        .submit(work, before, advance.command, UUID.randomUUID().toString())
+                        .observations
+                        .single()
 
-            val state = fixture.service.store.read(fixture.game.gameId).state()
-            val purchase = requireNotNull(after.purchase) { "The next purchase needs fresh facts." }
-            assertThat(after.seat).isEqualTo(before.seat)
-            assertThat(purchase.actions.map { it.command }).doesNotContain(advance.command)
-            assertThat(purchase.stateFeatures["role.0.cash"])
-                .isEqualTo((before.observation.availableCash - advance.cashCost) / 200.0)
-            assertThat(after.purchase)
-                .isEqualTo(
-                    PurchaseObservationEncoder.project(
-                        state.viewForPlayer(after.seat),
-                        after.seat,
-                        after.observation,
+                val state = fixture.service.store.read(fixture.game.gameId).state()
+                val purchase =
+                    requireNotNull(after.purchase) { "The next purchase needs fresh facts." }
+                assertThat(after.seat).isEqualTo(before.seat)
+                assertThat(purchase.actions.map { it.command }).doesNotContain(advance.command)
+                assertThat(purchase.stateFeatures["role.0.cash"])
+                    .isEqualTo((before.observation.availableCash - advance.cashCost) / 200.0)
+                assertThat(after.purchase)
+                    .isEqualTo(
+                        PurchaseObservationEncoder.project(
+                            state.viewForPlayer(after.seat),
+                            after.seat,
+                            after.observation,
+                        )
                     )
-                )
-        }
+            }
 
     @Test
     fun normalPurchaseWorkDoesNotRequestNeuralInputs() =
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.preparePurchase(PlayerId("p3"), PurchaseStep.ADVANCES)
+
+                val job = fixture.claim().observations.single()
+
+                assertThat(job.difficulty).isEqualTo(BotDifficulty.NORMAL)
+                assertThat(job.purchase).isNull()
+            }
+
+    @Test
+    fun currentRulesGamesDoNotRequestLegacyQualifiedPurchaseInputs() =
         AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
             fixture ->
-            fixture.preparePurchase(PlayerId("p3"), PurchaseStep.ADVANCES)
+            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
 
             val job = fixture.claim().observations.single()
 
-            assertThat(job.difficulty).isEqualTo(BotDifficulty.NORMAL)
+            assertThat(job.observation.rulesVersion).isEqualTo(RULES_VERSION)
             assertThat(job.purchase).isNull()
         }
 
@@ -161,25 +202,31 @@ class BotAutomationTest(private val postgres: Boolean) {
 
     @Test
     fun anotherHumanCannotReadThePurchaseWorkPayload() =
-        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
-            fixture ->
-            fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
-            val work = fixture.claim()
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
+                val work = fixture.claim()
 
-            val failure =
-                assertFailsWith<ServiceFailure> {
-                    BotAutomation.read(
-                        fixture.service,
-                        fixture.game.gameId,
-                        fixture.access(1),
-                        fixture.runnerId,
-                        work.epoch,
-                        now = 1100,
-                    )
-                }
+                val failure =
+                    assertFailsWith<ServiceFailure> {
+                        BotAutomation.read(
+                            fixture.service,
+                            fixture.game.gameId,
+                            fixture.access(1),
+                            fixture.runnerId,
+                            work.epoch,
+                            now = 1100,
+                        )
+                    }
 
-            assertThat(failure.code).isEqualTo("BOT_CONTROL_FORBIDDEN")
-        }
+                assertThat(failure.code).isEqualTo("BOT_CONTROL_FORBIDDEN")
+            }
 
     @Test
     fun oneLeaseOwnsTheBotsAndExpiredOwnersAreFenced() =
@@ -652,23 +699,46 @@ private class AutomationFixture(
     bots: Int = 2,
     policy: UndoPolicy = UndoPolicy.LINEAR_GAME,
     rules: RuleOptions = RuleOptions(),
+    rulesVersion: String = RULES_VERSION,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-bot-test-")
     private val database = if (postgres) PostgresFixture() else null
     val service = database?.service() ?: createGameService(directory, FixedRandom())
     val game =
-        service.create(
-            names = List(humans) { "Human ${it + 1}" },
-            bots =
-                List(bots) { index ->
-                    AutomatedPlayerRequest(
-                        "Automated ${index + 1}",
-                        if (index == 0) BotDifficulty.NORMAL else BotDifficulty.HARD,
+        service
+            .create(
+                names = List(humans) { "Human ${it + 1}" },
+                bots =
+                    List(bots) { index ->
+                        AutomatedPlayerRequest(
+                            "Automated ${index + 1}",
+                            if (index == 0) BotDifficulty.NORMAL else BotDifficulty.HARD,
+                        )
+                    },
+                undoPolicy = policy,
+                rules = rules,
+            )
+            .let { created ->
+                if (rulesVersion == RULES_VERSION) {
+                    created
+                } else {
+                    val original = service.store.read(created.gameId)
+                    val legacyId = UUID.randomUUID().toString()
+                    service.store.create(
+                        original.copy(
+                            id = legacyId,
+                            header = original.header.copy(rulesVersion = rulesVersion),
+                        )
                     )
-                },
-            undoPolicy = policy,
-            rules = rules,
-        )
+                    created.copy(
+                        gameId = legacyId,
+                        links =
+                            created.links.map { link ->
+                                link.copy(path = link.path.replace(created.gameId, legacyId))
+                            },
+                    )
+                }
+            }
     val runnerId: String = UUID.randomUUID().toString()
 
     fun access(human: Int = 0): GameAccess =

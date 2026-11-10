@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameState
 import dev.aragos.aor.InitialCardRule
+import dev.aragos.aor.LEGACY_RULES_VERSION
 import dev.aragos.aor.MapRule
 import dev.aragos.aor.Player
 import dev.aragos.aor.PlayerId
@@ -37,6 +38,31 @@ class BotConfigurationTest {
                     immediateMasterArtDiscard = true,
                 )
             )
+    }
+
+    @Test
+    fun openingSelectionVariantRemainsDistinctFromTheLegacyQualifiedSetup() {
+        val state =
+            GameState(
+                GameHeader(players, players.first().id),
+                rules = rules.copy(drawThreeKeepTwo = true),
+            )
+
+        val observation = BotObservations.from(state, players.first().id)
+
+        assertThat(observation.configuration)
+            .isEqualTo(PurchasePolicyScope.configuration.copy(drawThreeKeepTwo = true))
+        assertThat(observation.configuration).isNotEqualTo(PurchasePolicyScope.configuration)
+    }
+
+    @Test
+    fun legacyGamesRetainTheirRecordedRulesVersion() {
+        val header = GameHeader(players, players.first().id, rulesVersion = LEGACY_RULES_VERSION)
+        val state = GameState(header, rules = rules)
+
+        val observation = BotObservations.from(state, players.first().id)
+
+        assertThat(observation.rulesVersion).isEqualTo(LEGACY_RULES_VERSION)
     }
 
     @Test

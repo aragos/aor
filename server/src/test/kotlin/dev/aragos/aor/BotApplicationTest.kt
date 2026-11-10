@@ -59,7 +59,7 @@ class BotApplicationTest {
                     json.readTree(response.bodyAsText())["observations"].first()["observation"]
                 val expected =
                     json.readTree(
-                        """{"playerCount":4,"map":"STANDARD","initialCard":"NO_CRUSADES","deckModification":true,"immediateMasterArtDiscard":true}"""
+                        """{"playerCount":4,"map":"STANDARD","initialCard":"NO_CRUSADES","deckModification":true,"immediateMasterArtDiscard":true,"drawThreeKeepTwo":false}"""
                     )
                 assertThat(response.status).isEqualTo(HttpStatusCode.OK)
                 assertThat(observation["configuration"]).isEqualTo(expected)

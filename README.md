@@ -19,12 +19,12 @@ File storage defaults to `.aor-data/`; use one server per directory. `AOR_DATA_D
 absolute path; `AOR_HTTP_PORT` changes the port. Keep private player links: lost credentials
 cannot be recovered. Hosted play uses Firebase accounts and PostgreSQL.
 
-To try the qualified Hard automata profile, create a local game with one human and three Hard seats,
-the Standard map, No Crusades in the initial deal, deck modification enabled and immediate Master Art
-discard enabled. Keep the creator's game tab open. This profile has passed automated comparisons;
-its strength against human players still needs playtesting. Other setups use compatible fallback
-policies. After updating the application, restart the local server and reload the creator's tab to
-use the current projections and worker.
+The qualified Hard automata profile applies to existing rules-4 local games with four seats, the
+Standard map, No Crusades in the initial deal, deck modification and immediate Master Art discard
+enabled, and draw-three-keep-two disabled. Keep the creator's game tab open. This profile passed
+automated comparisons; its strength against humans still needs playtesting. New rules-5 games and
+other setups use compatible fallback policies pending separate qualification. After updating the
+application, restart the local server and reload the creator's tab.
 
 ## Find the owner
 
