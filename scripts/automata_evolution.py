@@ -177,8 +177,8 @@ def prepare(options):
     require(all(root != path and root not in path.parents and path not in root.parents
                 for path in (source, runtime)), "Prepared output must be separate from both source and runtime.")
     require(not root.exists() or not any(root.iterdir()), "Prepare a new empty evolution directory.")
-    require(type(options.workers) is int and 1 <= options.workers <= 4,
-            "Adaptive campaigns support one through four workers.")
+    require(type(options.workers) is int and 1 <= options.workers <= 32,
+            "Adaptive campaigns support one through thirty-two workers; the native executor enforces the machine limit.")
     maximum = options.maximum_seconds
     require(type(maximum) in (int, float) and math.isfinite(maximum) and 30 <= maximum <= 43200,
             "Campaign allowance must be 30 seconds through twelve hours.")

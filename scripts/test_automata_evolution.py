@@ -236,8 +236,10 @@ class EvolutionTest(unittest.TestCase):
 
     def test_preparation_pins_new_runtime_frozen_actor_and_nonrenewable_stage_caps(self):
         options, original, identity = self.preparation_inputs()
+        options.workers = 6
         campaign = self.prepare(options, original, identity)
         protocol = experiments.read(options.output / "protocol.json")
+        self.assertEqual(6, protocol["workers"])
         self.assertEqual([28800, 7200, 7200], [row["maximumSeconds"] for row in campaign["stages"]])
         self.assertEqual([[], ["evolve"], ["confirm"]], [row["dependsOn"] for row in campaign["stages"]])
         self.assertEqual(["evolve", "confirm", "robustness"], [row["id"] for row in campaign["stages"]])
