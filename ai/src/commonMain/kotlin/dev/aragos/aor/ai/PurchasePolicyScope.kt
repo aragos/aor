@@ -18,6 +18,7 @@ object PurchasePolicyScope {
             initialCard = InitialCardRule.NO_CRUSADES,
             deckModification = true,
             immediateMasterArtDiscard = true,
+            drawThreeKeepTwo = false,
         )
 
     fun supports(observation: BotObservation, difficulty: BotDifficulty): Boolean =

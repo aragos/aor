@@ -204,12 +204,22 @@ internal fun readConfiguration(raw: dynamic): BotConfiguration? {
     require(jsTypeOf(raw.immediateMasterArtDiscard) == "boolean") {
         "Bot immediate Master Art discard must be a boolean."
     }
+    val drawThreeKeepTwo =
+        if (jsTypeOf(raw.drawThreeKeepTwo) == "undefined") {
+            false
+        } else {
+            require(jsTypeOf(raw.drawThreeKeepTwo) == "boolean") {
+                "Bot draw three keep two must be a boolean."
+            }
+            raw.drawThreeKeepTwo as Boolean
+        }
     return BotConfiguration(
         playerCount = playerCount.toInt(),
         map = MapRule.valueOf(raw.map as String),
         initialCard = InitialCardRule.valueOf(raw.initialCard as String),
         deckModification = raw.deckModification as Boolean,
         immediateMasterArtDiscard = raw.immediateMasterArtDiscard as Boolean,
+        drawThreeKeepTwo = drawThreeKeepTwo,
     )
 }
 
