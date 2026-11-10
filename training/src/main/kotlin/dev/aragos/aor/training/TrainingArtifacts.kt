@@ -64,6 +64,30 @@ class TrainingArtifacts(val directory: Path) {
         if (!present) write(name, document)
     }
 
+    /** Freeze external model/source bytes once; a resume never silently replaces its inputs. */
+    internal fun ensureFileSnapshot(source: Path, sha256: String, name: String) {
+        require(name.matches(Regex("[a-zA-Z0-9._-]+"))) {
+            "Training snapshot names must be simple file names."
+        }
+        val destination = directory.resolve(name)
+        if (Files.exists(destination)) {
+            require(PurchaseJson.hash(destination) == sha256) {
+                "Existing training snapshot $name differs from its frozen input."
+            }
+            return
+        }
+        val temporary = Files.createTempFile(directory, ".snapshot-", ".tmp")
+        try {
+            Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING)
+            require(PurchaseJson.hash(temporary) == sha256) {
+                "Training input $name changed while archiving."
+            }
+            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
+    }
+
     private fun modelDocument(model: BotModel): Map<String, Any> =
         mapOf(
             "schemaVersion" to model.schemaVersion,

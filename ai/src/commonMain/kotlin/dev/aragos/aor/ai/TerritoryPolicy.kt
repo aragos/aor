@@ -29,6 +29,7 @@ enum class TerritoryPhase(
 /** Input versions are independent of phase and network architecture. PPO remains on version 1. */
 enum class TerritoryEncoder(val version: String, val phase: TerritoryPhase) {
     TOKEN_1(TerritoryPhase.TOKEN.encoderVersion, TerritoryPhase.TOKEN),
+    TOKEN_2("aor-token-observation-2", TerritoryPhase.TOKEN),
     EXPANSION_1(TerritoryPhase.EXPANSION.encoderVersion, TerritoryPhase.EXPANSION),
     EXPANSION_2("aor-expansion-observation-2", TerritoryPhase.EXPANSION);
 

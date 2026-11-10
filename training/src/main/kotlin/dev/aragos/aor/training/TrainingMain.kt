@@ -11,6 +11,10 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-order-collect") }) {
+        TokenOrderCollectionMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "territory-value-schema") }) {
         TerritoryValueSchema.run(arguments.toList())
         return
@@ -85,6 +89,7 @@ fun main(arguments: Array<String>) {
             --mode arena --source COMPARISON_JSON --output PATH --hours HOURS --workers N
             --mode strategy-search --source SEARCH_JSON --output PATH --hours HOURS --workers N
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
+            --mode token-order-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode joint-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N

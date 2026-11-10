@@ -202,13 +202,12 @@ object StrategyReplays {
                     deadlineNanos = deadlineNanos,
                     trace = recording,
                     controllers =
-                        specification.frozenPurchase
-                            ?.controllers(
-                                lineup.configuration.playerCount,
-                                lineup.seat,
-                                side.arenaSide,
-                            )
-                            .orEmpty(),
+                        specification.controllers(
+                            lineup.configuration.playerCount,
+                            lineup.seat,
+                            side.arenaSide,
+                            side.model(specification),
+                        ),
                 )
         val terminal = ArenaGame.from(game)
         pair?.verifyTerminal(terminal, side)
@@ -386,10 +385,10 @@ object StrategyReplayMain {
                 }
             }
         }
-        specification.frozenPurchase?.snapshot(artifacts)
+        specification.snapshotOverlays(artifacts)
         val identity =
             mapOf("kind" to "strategy-replay", "signature" to signature) +
-                specification.frozenPurchase?.metadata().orEmpty()
+                specification.overlayMetadata()
         if (artifacts.read("replay.json")?.required("replayVerified")?.booleanValue() == true) {
             artifacts.write("state.json", identity + mapOf("phase" to "complete"))
             if (artifacts.read("finished.json") == null) {

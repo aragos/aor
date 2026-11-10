@@ -35,7 +35,7 @@ object TerritoryValueSchema {
         val catalog = PublicCatalog.forPlayers(configuration.playerCount, configuration.rules)
         val dictionary =
             when (encoder.phase) {
-                TerritoryPhase.TOKEN -> TokenObservationEncoder.dictionary(catalog)
+                TerritoryPhase.TOKEN -> TokenObservationEncoder.dictionary(catalog, encoder)
                 TerritoryPhase.EXPANSION -> ExpansionObservationEncoder.dictionary(catalog, encoder)
             }
         val output =
