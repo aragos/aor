@@ -14,8 +14,11 @@ const configuration = {
     deckModification: true,
     immediateMasterArtDiscard: true,
 };
-const sourcePolicySha256 = '3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4';
+const sourcePolicySha256 = 'eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296';
+const originalPolicySha256 = '3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4';
 const sourceBaselineSha256 = 'ca5a700523e29d5084bf754d6a19ff2051d618ee844ec8a617aee53701bed140';
+const ordinaryModelSha256 = '0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b';
+const frozenPurchasePriorSha256 = 'c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0';
 
 // Object keys are sorted recursively; array order and parsed Float64 values are preserved.
 function canonical(value) {
@@ -36,7 +39,7 @@ const shipping = JSON.parse(readFileSync(new URL('./fixtures/purchaseShipping.js
 
 test('the shipped purchase actor contains exactly the independently qualified parameters', () => {
     assert(actor, 'The qualified purchase actor must be installed in the browser asset.');
-    assert.equal(digest(actor.model), 'fc76c3db46259efa96724053e45fca9ac36eae88acf68cafc2d839f522867893');
+    assert.equal(digest(actor.model), 'eb410d4c9397934b5fa792e2ab91e146ae9c5de2ed70bc4480360f91219db5a4');
     assert.equal(actor.schemaVersion, 1);
     assert.equal(actor.actorVersion, 'aor-purchase-policy-1');
     assert.equal(actor.encoderVersion, 'aor-purchase-observation-1');
@@ -59,22 +62,53 @@ test('the installed hybrid binds its ordinary model and preserves the existing c
         'Existing catalog-15 games must retain their qualified ordinary policy.');
 });
 
-test('the hybrid records independent qualification of its exact ordinary model', () => {
+test('the exact hybrid passes all three independent purchase qualification gates', () => {
     const qualification = actor.hybridQualification;
 
     assert.equal(qualification.qualificationPassed, true);
     assert.equal(qualification.humanStrengthVerified, false);
     assert.equal(qualification.qualificationConfidence, .99);
-    assert.equal(qualification.ordinaryModelSha256,
-        '0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b');
-    for (const [stage, count] of [['confirm', 2048], ['robustness', 4096]]) {
-        assert.equal(qualification[stage].candidateSha256, qualification.ordinaryModelSha256);
-        for (const metric of ['winShareDifference', 'rewardDifference']) {
+    assert.equal(qualification.ordinaryModelSha256, ordinaryModelSha256);
+    assert.equal(qualification.purchasePolicySha256, sourcePolicySha256);
+    assert.equal(qualification.frozenPurchasePriorSha256, frozenPurchasePriorSha256);
+    assert.equal(qualification.incumbentPurchasePolicySha256, originalPolicySha256);
+    const gates = [
+        ['confirm', 2048, .114990234375, .0895116659495154, .105126953125, .08207292301143723],
+        ['robustness', 4096, .0771484375, .05956481755909226, .07197265625, .056153642445138756],
+        ['population', 4096, .0791015625, .06267220941649437, .07554524739583333, .06072486561152196],
+    ];
+    for (const [stage, count, winMean, winLower, rewardMean, rewardLower] of gates) {
+        assert.equal(qualification[stage].policySha256, sourcePolicySha256);
+        assert.equal(qualification[stage].minimumPairs, count);
+        for (const [metric, mean, lower] of [
+            ['winShareDifference', winMean, winLower],
+            ['rewardDifference', rewardMean, rewardLower],
+        ]) {
             assert.equal(qualification[stage][metric].count, count);
             assert.equal(qualification[stage][metric].qualificationConfidence, .99);
+            assert.equal(qualification[stage][metric].mean, mean);
+            assert.equal(qualification[stage][metric].lowerConfidence, lower);
             assert(qualification[stage][metric].lowerConfidence > 0);
         }
     }
+});
+
+test('the population gate preserves its resource stop and continuation of the same trial', () => {
+    const population = actor.hybridQualification.population;
+
+    assert.deepEqual(population.recovery, {
+        sourceCampaign: 'automata-purchase-population-20261110',
+        originalStatus: 'resource-limit',
+        reason: 'Campaign minimum free disk reserve reached.',
+        reusedPairs: 3029,
+        originalStartedEpoch: 1794308319.9742541,
+        originalDeadlineEpoch: 1794319119.9742541,
+        completedBeforeOriginalDeadline: true,
+        resampled: false,
+    });
+    assert.deepEqual(population.canonicalReplays, {
+        indices: [0, 1365, 2730, 4095], sides: ['candidate', 'incumbent'], verified: true,
+    });
 });
 
 test('the shipped hybrid uses the frozen purchase prior for every signed seed', async () => {
@@ -91,12 +125,60 @@ test('the shipped hybrid uses the frozen purchase prior for every signed seed', 
     }
 });
 
-test('the actual asset records exact training and independent qualification provenance', () => {
+test('the P48 provenance binds the continuation to its original actor and Adam state', () => {
     const provenance = actor.provenance;
 
+    assert.equal(provenance.trainingGames, 12288);
+    assert.equal(provenance.selectedUpdate, 48);
+    assert.deepEqual(provenance.continuation, {
+        trainingGames: 4096,
+        selectedBatch: 16,
+        originalPolicySha256,
+        optimizerFromSha256: '7c6df048edfceceb72cde3cf7dabdf94815fa0990bc1f831fa010c95ca9cec3e',
+    });
+    assert.equal(provenance.sourcePolicySha256, sourcePolicySha256);
+    assert.equal(provenance.sourceBaselineSha256, sourceBaselineSha256);
+    assert.equal(provenance.frozenPurchasePriorSha256, frozenPurchasePriorSha256);
+    assert.equal(provenance.ordinaryModelSha256, ordinaryModelSha256);
+    assert.equal(provenance.runnerCommit, 'bad819172fbe837576b3453dd80f11c938accf5e');
+    assert.equal(provenance.nativeCommit, '5e9d5d951f5be1c86ea2c40e01607c41528e1d30');
+    assert.deepEqual(provenance.nativeRuntimeSha256, {
+        'lib/training.jar': '4fd044c8f902be470f6f9c57e83aa9ffc838cbadd8fa53fbb32c7d712e8e89b5',
+        'lib/ai-jvm.jar': 'a9a144ebb563c52cc385f0d5af05054481cfda4b80d49a6d576f763fafe0ee7e',
+    });
+    assert.equal(provenance.qualificationPassed, true);
+    assert.equal(provenance.humanStrengthVerified, false);
+    assert.equal(new Set(provenance.evidence.map(item => item.path)).size, provenance.evidence.length);
+    for (const evidence of provenance.evidence) assert.match(evidence.sha256, /^[a-f0-9]{64}$/);
+    const expectedEvidence = {
+        'automata-purchase-continuation-20261110/run/selected/policy.json': sourcePolicySha256,
+        'automata-purchase-continuation-20261110/run/confirm-report.json':
+            '6f5744e453dba2ce457957884169ca228da0545fef331fdd6a77d2ecf6e2cc99',
+        'automata-purchase-continuation-20261110/run/robustness-report.json':
+            '0fc1a8b35c84a2092b7f4c5ebdffb4e5ca2d49d45336fec5985f42a08a5d3440',
+        'automata-purchase-population-20261110/run/campaign-state.json':
+            '7a7d4b6929c529b34a89cd4a698156df41a9a814a69ca6e32513f8539c378570',
+        'automata-purchase-population-20261110/recovery/resume-1/checkpoint.json':
+            '39600f0398556f625dd842565ff550625979d2b97be6f973effc061e7a5b62d3',
+        'automata-purchase-population-20261110/recovery/resume-1/run/population-report.json':
+            '35ebc23466cdb4958a298bc0c12165a69e03e3d110d02ea5f2c26cda2823ab18',
+        'automata-purchase-preview-20261110/browser-parity-result.json':
+            '882925ddb64a9bd7ed00341cd8f6d2cb754fc4fee3022396dc72f735f4a199bd',
+    };
+    for (const [path, sha256] of Object.entries(expectedEvidence)) {
+        assert.equal(provenance.evidence.find(item => item.path === path)?.sha256, sha256);
+    }
+});
+
+test('the original P32 and F1 hybrid qualification remain intact in the parent lineage', () => {
+    const provenance = actor.provenance.parent.provenance;
+
+    assert.equal(digest(provenance), '2110e6eff00783dd402da9df01db907eaf77980c7942cd160adf6d35be597f29');
+    assert.equal(digest(actor.provenance.parent.hybridQualification),
+        'a756c1495075275af365c7591a2e4e3860918b94b811ebe75c9af5b5b3fbe9d4');
     assert.equal(provenance.trainingGames, 8192);
     assert.equal(provenance.selectedUpdate, 32);
-    assert.equal(provenance.sourcePolicySha256, sourcePolicySha256);
+    assert.equal(provenance.sourcePolicySha256, originalPolicySha256);
     assert.equal(provenance.sourceBaselineSha256, sourceBaselineSha256);
     assert.equal(provenance.trainingCommit, 'c4239ee8cdcbb285e8025f1dcd475722d3068497');
     assert.equal(provenance.runtimeQualificationCommit, 'ca641a43cc453d14c40667992873d0b9b5e8bb2a');
@@ -129,6 +211,17 @@ test('the actual generated worker activates the shipped actor on an authoritativ
     assert.equal(ordinary, 'upgrade-ships');
     // This seed maps to actor uniform zero: the low-probability legal alternative proves activation.
     assert.equal(await run(job), 'pass');
+});
+
+test('the shipped actor falls back when its ordinary model binding no longer matches', async () => {
+    const job = {...shipping, difficulty: 'HARD', seed: 0x6a09e667};
+    const mismatched = {...actor, ordinaryBaseline: {...actor.ordinaryBaseline,
+        weights: {...actor.ordinaryBaseline.weights, cash: actor.ordinaryBaseline.weights.cash + 1}}};
+    const run = createBotPolicyRunner(async () => ai, baseline, mismatched);
+    const ordinary = ai.chooseBotMove(JSON.stringify(job.observation), JSON.stringify(baseline), job.difficulty, job.seed);
+
+    assert.equal(ordinary, 'upgrade-ships');
+    assert.equal(await run(job), ordinary);
 });
 
 test('the shipped actor retains exact ordinary choices outside its qualified use', async () => {
