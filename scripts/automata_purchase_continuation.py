@@ -31,6 +31,8 @@ P32_SHA = "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4"
 ADAM_SHA = "7c6df048edfceceb72cde3cf7dabdf94815fa0990bc1f831fa010c95ca9cec3e"
 ACTOR = "aor-purchase-policy-1"
 ENCODER = "aor-purchase-observation-1"
+RULES_TRANSFER = {"sourceRulesVersion": "ah1996-three-epoch-4",
+                  "targetRulesVersion": "ah1996-three-epoch-5"}
 HYPERPARAMETERS = {"learningRate": .0003, "epochs": 4, "batchSize": 64, "clip": .2,
                    "valueCoefficient": .5, "entropyCoefficient": 0., "maxGradientNorm": .5,
                    "maxBehaviorKl": .01, "threads": 1, "maxSeconds": 900.}
@@ -44,6 +46,40 @@ PROFILES = {
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+
+def transfer_source(protocol):
+    transfer = protocol.get("experimentalRulesTransfer")
+    if transfer is None:
+        return {}
+    require(transfer == RULES_TRANSFER,
+            "Only the explicit, unqualified rules4-to-rules5 initialization is supported.")
+    return {"experimentalRulesTransfer": dict(transfer)}
+
+
+def verify_transfer_metadata(source, metadata):
+    """Historical qualification never transfers with source weights into new rules."""
+    expected = transfer_source(source).get("experimentalRulesTransfer")
+    actual = metadata.get("experimentalRulesTransfer")
+    if expected is None:
+        require(actual is None, "An undeclared rules transfer cannot change the experiment.")
+        return
+    require(isinstance(actual, dict) and all(actual.get(key) == value for key, value in expected.items())
+            and actual.get("initializationOnly") is True and actual.get("qualificationTransferred") is False
+            and metadata.get("rulesVersion") == expected["targetRulesVersion"],
+            "Rules transfer metadata must preserve source/target identities and initialization-only scope.")
+
+
+def verify_transferred_sources(source, metadata, directory, references):
+    verify_transfer_metadata(source, metadata)
+    if not transfer_source(source):
+        return
+    expected = {role: {**path_identity(path), "snapshot": f"{role}.json"}
+                for role, path in references.items() if path is not None}
+    require(metadata.get("ordinaryModelSources") == expected,
+            "Transferred ordinary source roles must retain their exact input identities.")
+    require(all(sha(directory / item["snapshot"]) == item["sha256"] for item in expected.values()),
+            "Transferred ordinary snapshots must preserve original bytes, including source rules tags.")
 
 
 def checkpoint(path, model):
@@ -300,6 +336,14 @@ def prepare(options):
         "seedNote": "Every declared bank is disjoint from frozen source/audit worlds; checkpoint development intentionally shares one bank.",
         "intervalMethod": "95% paired normal intervals; independent final gates use 99% normal lower bounds.",
         "productionActivation": False, "humanStrengthVerified": False}
+    if getattr(options, "experimental_rules_transfer", False):
+        require(read(baseline).get("rulesVersion") == RULES_TRANSFER["sourceRulesVersion"]
+                and all(read(path).get("rulesVersion") in (None, RULES_TRANSFER["sourceRulesVersion"])
+                        for path in (prior, *training, *robust)),
+                "Transfer requires a rules4 ordinary baseline and unchanged rules4 or metadata-free priors; sources are never relabelled.")
+        protocol.update(transfer_source({"experimentalRulesTransfer": RULES_TRANSFER}))
+        protocol["evaluationRulesVersion"] = RULES_TRANSFER["targetRulesVersion"]
+        protocol["historicalQualificationRole"] = "Initialization provenance only; no current-rules qualification."
     if options.seed_audit:
         protocol["seedAudit"] = copied(options.seed_audit, "seed-audit.json")
     if parent:
@@ -335,7 +379,7 @@ def collection_source(protocol, policy, index):
     return {"schemaVersion": 1, "configuration": protocol["configuration"], "games": protocol["gamesPerBatch"],
             "seed": protocol["seed"] + index, "baseline": protocol["baseline"], "opponents": protocol["opponents"],
             "policy": str(policy), "sharedPurchaseBaseline": protocol["prior"],
-            "opponentPurchasePolicy": protocol["purchasePolicy"]}
+            "opponentPurchasePolicy": protocol["purchasePolicy"], **transfer_source(protocol)}
 
 
 def arena_source(protocol, policy, bank):
@@ -346,6 +390,7 @@ def arena_source(protocol, policy, bank):
         protocol[count], protocol["baseline"], "SCREENING" if bank == "development" else "CONFIRMATION")
     source["frozenPurchase"] = {"baseline": protocol["prior"], "policy": protocol["purchasePolicy"],
                                 "candidatePolicy": str(policy), "incumbentPolicy": protocol["purchasePolicy"]}
+    source.update(transfer_source(protocol))
     return source
 
 
@@ -364,6 +409,9 @@ def verify_collection(protocol, source, directory):
         "sharedPurchaseBaseline": path_identity(protocol["prior"]),
         "opponentPurchasePolicy": path_identity(protocol["purchasePolicy"])}
     require(all(manifest.get(key) == value for key, value in expected.items()), "Collection differs from its frozen roles or game bank.")
+    verify_transferred_sources(specification, manifest, directory,
+        {"baseline": protocol["baseline"], "shared-purchase-baseline": protocol["prior"],
+         **{f"opponent-{index}": path for index, path in enumerate(protocol["opponents"])}})
     require(all(item.get("kind") == "purchase-collect" and item.get("signature") == manifest["signature"]
                 and item.get("games") == count for item in (state, finished))
             and state.get("phase") == "complete" and state.get("completedGames") == count,
@@ -397,6 +445,10 @@ def verify_arena(protocol, source, directory):
     specification = read(source)
     experiments.verify_arena(directory, source)
     report, run, state = [read(directory / name) for name in ("evaluation.json", "run.json", "state.json")]
+    for metadata in (report, run):
+        verify_transferred_sources(specification, metadata, directory,
+            {"candidate": protocol["baseline"], "incumbent": protocol["baseline"],
+             **{f"opponent-{index}": path for index, path in enumerate(specification["opponents"])}})
     expected = {name: dict(path_identity(path), snapshot="frozen-purchase-" + {
         "baseline": "baseline", "policy": "policy", "candidatePolicy": "candidate-policy",
         "incumbentPolicy": "incumbent-policy"}[name] + ".json") for name, path in specification["frozenPurchase"].items()}
@@ -492,6 +544,10 @@ def stage_result(protocol, output, stage, passed, summary, metrics, artifacts):
     report = {"schemaVersion": 1, "stage": stage, "accepted": stage == "robustness" and passed,
               "summary": summary, "metrics": metrics, "profile": protocol["profile"],
               "qualificationConfidence": .99, "productionActivation": False, "humanStrengthVerified": False}
+    if transfer_source(protocol):
+        report.update(transfer_source(protocol), evaluationRulesVersion=RULES_TRANSFER["targetRulesVersion"],
+                      historicalQualificationTransferred=False,
+                      comparisonScope="Current-rules improvement over the frozen transferred incumbent; browser fallback remains unqualified.")
     path, text_path = output / f"{stage}-report.json", output / f"{stage}-report.txt"
     document(path, report)
     lines = [summary]
@@ -501,6 +557,8 @@ def stage_result(protocol, output, stage, passed, summary, metrics, artifacts):
     if stage != "train":
         lines.extend(evolution.estimates(metrics))
     lines.append("No policy activated; human strength unverified. Ordinary F1, purchase prior F0 and incumbent rivals remain frozen.")
+    if transfer_source(protocol):
+        lines.append("Rules4 weights initialize this rules5 experiment; historical qualification is not carried over.")
     content = "\n".join(lines) + "\n"
     require(not text_path.exists() or text_path.read_text() == content, "Completed purchase report changed.")
     text_path.write_text(content)
@@ -626,6 +684,8 @@ def main(arguments=None):
     prep.add_argument("--workers", type=int, default=6)
     prep.add_argument("--maximum-seconds", type=float, default=28800)
     prep.add_argument("--profile", choices=PROFILES, default="search")
+    prep.add_argument("--experimental-rules-transfer", action="store_true",
+                      help="Explicit unqualified rules4-to-rules5 initialization; preserve source bytes and require fresh gates.")
     stage = commands.add_parser("stage")
     stage.add_argument("--protocol", type=Path, required=True)
     stage.add_argument("--output", type=Path, required=True)

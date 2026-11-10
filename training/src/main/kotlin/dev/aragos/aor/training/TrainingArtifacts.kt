@@ -109,7 +109,13 @@ class TrainingArtifacts(val directory: Path) {
     }
 
     companion object {
-        fun readModel(path: Path?): BotModel {
+        /**
+         * Optional transfer permits only declared initialization; it never imports qualification.
+         */
+        fun readModel(
+            path: Path?,
+            experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
+        ): BotModel {
             if (path == null) return BotModels.default
             val root = ObjectMapper().readTree(path.toFile())
             val schema = root["schemaVersion"]
@@ -121,7 +127,11 @@ class TrainingArtifacts(val directory: Path) {
             ) {
                 "The model must declare schemaVersion as the JSON integer 1."
             }
-            require(root["rulesVersion"]?.asText()?.let { it == RULES_VERSION } != false) {
+            require(
+                root["rulesVersion"]?.asText()?.let {
+                    it == RULES_VERSION || it == experimentalRulesTransfer?.sourceRulesVersion
+                } != false
+            ) {
                 "The model was generated for a different rules version."
             }
             require(root["dataVersion"]?.asText()?.let { it == DATA_VERSION } != false) {

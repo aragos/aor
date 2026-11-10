@@ -182,6 +182,7 @@ internal class PurchaseCollectionStore(
 
     private fun manifest(): Map<String, Any?> =
         identity +
+            input.initializationMetadata() +
             mapOf(
                 "schemaVersion" to 1,
                 "mode" to input.mode,

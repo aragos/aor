@@ -83,11 +83,7 @@ object TokenOrderCollectionMain {
         val identity = mapOf("kind" to KIND, "signature" to signature)
         artifacts.write("state.json", identity + mapOf("phase" to "initializing"))
         artifacts.ensureFileSnapshot(source, sourceHash, "source.json")
-        artifacts.ensureModelSnapshot(specification.arena.candidate, "initial.json")
-        artifacts.ensureModelSnapshot(specification.arena.incumbent, "incumbent.json")
-        specification.arena.opponents.forEachIndexed { index, model ->
-            artifacts.ensureModelSnapshot(model, "opponent-$index.json")
-        }
+        specification.arena.snapshotModels(artifacts, "initial.json")
         specification.arena.snapshotOverlays(artifacts)
         val startPath = output.resolve("started-at.txt")
         val started =
@@ -127,7 +123,7 @@ object TokenOrderCollectionMain {
             }
         val metadata =
             identity +
-                specification.arena.overlayMetadata() +
+                specification.arena.overlayMetadata("initial.json") +
                 mapOf(
                     "originSchemaVersion" to 1,
                     "source" to source.toString(),
