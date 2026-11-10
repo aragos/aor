@@ -1526,222 +1526,365 @@
     }
   },
   "provenance": {
-    "trainingGames": 12288,
-    "selectedUpdate": 48,
-    "continuation": {
-      "trainingGames": 4096,
-      "selectedBatch": 16,
-      "originalPolicySha256": "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4",
-      "optimizerFromSha256": "7c6df048edfceceb72cde3cf7dabdf94815fa0990bc1f831fa010c95ca9cec3e"
-    },
     "sourcePolicySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
     "sourceBaselineSha256": "ca5a700523e29d5084bf754d6a19ff2051d618ee844ec8a617aee53701bed140",
     "frozenPurchasePriorSha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0",
-    "ordinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
-    "runnerCommit": "bad819172fbe837576b3453dd80f11c938accf5e",
-    "nativeCommit": "5e9d5d951f5be1c86ea2c40e01607c41528e1d30",
-    "nativeRuntimeSha256": {
-      "lib/training.jar": "4fd044c8f902be470f6f9c57e83aa9ffc838cbadd8fa53fbb32c7d712e8e89b5",
-      "lib/ai-jvm.jar": "a9a144ebb563c52cc385f0d5af05054481cfda4b80d49a6d576f763fafe0ee7e"
-    },
+    "ordinaryModelSha256": "9d8b9cb3aa135474a49af41a1255e741604cb5cf4e9c9222eb7cd8dcd781ff92",
+    "sourceCampaign": "automata-p48-strategy-interaction-20261110",
     "qualificationPassed": true,
     "humanStrengthVerified": false,
     "parent": {
       "provenance": {
-        "trainingGames": 8192,
-        "selectedUpdate": 32,
-        "sourcePolicySha256": "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4",
+        "trainingGames": 12288,
+        "selectedUpdate": 48,
+        "continuation": {
+          "trainingGames": 4096,
+          "selectedBatch": 16,
+          "originalPolicySha256": "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4",
+          "optimizerFromSha256": "7c6df048edfceceb72cde3cf7dabdf94815fa0990bc1f831fa010c95ca9cec3e"
+        },
+        "sourcePolicySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
         "sourceBaselineSha256": "ca5a700523e29d5084bf754d6a19ff2051d618ee844ec8a617aee53701bed140",
-        "trainingCommit": "c4239ee8cdcbb285e8025f1dcd475722d3068497",
-        "runtimeQualificationCommit": "ca641a43cc453d14c40667992873d0b9b5e8bb2a",
-        "signalProtocolSha256": "c544d32a4b17b5a35ca84348c6ba151d829bbc25fdfe5c4a1bae00e743099454",
-        "learnedRivalProtocolSha256": "658bfb67e37a20b353ff3469ec3d476370bdb304f7439cad806f26fd462d3c7b",
-        "mixedVsBaseline": {
-          "pairs": 1024,
-          "mean": 0.0810546875,
-          "lower95": 0.05681105294456831,
-          "upper95": 0.10529832205543169
-        },
-        "mixedVsInitialization": {
-          "pairs": 1024,
-          "mean": 0.103515625,
-          "lower95": 0.0789149949011962,
-          "upper95": 0.1281162550988038
-        },
-        "fixedBaselineRivals": {
-          "pairs": 512,
-          "mean": 0.0771484375,
-          "lower95": 0.045042352378629524,
-          "upper95": 0.10925452262137048
-        },
-        "learnedRivals": {
-          "pairs": 1024,
-          "mean": 0.0732421875,
-          "lower95": 0.05619335281821104,
-          "upper95": 0.09029102218178896,
-          "independentWorlds": 256
+        "frozenPurchasePriorSha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0",
+        "ordinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+        "runnerCommit": "bad819172fbe837576b3453dd80f11c938accf5e",
+        "nativeCommit": "5e9d5d951f5be1c86ea2c40e01607c41528e1d30",
+        "nativeRuntimeSha256": {
+          "lib/training.jar": "4fd044c8f902be470f6f9c57e83aa9ffc838cbadd8fa53fbb32c7d712e8e89b5",
+          "lib/ai-jvm.jar": "a9a144ebb563c52cc385f0d5af05054481cfda4b80d49a6d576f763fafe0ee7e"
         },
         "qualificationPassed": true,
         "humanStrengthVerified": false,
+        "parent": {
+          "provenance": {
+            "trainingGames": 8192,
+            "selectedUpdate": 32,
+            "sourcePolicySha256": "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4",
+            "sourceBaselineSha256": "ca5a700523e29d5084bf754d6a19ff2051d618ee844ec8a617aee53701bed140",
+            "trainingCommit": "c4239ee8cdcbb285e8025f1dcd475722d3068497",
+            "runtimeQualificationCommit": "ca641a43cc453d14c40667992873d0b9b5e8bb2a",
+            "signalProtocolSha256": "c544d32a4b17b5a35ca84348c6ba151d829bbc25fdfe5c4a1bae00e743099454",
+            "learnedRivalProtocolSha256": "658bfb67e37a20b353ff3469ec3d476370bdb304f7439cad806f26fd462d3c7b",
+            "mixedVsBaseline": {
+              "pairs": 1024,
+              "mean": 0.0810546875,
+              "lower95": 0.05681105294456831,
+              "upper95": 0.10529832205543169
+            },
+            "mixedVsInitialization": {
+              "pairs": 1024,
+              "mean": 0.103515625,
+              "lower95": 0.0789149949011962,
+              "upper95": 0.1281162550988038
+            },
+            "fixedBaselineRivals": {
+              "pairs": 512,
+              "mean": 0.0771484375,
+              "lower95": 0.045042352378629524,
+              "upper95": 0.10925452262137048
+            },
+            "learnedRivals": {
+              "pairs": 1024,
+              "mean": 0.0732421875,
+              "lower95": 0.05619335281821104,
+              "upper95": 0.09029102218178896,
+              "independentWorlds": 256
+            },
+            "qualificationPassed": true,
+            "humanStrengthVerified": false,
+            "evidence": [
+              {
+                "path": "signal-v1/confirmation.json",
+                "sha256": "8ae2c6f6e132f898a9fd6e76014ad0d5232e6f699eb3a74d546966061f794707"
+              },
+              {
+                "path": "signal-analysis-v1/final.json",
+                "sha256": "a29dcacc8a1f50a4c24304f873831952d8b27573f4bb66c31cde979cb09d0309"
+              },
+              {
+                "path": "purchase-stress-v1/result.json",
+                "sha256": "7bab370420cdd32872a871ec3385dec48667dd1cdc260a35376e6ee8592354d3"
+              },
+              {
+                "path": "purchase-stress-analysis-v1/final.json",
+                "sha256": "e5cd89879de02208501e82079c57767abc06f21e89bab0f3fc58463942619bae"
+              },
+              {
+                "path": "playable-parity-v1/candidate-runtime-verification.json",
+                "sha256": "2ecea6bf18880685bdfe19af86ab131349b3e1d212ea6f7269421d37795b781b"
+              }
+            ]
+          },
+          "hybridQualification": {
+            "qualificationPassed": true,
+            "humanStrengthVerified": false,
+            "ordinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+            "qualificationConfidence": 0.99,
+            "sourceCampaign": "automata-refinement-20261109",
+            "frozenPurchasePriorSha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0",
+            "frozenPurchasePolicySha256": "72425f42dbb27d66e42a8dbbed19a7a4f62a143efbdba4a4f5db7f74fed27d49",
+            "confirm": {
+              "candidateSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+              "minimumPairs": 2048,
+              "rewardDifference": {
+                "count": 2048,
+                "lower95": 0.020262431158321402,
+                "lowerConfidence": 0.015720889335595237,
+                "mean": 0.034716796875,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.04917116259167859
+              },
+              "winShareDifference": {
+                "count": 2048,
+                "lower95": 0.019615045478151023,
+                "lowerConfidence": 0.014578603101046552,
+                "mean": 0.03564453125,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.05167401702184898
+              }
+            },
+            "robustness": {
+              "candidateSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+              "minimumPairs": 4096,
+              "rewardDifference": {
+                "count": 4096,
+                "lower95": 0.015088324955235358,
+                "lowerConfidence": 0.012145406273713657,
+                "mean": 0.024454752604166668,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.03382118025309798
+              },
+              "winShareDifference": {
+                "count": 4096,
+                "lower95": 0.013696025119572939,
+                "lowerConfidence": 0.01044349549263066,
+                "mean": 0.0240478515625,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.034399678005427065
+              }
+            },
+            "evidence": [
+              {
+                "path": "protocol.json",
+                "sha256": "72caee6074dcdc08a759dd6b03b71ee9a1a8d4dd13296bf6284b13b8b953d7ee"
+              },
+              {
+                "path": "run/selected/candidate.json",
+                "sha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b"
+              },
+              {
+                "path": "run/confirm-report.json",
+                "sha256": "22f540d7f95b2ccd62e713a9af4f475cd838ca3122a9516654f657b85017beac"
+              },
+              {
+                "path": "run/robustness-report.json",
+                "sha256": "3fd7f74febf145672a707a873d2ab7d4ce10b20a4b5a52ab65539363da11919c"
+              },
+              {
+                "path": "run/campaign-report.json",
+                "sha256": "f8065a35062a9572055eb8525455c37b3a52a18180433064b6f4cd9ee1caa185"
+              }
+            ]
+          }
+        },
         "evidence": [
           {
-            "path": "signal-v1/confirmation.json",
-            "sha256": "8ae2c6f6e132f898a9fd6e76014ad0d5232e6f699eb3a74d546966061f794707"
+            "path": "automata-purchase-continuation-20261110/protocol.json",
+            "sha256": "0176ae8ead61e8e759320e9a21059ec56c76ac9f5f2b24459c813542305244ff"
           },
           {
-            "path": "signal-analysis-v1/final.json",
-            "sha256": "a29dcacc8a1f50a4c24304f873831952d8b27573f4bb66c31cde979cb09d0309"
+            "path": "automata-purchase-continuation-20261110/provenance.json",
+            "sha256": "7de682ff8bf4efd902efd9c9048ff43a8b7d4c6720541b86997e9cbcbf89bbab"
           },
           {
-            "path": "purchase-stress-v1/result.json",
-            "sha256": "7bab370420cdd32872a871ec3385dec48667dd1cdc260a35376e6ee8592354d3"
+            "path": "automata-purchase-continuation-20261110/run/selection.json",
+            "sha256": "ee91324364b38a89842e240181c8e9c8215d69db3abffb1481c794259055f5f4"
           },
           {
-            "path": "purchase-stress-analysis-v1/final.json",
-            "sha256": "e5cd89879de02208501e82079c57767abc06f21e89bab0f3fc58463942619bae"
+            "path": "automata-purchase-continuation-20261110/run/selected/policy.json",
+            "sha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296"
           },
           {
-            "path": "playable-parity-v1/candidate-runtime-verification.json",
-            "sha256": "2ecea6bf18880685bdfe19af86ab131349b3e1d212ea6f7269421d37795b781b"
+            "path": "automata-purchase-continuation-20261110/run/batches/batch-16/receipt.json",
+            "sha256": "513b939742698d0783ad5f5a5763c47db66d57b4ebb557289fd3d9f74e89680f"
+          },
+          {
+            "path": "automata-purchase-continuation-20261110/run/confirm-report.json",
+            "sha256": "6f5744e453dba2ce457957884169ca228da0545fef331fdd6a77d2ecf6e2cc99"
+          },
+          {
+            "path": "automata-purchase-continuation-20261110/run/robustness-report.json",
+            "sha256": "0fc1a8b35c84a2092b7f4c5ebdffb4e5ca2d49d45336fec5985f42a08a5d3440"
+          },
+          {
+            "path": "automata-purchase-continuation-20261110/run/campaign-report.json",
+            "sha256": "efa679a0d41d86aafe52ae7d182902b4e5adddbc89aede71eb70deedf8384c40"
+          },
+          {
+            "path": "automata-purchase-population-20261110/protocol.json",
+            "sha256": "4fe1f6b988e086df6d39791d56fafeaccacde54bbf6471749683723175a38f4a"
+          },
+          {
+            "path": "automata-purchase-population-20261110/run/campaign-state.json",
+            "sha256": "7a7d4b6929c529b34a89cd4a698156df41a9a814a69ca6e32513f8539c378570"
+          },
+          {
+            "path": "automata-purchase-population-20261110/recovery/resume-1/checkpoint.json",
+            "sha256": "39600f0398556f625dd842565ff550625979d2b97be6f973effc061e7a5b62d3"
+          },
+          {
+            "path": "automata-purchase-population-20261110/recovery/resume-1/recovery-review.json",
+            "sha256": "ade48e8a08ab96a52b479094780564312b26c431f5b79b03ea3d5ce0fbb6f546"
+          },
+          {
+            "path": "automata-purchase-population-20261110/recovery/resume-1/protocol.json",
+            "sha256": "e4e8c7e488d10ffb2556f268a90d6af710d75323001dd19cf0b6a2e15e07dc68"
+          },
+          {
+            "path": "automata-purchase-population-20261110/recovery/resume-1/run/population-report.json",
+            "sha256": "35ebc23466cdb4958a298bc0c12165a69e03e3d110d02ea5f2c26cda2823ab18"
+          },
+          {
+            "path": "automata-purchase-population-20261110/recovery/resume-1/run/campaign-report.json",
+            "sha256": "9ad1f0adbab7dca52c118ee8412cbc377d59ed72a662f4ac75498d20f2b4f025"
+          },
+          {
+            "path": "automata-purchase-preview-20261110/browser-parity-result.json",
+            "sha256": "882925ddb64a9bd7ed00341cd8f6d2cb754fc4fee3022396dc72f735f4a199bd"
           }
         ]
       },
       "hybridQualification": {
         "qualificationPassed": true,
         "humanStrengthVerified": false,
-        "ordinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
         "qualificationConfidence": 0.99,
-        "sourceCampaign": "automata-refinement-20261109",
+        "ordinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+        "purchasePolicySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
         "frozenPurchasePriorSha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0",
-        "frozenPurchasePolicySha256": "72425f42dbb27d66e42a8dbbed19a7a4f62a143efbdba4a4f5db7f74fed27d49",
+        "incumbentPurchasePolicySha256": "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4",
+        "sourceCampaign": "automata-purchase-continuation-20261110",
+        "scope": "F1 ordinary policy and F0 purchase prior. Confirmation and held-out robustness use P32 rivals; population uses P48 rivals. Only the evaluated purchase actor differs between arms.",
         "confirm": {
-          "candidateSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
           "minimumPairs": 2048,
+          "policySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
           "rewardDifference": {
             "count": 2048,
-            "lower95": 0.020262431158321402,
-            "lowerConfidence": 0.015720889335595237,
-            "mean": 0.034716796875,
+            "lower95": 0.08758468083221754,
+            "lowerConfidence": 0.08207292301143723,
+            "mean": 0.105126953125,
             "qualificationConfidence": 0.99,
-            "upper95": 0.04917116259167859
+            "upper95": 0.12266922541778247
           },
           "winShareDifference": {
             "count": 2048,
-            "lower95": 0.019615045478151023,
-            "lowerConfidence": 0.014578603101046552,
-            "mean": 0.03564453125,
+            "lower95": 0.0956030824215896,
+            "lowerConfidence": 0.0895116659495154,
+            "mean": 0.114990234375,
             "qualificationConfidence": 0.99,
-            "upper95": 0.05167401702184898
+            "upper95": 0.1343773863284104
           }
         },
         "robustness": {
-          "candidateSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
           "minimumPairs": 4096,
+          "policySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
           "rewardDifference": {
             "count": 4096,
-            "lower95": 0.015088324955235358,
-            "lowerConfidence": 0.012145406273713657,
-            "mean": 0.024454752604166668,
+            "lower95": 0.05993565247230017,
+            "lowerConfidence": 0.056153642445138756,
+            "mean": 0.07197265625,
             "qualificationConfidence": 0.99,
-            "upper95": 0.03382118025309798
+            "upper95": 0.08400966002769983
           },
           "winShareDifference": {
             "count": 4096,
-            "lower95": 0.013696025119572939,
-            "lowerConfidence": 0.01044349549263066,
-            "mean": 0.0240478515625,
+            "lower95": 0.06376870964431645,
+            "lowerConfidence": 0.05956481755909226,
+            "mean": 0.0771484375,
             "qualificationConfidence": 0.99,
-            "upper95": 0.034399678005427065
+            "upper95": 0.09052816535568355
           }
         },
-        "evidence": [
-          {
-            "path": "protocol.json",
-            "sha256": "72caee6074dcdc08a759dd6b03b71ee9a1a8d4dd13296bf6284b13b8b953d7ee"
+        "population": {
+          "policySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
+          "minimumPairs": 4096,
+          "rewardDifference": {
+            "count": 4096,
+            "lower95": 0.06426812268216194,
+            "lowerConfidence": 0.06072486561152196,
+            "mean": 0.07554524739583333,
+            "qualificationConfidence": 0.99,
+            "upper95": 0.08682237210950473
           },
-          {
-            "path": "run/selected/candidate.json",
-            "sha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b"
+          "winShareDifference": {
+            "count": 4096,
+            "lower95": 0.06660013936636894,
+            "lowerConfidence": 0.06267220941649437,
+            "mean": 0.0791015625,
+            "qualificationConfidence": 0.99,
+            "upper95": 0.09160298563363106
           },
-          {
-            "path": "run/confirm-report.json",
-            "sha256": "22f540d7f95b2ccd62e713a9af4f475cd838ca3122a9516654f657b85017beac"
+          "recovery": {
+            "sourceCampaign": "automata-purchase-population-20261110",
+            "originalStatus": "resource-limit",
+            "reason": "Campaign minimum free disk reserve reached.",
+            "reusedPairs": 3029,
+            "originalStartedEpoch": 1794308319.9742541,
+            "originalDeadlineEpoch": 1794319119.9742541,
+            "completedBeforeOriginalDeadline": true,
+            "resampled": false
           },
-          {
-            "path": "run/robustness-report.json",
-            "sha256": "3fd7f74febf145672a707a873d2ab7d4ce10b20a4b5a52ab65539363da11919c"
-          },
-          {
-            "path": "run/campaign-report.json",
-            "sha256": "f8065a35062a9572055eb8525455c37b3a52a18180433064b6f4cd9ee1caa185"
+          "canonicalReplays": {
+            "indices": [
+              0,
+              1365,
+              2730,
+              4095
+            ],
+            "sides": [
+              "candidate",
+              "incumbent"
+            ],
+            "verified": true
           }
-        ]
+        }
       }
     },
     "evidence": [
       {
-        "path": "automata-purchase-continuation-20261110/protocol.json",
-        "sha256": "0176ae8ead61e8e759320e9a21059ec56c76ac9f5f2b24459c813542305244ff"
+        "path": "automata-p48-strategy-interaction-20261110/protocol.json",
+        "sha256": "72dc6ab1c6ab2ee98c5d8256c5adf116042a81d20291b6c2f59a86561921fd4f"
       },
       {
-        "path": "automata-purchase-continuation-20261110/provenance.json",
-        "sha256": "7de682ff8bf4efd902efd9c9048ff43a8b7d4c6720541b86997e9cbcbf89bbab"
+        "path": "automata-p48-strategy-interaction-20261110/inputs/challenger-f3.json",
+        "sha256": "9d8b9cb3aa135474a49af41a1255e741604cb5cf4e9c9222eb7cd8dcd781ff92"
       },
       {
-        "path": "automata-purchase-continuation-20261110/run/selection.json",
-        "sha256": "ee91324364b38a89842e240181c8e9c8215d69db3abffb1481c794259055f5f4"
+        "path": "automata-p48-strategy-interaction-20261110/inputs/incumbent-f1.json",
+        "sha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b"
       },
       {
-        "path": "automata-purchase-continuation-20261110/run/selected/policy.json",
+        "path": "automata-p48-strategy-interaction-20261110/inputs/purchase-policy.json",
         "sha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296"
       },
       {
-        "path": "automata-purchase-continuation-20261110/run/batches/batch-16/receipt.json",
-        "sha256": "513b939742698d0783ad5f5a5763c47db66d57b4ebb557289fd3d9f74e89680f"
+        "path": "automata-p48-strategy-interaction-20261110/inputs/purchase-baseline.json",
+        "sha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0"
       },
       {
-        "path": "automata-purchase-continuation-20261110/run/confirm-report.json",
-        "sha256": "6f5744e453dba2ce457957884169ca228da0545fef331fdd6a77d2ecf6e2cc99"
+        "path": "automata-p48-strategy-interaction-20261110/run/confirm-report.json",
+        "sha256": "714ecd89eff4011771cfc00b6232411851bc556d2e29bd234cf7d290b8293c80"
       },
       {
-        "path": "automata-purchase-continuation-20261110/run/robustness-report.json",
-        "sha256": "0fc1a8b35c84a2092b7f4c5ebdffb4e5ca2d49d45336fec5985f42a08a5d3440"
+        "path": "automata-p48-strategy-interaction-20261110/run/robustness-report.json",
+        "sha256": "907f4263904dbf13f6847ca63eb218f6777e544c762ff6e03a4f349e5a90a98f"
       },
       {
-        "path": "automata-purchase-continuation-20261110/run/campaign-report.json",
-        "sha256": "efa679a0d41d86aafe52ae7d182902b4e5adddbc89aede71eb70deedf8384c40"
+        "path": "automata-p48-strategy-interaction-20261110/run/campaign-report.json",
+        "sha256": "3aab2a1d6ed72dc250b8647fd65c20ef660531c8010f9426deb8c4c20423e5b2"
       },
       {
-        "path": "automata-purchase-population-20261110/protocol.json",
-        "sha256": "4fe1f6b988e086df6d39791d56fafeaccacde54bbf6471749683723175a38f4a"
-      },
-      {
-        "path": "automata-purchase-population-20261110/run/campaign-state.json",
-        "sha256": "7a7d4b6929c529b34a89cd4a698156df41a9a814a69ca6e32513f8539c378570"
-      },
-      {
-        "path": "automata-purchase-population-20261110/recovery/resume-1/checkpoint.json",
-        "sha256": "39600f0398556f625dd842565ff550625979d2b97be6f973effc061e7a5b62d3"
-      },
-      {
-        "path": "automata-purchase-population-20261110/recovery/resume-1/recovery-review.json",
-        "sha256": "ade48e8a08ab96a52b479094780564312b26c431f5b79b03ea3d5ce0fbb6f546"
-      },
-      {
-        "path": "automata-purchase-population-20261110/recovery/resume-1/protocol.json",
-        "sha256": "e4e8c7e488d10ffb2556f268a90d6af710d75323001dd19cf0b6a2e15e07dc68"
-      },
-      {
-        "path": "automata-purchase-population-20261110/recovery/resume-1/run/population-report.json",
-        "sha256": "35ebc23466cdb4958a298bc0c12165a69e03e3d110d02ea5f2c26cda2823ab18"
-      },
-      {
-        "path": "automata-purchase-population-20261110/recovery/resume-1/run/campaign-report.json",
-        "sha256": "9ad1f0adbab7dca52c118ee8412cbc377d59ed72a662f4ac75498d20f2b4f025"
-      },
-      {
-        "path": "automata-purchase-preview-20261110/browser-parity-result.json",
-        "sha256": "882925ddb64a9bd7ed00341cd8f6d2cb754fc4fee3022396dc72f735f4a199bd"
+        "path": "automata-p48-strategy-interaction-20261110/audit/seed-audit.json",
+        "sha256": "ce5c798a9f312e6b6b6d30b5751d671cc6148877b80edcc8bb754c32d1e3acf7"
       }
     ]
   },
@@ -240107,20 +240250,20 @@
       "order": 1.9514383097220485,
       "planning.advanceIncomeCorrection": 2.2729265906297917,
       "planning.advanceResearchSaving": 0.7903367698078113,
-      "planning.areaOpponentLoss": 0.025,
-      "planning.areaOwnLoss": 0.05,
-      "planning.commodityDenial": 0.033186025431182944,
-      "planning.commodityOption": 8.078953647793742,
+      "planning.areaOpponentLoss": 0.020000000000000004,
+      "planning.areaOwnLoss": 0.04000000000000001,
+      "planning.commodityDenial": 0.03982323051741953,
+      "planning.commodityOption": 9.69474437735249,
       "planning.endgameAdvanceIncomeCorrection": -1.8183412725038335,
       "planning.finalAdvanceScore": 0.2713337522134787,
       "planning.foregoneInterest": 1.852513254929378,
-      "planning.heldCommodity": 0.8847314731286771,
-      "planning.heldCommodityBundle": 0.05,
-      "planning.publicCommodity": 0.13492698789216143,
-      "planning.publicCommodityBundle": 0.05,
-      "planning.reachableCommodityOption": 0.075,
-      "planning.reachableRetention": 0.075,
-      "planning.retainedCommodity": 0.709563834488619,
+      "planning.heldCommodity": 1.0616777677544125,
+      "planning.heldCommodityBundle": 0.06,
+      "planning.publicCommodity": 0.1619123854705937,
+      "planning.publicCommodityBundle": 0.06,
+      "planning.reachableCommodityOption": 0.09,
+      "planning.reachableRetention": 0.09,
+      "planning.retainedCommodity": 0.8514766013863428,
       "planning.targetTieBreak": 1.0,
       "planning.tokenCapCorrection": 0.9147798857744132,
       "planning.tokenValue.enabled": 1.0,
@@ -240148,80 +240291,38 @@
     "qualificationPassed": true,
     "humanStrengthVerified": false,
     "qualificationConfidence": 0.99,
-    "ordinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+    "ordinaryModelSha256": "9d8b9cb3aa135474a49af41a1255e741604cb5cf4e9c9222eb7cd8dcd781ff92",
+    "incumbentOrdinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
     "purchasePolicySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
     "frozenPurchasePriorSha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0",
-    "incumbentPurchasePolicySha256": "3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c586e5b1b1b2aa4",
-    "sourceCampaign": "automata-purchase-continuation-20261110",
-    "scope": "F1 ordinary policy and F0 purchase prior. Confirmation and held-out robustness use P32 rivals; population uses P48 rivals. Only the evaluated purchase actor differs between arms.",
+    "sourceCampaign": "automata-p48-strategy-interaction-20261110",
+    "scope": {
+      "playerCount": 4,
+      "map": "STANDARD",
+      "initialCard": "NO_CRUSADES",
+      "deckModification": true,
+      "immediateMasterArtDiscard": true
+    },
+    "purchaseEnvironment": "The same P48 actor and F0 prior control purchase decisions in every candidate, incumbent and rival seat.",
     "confirm": {
-      "minimumPairs": 2048,
-      "policySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
-      "rewardDifference": {
-        "count": 2048,
-        "lower95": 0.08758468083221754,
-        "lowerConfidence": 0.08207292301143723,
-        "mean": 0.105126953125,
-        "qualificationConfidence": 0.99,
-        "upper95": 0.12266922541778247
-      },
-      "winShareDifference": {
-        "count": 2048,
-        "lower95": 0.0956030824215896,
-        "lowerConfidence": 0.0895116659495154,
-        "mean": 0.114990234375,
-        "qualificationConfidence": 0.99,
-        "upper95": 0.1343773863284104
-      }
-    },
-    "robustness": {
-      "minimumPairs": 4096,
-      "policySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
-      "rewardDifference": {
-        "count": 4096,
-        "lower95": 0.05993565247230017,
-        "lowerConfidence": 0.056153642445138756,
-        "mean": 0.07197265625,
-        "qualificationConfidence": 0.99,
-        "upper95": 0.08400966002769983
-      },
-      "winShareDifference": {
-        "count": 4096,
-        "lower95": 0.06376870964431645,
-        "lowerConfidence": 0.05956481755909226,
-        "mean": 0.0771484375,
-        "qualificationConfidence": 0.99,
-        "upper95": 0.09052816535568355
-      }
-    },
-    "population": {
-      "policySha256": "eaf40a734c2c48e4a38c7e088b16783f5eb0ba8f759ae4c25caabeab45793296",
+      "candidateSha256": "9d8b9cb3aa135474a49af41a1255e741604cb5cf4e9c9222eb7cd8dcd781ff92",
+      "incumbentSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
       "minimumPairs": 4096,
       "rewardDifference": {
         "count": 4096,
-        "lower95": 0.06426812268216194,
-        "lowerConfidence": 0.06072486561152196,
-        "mean": 0.07554524739583333,
+        "lower95": 0.012967317344893817,
+        "lowerConfidence": 0.009606005620311447,
+        "mean": 0.023665364583333334,
         "qualificationConfidence": 0.99,
-        "upper95": 0.08682237210950473
+        "upper95": 0.034363411821772855
       },
       "winShareDifference": {
         "count": 4096,
-        "lower95": 0.06660013936636894,
-        "lowerConfidence": 0.06267220941649437,
-        "mean": 0.0791015625,
+        "lower95": 0.013619538767106955,
+        "lowerConfidence": 0.009882725342439891,
+        "mean": 0.0255126953125,
         "qualificationConfidence": 0.99,
-        "upper95": 0.09160298563363106
-      },
-      "recovery": {
-        "sourceCampaign": "automata-purchase-population-20261110",
-        "originalStatus": "resource-limit",
-        "reason": "Campaign minimum free disk reserve reached.",
-        "reusedPairs": 3029,
-        "originalStartedEpoch": 1794308319.9742541,
-        "originalDeadlineEpoch": 1794319119.9742541,
-        "completedBeforeOriginalDeadline": true,
-        "resampled": false
+        "upper95": 0.037405851857893045
       },
       "canonicalReplays": {
         "indices": [
@@ -240235,7 +240336,45 @@
           "incumbent"
         ],
         "verified": true
-      }
+      },
+      "sourceSha256": "e296f0f842ba25378fc5537a0ab3537e2f23a7feb4aab68fc28652bd664ed96c",
+      "reportSha256": "714ecd89eff4011771cfc00b6232411851bc556d2e29bd234cf7d290b8293c80"
+    },
+    "robustness": {
+      "candidateSha256": "9d8b9cb3aa135474a49af41a1255e741604cb5cf4e9c9222eb7cd8dcd781ff92",
+      "incumbentSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+      "minimumPairs": 4096,
+      "rewardDifference": {
+        "count": 4096,
+        "lower95": 0.0056859893792033656,
+        "lowerConfidence": 0.002688456708198535,
+        "mean": 0.015226236979166667,
+        "qualificationConfidence": 0.99,
+        "upper95": 0.024766484579129968
+      },
+      "winShareDifference": {
+        "count": 4096,
+        "lower95": 0.005683142706318216,
+        "lowerConfidence": 0.0023676532008054772,
+        "mean": 0.0162353515625,
+        "qualificationConfidence": 0.99,
+        "upper95": 0.026787560418681786
+      },
+      "canonicalReplays": {
+        "indices": [
+          0,
+          1365,
+          2730,
+          4095
+        ],
+        "sides": [
+          "candidate",
+          "incumbent"
+        ],
+        "verified": true
+      },
+      "sourceSha256": "dd7b18adfad01560e42aabce85db73bfc9fdf2b6cacfede7a624239212e597b2",
+      "reportSha256": "907f4263904dbf13f6847ca63eb218f6777e544c762ff6e03a4f349e5a90a98f"
     }
   }
 }

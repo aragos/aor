@@ -56,14 +56,14 @@ test('the installed hybrid binds its ordinary model and preserves the existing c
 
     assert.equal(matching.length, 1);
     assert.deepEqual(actor.ordinaryBaseline, {schemaVersion: matching[0].schemaVersion, weights: matching[0].weights});
-    assert.equal(digest(actor.ordinaryBaseline), '9caa3d3bf3c466786c9af41a12fe5ffd19bd670e19aa79f980d53d1212a2312d');
+    assert.equal(digest(actor.ordinaryBaseline), '40bb34483f84f7ef6bd9c46908e5b88bb3198c9d98ccc277c75d298c5ac63a0c');
     assert.notDeepEqual(actor.baseline, actor.ordinaryBaseline);
     assert(baseline.models.some(model => model.dataVersion === 'ah1996-catalog-15'),
         'Existing catalog-15 games must retain their qualified ordinary policy.');
 });
 
-test('the exact hybrid passes all three independent purchase qualification gates', () => {
-    const qualification = actor.hybridQualification;
+test('the parent F1 hybrid retains all three independent purchase qualification gates', () => {
+    const qualification = actor.provenance.parent.hybridQualification;
 
     assert.equal(qualification.qualificationPassed, true);
     assert.equal(qualification.humanStrengthVerified, false);
@@ -94,7 +94,7 @@ test('the exact hybrid passes all three independent purchase qualification gates
 });
 
 test('the population gate preserves its resource stop and continuation of the same trial', () => {
-    const population = actor.hybridQualification.population;
+    const population = actor.provenance.parent.hybridQualification.population;
 
     assert.deepEqual(population.recovery, {
         sourceCampaign: 'automata-purchase-population-20261110',
@@ -126,7 +126,7 @@ test('the shipped hybrid uses the frozen purchase prior for every signed seed', 
 });
 
 test('the P48 provenance binds the continuation to its original actor and Adam state', () => {
-    const provenance = actor.provenance;
+    const provenance = actor.provenance.parent.provenance;
 
     assert.equal(provenance.trainingGames, 12288);
     assert.equal(provenance.selectedUpdate, 48);
@@ -171,10 +171,10 @@ test('the P48 provenance binds the continuation to its original actor and Adam s
 });
 
 test('the original P32 and F1 hybrid qualification remain intact in the parent lineage', () => {
-    const provenance = actor.provenance.parent.provenance;
+    const provenance = actor.provenance.parent.provenance.parent.provenance;
 
     assert.equal(digest(provenance), '2110e6eff00783dd402da9df01db907eaf77980c7942cd160adf6d35be597f29');
-    assert.equal(digest(actor.provenance.parent.hybridQualification),
+    assert.equal(digest(actor.provenance.parent.provenance.parent.hybridQualification),
         'a756c1495075275af365c7591a2e4e3860918b94b811ebe75c9af5b5b3fbe9d4');
     assert.equal(provenance.trainingGames, 8192);
     assert.equal(provenance.selectedUpdate, 32);
