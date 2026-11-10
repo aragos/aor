@@ -54,7 +54,8 @@ object BotPolicy {
                 val baseline = plan(observation, ranked, model, scores).candidate
                 if (observation.decision == "buy-tokens") {
                     val incumbent = BotTokenValue.choose(observation, baseline, model)
-                    BotTokenCorrection.choose(observation, incumbent, model)
+                    val corrected = BotTokenCorrection.choose(observation, incumbent, model)
+                    BotTokenOrderControl.choose(observation, corrected, model)
                 } else {
                     val deferred =
                         BotLeaderTiming.deferForCash(observation, baseline, model, ordinaryScores)

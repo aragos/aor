@@ -77,7 +77,9 @@ object BotTokenValue {
             .map { "$FEATURE_PREFIX$it" } + BotTokenPlanFeature.entries.map { it.key }
 
     internal fun reserved(name: String): Boolean =
-        name.startsWith(PREFIX) || BotTokenCorrection.reserved(name)
+        name.startsWith(PREFIX) ||
+            BotTokenCorrection.reserved(name) ||
+            BotTokenOrderControl.reserved(name)
 
     /** A complete feature vector, including explicit zeros, identifies this observation schema. */
     fun available(observation: BotObservation): Boolean =
