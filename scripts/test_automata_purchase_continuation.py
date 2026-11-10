@@ -39,6 +39,30 @@ class PurchaseContinuationTest(unittest.TestCase):
     def checkpoint(self, path, payload):
         experiments.document(path, {"sha256": continuation.digest(payload), "payload": payload}, immutable=False)
 
+    def test_rules_transfer_is_explicit_and_does_not_rewrite_source_models(self):
+        protocol = dict(self.protocol(), experimentalRulesTransfer=dict(continuation.RULES_TRANSFER))
+        before = self.baseline.read_bytes()
+        collection = continuation.collection_source(protocol, "updated.json", 1)
+        arena = continuation.arena_source(protocol, "updated.json", "confirmation")
+        self.assertEqual(continuation.RULES_TRANSFER, collection["experimentalRulesTransfer"])
+        self.assertEqual(continuation.RULES_TRANSFER, arena["experimentalRulesTransfer"])
+        self.assertEqual(before, self.baseline.read_bytes())
+        self.assertNotIn("experimentalRulesTransfer", continuation.collection_source(self.protocol(), "updated.json", 1))
+
+    def test_rules_transfer_cannot_claim_historical_qualification(self):
+        source = {"experimentalRulesTransfer": dict(continuation.RULES_TRANSFER)}
+        metadata = {"experimentalRulesTransfer": dict(continuation.RULES_TRANSFER,
+                     initializationOnly=True, qualificationTransferred=True)}
+        with self.assertRaisesRegex(ValueError, "initialization-only"):
+            continuation.verify_transfer_metadata(source, metadata)
+
+    def test_rules_transfer_rejects_an_undeclared_or_different_target(self):
+        with self.assertRaisesRegex(ValueError, "undeclared"):
+            continuation.verify_transfer_metadata({}, {"experimentalRulesTransfer": continuation.RULES_TRANSFER})
+        with self.assertRaisesRegex(ValueError, "rules4-to-rules5"):
+            continuation.transfer_source({"experimentalRulesTransfer": dict(continuation.RULES_TRANSFER,
+                                         targetRulesVersion="future")})
+
     def protocol(self, profile="search"):
         return {"profile": profile, **continuation.PROFILES[profile], "baseline": str(self.baseline),
                 "prior": str(self.prior), "purchasePolicy": str(self.policy), "optimizerFrom": str(self.adam),

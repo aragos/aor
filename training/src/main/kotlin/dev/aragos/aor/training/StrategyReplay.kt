@@ -385,6 +385,11 @@ object StrategyReplayMain {
                 }
             }
         }
+        if (specification.experimentalRulesTransfer != null) {
+            specification.snapshotModels(artifacts)
+            val selected = output.resolve("${side.commandValue}.json")
+            artifacts.ensureFileSnapshot(selected, PurchaseJson.hash(selected), "model.json")
+        }
         specification.snapshotOverlays(artifacts)
         val identity =
             mapOf("kind" to "strategy-replay", "signature" to signature) +
@@ -421,9 +426,11 @@ object StrategyReplayMain {
                         "Post-hoc inspection only; no fitting or promotion. Authority entries are separate from policy inputs.",
                 ),
         )
-        artifacts.model(side.model(specification), "model.json")
-        specification.opponents.forEachIndexed { opponent, model ->
-            artifacts.model(model, "opponent-$opponent.json")
+        if (specification.experimentalRulesTransfer == null) {
+            artifacts.model(side.model(specification), "model.json")
+            specification.opponents.forEachIndexed { opponent, model ->
+                artifacts.model(model, "opponent-$opponent.json")
+            }
         }
         val deadline = System.nanoTime() + (hours * 3_600_000_000_000).toLong()
         val replay = StrategyReplays.play(specification, index, side, deadline, pair)
