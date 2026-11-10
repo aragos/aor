@@ -15,6 +15,12 @@ enum class ArenaPurpose {
     CONFIRMATION,
 }
 
+/** Explicit replacement-seat role, independent of whether its ordinary model equals its rival. */
+enum class ArenaSide {
+    CANDIDATE,
+    INCUMBENT,
+}
+
 /**
  * Model paths in the source JSON are resolved relative to that JSON's directory. Null means prior.
  */
@@ -155,16 +161,44 @@ object StrategyArena {
         pair(
             specification,
             index,
-            game(specification, index, specification.candidate, deadlineNanos),
-            game(specification, index, specification.incumbent, deadlineNanos),
+            game(specification, index, ArenaSide.CANDIDATE, deadlineNanos),
+            game(specification, index, ArenaSide.INCUMBENT, deadlineNanos),
         )
 
-    /** Play one replacement seat against the same frozen lineup used by [play]. */
+    /** Play an explicit side, including its purchase actor, even when ordinary models are equal. */
+    fun game(
+        specification: ArenaSpecification,
+        index: Int,
+        side: ArenaSide,
+        deadlineNanos: Long,
+    ): ArenaGame =
+        game(
+            specification,
+            index,
+            when (side) {
+                ArenaSide.CANDIDATE -> specification.candidate
+                ArenaSide.INCUMBENT -> specification.incumbent
+            },
+            deadlineNanos,
+            side,
+        )
+
+    /**
+     * Model-search entry point; role-specific purchase actors require the explicit-side overload.
+     */
     fun game(
         specification: ArenaSpecification,
         index: Int,
         model: BotModel,
         deadlineNanos: Long,
+    ): ArenaGame = game(specification, index, model, deadlineNanos, side = null)
+
+    private fun game(
+        specification: ArenaSpecification,
+        index: Int,
+        model: BotModel,
+        deadlineNanos: Long,
+        side: ArenaSide?,
     ): ArenaGame {
         val lineup = lineup(specification, index)
         return ArenaGame.from(
@@ -183,7 +217,7 @@ object StrategyArena {
                     deadlineNanos = deadlineNanos,
                     controllers =
                         specification.frozenPurchase
-                            ?.controllers(lineup.configuration.playerCount)
+                            ?.controllers(lineup.configuration.playerCount, lineup.seat, side)
                             .orEmpty(),
                 )
         )

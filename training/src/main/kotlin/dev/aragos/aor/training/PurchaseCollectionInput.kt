@@ -30,8 +30,10 @@ internal data class PurchaseActorInput(
  * frozen HARD opponent population. Relative model paths resolve beside the source JSON. A null
  * [policy] collects exact baseline recommendations, without invented behavior likelihoods.
  * [opponentPurchasePolicy], when present, controls purchase decisions for every other seat using
- * that seat's existing HARD opponent model as its prior and nonpurchase policy. Only the rotating
- * controlled seat produces training records; absent/null retains the original collection format.
+ * that seat's existing HARD opponent model as its prior and nonpurchase policy. An explicit
+ * [sharedPurchaseBaseline] instead supplies every seat's purchase prior, including baseline-only
+ * rivals; ordinary decisions keep their original models. Only the rotating controlled seat produces
+ * training records. Omitting the shared baseline preserves legacy signatures and artifact fields.
  */
 internal data class PurchaseCollectionInput(
     val source: Path,
@@ -46,6 +48,7 @@ internal data class PurchaseCollectionInput(
     val policy: PurchasePolicyModel?,
     val dictionary: PurchaseFeatureDictionary,
     val opponentPurchasePolicy: PurchaseActorInput? = null,
+    val sharedPurchaseBaseline: PurchaseBaselineInput? = null,
 ) {
     init {
         require(
@@ -86,7 +89,8 @@ internal data class PurchaseCollectionInput(
                     listOfNotNull(
                         opponentPurchasePolicy?.let {
                             "opponent-purchase-policy:${it.sha256}"
-                        }
+                        },
+                        sharedPurchaseBaseline?.let { "shared-purchase-baseline:${it.sha256}" },
                     )
                 )
                 .joinToString("\n")
@@ -100,7 +104,7 @@ internal data class PurchaseCollectionInput(
             PurchaseJson.fields(
                 node,
                 setOf("schemaVersion", "configuration", "games", "seed", "baseline", "opponents"),
-                setOf("policy", "opponentPurchasePolicy"),
+                setOf("policy", "opponentPurchasePolicy", "sharedPurchaseBaseline"),
             )
             require(PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") == 1) {
                 "A purchase collection requires schemaVersion 1."
@@ -149,6 +153,10 @@ internal data class PurchaseCollectionInput(
                     }
             val policy = actor("policy")
             val opponentPolicy = actor("opponentPurchasePolicy")
+            val sharedBaseline =
+                node["sharedPurchaseBaseline"]?.let {
+                    baseline(PurchaseJson.text(it, "sharedPurchaseBaseline"))
+                }
             val dictionary =
                 PurchaseObservationEncoder.dictionary(
                     PublicCatalog.forPlayers(configuration.playerCount, configuration.rules)
@@ -169,6 +177,7 @@ internal data class PurchaseCollectionInput(
                 policy?.model,
                 dictionary,
                 opponentPolicy,
+                sharedBaseline,
             )
         }
     }

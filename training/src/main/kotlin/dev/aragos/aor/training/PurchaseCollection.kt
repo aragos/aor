@@ -55,13 +55,14 @@ internal class PurchaseCollector(
         }
         val seat = input.seat(index)
         val records = mutableListOf<PurchaseDecisionRecord>()
+        val sharedBaseline = input.sharedPurchaseBaseline?.model
         val controller =
-            PurchaseActorController(input.baseline.model, input.policy) {
+            PurchaseActorController(sharedBaseline ?: input.baseline.model, input.policy) {
                 records.add(it)
             }
         val opponents = input.opponentIndices(index)
         val opponentControllers =
-            input.opponentPurchasePolicy?.let { actor ->
+            if (input.opponentPurchasePolicy != null || sharedBaseline != null) {
                 opponents
                     .mapIndexedNotNull { player, opponent ->
                         if (player == seat) {
@@ -69,13 +70,15 @@ internal class PurchaseCollector(
                         } else {
                             player to
                                 PurchaseActorController(
-                                    input.opponents[opponent].model,
-                                    actor.model,
+                                    sharedBaseline ?: input.opponents[opponent].model,
+                                    input.opponentPurchasePolicy?.model,
                                 )
                         }
                     }
                     .toMap()
-            } ?: emptyMap()
+            } else {
+                emptyMap()
+            }
         val game =
             Simulation()
                 .play(
