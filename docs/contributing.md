@@ -124,11 +124,77 @@ terminal outcomes and decision counts, excluding only signatures and elapsed tim
 not record full trajectories. The bundled Mac reference is checked automatically; any per-world
 difference fails parity even if aggregate outcomes match. Worker, platform and smoke reuse is for
 performance/determinism only, never independent strength evidence. These commands neither train
-nor activate actors. Migrating training still requires fresh environment binding and qualification.
+nor activate actors. Training on another host requires fresh environment binding and qualification.
 
 After a full local reference passes, `export --bundle BUNDLE --reference RUN --archive FILE.tar.gz`
 includes both the immutable bundle and all reference evidence with hashes. Preserve the generated
 archive checksum alongside the transfer.
+
+#### Additional Ubuntu worker over SSH
+
+The Mac and desktop can run independent jobs concurrently. Give each job its own output directory
+and reserve disjoint training/evaluation worlds; the benchmark's explicit world reuse is an exception.
+
+On Windows 11 22H2 or newer, install [WSL and Ubuntu](https://learn.microsoft.com/en-us/windows/wsl/install)
+from administrator PowerShell, restart if requested, then open Ubuntu and create its Linux account:
+
+```powershell
+wsl --install -d Ubuntu
+wsl --update
+wsl -l -v
+```
+
+Confirm Ubuntu shows version 2. Merge the following into `%UserProfile%\.wslconfig`; 24 GB is a
+suggested ceiling for the 32 GB desktop, leaving memory for Windows. WSL uses all logical processors
+by default. The [documented idle setting](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)
+keeps the distribution available after terminals disconnect:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+memory=24GB
+
+[general]
+instanceIdleTimeout=-1
+```
+
+Run `wsl --shutdown`, then reopen Ubuntu. Mark the trusted home Wi-Fi network Private and add this
+port-specific rule in administrator PowerShell, following Microsoft's
+[mirrored networking instructions](https://learn.microsoft.com/en-us/windows/wsl/networking#mirrored-mode-networking):
+
+```powershell
+New-NetFirewallHyperVRule -Name "AoR-SSH" -DisplayName "AoR WSL SSH" -Direction Inbound -Action Allow -Profiles Private -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 22
+ipconfig
+```
+
+Record the Wi-Fi IPv4 address. Inside Ubuntu, install the
+[SSH server](https://ubuntu.com/server/docs/how-to/security/openssh-server/),
+[JDK 21](https://packages.ubuntu.com/openjdk-21-jdk), Python and session tools:
+
+```sh
+sudo apt update
+sudo apt install -y openssh-server openjdk-21-jdk-headless python3 python3-venv tmux git
+sudo systemctl enable --now ssh
+mkdir -p ~/aor-worker
+```
+
+From the Mac, use the Ubuntu username and Windows Wi-Fi address. Install the existing public key
+using the Ubuntu account password when prompted, then connect:
+
+```sh
+ssh-copy-id -i ~/.ssh/id_ed25519.pub UBUNTU_USER@DESKTOP_IP
+ssh UBUNTU_USER@DESKTOP_IP
+```
+
+This connects directly to Ubuntu over the local network; no router port forwarding is needed.
+Keep the desktop awake while jobs run. In Ubuntu, start `tmux new -s aor`, run the benchmark or job,
+and detach with Ctrl-b then d. Reconnect with `tmux attach -t aor`; [tmux preserves running programs
+across SSH disconnects](https://github.com/tmux/tmux/wiki/Getting-Started#attaching-and-detaching).
+Keep code and data in `~/aor-worker` on the [Linux filesystem](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems).
+
+For native Ubuntu, use the same Ubuntu package and Mac SSH commands with Ubuntu's LAN address
+(`hostname -I`); omit the WSL and Hyper-V steps. If its firewall is enabled, allow TCP 22 from the
+Mac's LAN address. Each host's environment, limits and results remain independently recorded.
 
 ## Unattended automata campaigns
 
