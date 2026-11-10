@@ -60,6 +60,20 @@ class OptionsAndBudgetTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             training.parse_options(["--mode", "token-value-pilot"])
 
+    def test_token_order_collection_forwards_its_frozen_source_and_worker_budget(self):
+        options = training.parse_options(["--mode", "token-order-collect", "--source", "/tmp/token-order.json", "--workers", "4"])
+        arguments = training.trainer_arguments(options, training.resource_budget(training.Hardware(10, 64 * training.GIB), 4), 2.)
+        self.assertEqual("token-order-collect", arguments[arguments.index("--mode") + 1])
+        self.assertEqual(str(Path("/tmp/token-order.json").resolve()), arguments[arguments.index("--source") + 1])
+        self.assertEqual("4", arguments[arguments.index("--workers") + 1])
+
+    def test_token_order_collection_requires_source_and_rejects_seed_override(self):
+        for arguments in (["--mode", "token-order-collect"],
+                          ["--mode", "token-order-collect", "--source", "/tmp/token-order.json", "--seed", "1"]):
+            with self.subTest(arguments=arguments), self.assertRaises(SystemExit), redirect_stdout(io.StringIO()), \
+                    patch("sys.stderr", new_callable=io.StringIO):
+                training.parse_options(arguments)
+
     def test_token_value_pilot_rejects_cli_overrides_of_frozen_settings(self):
         for flag in ("--pairs", "--samples", "--seed", "--model", "--rounds"):
             with self.subTest(flag=flag), self.assertRaises(SystemExit):
