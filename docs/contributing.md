@@ -479,11 +479,15 @@ run on JVM and JavaScript. Numerical updates prepare validated sparse inputs onc
 same Float64 arithmetic, optimizer state and portable model output.
 
 The browser's separate [purchase asset](../web/src/ai/purchaseModel.json) is optional. Its manifest
-binds the exact baseline weights, actor/encoder versions, rules, catalog and qualified setup. The
+binds the exact purchase-prior weights, actor/encoder versions, rules, catalog and qualified setup. The
 [selector](../ai/src/jsMain/kotlin/dev/aragos/aor/ai/PurchaseBotExports.kt) caches the decoded actor,
-computes the ordinary baseline recommendation and binds it to the server's actor-safe projection.
-Unsupported scopes and unavailable or incompatible actors retain that baseline. Preserve sampled
-selection and deterministic retries; greedy inference or a changed baseline requires requalification.
+computes the ordinary recommendation and binds the purchase prior to the server's actor-safe
+projection. An optional `ordinaryBaseline` binds a separately qualified ordinary model while
+`baseline` remains the frozen purchase prior. Without that field, both models must match. Invalid
+bindings disable the optional actor. Unsupported scopes and unavailable or incompatible actors retain
+the ordinary recommendation. Preserve sampled selection and deterministic retries; changing either
+model or using greedy inference requires qualification of the resulting combination. The asset keeps
+the actor's original provenance and records separate hybrid qualification evidence.
 The supported scope is HARD shipping and advance purchases in four-player standard-map games with
 No Crusades, the deck modification and immediate Master Art discard enabled. Other decisions and
 setups continue using the compatible baseline.
