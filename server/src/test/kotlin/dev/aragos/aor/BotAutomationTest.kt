@@ -178,7 +178,7 @@ class BotAutomationTest(private val postgres: Boolean) {
             }
 
     @Test
-    fun currentRulesGamesDoNotRequestLegacyQualifiedPurchaseInputs() =
+    fun currentRulesGamesRequestIndependentlyQualifiedPurchaseInputs() =
         AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
             fixture ->
             fixture.preparePurchase(PlayerId("p4"), PurchaseStep.ADVANCES)
@@ -186,7 +186,7 @@ class BotAutomationTest(private val postgres: Boolean) {
             val job = fixture.claim().observations.single()
 
             assertThat(job.observation.rulesVersion).isEqualTo(RULES_VERSION)
-            assertThat(job.purchase).isNull()
+            assertThat(job.purchase).isNotNull()
         }
 
     @Test
