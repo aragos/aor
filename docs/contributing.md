@@ -512,6 +512,42 @@ together and compute uncertainty over independent worlds. Reports, checkpoints a
 files stay in isolated experiment storage; they do not activate a browser model automatically.
 See [open learning work](follow-ups.md#autonomous-strategy-discovery) for broader strategy coverage.
 
+### Purchase continuation campaigns
+
+The [continuation runner](../scripts/automata_purchase_continuation.py) extends the qualified P32
+purchase actor with its original Adam state and PPO objective. A qualified ordinary model supplies
+all other decisions; every seat keeps the original purchase prior, and rivals keep P32. The source
+campaign must have passed independent confirmation and robustness for that ordinary model.
+
+```sh
+python3 scripts/automata_purchase_continuation.py prepare \
+  --from-campaign /absolute/qualified-campaign \
+  --baseline /absolute/qualified-campaign/run/selected/candidate.json \
+  --prior /absolute/qualified-campaign/inputs/purchase-prior.json \
+  --purchase-policy /absolute/original-purchase-run/update-32/policy.json \
+  --optimizer-from /absolute/original-purchase-run/update-32/checkpoint.json \
+  --update-config /absolute/original-purchase-run/update-32-config.json \
+  --numerical-python /absolute/numerical-venv/bin/python \
+  --runtime training/build/install/training --seed-audit /absolute/seed-audit.json \
+  --seed 4000000 --workers 6 --output .aor-training/purchase-continuation
+python3 .aor-training/purchase-continuation/scripts/automata_campaign.py \
+  --spec .aor-training/purchase-continuation/campaign.json \
+  --output .aor-training/purchase-continuation/run
+```
+
+Choose unused seeds for each preparation. The required historical audit reserves actual
+`reservedSeeds`, conservative native `conservativelyExpandedOffsets` with
+`conservativePairsPerOffset`, or both. Include earlier purchase, joint-learning and diagnostic runs;
+the source campaign alone is insufficient. Preparation pins the audit and numerical environment.
+Use `--profile smoke` for a small pipeline check that cannot qualify a policy.
+
+The search profile caps training at sixteen batches of 256 games and compares fixed checkpoints on
+one shared development bank. A collapse stops the recipe. At most one actor advances to fresh paired
+confirmation and separate opponents, requiring positive 99% lower bounds for both win share and
+composite reward against the unchanged qualified hybrid. Training and selection have four hours;
+the final stages have two hours each within one eight-hour deadline. Resume preserves these clocks,
+the actor/optimizer chain and all reserved worlds. Reports never activate a browser policy.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It
