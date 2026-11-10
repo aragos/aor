@@ -6,7 +6,9 @@ import * as ai from '../../ai/build/dist/js/productionLibrary/aor-ai.mjs';
 import {createBotPolicyRunner} from '../src/ai/botPolicy.ts';
 
 const baseline = JSON.parse(readFileSync(new URL('../src/ai/model.json', import.meta.url), 'utf8'));
-const actor = JSON.parse(readFileSync(new URL('../src/ai/purchaseModel.json', import.meta.url), 'utf8'));
+const purchaseBundle = JSON.parse(readFileSync(new URL('../src/ai/purchaseModel.json', import.meta.url), 'utf8'));
+const actor = purchaseBundle.models.find(model => model.rulesVersion === 'ah1996-three-epoch-4');
+const currentActor = purchaseBundle.models.find(model => model.rulesVersion === 'ah1996-three-epoch-5');
 const configuration = {
     playerCount: 4,
     map: 'STANDARD',
@@ -238,5 +240,38 @@ test('the shipped actor retains exact ordinary choices outside its qualified use
     for (const input of inputs) {
         const ordinary = ai.chooseBotMove(JSON.stringify(input.observation), JSON.stringify(baseline), input.difficulty, input.seed);
         assert.equal(await run(input), ordinary);
+    }
+});
+
+test('current rules have fresh qualification and retain exact ordinary F1 binding', () => {
+    assert.equal(purchaseBundle.models.length, 2);
+    assert.equal(currentActor.provenance.sourcePolicySha256,
+        '62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44');
+    const ordinary = baseline.models.find(model => model.rulesVersion === currentActor.rulesVersion);
+    assert.deepEqual(currentActor.ordinaryBaseline, {schemaVersion: ordinary.schemaVersion, weights: ordinary.weights});
+    assert.deepEqual(currentActor.ordinaryBaseline, actor.ordinaryBaseline);
+    assert.equal(currentActor.configuration.drawThreeKeepTwo, false);
+    const qualified = currentActor.hybridQualification;
+    assert.equal(qualified.initialization.qualificationTransferred, false);
+    assert.equal(qualified.humanStrengthVerified, false);
+    for (const [stage, count] of [['confirmation', 2048], ['heldout', 4096]]) {
+        for (const metric of ['winShareDifference', 'rewardDifference']) {
+            assert.equal(qualified[stage][metric].count, count);
+            assert.equal(qualified[stage][metric].qualificationConfidence, .99);
+            assert(qualified[stage][metric].lowerConfidence > 0);
+        }
+    }
+});
+
+test('current-rules actor preserves its frozen purchase prior over signed seeds', async () => {
+    const prior = {...currentActor.baseline, rulesVersion: currentActor.rulesVersion,
+        dataVersion: currentActor.dataVersion, configuration: currentActor.configuration};
+    const standalone = {...currentActor}; delete standalone.ordinaryBaseline;
+    const expected = createBotPolicyRunner(async () => ai, prior, standalone);
+    const actual = createBotPolicyRunner(async () => ai, baseline, purchaseBundle);
+    for (const seed of [0, 1, 2, 17, -1, -2147483648, 2147483647, 0x6a09e667]) {
+        const job = {...shipping, difficulty: 'HARD', seed,
+            observation: {...shipping.observation, rulesVersion: currentActor.rulesVersion}};
+        assert.equal(await actual(job), await expected(job));
     }
 });

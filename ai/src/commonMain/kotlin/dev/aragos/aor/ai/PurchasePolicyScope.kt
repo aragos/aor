@@ -10,6 +10,8 @@ import dev.aragos.aor.MapRule
  */
 object PurchasePolicyScope {
     const val RULES_VERSION = "ah1996-three-epoch-4"
+    const val CURRENT_RULES_VERSION = "ah1996-three-epoch-5"
+    val rulesVersions = setOf(RULES_VERSION, CURRENT_RULES_VERSION)
     const val DATA_VERSION = "ah1996-catalog-16"
     val configuration =
         BotConfiguration(
@@ -24,7 +26,7 @@ object PurchasePolicyScope {
     fun supports(observation: BotObservation, difficulty: BotDifficulty): Boolean =
         difficulty == BotDifficulty.HARD &&
             observation.decision in setOf("purchase-shipping", "purchase-advances") &&
-            observation.rulesVersion == RULES_VERSION &&
+            observation.rulesVersion in rulesVersions &&
             observation.dataVersion == DATA_VERSION &&
             observation.configuration == configuration
 }

@@ -8,15 +8,15 @@ import kotlin.js.JsExport
 import kotlin.js.jsTypeOf
 
 /**
- * One immutable actor is parsed per worker. Its manifest binds the exact qualified ordinary model
- * and setup; ordinary play is always computed first, including on an optional-asset failure. An
+ * Version-specific immutable actors are parsed once per worker. Each binds its qualified model and
+ * setup; ordinary play is always computed first, including on an optional-asset failure. An
  * explicit ordinary binding permits a distinct frozen purchase prior. Purchase input carries no
  * recommendation: the selected prior model supplies the network's baseline command.
  */
 @JsExport
 class PurchaseBotSelector(baselineModelJson: String, purchaseModelJson: String) {
     private val baselineJson = baselineModelJson
-    private val purchase = readQualifiedPurchaseAsset(purchaseModelJson)
+    private val purchases = readQualifiedPurchaseAssets(purchaseModelJson)
 
     fun choose(
         observationJson: String,
@@ -28,7 +28,8 @@ class PurchaseBotSelector(baselineModelJson: String, purchaseModelJson: String) 
         val level = BotDifficulty.valueOf(difficulty.uppercase())
         val baselineModel = readBotModel(baselineJson, observation)
         val baseline = BotPolicy.choose(observation, level, seed, baselineModel)
-        val actor = purchase ?: return baseline
+        val actor =
+            purchases.firstOrNull { it.rulesVersion == observation.rulesVersion } ?: return baseline
         if (
             purchaseJson == null ||
                 !PurchasePolicyScope.supports(observation, level) ||
@@ -83,28 +84,45 @@ class PurchaseBotSelector(baselineModelJson: String, purchaseModelJson: String) 
  * absence preserves the legacy contract that the prior and ordinary model must match.
  */
 private data class QualifiedPurchaseAsset(
+    val rulesVersion: String,
     val baseline: BotModel,
     val ordinaryBaseline: BotModel?,
     val model: PurchasePolicyModel,
 )
 
-private fun readQualifiedPurchaseAsset(json: String): QualifiedPurchaseAsset? =
+/** Ordered version-specific assets retain legacy saves without transferring qualification. */
+private fun readQualifiedPurchaseAssets(json: String): List<QualifiedPurchaseAsset> =
     try {
         require(json.isNotBlank() && json.length <= 26_000_000) {
             "A qualified purchase asset must fit its transport bound."
         }
         val raw = JSON.parse<dynamic>(json)
+        if (jsTypeOf(raw.models) == "undefined") {
+            listOfNotNull(readQualifiedPurchaseAsset(raw))
+        } else {
+            require(purchaseInteger(raw.schemaVersion) == 1) { "Unknown purchase bundle schema." }
+            val models = purchaseArray(raw.models)
+            require(models.size in 1..16) { "A purchase bundle requires one to sixteen entries." }
+            models.mapNotNull { readQualifiedPurchaseAsset(it) }
+        }
+    } catch (_: Throwable) {
+        emptyList()
+    }
+
+private fun readQualifiedPurchaseAsset(raw: dynamic): QualifiedPurchaseAsset? =
+    try {
         require(
             purchaseInteger(raw.schemaVersion) == 1 &&
                 purchaseString(raw.actorVersion) == PurchasePolicy.ACTOR_VERSION &&
                 purchaseString(raw.encoderVersion) == PurchaseObservationEncoder.ENCODER_VERSION &&
-                purchaseString(raw.rulesVersion) == PurchasePolicyScope.RULES_VERSION &&
+                purchaseString(raw.rulesVersion) in PurchasePolicyScope.rulesVersions &&
                 purchaseString(raw.dataVersion) == PurchasePolicyScope.DATA_VERSION &&
                 readConfiguration(raw.configuration) == PurchasePolicyScope.configuration
         ) {
             "The purchase actor must declare its exact qualified versions and configuration."
         }
         QualifiedPurchaseAsset(
+            rulesVersion = purchaseString(raw.rulesVersion),
             baseline = readPurchaseBaseline(raw.baseline),
             ordinaryBaseline =
                 if (jsTypeOf(raw.ordinaryBaseline) == "undefined") {
