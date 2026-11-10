@@ -203,6 +203,10 @@ across evolution, confirmation and robustness. The finite controller owns resour
 deadlines and immutable receipts; no language model participates in generation or selection.
 Smoke runs cannot qualify a candidate. Freeze distinct training and robustness opponent models
 before execution, and reserve all actual game seeds before opening any bank.
+`--workers` defaults to four and accepts up to 32; the native executor additionally enforces its
+machine-specific worker ceiling. Independent campaigns can use separate worker pools and disjoint
+seed banks when aggregate CPU and memory capacity permits. A running campaign's resource settings
+remain frozen with its inputs.
 
 An accepted result is a candidate for human evaluation. It does not establish human-level strength
 or activate browser assets. Its hybrid policy keeps the original purchase prior separate from the
