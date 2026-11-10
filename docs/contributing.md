@@ -91,6 +91,45 @@ setups and existing saves. Failed promotion retains the prior model and diagnost
 Schema/rules/catalog metadata protects inference compatibility; human strength remains unverified
 without independent playtests.
 
+### Portable simulation benchmark
+
+For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages
+a completed generation's frozen JVM distribution, ordinary models, purchase prior and actors. Its
+`prepare` command requires a historical seed audit reserving exactly 256 collection worlds and 128
+paired arena worlds. Collection uses the candidate in every purchase seat; the arena compares the
+candidate with its incumbent while rivals retain the candidate. The original ordinary rival pool
+remains frozen. Bundle paths are relative; source provenance and local JDK/Python identities are
+separate, so copying a benchmark does not rewrite or resume its source campaign.
+
+Extract an exported bundle on macOS, native Ubuntu or Ubuntu under WSL 2. Use a local JDK 21+ and
+Python 3.10+; the runner also supports the Mac's existing Python 3.9 reference environment. No Gradle,
+Node, numerical Python packages or CUDA installation is needed:
+
+```sh
+python3 aor-benchmark/scripts/automata_benchmark.py run --bundle aor-benchmark --output desktop-benchmark --java /path/to/jdk/bin/java
+```
+
+The default worker sweep is 4, 6, 8 and 10, skipping counts above the host's existing supervisor
+allowance. `--workers 6` selects one pass. Run on an otherwise idle machine. `--smoke --workers 2`
+uses the first two worlds of each reserved bank to check execution; those worlds are intentionally
+reused by the full benchmark. Each run needs a new output directory and allows one attempt per
+stage, bounded by 15 minutes per stage, two hours overall, 4 GiB sampled process-group RSS/output
+and 2 GiB minimum free disk. RSS is reduced further on memory-constrained hosts. Limits are sampled,
+so transient overshoot is possible. SIGINT/SIGTERM clean the owned process group.
+
+Reports retain total/native wall time, throughput, peak RSS, GC logs and all original per-world records.
+Native timings include JVM startup and warmup; compare the same workload sizes on both machines.
+They compare complete controlled purchase trajectories and terminal results, plus paired arena
+terminal outcomes and decision counts, excluding only signatures and elapsed times. The arena does
+not record full trajectories. The bundled Mac reference is checked automatically; any per-world
+difference fails parity even if aggregate outcomes match. Worker, platform and smoke reuse is for
+performance/determinism only, never independent strength evidence. These commands neither train
+nor activate actors. Migrating training still requires fresh environment binding and qualification.
+
+After a full local reference passes, `export --bundle BUNDLE --reference RUN --archive FILE.tar.gz`
+includes both the immutable bundle and all reference evidence with hashes. Preserve the generated
+archive checksum alongside the transfer.
+
 ## Unattended automata campaigns
 
 The [controller](../scripts/automata_campaign.py) and [experiment adapter](../scripts/automata_experiments.py)
