@@ -118,6 +118,9 @@ data class StrategySearchSpecification(
     val explicitCandidates: List<BotModel>? = null,
 ) {
     init {
+        require(arena.tokenOrder == null) {
+            "Ordinary model search cannot assign token-order actor roles."
+        }
         require(arena.purpose == ArenaPurpose.SCREENING) {
             "Parameter search is selection data and requires SCREENING purpose."
         }

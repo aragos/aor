@@ -33,6 +33,7 @@ data class ArenaSpecification(
     val pairsPerConfiguration: Int,
     val seed: Int,
     val frozenPurchase: ArenaPurchasePolicy? = null,
+    val tokenOrder: ArenaTokenOrderPolicy? = null,
 ) {
     init {
         require(
@@ -51,6 +52,7 @@ data class ArenaSpecification(
         }
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
         frozenPurchase?.validate(configurations)
+        tokenOrder?.validate(configurations)
     }
 
     fun identity(): String =
@@ -62,8 +64,38 @@ data class ArenaSpecification(
                 candidate.weights.toSortedMap(),
                 incumbent.weights.toSortedMap(),
                 opponents.map { it.weights.toSortedMap() },
-            ) + listOfNotNull(frozenPurchase?.identity()))
+            ) + listOfNotNull(frozenPurchase?.identity(), tokenOrder?.identity()))
             .joinToString("\n")
+
+    /** Phase-disjoint overlays retain their own priors and never replace a rival's token policy. */
+    internal fun controllers(
+        playerCount: Int,
+        controlledSeat: Int,
+        side: ArenaSide?,
+        ordinary: BotModel,
+    ): Map<Int, SimulationController> {
+        val purchase = frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
+        val token = tokenOrder?.controller(side, ordinary) ?: return purchase
+        val previous = purchase[controlledSeat]
+        val combined =
+            object : SimulationController {
+                override fun controls(decision: String): Boolean =
+                    token.controls(decision) || previous?.controls(decision) == true
+
+                override fun choose(decision: SimulationDecision): String? =
+                    if (token.controls(decision.observation.decision)) token.choose(decision)
+                    else previous?.choose(decision)
+            }
+        return purchase + (controlledSeat to combined)
+    }
+
+    internal fun overlayMetadata(): Map<String, Any> =
+        frozenPurchase?.metadata().orEmpty() + tokenOrder?.metadata().orEmpty()
+
+    internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
+        frozenPurchase?.snapshot(artifacts)
+        tokenOrder?.snapshot(artifacts)
+    }
 
     companion object {
         fun read(source: Path): ArenaSpecification {
@@ -97,6 +129,7 @@ data class ArenaSpecification(
                 seed = integer(node, "seed"),
                 frozenPurchase =
                     node["frozenPurchase"]?.let { ArenaPurchasePolicy.read(source, it) },
+                tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
             )
         }
 
@@ -216,9 +249,12 @@ object StrategyArena {
                         },
                     deadlineNanos = deadlineNanos,
                     controllers =
-                        specification.frozenPurchase
-                            ?.controllers(lineup.configuration.playerCount, lineup.seat, side)
-                            .orEmpty(),
+                        specification.controllers(
+                            lineup.configuration.playerCount,
+                            lineup.seat,
+                            side,
+                            model,
+                        ),
                 )
         )
     }
@@ -356,7 +392,7 @@ object StrategyArenaMain {
         specification.opponents.forEachIndexed { index, model ->
             artifacts.ensureModelSnapshot(model, "opponent-$index.json")
         }
-        specification.frozenPurchase?.snapshot(artifacts)
+        specification.snapshotOverlays(artifacts)
         val startPath = output.resolve("started-at.txt")
         val started =
             if (Files.exists(startPath)) {
@@ -374,7 +410,7 @@ object StrategyArenaMain {
         val total = specification.configurations.size * specification.pairsPerConfiguration
         artifacts.write(
             "run.json",
-            specification.frozenPurchase?.metadata().orEmpty() +
+            specification.overlayMetadata() +
                 mapOf(
                     "kind" to "strategy-arena",
                     "signature" to signature,
@@ -417,7 +453,7 @@ object StrategyArenaMain {
             }
         artifacts.write(
             "evaluation.json",
-            specification.frozenPurchase?.metadata().orEmpty() +
+            specification.overlayMetadata() +
                 mapOf(
                     "complete" to true,
                     "promoted" to false,

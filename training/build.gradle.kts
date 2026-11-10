@@ -36,6 +36,7 @@ distributions {
                     "joint_economy.py",
                     "joint_trajectory.py",
                     "token_policy.py",
+                    "token_order_policy.py",
                     "expansion_policy.py",
                     "territory_trajectory.py",
                     "territory_value.py",
