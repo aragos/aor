@@ -219,6 +219,54 @@ class CollectionAndCheckpointTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "completed collection"):
             learner.read_collection(self.data, self.model_path, self.model)
 
+    def shared_baseline(self):
+        snapshot = self.data / "shared-purchase-baseline.json"
+        learner.atomic_json(snapshot, {"schemaVersion": 1, "weights": {}})
+        path = self.data / "collection.json"
+        manifest = learner.read_json(path)
+        manifest["sharedPurchaseBaseline"] = {
+            "path": str(self.root / "archived-source.json"),
+            "sha256": learner.file_digest(snapshot)}
+        learner.atomic_json(path, manifest)
+        return snapshot
+
+    def test_shared_baseline_uses_archived_bytes_without_requiring_original_source(self):
+        self.shared_baseline()
+
+        rows, provenance = learner.read_collection(self.data, self.model_path, self.model)
+
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(provenance["collectionSha256"],
+                         learner.file_digest(self.data / "collection.json"))
+        self.assertEqual(set(provenance), {"collectionSha256", "collectionSignature",
+                                          "gameHashes", "games", "gameMeanReward"})
+
+    def test_malformed_shared_baseline_provenance_is_rejected(self):
+        self.shared_baseline()
+        path = self.data / "collection.json"
+        manifest = learner.read_json(path)
+        original = manifest["sharedPurchaseBaseline"]
+        for invalid in (None, "baseline.json", {}, {**original, "path": "relative.json"},
+                        {**original, "sha256": "not-a-hash"}, {**original, "extra": True}):
+            with self.subTest(invalid=invalid):
+                learner.atomic_json(path, {**manifest, "sharedPurchaseBaseline": invalid})
+
+                with self.assertRaisesRegex(ValueError, "exact path and SHA-256"):
+                    learner.read_collection(self.data, self.model_path, self.model)
+
+    def test_missing_shared_baseline_snapshot_is_rejected(self):
+        self.shared_baseline().unlink()
+
+        with self.assertRaisesRegex(ValueError, "Shared purchase baseline snapshot"):
+            learner.read_collection(self.data, self.model_path, self.model)
+
+    def test_changed_shared_baseline_snapshot_is_rejected(self):
+        snapshot = self.shared_baseline()
+        snapshot.write_bytes(snapshot.read_bytes() + b"\n")
+
+        with self.assertRaisesRegex(ValueError, "Shared purchase baseline snapshot"):
+            learner.read_collection(self.data, self.model_path, self.model)
+
     def test_cli_initialization_accepts_full_collection_dictionary(self):
         output = self.root / "initial"
         with redirect_stdout(io.StringIO()):

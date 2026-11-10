@@ -68,6 +68,9 @@ internal class PurchaseCollectionStore(
         immutableJson("collection.json", manifest())
         snapshot("source.json", input.source, input.sourceSha256)
         snapshot("baseline.json", input.baseline.path, input.baseline.sha256)
+        input.sharedPurchaseBaseline?.let {
+            snapshot("shared-purchase-baseline.json", it.path, it.sha256)
+        }
         input.opponents.forEachIndexed { index, model ->
             snapshot("opponent-$index.json", model.path, model.sha256)
         }
@@ -216,6 +219,12 @@ internal class PurchaseCollectionStore(
                             "path" to it.path.toString(),
                             "sha256" to it.sha256,
                         )
+                )
+            } ?: emptyMap()) +
+            (input.sharedPurchaseBaseline?.let {
+                mapOf(
+                    "sharedPurchaseBaseline" to
+                        mapOf("path" to it.path.toString(), "sha256" to it.sha256)
                 )
             } ?: emptyMap())
 

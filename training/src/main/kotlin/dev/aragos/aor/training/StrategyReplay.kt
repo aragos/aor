@@ -17,6 +17,13 @@ enum class StrategyReplaySide(val commandValue: String) {
     CANDIDATE("candidate"),
     INCUMBENT("incumbent");
 
+    internal val arenaSide: ArenaSide
+        get() =
+            when (this) {
+                CANDIDATE -> ArenaSide.CANDIDATE
+                INCUMBENT -> ArenaSide.INCUMBENT
+            }
+
     fun model(specification: ArenaSpecification): BotModel =
         when (this) {
             CANDIDATE -> specification.candidate
@@ -196,7 +203,11 @@ object StrategyReplays {
                     trace = recording,
                     controllers =
                         specification.frozenPurchase
-                            ?.controllers(lineup.configuration.playerCount)
+                            ?.controllers(
+                                lineup.configuration.playerCount,
+                                lineup.seat,
+                                side.arenaSide,
+                            )
                             .orEmpty(),
                 )
         val terminal = ArenaGame.from(game)
