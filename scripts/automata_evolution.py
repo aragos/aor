@@ -44,7 +44,11 @@ PROFILES = {
                "confirmationPairs": 1024, "robustnessPairs": 512},
     "archive": {"rounds": 1, "screeningPairs": 512, "selectionPairs": 1024,
                 "confirmationPairs": 2048, "robustnessPairs": 1024},
+    "archive-strong": {"rounds": 1, "screeningPairs": 512, "selectionPairs": 1024,
+                       "confirmationPairs": 2048, "robustnessPairs": 4096,
+                       "qualificationConfidence": .99},
 }
+ARCHIVE_PROFILES = ("archive", "archive-strong")
 BUNDLE_CONFIGURATION = {"playerCount": 4, "map": "STANDARD", "initialCard": "NO_CRUSADES",
                         "deckModification": True, "immediateMasterArtDiscard": True}
 
@@ -183,7 +187,7 @@ def prepare(options):
     baseline_model = read(original["baseline"])
     validate_model(baseline_model)
     seed_models = getattr(options, "seed_model", [])
-    if options.profile == "archive":
+    if options.profile in ARCHIVE_PROFILES:
         archive_proposals(original["baseline"], seed_models)
     else:
         require(not seed_models, "Seed models require the archive profile.")
@@ -240,15 +244,16 @@ def prepare(options):
         "workers": options.workers, "heapMiB": 1536, "seed": options.seed, "seedBanks": banks,
         "sourceSeedBanks": original["seedBanks"], **profile,
         "seedModels": list(map(str, seeds)), "seedModelSha256": {str(path): sha(path) for path in seeds},
-        "finalists": 3 if options.profile == "archive" else 4,
-        "maximumCandidates": 17 if options.profile == "archive" else 21,
+        "finalists": 3 if options.profile in ARCHIVE_PROFILES else 4,
+        "maximumCandidates": 17 if options.profile in ARCHIVE_PROFILES else 21,
+        "qualificationConfidence": profile.get("qualificationConfidence", .95),
         "maximumConsecutiveFailures": 2, "initialRadius": 1.0,
         "minimumRoundSeconds": 10 if options.profile == "smoke" else 300,
         "seedNote": "Disjoint from the supplied source campaign and every bank in this campaign; external historical banks are not certified.",
         "gates": {"evolve": "Different final parent and last accepted selection win-share AND composite mean > 0.",
-                  "confirm": f"One final model versus original baseline; {profile['confirmationPairs']} fresh worlds, both lower95 > 0.",
-                  "robustness": f"Same final model versus original baseline; {profile['robustnessPairs']} fresh worlds with held-out opponents, both lower95 > 0; smoke never qualifies."},
-        "scope": ("One exact saved-model archive race" if options.profile == "archive" else "Five bounded policy modules")
+                  "confirm": f"One final model versus original baseline; {profile['confirmationPairs']} fresh worlds, both {profile.get('qualificationConfidence', .95):.0%} lower bounds > 0.",
+                  "robustness": f"Same final model versus original baseline; {profile['robustnessPairs']} fresh worlds with held-out opponents, both {profile.get('qualificationConfidence', .95):.0%} lower bounds > 0; smoke never qualifies."},
+        "scope": ("One exact saved-model archive race" if options.profile in ARCHIVE_PROFILES else "Five bounded policy modules")
                  + "; P32 purchase actor and its prior frozen for every seat.",
         "productionActivation": False, "humanStrengthVerified": False,
         "intervalMethod": "Approximate 95% normal intervals over independent paired game worlds.",
@@ -367,6 +372,10 @@ def estimates(metrics):
                   if value["lower95"] is not None else "unavailable")
         lines.append(f"{label}: {value['mean'] * scale:+.4f}{unit}; 95% interval {bounds}; "
                      f"{value['count']} paired worlds.")
+        if "qualificationConfidence" in value:
+            lower = (f"{value['lowerConfidence'] * scale:+.4f}{unit}"
+                     if value["lowerConfidence"] is not None else "unavailable")
+            lines.append(f"{label}: {value['qualificationConfidence']:.0%} qualification lower bound {lower}.")
     return lines
 
 
@@ -390,6 +399,7 @@ def report_result(protocol, output, stage, passed, summary, metrics, artifacts):
     report = {"schemaVersion": 1, "stage": stage, "accepted": stage == "robustness" and passed,
               "summary": summary, "metrics": metrics, "profile": protocol["profile"],
               "productionActivation": False, "humanStrengthVerified": False,
+              "qualificationConfidence": protocol.get("qualificationConfidence", .95),
               "seedNote": protocol["seedNote"], "intervalMethod": protocol["intervalMethod"]}
     report_path, text_path = output / f"{stage}-report.json", output / f"{stage}-report.txt"
     document(report_path, report)
@@ -419,7 +429,7 @@ def evolve_stage(protocol, output):
         if not receipt_path.exists() and not source.exists() and experiments.remaining_seconds() < protocol["minimumRoundSeconds"]:
             stop = "Original evolve-stage allowance cannot admit another round; confirmation reserve retained."
             break
-        archived = protocol["profile"] == "archive"
+        archived = protocol["profile"] in ARCHIVE_PROFILES
         pool = archive_proposals(parent, protocol["seedModels"]) if archived else proposals(read(parent), radius)
         paths = [directory / f"proposal-{row['candidateId']}.json" for row in pool]
         for path, row in zip(paths, pool):
@@ -500,11 +510,23 @@ def minimum_pairs(protocol, stage):
     return protocol.get(field, PROFILES[protocol["profile"]][field])
 
 
+def qualification_estimates(protocol, metrics):
+    """Derive the declared normal lower bound without relabeling native 95% intervals."""
+    confidence = protocol.get("qualificationConfidence", .95)
+    require(confidence in (.95, .99), "Qualification confidence must be 0.95 or 0.99.")
+    critical = 1.96 if confidence == .95 else 2.5758293035489004
+    return {name: dict(value, qualificationConfidence=confidence,
+                       lowerConfidence=(value["lower95"] if confidence == .95 or value["lower95"] is None else
+                                        value["mean"] - (value["mean"] - value["lower95"]) / 1.96 * critical))
+            for name, value in metrics.items() if name in ("winShareDifference", "rewardDifference")}
+
+
 def qualification_passes(protocol, metrics, stage):
     minimum = minimum_pairs(protocol, stage)
+    qualified = qualification_estimates(protocol, metrics)
     return protocol["profile"] != "smoke" and all(
-        metrics[name]["count"] >= minimum and metrics[name]["lower95"] is not None
-        and metrics[name]["lower95"] > 0 for name in ("winShareDifference", "rewardDifference"))
+        qualified[name]["count"] >= minimum and qualified[name]["lowerConfidence"] is not None
+        and qualified[name]["lowerConfidence"] > 0 for name in ("winShareDifference", "rewardDifference"))
 
 
 def final_stage(protocol, output, stage):
@@ -542,9 +564,10 @@ def final_stage(protocol, output, stage):
     metrics = search.comparison(pairs)
     require(report["overall"]["pairs"] == len(seeds), "Final arena bank is incomplete.")
     search.verify_metrics(report["overall"], metrics)
+    metrics = qualification_estimates(protocol, metrics)
     passed = qualification_passes(protocol, metrics, stage)
     metrics.update(candidateSha256=selection["candidateSha256"], minimumPairs=minimum_pairs(protocol, stage))
-    summary = (f"{name.capitalize()} passed both independent lower95 gates; "
+    summary = (f"{name.capitalize()} passed both independent {protocol.get('qualificationConfidence', .95):.0%} lower-bound gates; "
                + ("same frozen model advances to held-out opponents." if stage == "confirm" else
                   "candidate is ready for offline review.") if passed else
                f"{name.capitalize()} did not qualify the candidate; keep the incumbent.")

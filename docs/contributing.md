@@ -215,6 +215,10 @@ up to three finalists on 1,024 selection worlds, then 2,048 confirmation worlds 
 held-out-opponent worlds for the single winner. All banks must be fresh. Archive ranking is
 selection evidence, and the same independent improvement gates apply. This permits testing
 earlier checkpoints without assuming that the latest provisional parent is the strongest.
+`--profile archive-strong` uses the same frozen candidate race, 2,048 confirmation worlds and
+4,096 held-out-opponent worlds, with a 99% lower-bound gate for both final metrics. Reports retain
+the descriptive 95% intervals separately from the qualification bounds. Choose the profile and
+reserve every bank before execution; it does not extend a completed or failed test's sample.
 
 Detach the launch command with `nohup` and redirect its output as described above. On macOS,
 `caffeinate -i` before the Python command keeps an otherwise idle machine awake. The local process
