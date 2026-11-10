@@ -13,6 +13,7 @@ from unittest import mock
 import automata_evolution as evolution
 import automata_experiments as experiments
 import automata_purchase_continuation as continuation
+import purchase_storage as storage
 
 
 def metrics(win=.1, reward=.2, lower=.05, count=4096):
@@ -297,6 +298,177 @@ class PurchaseContinuationTest(unittest.TestCase):
         self.assertEqual([7200000, 2000000, 2000001, 2000002], protocol["reservedOffsets"])
         self.assertEqual(audit.read_bytes(), Path(protocol["seedAudit"]).read_bytes())
         self.assertEqual(16, len(list((output / "configs").glob("*.json"))))
+        self.assertEqual("lossless-batch-archive-v1", protocol["collectionStorage"])
+
+    def parent_fixture(self):
+        root = self.root / "parent"
+        protocol = dict(self.protocol(), kind="automata-purchase-continuation", configDirectory=str(root / "configs"),
+                        originalUpdateConfig=str(root / "inputs/original-config.json"),
+                        seedBanks={"old": experiments.arena_seeds(7200000, 4)})
+        experiments.document(Path(protocol["originalUpdateConfig"]), dict(continuation.HYPERPARAMETERS, seed=1))
+        for index in range(1, 17):
+            experiments.document(root / f"configs/update-{index:02}.json", continuation.update_config(protocol, index))
+        experiments.document(root / "protocol.json", protocol)
+        inputs = {str(path.relative_to(root)): experiments.sha(path) for path in root.rglob("*") if path.is_file()}
+        inputs.update({str(path): experiments.sha(path) for path in (self.baseline, self.prior, self.policy, self.adam,
+            Path(protocol["scripts"]) / "purchase_policy.py")})
+        experiments.document(root / "campaign.json", {"kind": "automata-campaign", "inputs": inputs})
+        batch = root / "run/batches/batch-16"
+        evolution.freeze_copy(self.policy, batch / "update/policy.json")
+        evolution.freeze_copy(self.adam, batch / "update/checkpoint.json")
+        experiments.document(batch / "receipt.json", {"artifacts": evolution.artifact_hashes(batch)})
+        selected = evolution.freeze_copy(self.policy, root / "run/selected/policy.json")
+        rows = [{"batch": index, "policy": str(batch / "update/policy.json"),
+                 "policySha256": experiments.sha(self.policy), "metrics": metrics(win=index / 100)}
+                for index in (4, 8, 16)]
+        experiments.document(root / "run/selection.json", {"development": rows, "selected": rows[-1],
+                             "policy": str(selected), "policySha256": experiments.sha(selected)})
+        for bank in ("confirmation", "robustness"):
+            experiments.document(root / "run" / (bank + "-source.json"),
+                                 continuation.arena_source(protocol, selected, bank))
+        stages = {}
+        for name, bank, count in (("train", None, None), ("confirm", "confirmation", 2048), ("robustness", "robustness", 4096)):
+            if bank:
+                values = evolution.qualification_estimates(protocol, metrics(count=count, lower=.09))
+                values["policySha256"] = experiments.sha(selected)
+                experiments.document(root / "run" / (name + "-report.json"),
+                    {"metrics": values, "accepted": name == "robustness"})
+                files = [root / "run" / (name + "-report.json")]
+            else:
+                files = [root / "run/selection.json", root / "run/confirmation-source.json", root / "run/robustness-source.json",
+                         selected, *[path for path in batch.rglob("*") if path.is_file()]]
+            result = {"status": "passed", "artifacts": {str(path.relative_to(root / "run")): experiments.sha(path) for path in files}}
+            path = root / "run/results" / (name + ".json")
+            experiments.document(path, result)
+            stages[name] = dict(result, resultSha256=experiments.sha(path))
+        experiments.document(root / "run/campaign-state.json", {"status": "completed", "stages": stages})
+        return root
+
+    def test_qualified_purchase_parent_binds_selected_actor_and_exact_adam(self):
+        root = self.parent_fixture()
+        evidence, protocol = continuation.purchase_parent(root, self.baseline, self.prior, self.policy, self.adam)
+        self.assertEqual(16, evidence["selectedBatch"])
+        self.assertEqual(experiments.sha(self.adam), evidence["optimizerSha256"])
+        self.assertIn(str(root / "run/batches/batch-16/update/checkpoint.json"), evidence["verifiedFiles"])
+        self.assertEqual(str(self.baseline), protocol["baseline"])
+
+    def test_parent_preparation_freezes_selected_lineage_and_incumbent_roles(self):
+        parent = self.parent_fixture()
+        source, runtime, output = self.root / "ordinary-source", self.root / "runtime", self.root / "prepared"
+        experiments.document(source / "campaign.json", {"kind": "automata-campaign"})
+        experiments.document(source / "protocol.json", {})
+        (runtime / "lib").mkdir(parents=True)
+        (runtime / "lib/training.jar").write_bytes(b"runtime")
+        java = self.root / "java"
+        java.write_bytes(b"java")
+        java_identity = {"executable": str(java), "files": {str(java): experiments.sha(java)}}
+        numerical = dict(self.protocol()["numerical"], files={str(java): experiments.sha(java)})
+        original = dict(self.protocol(), java=java_identity, seedBanks={"old": experiments.arena_seeds(7100000, 4)})
+        audit = self.root / "audit.json"
+        experiments.document(audit, {"conservativelyExpandedOffsets": [7100000, 7200000]})
+        options = argparse.Namespace(from_campaign=source, from_purchase_campaign=parent,
+            baseline=self.baseline, prior=self.prior, purchase_policy=self.policy, optimizer_from=self.adam,
+            runtime=runtime, output=output, workers=1, maximum_seconds=28800,
+            update_config=parent / "inputs/original-config.json", opponent=[], robust_opponent=[],
+            seed=7300000, profile="search", numerical_python=Path("/pinned/python"), seed_audit=audit)
+        with mock.patch.object(continuation, "qualified_source", return_value=original) as qualified, \
+                mock.patch.object(experiments, "java_identity", return_value=java_identity), \
+                mock.patch.object(continuation, "numerical_identity", return_value=numerical), \
+                contextlib.redirect_stdout(io.StringIO()):
+            campaign = continuation.prepare(options)
+        qualified.assert_called_once_with(source, self.baseline, self.prior, None)
+        protocol = experiments.read(output / "protocol.json")
+        evidence = experiments.read(protocol["purchaseParent"])
+        self.assertEqual(experiments.sha(self.adam), evidence["optimizerSha256"])
+        self.assertEqual(self.policy.read_bytes(), Path(protocol["purchasePolicy"]).read_bytes())
+        self.assertEqual(str(Path(protocol["purchasePolicy"])), continuation.collection_source(protocol, "next.json", 1)["opponentPurchasePolicy"])
+        self.assertEqual((parent / "run/selection.json").read_bytes(),
+                         (output / "inputs/purchase-parent/run/selection.json").read_bytes())
+        for path, expected in campaign["inputs"].items():
+            self.assertEqual(expected, experiments.sha(output / path))
+
+    def test_purchase_parent_rejects_different_adam_even_when_actor_matches(self):
+        root = self.parent_fixture()
+        different = self.root / "different-adam.json"
+        payload = copy.deepcopy(self.payload)
+        payload["optimizer"]["state"]["0"]["step"] = 5
+        self.checkpoint(different, payload)
+        with self.assertRaisesRegex(ValueError, "exact selected batch"):
+            continuation.purchase_parent(root, self.baseline, self.prior, self.policy, different)
+
+    def test_purchase_parent_rejects_changed_ordinary_environment(self):
+        root = self.parent_fixture()
+        with self.assertRaisesRegex(ValueError, "ordinary model"):
+            continuation.purchase_parent(root, self.prior, self.prior, self.policy, self.adam)
+
+    def test_purchase_parent_rejects_missing_nonrow_evidence(self):
+        root = self.parent_fixture()
+        (root / "run/confirm-report.json").unlink()
+        with self.assertRaisesRegex(ValueError, "Unexplained missing"):
+            continuation.purchase_parent(root, self.baseline, self.prior, self.policy, self.adam)
+
+    def test_parent_requires_completed_qualification(self):
+        root = self.parent_fixture()
+        state = experiments.read(root / "run/campaign-state.json")
+        state["stages"]["robustness"]["status"] = "rejected"
+        experiments.document(root / "run/campaign-state.json", state, immutable=False)
+        with self.assertRaisesRegex(ValueError, "both 99%"):
+            continuation.purchase_parent(root, self.baseline, self.prior, self.policy, self.adam)
+
+    def test_completed_compressed_batch_resume_does_not_restore_or_recollect(self):
+        protocol, source, collection = self.collection_fixture()
+        protocol.update(collectionStorage="lossless-batch-archive-v1", batches=1, checkpoints=[1])
+        output = self.root / "run"
+        batch = output / "batches/batch-01"
+        batch.mkdir(parents=True)
+        collection.rename(batch / "collection")
+        source = batch / "collection-source.json"
+        experiments.document(source, continuation.collection_source(protocol, self.policy, 1))
+        evolution.freeze_copy(self.policy, batch / "update/policy.json")
+        evolution.freeze_copy(self.adam, batch / "update/checkpoint.json")
+        storage.archive(batch)
+        descriptor = {"batch": 1, "sourceSha256": experiments.sha(source), "policySha256": experiments.sha(self.policy),
+                      "optimizerSha256": experiments.sha(self.adam)}
+        measured = {"batch": 1, "policy": str(batch / "update/policy.json"), "policySha256": experiments.sha(self.policy),
+                    "metrics": metrics(win=0, reward=0)}
+        experiments.document(batch / "receipt.json", {"descriptor": descriptor, "update": {"acceptedEpochs": 1},
+                             "development": measured, "artifacts": evolution.artifact_hashes(batch)})
+        with mock.patch.object(storage, "restore") as restore, mock.patch.object(experiments, "native") as native, \
+                contextlib.redirect_stdout(io.StringIO()):
+            continuation.train_stage(protocol, output)
+        restore.assert_not_called()
+        native.assert_not_called()
+        self.assertEqual([], list((batch / "collection").glob("game-*.json")))
+
+    def test_unreceipted_archived_batch_restores_rows_without_recollecting_or_replacing_completion(self):
+        protocol, original_source, collection = self.collection_fixture()
+        protocol.update(collectionStorage="lossless-batch-archive-v1", batches=1, checkpoints=[],
+                        configDirectory=str(self.root / "configs"))
+        output = self.root / "run"
+        batch = output / "batches/batch-01"
+        batch.mkdir(parents=True)
+        collection.rename(batch / "collection")
+        source = batch / "collection-source.json"
+        evolution.freeze_copy(original_source, source)
+        manifest = experiments.read(batch / "collection/collection.json")
+        manifest["source"] = str(source)
+        experiments.document(batch / "collection/collection.json", manifest, immutable=False)
+        evolution.freeze_copy(self.policy, batch / "update/policy.json")
+        evolution.freeze_copy(self.adam, batch / "update/checkpoint.json")
+        storage.archive(batch)
+        archive_hash = experiments.sha(batch / storage.ARCHIVE)
+        finished = (batch / "collection/finished.json").read_bytes()
+        def resumed_update(*arguments):
+            self.assertEqual(2, len(list((batch / "collection").glob("game-*.json"))))
+            return {"acceptedEpochs": 1}
+        with mock.patch.object(continuation, "update", side_effect=resumed_update), \
+                mock.patch.object(experiments, "native") as native, contextlib.redirect_stdout(io.StringIO()):
+            continuation.train_stage(protocol, output)
+        native.assert_not_called()
+        self.assertEqual(finished, (batch / "collection/finished.json").read_bytes())
+        self.assertEqual(archive_hash, experiments.sha(batch / storage.ARCHIVE))
+        self.assertEqual([], list((batch / "collection").glob("game-*.json")))
+        self.assertIn(storage.ARCHIVE, experiments.read(batch / "receipt.json")["artifacts"])
 
 
 if __name__ == "__main__":
