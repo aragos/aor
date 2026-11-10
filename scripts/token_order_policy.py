@@ -27,6 +27,8 @@ PROPOSALS = "token-order-proposals-1"
 MARGIN = .02
 CONFIGURATION = "players-4/standard/no-crusades/deck-true/art-true"
 SELECTION = "PRECOMMITTED_ORDINAL_V1"
+RULES_TRANSFER = {"sourceRulesVersion": "ah1996-three-epoch-4",
+                  "targetRulesVersion": "ah1996-three-epoch-5"}
 read, sha, require = b.read_json, b.file_digest, b.require
 
 
@@ -117,6 +119,30 @@ def validate_root(row, model, replicates):
             "origin": row["index"], "split": row["split"]}
 
 
+def transfer_metadata(source, manifest, snapshots):
+    """Transferred weights retain their original bytes and never import source qualification."""
+    transfer = source.get("experimentalRulesTransfer")
+    actual = manifest.get("experimentalRulesTransfer")
+    if transfer is None:
+        require(actual is None, "Token data contains an undeclared rules transfer.")
+        return
+    require(transfer == RULES_TRANSFER and actual == dict(RULES_TRANSFER,
+                initializationOnly=True, qualificationTransferred=False)
+            and manifest.get("rulesVersion") == RULES_TRANSFER["targetRulesVersion"],
+            "Token rules transfer must identify unqualified rules4 initialization evaluated under rules5.")
+    references = {"candidate": source["candidate"], "incumbent": source["incumbent"],
+                  **{f"opponent-{index}": path for index, path in enumerate(source["opponents"])}}
+    expected = {role for role, path in references.items() if path is not None}
+    inputs = manifest["ordinaryModelSources"]
+    require(set(inputs) == expected, "Transfer must retain every explicit ordinary source identity.")
+    source_directory = Path(manifest["source"]).parent
+    for role, item in inputs.items():
+        name = "initial.json" if role == "candidate" else f"{role}.json"
+        require(item == {"path": str((source_directory / references[role]).resolve()),
+                         "sha256": snapshots[name], "snapshot": name},
+                "Transferred ordinary bytes differ from their source identity: " + role)
+
+
 def collection_metadata(directory, manifest, finished):
     """Bind completed data to its prospective request table and archived environment."""
     require(manifest.get("kind") == finished.get("kind") == KIND
@@ -147,6 +173,7 @@ def collection_metadata(directory, manifest, finished):
     snapshots = manifest["ordinaryModelSnapshots"]
     expected_names = {"initial.json", "incumbent.json"} | {f"opponent-{i}.json" for i in range(len(opponents))}
     require(set(snapshots) == expected_names, "Token collection must bind every ordinary model snapshot.")
+    transfer_metadata(source, manifest, snapshots)
     require(read(directory / "initial.json")["weights"] == read(directory / "incumbent.json")["weights"],
             "Token collection must use identical ordinary candidate and incumbent policies.")
     pins = {"source.json": manifest["sourceSha256"], **snapshots}

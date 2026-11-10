@@ -118,6 +118,9 @@ data class StrategySearchSpecification(
     val explicitCandidates: List<BotModel>? = null,
 ) {
     init {
+        require(arena.experimentalRulesTransfer == null) {
+            "Experimental rules transfer supports arena, token-order and purchase collection, not ordinary model search."
+        }
         require(arena.tokenOrder == null) {
             "Ordinary model search cannot assign token-order actor roles."
         }

@@ -8,7 +8,7 @@ import dev.aragos.aor.ai.PurchasePolicy
 import dev.aragos.aor.ai.PurchasePolicyModel
 import java.nio.file.Path
 
-/** Raw file identity and decoded baseline retain explicit zeros and qualified-profile metadata. */
+/** Original bytes retain explicit zeros and historical metadata without importing qualification. */
 internal data class PurchaseBaselineInput(val path: Path, val sha256: String, val model: BotModel)
 
 /** Exact bytes and decoded actor for an optional learned purchase policy. */
@@ -49,6 +49,7 @@ internal data class PurchaseCollectionInput(
     val dictionary: PurchaseFeatureDictionary,
     val opponentPurchasePolicy: PurchaseActorInput? = null,
     val sharedPurchaseBaseline: PurchaseBaselineInput? = null,
+    val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
 ) {
     init {
         require(
@@ -71,6 +72,23 @@ internal data class PurchaseCollectionInput(
             (index / configuration.playerCount + player) % opponents.size
         }
 
+    internal fun initializationMetadata(): Map<String, Any> {
+        val transfer = experimentalRulesTransfer ?: return emptyMap()
+        val sources =
+            listOf("baseline" to baseline) +
+                opponents.mapIndexed { index, model -> "opponent-$index" to model } +
+                listOfNotNull(sharedPurchaseBaseline?.let { "shared-purchase-baseline" to it })
+        return transfer.metadata() +
+            mapOf(
+                "ordinaryModelSources" to
+                    sources.associate { (role, input) ->
+                        role to
+                            ModelInitializationSource(input.path, input.sha256)
+                                .metadata("$role.json")
+                    }
+            )
+    }
+
     fun signature(): String =
         trainingSignature(
             listOf(
@@ -91,6 +109,7 @@ internal data class PurchaseCollectionInput(
                             "opponent-purchase-policy:${it.sha256}"
                         },
                         sharedPurchaseBaseline?.let { "shared-purchase-baseline:${it.sha256}" },
+                        experimentalRulesTransfer?.metadata(),
                     )
                 )
                 .joinToString("\n")
@@ -104,8 +123,14 @@ internal data class PurchaseCollectionInput(
             PurchaseJson.fields(
                 node,
                 setOf("schemaVersion", "configuration", "games", "seed", "baseline", "opponents"),
-                setOf("policy", "opponentPurchasePolicy", "sharedPurchaseBaseline"),
+                setOf(
+                    "policy",
+                    "opponentPurchasePolicy",
+                    "sharedPurchaseBaseline",
+                    "experimentalRulesTransfer",
+                ),
             )
+            val transfer = ExperimentalRulesTransfer.read(node["experimentalRulesTransfer"])
             require(PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") == 1) {
                 "A purchase collection requires schemaVersion 1."
             }
@@ -127,7 +152,7 @@ internal data class PurchaseCollectionInput(
             fun baseline(text: String): PurchaseBaselineInput {
                 val path = resolve(text)
                 val hash = PurchaseJson.hash(path)
-                val model = TrainingArtifacts.readModel(path)
+                val model = TrainingArtifacts.readModel(path, transfer)
                 require(PurchaseJson.hash(path) == hash) {
                     "A baseline input changed while it was being read."
                 }
@@ -178,6 +203,7 @@ internal data class PurchaseCollectionInput(
                 dictionary,
                 opponentPolicy,
                 sharedBaseline,
+                transfer,
             )
         }
     }

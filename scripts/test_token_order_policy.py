@@ -204,6 +204,25 @@ class TokenOrderPolicyTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "environment snapshot changed"):
                 learner.collection(root, 137)
 
+    def test_transfer_keeps_original_model_identity_without_importing_qualification(self):
+        source = {"experimentalRulesTransfer": dict(learner.RULES_TRANSFER),
+                  "candidate": "ordinary.json", "incumbent": "ordinary.json", "opponents": [None]}
+        snapshots = {"initial.json": "same-source", "incumbent.json": "same-source", "opponent-0.json": "prior"}
+        manifest = {"source": "/original/source.json", "rulesVersion": "ah1996-three-epoch-5",
+                    "experimentalRulesTransfer": dict(learner.RULES_TRANSFER,
+                         initializationOnly=True, qualificationTransferred=False),
+                    "ordinaryModelSources": {role: {"path": "/original/ordinary.json",
+                         "sha256": "same-source", "snapshot": name}
+                         for role, name in (("candidate", "initial.json"), ("incumbent", "incumbent.json"))}}
+        learner.transfer_metadata(source, manifest, snapshots)
+        manifest["experimentalRulesTransfer"]["qualificationTransferred"] = True
+        with self.assertRaisesRegex(ValueError, "unqualified rules4"):
+            learner.transfer_metadata(source, manifest, snapshots)
+
+    def test_undeclared_transfer_cannot_silently_change_the_fitting_environment(self):
+        with self.assertRaisesRegex(ValueError, "undeclared rules transfer"):
+            learner.transfer_metadata({}, {"experimentalRulesTransfer": learner.RULES_TRANSFER}, {})
+
 
 if __name__ == "__main__":
     unittest.main()

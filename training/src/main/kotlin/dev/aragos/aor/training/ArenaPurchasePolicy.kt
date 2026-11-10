@@ -3,9 +3,7 @@ package dev.aragos.aor.training
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.PurchaseObservationEncoder
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 /**
  * Frozen shipping/advance policies sharing one prior independent of ordinary seat-model weights.
@@ -107,41 +105,24 @@ private constructor(
         )
 
     internal fun snapshot(artifacts: TrainingArtifacts) {
-        snapshot(
-            artifacts.directory,
-            "frozen-purchase-baseline.json",
+        artifacts.ensureFileSnapshot(
             baseline.path,
             baseline.sha256,
+            "frozen-purchase-baseline.json",
         )
         for ((role, actor) in actors) {
-            snapshot(artifacts.directory, role.snapshot, actor.path, actor.sha256)
-        }
-    }
-
-    private fun snapshot(directory: Path, name: String, source: Path, sha256: String) {
-        val destination = directory.resolve(name)
-        if (Files.exists(destination)) {
-            require(PurchaseJson.hash(destination) == sha256) {
-                "Existing arena snapshot $name differs and will not be overwritten."
-            }
-            return
-        }
-        val temporary = Files.createTempFile(directory, ".frozen-purchase-", ".tmp")
-        try {
-            Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING)
-            require(PurchaseJson.hash(temporary) == sha256) {
-                "A frozen arena purchase input changed before archiving."
-            }
-            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE)
-        } finally {
-            Files.deleteIfExists(temporary)
+            artifacts.ensureFileSnapshot(actor.path, actor.sha256, role.snapshot)
         }
     }
 
     companion object {
         private const val CONFIGURATION = "players-4/standard/no-crusades/deck-true/art-true"
 
-        internal fun read(source: Path, node: JsonNode): ArenaPurchasePolicy {
+        internal fun read(
+            source: Path,
+            node: JsonNode,
+            experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
+        ): ArenaPurchasePolicy {
             PurchaseJson.fields(
                 node,
                 setOf("baseline", "policy"),
@@ -160,7 +141,7 @@ private constructor(
                 PurchaseBaselineInput(
                     baselinePath,
                     baselineHash,
-                    TrainingArtifacts.readModel(baselinePath),
+                    TrainingArtifacts.readModel(baselinePath, experimentalRulesTransfer),
                 )
             fun actor(name: String): PurchaseActorInput {
                 val actorPath = path(name)

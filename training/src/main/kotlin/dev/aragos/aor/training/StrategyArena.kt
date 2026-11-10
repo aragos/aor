@@ -1,7 +1,8 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import dev.aragos.aor.DATA_VERSION
+import dev.aragos.aor.RULES_VERSION
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
 import java.nio.file.Files
@@ -34,6 +35,9 @@ data class ArenaSpecification(
     val seed: Int,
     val frozenPurchase: ArenaPurchasePolicy? = null,
     val tokenOrder: ArenaTokenOrderPolicy? = null,
+    val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
+    private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
+    private val initializationSource: ModelInitializationSource? = null,
 ) {
     init {
         require(
@@ -64,7 +68,14 @@ data class ArenaSpecification(
                 candidate.weights.toSortedMap(),
                 incumbent.weights.toSortedMap(),
                 opponents.map { it.weights.toSortedMap() },
-            ) + listOfNotNull(frozenPurchase?.identity(), tokenOrder?.identity()))
+            ) +
+                listOfNotNull(
+                    frozenPurchase?.identity(),
+                    tokenOrder?.identity(),
+                    experimentalRulesTransfer?.metadata(),
+                    initializationSource?.sha256,
+                    ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
+                ))
             .joinToString("\n")
 
     /** Phase-disjoint overlays retain their own priors and never replace a rival's token policy. */
@@ -89,8 +100,45 @@ data class ArenaSpecification(
         return purchase + (controlledSeat to combined)
     }
 
-    internal fun overlayMetadata(): Map<String, Any> =
-        frozenPurchase?.metadata().orEmpty() + tokenOrder?.metadata().orEmpty()
+    internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
+        mapOf("rulesVersion" to RULES_VERSION, "dataVersion" to DATA_VERSION) +
+            frozenPurchase?.metadata().orEmpty() +
+            tokenOrder?.metadata().orEmpty() +
+            experimentalRulesTransfer?.metadata().orEmpty() +
+            (experimentalRulesTransfer?.let {
+                mapOf(
+                    "ordinaryModelSources" to
+                        ordinaryModelSources.mapValues { (role, input) ->
+                            input.metadata(
+                                if (role == "candidate") candidateSnapshot else "$role.json"
+                            )
+                        }
+                )
+            } ?: emptyMap())
+
+    /**
+     * Transfer snapshots preserve original bytes; decoded weights do not acquire target provenance.
+     */
+    internal fun snapshotModels(
+        artifacts: TrainingArtifacts,
+        candidateSnapshot: String = "candidate.json",
+    ) {
+        initializationSource?.let {
+            artifacts.ensureFileSnapshot(it.path, it.sha256, "source.json")
+        }
+        val models =
+            listOf("candidate" to candidate, "incumbent" to incumbent) +
+                opponents.mapIndexed { index, model -> "opponent-$index" to model }
+        for ((role, model) in models) {
+            val name = if (role == "candidate") candidateSnapshot else "$role.json"
+            val input = ordinaryModelSources[role]
+            if (input == null) {
+                artifacts.ensureModelSnapshot(model, name)
+            } else {
+                artifacts.ensureFileSnapshot(input.path, input.sha256, name)
+            }
+        }
+    }
 
     internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
         frozenPurchase?.snapshot(artifacts)
@@ -99,19 +147,57 @@ data class ArenaSpecification(
 
     companion object {
         fun read(source: Path): ArenaSpecification {
-            val node = ObjectMapper().readTree(source.toFile())
+            val sourceHash = PurchaseJson.hash(source)
+            val node = PurchaseJson.read(source)
+            val transfer = ExperimentalRulesTransfer.read(node["experimentalRulesTransfer"])
             require(integer(node, "schemaVersion") == 1) {
                 "Arena source requires schemaVersion 1."
             }
-            fun model(value: JsonNode): BotModel =
+            val references =
+                listOf(
+                    "candidate" to node.required("candidate"),
+                    "incumbent" to node.required("incumbent"),
+                ) +
+                    node.required("opponents").mapIndexed { index, value ->
+                        "opponent-$index" to value
+                    }
+            fun path(value: JsonNode): Path {
+                require(value.isTextual) {
+                    "Arena model references must be paths or null for the prior."
+                }
+                return source
+                    .toAbsolutePath()
+                    .parent
+                    .resolve(value.asText())
+                    .normalize()
+                    .toRealPath()
+            }
+            val modelSources =
+                if (transfer == null) {
+                    emptyMap()
+                } else {
+                    references
+                        .mapNotNull { (role, value) ->
+                            if (value.isNull) {
+                                null
+                            } else {
+                                path(value).let {
+                                    role to ModelInitializationSource(it, PurchaseJson.hash(it))
+                                }
+                            }
+                        }
+                        .toMap()
+                }
+            fun model(role: String, value: JsonNode): BotModel =
                 if (value.isNull) TrainingArtifacts.readModel(null)
                 else {
-                    require(value.isTextual) {
-                        "Arena model references must be paths or null for the prior."
+                    val input = modelSources[role]
+                    val resolved = input?.path ?: path(value)
+                    val model = TrainingArtifacts.readModel(resolved, transfer)
+                    require(input == null || PurchaseJson.hash(resolved) == input.sha256) {
+                        "An ordinary initialization model changed while reading."
                     }
-                    TrainingArtifacts.readModel(
-                        source.toAbsolutePath().parent.resolve(value.asText()).normalize()
-                    )
+                    model
                 }
             val ids = node.required("configurations").map { it.asText() }
             val configurations = ids.map { id ->
@@ -119,18 +205,34 @@ data class ArenaSpecification(
                     "Unsupported arena configuration: $id."
                 }
             }
-            return ArenaSpecification(
-                purpose = ArenaPurpose.valueOf(node.required("purpose").asText()),
-                configurations = configurations,
-                candidate = model(node.required("candidate")),
-                incumbent = model(node.required("incumbent")),
-                opponents = node.required("opponents").map(::model),
-                pairsPerConfiguration = integer(node, "pairsPerConfiguration"),
-                seed = integer(node, "seed"),
-                frozenPurchase =
-                    node["frozenPurchase"]?.let { ArenaPurchasePolicy.read(source, it) },
-                tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
-            )
+            val specification =
+                ArenaSpecification(
+                    purpose = ArenaPurpose.valueOf(node.required("purpose").asText()),
+                    configurations = configurations,
+                    candidate = model("candidate", node.required("candidate")),
+                    incumbent = model("incumbent", node.required("incumbent")),
+                    opponents =
+                        node.required("opponents").mapIndexed { index, value ->
+                            model("opponent-$index", value)
+                        },
+                    pairsPerConfiguration = integer(node, "pairsPerConfiguration"),
+                    seed = integer(node, "seed"),
+                    frozenPurchase =
+                        node["frozenPurchase"]?.let {
+                            ArenaPurchasePolicy.read(source, it, transfer)
+                        },
+                    tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
+                    experimentalRulesTransfer = transfer,
+                    ordinaryModelSources = modelSources,
+                    initializationSource =
+                        transfer?.let {
+                            ModelInitializationSource(source.toRealPath(), sourceHash)
+                        },
+                )
+            require(PurchaseJson.hash(source) == sourceHash) {
+                "Arena source changed while reading."
+            }
+            return specification
         }
 
         private fun integer(node: JsonNode, name: String): Int {
@@ -387,11 +489,7 @@ object StrategyArenaMain {
                 ),
             )
         }
-        artifacts.ensureModelSnapshot(specification.candidate, "candidate.json")
-        artifacts.ensureModelSnapshot(specification.incumbent, "incumbent.json")
-        specification.opponents.forEachIndexed { index, model ->
-            artifacts.ensureModelSnapshot(model, "opponent-$index.json")
-        }
+        specification.snapshotModels(artifacts)
         specification.snapshotOverlays(artifacts)
         val startPath = output.resolve("started-at.txt")
         val started =
