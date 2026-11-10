@@ -90,6 +90,94 @@ class PurchaseBotExportsTest {
     }
 
     @Test
+    fun qualifiedHybridUsesItsFrozenPriorWhenTheOrdinaryPolicyDisagrees() {
+        val seed = 17 xor 0x6a09e667
+        val selector = PurchaseBotSelector(ordinaryBaseline(), hybridAsset())
+        val prior = chooseBotMove(observation(), baseline(), "HARD", seed)
+        val ordinary = chooseBotMove(observation(), ordinaryBaseline(), "HARD", seed)
+
+        val command = selector.choose(observation(), projection(), "HARD", seed)
+
+        assertEquals("pass", prior)
+        assertEquals("buy-advance A", ordinary)
+        assertEquals(prior, command)
+    }
+
+    @Test
+    fun qualifiedHybridShippingAlsoUsesTheFrozenPurchasePrior() {
+        val input =
+            observation()
+                .replace("purchase-advances", "purchase-shipping")
+                .replace("buy-advance A", "upgrade-ships")
+        val purchase = JSON.parse<dynamic>(projection().replace("buy-advance A", "upgrade-ships"))
+        val actions = purchase.actions as Array<dynamic>
+        purchase.actions = actions.reversedArray()
+        val selector = PurchaseBotSelector(ordinaryBaseline(), hybridAsset())
+        val ordinary = chooseBotMove(input, ordinaryBaseline(), "HARD", 17 xor 0x6a09e667)
+
+        val command = selector.choose(input, JSON.stringify(purchase), "HARD", 17 xor 0x6a09e667)
+
+        assertEquals("upgrade-ships", ordinary)
+        assertEquals("pass", command)
+    }
+
+    @Test
+    fun qualifiedHybridPreservesTheFrozenPriorAndSampledActorSeedStream() {
+        val raw = JSON.parse<dynamic>(hybridAsset())
+        raw.model.actionWeights[0] = 1.0
+        raw.model.actorWeights[0] = 3.0
+        val input = JSON.parse<dynamic>(projection())
+        input.baselineIndex = 1
+        val selector = PurchaseBotSelector(ordinaryBaseline(), JSON.stringify(raw))
+
+        listOf(0, 1, 2, 17, -1, Int.MIN_VALUE, Int.MAX_VALUE).forEach { actorSeed ->
+            val expected =
+                JSON.parse<dynamic>(
+                    evaluatePurchasePolicy(
+                        JSON.stringify(input),
+                        JSON.stringify(raw.model),
+                        PurchasePolicy.uniform(actorSeed),
+                    )
+                )
+
+            assertEquals(
+                expected.command as String,
+                selector.choose(observation(), projection(), "HARD", actorSeed xor 0x6a09e667),
+            )
+        }
+    }
+
+    @Test
+    fun unmatchedHybridOrdinaryBindingCannotActivateTheActor() {
+        val different = ordinaryBaseline().replace("\"test.baseline\":-1", "\"test.baseline\":-2")
+        val selector = PurchaseBotSelector(different, hybridAsset())
+
+        val command = selector.choose(observation(), projection(), "HARD", 17 xor 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun malformedExplicitOrdinaryBindingCannotBecomeALegacyBinding() {
+        val bindings =
+            listOf(
+                "null",
+                "false",
+                "1",
+                "\"invalid\"",
+                "[]",
+                "{}",
+                """{"schemaVersion":"1","weights":{"test.baseline":1}}""",
+                """{"schemaVersion":1,"weights":{"test.baseline":false}}""",
+            )
+        bindings.forEach { binding ->
+            val selector = PurchaseBotSelector(baseline(), hybridAsset(binding))
+
+            assertEquals("pass", selector.choose(observation(), projection(), "HARD", 0x6a09e667))
+        }
+    }
+
+    @Test
     fun suppliedRecommendationCannotReplaceTheActuallyComputedBaseline() {
         val raw = JSON.parse<dynamic>(projection())
         raw.baselineIndex = 0
@@ -102,13 +190,16 @@ class PurchaseBotExportsTest {
 
     @Test
     fun easyAndNormalChoicesRemainExactlyTheOrdinaryPolicy() {
-        val selector = PurchaseBotSelector(baseline(), asset())
-        listOf("EASY", "NORMAL").forEach { difficulty ->
-            listOf(0, -1, 17, 0x6a09e667).forEach { seed ->
-                assertEquals(
-                    chooseBotMove(observation(), baseline(), difficulty, seed),
-                    selector.choose(observation(), projection(), difficulty, seed),
-                )
+        listOf(baseline() to asset(), ordinaryBaseline() to hybridAsset()).forEach {
+            (model, qualifiedAsset) ->
+            val selector = PurchaseBotSelector(model, qualifiedAsset)
+            listOf("EASY", "NORMAL").forEach { difficulty ->
+                listOf(0, -1, 17, 0x6a09e667).forEach { seed ->
+                    assertEquals(
+                        chooseBotMove(observation(), model, difficulty, seed),
+                        selector.choose(observation(), projection(), difficulty, seed),
+                    )
+                }
             }
         }
     }
@@ -122,6 +213,16 @@ class PurchaseBotExportsTest {
             chooseBotMove(input, baseline(), "HARD", 0x6a09e667),
             selector.choose(input, projection(), "HARD", 0x6a09e667),
         )
+    }
+
+    @Test
+    fun qualifiedHybridUsesItsOrdinaryModelOutsidePurchases() {
+        val input = observation().replace("purchase-advances", "play-cards")
+        val selector = PurchaseBotSelector(ordinaryBaseline(), hybridAsset())
+
+        val command = selector.choose(input, projection(), "HARD", 17 xor 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
     }
 
     @Test
@@ -139,12 +240,16 @@ class PurchaseBotExportsTest {
                         "\"immediateMasterArtDiscard\":false",
                     ),
             )
-        val selector = PurchaseBotSelector(baseline(), asset())
-        inputs.forEach { input ->
-            assertEquals(
-                chooseBotMove(input, baseline(), "HARD", 0x6a09e667),
-                selector.choose(input, projection(), "HARD", 0x6a09e667),
-            )
+        listOf(baseline() to asset(), ordinaryBaseline() to hybridAsset()).forEach {
+            (model, qualifiedAsset) ->
+            val selector = PurchaseBotSelector(model, qualifiedAsset)
+            val seed = if (model == baseline()) 0x6a09e667 else 17 xor 0x6a09e667
+            inputs.forEach { input ->
+                assertEquals(
+                    chooseBotMove(input, model, "HARD", seed),
+                    selector.choose(input, projection(), "HARD", seed),
+                )
+            }
         }
     }
 
@@ -200,6 +305,18 @@ class PurchaseBotExportsTest {
     }
 
     @Test
+    fun qualifiedHybridFallsBackToItsOrdinaryModelWhenPurchaseInputFails() {
+        val selector = PurchaseBotSelector(ordinaryBaseline(), hybridAsset())
+
+        listOf(null, "{}", "invalid-json").forEach { invalid ->
+            assertEquals(
+                "buy-advance A",
+                selector.choose(observation(), invalid, "HARD", 17 xor 0x6a09e667),
+            )
+        }
+    }
+
+    @Test
     fun projectionMustContainExactlyTheOrdinaryOfferedCommands() {
         val missing = JSON.parse<dynamic>(projection())
         missing.actions = arrayOf(missing.actions[1])
@@ -216,6 +333,15 @@ class PurchaseBotExportsTest {
             "deckModification":true,"immediateMasterArtDiscard":true}"""
 
     private fun baseline(): String = """{"schemaVersion":1,"weights":{"test.baseline":1}}"""
+
+    private fun ordinaryBaseline(): String =
+        """{"schemaVersion":1,"weights":{"test.baseline":-1}}"""
+
+    private fun hybridAsset(binding: String = ordinaryBaseline()): String {
+        val raw = JSON.parse<dynamic>(asset())
+        raw.ordinaryBaseline = JSON.parse<dynamic>(binding)
+        return JSON.stringify(raw)
+    }
 
     private fun observation(): String =
         """{

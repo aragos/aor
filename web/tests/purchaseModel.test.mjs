@@ -43,17 +43,52 @@ test('the shipped purchase actor contains exactly the independently qualified pa
     assert.equal(actor.rulesVersion, 'ah1996-three-epoch-4');
     assert.equal(actor.dataVersion, 'ah1996-catalog-16');
     assert.deepEqual(actor.configuration, configuration);
+    assert.equal(digest(actor.baseline), '53c26a55a7b7318e47d899847a1941a8e11db309ea34bd8c28486f92752e8cbe');
 });
 
-test('the installed actor binds its qualified baseline and preserves the existing catalog policy', () => {
+test('the installed hybrid binds its ordinary model and preserves the existing catalog policy', () => {
     const matching = baseline.models.filter(model => model.dataVersion === actor.dataVersion
         && model.rulesVersion === actor.rulesVersion
         && digest(model.configuration) === digest(configuration));
 
     assert.equal(matching.length, 1);
-    assert.deepEqual(actor.baseline, {schemaVersion: matching[0].schemaVersion, weights: matching[0].weights});
+    assert.deepEqual(actor.ordinaryBaseline, {schemaVersion: matching[0].schemaVersion, weights: matching[0].weights});
+    assert.equal(digest(actor.ordinaryBaseline), '9caa3d3bf3c466786c9af41a12fe5ffd19bd670e19aa79f980d53d1212a2312d');
+    assert.notDeepEqual(actor.baseline, actor.ordinaryBaseline);
     assert(baseline.models.some(model => model.dataVersion === 'ah1996-catalog-15'),
         'Existing catalog-15 games must retain their qualified ordinary policy.');
+});
+
+test('the hybrid records independent qualification of its exact ordinary model', () => {
+    const qualification = actor.hybridQualification;
+
+    assert.equal(qualification.qualificationPassed, true);
+    assert.equal(qualification.humanStrengthVerified, false);
+    assert.equal(qualification.qualificationConfidence, .99);
+    assert.equal(qualification.ordinaryModelSha256,
+        '0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b');
+    for (const [stage, count] of [['confirm', 2048], ['robustness', 4096]]) {
+        assert.equal(qualification[stage].candidateSha256, qualification.ordinaryModelSha256);
+        for (const metric of ['winShareDifference', 'rewardDifference']) {
+            assert.equal(qualification[stage][metric].count, count);
+            assert.equal(qualification[stage][metric].qualificationConfidence, .99);
+            assert(qualification[stage][metric].lowerConfidence > 0);
+        }
+    }
+});
+
+test('the shipped hybrid uses the frozen purchase prior for every signed seed', async () => {
+    const prior = {...actor.baseline, rulesVersion: actor.rulesVersion, dataVersion: actor.dataVersion,
+        configuration: actor.configuration};
+    const legacyActor = {...actor};
+    delete legacyActor.ordinaryBaseline;
+    const frozen = createBotPolicyRunner(async () => ai, prior, legacyActor);
+    const hybrid = createBotPolicyRunner(async () => ai, baseline, actor);
+
+    for (const seed of [0, 1, 2, 17, -1, -2147483648, 2147483647, 0x6a09e667]) {
+        const job = {...shipping, difficulty: 'HARD', seed};
+        assert.equal(await hybrid(job), await frozen(job));
+    }
 });
 
 test('the actual asset records exact training and independent qualification provenance', () => {
