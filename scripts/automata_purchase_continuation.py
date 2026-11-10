@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Bounded P32 purchase PPO continuation over a qualified ordinary F1 policy.
+"""Bounded purchase PPO generations over a qualified ordinary F1 policy.
 
 Every seat retains the original F0 purchase prior. Only the controlled purchase
-actor learns; rivals retain P32. Sixteen fresh on-policy batches carry Adam state,
+actor learns; rivals retain the initial incumbent. Fresh on-policy batches carry Adam state,
 three fixed checkpoints share development worlds, and at most one actor proceeds
 to independent confirmation and held-out opponents. No production activation.
 """
@@ -23,6 +23,7 @@ import automata_campaign as controller
 import automata_evolution as evolution
 import automata_experiments as experiments
 import automata_policy_search as search
+import purchase_storage as storage
 
 
 read, sha, document, require = experiments.read, experiments.sha, experiments.document, experiments.require
@@ -82,7 +83,7 @@ def seed_banks(seed, profile, reserved, offsets=(), pairs_per_offset=10000):
     return banks
 
 
-def qualified_source(source, baseline, prior, policy):
+def qualified_source(source, baseline, prior, policy=None):
     campaign, protocol = read(source / "campaign.json"), read(source / "protocol.json")
     require(campaign.get("kind") == "automata-campaign", "Use an existing qualified campaign.")
     for name, expected in campaign["inputs"].items():
@@ -96,9 +97,91 @@ def qualified_source(source, baseline, prior, policy):
     require(final.get("accepted") is True and final["metrics"]["candidateSha256"] == sha(baseline),
             "The ordinary F1 baseline must be the source campaign's qualified candidate.")
     require(read(protocol["frozenPurchase"]["baseline"])["weights"] == read(prior)["weights"]
-            and read(protocol["frozenPurchase"]["policy"]) == read(policy),
-            "Continuation must retain the qualified source's F0 purchase prior and P32 actor.")
+            and (policy is None or read(protocol["frozenPurchase"]["policy"]) == read(policy)),
+            "Continuation must retain the qualified source's purchase prior and declared initial actor.")
     return protocol
+
+
+def purchase_parent(root, baseline, prior, policy, adam):
+    """Verify a qualified selected actor and its Adam, including archived original evidence."""
+    root = Path(root).expanduser().resolve(strict=True)
+    campaign, protocol, state = [read(root / name) for name in
+                               ("campaign.json", "protocol.json", "run/campaign-state.json")]
+    require(campaign.get("kind") == "automata-campaign"
+            and protocol.get("kind") == "automata-purchase-continuation"
+            and protocol.get("profile") == "search" and protocol.get("qualificationConfidence") == .99
+            and all(protocol.get(key) == value for key, value in PROFILES["search"].items())
+            and state.get("status") == "completed"
+            and all(state["stages"][name]["status"] == "passed" for name in ("train", "confirm", "robustness")),
+            "Purchase parent must have completed training and both 99% qualification stages.")
+    verified = {}
+    def pinned(path, expected):
+        require(path.is_file() and sha(path) == expected, "Purchase parent evidence changed: " + str(path))
+        verified[str(path)] = expected
+    for name, expected in campaign["inputs"].items():
+        pinned(root / name, expected)
+    require(sha(protocol["baseline"]) == sha(baseline)
+            and read(protocol["prior"])["weights"] == read(prior)["weights"]
+            and protocol["configuration"] == experiments.CONFIGURATION,
+            "Purchase parent ordinary model, purchase prior or configuration differs.")
+    require({key: value for key, value in read(protocol["originalUpdateConfig"]).items() if key != "seed"}
+            == HYPERPARAMETERS and read(policy).get("schemaVersion") == 1
+            and sha(Path(protocol["scripts"]) / "purchase_policy.py") == sha(Path(__file__).parent / "purchase_policy.py"),
+            "Purchase parent must retain the original actor schema and PPO objective.")
+    for index in range(1, protocol["batches"] + 1):
+        require(read(Path(protocol["configDirectory"]) / f"update-{index:02}.json") == update_config(protocol, index)
+                and protocol["numerical"]["configDefaults"].get("cardReferenceKlCoefficient", 0) == 0,
+                "Purchase parent update objective changed.")
+    train_path = root / "run/results/train.json"
+    pinned(train_path, state["stages"]["train"]["resultSha256"])
+    train = read(train_path)
+    archived, archives = storage.archived_parent_rows(root, train)
+    for name in ("train", "confirm", "robustness"):
+        result_path = root / "run/results" / (name + ".json")
+        pinned(result_path, state["stages"][name]["resultSha256"])
+        result = read(result_path)
+        require(result["status"] == "passed" and result["artifacts"] == state["stages"][name]["artifacts"],
+                "Purchase parent completed receipt differs from controller evidence.")
+        required = ["selection.json", "confirmation-source.json", "robustness-source.json"] if name == "train" else [name + "-report.json"]
+        require(all(path in result["artifacts"] for path in required), "Purchase parent receipt lacks qualification evidence.")
+        for relative, expected in result["artifacts"].items():
+            path = root / "run" / relative
+            if path.exists():
+                pinned(path, expected)
+            else:
+                require(name == "train" and archived.get(relative) == expected,
+                        "Unexplained missing purchase parent evidence: " + relative)
+    for batch in (root / "run/batches").glob("batch-*"):
+        if (batch / storage.MANIFEST).exists():
+            storage.verify(batch)
+    selection = read(root / "run/selection.json")
+    winner = selection["selected"]
+    require(winner and winner == select_checkpoint(selection["development"], protocol["checkpoints"])
+            and sha(policy) == selection["policySha256"] == sha(selection["policy"]) == winner["policySha256"],
+            "Purchase parent actor must be the exact declared selected checkpoint.")
+    batch = root / "run/batches" / f"batch-{winner['batch']:02}"
+    receipt = read(batch / "receipt.json")
+    pinned(batch / "receipt.json", train["artifacts"][str((batch / "receipt.json").relative_to(root / "run"))])
+    require(sha(policy) == sha(batch / "update/policy.json") == receipt["artifacts"]["update/policy.json"]
+            and sha(adam) == sha(batch / "update/checkpoint.json") == receipt["artifacts"]["update/checkpoint.json"],
+            "Purchase parent Adam must be the exact selected batch checkpoint.")
+    checkpoint(adam, policy)
+    for stage, bank in (("confirm", "confirmation"), ("robustness", "robustness")):
+        report = read(root / "run" / (stage + "-report.json"))
+        require(report["metrics"]["policySha256"] == sha(policy)
+                and evolution.qualification_passes(protocol, report["metrics"], stage)
+                and (stage != "robustness" or report.get("accepted") is True)
+                and read(root / "run" / (bank + "-source.json")) == arena_source(protocol, selection["policy"], bank),
+                "Purchase parent qualification or frozen evaluation roles changed.")
+    for path in archives:
+        verified[str(path)] = sha(path)
+    evidence = [root / name for name in ("campaign.json", "protocol.json", "run/campaign-state.json",
+                "run/selection.json", "run/results/train.json", "run/results/confirm.json", "run/results/robustness.json",
+                "run/confirm-report.json", "run/robustness-report.json")]
+    evidence += [batch / "receipt.json", *[path for path in archives if path.suffix == ".json"]]
+    return {"source": str(root), "policySha256": sha(policy), "optimizerSha256": sha(adam),
+            "selectedBatch": winner["batch"], "verifiedFiles": verified,
+            "evidence": [str(path.relative_to(root)) for path in evidence]}, protocol
 
 
 def numerical_identity(executable, learner):
@@ -139,14 +222,18 @@ def prepare(options):
     source = options.from_campaign.expanduser().resolve(strict=True)
     baseline, prior, policy, adam = [Path(path).expanduser().resolve(strict=True) for path in
                                      (options.baseline, options.prior, options.purchase_policy, options.optimizer_from)]
-    require(sha(policy) == P32_SHA and sha(adam) == ADAM_SHA, "Start from the original P32 actor and Adam checkpoint bytes.")
+    parent_source = getattr(options, "from_purchase_campaign", None)
+    require(parent_source is not None or (sha(policy) == P32_SHA and sha(adam) == ADAM_SHA),
+            "Use original P32/Adam bytes or declare a qualified purchase parent.")
     checkpoint(adam, policy)
-    original = qualified_source(source, baseline, prior, policy)
+    original = qualified_source(source, baseline, prior, None if parent_source else policy)
+    parent, parent_protocol = purchase_parent(parent_source, baseline, prior, policy, adam) if parent_source else (None, None)
     evolution.validate_model(read(baseline))
     evolution.validate_model(read(prior))
     runtime, root = options.runtime.expanduser().resolve(strict=True), options.output.expanduser().resolve()
     require((runtime / "lib/training.jar").is_file(), "Use a complete training runtime distribution.")
-    require(all(root != path and root not in path.parents and path not in root.parents for path in (source, runtime)),
+    sources = (source, runtime, *([Path(parent["source"])] if parent else []))
+    require(all(root != path and root not in path.parents and path not in root.parents for path in sources),
             "Prepared output must be separate from its source and runtime.")
     require(not root.exists() or not any(root.iterdir()), "Prepare a new empty continuation directory.")
     require(type(options.workers) is int and 1 <= options.workers <= (os.cpu_count() or 1),
@@ -157,13 +244,16 @@ def prepare(options):
     source_config = read(options.update_config)
     require({key: value for key, value in source_config.items() if key != "seed"} == HYPERPARAMETERS,
             "Use the original P32 signal update hyperparameters; no extra objectives.")
-    training = options.opponent or list(map(Path, original["opponents"]))
-    robust = options.robust_opponent or list(map(Path, original["robustOpponents"]))
+    pool_source = parent_protocol or original
+    training = options.opponent or list(map(Path, pool_source["opponents"]))
+    robust = options.robust_opponent or list(map(Path, pool_source["robustOpponents"]))
     train_keys, robust_keys = [evolution.model_key(path) for path in training], [evolution.model_key(path) for path in robust]
     require(1 <= len(training) <= 16 and 1 <= len(robust) <= 16
             and len(set(train_keys)) == len(train_keys) and len(set(robust_keys)) == len(robust_keys)
             and not set(train_keys).intersection(robust_keys), "Opponent pools must be distinct and held out from one another.")
     reserved = sorted({value for bank in original["seedBanks"].values() for value in bank})
+    if parent_protocol:
+        reserved = sorted(set(reserved).union(value for bank in parent_protocol["seedBanks"].values() for value in bank))
     offsets, pairs_per_offset = [], 10000
     require(options.seed_audit or options.profile == "smoke", "Search requires a comprehensive frozen historical seed audit.")
     if options.seed_audit:
@@ -188,14 +278,14 @@ def prepare(options):
             "Runtime changed during freezing.")
     for name in ("automata_purchase_continuation.py", "automata_campaign.py", "automata_experiments.py",
                  "automata_evolution.py", "automata_policy_search.py", "purchase_policy.py",
-                 "purchase_policy_toy.py", "train-opponents.py"):
+                 "purchase_policy_toy.py", "purchase_storage.py", "train-opponents.py"):
         experiments.copy_input(scripts / name, root / "scripts" / name, provenance)
     def copied(path, name):
         return str(experiments.copy_input(path, root / "inputs" / name, provenance))
     protocol = {"schemaVersion": 1, "kind": "automata-purchase-continuation", "profile": options.profile,
         "preparedAt": datetime.now(timezone.utc).isoformat(), "configuration": experiments.CONFIGURATION,
         "baseline": copied(baseline, "ordinary-f1.json"), "prior": copied(prior, "purchase-prior-f0.json"),
-        "purchasePolicy": copied(policy, "p32.json"), "optimizerFrom": copied(adam, "p32-checkpoint.json"),
+        "purchasePolicy": copied(policy, "incumbent-purchase.json"), "optimizerFrom": copied(adam, "incumbent-checkpoint.json"),
         "originalUpdateConfig": copied(options.update_config, "original-update-config.json"),
         "opponents": [copied(path, f"opponent-{index}.json") for index, path in enumerate(training)],
         "robustOpponents": [copied(path, f"robust-opponent-{index}.json") for index, path in enumerate(robust)],
@@ -205,12 +295,18 @@ def prepare(options):
         "reservedOffsets": offsets, "conservativePairsPerOffset": pairs_per_offset, **PROFILES[options.profile],
         "workers": options.workers, "heapMiB": 1536, "qualificationConfidence": .99,
         "collapseGuard": {"rewardMeanBelow": -.1, "rewardUpper95Below": 0.},
-        "scope": "Purchase actor only; ordinary F1 and every seat's F0 purchase prior remain frozen; rivals retain P32.",
+        "scope": "Purchase actor only; ordinary F1, every seat's F0 prior and incumbent rival actor remain frozen.",
+        "collectionStorage": "lossless-batch-archive-v1",
         "seedNote": "Every declared bank is disjoint from frozen source/audit worlds; checkpoint development intentionally shares one bank.",
         "intervalMethod": "95% paired normal intervals; independent final gates use 99% normal lower bounds.",
         "productionActivation": False, "humanStrengthVerified": False}
     if options.seed_audit:
         protocol["seedAudit"] = copied(options.seed_audit, "seed-audit.json")
+    if parent:
+        for relative in parent["evidence"]:
+            copied(Path(parent["source"]) / relative, "purchase-parent/" + relative)
+        document(root / "inputs/purchase-parent.json", parent)
+        protocol["purchaseParent"] = str(root / "inputs/purchase-parent.json")
     for index in range(1, protocol["batches"] + 1):
         document(root / f"configs/update-{index:02}.json", update_config(protocol, index))
     protocol["configDirectory"] = str(root / "configs")
@@ -404,7 +500,7 @@ def stage_result(protocol, output, stage, passed, summary, metrics, artifacts):
         lines.extend(evolution.estimates(row["metrics"]))
     if stage != "train":
         lines.extend(evolution.estimates(metrics))
-    lines.append("No policy activated; human strength unverified. Ordinary F1, purchase prior F0 and rival P32 remain frozen.")
+    lines.append("No policy activated; human strength unverified. Ordinary F1, purchase prior F0 and incumbent rivals remain frozen.")
     content = "\n".join(lines) + "\n"
     require(not text_path.exists() or text_path.read_text() == content, "Completed purchase report changed.")
     text_path.write_text(content)
@@ -424,7 +520,10 @@ def train_stage(protocol, output):
             require(receipt["descriptor"] == descriptor, "Cached continuation changed its actor/Adam chain.")
             evolution.verify_receipt(directory, receipt)
         else:
-            experiments.native(protocol, "purchase-collect", source, directory / "collection", extra=("--workers", str(protocol["workers"])))
+            if (directory / storage.MANIFEST).exists():
+                storage.restore(directory)
+            if not (directory / "collection/finished.json").exists():
+                experiments.native(protocol, "purchase-collect", source, directory / "collection", extra=("--workers", str(protocol["workers"])))
             data, decisions = verify_collection(protocol, source, directory / "collection")
             config = Path(protocol["configDirectory"]) / f"update-{index:02}.json"
             report = update(protocol, model, optimizer, config, directory / "collection", directory / "update", data, decisions)
@@ -436,6 +535,8 @@ def train_stage(protocol, output):
                 measured = {"batch": index, "policy": str(directory / "update/policy.json"),
                             "policySha256": sha(directory / "update/policy.json"),
                             "metrics": verify_arena(protocol, arena, directory / "development")}
+            if protocol.get("collectionStorage") == "lossless-batch-archive-v1":
+                storage.archive(directory)
             receipt = {"descriptor": descriptor, "update": report, "development": measured,
                        "artifacts": evolution.artifact_hashes(directory)}
             document(receipt_path, receipt)
@@ -462,7 +563,7 @@ def train_stage(protocol, output):
     document(output / "selection.json", selection)
     artifacts.append(output / "selection.json")
     return stage_result(protocol, output, "train", winner is not None,
-        "One purchase actor frozen for independent F1+P32 confirmation." if winner else
+        "One purchase actor frozen for independent confirmation against the unchanged incumbent hybrid." if winner else
         "No checkpoint passed both positive development means; final banks remain unopened.", selection, artifacts)
 
 
@@ -481,10 +582,10 @@ def final_stage(protocol, output, stage):
     metrics = evolution.qualification_estimates(protocol, verify_arena(protocol, source, directory))
     passed = evolution.qualification_passes(protocol, metrics, stage)
     metrics.update(policySha256=selection["policySha256"], minimumPairs=evolution.minimum_pairs(protocol, stage))
-    summary = (f"{bank.capitalize()} passed both 99% lower-bound gates versus F1+P32; no activation." if passed else
-               f"{bank.capitalize()} did not qualify the purchase actor; retain F1+P32.")
+    summary = (f"{bank.capitalize()} passed both 99% lower-bound gates versus the unchanged incumbent hybrid; no activation." if passed else
+               f"{bank.capitalize()} did not qualify the purchase actor; retain the incumbent hybrid.")
     if protocol["profile"] == "smoke":
-        summary = "Smoke completed; smoke never qualifies a purchase actor. Retain F1+P32."
+        summary = "Smoke completed; smoke never qualifies a purchase actor. Retain the incumbent hybrid."
     return stage_result(protocol, output, stage, passed, summary, metrics,
                         sorted(path for path in directory.rglob("*") if path.is_file()))
 
@@ -516,6 +617,8 @@ def main(arguments=None):
                  "numerical-python", "update-config", "output"):
         prep.add_argument("--" + name, type=Path, required=True)
     prep.add_argument("--opponent", type=Path, action="append", default=[])
+    prep.add_argument("--from-purchase-campaign", type=Path,
+                      help="Qualified purchase parent whose exact selected actor and Adam initialize this generation.")
     prep.add_argument("--robust-opponent", type=Path, action="append", default=[])
     prep.add_argument("--seed-audit", type=Path,
                       help="Required for search: frozen reservedSeeds and/or conservativelyExpandedOffsets with conservativePairsPerOffset.")

@@ -515,9 +515,10 @@ See [open learning work](follow-ups.md#autonomous-strategy-discovery) for broade
 ### Purchase continuation campaigns
 
 The [continuation runner](../scripts/automata_purchase_continuation.py) extends the qualified P32
-purchase actor with its original Adam state and PPO objective. A qualified ordinary model supplies
-all other decisions; every seat keeps the original purchase prior, and rivals keep P32. The source
-campaign must have passed independent confirmation and robustness for that ordinary model.
+purchase actor or an explicitly qualified purchase parent with its exact selected Adam state and
+original PPO objective. A qualified ordinary model supplies all other decisions; every seat keeps
+the original purchase prior, and rivals keep the initial incumbent purchase actor. The ordinary
+source campaign must have passed independent confirmation and robustness for that ordinary model.
 
 ```sh
 python3 scripts/automata_purchase_continuation.py prepare \
@@ -535,6 +536,16 @@ python3 .aor-training/purchase-continuation/scripts/automata_campaign.py \
   --output .aor-training/purchase-continuation/run
 ```
 
+For a later generation, additionally pass `--from-purchase-campaign /absolute/purchase-parent`,
+set `--purchase-policy` to that parent's `run/selected/policy.json`, and set `--optimizer-from` to
+the selected batch's `update/checkpoint.json`. Keep `--from-campaign` bound to the ordinary model's
+qualification and use the original update config, not a generated batch config. Preparation verifies
+the parent's completed selection and final gates, exact actor/Adam pair, ordinary model and purchase
+prior, original objective and artifact hashes. Legacy archived rows are streamed and checked against
+their original receipts without restoration. The incumbent, rival actor and ordinary environment
+are frozen at preparation; later browser changes do not change them. Each generation is a new bounded
+experiment with fresh physical and numerical seeds, not a resume of its parent's expired clocks.
+
 Choose unused seeds for each preparation. The required historical audit reserves actual
 `reservedSeeds`, conservative native `conservativelyExpandedOffsets` with
 `conservativePairsPerOffset`, or both. Include earlier purchase, joint-learning and diagnostic runs;
@@ -547,6 +558,15 @@ confirmation and separate opponents, requiring positive 99% lower bounds for bot
 composite reward against the unchanged qualified hybrid. Training and selection have four hours;
 the final stages have two hours each within one eight-hour deadline. Resume preserves these clocks,
 the actor/optimizer chain and all reserved worlds. Reports never activate a browser policy.
+
+Completed batches retain their rows in a lossless archive before their receipt is published. The
+[storage helper](../scripts/purchase_storage.py) verifies every raw row against the collector's
+completion hashes and every compressed member before deleting raw copies. Batch receipts bind the
+archive, manifest and unchanged metadata. An interrupted batch restores exact rows before resuming;
+completed batches need no extraction. For manual inspection, run `purchase_storage.py restore
+/absolute/run/batches/batch-NN`; run `archive` on the same batch afterward to return to its receipted
+storage layout. Archives never overwrite conflicting evidence. The campaign keeps its four-GiB
+output/RSS limits and two-GiB free-space reserve.
 
 ## Card policy learning
 
