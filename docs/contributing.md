@@ -363,8 +363,8 @@ Arena and strategy-search sources may include `frozenPurchase: {"baseline": "pri
 "policy": "purchase-policy.json"}` for the qualified four-player profile. Paths resolve relative
 to the source. Every seat uses this raw purchase actor and frozen prior, regardless of its ordinary
 model. Both files are hashed, archived and included in checkpoint identity. Omission preserves
-legacy behavior and identity. Token continuation collection rejects this option until it supports
-the same controller; it must not silently collect under a different purchase policy.
+legacy behavior and identity. The older `token-value-pilot` rejects this option; the
+`token-order-collect` experiment below requires the shared controller throughout its prefix and tails.
 
 Direct arenas may also supply `candidatePolicy` and `incumbentPolicy` inside `frozenPurchase`.
 Each optional path replaces the actor only for the evaluated seat on that side; all rival seats
@@ -811,6 +811,24 @@ Resume preserves the original clock and completed per-game evidence; no result a
 model. The driver-local screen leaves existing experiment stage definitions unchanged.
 
 ## Token-purchase continuation learning
+
+The token-order experiment uses `--mode token-order-collect --source SOURCE --output PATH
+--workers N --hours H`. Its source uses the arena contract with one screening configuration,
+identical ordinary candidate/incumbent models, shared `frozenPurchase` prior/actor paths,
+`trainingRoots`, `validationRoots`, and two `continuationReplicates`. One prospective epoch/ordinal
+root per fresh game supplies paired full-tail terminal outcomes. `dataset.json` and the ordered
+origin hashes in `finished.json` identify a complete bank; skips and interrupted games provide no
+training labels. The [collector](../training/src/main/kotlin/dev/aragos/aor/training/TokenOrderCollection.kt)
+owns the origin contract and routing.
+
+Token observation version 2 adds public capital-choice priority and categorical signed amounts;
+version 1 and the Purchase encoder remain unchanged. Collection and inference compare the actual
+ordinary baseline, its offered integer neighbors, and the original six token proposals. Direct
+arena sources can add `tokenOrder.candidateModel` and/or `tokenOrder.incumbentModel` paths to
+version 2 action-value models. These roles replace only the evaluated seat's token decision,
+retain the separate frozen Purchase prior, and require predicted advantage above 0.02. Replays
+retain the same roles and hashed snapshots. Selection data does not establish strength;
+independent complete-game confirmation is required before any client integration.
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
 token-purchase decisions. Start from a frozen arena specification and add `trainingRoots`,

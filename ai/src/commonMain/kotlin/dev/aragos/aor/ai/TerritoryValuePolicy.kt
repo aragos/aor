@@ -30,6 +30,13 @@ data class TerritoryValueModel(
         require(hiddenSize == 64) { "Territory action values require exactly 64 hidden units." }
         TerritoryFeatureDictionary(stateFeatureNames, actionFeatureNames)
         require(
+            encoderVersion != TerritoryEncoder.TOKEN_2.version ||
+                stateFeatureNames.containsAll(TokenObservationEncoder.capitalChoiceNames) &&
+                    actionFeatureNames.containsAll(TokenObservationEncoder.bidAmountNames)
+        ) {
+            "Token encoder 2 requires every public capital-priority and categorical bid column."
+        }
+        require(
             encoderVersion != TerritoryEncoder.EXPANSION_2.version ||
                 stateFeatureNames.containsAll(ExpansionObservationEncoder.cathedralUsageNames)
         ) {

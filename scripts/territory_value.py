@@ -22,6 +22,11 @@ SALTS = {"token": 0x243f6a88, "expansion": 0x85a308d3}
 CONTRACTS = {"token": b.TOKEN_CONTRACT, "expansion": b.EXPANSION_CONTRACT}
 EXPANSION_ENCODER_2 = "aor-expansion-observation-2"
 EXPANSION_CONTRACT_2 = replace(b.EXPANSION_CONTRACT, encoder=EXPANSION_ENCODER_2)
+TOKEN_ENCODER_2 = "aor-token-observation-2"
+TOKEN_CONTRACT_2 = replace(b.TOKEN_CONTRACT, encoder=TOKEN_ENCODER_2)
+TOKEN_ORDER_FEATURES = tuple(f"role.{role}.capitalChoicePosition" for role in range(6))
+TOKEN_AMOUNT_FEATURES = tuple(f"bid.amount.{amount}" for amount in range(-36, 37)) + (
+    "bid.amount.below", "bid.amount.above")
 CATHEDRAL_USAGE_FEATURES = tuple(sorted(
     f"cathedral.used.role.{owner}.role.{opponent}"
     for owner in range(6) for opponent in range(6) if owner != opponent))
@@ -36,6 +41,8 @@ def contract_for(phase, encoder_version):
     b.require(phase in PHASES, "Unknown territory Q phase.")
     if phase == 'expansion' and encoder_version == EXPANSION_ENCODER_2:
         return EXPANSION_CONTRACT_2
+    if phase == 'token' and encoder_version == TOKEN_ENCODER_2:
+        return TOKEN_CONTRACT_2
     contract = CONTRACTS[phase]
     b.require(encoder_version == contract.encoder, "Unsupported typed Q encoder version.")
     return contract
@@ -94,6 +101,10 @@ def validate_model(model, phase):
     if model['encoderVersion'] == EXPANSION_ENCODER_2:
         b.require(set(CATHEDRAL_USAGE_FEATURES) <= set(states),
                   "Expansion encoder2 requires every public Cathedral usage column.")
+    if model['encoderVersion'] == TOKEN_ENCODER_2:
+        b.require(set(TOKEN_ORDER_FEATURES) <= set(states)
+                  and set(TOKEN_AMOUNT_FEATURES) <= set(actions),
+                  "Token encoder2 requires capital-choice positions and signed amount columns.")
     sizes = dict(stateWeights=64*len(states), stateBias=64, actionWeights=64*len(actions),
                  actionBias=64, outputWeights=64)
     for name, size in sizes.items():

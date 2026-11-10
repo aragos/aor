@@ -19,30 +19,50 @@ import dev.aragos.aor.TurnCommand
  */
 object TokenObservationEncoder {
     const val ENCODER_VERSION = "aor-token-observation-1"
+    /** Public capital priority is one-based in six-player units; absent roles remain zero. */
+    val capitalChoiceNames = (0..5).map { "role.$it.capitalChoicePosition" }
+    /** Exact physical-stock-sized bids plus two bins for the offered full-cash endpoints. */
+    val bidAmountNames =
+        (-36..36).map { "bid.amount.$it" } + listOf("bid.amount.below", "bid.amount.above")
     private val amounts =
         listOf("amount", "cost", "received", "cashAfter", "stockAfter", "poolAfter")
     private val prospectFields = listOf("present", "required", "shipping", "overseas")
 
-    fun dictionary(catalog: PublicCatalog): TerritoryFeatureDictionary =
-        TerritoryFeatureDictionary(
+    fun dictionary(
+        catalog: PublicCatalog,
+        encoder: TerritoryEncoder = TerritoryEncoder.TOKEN_1,
+    ): TerritoryFeatureDictionary {
+        require(encoder.phase == TerritoryPhase.TOKEN) {
+            "A token dictionary requires a token encoder."
+        }
+        return TerritoryFeatureDictionary(
             (RawActorState.dictionary(catalog, listOf(TerritoryPhase.TOKEN.decision)) +
                     "forecast.available" +
                     catalog.provinces.flatMap { province ->
                         listOf("peaceful", "contested").flatMap { kind ->
                             prospectFields.map { "prospect.${province.id.value}.$kind.$it" }
                         }
-                    })
+                    } +
+                    if (encoder == TerritoryEncoder.TOKEN_2) capitalChoiceNames else emptyList())
                 .distinct()
                 .sorted(),
-            (amounts + listOf("kind.token", "negative", "zero", "positive")).sorted(),
+            (amounts +
+                    listOf("kind.token", "negative", "zero", "positive") +
+                    if (encoder == TerritoryEncoder.TOKEN_2) bidAmountNames else emptyList())
+                .sorted(),
         )
+    }
 
     fun from(
         view: GameView,
         seat: PlayerId,
         observation: BotObservation,
         baselineCommand: String,
+        encoder: TerritoryEncoder = TerritoryEncoder.TOKEN_1,
     ): TerritoryObservation {
+        require(encoder.phase == TerritoryPhase.TOKEN) {
+            "Token observations require a token encoder."
+        }
         require(
             view.stage == Stage.TOKEN_PURCHASE &&
                 observation.decision == TerritoryPhase.TOKEN.decision &&
@@ -54,6 +74,17 @@ object TokenObservationEncoder {
             TerritoryFeatures()
                 .apply {
                     values.putAll(RawActorState.from(view, seat, observation.decision))
+                    if (encoder == TerritoryEncoder.TOKEN_2) {
+                        val ownIndex = view.players.indexOfFirst { it.id == seat }
+                        view.players.forEachIndexed { index, player ->
+                            val role = (index - ownIndex + view.players.size) % view.players.size
+                            val position = view.capitalOrder.indexOf(player.id)
+                            require(position >= 0) {
+                                "Token-order encoding requires public capital priority."
+                            }
+                            add("role.$role.capitalChoicePosition", (position + 1) / 6.0)
+                        }
+                    }
                     view.expansionForecast?.let { forecast ->
                         add("forecast.available")
                         fun prospect(
@@ -109,6 +140,15 @@ object TokenObservationEncoder {
                             add("cashAfter", quote.cashAfter / 200.0)
                             add("stockAfter", quote.stockAfter / 36.0)
                             add("poolAfter", quote.poolAfter / 36.0)
+                            if (encoder == TerritoryEncoder.TOKEN_2) {
+                                add(
+                                    when {
+                                        quote.amount < -36 -> "bid.amount.below"
+                                        quote.amount > 36 -> "bid.amount.above"
+                                        else -> "bid.amount.${quote.amount}"
+                                    }
+                                )
+                            }
                             add(
                                 when {
                                     quote.amount < 0 -> "negative"
@@ -125,7 +165,7 @@ object TokenObservationEncoder {
             "Token encoding must retain the complete offered quote set."
         }
         return TerritoryObservation(
-            ENCODER_VERSION,
+            encoder.version,
             state,
             actions,
             actions.indexOfFirst { it.command == baselineCommand },
