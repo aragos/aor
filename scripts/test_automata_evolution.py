@@ -43,7 +43,7 @@ class EvolutionTest(unittest.TestCase):
                 "opponents": [str(self.baseline)], "robustOpponents": [str(self.baseline)],
                 "seed": 7200000, "seedBanks": evolution.seed_banks(7200000, profile_values, {}),
                 "initialRadius": 1.0, "maximumConsecutiveFailures": 2,
-                "minimumRoundSeconds": 10, "finalists": 3 if profile == "archive" else 4, "workers": 4,
+                "minimumRoundSeconds": 10, "finalists": 3 if profile in evolution.ARCHIVE_PROFILES else 4, "workers": 4,
                 "seedNote": "Source worlds excluded.", "intervalMethod": "Paired intervals.",
                 "frozenPurchase": {"baseline": str(prior), "policy": str(policy)},
                 "frozenPurchaseSha256": {"baseline": experiments.sha(prior), "policy": experiments.sha(policy)}}
@@ -330,6 +330,59 @@ class EvolutionTest(unittest.TestCase):
                 self.assertEqual(count, evolution.minimum_pairs(protocol, stage))
                 self.assertFalse(evolution.qualification_passes(protocol, metrics(count=count - 1), stage))
                 self.assertTrue(evolution.qualification_passes(protocol, metrics(count=count), stage))
+
+    def test_strong_archive_preparation_freezes_pool_and_stricter_final_contract(self):
+        options, original, identity = self.preparation_inputs()
+        options.profile, options.seed_model = "archive-strong", self.archived_models()
+        self.prepare(options, original, identity)
+        protocol = experiments.read(options.output / "protocol.json")
+        self.assertEqual((1, 512, 1024, 3, 2048, 4096, .99), tuple(protocol[key] for key in (
+            "rounds", "screeningPairs", "selectionPairs", "finalists", "confirmationPairs",
+            "robustnessPairs", "qualificationConfidence")))
+        for source, frozen in zip(options.seed_model, protocol["seedModels"]):
+            self.assertEqual(source.read_bytes(), Path(frozen).read_bytes())
+            self.assertEqual(experiments.sha(source), protocol["seedModelSha256"][frozen])
+
+    def test_strong_archive_uses_exact_pool_without_generating_proposals(self):
+        models = self.archived_models()
+        with mock.patch.object(evolution, "proposals", side_effect=AssertionError("Archive must not generate models")):
+            _, output, result, calls = self.run_evolution([(2, .1, .2)], "archive-strong", models)
+        self.assertEqual(1, calls)
+        self.assertEqual("passed", result["status"])
+        self.assertEqual(models[1].read_bytes(), (output / "selected/candidate.json").read_bytes())
+
+    def test_99_percent_gate_rejects_a_positive_95_percent_bound(self):
+        measured = metrics(win=.02, reward=.02, count=4096, lower=.001)
+        strong = self.protocol("archive-strong")
+        for stage in ("confirm", "robustness"):
+            with self.subTest(stage=stage):
+                self.assertTrue(evolution.qualification_passes(self.protocol("archive"), measured, stage))
+                self.assertFalse(evolution.qualification_passes(strong, measured, stage))
+        qualified = evolution.qualification_estimates(strong, measured)
+        self.assertAlmostEqual(.02 - .019 / 1.96 * 2.5758293035489004,
+                               qualified["winShareDifference"]["lowerConfidence"])
+        self.assertEqual(.001, qualified["winShareDifference"]["lower95"])
+
+    def test_strong_robustness_requires_4096_worlds_even_with_positive_99_percent_bounds(self):
+        protocol = self.protocol("archive-strong")
+        self.assertFalse(evolution.qualification_passes(protocol, metrics(count=4095, lower=.09), "robustness"))
+        self.assertTrue(evolution.qualification_passes(protocol, metrics(count=4096, lower=.09), "robustness"))
+
+    def test_strong_report_labels_99_percent_qualification_separately_from_95_percent_intervals(self):
+        protocol = self.protocol("archive-strong")
+        measured = metrics(count=4096, lower=.09)
+        qualified = evolution.qualification_estimates(protocol, measured)
+        output = self.root / "report"
+        evolution.report_result(protocol, output, "robustness", True, "Both declared gates passed.", qualified, [])
+        report = experiments.read(output / "robustness-report.json")
+        self.assertEqual(.99, report["qualificationConfidence"])
+        for name in ("winShareDifference", "rewardDifference"):
+            self.assertEqual(.99, report["metrics"][name]["qualificationConfidence"])
+            self.assertEqual(measured[name]["lower95"], report["metrics"][name]["lower95"])
+            self.assertLess(report["metrics"][name]["lowerConfidence"], measured[name]["lower95"])
+        text = (output / "robustness-report.txt").read_text()
+        self.assertEqual(2, text.count("95% interval"))
+        self.assertEqual(2, text.count("99% qualification lower bound"))
 
     def frozen_purchase_report(self, protocol, directory):
         result = {}
