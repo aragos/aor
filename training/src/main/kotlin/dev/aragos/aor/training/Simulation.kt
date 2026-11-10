@@ -26,6 +26,10 @@ import kotlin.random.Random
 /** A simulated policy has the same observation-only access as a browser-hosted opponent. */
 data class Competitor(val model: BotModel, val difficulty: BotDifficulty = BotDifficulty.NORMAL)
 
+/** The sealed batch shares one command-index seed base; seat indices are zero-based. */
+internal fun simulationPolicySeed(gameSeed: Int, batchStartNumber: Int, seat: Int): Int =
+    gameSeed xor (batchStartNumber * 65537 + seat * 8191)
+
 /**
  * One ordinary actor-visible decision. [number] is the zero-based game command index and [seed] is
  * the unchanged baseline-policy seed, not the authority's chance stream or a learned feature.
@@ -187,7 +191,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 val competitor = competitors[seat]
                 val observation = BotObservations.from(state, actor)
                 observation.candidates.flatMapTo(features) { it.features.keys }
-                val policySeed = seed xor (step * 65537 + seat * 8191)
+                val policySeed = simulationPolicySeed(seed, step, seat)
                 val controller = controlled[seat]?.takeIf { it.controls(observation.decision) }
                 val view = if (controller != null) state.viewForPlayer(actor) else null
                 val command =
