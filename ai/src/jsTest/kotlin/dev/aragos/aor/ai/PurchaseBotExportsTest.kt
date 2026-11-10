@@ -1,5 +1,6 @@
 package dev.aragos.aor.ai
 
+import dev.aragos.aor.RULES_VERSION
 import kotlin.js.JSON
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +15,52 @@ class PurchaseBotExportsTest {
 
         assertEquals("buy-advance A", command)
         assertEquals("pass", chooseBotMove(observation(), baseline(), "HARD", 0x6a09e667))
+    }
+
+    @Test
+    fun anExplicitlyDisabledOpeningSelectionRuleAcceptsTheLegacyPurchaseAsset() {
+        val input = JSON.parse<dynamic>(observation())
+        input.configuration.drawThreeKeepTwo = false
+        val selector = PurchaseBotSelector(baseline(), asset())
+
+        val command = selector.choose(JSON.stringify(input), projection(), "HARD", 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun theOpeningSelectionVariantRetainsTheOrdinaryPolicyInsteadOfTheFrozenPurchasePrior() {
+        val input = JSON.parse<dynamic>(observation())
+        input.configuration.drawThreeKeepTwo = true
+        val selector = PurchaseBotSelector(ordinaryBaseline(), hybridAsset())
+
+        val command =
+            selector.choose(JSON.stringify(input), projection(), "HARD", 17 xor 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun currentRulesGamesRetainTheOrdinaryPolicyInsteadOfTheLegacyPurchaseActor() {
+        val input = JSON.parse<dynamic>(observation())
+        input.rulesVersion = RULES_VERSION
+        val selector = PurchaseBotSelector(ordinaryBaseline(), hybridAsset())
+
+        val command =
+            selector.choose(JSON.stringify(input), projection(), "HARD", 17 xor 0x6a09e667)
+
+        assertEquals("buy-advance A", command)
+    }
+
+    @Test
+    fun aPurchaseAssetCannotBroadenItsQualifiedOpeningRules() {
+        val raw = JSON.parse<dynamic>(asset())
+        raw.configuration.drawThreeKeepTwo = true
+        val selector = PurchaseBotSelector(baseline(), JSON.stringify(raw))
+
+        val command = selector.choose(observation(), projection(), "HARD", 0x6a09e667)
+
+        assertEquals("pass", command)
     }
 
     @Test

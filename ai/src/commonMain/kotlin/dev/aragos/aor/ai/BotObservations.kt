@@ -46,16 +46,26 @@ object BotObservations {
                 }
                 else -> error("A bot observation requires a player decision.")
             }
-        return from(state.viewForDecision(seat), state.legalChoices(seat), seat, decision)
+        return from(
+            state.viewForDecision(seat),
+            state.legalChoices(seat),
+            seat,
+            decision,
+            rulesVersion = state.header.rulesVersion,
+        )
     }
 
-    /** Public projection entry point also supports isolated policy and privacy tests. */
+    /**
+     * Public projection entry point also supports isolated policy and privacy tests. [rulesVersion]
+     * is the source game's public header version; callers projecting legacy games must retain it.
+     */
     fun from(
         view: GameView,
         choices: LegalChoices,
         seat: PlayerId,
         decision: String,
-    ): BotObservation = ObservationProjection(view, choices, seat, decision).build()
+        rulesVersion: String = RULES_VERSION,
+    ): BotObservation = ObservationProjection(view, choices, seat, decision, rulesVersion).build()
 }
 
 private class ObservationProjection(
@@ -63,6 +73,7 @@ private class ObservationProjection(
     private val choices: LegalChoices,
     private val seat: PlayerId,
     private val decision: String,
+    private val rulesVersion: String,
 ) {
     private val self = view.players.single { it.id == seat }
     private val catalog =
@@ -128,7 +139,7 @@ private class ObservationProjection(
             availableCash = self.cash,
             availableTokens = self.poolTokens,
             candidates = candidates,
-            rulesVersion = RULES_VERSION,
+            rulesVersion = rulesVersion,
             dataVersion = catalog.dataVersion,
             configuration =
                 BotConfiguration(
@@ -137,6 +148,7 @@ private class ObservationProjection(
                     initialCard = view.rules.initialCard,
                     deckModification = view.rules.deckModification,
                     immediateMasterArtDiscard = view.rules.immediateMasterArtDiscard,
+                    drawThreeKeepTwo = view.rules.drawThreeKeepTwo,
                 ),
             expansionPlanning = if (decision == "expand") economic.planning(candidates) else null,
             reserveShortfallBasis =

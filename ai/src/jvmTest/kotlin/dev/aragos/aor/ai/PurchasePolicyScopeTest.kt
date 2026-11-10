@@ -3,6 +3,7 @@ package dev.aragos.aor.ai
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.InitialCardRule
 import dev.aragos.aor.MapRule
+import dev.aragos.aor.RULES_VERSION
 import kotlin.test.Test
 
 class PurchasePolicyScopeTest {
@@ -49,6 +50,7 @@ class PurchasePolicyScopeTest {
                 expected.copy(initialCard = InitialCardRule.ANY),
                 expected.copy(deckModification = false),
                 expected.copy(immediateMasterArtDiscard = false),
+                expected.copy(drawThreeKeepTwo = true),
                 null,
             )
 
@@ -60,6 +62,17 @@ class PurchasePolicyScopeTest {
         }
 
         assertThat(supported).doesNotContain(true)
+    }
+
+    @Test
+    fun theNewRulesVersionRemainsOutsideTheQualifiedActorScope() {
+        val supported =
+            PurchasePolicyScope.supports(
+                observation().copy(rulesVersion = RULES_VERSION),
+                BotDifficulty.HARD,
+            )
+
+        assertThat(supported).isFalse()
     }
 
     @Test

@@ -86,7 +86,8 @@ It records wall time, thread CPU and allocated bytes separately for games and re
 replay in warmup, and checks outcomes, coverage and regret against the baseline. Use the same JDK
 and an idle machine for both runs. These fixed development games do not measure playing strength.
 
-The default matrix covers all 128 player-count/variant combinations. `coverage.json` distinguishes
+The default matrix covers 128 historical player-count/variant combinations, with draw-three-keep-two
+disabled. `coverage.json` distinguishes
 observed/missing decisions, cards and configurations; directed probes do not establish exhaustive
 position coverage. `rounds.jsonl` records exploration; `evaluation.json` records independent comparison.
 Review independent evaluation and coverage gates before publishing a model. Limit its
@@ -611,9 +612,10 @@ bindings disable the optional actor. Unsupported scopes and unavailable or incom
 the ordinary recommendation. Preserve sampled selection and deterministic retries; changing either
 model or using greedy inference requires qualification of the resulting combination. The asset keeps
 the actor's original provenance and records separate hybrid qualification evidence.
-The supported scope is HARD shipping and advance purchases in four-player standard-map games with
-No Crusades, the deck modification and immediate Master Art discard enabled. Other decisions and
-setups continue using the compatible baseline.
+The supported scope is HARD shipping and advance purchases in existing rules-4 four-player
+standard-map games with No Crusades, the deck modification and immediate Master Art discard enabled,
+and draw-three-keep-two disabled. New rules-5 games, other decisions and other setups use the
+compatible baseline until separately qualified.
 
 Freeze training budgets, checkpoint-selection rules and unused confirmation worlds before launch.
 Compare complete games against both the unchanged initialization and the qualified baseline, then
