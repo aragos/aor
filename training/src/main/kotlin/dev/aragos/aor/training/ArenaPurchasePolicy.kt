@@ -8,14 +8,30 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 /**
- * Frozen shipping/advance policy for every arena seat. Its prior remains independent of candidate,
- * incumbent and opponent weights; both source files are bound by SHA-256 and archived verbatim.
+ * Frozen shipping/advance policies sharing one prior independent of ordinary seat-model weights.
+ * Optional candidate/incumbent actors replace only the evaluated seat; rivals retain [policy].
+ * Every explicitly supplied input is bound by SHA-256 and archived verbatim.
  */
 class ArenaPurchasePolicy
 private constructor(
     private val baseline: PurchaseBaselineInput,
     private val policy: PurchaseActorInput,
+    private val candidatePolicy: PurchaseActorInput?,
+    private val incumbentPolicy: PurchaseActorInput?,
 ) {
+    private enum class ActorRole(val field: String, val snapshot: String) {
+        SHARED("policy", "frozen-purchase-policy.json"),
+        CANDIDATE("candidatePolicy", "frozen-purchase-candidate-policy.json"),
+        INCUMBENT("incumbentPolicy", "frozen-purchase-incumbent-policy.json"),
+    }
+
+    private val actors =
+        listOfNotNull(
+            ActorRole.SHARED to policy,
+            candidatePolicy?.let { ActorRole.CANDIDATE to it },
+            incumbentPolicy?.let { ActorRole.INCUMBENT to it },
+        )
+
     internal fun validate(configurations: List<TrainingConfiguration>) {
         require(configurations.all { it.id == CONFIGURATION }) {
             "A frozen arena purchase policy requires $CONFIGURATION."
@@ -26,19 +42,48 @@ private constructor(
                 PublicCatalog.forPlayers(configuration.playerCount, configuration.rules)
             )
         require(
-            policy.model.stateFeatureNames == dictionary.stateFeatureNames &&
-                policy.model.actionFeatureNames == dictionary.actionFeatureNames
+            actors.all { (_, actor) ->
+                actor.model.stateFeatureNames == dictionary.stateFeatureNames &&
+                    actor.model.actionFeatureNames == dictionary.actionFeatureNames
+            }
         ) {
             "The frozen arena purchase actor must match the complete encoder dictionaries."
         }
     }
 
-    internal fun identity(): String = "frozen-purchase-1:${baseline.sha256}:${policy.sha256}"
+    internal fun identity(): String =
+        "frozen-purchase-1:${baseline.sha256}:${policy.sha256}" +
+            actors
+                .filter { (role, _) -> role != ActorRole.SHARED }
+                .joinToString("") { (role, actor) ->
+                    ":${role.field}:${actor.sha256}"
+                }
 
-    internal fun controllers(playerCount: Int): Map<Int, SimulationController> =
-        (0 until playerCount).associateWith {
-            PurchaseActorController(baseline.model, policy.model)
+    /** Null [side] preserves the shared environment and rejects ambiguous override routing. */
+    internal fun controllers(
+        playerCount: Int,
+        controlledSeat: Int,
+        side: ArenaSide?,
+    ): Map<Int, SimulationController> {
+        require(controlledSeat in 0 until playerCount) {
+            "The purchase actor's controlled seat must belong to the arena lineup."
         }
+        require(side != null || candidatePolicy == null && incumbentPolicy == null) {
+            "Purchase actor overrides require an explicit candidate or incumbent arena side."
+        }
+        val controlledPolicy =
+            when (side) {
+                ArenaSide.CANDIDATE -> candidatePolicy ?: policy
+                ArenaSide.INCUMBENT -> incumbentPolicy ?: policy
+                null -> policy
+            }
+        return (0 until playerCount).associateWith { seat ->
+            PurchaseActorController(
+                baseline.model,
+                if (seat == controlledSeat) controlledPolicy.model else policy.model,
+            )
+        }
+    }
 
     internal fun metadata(): Map<String, Any> =
         mapOf(
@@ -49,14 +94,16 @@ private constructor(
                             "path" to baseline.path.toString(),
                             "sha256" to baseline.sha256,
                             "snapshot" to "frozen-purchase-baseline.json",
-                        ),
-                    "policy" to
-                        mapOf(
-                            "path" to policy.path.toString(),
-                            "sha256" to policy.sha256,
-                            "snapshot" to "frozen-purchase-policy.json",
-                        ),
-                )
+                        )
+                ) +
+                    actors.associate { (role, actor) ->
+                        role.field to
+                            mapOf(
+                                "path" to actor.path.toString(),
+                                "sha256" to actor.sha256,
+                                "snapshot" to role.snapshot,
+                            )
+                    }
         )
 
     internal fun snapshot(artifacts: TrainingArtifacts) {
@@ -66,7 +113,9 @@ private constructor(
             baseline.path,
             baseline.sha256,
         )
-        snapshot(artifacts.directory, "frozen-purchase-policy.json", policy.path, policy.sha256)
+        for ((role, actor) in actors) {
+            snapshot(artifacts.directory, role.snapshot, actor.path, actor.sha256)
+        }
     }
 
     private fun snapshot(directory: Path, name: String, source: Path, sha256: String) {
@@ -93,7 +142,11 @@ private constructor(
         private const val CONFIGURATION = "players-4/standard/no-crusades/deck-true/art-true"
 
         internal fun read(source: Path, node: JsonNode): ArenaPurchasePolicy {
-            PurchaseJson.fields(node, setOf("baseline", "policy"))
+            PurchaseJson.fields(
+                node,
+                setOf("baseline", "policy"),
+                setOf("candidatePolicy", "incumbentPolicy"),
+            )
             fun path(name: String): Path =
                 source
                     .toAbsolutePath()
@@ -109,17 +162,22 @@ private constructor(
                     baselineHash,
                     TrainingArtifacts.readModel(baselinePath),
                 )
-            val policyPath = path("policy")
-            val policyHash = PurchaseJson.hash(policyPath)
-            val policy =
-                PurchaseActorInput(policyPath, policyHash, PurchasePolicyInput.read(policyPath))
-            require(
-                PurchaseJson.hash(baselinePath) == baselineHash &&
-                    PurchaseJson.hash(policyPath) == policyHash
-            ) {
+            fun actor(name: String): PurchaseActorInput {
+                val actorPath = path(name)
+                val actorHash = PurchaseJson.hash(actorPath)
+                val model = PurchasePolicyInput.read(actorPath)
+                require(PurchaseJson.hash(actorPath) == actorHash) {
+                    "The frozen arena purchase $name changed while being read."
+                }
+                return PurchaseActorInput(actorPath, actorHash, model)
+            }
+            val policy = actor("policy")
+            val candidate = node["candidatePolicy"]?.let { actor("candidatePolicy") }
+            val incumbent = node["incumbentPolicy"]?.let { actor("incumbentPolicy") }
+            require(PurchaseJson.hash(baselinePath) == baselineHash) {
                 "A frozen arena purchase input changed while being read."
             }
-            return ArenaPurchasePolicy(baseline, policy)
+            return ArenaPurchasePolicy(baseline, policy, candidate, incumbent)
         }
     }
 }

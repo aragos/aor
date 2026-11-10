@@ -801,6 +801,17 @@ def read_collection(directory, model_path, model, *, contract=PURCHASE_CONTRACT)
     for key in ("encoderVersion", "stateFeatureNames", "actionFeatureNames"):
         require(collection.get(key) == model[key], f"Collection {key} differs from policy.")
     require(collection.get("actorVersion") == contract.actor, "Actor version is unsupported.")
+    if "sharedPurchaseBaseline" in collection:
+        shared = collection["sharedPurchaseBaseline"]
+        require(contract == PURCHASE_CONTRACT and isinstance(shared, dict)
+                and set(shared) == {"path", "sha256"}
+                and isinstance(shared["path"], str) and Path(shared["path"]).is_absolute()
+                and isinstance(shared["sha256"], str) and len(shared["sha256"]) == 64
+                and all(character in "0123456789abcdef" for character in shared["sha256"]),
+                "Shared purchase baseline requires its exact path and SHA-256 provenance.")
+        shared_path = directory / "shared-purchase-baseline.json"
+        require(shared_path.is_file() and file_digest(shared_path) == shared["sha256"],
+                "Shared purchase baseline snapshot differs from the collection manifest.")
     frozen_purchase = None
     if contract.frozenPurchase:
         require(collection.get("trajectoryEncoding") == contract.trajectoryEncoding,
