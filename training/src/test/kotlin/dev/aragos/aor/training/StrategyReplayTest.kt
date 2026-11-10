@@ -78,6 +78,15 @@ class StrategyReplayTest {
     }
 
     @Test
+    fun ordinaryTokenBaselineMatchesTheActualMoveForALaterSeatInTheSealedBatch() {
+        val decision = recorded.decisions.first { it.snapshot.decision == "buy-tokens" }
+
+        assertThat(recorded.seat).isGreaterThan(0)
+        assertThat(decision.commandEntryIndex).isGreaterThan(decision.snapshotEntryCount)
+        assertThat(decision.ordinaryTokenBaseline).isEqualTo(decision.chosen.command)
+    }
+
+    @Test
     fun featureCountsTrackSelectedAndAvailableActions() {
         val expectedCounts =
             recorded.decisions
