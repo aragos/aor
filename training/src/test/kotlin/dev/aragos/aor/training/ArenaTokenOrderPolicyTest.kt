@@ -3,13 +3,20 @@ package dev.aragos.aor.training
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.GameState
 import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.Stage
+import dev.aragos.aor.TextCodec
 import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.BotModel
+import dev.aragos.aor.ai.BotModels
+import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.BotPolicy
+import dev.aragos.aor.ai.BotTokenValue
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryValuePolicy
 import dev.aragos.aor.ai.TokenObservationEncoder
+import dev.aragos.aor.ai.TokenOrderPolicy
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -136,36 +143,426 @@ class ArenaTokenOrderPolicyTest {
         }
     }
 
-    private fun withTokenRoles(fixture: ArenaPurchaseFixture): ArenaSpecification {
+    @Test
+    fun explicitModelSelectorsPreserveLegacyIdentityMetadataAndChoices() {
+        ArenaPurchaseFixture().use { fixture ->
+            val legacy = withTokenRoles(fixture)
+            val source = PurchaseJson.read(fixture.source) as ObjectNode
+            val roles = source["tokenOrder"] as ObjectNode
+            roles.put("candidateSelector", "MODEL")
+            roles.put("incumbentSelector", "MODEL")
+            fixture.artifacts.write("arena.json", source)
+            val explicit = fixture.specification
+            val policy = requireNotNull(legacy.tokenOrder) { "The fixture has token roles." }
+
+            assertThat(policy.identity())
+                .isEqualTo(
+                    "${TokenOrderPolicy.SELECTOR_VERSION}:${TokenOrderPolicy.PROPOSAL_VERSION}:" +
+                        "CANDIDATE=${PurchaseJson.hash(fixture.directory.resolve("candidate-token.json"))}:" +
+                        "INCUMBENT=${PurchaseJson.hash(fixture.directory.resolve("incumbent-token.json"))}"
+                )
+            assertThat(explicit.identity()).isEqualTo(legacy.identity())
+            assertThat(explicit.overlayMetadata()).isEqualTo(legacy.overlayMetadata())
+            val decision = tokenDecision(fixture)
+            assertThat(
+                    explicit
+                        .controllers(4, 0, ArenaSide.CANDIDATE, explicit.candidate)[0]
+                        ?.choose(decision)
+                )
+                .isEqualTo(
+                    legacy
+                        .controllers(4, 0, ArenaSide.CANDIDATE, legacy.candidate)[0]
+                        ?.choose(decision)
+                )
+        }
+    }
+
+    @Test
+    fun adjacentVetoRetainsTheChosenLowerNeighbor() {
+        ArenaPurchaseFixture().use { fixture ->
+            val role =
+                ArenaTokenRole(
+                    ArenaTokenSelector.ADJACENT_VETO,
+                    tokenInput(fixture, "neighbor.json", mapOf(15 to 1.0)),
+                )
+
+            val chosen = TokenOrderController(testBaseline, role).choose(tokenDecision(fixture))
+
+            assertThat(chosen).isEqualTo("buy-tokens 15")
+        }
+    }
+
+    @Test
+    fun adjacentVetoRetainsTheChosenUpperNeighbor() {
+        ArenaPurchaseFixture().use { fixture ->
+            val role =
+                ArenaTokenRole(
+                    ArenaTokenSelector.ADJACENT_VETO,
+                    tokenInput(fixture, "neighbor.json", mapOf(17 to 1.0)),
+                )
+
+            val chosen = TokenOrderController(testBaseline, role).choose(tokenDecision(fixture))
+
+            assertThat(chosen).isEqualTo("buy-tokens 17")
+        }
+    }
+
+    @Test
+    fun vetoedLongJumpDoesNotReselectAProfitableNeighbor() {
+        ArenaPurchaseFixture().use { fixture ->
+            val role =
+                ArenaTokenRole(
+                    ArenaTokenSelector.ADJACENT_VETO,
+                    tokenInput(fixture, "jump.json", mapOf(0 to 1.0, 15 to .5)),
+                )
+            val decision = tokenDecision(fixture)
+            val unrestricted =
+                TokenOrderController(testBaseline, role.copy(selector = ArenaTokenSelector.MODEL))
+
+            val chosen = TokenOrderController(testBaseline, role).choose(decision)
+
+            assertThat(unrestricted.choose(decision)).isEqualTo("buy-tokens 0")
+            assertThat(chosen).isEqualTo("buy-tokens 16")
+        }
+    }
+
+    @Test
+    fun adjacentVetoPreservesTheOriginalQAdvantageCutoff() {
+        ArenaPurchaseFixture().use { fixture ->
+            val role =
+                ArenaTokenRole(
+                    ArenaTokenSelector.ADJACENT_VETO,
+                    tokenInput(fixture, "small.json", mapOf(15 to .01)),
+                )
+
+            val chosen = TokenOrderController(testBaseline, role).choose(tokenDecision(fixture))
+
+            assertThat(chosen).isEqualTo("buy-tokens 16")
+        }
+    }
+
+    @Test
+    fun fixedControlUsesTheActualTokenHeadChoiceInsteadOfTheOrdinaryScoreWinner() {
+        ArenaPurchaseFixture().use { fixture ->
+            val initial = tokenDecision(fixture, amount = 8)
+            val observation =
+                initial.observation.copy(
+                    candidates =
+                        initial.observation.candidates.map { candidate ->
+                            candidate.copy(
+                                features =
+                                    candidate.features +
+                                        (BotTokenValue.featureNames.first() to
+                                            if (candidate.command == "buy-tokens 16") 1.0 else 0.0)
+                            )
+                        }
+                )
+            val baseline =
+                BotModel(
+                    weights =
+                        testBaseline.weights +
+                            mapOf(
+                                BotTokenValue.GATE to 1.0,
+                                BotTokenValue.featureNames.first() to 1.0,
+                            )
+                )
+            val controller =
+                TokenOrderController(
+                    baseline,
+                    ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_15, null),
+                )
+
+            val chosen = controller.choose(initial.copy(observation = observation))
+
+            assertThat(BotPolicy.choose(observation, BotDifficulty.NORMAL, initial.seed, baseline))
+                .isEqualTo("buy-tokens 8")
+            assertThat(chosen).isEqualTo("buy-tokens 15")
+        }
+    }
+
+    @Test
+    fun fixedControlRetainsTheBaselineWhenFifteenIsNotOffered() {
+        ArenaPurchaseFixture().use { fixture ->
+            val initial = tokenDecision(fixture)
+            val decision =
+                initial.copy(
+                    view =
+                        initial.view.copy(
+                            tokenPurchaseOffers =
+                                initial.view.tokenPurchaseOffers.filter { it.amount != 15 }
+                        ),
+                    observation =
+                        initial.observation.copy(
+                            candidates =
+                                initial.observation.candidates.filter {
+                                    it.command != "buy-tokens 15"
+                                }
+                        ),
+                )
+            val controller =
+                TokenOrderController(
+                    testBaseline,
+                    ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_15, null),
+                )
+
+            val chosen = controller.choose(decision)
+
+            assertThat(chosen).isEqualTo("buy-tokens 16")
+        }
+    }
+
+    @Test
+    fun fixedControlLeavesOtherOrdinaryAmountsUnchanged() {
+        ArenaPurchaseFixture().use { fixture ->
+            val controller =
+                TokenOrderController(
+                    testBaseline,
+                    ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_15, null),
+                )
+
+            val chosen = controller.choose(tokenDecision(fixture, amount = 17))
+
+            assertThat(chosen).isEqualTo("buy-tokens 17")
+        }
+    }
+
+    @Test
+    fun aFixedRoleNeedsNoModelAndProducesNoUnusedModelSnapshot() {
+        ArenaPurchaseFixture().use { fixture ->
+            val specification = tokenRoles(fixture, mapOf("candidateSelector" to "FIXED_16_TO_15"))
+            val output = TrainingArtifacts(fixture.directory.resolve("fixed-snapshots"))
+
+            specification.snapshotOverlays(output)
+
+            assertThat(specification.overlayMetadata()["tokenOrder"])
+                .isEqualTo(mapOf("candidateSelector" to "FIXED_16_TO_15"))
+            assertThat(Files.exists(output.directory.resolve("token-order-candidate-model.json")))
+                .isFalse()
+            assertThat(
+                    requireNotNull(specification.tokenOrder) {
+                            "The fixed control has a token role."
+                        }
+                        .identity()
+                )
+                .contains("FIXED_16_TO_15")
+        }
+    }
+
+    @Test
+    fun candidateAndIncumbentSelectorsRouteIndependentlyWithEqualOrdinaryModels() {
+        ArenaPurchaseFixture().use { fixture ->
+            tokenInput(fixture, "jump.json", mapOf(0 to 1.0))
+            val specification =
+                tokenRoles(
+                        fixture,
+                        mapOf(
+                            "candidateSelector" to "FIXED_16_TO_15",
+                            "incumbentSelector" to "ADJACENT_VETO",
+                            "incumbentModel" to "jump.json",
+                        ),
+                    )
+                    .copy(candidate = testBaseline, incumbent = testBaseline)
+            val decision = tokenDecision(fixture)
+
+            val chosen =
+                ArenaSide.entries.map { side ->
+                    requireNotNull(specification.controllers(4, 0, side, testBaseline)[0]) {
+                            "The evaluated seat has an explicit token selector."
+                        }
+                        .choose(decision)
+                }
+
+            assertThat(chosen).containsExactly("buy-tokens 15", "buy-tokens 16").inOrder()
+        }
+    }
+
+    @Test
+    fun selectorsRejectMissingUnusedAndUnknownModelRoles() {
+        ArenaPurchaseFixture().use { fixture ->
+            tokenInput(fixture, "model.json", mapOf(0 to 1.0))
+            val invalid =
+                listOf(
+                    mapOf("candidateSelector" to "MODEL"),
+                    mapOf("candidateSelector" to "ADJACENT_VETO"),
+                    mapOf(
+                        "candidateSelector" to "FIXED_16_TO_15",
+                        "candidateModel" to "model.json",
+                    ),
+                    mapOf("candidateSelector" to "UNKNOWN"),
+                )
+
+            invalid.forEach { fields ->
+                assertFailsWith<IllegalArgumentException> { tokenRoles(fixture, fields) }
+            }
+        }
+    }
+
+    @Test
+    fun selectorChangesAreBoundIntoIdentityAndReplayMetadata() {
+        ArenaPurchaseFixture().use { fixture ->
+            tokenInput(fixture, "model.json", mapOf(15 to 1.0))
+            val original = tokenRoles(fixture, mapOf("candidateModel" to "model.json"))
+            val changed =
+                tokenRoles(
+                    fixture,
+                    mapOf(
+                        "candidateModel" to "model.json",
+                        "candidateSelector" to "ADJACENT_VETO",
+                    ),
+                )
+
+            assertThat(changed.identity()).isNotEqualTo(original.identity())
+            val metadata = changed.overlayMetadata()["tokenOrder"] as Map<*, *>
+            assertThat(metadata["candidateSelector"]).isEqualTo("ADJACENT_VETO")
+            assertThat(metadata["candidateModel"])
+                .isEqualTo(
+                    (original.overlayMetadata()["tokenOrder"] as Map<*, *>)["candidateModel"]
+                )
+        }
+    }
+
+    @Test
+    fun diagnosticSelectorsReplayTheSameWholeGameOutcomes() {
+        ArenaPurchaseFixture().use { fixture ->
+            tokenInput(fixture, "model.json", mapOf(15 to 1.0))
+            for (selector in listOf("ADJACENT_VETO", "FIXED_16_TO_15")) {
+                val fields =
+                    mapOf("candidateSelector" to selector) +
+                        if (selector == "ADJACENT_VETO") mapOf("candidateModel" to "model.json")
+                        else emptyMap()
+                val specification = tokenRoles(fixture, fields)
+                val game = StrategyArena.game(specification, 0, ArenaSide.CANDIDATE, Long.MAX_VALUE)
+
+                val replay = StrategyReplays.play(specification, 0, StrategyReplaySide.CANDIDATE)
+
+                assertThat(replay.game.scores).isEqualTo(game.scores)
+                assertThat(replay.game.decisions).isEqualTo(game.decisions)
+                assertThat(replay.replayVerified).isTrue()
+            }
+        }
+    }
+
+    @Test
+    fun tokenReplayReportsTheActualOrdinaryHeadBaselineBeforeTheOverlay() {
+        ArenaPurchaseFixture().use { fixture ->
+            val baseline =
+                BotModels.default.copy(
+                    weights =
+                        BotModels.default.weights +
+                            mapOf(
+                                BotTokenValue.GATE to 1.0,
+                                BotTokenValue.featureNames.first() to -10.0,
+                            )
+                )
+            val specification = withTokenRoles(fixture).copy(candidate = baseline)
+            val replay = StrategyReplays.play(specification, 0, StrategyReplaySide.CANDIDATE)
+            val decision = replay.decisions.first { it.snapshot.decision == "buy-tokens" }
+            val state =
+                replay.entries.take(decision.snapshotEntryCount).fold(GameState(replay.header)) {
+                    current,
+                    text ->
+                    current.step(TextCodec.parse(text))
+                }
+            val observation = BotObservations.from(state, state.playerIds[replay.seat])
+            val scoreWinner = observation.candidates.maxBy { BotPolicy.score(it, baseline) }.command
+
+            assertThat(decision.ordinaryTokenBaseline).isEqualTo("buy-tokens -4")
+            assertThat(decision.ordinaryTokenBaseline).isNotEqualTo(scoreWinner)
+            assertThat(decision.chosen.command).isEqualTo("buy-tokens 0")
+            val other = replay.decisions.first { it.snapshot.decision != "buy-tokens" }
+            assertThat(
+                    PurchaseJson.mapper.valueToTree<JsonNode>(other).has("ordinaryTokenBaseline")
+                )
+                .isFalse()
+        }
+    }
+
+    private val testBaseline = BotModel(weights = mapOf("test.baseline" to 1.0))
+
+    private fun tokenDecision(fixture: ArenaPurchaseFixture, amount: Int = 16): SimulationDecision {
+        val session = firstToken(fixture)
+        val actor = session.state.playerIds.first()
+        val observation = session.observation(actor)
+        return SimulationDecision(
+            0,
+            0,
+            71,
+            session.state.viewForPlayer(actor),
+            observation.copy(
+                candidates =
+                    observation.candidates.map { candidate ->
+                        candidate.copy(
+                            features =
+                                candidate.features +
+                                    ("test.baseline" to
+                                        if (candidate.command == "buy-tokens $amount") 1.0 else 0.0)
+                        )
+                    }
+            ),
+        )
+    }
+
+    private fun tokenRoles(
+        fixture: ArenaPurchaseFixture,
+        fields: Map<String, String>,
+    ): ArenaSpecification {
+        val source = PurchaseJson.read(fixture.source) as ObjectNode
+        source.set<JsonNode>("tokenOrder", PurchaseJson.mapper.valueToTree(fields))
+        fixture.artifacts.write("arena.json", source)
+        return fixture.specification
+    }
+
+    private fun tokenInput(
+        fixture: ArenaPurchaseFixture,
+        name: String,
+        scores: Map<Int, Double>,
+    ): TerritoryValueInput {
         val dictionary =
             TokenObservationEncoder.dictionary(
                 PublicCatalog.forPlayers(4, fixture.configuration.rules),
                 TerritoryEncoder.TOKEN_2,
             )
-        for ((role, amount) in listOf("candidate" to 0, "incumbent" to 36)) {
-            fixture.artifacts.write(
-                "$role-token.json",
-                mapOf(
-                    "schemaVersion" to 1,
-                    "architecture" to TerritoryValuePolicy.ARCHITECTURE,
-                    "encoderVersion" to TerritoryEncoder.TOKEN_2.version,
-                    "hiddenSize" to 64,
-                    "stateFeatureNames" to dictionary.stateFeatureNames,
-                    "actionFeatureNames" to dictionary.actionFeatureNames,
-                    "stateWeights" to List(64 * dictionary.stateFeatureNames.size) { 0.0 },
-                    "stateBias" to List(64) { 0.0 },
-                    "actionWeights" to
-                        List(64 * dictionary.actionFeatureNames.size) {
-                            if (it == dictionary.actionFeatureNames.indexOf("bid.amount.$amount"))
-                                8.0
-                            else 0.0
-                        },
-                    "actionBias" to List(64) { 0.0 },
-                    "outputWeights" to List(64) { if (it == 0) 1.0 else 0.0 },
-                    "outputBias" to .5,
-                ),
-            )
-        }
+        val choices = scores.entries.toList()
+        fixture.artifacts.write(
+            name,
+            mapOf(
+                "schemaVersion" to 1,
+                "architecture" to TerritoryValuePolicy.ARCHITECTURE,
+                "encoderVersion" to TerritoryEncoder.TOKEN_2.version,
+                "hiddenSize" to 64,
+                "stateFeatureNames" to dictionary.stateFeatureNames,
+                "actionFeatureNames" to dictionary.actionFeatureNames,
+                "stateWeights" to List(64 * dictionary.stateFeatureNames.size) { 0.0 },
+                "stateBias" to List(64) { 0.0 },
+                "actionWeights" to
+                    List(64 * dictionary.actionFeatureNames.size) { index ->
+                        val choice = choices.getOrNull(index / dictionary.actionFeatureNames.size)
+                        if (
+                            choice != null &&
+                                index % dictionary.actionFeatureNames.size ==
+                                    dictionary.actionFeatureNames.indexOf(
+                                        "bid.amount.${choice.key}"
+                                    )
+                        )
+                            8.0
+                        else 0.0
+                    },
+                "actionBias" to List(64) { 0.0 },
+                "outputWeights" to List(64) { choices.getOrNull(it)?.value ?: 0.0 },
+                "outputBias" to .5,
+            ),
+        )
+        val path = fixture.directory.resolve(name)
+        return TerritoryValueInput(
+            path,
+            PurchaseJson.hash(path),
+            TerritoryValuePolicyInput.read(path),
+        )
+    }
+
+    private fun withTokenRoles(fixture: ArenaPurchaseFixture): ArenaSpecification {
+        tokenInput(fixture, "candidate-token.json", mapOf(0 to 1.0))
+        tokenInput(fixture, "incumbent-token.json", mapOf(36 to 1.0))
         val source = PurchaseJson.read(fixture.source) as ObjectNode
         source.set<JsonNode>(
             "tokenOrder",

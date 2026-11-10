@@ -484,6 +484,13 @@ Explicit roles have separate hashes and immutable snapshots, and canonical repla
 side-specific actor. This permits comparing learned purchase actors with identical ordinary models.
 Weight-only strategy search rejects these overrides because its cache identifies ordinary models.
 
+For comparison with an ordinary opponent, direct arenas may instead declare
+`ordinaryEvaluatedSides: ["INCUMBENT"]` inside `frozenPurchase` (or `"CANDIDATE"`, or both).
+The evaluated seat on each named side uses its ordinary model for purchase decisions, including
+its own prior; rivals retain the shared frozen actor and prior. A named ordinary side must omit
+its actor override. These roles bind experiment identity and metadata and require explicit arena
+sides. With a null ordinary `incumbent`, this compares against the built-in default opponent.
+
 For direct compact token-head search, copy the frozen baseline and set every reserved
 `planning.tokenValue.*` coefficient to zero except `planning.tokenValue.enabled = 1`. Search only
 named existing [token feature definitions](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenValue.kt),
@@ -941,6 +948,15 @@ version 2 action-value models. These roles replace only the evaluated seat's tok
 retain the separate frozen Purchase prior, and require predicted advantage above 0.02. Replays
 retain the same roles and hashed snapshots. Selection data does not establish strength;
 independent complete-game confirmation is required before any client integration.
+
+Native diagnostic sources can additionally set `tokenOrder.candidateSelector` and/or
+`tokenOrder.incumbentSelector`. `MODEL` is the unchanged default. `ADJACENT_VETO` requires that side's
+model and keeps its original choice only when it differs from the actual ordinary baseline by one;
+a larger change retains the baseline without reselecting a neighbor. `FIXED_16_TO_15` must omit that
+side's model and changes only an ordinary bid of 16 to an offered legal 15. Selector roles are bound
+into experiment identity and metadata; model roles retain immutable snapshots. Token replay
+decisions record `ordinaryTokenBaseline`, including the ordinary policy's token heads, separately
+from immediate linear scores. These controls do not change collection, fitting or browser play.
 
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
 token-purchase decisions. Start from a frozen arena specification and add `trainingRoots`,

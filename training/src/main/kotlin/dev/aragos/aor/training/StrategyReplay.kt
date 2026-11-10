@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.aragos.aor.GameHeader
@@ -134,6 +135,8 @@ data class StrategyReplayDecision(
     val chosen: StrategyReplayCandidate,
     val alternatives: List<StrategyReplayCandidate>,
     val candidateCount: Int,
+    /** Exact ordinary token choice, including token heads, before any experimental overlay. */
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val ordinaryTokenBaseline: String? = null,
 )
 
 /**
@@ -181,7 +184,7 @@ object StrategyReplays {
     ): StrategyReplay {
         val lineup = StrategyArena.lineup(specification, index)
         val opponentIndices = pair?.opponentIndices(specification, index) ?: lineup.opponentIndices
-        val recording = StrategyRecording(lineup.seat)
+        val recording = StrategyRecording(lineup.seat, lineup.seed)
         val game =
             Simulation()
                 .play(
@@ -231,7 +234,7 @@ object StrategyReplays {
     }
 }
 
-private class StrategyRecording(override val seat: Int) : SimulationTrace {
+private class StrategyRecording(override val seat: Int, private val seed: Int) : SimulationTrace {
     var header: GameHeader? = null
         private set
 
@@ -279,6 +282,16 @@ private class StrategyRecording(override val seat: Int) : SimulationTrace {
                 )
                 .take(5)
                 .map { StrategyReplayCandidate.from(it.first, model) }
+        val ordinaryTokenBaseline =
+            if (observation.decision == "buy-tokens") {
+                val batchStart = number - (commandEntryIndex - snapshotEntryCount)
+                BotPolicy.choose(
+                    observation,
+                    BotDifficulty.HARD,
+                    simulationPolicySeed(seed, batchStart, seat),
+                    model,
+                )
+            } else null
         decisions +=
             StrategyReplayDecision(
                 snapshotEntryCount = snapshotEntryCount,
@@ -288,6 +301,7 @@ private class StrategyRecording(override val seat: Int) : SimulationTrace {
                 chosen = StrategyReplayCandidate.from(chosen, model),
                 alternatives = alternatives,
                 candidateCount = observation.candidates.size,
+                ordinaryTokenBaseline = ordinaryTokenBaseline,
             )
     }
 
