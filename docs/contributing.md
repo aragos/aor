@@ -174,6 +174,12 @@ qualified combined incumbent, native AI/engine/training bytes and all audited se
 A separate fixed-weight portability bank verifies execution across hosts and is excluded from
 learning, selection and strength claims. Exact-child environment/process-sampler preflight precedes
 both package freeze and launch.
+[`finalize_expansion_target_search.py`](../scripts/finalize_expansion_target_search.py) binds the
+reviewed weighted-parity receipt and compared artifacts before transport freeze. Host selection is
+separate from the scientific template: a reviewed six-worker Mac or Linux request supplies the
+interpreter, JDK and environment; preparation and launch each validate the actual clean child and
+external process sampler. The weighted proof must preserve failed operational attempts when a
+separately authorized mechanical recovery was needed.
 
 ### Portable simulation benchmark
 

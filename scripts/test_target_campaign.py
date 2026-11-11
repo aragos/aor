@@ -41,6 +41,17 @@ class TargetCampaignTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'both final stages passed'):prepare.verify_combination(Path('/parent'))
         verify.assert_not_called()
 
+    def test_native_worker_allowance_uses_actual_machine_cpu_count(self):
+        with tempfile.TemporaryDirectory() as name:
+            protocol=dict(java=dict(executable='/java'),heapMiB=1536,workers=6,runtime='/runtime')
+            with mock.patch.object(campaign.exp,'remaining_seconds',return_value=600), \
+                 mock.patch.object(campaign.exp.os,'cpu_count',return_value=16), \
+                 mock.patch.object(campaign.exp.subprocess,'run',return_value=mock.Mock(returncode=0)) as native:
+                campaign.exp.native(protocol,'arena',Path('/source.json'),Path(name)/'native')
+            self.assertEqual(native.call_args.kwargs['env']['AOR_TRAINING_MACHINE_CPUS'],'16')
+            self.assertIn('-XX:ActiveProcessorCount=6',native.call_args.args[0])
+            self.assertEqual(native.call_args.args[0][-2:],['--workers','6'])
+
     def test_changed_preflight_verifier_blocks_freeze(self):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name)

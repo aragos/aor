@@ -37,8 +37,10 @@ def verify_execution(protocol,path,output):
         actual = {str(path) for path in (root/name).rglob('*') if path.is_file()}
         declared = {path for path in protocol['frozenFiles'] if Path(path).is_relative_to(root/name)}
         require(actual == declared,'Unexpected or missing target package files in '+name)
-    require(protocol['combinationQualification']['qualified'] is True,
-            'Target search requires the independently qualified combined incumbent.')
+    require(protocol['combinationQualification']['qualified'] is True
+            and protocol['weightedPortabilityVerified'] is True
+            and sha(root/'portability/receipt.json') == protocol['weightedPortabilitySha256'],
+            'Target search requires the qualified incumbent and exact verified weighted host proof.')
 
 
 def campaign_spec(root,protocol,files):

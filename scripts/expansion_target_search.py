@@ -196,7 +196,13 @@ def validate_protocol(protocol):
     for index,seed in enumerate(protocol['proposalSeeds']):
         require(audit['seedBanks'][f'generation-{index}']['proposalSeeds'] == [seed],
                 'Target proposal seed differs from its independent reservation.')
-    values += protocol['proposalSeeds']
+    portable_bank = protocol['portability']['bank']
+    require(portable_bank == audit['seedBanks']['portability'] and portable_bank['count'] == 32
+            and portable_bank['seeds'] == exp.arena_seeds(portable_bank['nativeOffset'],32)
+            and protocol['portability']['usedForSelection'] is False
+            and protocol['portability']['usedForStrength'] is False,
+            'Portability worlds must remain a separate fixed operational-only bank.')
+    values += protocol['proposalSeeds'] + portable_bank['seeds']
     require(len(values) == len(set(values)),'Target game/proposal streams must remain distinct.')
     require(Path(sys.executable).resolve() == Path(protocol['python']['executable'])
             and sys.version == protocol['python']['version'],'Frozen target interpreter changed.')
