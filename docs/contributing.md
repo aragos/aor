@@ -130,6 +130,15 @@ for role and replay contracts.
 
 ### Bounded expansion evolution
 
+The ordinary projection also exposes four default-zero
+[`BotExpansionTargetFeature`](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotExpansionTargets.kt)
+inputs for completed attacks on opposing markets: dice-conditional market removal and the owner's
+shares of public income, advance count and cash. Shares include every active player, including the
+actor; missing or empty totals give zero. Optional defensive decisions can change the actual outcome.
+These facts neither rank leaders nor change existing models. The eight-coordinate imitation and
+evolution protocols below do not train these extra coefficients; doing so requires a separate,
+explicitly scoped experiment and fresh strength comparisons.
+
 [`prepare_expansion_evolution.py`](../scripts/prepare_expansion_evolution.py) freezes a separate
 whole-game learning campaign after the fixed imitation screen has a verified terminal receipt.
 Only validation-selected rivals surviving that screen's original collapse exclusion may seed it.

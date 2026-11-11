@@ -86,6 +86,10 @@ private class ObservationProjection(
     private val stabilization = (view.stabilizationCost ?: 0L).toDouble()
     private val economic by lazy(LazyThreadSafetyMode.NONE) { BotEconomicProjection(view, seat) }
     private val purchases by lazy(LazyThreadSafetyMode.NONE) { BotPurchaseProjection(view, seat) }
+    private val expansionTargets by
+        lazy(LazyThreadSafetyMode.NONE) {
+            BotExpansionTargets(view, seat)
+        }
     private val tokenValue by
         lazy(LazyThreadSafetyMode.NONE) {
             BotTokenValueProjection(view, seat, endgame)
@@ -652,6 +656,7 @@ private class ObservationProjection(
                 else -> 2.0 * chance
             }
         features["risk"] = if (offer.uncertain) (1.0 - chance) * tokens else 0.0
+        features.putAll(expansionTargets.features(offer, complete))
     }
 
     private fun addMisery(features: MutableMap<String, Double>, changes: List<MiseryChangeView>) {
