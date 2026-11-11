@@ -97,6 +97,37 @@ diagnostic `candidate.json`. Schema/rules/catalog metadata protects inference co
 matching metadata alone establishes no playing-strength claim. Broader qualification remains
 [open work](follow-ups.md).
 
+### Bounded human expansion imitation
+
+`--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic
+pilot from a sanitized actor-visible observation JSONL, with a ten-minute fitting ceiling. The
+source binds `observations`, `observationsSha256`, `baseline`, `baselineSha256`, `gameId` and
+`gameSourceSha256`, plus `schemaVersion: 1` and optional `experimentalRulesTransfer`. Game hashes
+are provenance only: do not supply original saves, server metadata, credentials or future outcomes.
+The fixed pilot takes exactly 50 nontrivial expansion choices from 186 chronological gameplay
+observations: 30 training, ten validation and ten descriptive audit decisions. It fits three
+predeclared regularizations of eight feature corrections anchored to the frozen ordinary model.
+Only training decisions determine numerical scales; each decision has equal total fitting weight.
+
+`selection.json` freezes models and validation-based rival eligibility before the audit labels are
+evaluated. Linear ranking loss and actual HARD-planner agreement are reported separately. This
+single-game imitation experiment explores training-rival diversity; neither agreement nor a small
+whole-game screen establishes human-level strength or qualifies application activation. The fixed
+screening and collapse rules are recorded in `run.json`; an audit cannot revise selection.
+
+Arena sources can attach `expansionImitation` with `candidateModel`, `incumbentModel`, or an
+`opponentModels` array containing paths or null for ordinary behavior. Rival roles align exactly
+with ordinary opponent model indices, not rotating seat positions. Models must preserve all but
+the eight declared coefficients of their actual ordinary model. The overlay applies only to
+`expand`; other decisions retain ordinary behavior and any disjoint frozen Purchase/token overlay.
+Model bytes, roles and snapshots bind arena and replay identities. Omission preserves previous
+behavior and metadata. Weight-only strategy search and frozen continuation collectors reject this
+overlay rather than silently evaluating different policies. See the native
+[`ExpansionImitationProtocol`](../training/src/main/kotlin/dev/aragos/aor/training/ExpansionImitationFit.kt)
+for the fixed fit and
+[`ArenaExpansionImitation`](../training/src/main/kotlin/dev/aragos/aor/training/ArenaExpansionImitation.kt)
+for role and replay contracts.
+
 ### Portable simulation benchmark
 
 For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages

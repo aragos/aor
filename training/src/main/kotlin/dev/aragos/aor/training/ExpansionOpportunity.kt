@@ -28,7 +28,11 @@ internal data class ExpansionOpportunitySpecification(
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
             "Expansion diagnostics require exactly one SCREENING configuration."
         }
-        require(arena.candidate == arena.incumbent && arena.tokenOrder == null) {
+        require(
+            arena.candidate == arena.incumbent &&
+                arena.tokenOrder == null &&
+                arena.expansionImitation == null
+        ) {
             "Expansion diagnostics require identical ordinary baselines and no token overlays."
         }
         require(diagnosticRoots in 1..128 && continuationReplicates == 2) {
