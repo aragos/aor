@@ -100,6 +100,15 @@ def collect(protocol,output):
     return batches
 
 
+def result_artifacts(output):
+    """Only completed science owners are immutable; supervisor state/logs continue changing."""
+    output=Path(output)
+    artifacts=[output/name for name in ('progress.json','corpus.json','numeric.log','study-report.json')]
+    for directory in (output/'batches',output/'value'):
+        artifacts.extend(p for p in directory.rglob('*') if p.is_file())
+    return artifacts
+
+
 def study(protocol,path,output):
     batches=collect(protocol,output)
     command=[read(protocol['gpuEnvironment'])['executable'],'-E','-s','-B',str(Path(__file__).resolve()),
@@ -119,11 +128,8 @@ def study(protocol,path,output):
     summary=dict(report,completedBatches=len(batches),scientificTerminalGames=4096,
         historicalReproductions=64,totalTerminalExecutions=4160,actualFits=2,protocolSha256=sha(path))
     document(output/'study-report.json',summary)
-    artifacts=[output/name for name in ('progress.json','corpus.json','numeric.log','study-report.json')]
-    for directory in (output/'batches',output/'value'):
-        artifacts.extend(p for p in directory.rglob('*') if p.is_file())
     return exp.stage_result(output,'study',True,'Bounded predictive-value study completed; no strength qualification.',
-        summary,artifacts)
+        summary,result_artifacts(output))
 
 
 def main():

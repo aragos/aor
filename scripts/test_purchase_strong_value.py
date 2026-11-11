@@ -21,6 +21,21 @@ def banks():
 
 
 class ContractTests(unittest.TestCase):
+    def test_late_controller_changes_cannot_invalidate_scientific_result(self):
+        with TemporaryDirectory() as directory:
+            root=Path(directory)
+            for name in ('progress.json','corpus.json','numeric.log','study-report.json',
+                         'batches/batch-1/batch-receipt.json','value/fits/selected.json',
+                         'campaign-state.json','logs/study.log'):
+                path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('{}')
+            pinned={str(p):original.sha(p) for p in study.result_artifacts(root)}
+            (root/'campaign-state.json').write_text('{"status":"completed"}')
+            (root/'logs/study.log').write_text('controller exited')
+            self.assertEqual(len(pinned),6)
+            self.assertTrue(all(original.sha(p)==digest for p,digest in pinned.items()))
+            (root/'value/fits/selected.json').write_text('{"changed":true}')
+            self.assertNotEqual(original.sha(root/'value/fits/selected.json'),
+                                pinned[str(root/'value/fits/selected.json')])
     def test_prospective_split_by_batch(self):
         self.assertEqual([data.split(i) for i in range(1,17)],['training']*12+['validation']*2+['test']*2)
     def test_source_names_follow_exact_split(self):
