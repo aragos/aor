@@ -1,10 +1,12 @@
 """One prospective eight-tail token experiment; frozen basis, labels and final gates."""
 import argparse
 import json
+import math
 from pathlib import Path
 import subprocess
 
 import automata_adaptive_token as previous
+import token_order_fixed_reference as fixed
 
 arena, exp, evolution, controller = previous.arena, previous.exp, previous.evolution, previous.controller
 read, sha, document, require = previous.read, previous.sha, previous.document, previous.require
@@ -22,6 +24,18 @@ FIT = dict(ridgePenalties=[.0001, .001, .01, .1, 1.], maxSeconds=600.)
 SCREEN = previous.SCREEN
 
 
+def fixed_reference(protocol):
+    return protocol.get('kind') == fixed.CAMPAIGN_KIND
+
+
+def numerical_environment(protocol):
+    if fixed_reference(protocol):
+        import purchase_ecology_environment
+        return purchase_ecology_environment
+    import adaptive_token_environment
+    return adaptive_token_environment
+
+
 def collection_source(protocol):
     bindings = arena.bindings(protocol, 'collect')
     source = exp.arena_source(protocol['baseline'], bindings['opponents'],
@@ -29,19 +43,32 @@ def collection_source(protocol):
     return dict(source, **previous.legacy.purchase.transfer_source(protocol),
         frozenPurchase=protocol['frozenPurchase'], expansionImitation=bindings['expansionImitation'],
         tokenOrder=bindings['tokenOrder'], trainingRoots=512, validationRoots=128,
-        continuationReplicates=8, continuationProtocol=CONTINUATION, replayOrigins=REPLAY_ORIGINS)
+        continuationReplicates=8,
+        continuationProtocol=fixed.PROTOCOL if fixed_reference(protocol) else CONTINUATION,
+        replayOrigins=REPLAY_ORIGINS)
 
 
 def validate_inputs(protocol):
-    require(protocol['kind'] == KIND and protocol['schemaVersion'] == 1
+    require(protocol['kind'] in (KIND, fixed.CAMPAIGN_KIND) and protocol['schemaVersion'] == 1
             and protocol['workers'] == 6 and protocol['maximumSeconds'] == 21600
             and protocol['maximumAttempts'] == 1 and protocol['screenRule'] == SCREEN
             and protocol['qualificationConfidence'] == .99
-            and protocol['continuationProtocol'] == CONTINUATION
+            and protocol['continuationProtocol'] == (fixed.PROTOCOL if fixed_reference(protocol) else CONTINUATION)
             and protocol['continuationReplicates'] == 8 and protocol['trainingRoots'] == 512
             and protocol['validationRoots'] == 128 and protocol['replayOrigins'] == REPLAY_ORIGINS
             and not protocol['productionActivation'] and not protocol['automaticNextCampaign'],
             'Require the exact six-worker, six-hour, prospective eight-tail experiment.')
+    if fixed_reference(protocol):
+        require(protocol['tokenReference'] == dict(version=fixed.REFERENCE,
+                    proposalReference='ordinary-token-reference-1', controlledSelector=fixed.SELECTOR,
+                    learnerSelector='MODEL_FIXED_T_RESIDUAL')
+                and protocol['python']['executable'] == protocol['numerical']['resolvedExecutable']
+                and protocol['python']['version'] == protocol['numerical']['pythonVersion']
+                and sha(protocol['zeroHeadEquivalence']) == protocol['zeroHeadEquivalenceSha256'],
+                'Residual collection, runtime reference and same-interpreter numerical ownership must be explicit.')
+        proof = read(protocol['zeroHeadEquivalence'])
+        require(proof['passed'] and proof['newGames'] == 0 and proof['actualFits'] == 0,
+                'Residual preparation requires the reviewed saved-observation zero-head equivalence proof.')
     require(sha(protocol['baseline']) == protocol['baselineSha256'] == BASELINE
             and sha(protocol['expansionModel']) == protocol['expansionSha256'] == EXPANSION
             and {key:sha(path) for key,path in protocol['frozenPurchase'].items()}
@@ -86,8 +113,11 @@ def validate_inputs(protocol):
 
 
 def numerical_child(protocol, output, operation):
-    import adaptive_token_environment as environment
-    environment.verify_numerical(protocol['numerical'])
+    environment = numerical_environment(protocol)
+    if fixed_reference(protocol):
+        environment.verify(protocol['numerical'])
+    else:
+        environment.verify_numerical(protocol['numerical'])
     import token_order_eight_tail as fitter
     directory = output/'collection'
     bindings = fitter.InputBindings(str(directory), sha(protocol['collectionSource']),
@@ -95,9 +125,9 @@ def numerical_child(protocol, output, operation):
         INITIALIZER, fitter.b.digest(read(protocol['initializer'])), protocol['originalBasisIdentity'], BASIS_IDENTITY)
     if operation == 'fit-child':
         document(output/'fit-inputs.json', fitter.asdict(bindings))
-        fitter.fit(bindings, output/'fit', fitter.ridge.FitConfig())
+        fitter.fit(bindings, output/'fit', fitter.ridge.FitConfig(), fixed_reference=fixed_reference(protocol))
         return
-    model, rows, provenance = fitter.fresh_collection(bindings)
+    model, rows, provenance = fitter.fresh_collection(bindings, fixed_reference=fixed_reference(protocol))
     source, native, dataset = [read(directory/name) for name in ('source.json','run.json','dataset.json')]
     require(source == collection_source(protocol) and native['workers'] == 6
             and native['sourceSha256'] == sha(protocol['collectionSource'])
@@ -141,7 +171,9 @@ def collect(protocol, protocol_path, output):
 def verify_fit(protocol, output):
     directory = output/'fit'
     report, finished, identity = [read(directory/name) for name in ('fit.json','finished.json','identity.json')]
-    require(report['kind'] == identity['kind'] == finished['kind'] == 'token-order-fresh-eight-tail-ridge-1'
+    kind = ('token-order-fixed-reference-eight-tail-ridge-1' if fixed_reference(protocol)
+            else 'token-order-fresh-eight-tail-ridge-1')
+    require(report['kind'] == identity['kind'] == finished['kind'] == kind
             and finished['reportSha256'] == sha(directory/'fit.json')
             and report['identitySha256'] == sha(directory/'identity.json')
             and identity['config'] == FIT and identity['inputs'] == read(output/'fit-inputs.json')
@@ -149,6 +181,13 @@ def verify_fit(protocol, output):
             and identity['primaryContinuationReplicates'] == report['primaryContinuationReplicates'] == 8
             and not identity['diagnosticPrefixesAffectSelection'] and not report['validationPreviouslyInspected'],
             'Fit must retain exact fresh eight-tail inputs, unchanged basis/grid and primary selection semantics.')
+    if fixed_reference(protocol):
+        require(identity['referenceProtocol'] == fixed.REFERENCE
+                and identity['referenceCodecSha256'] == sha(Path(protocol['scripts'])/'token_order_fixed_reference.py')
+                and identity['selector'] == 'MODEL_FIXED_T_RESIDUAL'
+                and identity['modelArtifactKind'] == fixed.KIND
+                and identity['proposalReference'] == 'ordinary-token-reference-1',
+                'Residual fit must bind its exact codec, reference and selector semantics.')
     for name,digest in finished['artifacts'].items():
         require(Path(name).name == name and sha(directory/name) == digest,'A completed fit artifact changed.')
     original = read(protocol['initializer'])
@@ -156,9 +195,12 @@ def verify_fit(protocol, output):
     require([row['ridgePenalty'] for row in fits] == FIT['ridgePenalties'], 'The fixed ridge grid changed.')
     for index,row in enumerate(fits):
         model = read(directory/f'model-{index}.json')
+        if fixed_reference(protocol):
+            model = fixed.envelope_model(model)
         require(row == read(directory/f'fit-{index}.json') and row['index'] == index
                 and row['modelSha256'] == sha(directory/f'model-{index}.json')
                 and len(model['outputWeights']) == 64
+                and all(type(value) in (int,float) and math.isfinite(value) for value in model['outputWeights'])
                 and {key:value for key,value in model.items() if key!='outputWeights'}
                     == {key:value for key,value in original.items() if key!='outputWeights'},
                 'Only the original64 output weights may change in the five declared models.')

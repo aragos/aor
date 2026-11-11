@@ -5,6 +5,7 @@ import subprocess
 import automata_experiments as exp
 import automata_policy_search as search
 import automata_token_order as legacy
+import token_order_fixed_reference as fixed
 
 read, sha, require = exp.read, exp.sha, exp.require
 FEATURES = ('tokens', 'progress', 'reach', 'commodity', 'income', 'risk',
@@ -14,7 +15,7 @@ FIXED = 'FIXED_16_TO_15'
 
 
 def bindings(protocol, stage, model=None, *, control=False):
-    """Collection has ordinary evaluated tokens; all evaluation references use fixed T."""
+    """The explicit residual profile fixes collection tokens; all arena references use T."""
     require(stage in ('collect', 'screen', 'confirm', 'heldout'), 'Unknown token experiment phase.')
     roles = ('E+T',) if stage == 'heldout' else MIXED
     expansion = dict(candidateModel=protocol['expansionModel'], opponentModels=[
@@ -30,8 +31,12 @@ def bindings(protocol, stage, model=None, *, control=False):
             tokens['candidateSelector'] = 'ORDINARY_MINUS_TWO'
         else:
             tokens['candidateModel'] = str(model)
+            if protocol.get('kind') == fixed.CAMPAIGN_KIND:
+                tokens['candidateSelector'] = 'MODEL_FIXED_T_RESIDUAL'
     else:
         require(model is None, 'Collection cannot install an evaluated token override.')
+        if protocol.get('kind') == fixed.CAMPAIGN_KIND:
+            tokens['candidateSelector'] = FIXED
     return dict(candidate=protocol['baseline'], incumbent=protocol['baseline'],
                 opponents=[protocol['baseline']] * len(roles),
                 expansionImitation=expansion, tokenOrder=tokens)
@@ -79,7 +84,12 @@ def verify_overlay(protocol, source, directory, reports, *, collection=False):
         reference = dict(version='ordinary-token-reference-1', ordinaryModelSnapshot='initial.json',
                          ordinaryModelSha256=sha(protocol['baseline']))
         continuation = protocol.get('continuationProtocol', 'ARENA_OVERLAYS_1')
-        require(continuation in ('ARENA_OVERLAYS_1', 'ARENA_OVERLAYS_EIGHT_TAILS_1')
+        allowed = ('ARENA_OVERLAYS_1', 'ARENA_OVERLAYS_EIGHT_TAILS_1')
+        if protocol.get('kind') == fixed.CAMPAIGN_KIND:
+            reference.update(version=fixed.REFERENCE, selector=FIXED,
+                             proposalReference='ordinary-token-reference-1')
+            allowed = (fixed.PROTOCOL,)
+        require(continuation in allowed
                 and source['continuationProtocol'] == continuation
                 and source['replayOrigins'] == protocol['replayOrigins']
                 and all(report.get('continuationProtocol') == continuation

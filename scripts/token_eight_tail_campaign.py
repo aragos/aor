@@ -56,8 +56,9 @@ def preflight_child(path,output):
     verify_execution(protocol,path,output)
     target.validate_inputs(protocol)
     require(not output.exists(),'Preflight must run before any eight-tail token campaign attempt.')
-    import adaptive_token_environment as numerical
-    require(numerical.inspect_numerical(protocol['numerical']['executable']) == protocol['numerical'],
+    numerical = target.numerical_environment(protocol)
+    inspect = numerical.inspect if target.fixed_reference(protocol) else numerical.inspect_numerical
+    require(inspect(protocol['numerical']['executable']) == protocol['numerical'],
             'The exact clean child must reproduce its separately pinned CPU numerical environment.')
     samples = controller.processes.sample_group(os.getpgrp())
     own = [sample for sample in samples if sample.pid == os.getpid()]
@@ -141,8 +142,11 @@ def run(root,options):
     expected = campaign_spec(root,protocol,dict(protocol['frozenFiles'],**{str(root/'protocol.json'):options.protocol_sha}))
     require(read(root/'campaign.json') == expected,'Adaptive-token commands, limits or input pins changed.')
     require(not (root/'run').exists(),'One eight-tail token attempt only; no automatic recovery, resume or new campaign.')
-    require(protocol['executionAllocation'] == {'thisWorkers':6,'otherDesktopWorkers':10,'desktopLogicalCpus':16},
-            'The six-worker experiment must retain its declared joint-search allocation.')
+    allocation = ({'thisWorkers':6,'host':'mac','logicalCpus':os.cpu_count(),'otherMacWorkers':0}
+                  if target.fixed_reference(protocol) else
+                  {'thisWorkers':6,'otherDesktopWorkers':10,'desktopLogicalCpus':16})
+    require(protocol['executionAllocation'] == allocation,
+            'The six-worker experiment must retain its separately reviewed host allocation.')
     document(root/'launch-child-preflight.json',external_child_preflight(root,root/'protocol.json'))
     return controller.main(['--spec',str(root/'campaign.json'),'--output',str(root/'run')])
 

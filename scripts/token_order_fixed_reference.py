@@ -6,6 +6,7 @@ PROTOCOL = "ARENA_FIXED_T_RESIDUAL_EIGHT_TAILS_1"
 REFERENCE = "fixed-token-reference-1"
 SELECTOR = "FIXED_16_TO_15"
 KIND = "token-order-fixed-reference-residual-1"
+CAMPAIGN_KIND = "token-fixed-reference-eight-tail-campaign-1"
 ENVELOPE = dict(schemaVersion=1, kind=KIND, referenceProtocol=REFERENCE,
                 proposalVersion="token-order-proposals-1", minimumAdvantage=.02)
 
@@ -32,9 +33,15 @@ def wrap(model):
     return dict(ENVELOPE, model=model)
 
 
-def unwrap(artifact):
+def envelope_model(artifact):
+    """Validate reference ownership without importing a numerical backend."""
     require(isinstance(artifact, dict) and set(artifact) == {*ENVELOPE, "model"}
             and type(artifact["schemaVersion"]) is int
             and all(artifact[key] == value for key, value in ENVELOPE.items()),
             "Fixed token residuals require the exact tagged artifact envelope.")
-    return wrap(artifact["model"])["model"]
+    require(isinstance(artifact['model'], dict), 'A residual envelope requires its raw Q object.')
+    return artifact['model']
+
+
+def unwrap(artifact):
+    return wrap(envelope_model(artifact))["model"]
