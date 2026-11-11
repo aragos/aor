@@ -161,6 +161,13 @@ after the ordinary token selector: a choice of 16 becomes 15 only when 15 is off
 asset binds that exact ordinary model while retaining the frozen purchase prior. Separate token
 qualification records the ordinary and varied-token rival comparisons; it does not establish human
 playing strength. Legacy entries retain their original choices.
+An independently qualified expansion model can opt into
+[eight absolute coefficients](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotExpansionModel.kt)
+under `planning.expansionModel.*`. A unit gate and the complete coefficient set replace only those
+ordinary weights for Hard `expand` decisions, retaining the existing beam planner. Other decisions,
+other difficulties and incomplete entries keep the ordinary policy. Reserved transport keys never
+contribute to ordinary feature scores; support alone does not activate a model or establish its
+qualification.
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 

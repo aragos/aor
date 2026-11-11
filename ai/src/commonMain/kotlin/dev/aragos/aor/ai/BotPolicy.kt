@@ -9,7 +9,7 @@ internal data class BotPlanEvaluation(val candidate: BotCandidate, val value: Do
 object BotPolicy {
     fun score(candidate: BotCandidate, model: BotModel = BotModels.default): Double =
         candidate.features.entries.sumOf { (feature, value) ->
-            if (BotTokenValue.reserved(feature)) 0.0 else value * (model.weights[feature] ?: 0.0)
+            if (BotModels.reservedFeature(feature)) 0.0 else value * (model.weights[feature] ?: 0.0)
         }
 
     fun choose(
@@ -30,13 +30,14 @@ object BotPolicy {
         }
         require(observation.candidates.isNotEmpty()) { "A bot decision requires a candidate." }
         require(observation.candidates.size <= 1024) { "A bot decision has too many candidates." }
+        val activeModel = BotExpansionModel.forObservation(observation, difficulty, model)
         val ordinaryScores =
             observation.candidates.associate { candidate ->
-                candidate.command to score(candidate, model)
+                candidate.command to score(candidate, activeModel)
             }
         val scores =
             if (difficulty == BotDifficulty.HARD) {
-                BotLeaderTiming.scores(observation, model, ordinaryScores)
+                BotLeaderTiming.scores(observation, activeModel, ordinaryScores)
             } else ordinaryScores
         val ranked =
             observation.candidates.sortedWith(
@@ -51,15 +52,20 @@ object BotPolicy {
             BotDifficulty.EASY -> easy(ranked, seed, scores)
             BotDifficulty.NORMAL -> ranked.first()
             BotDifficulty.HARD -> {
-                val baseline = plan(observation, ranked, model, scores).candidate
+                val baseline = plan(observation, ranked, activeModel, scores).candidate
                 if (observation.decision == "buy-tokens") {
-                    val incumbent = BotTokenValue.choose(observation, baseline, model)
-                    val corrected = BotTokenCorrection.choose(observation, incumbent, model)
-                    BotTokenOrderControl.choose(observation, corrected, model)
+                    val incumbent = BotTokenValue.choose(observation, baseline, activeModel)
+                    val corrected = BotTokenCorrection.choose(observation, incumbent, activeModel)
+                    BotTokenOrderControl.choose(observation, corrected, activeModel)
                 } else {
                     val deferred =
-                        BotLeaderTiming.deferForCash(observation, baseline, model, ordinaryScores)
-                    BotTargetTieBreak.choose(observation, deferred, model, seed, scores)
+                        BotLeaderTiming.deferForCash(
+                            observation,
+                            baseline,
+                            activeModel,
+                            ordinaryScores,
+                        )
+                    BotTargetTieBreak.choose(observation, deferred, activeModel, seed, scores)
                 }
             }
         }
@@ -148,7 +154,8 @@ object BotPolicy {
         // the exact active coefficient even when no individual offer yet crosses the reserve.
         val reserveCoefficient =
             observation.reserveShortfallBasis?.entries?.sumOf { (feature, value) ->
-                value * (model.weights[feature] ?: 0.0)
+                if (BotModels.reservedFeature(feature)) 0.0
+                else value * (model.weights[feature] ?: 0.0)
             } ?: (model.weights["reserveShortfall"] ?: 0.0)
         fun reserveValue(cash: Int): Double =
             if (planningFamily == "advance") {
@@ -160,7 +167,7 @@ object BotPolicy {
                     .filterNot { (name, _) ->
                         name == "reserveShortfall" ||
                             name.endsWith(".reserveShortfall") ||
-                            BotTokenValue.reserved(name) ||
+                            BotModels.reservedFeature(name) ||
                             (interest != null && name == BotEconomicFeature.FOREGONE_INTEREST.key)
                     }
                     .sumOf { (name, value) -> value * (model.weights[name] ?: 0.0) }
