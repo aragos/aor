@@ -77,22 +77,34 @@ internal object RecordedPrefixMain {
                 "resumable" to false,
             ),
         )
-        execute(diagnostic, roots, output, deadline)
+        execute(
+            roots,
+            output,
+            deadline,
+            workers = 6,
+            totalTails = roots.sumOf { it.commands.size * 32 },
+            collect = diagnostic::replicate,
+        )
     }
 
-    private fun execute(
-        diagnostic: RecordedPrefixDiagnostic,
+    internal fun execute(
         roots: List<PreparedRecordedRoot>,
         output: Path,
         deadline: Long,
+        workers: Int,
+        totalTails: Int,
+        collect: (PreparedRecordedRoot, Int, Long) -> List<*>,
     ) {
-        val pool = Executors.newFixedThreadPool(6)
+        require(workers in 1..6 && totalTails in 1..2432) {
+            "Recorded execution must retain its finite worker/tail bounds."
+        }
+        val pool = Executors.newFixedThreadPool(workers)
         val completion = ExecutorCompletionService<String>(pool)
         val requests = (0..31).flatMap { replicate -> roots.map { it to replicate } }
         val futures = requests.map { (root, replicate) ->
             completion.submit(
                 Callable {
-                    val tails = diagnostic.replicate(root, replicate, deadline)
+                    val tails = collect(root, replicate, deadline)
                     val name = "root-${root.request.entry}-replicate-$replicate.json.gz"
                     val path = output.resolve(name)
                     GZIPOutputStream(Files.newOutputStream(path, StandardOpenOption.CREATE_NEW))
@@ -111,11 +123,11 @@ internal object RecordedPrefixMain {
             repeat(requests.size) { index ->
                 val remaining = deadline - System.nanoTime()
                 check(remaining > 0) {
-                    "The recorded diagnostic reached its ninety-minute deadline."
+                    "The recorded diagnostic reached its declared deadline."
                 }
                 val done =
                     checkNotNull(completion.poll(remaining, TimeUnit.NANOSECONDS)) {
-                        "The recorded diagnostic reached its ninety-minute deadline."
+                        "The recorded diagnostic reached its declared deadline."
                     }
                 val name = done.get()
                 Files.writeString(
@@ -133,15 +145,16 @@ internal object RecordedPrefixMain {
                     output.resolve("completed.jsonl"),
                     PosixFilePermissions.fromString("rw-------"),
                 )
-                if ((index + 1) % 19 == 0)
+                if ((index + 1) % roots.size == 0) {
                     println("Recorded prefix paired replicates: ${index + 1}/${requests.size}")
+                }
             }
             write(
                 output.resolve("complete.json"),
                 mapOf(
                     "completedAt" to Instant.now().toString(),
                     "replicates" to requests.size,
-                    "tails" to roots.sumOf { it.commands.size * 32 },
+                    "tails" to totalTails,
                     "allReplaysVerified" to true,
                 ),
             )
@@ -161,14 +174,14 @@ internal object RecordedPrefixMain {
         }
     }
 
-    private fun createOutput(path: Path) {
+    internal fun createOutput(path: Path) {
         Files.createDirectory(
             path,
             PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")),
         )
     }
 
-    private fun write(path: Path, value: Any) {
+    internal fun write(path: Path, value: Any) {
         Files.write(
             path,
             PurchaseJson.mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(value),

@@ -14,7 +14,7 @@ import java.nio.file.Path
 /** Explicit independent streams; each replicate reuses these two seeds across its root's arms. */
 internal data class RecordedPrefixRequest(
     val entry: Int,
-    val proposalSeed: Int,
+    val proposalSeed: Int?,
     val chanceSeeds: List<Int>,
     val policySeeds: List<Int>,
 ) {
@@ -46,7 +46,9 @@ internal data class RecordedPrefixInput(
         ) {
             "A recorded diagnostic requires one through nineteen distinct predeclared roots."
         }
-        val streams = requests.flatMap { it.chanceSeeds + it.policySeeds + it.proposalSeed }
+        val streams = requests.flatMap {
+            it.chanceSeeds + it.policySeeds + listOfNotNull(it.proposalSeed)
+        }
         require(streams.distinct().size == streams.size) {
             "Recorded roots require distinct proposal, chance and continuation policy streams."
         }
@@ -118,7 +120,7 @@ internal data class RecordedPrefixInput(
     }
 
     companion object {
-        fun read(source: Path): RecordedPrefixInput {
+        fun read(source: Path, proposalSampling: Boolean = true): RecordedPrefixInput {
             val node = PurchaseJson.read(source)
             PurchaseJson.fields(
                 node,
@@ -176,11 +178,14 @@ internal data class RecordedPrefixInput(
                 PurchaseJson.array(node.required("roots"), "roots").map {
                     PurchaseJson.fields(
                         it,
-                        setOf("entry", "proposalSeed", "chanceSeeds", "policySeeds"),
+                        setOf("entry", "chanceSeeds", "policySeeds") +
+                            if (proposalSampling) setOf("proposalSeed") else emptySet(),
                     )
                     RecordedPrefixRequest(
                         PurchaseJson.integer(it.required("entry"), "entry"),
-                        PurchaseJson.integer(it.required("proposalSeed"), "proposalSeed"),
+                        if (proposalSampling)
+                            PurchaseJson.integer(it.required("proposalSeed"), "proposalSeed")
+                        else null,
                         PurchaseJson.array(it.required("chanceSeeds"), "chanceSeeds").map { seed ->
                             PurchaseJson.integer(seed, "chanceSeed")
                         },

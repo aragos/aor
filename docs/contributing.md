@@ -124,6 +124,18 @@ only by the terminal outcomes and retained histories. Roots
 from one game are dependent: neither a root-averaged confidence interval nor a playing-strength claim
 is justified. This is a realized-hidden-world teacher diagnosis, not an information-safe oracle.
 
+The separate `recorded-leader-hold-prepare` / `recorded-leader-hold-run` profile fixes seven
+leader prefixes and two policies: recorded leader play, or ordinary actor-visible choices with only
+that physical leader's play commands withheld through the current turn. Other cards remain playable;
+discards, trades and chance are unchanged. An unavoidable mandatory play releases the restriction
+and is retained as an explicit receipt. Preparation freezes each first command without advancing
+any counterfactual world. All 32 paired streams are evaluation; there is no selection or proposal
+RNG. This profile uses three workers and one sixty-minute allowance. Persisted canonical histories
+support descriptive lifetime tracking of the original leader through play, discard or game end,
+including authoritative advance savings, Printed Word rebates and patronage. The same private-world
+and one-game inference limits apply. `scripts/analyze_leader_hold.py` verifies the completed bank
+and reports each fixed-policy difference without fitting or promotion.
+
 ### Bounded human expansion imitation
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic

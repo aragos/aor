@@ -61,7 +61,9 @@ internal data class PreparedRecordedRoot(
  * Realized-world diagnostic, deliberately not an information-safe online teacher or strength test.
  */
 internal class RecordedPrefixDiagnostic(private val input: RecordedPrefixInput) {
-    fun prepare(): Pair<List<PreparedRecordedRoot>, Map<String, Any>> {
+    fun prepare(
+        proposalSampling: Boolean = true
+    ): Pair<List<PreparedRecordedRoot>, Map<String, Any>> {
         val (states, terminal) = input.states()
         val roots =
             input.requests.map { request ->
@@ -117,12 +119,16 @@ internal class RecordedPrefixDiagnostic(private val input: RecordedPrefixInput) 
                             input.arena.candidate,
                         )
                 val commands =
-                    RecordedPrefixProposals.commands(
-                        observation,
-                        recorded,
-                        current,
-                        request.proposalSeed,
-                    )
+                    if (proposalSampling)
+                        RecordedPrefixProposals.commands(
+                            observation,
+                            recorded,
+                            current,
+                            requireNotNull(request.proposalSeed) {
+                                "Action sampling requires its frozen proposal stream."
+                            },
+                        )
+                    else listOf(recorded)
                 val receipt =
                     mapOf(
                         "entry" to request.entry,
