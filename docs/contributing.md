@@ -97,6 +97,17 @@ diagnostic `candidate.json`. Schema/rules/catalog metadata protects inference co
 matching metadata alone establishes no playing-strength claim. Broader qualification remains
 [open work](follow-ups.md).
 
+### Retained privileged purchase extraction
+
+The standalone `PurchasePrivilegedMainKt` extractor replays four explicitly frozen synthetic
+purchase histories without invoking a policy or simulator. It reuses the ordinary purchase encoder
+and requires exact original state/action parity, binding the original legal baseline command rather
+than recomputing a recommendation. Its separate training-only feature document adds current
+opponent-hand card-definition counts in cyclic relative-seat order. It exports no terminal labels,
+deck order, card references, seeds, RNG state, sampled actions or future history. Actor models and
+browser inference remain unchanged. The retained action/chance seed coupling and paired-world
+dependence preclude an unbiased-gradient or playing-strength claim from extraction alone.
+
 ### Bounded human expansion imitation
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic
