@@ -77,10 +77,12 @@ def verify_overlay(protocol, source, directory, reports, *, collection=False):
                 for report in reports), 'Native expansion/token metadata changed its explicit role bindings.')
     if collection:
         reference = dict(version='ordinary-token-reference-1', ordinaryModelSnapshot='initial.json',
-                         ordinaryModelSha256=legacy.F1)
-        require(source['continuationProtocol'] == 'ARENA_OVERLAYS_1'
+                         ordinaryModelSha256=sha(protocol['baseline']))
+        continuation = protocol.get('continuationProtocol', 'ARENA_OVERLAYS_1')
+        require(continuation in ('ARENA_OVERLAYS_1', 'ARENA_OVERLAYS_EIGHT_TAILS_1')
+                and source['continuationProtocol'] == continuation
                 and source['replayOrigins'] == protocol['replayOrigins']
-                and all(report.get('continuationProtocol') == 'ARENA_OVERLAYS_1'
+                and all(report.get('continuationProtocol') == continuation
                         and report.get('replayOrigins') == protocol['replayOrigins']
                         and report.get('tokenReference') == reference for report in reports),
                 'Collection must retain its ordinary token head and declared overlay continuation contract.')

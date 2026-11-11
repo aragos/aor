@@ -199,14 +199,15 @@ def verify_reproduction(protocol, output):
     require(report['kind'] == finished['kind'] == 'token-order-reproduction'
             and report['collection'] == str(collection)
             and report['signature'] == finished['signature'] == native['signature']
-            and report['continuationProtocol'] == 'ARENA_OVERLAYS_1'
+            and report['continuationProtocol'] == protocol['continuationProtocol']
             and report['replayOrigins'] == protocol['replayOrigins']
             and report['allOriginsExact'] and report['newOriginWorlds'] == report['newContinuationWorlds'] == 0
             and report['qualificationPassed'] is False and report['productionActivation'] is False
             and finished['reportSha256'] == sha(directory / 'reproduction.json') and bool(finished['at']),
             'Collection reproduction must bind exact historical overlay worlds with no new seeds.')
     required = {'source.json', 'dataset.json', 'run.json', 'finished.json', 'state.json'}
-    required.update(f'origin-{index}.json' for index in range(384))
+    required.update(f'origin-{index}.json' for index in
+                    range(protocol['trainingRoots'] + protocol['validationRoots']))
     require(required <= set(report['files']), 'Reproduction must hash the complete original collection.')
     for name, digest in report['files'].items():
         require(Path(name).name == name and sha(collection / name) == digest,
