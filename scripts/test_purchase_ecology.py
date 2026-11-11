@@ -11,7 +11,7 @@ import purchase_ecology_data as data
 
 class PurchaseEcologyTest(unittest.TestCase):
     def protocol(self):
-        return dict(configuration=pilot.exp.CONFIGURATION, baseline='/f1.json', prior='/f0.json',
+        return dict(configuration=pilot.exp.CONFIGURATION, workers=6, baseline='/f1.json', prior='/f0.json',
                     purchasePolicy='/c.json', expansionModel='/e.json', opponents=['/f1.json'] * 4,
                     experimentalRulesTransfer=pilot.legacy.RULES_TRANSFER,
                     banks={'training-1': dict(nativeOffset=32000000),
@@ -96,6 +96,33 @@ class PurchaseEcologyTest(unittest.TestCase):
             self.assertFalse(report['productionActivation'])
             self.assertFalse(report['humanStrengthVerified'])
             self.assertNotIn(root/'logs/live.log', artifacts)
+
+    def test_recovery_imports_completed_actor_without_repeating_first_batch(self):
+        class NativeReached(Exception):
+            pass
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            prefix = root/'prefix'
+            (prefix/'update').mkdir(parents=True)
+            (prefix/'reproduction').mkdir()
+            (prefix/'update/policy.json').write_text('{"learned": true}')
+            (prefix/'update/checkpoint.json').write_text('{}')
+            (prefix/'reproduction/reproduction.json').write_text('{}')
+            receipt = dict(directory=str(prefix), outputPolicySha256=pilot.sha(prefix/'update/policy.json'),
+                update={'acceptedEpochs': 4}, provenance={}, reproduction={})
+            (root/'prefix.json').write_text(json.dumps(receipt))
+            protocol = self.protocol()
+            protocol['banks']['training-2'] = {'nativeOffset': 32000001}
+            protocol['recovery'] = {'prefixReceipt': str(root/'prefix.json')}
+            with patch.object(pilot, 'checkpoint'), patch.object(pilot.storage, 'archive', return_value={}), \
+                 patch.object(pilot.exp, 'native', side_effect=NativeReached) as native:
+                with self.assertRaises(NativeReached):
+                    pilot.train(protocol, root/'protocol.json', root/'run')
+            source = Path(native.call_args.args[2])
+            self.assertEqual('batch-2', source.parent.name)
+            self.assertEqual(32000001, json.loads(source.read_text())['seed'])
+            self.assertEqual(str(root/'run/batches/batch-1/update/policy.json'), json.loads(source.read_text())['policy'])
+            self.assertTrue(json.loads((root/'run/batches/batch-1/receipt.json').read_text())['imported'])
 
 
 if __name__ == '__main__':

@@ -786,6 +786,13 @@ The [supervisor](../scripts/purchase_ecology_campaign.py) permits one four-hour 
 simulation workers and a separate, pinned one-thread CPU numerical environment. Its exact-child
 preflight validates interpreter, packages, environment and process sampling before freezing the
 campaign. A new experiment requires its own audited world/update seeds and reviewed input package.
+The pure supervisor and numerical child use the same interpreter version so exact diagnostic
+provenance also has the same floating-point accumulation semantics. A separately reviewed mechanical
+recovery may import a completely verified first batch without collecting or updating it again.
+It retains every original artifact and input hash, uses the remaining original campaign/stage
+deadlines, and permits one launch within an explicit window. Recovery never creates another seed bank
+or changes the learning recipe. Optional campaign/stage `absoluteDeadlineEpoch` values are Unix
+seconds and can only shorten the supervisor's duration-based deadlines.
 
 ## Card policy learning
 

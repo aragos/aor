@@ -6,6 +6,10 @@ all code, runtime distributions, models and source data used by commands. Output
 must stay inside the output directory. Limits are sampled, so transient overshoot is
 possible. Commands must keep their descendants in the owned process group. SIGINT and
 SIGTERM clean that group; SIGKILL and machine failure cannot guarantee cleanup.
+
+Limits and stages may declare absoluteDeadlineEpoch as finite Unix seconds. This
+additional ceiling only shortens duration-based deadlines; a past ceiling prevents
+new work. Omission preserves the original duration and resume behavior.
 """
 
 import argparse
@@ -82,6 +86,13 @@ def positive_number(value, name, allow_zero=False):
         raise ValueError(f"{name} must be a finite {'nonnegative' if allow_zero else 'positive'} number.")
 
 
+def validate_absolute_deadline(owner, name):
+    if "absoluteDeadlineEpoch" in owner:
+        value = owner["absoluteDeadlineEpoch"]
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError(f"{name}.absoluteDeadlineEpoch must be finite Unix seconds.")
+
+
 def result_path(output, value):
     if not isinstance(value, str) or not value:
         raise ValueError("Each result must be a relative file path.")
@@ -102,6 +113,7 @@ def validate_spec(spec, output):
     limits = spec["limits"]
     for name in ("maximumSeconds", "maximumDataBytes", "minimumFreeBytes", "maximumRssBytes"):
         positive_number(limits[name], name, allow_zero=name == "minimumFreeBytes")
+    validate_absolute_deadline(limits, "limits")
     stages = spec["stages"]
     if not isinstance(stages, list) or not stages:
         raise ValueError("Campaign stages must be a nonempty list.")
@@ -120,6 +132,7 @@ def validate_spec(spec, output):
                 or any(not isinstance(item, str) or not item or "\0" in item for item in command)):
             raise ValueError(f"Stage {name} needs a nonempty command argv list.")
         positive_number(stage["maximumSeconds"], f"{name}.maximumSeconds")
+        validate_absolute_deadline(stage, name)
         if type(stage.get("maximumAttempts", 1)) is not int or stage.get("maximumAttempts", 1) not in (1, 2):
             raise ValueError("maximumAttempts must be 1 or 2; retries require explicit --resume.")
         path = result_path(output, stage["result"])
@@ -209,8 +222,11 @@ def load_campaign(spec, source, output, resume):
     if occupied:
         raise ValueError("New campaigns require an empty output directory; use --resume.")
     started = time.time()
+    deadline = started + spec["limits"]["maximumSeconds"]
+    if "absoluteDeadlineEpoch" in spec["limits"]:
+        deadline = min(deadline, spec["limits"]["absoluteDeadlineEpoch"])
     manifest = {"schemaVersion": 1, "identity": pins, "startedEpoch": started,
-                "deadlineEpoch": started + spec["limits"]["maximumSeconds"]}
+                "deadlineEpoch": deadline}
     (output / "campaign-spec.json").write_bytes(source.read_bytes())
     atomic_json(output / "campaign-manifest.json", manifest)
     return {"schemaVersion": 1, "manifestSha256": sha256(output / "campaign-manifest.json"),
@@ -321,6 +337,9 @@ def run_stage(stage, entry, spec, source, output, state, stopped, pins):
     now = time.time()
     entry.setdefault("startedEpoch", now)
     entry.setdefault("deadlineEpoch", min(state["deadlineEpoch"], now + stage["maximumSeconds"]))
+    if "absoluteDeadlineEpoch" in stage:
+        entry["deadlineEpoch"] = min(entry["deadlineEpoch"], state["deadlineEpoch"],
+                                     now + stage["maximumSeconds"], stage["absoluteDeadlineEpoch"])
     if time.time() >= entry["deadlineEpoch"]:
         raise CampaignStop("deadline", f"Stage {stage['id']} exhausted its original deadline.")
     check_resources(output, spec["limits"])

@@ -1,6 +1,7 @@
 """Freeze and supervise one finite descriptive purchase campaign without a model loop."""
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -21,15 +22,53 @@ DYNAMIC_ENV = {'AOR_CAMPAIGN_OUTPUT', 'AOR_CAMPAIGN_STAGE_ID', 'AOR_CAMPAIGN_DEA
                'AOR_CAMPAIGN_STAGE_DEADLINE_EPOCH'}
 
 
+def execution_limits(protocol):
+    """A reviewed mechanical recovery can consume only its original remaining allowance."""
+    recovery = protocol.get('recovery')
+    if recovery is None:
+        return MAXIMUM_SECONDS, STAGE_SECONDS
+    fields = ('originalStartedEpoch', 'originalDeadlineEpoch', 'originalTrainStartedEpoch',
+              'originalTrainDeadlineEpoch', 'launchByEpoch', 'maximumSeconds', 'trainMaximumSeconds')
+    require(isinstance(recovery, dict) and all(
+        type(recovery.get(name)) in (int, float) and math.isfinite(recovery[name]) for name in fields),
+        'Recovery requires finite original clocks and fixed remaining ceilings.')
+    require(protocol['maximumSeconds'] == MAXIMUM_SECONDS
+            and recovery['originalDeadlineEpoch'] == recovery['originalStartedEpoch'] + MAXIMUM_SECONDS
+            and recovery['originalTrainDeadlineEpoch'] == min(recovery['originalDeadlineEpoch'],
+                recovery['originalTrainStartedEpoch'] + STAGE_SECONDS[0])
+            and recovery['originalStartedEpoch'] <= recovery['originalTrainStartedEpoch']
+            < recovery['launchByEpoch'] < recovery['originalTrainDeadlineEpoch']
+            and recovery['maximumSeconds'] == recovery['originalDeadlineEpoch'] - recovery['launchByEpoch']
+            and recovery['trainMaximumSeconds'] == recovery['originalTrainDeadlineEpoch'] - recovery['launchByEpoch'],
+            'Recovery may not renew, move or enlarge the original campaign or training deadlines.')
+    require(isinstance(recovery.get('prefixReceipt'), str) and recovery['prefixReceipt']
+            and isinstance(recovery.get('originalInputPins'), dict) and recovery['originalInputPins'],
+            'Recovery requires an explicit verified prefix receipt and immutable original input pins.')
+    require(protocol['python']['executable'] == protocol['numerical']['resolvedExecutable']
+            and protocol['python']['version'] == protocol['numerical']['pythonVersion'],
+            'Recovery verification must use the exact same interpreter and version as numerical learning.')
+    return recovery['maximumSeconds'], (recovery['trainMaximumSeconds'], STAGE_SECONDS[1])
+
+
+def check_launch_window(protocol):
+    recovery = protocol.get('recovery')
+    if recovery is not None:
+        execution_limits(protocol)
+        require(time.time() <= recovery['launchByEpoch'],
+                'The reviewed recovery launch window expired; no automatic rescheduling or retry.')
+
+
 def validate_science(protocol):
     # Import only at execution boundaries: preparation can test this generic supervisor
     # independently while the scientific stage adapter is being implemented.
     import purchase_ecology as target
     require(tuple(target.STAGES) == STAGES, 'Purchase pilot stages must remain train then screen.')
+    execution_limits(protocol)
     target.validate_inputs(protocol)
 
 
 def verify_execution(protocol, path, output):
+    execution_limits(protocol)
     root = Path(path).resolve().parent
     require(root == Path(__file__).resolve().parents[1] and Path(output).resolve() == root / 'run',
             'Execute only in the declared isolated purchase package and its run directory.')
@@ -52,14 +91,21 @@ def verify_execution(protocol, path, output):
 
 
 def campaign_spec(root, protocol, files):
-    return dict(schemaVersion=1, kind='automata-campaign', inputs=files,
-        limits=dict(maximumSeconds=MAXIMUM_SECONDS, maximumDataBytes=4 * exp.GIB,
+    maximum_seconds, stage_seconds = execution_limits(protocol)
+    spec = dict(schemaVersion=1, kind='automata-campaign', inputs=files,
+        limits=dict(maximumSeconds=maximum_seconds, maximumDataBytes=4 * exp.GIB,
                     maximumRssBytes=4 * exp.GIB, minimumFreeBytes=2 * exp.GIB),
         stages=[dict(id=name, dependsOn=[] if index == 0 else [STAGES[index - 1]],
-            maximumSeconds=STAGE_SECONDS[index], maximumAttempts=1, result=f'results/{name}.json',
+            maximumSeconds=stage_seconds[index], maximumAttempts=1, result=f'results/{name}.json',
             command=[protocol['python']['executable'], '-E', '-s', '-S', '-B',
                 str(root / 'scripts/purchase_ecology.py'), 'stage', '--protocol', str(root / 'protocol.json'),
                 '--output', '{output}', '--stage', name]) for index, name in enumerate(STAGES)])
+    recovery = protocol.get('recovery')
+    if recovery is not None:
+        spec['limits']['absoluteDeadlineEpoch'] = recovery['originalDeadlineEpoch']
+        spec['stages'][0]['absoluteDeadlineEpoch'] = recovery['originalTrainDeadlineEpoch']
+        spec['stages'][1]['absoluteDeadlineEpoch'] = recovery['originalDeadlineEpoch']
+    return spec
 
 
 def preflight_child(path, output):
@@ -77,10 +123,14 @@ def preflight_child(path, output):
 
 def external_child_preflight(root, path):
     protocol = read(path)
+    maximum_seconds, stage_seconds = execution_limits(protocol)
     now = time.time()
+    recovery = protocol.get('recovery')
+    deadline = recovery['originalDeadlineEpoch'] if recovery else now + maximum_seconds
+    train_deadline = recovery['originalTrainDeadlineEpoch'] if recovery else now + stage_seconds[0]
     environment = dict(protocol['environment']['variables'], AOR_CAMPAIGN_OUTPUT=str(root / 'run'),
-        AOR_CAMPAIGN_STAGE_ID='train', AOR_CAMPAIGN_DEADLINE_EPOCH=str(now + MAXIMUM_SECONDS),
-        AOR_CAMPAIGN_STAGE_DEADLINE_EPOCH=str(now + STAGE_SECONDS[0]))
+        AOR_CAMPAIGN_STAGE_ID='train', AOR_CAMPAIGN_DEADLINE_EPOCH=str(deadline),
+        AOR_CAMPAIGN_STAGE_DEADLINE_EPOCH=str(train_deadline))
     command = [protocol['python']['executable'], '-E', '-s', '-S', '-B',
         str(root / 'scripts/purchase_ecology_campaign.py'), 'preflight-child',
         '--protocol', str(path), '--output', str(root / 'run')]
@@ -102,6 +152,10 @@ def input_files(root, protocol):
              if path.is_file() and '__pycache__' not in path.parts}
     for identity in ('java', 'python', 'numerical'):
         files.update(protocol[identity]['files'])
+    for path, digest in protocol.get('recovery', {}).get('originalInputPins', {}).items():
+        require(path not in files or files[path] == digest, 'Recovery pin conflicts with a current input: ' + path)
+        require(sha(path) == digest, 'An original recovery-prefix input changed: ' + path)
+        files[path] = digest
     return files
 
 
@@ -157,6 +211,7 @@ def run(root, options):
     require(read(root / 'campaign.json') == expected, 'Purchase commands, limits or pins changed.')
     require(not (root / 'run').exists(), 'One purchase attempt only: no retry, resume or next campaign.')
     document(root / 'launch-child-preflight.json', external_child_preflight(root, root / 'protocol.json'))
+    check_launch_window(protocol)
     return controller.main(['--spec', str(root / 'campaign.json'), '--output', str(root / 'run')])
 
 

@@ -17,6 +17,15 @@ def numerical_identity():
                 device='cpu', cuda=None, mpsUsed=False, gpuUsed=False)
 
 
+def recovery_protocol():
+    return dict(maximumSeconds=14400, python={'executable': '/pure-python', 'version': '3.14'},
+        numerical={'resolvedExecutable': '/pure-python', 'pythonVersion': '3.14'},
+        recovery=dict(originalStartedEpoch=1000, originalDeadlineEpoch=15400,
+            originalTrainStartedEpoch=1005, originalTrainDeadlineEpoch=11805, launchByEpoch=2000,
+            maximumSeconds=13400, trainMaximumSeconds=9805, prefixReceipt='/prefix-receipt.json',
+            originalInputPins={'/original/input': 'a' * 64}))
+
+
 class NumericalTest(unittest.TestCase):
     def test_inspection_preserves_venv_launcher_and_site_packages(self):
         identity = numerical_identity()
@@ -65,6 +74,65 @@ class NumericalTest(unittest.TestCase):
 
 
 class SupervisorTest(unittest.TestCase):
+    def test_recovery_retains_original_global_and_actual_train_deadlines(self):
+        spec = campaign.campaign_spec(Path('/package'), recovery_protocol(), {})
+        self.assertEqual((13400, 15400), (spec['limits']['maximumSeconds'], spec['limits']['absoluteDeadlineEpoch']))
+        self.assertEqual([(9805, 11805), (3600, 15400)],
+                         [(row['maximumSeconds'], row['absoluteDeadlineEpoch']) for row in spec['stages']])
+        self.assertTrue(all(row['maximumAttempts'] == 1 for row in spec['stages']))
+
+    def test_recovery_rejects_renewed_allowance(self):
+        protocol = recovery_protocol()
+        protocol['recovery']['maximumSeconds'] += 1
+        with self.assertRaisesRegex(ValueError, 'may not renew'):
+            campaign.execution_limits(protocol)
+
+    def test_recovery_rejects_different_pure_interpreter(self):
+        protocol = recovery_protocol()
+        protocol['python']['version'] = '3.9'
+        with self.assertRaisesRegex(ValueError, 'same interpreter'):
+            campaign.execution_limits(protocol)
+
+    def test_recovery_rechecks_launch_window_after_preflight(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
+            root = Path(directory)
+            protocol = dict(recovery_protocol(), environment={'variables': {}}, frozenFiles={})
+            campaign.document(root / 'protocol.json', protocol)
+            protocol_sha = campaign.sha(root / 'protocol.json')
+            spec = campaign.campaign_spec(root, protocol, {str(root / 'protocol.json'): protocol_sha})
+            campaign.document(root / 'campaign.json', spec)
+            options = SimpleNamespace(protocol_sha=protocol_sha, campaign_sha=campaign.sha(root / 'campaign.json'))
+            with patch.object(campaign, 'verify_execution'), patch.object(campaign, 'validate_science'), \
+                 patch.object(campaign, 'external_child_preflight', return_value={'passed': True}) as preflight, \
+                 patch.object(campaign.time, 'time', return_value=2001), \
+                 patch.object(campaign.controller, 'main') as launch:
+                with self.assertRaisesRegex(ValueError, 'launch window expired'):
+                    campaign.run(root, options)
+            preflight.assert_called_once()
+            launch.assert_not_called()
+
+    def test_recovery_pins_original_prefix_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = root / 'original-input.json'
+            original.write_text('unchanged')
+            digest = campaign.sha(original)
+            package = root / 'package'
+            package.mkdir()
+            protocol = dict(java={'files': {}}, python={'files': {}}, numerical={'files': {}},
+                            recovery={'originalInputPins': {str(original): digest}})
+            self.assertEqual({str(original): digest}, campaign.input_files(package, protocol))
+
+    def test_recovery_rejects_conflicting_original_pin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = root / 'input.json'
+            original.write_text('unchanged')
+            protocol = dict(java={'files': {}}, python={'files': {}}, numerical={'files': {}},
+                            recovery={'originalInputPins': {str(original): '0' * 64}})
+            with self.assertRaisesRegex(ValueError, 'pin conflicts'):
+                campaign.input_files(root, protocol)
+
     def test_only_train_then_screen_with_original_total_budget(self):
         spec = campaign.campaign_spec(Path('/package'), {'python': {'executable': '/python'}}, {})
         self.assertEqual(14400, spec['limits']['maximumSeconds'])

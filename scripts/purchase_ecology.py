@@ -5,6 +5,7 @@ and eight share a descriptive screen; neither can qualify or activate a policy.
 """
 import argparse
 from pathlib import Path
+import shutil
 import subprocess
 
 import automata_evolution as evolution
@@ -74,6 +75,23 @@ def validate_inputs(protocol):
                                    seed=bank['updateSeed']), 'The PPO recipe or update RNG changed.')
             streams[name + '-update'] = [bank['updateSeed']]
     exp.validate_banks(streams)
+    require(protocol['python']['version'] == protocol['numerical']['pythonVersion']
+            and protocol['python']['executable'] == protocol['numerical']['resolvedExecutable'],
+            'Purchase provenance requires the same interpreter version for supervisor and numerical children.')
+    if 'recovery' in protocol:
+        prefix = read(protocol['recovery']['prefixReceipt'])
+        require(prefix['kind'] == 'purchase-completed-prefix-import-1' and prefix['completedBatches'] == 1
+                and prefix['trainingBank'] == protocol['banks']['training-1']
+                and prefix['initialPolicySha256'] == data.C
+                and prefix['additionalWorlds'] == prefix['additionalUpdates'] == 0
+                and prefix['allOriginalUpdateFieldsVerified'] and prefix['canonicalReplaysVerified'] == 4
+                and prefix['originalCampaignSha256'] == '2c6f1f9de5f9f9e448674122a3a6cedd48f5a9e4c917d44248dca66a11d05e4a'
+                and prefix['originalProtocolSha256'] == '7ba6f893810675431670257b46e24ac8275ff590c3edd59a3558a20eaf420bda',
+                'Recovery may import only the completely verified first batch of this original pilot.')
+        source = Path(prefix['directory'])
+        require({str(path.relative_to(source)) for path in source.rglob('*') if path.is_file()}
+                == set(prefix['files']) and all(sha(source/name) == digest for name,digest in prefix['files'].items()),
+                'The imported completed batch must retain every original artifact byte.')
 
 
 def checkpoint(path, model):
@@ -201,7 +219,23 @@ def result(protocol_path, output, stage, passed, payload):
 
 def train(protocol, protocol_path, output):
     model, updates, stalled = Path(protocol['purchasePolicy']), [], 0
-    for index in range(1, BATCHES + 1):
+    first = 1
+    if 'recovery' in protocol:
+        prefix = read(protocol['recovery']['prefixReceipt'])
+        directory = output/'batches/batch-1'
+        require(not directory.exists(), 'The reviewed prefix is imported once, never resumed or rerun.')
+        shutil.copytree(prefix['directory'], directory)
+        model = directory/'update/policy.json'
+        require(sha(model) == prefix['outputPolicySha256'], 'Imported first-batch actor changed.')
+        checkpoint(directory/'update/checkpoint.json', model)
+        archive = storage.archive(directory)
+        document(directory/'receipt.json', dict(imported=True, prefixReceiptSha256=sha(protocol['recovery']['prefixReceipt']),
+            update=prefix['update'], provenance=prefix['provenance'], replay=prefix['reproduction'], storage=archive))
+        updates.append(dict(batch=1, policySha256=sha(model), acceptedEpochs=prefix['update']['acceptedEpochs'],
+            reproductionSha256=sha(directory/'reproduction/reproduction.json'), imported=True))
+        stalled = int(prefix['update']['acceptedEpochs'] == 0)
+        first = 2
+    for index in range(first, BATCHES + 1):
         directory = output / 'batches' / f'batch-{index}'
         require(not directory.exists(), 'Each on-policy batch permits exactly one fresh attempt.')
         source = directory / 'collection-source.json'
