@@ -63,6 +63,11 @@ class BoundedControllerTest(unittest.TestCase):
         self.assertEqual(600,fit['maximumSeconds'])
         self.assertIn('/isolated/scripts/automata_token_eight_tail.py',fit['command'])
 
+    def test_collection_can_use_remaining_global_allowance_without_renewal(self):
+        spec=campaign.campaign_spec(Path('/isolated'),protocol(),{})
+        self.assertEqual(21600,spec['stages'][0]['maximumSeconds'])
+        self.assertEqual(21600,spec['limits']['maximumSeconds'])
+
     def test_final_banks_are_conditional_on_previous_stage(self):
         spec=campaign.campaign_spec(Path('/isolated'),protocol(),{})
         self.assertEqual(['screen'],spec['stages'][3]['dependsOn'])

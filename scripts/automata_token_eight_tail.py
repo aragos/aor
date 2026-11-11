@@ -16,7 +16,7 @@ INITIALIZER = 'b3c32299854068bacdb9ab34d29cdea478bd185dc8664635d815b746d62dfb3c'
 BASIS_IDENTITY = 'b532aaade82c798b8b338bebaa8d46f258f9c4e8cec7e6868889e02611dc56a9'
 COUNTS = dict(training=512, validation=128, screen=512, confirm=2048, heldout=4096)
 STAGES = previous.STAGES
-CEILINGS = (10800, 600, 1800, 3600, 7200)
+CEILINGS = (21600, 600, 1800, 3600, 7200)
 REPLAY_ORIGINS = [0, 170, 341, 511, 512, 555, 598, 639]
 FIT = dict(ridgePenalties=[.0001, .001, .01, .1, 1.], maxSeconds=600.)
 SCREEN = previous.SCREEN
