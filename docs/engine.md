@@ -85,3 +85,10 @@ through the ordinary placement rules, then resolves explicit Cathedral responses
 through the ordinary competition rules. Fresh follow-up evaluations use the resulting board, stock,
 pool, shipping and used Cathedral pairs. Victories explicitly leave optional continuations unresolved;
 the type does not simulate private cards, marker bonuses or phase progression and is not a planner.
+
+[ExpansionTacticalFrontier](../core/src/commonMain/kotlin/dev/aragos/aor/ExpansionTacticalFrontier.kt)
+adds bounded factual attack/response enumeration for local diagnostics. It reports complete legal
+option counts alongside deterministic truncation, keeps actor and defender Cathedral choices
+separate, and resolves all supplied dice triples through the ordinary competition owner. Conditional
+dice counts do not predict whether an opponent will decline. No economic utility or playing policy
+is assigned; unresolved victories remain explicit continuation boundaries.
