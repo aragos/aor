@@ -1323,3 +1323,13 @@ artifacts together when reviewing the result.
 This is an investigation of an already examined curriculum. Its fresh continuation results help
 locate planning or learning failures, but do not qualify a model for release or override the original
 validation gate. Further policy changes require a separately planned evaluation with new scenarios.
+
+The retained purchase-state value benchmark is separate from automata policy training. Its
+[preparer](../scripts/prepare_purchase_value_benchmark.py) freezes whole-game, seed-disjoint
+training/validation/test ownership before any fitting. The
+[bounded runner](../scripts/purchase_value_campaign.py) compares two fresh state-only critics
+with the frozen C64 critic and a training-game constant; it never exports an actor or qualifies
+play strength. Preparation and synthetic CPU/GPU preflight do not authorize the one-hour fit.
+Keep existing encoder units, equal whole-game weights and the stronger-ecology final test sealed
+until both models are selected on validation. Tests: `python -m unittest discover -s scripts
+-p test_purchase_value_benchmark.py` in the dedicated numerical environment.
