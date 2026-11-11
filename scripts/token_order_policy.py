@@ -23,6 +23,7 @@ import purchase_policy as b
 import territory_value as q
 import token_order_metadata as metadata
 import token_order_fixed_reference as fixed
+import token_order_proposals as proposals
 
 
 KIND = metadata.KIND
@@ -64,25 +65,11 @@ class FitConfig:
         return self
 
 
-def proposal_indices(observation):
-    """Mirror the native selector's baseline, offered neighbours, then legacy six proposals."""
-    commands = [action["command"] for action in observation["actions"]]
-    amounts = [int(command.removeprefix("buy-tokens ")) for command in commands]
-    require(all(command == f"buy-tokens {amount}" for command, amount in zip(commands, amounts)),
-            "Token observations require canonical signed purchase commands.")
-    baseline = observation["baselineIndex"]
-    amount = amounts[baseline]
-    cash = round(observation["stateFeatures"].get("role.0.cash", 0.) * 200)
-    stock = round(observation["stateFeatures"].get("role.0.stock", 0.) * 36)
-    maximum, positive = min(cash, stock), max(amount, 0)
-    proposed = [baseline] + [amounts.index(value) for value in (amount-1, amount+1) if value in amounts]
-    for target in (amount, 0, -min(4, cash), positive//2, min(maximum, positive+8), maximum):
-        proposed.append(min(range(len(amounts)), key=lambda index:
-                            (abs(amounts[index]-target), amounts[index], commands[index])))
-    return list(dict.fromkeys(proposed))
+proposal_indices = proposals.ordinary_indices
 
 
-def validate_root(row, model, replicates, *, fixed_reference=False):
+def validate_root(row, model, replicates, *, fixed_reference=False,
+                  proposal_profile=proposals.ProposalProfile.ORDINARY):
     observation = row["observation"]
     b.validate_observation(observation, model, contract=q.TOKEN_CONTRACT_2)
     indices = row["proposedIndices"]
@@ -91,7 +78,10 @@ def validate_root(row, model, replicates, *, fixed_reference=False):
             and indices[0] == baseline and len(indices) == len(set(indices))
             and all(type(index) is int and 0 <= index < len(observation["actions"]) for index in indices),
             "A collected token root requires baseline-first distinct offered proposals.")
-    require(indices == proposal_indices(observation), "Token root differs from the fixed proposal selector.")
+    require(proposal_profile is proposals.ProposalProfile.ORDINARY or fixed_reference,
+            "Reference-neighbor queries require an explicit fixed reference.")
+    require(indices == proposals.indices(observation, proposal_profile),
+            "Token root differs from the fixed proposal selector.")
     if fixed_reference:
         require(type(row.get("referenceIndex")) is int
                 and row["referenceIndex"] == fixed.expected_reference_index(observation)
@@ -102,7 +92,8 @@ def validate_root(row, model, replicates, *, fixed_reference=False):
     reference = fixed.reference_index(row)
     commands = [action["command"] for action in observation["actions"]]
     require(commands[baseline] == row["baselineCommand"], "Root baseline command differs from its observation.")
-    amount = int(commands[baseline].removeprefix("buy-tokens "))
+    neighbor_reference = reference if proposal_profile is proposals.ProposalProfile.REFERENCE_NEIGHBORS else baseline
+    amount = int(commands[neighbor_reference].removeprefix("buy-tokens "))
     neighbours = [commands.index(command) for command in
                   (f"buy-tokens {amount-1}", f"buy-tokens {amount+1}") if command in commands]
     require(all(index in indices for index in neighbours), "Token proposals omitted an offered one-token neighbour.")
