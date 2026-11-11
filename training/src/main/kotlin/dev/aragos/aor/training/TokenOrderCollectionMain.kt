@@ -5,6 +5,7 @@ import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TokenObservationEncoder
 import dev.aragos.aor.ai.TokenOrderPolicy
+import dev.aragos.aor.ai.TokenOrderReference
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -257,6 +258,7 @@ object TokenOrderCollectionMain {
         if (node["status"]?.asText() == TokenValueOriginStatus.SKIPPED.name) {
             require(
                 !node.has("observation") &&
+                    !node.has("referenceIndex") &&
                     !node.has("alternatives") &&
                     !node.has("proposedIndices") &&
                     node["skipReason"]?.asText() in
@@ -290,6 +292,18 @@ object TokenOrderCollectionMain {
                 actions[baseline]["command"]?.asText() == node["baselineCommand"]?.asText()
         ) {
             "Token-order proposals require complete version 2 quotes with the actual baseline first."
+        }
+        if (specification.reference == TokenOrderReference.ORDINARY) {
+            require(!node.has("referenceIndex")) {
+                "An ordinary-reference token root cannot contain residual reference metadata."
+            }
+        } else {
+            val reference = PurchaseJson.integer(node.required("referenceIndex"), "referenceIndex")
+            val commands = actions.map { PurchaseJson.text(it.required("command"), "command") }
+            val expected = specification.reference.command(commands[baseline], commands)
+            require(reference in proposed && commands[reference] == expected) {
+                "A residual root must retain the offered fixed-T reference without changing ordinary proposals."
+            }
         }
         val alternatives = node.required("alternatives")
         require(alternatives.map { it.required("index").asInt() } == proposed) {

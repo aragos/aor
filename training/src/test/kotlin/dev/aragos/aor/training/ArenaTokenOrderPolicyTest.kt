@@ -23,6 +23,164 @@ import kotlin.test.assertFailsWith
 
 class ArenaTokenOrderPolicyTest {
     @Test
+    fun residualSelectorRejectsAnUntaggedOrdinaryModel() {
+        ArenaPurchaseFixture().use { fixture ->
+            tokenInput(fixture, "ordinary.json", emptyMap())
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(
+                    fixture,
+                    mapOf(
+                        "candidateSelector" to "MODEL_FIXED_T_RESIDUAL",
+                        "candidateModel" to "ordinary.json",
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun residualArtifactCannotRunUnderTheOrdinarySelector() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(fixture, mapOf("candidateModel" to "residual.json"))
+            }
+        }
+    }
+
+    @Test
+    fun residualModelMustBindTheFixedReferenceVersion() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+            val artifact =
+                PurchaseJson.read(fixture.directory.resolve("residual.json")) as ObjectNode
+            artifact.put("referenceProtocol", "ordinary-token-reference-1")
+            fixture.artifacts.write("residual.json", artifact)
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(fixture, residualFields())
+            }
+        }
+    }
+
+    @Test
+    fun residualModelCannotChangeItsAdvantageMargin() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+            val artifact =
+                PurchaseJson.read(fixture.directory.resolve("residual.json")) as ObjectNode
+            artifact.put("minimumAdvantage", 0.0)
+            fixture.artifacts.write("residual.json", artifact)
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(fixture, residualFields())
+            }
+        }
+    }
+
+    @Test
+    fun residualZeroHeadRoutesToFixedFallbackWhileOrdinarySideRetainsSixteen() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+            tokenInput(fixture, "ordinary.json", emptyMap())
+            val specification =
+                tokenRoles(fixture, residualFields() + mapOf("incumbentModel" to "ordinary.json"))
+                    .copy(candidate = testBaseline, incumbent = testBaseline)
+
+            val chosen =
+                ArenaSide.entries.map { side ->
+                    requireNotNull(specification.controllers(4, 0, side, testBaseline)[0]) {
+                            "Each evaluated side has an explicit learned token controller."
+                        }
+                        .choose(tokenDecision(fixture))
+                }
+
+            assertThat(chosen).containsExactly("buy-tokens 15", "buy-tokens 16").inOrder()
+        }
+    }
+
+    @Test
+    fun residualSnapshotRetainsTheTaggedArtifactBytes() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+            val specification = tokenRoles(fixture, residualFields())
+            val expected = PurchaseJson.hash(fixture.directory.resolve("residual.json"))
+
+            specification.snapshotOverlays(fixture.artifacts)
+
+            assertThat(
+                    PurchaseJson.hash(fixture.directory.resolve("token-order-candidate-model.json"))
+                )
+                .isEqualTo(expected)
+            val metadata = specification.overlayMetadata()["tokenOrder"] as Map<*, *>
+            assertThat(metadata["candidateSelector"]).isEqualTo("MODEL_FIXED_T_RESIDUAL")
+        }
+    }
+
+    @Test
+    fun residualHistoricalArenaReplayRetainsTheSameOutcomes() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+            val specification = tokenRoles(fixture, residualFields())
+            val game = StrategyArena.game(specification, 0, ArenaSide.CANDIDATE, Long.MAX_VALUE)
+
+            val replay = StrategyReplays.play(specification, 0, StrategyReplaySide.CANDIDATE)
+
+            assertThat(replay.game.scores).isEqualTo(game.scores)
+            assertThat(replay.game.decisions).isEqualTo(game.decisions)
+            assertThat(replay.replayVerified).isTrue()
+        }
+    }
+
+    private fun residualFields(): Map<String, Any> =
+        mapOf("candidateSelector" to "MODEL_FIXED_T_RESIDUAL", "candidateModel" to "residual.json")
+
+    @Test
+    fun residualCollectionCanResolveTheActualOrdinaryHeadAlongsideFixedContinuation() {
+        ArenaPurchaseFixture().use { fixture ->
+            val session = firstToken(fixture)
+            val actor = session.state.playerIds.first()
+            val observation = tokenDecision(fixture).observation
+            val continuation =
+                FrozenPolicyContinuation(
+                    List(4) { testBaseline },
+                    mapOf(
+                        0 to
+                            TokenOrderController(
+                                testBaseline,
+                                ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_15, null),
+                            )
+                    ),
+                    71,
+                    Long.MAX_VALUE,
+                )
+
+            val ordinary = continuation.ordinaryCommand(session, 0, observation)
+            val fixed = continuation.commands(session, mapOf(actor to observation))[actor]
+
+            assertThat(ordinary).isEqualTo("buy-tokens 16")
+            assertThat(fixed).isEqualTo("buy-tokens 15")
+        }
+    }
+
+    private fun residualArtifact(fixture: ArenaPurchaseFixture) {
+        tokenInput(fixture, "raw.json", emptyMap())
+        fixture.artifacts.write(
+            "residual.json",
+            mapOf(
+                "schemaVersion" to 1,
+                "kind" to TokenOrderPolicy.RESIDUAL_MODEL_KIND,
+                "referenceProtocol" to "fixed-token-reference-1",
+                "proposalVersion" to TokenOrderPolicy.PROPOSAL_VERSION,
+                "minimumAdvantage" to TokenOrderPolicy.MINIMUM_ADVANTAGE,
+                "model" to PurchaseJson.read(fixture.directory.resolve("raw.json")),
+            ),
+        )
+    }
+
+    @Test
     fun evaluatedMinusTwoReusesTheRivalControlAndRetainsTheOtherSide() {
         ArenaPurchaseFixture().use { fixture ->
             val specification =

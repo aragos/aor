@@ -108,6 +108,15 @@ contract. It fits the same five ridge penalties using eight-tail labels and trai
 Two- and four-tail prefix metrics are computed after selection and cannot select a model or
 change admission. Fresh whole-game gates remain necessary before activation.
 
+`ARENA_FIXED_T_RESIDUAL_EIGHT_TAILS_1` is a separate reference contract: the controlled player
+uses fixed16→15 during both origin play and all continuations. Its observation baseline and
+proposal set remain anchored to the actual ordinary bid; collected roots additionally record
+`referenceIndex`. Residual targets compare each action with that reference under the same fixed-T
+future policy. The `MODEL_FIXED_T_RESIDUAL` selector requires a tagged
+`token-order-fixed-reference-residual-1` artifact and retains fixed T unless an original proposal
+beats it by more than `.02`. Ordinary selectors reject this envelope, and residual selectors reject
+untagged Q models. Rebased ordinary-continuation labels cannot establish fixed-T continuation values.
+
 ### Bounded human expansion imitation
 
 

@@ -9,6 +9,7 @@ object TokenOrderPolicy {
     const val PROPOSAL_VERSION = "token-order-proposals-1"
     const val SELECTOR_VERSION = "token-order-selector-1"
     const val MINIMUM_ADVANTAGE = 0.02
+    const val RESIDUAL_MODEL_KIND = "token-order-fixed-reference-residual-1"
 
     /** Baseline first, its offered integer neighbors, then the original six proposals. */
     fun proposedIndices(
@@ -46,10 +47,27 @@ object TokenOrderPolicy {
         ordinary: BotObservation,
         observation: TerritoryObservation,
         model: TerritoryValueModel,
+    ): String = chooseAgainst(ordinary, observation, model, TokenOrderReference.ORDINARY)
+
+    /** Preserve ordinary-centered proposals while requiring improvement over the fixed fallback. */
+    fun chooseResidual(
+        ordinary: BotObservation,
+        observation: TerritoryObservation,
+        model: TerritoryValueModel,
+    ): String = chooseAgainst(ordinary, observation, model, TokenOrderReference.FIXED_16_TO_15)
+
+    private fun chooseAgainst(
+        ordinary: BotObservation,
+        observation: TerritoryObservation,
+        model: TerritoryValueModel,
+        reference: TokenOrderReference,
     ): String {
         val proposals = proposedIndices(ordinary, observation)
         val values = TerritoryValuePolicy.evaluate(observation, model, epsilon = 0.0).values
-        val baseline = observation.baselineIndex
+        val baseline = reference.index(observation)
+        require(baseline in proposals) {
+            "Token proposals must contain their exact reference action."
+        }
         val best = proposals.maxBy { values[it] }
         val selected = if (values[best] - values[baseline] > MINIMUM_ADVANTAGE) best else baseline
         return observation.actions[selected].command

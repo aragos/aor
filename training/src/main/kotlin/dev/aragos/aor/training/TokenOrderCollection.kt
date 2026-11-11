@@ -7,12 +7,17 @@ import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TokenObservationEncoder
 import dev.aragos.aor.ai.TokenOrderPolicy
+import dev.aragos.aor.ai.TokenOrderReference
 import java.nio.file.Path
 
 /** Explicit continuation semantics; omission retains the historical purchase-only collector. */
-internal enum class TokenOrderContinuationProtocol(val replicates: Int) {
+internal enum class TokenOrderContinuationProtocol(
+    val replicates: Int,
+    val reference: TokenOrderReference = TokenOrderReference.ORDINARY,
+) {
     ARENA_OVERLAYS_1(2),
     ARENA_OVERLAYS_EIGHT_TAILS_1(8),
+    ARENA_FIXED_T_RESIDUAL_EIGHT_TAILS_1(8, TokenOrderReference.FIXED_16_TO_15),
 }
 
 /** Fresh, precommitted origin banks; validation is model selection, never final confirmation. */
@@ -40,7 +45,10 @@ internal data class TokenOrderSpecification(
                 "Origin reproduction requires the explicit arena continuation protocol."
             }
         } else {
-            arena.tokenOrder?.validateCollectionContinuation()
+            require(arena.tokenOrder != null || reference == TokenOrderReference.ORDINARY) {
+                "Fixed-reference collection requires its explicit candidate fixed-T controller."
+            }
+            arena.tokenOrder?.validateCollectionContinuation(reference)
             requireNotNull(arena.expansionImitation) {
                     "Arena token continuation requires an explicit expansion model."
                 }
@@ -73,14 +81,15 @@ internal data class TokenOrderSpecification(
     val origins: Int
         get() = trainingRoots + validationRoots
 
+    val reference: TokenOrderReference
+        get() = continuationProtocol?.reference ?: TokenOrderReference.ORDINARY
+
     /** Eight-tail opt-in extends the same seed prefix without changing legacy value collectors. */
     fun continuationSeed(originSeed: Int, replicate: Int): Long {
         require(replicate in 0 until continuationReplicates) {
             "A token-order continuation must belong to its declared stream prefix."
         }
-        return if (
-            continuationProtocol == TokenOrderContinuationProtocol.ARENA_OVERLAYS_EIGHT_TAILS_1
-        ) {
+        return if (continuationProtocol?.replicates == 8) {
             (originSeed.toLong() shl 3) xor replicate.toLong() xor 0x6f20a5319dL
         } else {
             TokenValueCollector.continuationSeed(originSeed, replicate)
@@ -140,8 +149,9 @@ internal data class TokenOrderSpecification(
                 opponentIndices = lineup.opponentIndices,
             )
             .also { controllers ->
-                check(controllers[lineup.seat]?.controls("buy-tokens") != true) {
-                    "The controlled token reference must remain the actual ordinary head."
+                val controlled = controllers[lineup.seat]?.controls("buy-tokens") == true
+                check(controlled == (reference == TokenOrderReference.FIXED_16_TO_15)) {
+                    "The controlled token continuation must match its explicit ordinary or fixed-T reference."
                 }
             }
     }
@@ -203,6 +213,10 @@ internal data class TokenOrderOrigin(
     val turn: Int? = null,
     val rootDecision: Int? = null,
     val baselineCommand: String? = null,
+    /**
+     * Only residual roots declare this; observation.baselineIndex remains the actual ordinary bid.
+     */
+    val referenceIndex: Int? = null,
     val observation: TerritoryObservation? = null,
     val proposedIndices: List<Int>? = null,
     val alternatives: List<TokenOrderAlternative>? = null,
@@ -261,8 +275,12 @@ internal class TokenOrderCollector(
             ) {
                 if (BotTokenValue.available(ordinary)) {
                     val command =
-                        requireNotNull(commands[actor]) {
-                            "A selected sealed actor requires its baseline command."
+                        if (specification.reference == TokenOrderReference.FIXED_16_TO_15) {
+                            continuation.ordinaryCommand(session, lineup.seat, ordinary)
+                        } else {
+                            requireNotNull(commands[actor]) {
+                                "A selected sealed actor requires its baseline command."
+                            }
                         }
                     val observation =
                         TokenObservationEncoder.from(
@@ -273,6 +291,10 @@ internal class TokenOrderCollector(
                             TerritoryEncoder.TOKEN_2,
                         )
                     val proposed = TokenOrderPolicy.proposedIndices(ordinary, observation)
+                    val reference = specification.reference.index(observation)
+                    check(observation.actions[reference].command == commands[actor]) {
+                        "The collected reference must equal the frozen continuation controller's choice."
+                    }
                     if (proposed.size >= 2) {
                         val root = TokenValueFrozenRoot(session, actor, commands)
                         val alternatives = proposed.map { action ->
@@ -298,6 +320,11 @@ internal class TokenOrderCollector(
                                 turn = session.state.turnNumber,
                                 rootDecision = session.decisions,
                                 baselineCommand = command,
+                                referenceIndex =
+                                    reference.takeIf {
+                                        specification.reference ==
+                                            TokenOrderReference.FIXED_16_TO_15
+                                    },
                                 observation = observation,
                                 proposedIndices = proposed,
                                 alternatives = alternatives,

@@ -28,7 +28,7 @@ internal class FrozenPolicyContinuation(
         observations.entries
             .mapIndexed { actorIndex, (actor, observation) ->
                 val seat = session.state.playerIds.indexOf(actor)
-                val policySeed = seed xor (session.decisions * 65537 + seat * 8191)
+                val policySeed = policySeed(session, seat)
                 val controller = controllers[seat]?.takeIf { it.controls(observation.decision) }
                 val command =
                     controller?.choose(
@@ -44,6 +44,19 @@ internal class FrozenPolicyContinuation(
                 actor to command
             }
             .toMap()
+
+    /**
+     * Resolve the same ordinary head even when a phase controller supplies a different fallback.
+     */
+    fun ordinaryCommand(
+        session: ExperimentSession,
+        seat: Int,
+        observation: BotObservation,
+    ): String =
+        BotPolicy.choose(observation, BotDifficulty.HARD, policySeed(session, seat), models[seat])
+
+    private fun policySeed(session: ExperimentSession, seat: Int): Int =
+        seed xor (session.decisions * 65537 + seat * 8191)
 
     fun finish(
         session: ExperimentSession,

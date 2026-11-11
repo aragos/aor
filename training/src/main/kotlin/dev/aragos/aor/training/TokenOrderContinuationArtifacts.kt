@@ -1,12 +1,11 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.TokenOrderReference
 import java.nio.file.Path
 
 /** Snapshot-bound continuation semantics, separate from the unchanged token encoder and model. */
 internal object TokenOrderContinuationArtifacts {
-    private const val REFERENCE_VERSION = "ordinary-token-reference-1"
-
     fun metadata(specification: TokenOrderSpecification, directory: Path): Map<String, Any> {
         val protocol = specification.continuationProtocol ?: return emptyMap()
         validateWeights(specification, directory)
@@ -15,10 +14,16 @@ internal object TokenOrderContinuationArtifacts {
             "replayOrigins" to specification.replayOrigins,
             "tokenReference" to
                 mapOf(
-                    "version" to REFERENCE_VERSION,
+                    "version" to specification.reference.version,
                     "ordinaryModelSnapshot" to "initial.json",
                     "ordinaryModelSha256" to PurchaseJson.hash(directory.resolve("initial.json")),
-                ),
+                ) +
+                    if (specification.reference == TokenOrderReference.FIXED_16_TO_15) {
+                        mapOf(
+                            "selector" to "FIXED_16_TO_15",
+                            "proposalReference" to TokenOrderReference.ORDINARY.version,
+                        )
+                    } else emptyMap(),
         )
     }
 

@@ -1,12 +1,14 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.TerritoryValueModel
 import java.nio.file.Path
 
 /** Strict transport decoding; all numerical inference and model invariants remain in shared AI. */
 internal object TerritoryValuePolicyInput {
-    fun read(path: Path): TerritoryValueModel {
-        val node = PurchaseJson.read(path)
+    fun read(path: Path): TerritoryValueModel = read(PurchaseJson.read(path))
+
+    fun read(node: JsonNode): TerritoryValueModel {
         PurchaseJson.fields(
             node,
             setOf(

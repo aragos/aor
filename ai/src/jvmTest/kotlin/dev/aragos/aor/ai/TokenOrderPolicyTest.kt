@@ -163,6 +163,84 @@ class TokenOrderPolicyTest {
         assertThat(command).isEqualTo("buy-tokens 15")
     }
 
+    @Test
+    fun residualZeroHeadRetainsFixedReferenceWithoutRelearningIt() {
+        val state = fixture()
+
+        val command =
+            TokenOrderPolicy.chooseResidual(
+                BotObservations.from(state, own),
+                encoded(state),
+                model(state, 0.0),
+            )
+
+        assertThat(command).isEqualTo("buy-tokens 15")
+    }
+
+    @Test
+    fun residualCanUndoFixedAdjustmentWhenOrdinaryBidBeatsItsReference() {
+        val state = fixture()
+
+        val command =
+            TokenOrderPolicy.chooseResidual(
+                BotObservations.from(state, own),
+                encoded(state),
+                model(state, -.03),
+            )
+
+        assertThat(command).isEqualTo("buy-tokens 16")
+    }
+
+    @Test
+    fun residualSmallAdvantageStillRetainsFixedReference() {
+        val state = fixture()
+
+        val command =
+            TokenOrderPolicy.chooseResidual(
+                BotObservations.from(state, own),
+                encoded(state),
+                model(state, -.019),
+            )
+
+        assertThat(command).isEqualTo("buy-tokens 15")
+    }
+
+    @Test
+    fun residualDoesNotRecenterProposalsAroundFifteen() {
+        val state = fixture()
+        val original = model(state, 1.0)
+        val onlyFourteen =
+            original.copy(
+                actionWeights =
+                    List(original.actionWeights.size) {
+                        if (it == original.actionFeatureNames.indexOf("bid.amount.14")) 8.0 else 0.0
+                    }
+            )
+
+        val command =
+            TokenOrderPolicy.chooseResidual(
+                BotObservations.from(state, own),
+                encoded(state),
+                onlyFourteen,
+            )
+
+        assertThat(command).isEqualTo("buy-tokens 15")
+    }
+
+    @Test
+    fun residualRetainsSignedOrdinaryFallbackOutsideFixedTrigger() {
+        val state = fixture()
+
+        val command =
+            TokenOrderPolicy.chooseResidual(
+                BotObservations.from(state, own),
+                encoded(state, baseline = "buy-tokens -4"),
+                model(state, 0.0),
+            )
+
+        assertThat(command).isEqualTo("buy-tokens -4")
+    }
+
     private fun encoded(
         state: GameState,
         baseline: String = "buy-tokens 16",
