@@ -10,6 +10,7 @@ incumbent and requires strictly more than .02 predicted advantage.
 from __future__ import annotations
 
 import argparse
+import copy
 from dataclasses import asdict, dataclass
 import math
 from pathlib import Path
@@ -141,11 +142,23 @@ def origin_request(manifest, index, opponents):
     return {**identity, "requestedOrdinal": request["requestedOrdinal"]}
 
 
-def collection(directory, seed):
+def collection(directory, seed, *, supplied_initializer=None):
+    """Validate one completed bank against a generated or explicitly supplied Q initializer.
+
+    A supplied initializer retains its exact basis; the seed is then unused. Its caller
+    owns initializer provenance, while this loader preserves the collection provenance.
+    """
     directory = Path(directory).resolve(strict=True)
     manifest, finished = read(directory / "dataset.json"), read(directory / "finished.json")
     source, pins = collection_metadata(directory, manifest, finished)
-    model = q.initialize(manifest, seed, "token")
+    if supplied_initializer is None:
+        model = q.initialize(manifest, seed, "token")
+    else:
+        model = copy.deepcopy(q.validate_model(supplied_initializer, "token"))
+        require(model["encoderVersion"] == manifest["encoderVersion"] == q.TOKEN_ENCODER_2,
+                "A supplied token initializer must retain the collection's version 2 encoder.")
+        require(all(model[key] == manifest[key] for key in ("stateFeatureNames", "actionFeatureNames")),
+                "A supplied token initializer must retain the exact collection feature dictionaries.")
     count = manifest["trainingRoots"] + manifest["validationRoots"]
     require(manifest["originFiles"] == [f"origin-{index}.json" for index in range(count)]
             and len(finished["originSha256"]) == count and len(manifest["rootRequests"]) == count,

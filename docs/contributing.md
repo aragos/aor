@@ -1050,6 +1050,26 @@ determinism; it supplies no new independent worlds or policy qualification. The 
 validates this explicit protocol and includes its metadata validator hash in new-protocol provenance;
 legacy input and provenance behavior remain unchanged.
 
+The separate [frozen-head ridge fitter](../scripts/token_order_ridge.py) accepts an explicitly pinned
+original Q initializer through the collector's optional supplied-initializer path; omission retains
+the existing neural fitter's initialization and behavior. It trains only the 64 output weights,
+preserving the hidden network, dictionaries and output bias of 0.5. Paired hidden differences are
+read through the existing `ActionValue` affine head. The loss retains the original equal-root mean
+over **nonbaseline** proposals. Weighted RMS scaling uses only training differences, without
+centering; exact zero columns export zero weights. In Float64, each of the five fixed penalties
+`[0.0001, 0.001, 0.01, 0.1, 1.0]` minimizes weighted paired MSE plus the penalty times the squared
+normalized output-weight norm. Export reverses the RMS scaling into the unchanged native Q format.
+
+Run `token_order_ridge.py --inputs BINDINGS_JSON --config CONFIG_JSON --output NEW_DIRECTORY` only
+after freezing the retained collection, original initializer raw/canonical hashes and prior fit
+identity. The one-attempt allowance includes validation and fitting; no resume or random feature
+regeneration is allowed. Previously inspected validation chooses the lowest MSE strictly better
+than the initializer, preferring stronger regularization on exact ties. This is explicitly reused
+model-selection data. The existing selector margin and scaling diagnostic remain unchanged; fresh
+whole-game gates are still required. The unchanged proposals generally omit bid 14 around baseline
+16, so this fit cannot learn that minus-two action there. New labels or proposal changes require a
+separate experiment.
+
 
 The native `expansion-opportunity-collect` diagnostic uses an arena-shaped `SCREENING` source
 with `diagnosticRoots` (1–128, default 128), exactly two `continuationReplicates`, identical ordinary

@@ -5,6 +5,7 @@ import tempfile
 import time
 from pathlib import Path
 import unittest
+from unittest import mock
 
 import purchase_policy as b
 import territory_value as q
@@ -238,6 +239,62 @@ class TokenOrderPolicyTest(unittest.TestCase):
     def test_undeclared_transfer_cannot_silently_change_the_fitting_environment(self):
         with self.assertRaisesRegex(ValueError, "undeclared rules transfer"):
             learner.transfer_metadata({}, {"experimentalRulesTransfer": learner.RULES_TRANSFER}, {})
+
+
+class SuppliedInitializerTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        collection_fixture(self.root)
+
+    def test_omission_and_explicit_none_retain_default_model_rows_and_provenance(self):
+        expected = q.initialize(learner.read(self.root / "dataset.json"), 137, "token")
+
+        omitted = learner.collection(self.root, 137)
+        explicit = learner.collection(self.root, 137, supplied_initializer=None)
+
+        self.assertEqual(expected, omitted[0])
+        self.assertEqual(omitted, explicit)
+        self.assertEqual({"source", "signature", "files", "collected", "skipped"}, set(omitted[2]))
+
+    def test_supplied_model_is_used_without_initializing_or_reseeding(self):
+        supplied = q.initialize(schema(), 991, "token")
+        _, expected_rows, expected_provenance = learner.collection(self.root, 137)
+        with mock.patch.object(q, "initialize", side_effect=AssertionError("Unexpected initialization")), \
+                mock.patch.object(learner.random, "seed", side_effect=AssertionError("Unexpected reseeding")):
+            actual, rows, provenance = learner.collection(self.root, None, supplied_initializer=supplied)
+
+        self.assertEqual(supplied, actual)
+        self.assertEqual(expected_rows, rows)
+        self.assertEqual(expected_provenance, provenance)
+
+    def test_returned_model_does_not_share_nested_weights_with_the_supplied_model(self):
+        supplied = q.initialize(schema(), 991, "token")
+        expected = copy.deepcopy(supplied)
+
+        actual, _, _ = learner.collection(self.root, 137, supplied_initializer=supplied)
+        actual["stateWeights"][0] += 1.
+
+        self.assertEqual(expected, supplied)
+        self.assertNotEqual(supplied, actual)
+
+    def test_supplied_feature_dictionaries_must_match_the_collection_exactly(self):
+        for key in ("stateFeatureNames", "actionFeatureNames"):
+            with self.subTest(dictionary=key):
+                different = schema()
+                different[key] = sorted([*different[key], "unrecorded.feature"])
+                supplied = q.initialize(different, 991, "token")
+
+                with self.assertRaisesRegex(ValueError, "exact collection feature dictionaries"):
+                    learner.collection(self.root, 137, supplied_initializer=supplied)
+
+    def test_supplied_legacy_encoder_cannot_bind_a_version_two_collection(self):
+        legacy = dict(schema(), encoderVersion=b.TOKEN_CONTRACT.encoder)
+        supplied = q.initialize(legacy, 991, "token")
+
+        with self.assertRaisesRegex(ValueError, "version 2 encoder"):
+            learner.collection(self.root, 137, supplied_initializer=supplied)
 
 
 class ArenaContinuationParityTest(unittest.TestCase):

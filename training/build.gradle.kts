@@ -37,6 +37,7 @@ distributions {
                     "joint_trajectory.py",
                     "token_policy.py",
                     "token_order_policy.py",
+                    "token_order_ridge.py",
                     "token_order_metadata.py",
                     "expansion_policy.py",
                     "territory_trajectory.py",
