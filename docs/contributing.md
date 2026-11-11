@@ -162,6 +162,15 @@ Prefix transition/action counts describe retained work, not a measured runtime s
 checks source/model-dictionary pins without extracting samples; extraction requires a new output
 directory. This tool cannot choose a policy, generate chance, train a model or evaluate a critic.
 
+The separately reviewed `scripts/purchase_boundary_analysis.py` consumes these frozen features and
+the audited original Torch critic classes. Its default mode checks pins without scoring. Explicit
+scoring compares the small fresh critic (primary), C64 and large critic, with a fixed terminal-return
+comparator. Replicates 0–7 select the option only above a 0.02 predicted advantage; replicates 8–15
+evaluate the resulting choice, with swapped halves secondary. Intervals use one paired value per
+origin. This retrospective analysis never fits, changes a target or activates a policy. Synthetic
+split-isolation and input-contract checks run with `python3 -m unittest test_purchase_boundary_analysis`
+from `scripts`.
+
 ### Bounded human expansion imitation
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic
