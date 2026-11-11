@@ -93,9 +93,12 @@ def per_game_mse(predictions, cache, games):
                        for g in games], dtype=np.float64)
 
 
-def fit_one(name, widths, seed, cache, corpus, output, config, guard, device):
+def fit_one(name, widths, seed, cache, corpus, output, config, guard, device, *, initial_state=None):
     """One fit, best validation epoch only; never accesses test indices or test metrics."""
     model = Critic(widths, seed).to(device)
+    if initial_state is not None:
+        # Explicit weight-only warm start; Adam below always starts without moments.
+        model.load_state_dict(initial_state, strict=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learningRate, betas=(.9, .999),
                                  eps=1e-8, weight_decay=0, foreach=False, fused=False)
     training = [g['id'] for g in corpus['games'] if g['split'] == 'training']

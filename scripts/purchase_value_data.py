@@ -126,15 +126,17 @@ def encode_state(features, names):
     return [index for index, _ in ordered], [value for _, value in ordered]
 
 
-def build_cache(package, output, guard):
+def build_cache(package, output, guard, *, corpus_validator=verify_declaration,
+                model_path=None, model_sha=C64):
     """Stream one source game at a time; never expand an archive to a JSON directory."""
     import numpy as np
     package, output = Path(package), Path(output)
     corpus = read(package/'corpus.json')
-    verify_declaration(corpus)
-    model = read(package/'inputs/c64.json')
-    require(sha(package/'inputs/c64.json') == C64 and len(model['stateFeatureNames']) == STATE_COUNT,
-            'The benchmark requires exact C64 and its original 3,556-state dictionary.')
+    corpus_validator(corpus)
+    model_path = Path(model_path) if model_path is not None else package/'inputs/c64.json'
+    model = read(model_path)
+    require(sha(model_path) == model_sha and len(model['stateFeatureNames']) == STATE_COUNT,
+            'The benchmark requires its exact frozen model and original 3,556-state dictionary.')
     names = {name: index for index, name in enumerate(model['stateFeatureNames'])}
     require(not output.exists(), 'CSR construction is a single attempt with a new output.')
     output.mkdir(parents=True)

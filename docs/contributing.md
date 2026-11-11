@@ -1422,3 +1422,17 @@ play strength. Preparation and synthetic CPU/GPU preflight do not authorize the 
 Keep existing encoder units, equal whole-game weights and the stronger-ecology final test sealed
 until both models are selected on validation. Tests: `python -m unittest discover -s scripts
 -p test_purchase_value_benchmark.py` in the dedicated numerical environment.
+
+### Fixed strong-ecology value diagnostic
+
+`purchase_strong_value.py` collects sixteen fixed-policy batches with the same qualified purchase
+actor and complete ordinary/token/expansion roles in every seat. Whole batches own the prospective
+3,072/512/512 training/validation/test split. Four prescribed historical reproductions per batch
+precede lossless archiving. State-only CSR inputs preserve the original encoder units.
+
+The existing 64-unit value fitter accepts an explicit weight-only warm start; Adam remains fresh.
+Its omitted argument preserves the original fresh-fit path. A fresh and a warm fit use the original
+20-epoch optimizer recipe and shared epoch shuffles. Validation selects epoch and arm (earlier epoch,
+then warm arm on exact ties). Only the selected critic and unchanged original critic enter the final
+whole-game paired MSE test. This is predictive evidence under fixed play, without actor updates,
+playing-strength qualification, activation, automatic retries or a successor.
