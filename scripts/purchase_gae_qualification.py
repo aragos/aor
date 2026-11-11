@@ -73,20 +73,21 @@ def gate(metrics):
                for name in ('winShareDifference','rewardDifference'))
 
 
-def heldout_ready(output):
+def heldout_ready(output, *, candidate_sha256=CANDIDATE):
     state=read(output/'campaign-state.json')['stages']['confirm']
     prior=controller.validate_result(output/'results/confirm.json',output)
     report=read(output/'confirm-report.json')
     require(state['status']==prior['status']=='passed'
         and state['resultSha256']==sha(output/'results/confirm.json')
-        and report['candidateSha256']==CANDIDATE and gate(report['metrics'])
+        and report['candidateSha256']==candidate_sha256 and gate(report['metrics'])
         and prior['metrics']==report,'Heldout requires this exact actor to pass both complete99% confirmation gates.')
 
 
-def stage(protocol,path,output,name):
+def stage(protocol,path,output,name, *, candidate_sha256=CANDIDATE, source_builder=arena_source):
+    """Shared exact-policy gate; omitted overrides preserve the original qualification contract."""
     require(name in STAGES,'Only the two declared stages may execute.')
-    if name=='heldout':heldout_ready(output)
-    source_path=output/f'{name}-source.json';source=arena_source(protocol,name)
+    if name=='heldout':heldout_ready(output,candidate_sha256=candidate_sha256)
+    source_path=output/f'{name}-source.json';source=source_builder(protocol,name)
     directory=output/'screens'/name
     require(not source_path.exists() and not directory.exists(),'Each final bank permits one attempt, no top-ups.')
     document(source_path,source);exp.native(protocol,'arena',source_path,directory)
@@ -99,7 +100,7 @@ def stage(protocol,path,output,name):
     replays=ecology.arena_replays(protocol,source_path,pairs,output/'replays'/name,
         expected_expansion=matched.EXPANSION,rival_ecology=ECOLOGIES[name],indices=REPLAYS)
     passed=gate(metrics)
-    report=dict(stage=name,protocolSha256=sha(path),candidateSha256=CANDIDATE,
+    report=dict(stage=name,protocolSha256=sha(path),candidateSha256=candidate_sha256,
         rivalEcology=ECOLOGIES[name].value,metrics=estimates(metrics),replays=replays,
         passed=passed,qualificationPassed=name=='heldout' and passed,productionActivation=False,
         automaticNextCampaign=False,actualFits=0,selectionDisclosure=protocol['selectionDisclosure'])

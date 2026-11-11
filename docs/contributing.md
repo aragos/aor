@@ -854,6 +854,19 @@ The controlled incumbent and F0 prior remain identical in both banks. Eight pros
 side replays per bank verify exact outcomes; qualifying evidence does not activate an application
 profile or establish human-level strength.
 
+The prospective [strong-rival qualification](../scripts/purchase_strong_qualification.py) admits
+only the completed learning curve's final batch64 actor, after its full terminal audit and both
+positive 95% lower bounds on the declared 512-pair final development screen. This admission gate
+allocates compute; it is not qualification, and an earlier checkpoint cannot substitute. Explicit
+purchase roles bind the qualified44 actor to the incumbent and every rival, while the candidate
+alone uses batch64; all seats retain the frozen F0 prior and their declared M8/expansion/token roles.
+Two fresh 4,096-pair banks test mixed then homogeneous strong rivals, with both win and reward 99%
+lower bounds strictly positive at each stage. Confirmation failure leaves heldout unopened.
+The existing native arena, exact role snapshots and canonical replays are reused unchanged.
+The finite run permits ten workers, two hours, one attempt, 16,384 scientific terminal games and
+16 historical reproductions, with no fits, top-ups, reselection, successor or asset activation.
+Final input hashes, seed ancestry and host preflight remain prerequisites to freezing a campaign.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It
