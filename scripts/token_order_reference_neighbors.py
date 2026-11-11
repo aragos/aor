@@ -4,6 +4,7 @@ import token_order_fixed_reference as fixed
 from token_order_proposals import ProposalProfile
 
 KIND = 'token-order-reference-neighbor-residual-1'
+CAMPAIGN_KIND = 'token-reference-neighbor-campaign-1'
 SELECTOR = 'MODEL_FIXED_T_REFERENCE_NEIGHBORS'
 SELECTOR_VERSION = 'token-order-reference-neighbor-selector-1'
 PROPOSALS = ProposalProfile.REFERENCE_NEIGHBORS.value

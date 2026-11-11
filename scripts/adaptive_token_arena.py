@@ -6,6 +6,7 @@ import automata_experiments as exp
 import automata_policy_search as search
 import automata_token_order as legacy
 import token_order_fixed_reference as fixed
+import token_order_reference_neighbors as neighbors
 
 read, sha, require = exp.read, exp.sha, exp.require
 FEATURES = ('tokens', 'progress', 'reach', 'commodity', 'income', 'risk',
@@ -17,11 +18,16 @@ FIXED = 'FIXED_16_TO_15'
 def bindings(protocol, stage, model=None, *, control=False):
     """The explicit residual profile fixes collection tokens; all arena references use T."""
     require(stage in ('collect', 'screen', 'confirm', 'heldout'), 'Unknown token experiment phase.')
-    roles = ('E+T',) if stage == 'heldout' else MIXED
+    derived = protocol.get('kind') == neighbors.CAMPAIGN_KIND
+    require(not derived or (stage != 'collect' and not control),
+            'Neighbor evidence uses explicit augmentation; it cannot recollect or add screen controls.')
+    roles = ('E+T',)*4 if derived and stage == 'heldout' else (('E+T',) if stage == 'heldout' else MIXED)
     expansion = dict(candidateModel=protocol['expansionModel'], opponentModels=[
         protocol['expansionModel'] if role in ('E', 'E+T') else None for role in roles])
     tokens = dict(opponentSelectors=[FIXED if role in ('T', 'E+T') else 'ORDINARY'
                                     for role in roles])
+    if derived and stage == 'heldout':
+        tokens['opponentSelectors'] = ['FIXED_16_TO_13','FIXED_16_TO_14',FIXED,'ORDINARY']
     require(not control or stage == 'screen', 'The minus-two control belongs only to development screening.')
     if stage != 'collect':
         require((model is None) == control, 'Use either the frozen learned model or the model-free screen control.')
@@ -31,7 +37,9 @@ def bindings(protocol, stage, model=None, *, control=False):
             tokens['candidateSelector'] = 'ORDINARY_MINUS_TWO'
         else:
             tokens['candidateModel'] = str(model)
-            if protocol.get('kind') == fixed.CAMPAIGN_KIND:
+            if derived:
+                tokens['candidateSelector'] = neighbors.SELECTOR
+            elif protocol.get('kind') == fixed.CAMPAIGN_KIND:
                 tokens['candidateSelector'] = 'MODEL_FIXED_T_RESIDUAL'
     else:
         require(model is None, 'Collection cannot install an evaluated token override.')

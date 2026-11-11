@@ -7,6 +7,8 @@ import subprocess
 
 import automata_adaptive_token as previous
 import token_order_fixed_reference as fixed
+import token_order_reference_neighbors as neighbors
+import token_order_augmentation as augmentation
 
 arena, exp, evolution, controller = previous.arena, previous.exp, previous.evolution, previous.controller
 read, sha, document, require = previous.read, previous.sha, previous.document, previous.require
@@ -179,23 +181,33 @@ def collect(protocol, protocol_path, output):
 def verify_fit(protocol, output):
     directory = output/'fit'
     report, finished, identity = [read(directory/name) for name in ('fit.json','finished.json','identity.json')]
-    kind = ('token-order-fixed-reference-eight-tail-ridge-1' if fixed_reference(protocol)
-            else 'token-order-fresh-eight-tail-ridge-1')
+    derived = protocol.get('kind') == neighbors.CAMPAIGN_KIND
+    kind = (augmentation.FIT_KIND if derived else ('token-order-fixed-reference-eight-tail-ridge-1'
+            if fixed_reference(protocol) else 'token-order-fresh-eight-tail-ridge-1'))
     require(report['kind'] == identity['kind'] == finished['kind'] == kind
             and finished['reportSha256'] == sha(directory/'fit.json')
             and report['identitySha256'] == sha(directory/'identity.json')
             and identity['config'] == FIT and identity['inputs'] == read(output/'fit-inputs.json')
             and identity['source'] == read(output/'collection-validation.json')['provenance']
             and identity['primaryContinuationReplicates'] == report['primaryContinuationReplicates'] == 8
-            and not identity['diagnosticPrefixesAffectSelection'] and not report['validationPreviouslyInspected'],
+            and not identity['diagnosticPrefixesAffectSelection']
+            and identity['validationPreviouslyInspected'] == report['validationPreviouslyInspected'] == derived,
             'Fit must retain exact fresh eight-tail inputs, unchanged basis/grid and primary selection semantics.')
-    if fixed_reference(protocol):
+    if fixed_reference(protocol) or derived:
+        codec = neighbors if derived else fixed
         require(identity['referenceProtocol'] == fixed.REFERENCE
-                and identity['referenceCodecSha256'] == sha(Path(protocol['scripts'])/'token_order_fixed_reference.py')
-                and identity['selector'] == 'MODEL_FIXED_T_RESIDUAL'
-                and identity['modelArtifactKind'] == fixed.KIND
+                and identity['referenceCodecSha256'] == sha(codec.__file__)
+                and identity['selector'] == (neighbors.SELECTOR if derived else 'MODEL_FIXED_T_RESIDUAL')
+                and identity['modelArtifactKind'] == codec.KIND
                 and identity['proposalReference'] == 'ordinary-token-reference-1',
                 'Residual fit must bind its exact codec, reference and selector semantics.')
+    if derived:
+        require(identity['proposalVersion'] == neighbors.PROPOSALS
+                and identity['selectorVersion'] == neighbors.SELECTOR_VERSION
+                and identity['validationPurpose'] == 'REUSED_DEVELOPMENT_SELECTION_ONLY'
+                and identity['derivedViewBackendSha256'] == sha(augmentation.__file__)
+                and identity['reusedDevelopmentRoots'] == 104,
+                'Augmented evidence retains explicit reused-development and new-query ownership.')
     for name,digest in finished['artifacts'].items():
         require(Path(name).name == name and sha(directory/name) == digest,'A completed fit artifact changed.')
     original = read(protocol['initializer'])
@@ -203,8 +215,8 @@ def verify_fit(protocol, output):
     require([row['ridgePenalty'] for row in fits] == FIT['ridgePenalties'], 'The fixed ridge grid changed.')
     for index,row in enumerate(fits):
         model = read(directory/f'model-{index}.json')
-        if fixed_reference(protocol):
-            model = fixed.envelope_model(model)
+        if fixed_reference(protocol) or derived:
+            model = (neighbors if derived else fixed).envelope_model(model)
         require(row == read(directory/f'fit-{index}.json') and row['index'] == index
                 and row['modelSha256'] == sha(directory/f'model-{index}.json')
                 and len(model['outputWeights']) == 64
