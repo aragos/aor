@@ -794,6 +794,25 @@ deadlines, and permits one launch within an explicit window. Recovery never crea
 or changes the learning recipe. Optional campaign/stage `absoluteDeadlineEpoch` values are Unix
 seconds and can only shorten the supervisor's duration-based deadlines.
 
+### Matched purchase baseline diagnostic
+
+The [matched pilot](../scripts/purchase_baseline_pilot.py) compares two actor-only updates
+from the same C64 actor and one completed collection. Both retain the original PPO clipping,
+whole-epoch KL rollback, raw terminal returns and decision weighting. Each starts fresh Adam;
+`valueWeights` and `valueBias` are frozen and excluded from optimizer state. Shared state weights
+still learn from actor gradients, so the actor's reported value can change despite its frozen head.
+The omitted objective preserves existing update arithmetic, identities and optimizer behavior.
+
+`purchase_policy.ActorOnlyObjective` explicitly chooses either recorded behavior values or a
+separately frozen state-baseline file. External values bind the exact collection, ordered game
+hashes and decision numbers. They never replace original behavior values or likelihoods, which
+remain independently validated. The [prediction owner](../scripts/purchase_actor_baseline.py)
+uses the audited fresh64 critic's original actor-visible state features and CPU Float32 inference;
+it fits no critic and publishes predictions before either actor update. Both updates share the same
+configuration and epoch shuffles. The common-world screens verify exact incumbent parity before
+reporting external-minus-recorded paired intervals. This finite diagnostic selects and activates
+nothing; improved state prediction alone is not playing-strength evidence.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It

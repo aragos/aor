@@ -279,7 +279,7 @@ def verify_purchase_roles(source, directory, reports):
             'Historical screen replay changed its exact purchase actor roles or archived bytes.')
 
 
-def arena_replays(protocol, source_path, pairs, output):
+def arena_replays(protocol, source_path, pairs, output, *, expected_expansion=data.E):
     source, receipts = read(source_path), []
     for index in (0, 170, 341, 511):
         for side in ('candidate', 'incumbent'):
@@ -301,7 +301,8 @@ def arena_replays(protocol, source_path, pairs, output):
                             ('index', 'configuration', 'seed', 'seat', 'opponentIndices'))
                     and search.same_game(replay['game'], pairs[index][side]),
                     'Canonical purchase-screen replay changed the original historical game.')
-            data.verify_overlays(source, target, [native, state], arena=True)
+            data.verify_overlays(source, target, [native, state], arena=True,
+                                 expected_expansion=expected_expansion)
             verify_purchase_roles(source, target, [native, state])
             receipts.append(dict(index=index, side=side, replaySha256=sha(target/'replay.json')))
     return receipts

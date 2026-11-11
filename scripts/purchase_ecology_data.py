@@ -31,21 +31,23 @@ def bindings(expansion, *, arena=False):
     return dict(expansionImitation=models, tokenOrder=tokens)
 
 
-def verify_overlays(source, directory, reports, *, arena=False):
+def verify_overlays(source, directory, reports, *, arena=False, expected_expansion=E):
     directory = Path(directory)
     expansion = source['expansionImitation']['candidateModel']
     require(all(source.get(key) == value for key, value in bindings(expansion, arena=arena).items()),
             'Purchase adaptation must preserve exact E+T and indexed F1/E/T/E+T rival roles.')
-    require(sha(expansion) == E, 'The expansion owner must retain exact qualified lambda1 bytes.')
+    require(sha(expansion) == expected_expansion,
+            'The expansion owner must retain its exact declared qualified bytes.')
     metadata = dict(version='expansion-imitation-1', decision='expand', featureNames=FEATURES)
     pins = {}
 
     def snapshot(path, name):
         if path is None:
             return None
-        require(sha(path) == E and sha(directory / name) == E, 'Expansion snapshot differs from exact E.')
-        pins[name] = E
-        return dict(path=str(Path(path).resolve()), sha256=E, snapshot=name)
+        require(sha(path) == expected_expansion and sha(directory / name) == expected_expansion,
+                'Expansion snapshot differs from its declared model.')
+        pins[name] = expected_expansion
+        return dict(path=str(Path(path).resolve()), sha256=expected_expansion, snapshot=name)
 
     for role, value in source['expansionImitation'].items():
         metadata[role] = ([snapshot(path, f'expansion-imitation-opponent-{index}.json')
@@ -63,7 +65,7 @@ def verify_overlays(source, directory, reports, *, arena=False):
     return pins
 
 
-def verify_collection(directory):
+def verify_collection(directory, *, expected_ordinary=F1, expected_expansion=E):
     """Pure-Python provenance validation, reusable by the supervisor and numerical reader."""
     directory = Path(directory)
     source = read(directory / 'source.json')
@@ -74,8 +76,8 @@ def verify_collection(directory):
             and source['configuration'] == exp.CONFIGURATION
             and source['experimentalRulesTransfer'] == legacy.RULES_TRANSFER,
             'Use the explicit 256-game purchase adaptation source and canonical setup.')
-    require(sha(source['baseline']) == F1 and len(source['opponents']) == 4
-            and all(sha(path) == F1 for path in source['opponents'])
+    require(sha(source['baseline']) == expected_ordinary and len(source['opponents']) == 4
+            and all(sha(path) == expected_ordinary for path in source['opponents'])
             and sha(source['opponentPurchasePolicy']) == C
             and sha(source['sharedPurchaseBaseline']) == F0,
             'Only the controlled purchase actor may learn; ordinary, rival actor and prior bytes stay fixed.')
@@ -86,7 +88,7 @@ def verify_collection(directory):
                     opponents=source['opponents'], prior=source['sharedPurchaseBaseline'],
                     purchasePolicy=source['opponentPurchasePolicy'])
     data, decisions = legacy.verify_collection(protocol, original, directory)
-    pins = verify_overlays(source, directory, [manifest])
+    pins = verify_overlays(source, directory, [manifest], expected_expansion=expected_expansion)
     for name in ('source.json', 'collection.json', 'state.json', 'finished.json', 'baseline.json',
                  'policy.json', 'shared-purchase-baseline.json', 'opponent-purchase-policy.json',
                  *[f'opponent-{index}.json' for index in range(4)]):
@@ -100,10 +102,12 @@ def verify_collection(directory):
     return dict(data, ecologyFiles=pins, readerSha256=sha(__file__)), decisions
 
 
-def read_collection(directory, model_path, model, *, contract):
+def read_collection(directory, model_path, model, *, contract,
+                    expected_ordinary=F1, expected_expansion=E):
     import purchase_policy as learner
     require(contract == learner.PURCHASE_CONTRACT, 'Purchase ecology cannot collect another actor family.')
-    expected, decisions = verify_collection(directory)
+    expected, decisions = verify_collection(directory, expected_ordinary=expected_ordinary,
+                                           expected_expansion=expected_expansion)
     rows, provenance = learner.read_collection(directory, model_path, model, contract=contract)
     require(provenance == {key: value for key, value in expected.items()
                            if key not in ('ecologyFiles', 'readerSha256')}

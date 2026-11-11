@@ -1,4 +1,4 @@
-"""Exact numerical identity for the existing Mac CPU purchase-learning environment.
+"""Exact numerical identity for the existing CPU purchase-learning environments.
 
 The venv launcher path controls prefix discovery. Keep it distinct from the resolved
 interpreter executable, and retain site-packages while excluding user customization.
@@ -55,11 +55,18 @@ def current():
     standard, paths = interpreter_files()
     paths.update(path.resolve() for path in library.rglob('*')
                  if path.is_file() and '__pycache__' not in path.parts and path.suffix not in ('.pyc', '.pyo'))
-    for name in ('pyvenv.cfg', 'requirements.lock.txt', 'environment-receipt.json', 'install-report.json'):
+    # The already-installed desktop venv has separate pip receipts; Mac's original single
+    # receipt and complete identity remain byte-compatible. No packages are installed here.
+    install_names = (('torch-install.json', 'numpy-install.json') if sys.platform == 'linux'
+                     else ('install-report.json',))
+    for name in ('pyvenv.cfg', 'requirements.lock.txt', 'environment-receipt.json', *install_names):
         path = prefix / name
         require(path.is_file(), 'The existing numerical installation receipt is missing: ' + name)
         paths.add(path)
     executable = Path(sys.executable).absolute()
+    installation = ({'installationReportSha256': sha(prefix / 'install-report.json')}
+                    if sys.platform != 'linux' else
+                    {'installationReportsSha256': {name: sha(prefix/name) for name in install_names}})
     return dict(executable=str(executable), resolvedExecutable=str(executable.resolve()),
         prefix=str(prefix), basePrefix=str(base), sitePackages=str(library), stdlib=str(standard),
         pythonVersion=sys.version, torchVersion=torch.__version__, numpyVersion=numpy.__version__,
@@ -67,7 +74,7 @@ def current():
         torchThreads=torch.get_num_threads(), deterministicAlgorithms=torch.are_deterministic_algorithms_enabled(),
         device='cpu', cuda=None, mpsUsed=False, gpuUsed=False,
         requirementsLockSha256=sha(prefix / 'requirements.lock.txt'),
-        installationReportSha256=sha(prefix / 'install-report.json'),
+        **installation,
         files={str(path): sha(path) for path in sorted(paths)})
 
 

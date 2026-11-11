@@ -594,14 +594,60 @@ def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
     return -torch.minimum(ratio * advantage, torch.clamp(ratio, 1 - clip, 1 + clip) * advantage)
 
 
-def ordinary_loss_for_rows(policy, rows, config):
+@dataclass(frozen=True)
+class ActorOnlyObjective:
+    """Purchase-only baseline comparison, with a fresh optimizer and frozen value head.
+
+    External predictions are made before either update, keyed by immutable game bytes and
+    decision number. They never replace the recorded behavior value or likelihood. Shared
+    state parameters still receive actor gradients; freezing the head does not freeze its output.
+    """
+    baseline: str
+    externalFile: str | None = None
+
+    def bind(self, rows, provenance, model_sha):
+        require(self.baseline in ("recorded", "external"), "Unsupported actor-only baseline.")
+        require((self.externalFile is not None) == (self.baseline == "external"),
+                "Only the external objective requires a frozen prediction file.")
+        identity = {"version": "purchase-actor-only-baseline-1", "baseline": self.baseline,
+                    "frozenParameters": ["valueWeights", "valueBias"],
+                    "optimizerInitialization": "fresh-adam"}
+        if self.baseline == "recorded":
+            return [{**row, "_actorOnlyBaseline": row["behaviorValue"]} for row in rows], identity
+        path = Path(self.externalFile).resolve()
+        external = read_json(path)
+        require(external.get("kind") == "purchase-frozen-state-baselines-1"
+                and external.get("collectionSha256") == provenance["collectionSha256"]
+                and external.get("gameHashes") == provenance["gameHashes"]
+                and external.get("behaviorModelSha256") == model_sha,
+                "External baselines must bind this complete collection and behavior actor.")
+        require(isinstance(external.get("predictor"), dict) and external["predictor"]
+                and external.get("newFits") == 0,
+                "External baselines require their frozen predictor provenance and no fitting.")
+        expected = [(provenance["gameHashes"][row["originIndex"]], row["number"]) for row in rows]
+        predictions = external.get("predictions")
+        require(isinstance(predictions, list) and len(predictions) == len(expected)
+                and [(row.get("gameSha256"), row.get("decision")) for row in predictions] == expected
+                and len(set(expected)) == len(expected),
+                "External predictions must cover every decision exactly once in original order.")
+        values = [number(row.get("value"), "Frozen state baseline", 0, 1) for row in predictions]
+        identity.update(externalFile=str(path), externalSha256=file_digest(path),
+                        predictor=external["predictor"])
+        return [{**row, "_actorOnlyBaseline": value} for row, value in zip(rows, values)], identity
+
+
+def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False):
     config.validate_reference(policy.contract)
     probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
                           for logp, row in zip(probabilities, rows)])
     old = torch.tensor([row["behaviorLogProbability"] for row in rows], dtype=DTYPE)
     returns = torch.tensor([row["return"] for row in rows], dtype=DTYPE)
-    advantages = returns - torch.tensor([row["behaviorValue"] for row in rows], dtype=DTYPE)
+    if actor_only:
+        require(policy.contract == PURCHASE_CONTRACT and config.valueCoefficient == 0,
+                "Actor-only objectives require purchase rows and zero critic coefficient.")
+    baseline_key = "_actorOnlyBaseline" if actor_only else "behaviorValue"
+    advantages = returns - torch.tensor([row[baseline_key] for row in rows], dtype=DTYPE)
     actor = clipped_policy_loss(chosen, old, advantages, config.clip).mean()
     critic = 0.5 * (values - returns).square().mean()
     entropy = torch.stack([-(value.exp() * value).sum() for value in probabilities]).mean()
@@ -619,7 +665,8 @@ def ordinary_loss_for_rows(policy, rows, config):
 
 
 
-def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_reference=None):
+def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_reference=None,
+                  actor_only=False):
     require(purchase_reference is None or offered_reference is None,
             "A typed actor cannot use two offered reference objectives.")
     if offered_reference is not None:
@@ -629,7 +676,7 @@ def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_refe
         require(isinstance(purchase_reference, PurchaseReferenceObjective),
                 "Purchase reference must be an explicit typed objective.")
         purchase_reference.validate(policy.contract)
-    ordinary = ordinary_loss_for_rows(policy, rows, config)
+    ordinary = ordinary_loss_for_rows(policy, rows, config, actor_only=actor_only)
     if purchase_reference is None and offered_reference is None:
         return ordinary
     # Match the reviewed LAB objective's separate forward and operation order exactly.
@@ -669,10 +716,15 @@ def epoch_batches(rows, config, epoch):
     return row_batches([rows[index] for index in order], config.batchSize)
 
 
-def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None, offered_reference=None):
+def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None,
+                  offered_reference=None, actor_only=False):
     require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
     optimizer.zero_grad(set_to_none=True)
-    if offered_reference is not None:
+    if actor_only:
+        require(purchase_reference is None and offered_reference is None,
+                "Actor-only baseline comparisons cannot add another objective.")
+        loss = loss_for_rows(policy, batch, config, actor_only=True)
+    elif offered_reference is not None:
         loss = loss_for_rows(policy, batch, config, purchase_reference=purchase_reference,
                              offered_reference=offered_reference)
     else:
@@ -685,9 +737,12 @@ def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_refere
     optimizer.step()
 
 
-def fit_epoch(policy, optimizer, rows, config, epoch, deadline):
+def fit_epoch(policy, optimizer, rows, config, epoch, deadline, *, actor_only=False):
     for batch in epoch_batches(rows, config, epoch):
-        fit_minibatch(policy, optimizer, batch, config, deadline)
+        if actor_only:
+            fit_minibatch(policy, optimizer, batch, config, deadline, actor_only=True)
+        else:
+            fit_minibatch(policy, optimizer, batch, config, deadline)
 
 
 def checked_block_bounds(rows, config, cursor):
@@ -1041,7 +1096,8 @@ def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
 
 def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
            *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE,
-           purchase_reference=None, collection_reader=None, offered_reference=None):
+           purchase_reference=None, collection_reader=None, offered_reference=None,
+           actor_only=None):
     """Fit one typed actor; optional readers own completed-data/likelihood validation.
 
     A custom reader has read_collection's signature and returns rows plus provenance containing
@@ -1050,6 +1106,13 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     """
     require(update_mode in (LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE), "Unsupported PPO update mode.")
     config.validate(contract)
+    if actor_only is not None:
+        require(isinstance(actor_only, ActorOnlyObjective) and contract == PURCHASE_CONTRACT
+                and update_mode == LEGACY_UPDATE_MODE and not resume and optimizer_from is None
+                and config.valueCoefficient == config.entropyCoefficient == 0
+                and config.cardReferenceKlCoefficient == 0
+                and purchase_reference is None and offered_reference is None,
+                "Actor-only comparisons require fresh purchase Adam, epoch rollback and no other loss.")
     validate_purchase_reference(purchase_reference, contract, update_mode)
     validate_offered_reference(offered_reference, contract, update_mode)
     require(purchase_reference is None or offered_reference is None,
@@ -1067,6 +1130,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 "A custom collection reader must have an inspectable implementation source file.")
         reader_source = {"path": str(Path(source).resolve()), "sha256": file_digest(source)}
     rows, provenance = reader(collection_path, model_path, model, contract=contract)
+    actor_only_identity = None
+    if actor_only is not None:
+        rows, actor_only_identity = actor_only.bind(rows, provenance, file_digest(model_path))
     if reader_source is not None:
         require(file_digest(reader_source["path"]) == reader_source["sha256"]
                 and provenance.get("readerSha256") == reader_source["sha256"],
@@ -1090,6 +1156,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         identity["offeredReferenceObjective"] = asdict(offered_reference)
     if reader_source is not None:
         identity["collectionReaderSource"] = reader_source
+    if actor_only_identity is not None:
+        identity["actorOnlyObjective"] = actor_only_identity
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
     started_path = output / ("block-started.json" if update_mode == CHECKED_PREFIX_MODE
@@ -1131,7 +1199,12 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 "Existing epoch marker belongs to a different purchase update.")
     policy = ResidualPolicy(checkpoint["model"], contract)
     behavior = ResidualPolicy(model, contract)
-    optimizer = torch.optim.Adam(policy.parameters(), lr=config.learningRate, foreach=False)
+    if actor_only is not None:
+        policy.valueWeights.requires_grad_(False)
+        policy.valueBias.requires_grad_(False)
+    parameters = (policy.parameters() if actor_only is None else
+                  [parameter for parameter in policy.parameters() if parameter.requires_grad])
+    optimizer = torch.optim.Adam(parameters, lr=config.learningRate, foreach=False)
     if checkpoint["optimizer"] is not None:
         restore_optimizer(optimizer, checkpoint["optimizer"])
     elif optimizer_from:
@@ -1169,7 +1242,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         before = copy.deepcopy(policy.state_dict())
         old_optimizer = copy.deepcopy(optimizer.state_dict())
         try:
-            fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline)
+            if actor_only is None:
+                fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline)
+            else:
+                fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline,
+                          actor_only=True)
         except ValueError as failure:
             if "elapsed-time budget" not in str(failure):
                 raise
@@ -1208,6 +1285,14 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         report["purchaseReferenceObjective"] = asdict(purchase_reference)
     if offered_reference is not None:
         report["offeredReferenceObjective"] = asdict(offered_reference)
+    if actor_only_identity is not None:
+        require(policy.artifact()["valueWeights"] == model["valueWeights"]
+                and policy.artifact()["valueBias"] == model["valueBias"],
+                "Actor-only optimization must preserve both original value-head parameters.")
+        require(len(optimizer.param_groups) == 1
+                and len(optimizer.param_groups[0]["params"]) == len(PARAMETERS) - 2,
+                "Actor-only Adam must exclude both value-head parameters and their momentum.")
+        report["actorOnlyObjective"] = actor_only_identity
     atomic_json(output / "finished.json", report)
     return report
 
