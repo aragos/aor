@@ -118,7 +118,7 @@ def verify_declaration(corpus):
 
 def encode_state(features, names):
     """Preserve original encoder units and IEEE Float64 values; do not fit normalization."""
-    require(isinstance(features, dict) and set(features) <= set(names),
+    require(isinstance(features, dict) and all(name in names for name in features),
             'A purchase state uses an unknown feature.')
     require(all(type(value) in (int, float) and math.isfinite(value) and abs(value) <= 16
                 for value in features.values()), 'State values must retain the encoder range.')
