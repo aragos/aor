@@ -78,3 +78,10 @@ check legality, privacy, decision coverage, replay and cross-target behavior. St
 make earlier play independent of model changes. [Contributing](contributing.md#opponent-training) owns
 operation; [checks](contributing.md#checks) selects tests. Preserve physical-card/token/marker conservation,
 timing and live/replayed equivalence.
+
+[ExpansionPosition](../core/src/commonMain/kotlin/dev/aragos/aor/ExpansionPosition.kt) provides a
+typed public board/resource transition boundary for diagnostics. It reserves pool and shipping
+through the ordinary placement rules, then resolves explicit Cathedral responses or supplied dice
+through the ordinary competition rules. Fresh follow-up evaluations use the resulting board, stock,
+pool, shipping and used Cathedral pairs. Victories explicitly leave optional continuations unresolved;
+the type does not simulate private cards, marker bonuses or phase progression and is not a planner.
