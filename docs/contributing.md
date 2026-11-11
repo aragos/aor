@@ -154,6 +154,14 @@ terminal returns test that claim. `scripts/analyze_leader_coordination.py` check
 reports origin-level comparisons, preserving the condition that an eligible leader opportunity was
 reached under the unchanged policy.
 
+`PurchaseBoundaryMainKt` is a separate read-only extractor for an already audited coordination bank.
+It replays each retained suffix only to the first controlled-seat shipping/advance decision in a
+strictly later turn, or to terminal if none occurs. It calls the ordinary actor-view purchase encoder
+without a baseline recommendation and writes state-feature rows separately from terminal labels.
+Prefix transition/action counts describe retained work, not a measured runtime speedup. Preparation
+checks source/model-dictionary pins without extracting samples; extraction requires a new output
+directory. This tool cannot choose a policy, generate chance, train a model or evaluate a critic.
+
 ### Bounded human expansion imitation
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic
