@@ -243,13 +243,16 @@ test('the shipped actor retains exact ordinary choices outside its qualified use
     }
 });
 
-test('current rules have fresh qualification and retain exact ordinary F1 binding', () => {
+test('current rules bind qualified F1 token control while preserving the purchase prior', () => {
     assert.equal(purchaseBundle.models.length, 2);
     assert.equal(currentActor.provenance.sourcePolicySha256,
         '62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44');
     const ordinary = baseline.models.find(model => model.rulesVersion === currentActor.rulesVersion);
     assert.deepEqual(currentActor.ordinaryBaseline, {schemaVersion: ordinary.schemaVersion, weights: ordinary.weights});
-    assert.deepEqual(currentActor.ordinaryBaseline, actor.ordinaryBaseline);
+    assert.deepEqual(currentActor.ordinaryBaseline, {
+        ...actor.ordinaryBaseline,
+        weights: {...actor.ordinaryBaseline.weights, 'planning.tokenOrderControl.fixed16To15': 1},
+    });
     assert.equal(currentActor.configuration.drawThreeKeepTwo, false);
     const qualified = currentActor.hybridQualification;
     assert.equal(qualified.initialization.qualificationTransferred, false);
@@ -259,6 +262,19 @@ test('current rules have fresh qualification and retain exact ordinary F1 bindin
             assert.equal(qualified[stage][metric].count, count);
             assert.equal(qualified[stage][metric].qualificationConfidence, .99);
             assert(qualified[stage][metric].lowerConfidence > 0);
+        }
+    }
+    const token = currentActor.tokenOrderQualification;
+    assert.equal(token.control, 'FIXED_16_TO_15');
+    assert.equal(token.qualificationPassed, true);
+    assert.equal(token.humanStrengthVerified, false);
+    for (const pool of [token.ordinaryRivals, token.variedTokenRivals]) {
+        for (const [stage, count] of [['confirm', 2048], ['heldout', 4096]]) {
+            for (const metric of ['winShareDifference', 'rewardDifference']) {
+                assert.equal(pool[stage].metrics[metric].count, count);
+                assert.equal(pool[stage].metrics[metric].qualificationConfidence, .99);
+                assert(pool[stage].metrics[metric].lowerConfidence > 0);
+            }
         }
     }
 });

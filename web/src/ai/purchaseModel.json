@@ -3046,7 +3046,8 @@
           "stabilizeCash": 0.2520252237725352,
           "tokenPreference": 13.25445053241261,
           "tokens": 1.8211396802069946,
-          "windmill": 1.4064759373147095
+          "windmill": 1.4064759373147095,
+          "planning.tokenOrderControl.fixed16To15": 1.0
         }
       },
       "model": {
@@ -240059,6 +240060,151 @@
           {
             "path": "automata-browser-fallback-20261110/run/heldout-report.json",
             "sha256": "6935dec85c5518e650a873e9d9c7ae11bfa2b454be4a0f1ed00066a88a693d4f"
+          }
+        ]
+      },
+      "tokenOrderQualification": {
+        "control": "FIXED_16_TO_15",
+        "modelGate": "planning.tokenOrderControl.fixed16To15",
+        "implementationCommit": "be037e8",
+        "qualificationPassed": true,
+        "humanStrengthVerified": false,
+        "ordinarySourceSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+        "purchasePolicySha256": "62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44",
+        "qualificationConfidence": 0.99,
+        "ordinaryRivals": {
+          "confirm": {
+            "candidateWinShare": 0.56591796875,
+            "canonicalReplays": 8,
+            "incumbentWinShare": 0.3232421875,
+            "metrics": {
+              "rewardDifference": {
+                "count": 2048,
+                "lower95": 0.2069603008258185,
+                "lowerConfidence": 0.1999319521298171,
+                "mean": 0.22932942708333334,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.2516985533408482
+              },
+              "winShareDifference": {
+                "count": 2048,
+                "lower95": 0.21818793745519854,
+                "lowerConfidence": 0.2104938906237869,
+                "mean": 0.24267578125,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.26716362504480146
+              }
+            },
+            "pairs": 2048,
+            "reportSha256": "57950a9576ce2bc50facc7d24288855a68b6e2cd1d17b5c6fbae27532fd83a9b",
+            "resultSha256": "3acd45cbce921e1978a730a2be98a842999bb346c470ff6b19a7bc9d439f343e"
+          },
+          "heldout": {
+            "candidateWinShare": 0.4918212890625,
+            "canonicalReplays": 8,
+            "incumbentWinShare": 0.26220703125,
+            "metrics": {
+              "rewardDifference": {
+                "count": 4096,
+                "lower95": 0.2038111295163571,
+                "lowerConfidence": 0.1990636609084529,
+                "mean": 0.2189208984375,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.23403066735864292
+              },
+              "winShareDifference": {
+                "count": 4096,
+                "lower95": 0.21310312168300713,
+                "lowerConfidence": 0.20791534542615678,
+                "mean": 0.2296142578125,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.24612539394199287
+              }
+            },
+            "pairs": 4096,
+            "reportSha256": "37896b51e71863c8574bc297218b992cb82381a82db82455c3f4eb312c0ea557",
+            "resultSha256": "f6959010cc771e3e77aebc1c9e8cdeb00618db25d581edd1c196f7bbc3432f3e"
+          }
+        },
+        "variedTokenRivals": {
+          "confirm": {
+            "candidateWinShare": 0.310546875,
+            "canonicalReplays": 8,
+            "incumbentWinShare": 0.1279296875,
+            "metrics": {
+              "rewardDifference": {
+                "count": 2048,
+                "lower95": 0.1643395392748727,
+                "lowerConfidence": 0.15813647545683063,
+                "mean": 0.18408203125,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.2038245232251273
+              },
+              "winShareDifference": {
+                "count": 2048,
+                "lower95": 0.16121848909318814,
+                "lowerConfidence": 0.15449504749282084,
+                "mean": 0.1826171875,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.20401588590681186
+              }
+            },
+            "opponentSelectors": [
+              "FIXED_16_TO_15",
+              "FIXED_16_TO_15",
+              "FIXED_16_TO_15",
+              "FIXED_16_TO_15"
+            ],
+            "pairs": 2048,
+            "reportSha256": "57fa1c096b3dca8f63e59be08c6d23d853b19975fb179c15bc2f5f7d2b61fd94",
+            "resultSha256": "1b18de2a4eeea63296511863ebeb42371cc17f7b5b15130c05e285ec9f5e028f",
+            "status": "passed"
+          },
+          "heldout": {
+            "candidateWinShare": 0.3330078125,
+            "canonicalReplays": 8,
+            "incumbentWinShare": 0.1944580078125,
+            "metrics": {
+              "rewardDifference": {
+                "count": 4096,
+                "lower95": 0.122964022976927,
+                "lowerConfidence": 0.11875736964196187,
+                "mean": 0.1363525390625,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.149741055148073
+              },
+              "winShareDifference": {
+                "count": 4096,
+                "lower95": 0.1238020891035203,
+                "lowerConfidence": 0.11916837715606138,
+                "mean": 0.1385498046875,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.1532975202714797
+              }
+            },
+            "opponentSelectors": [
+              "ORDINARY",
+              "FIXED_16_TO_15",
+              "ORDINARY_MINUS_TWO",
+              "ORDINARY",
+              "FIXED_16_TO_15",
+              "ORDINARY_MINUS_TWO"
+            ],
+            "pairs": 4096,
+            "reportSha256": "fdc784d32ab226f8ed2db4a280cc90e770f14f3aaab99c306a08f48f54444175",
+            "resultSha256": "a4a3248fb7dfb5078d4ea24c1440aab21196c9d0387e899c7e3a8eb0faf72285",
+            "status": "passed"
+          }
+        },
+        "scope": "Only this rules-5 four-player profile; varied rivals are the declared ordinary, fixed-16-to-15 and minus-two controls.",
+        "evidence": [
+          {
+            "path": "automata-remote-dispatch-20261110/desktop-completion/fixed-token-qualification-v2-20261110/completion-audit.json",
+            "sha256": "eff06f09e72242522d8f1e7e51dfe543fbbad2c3711cf53d3f66b176b67913c2"
+          },
+          {
+            "path": "automata-remote-dispatch-20261110/population-completion/population-qualification-20261110/completion-audit.json",
+            "sha256": "a1819bc38252f9eba94a8c3c51db9b5ab9684f10c726a858459eafdddfc2605d"
           }
         ]
       }
