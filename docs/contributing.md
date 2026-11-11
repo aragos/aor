@@ -619,10 +619,10 @@ bindings disable the optional actor. Unsupported scopes and unavailable or incom
 the ordinary recommendation. Preserve sampled selection and deterministic retries; changing either
 model or using greedy inference requires qualification of the resulting combination. The asset keeps
 the actor's original provenance and records separate hybrid qualification evidence.
-The supported scope is HARD shipping and advance purchases in existing rules-4 four-player
+The supported scope is HARD shipping and advance purchases in rules-4 and rules-5 four-player
 standard-map games with No Crusades, the deck modification and immediate Master Art discard enabled,
-and draw-three-keep-two disabled. New rules-5 games, other decisions and other setups use the
-compatible baseline until separately qualified.
+and draw-three-keep-two disabled. Each rules version binds its independently qualified actor and
+ordinary model. Other difficulties, decisions and setups use the compatible ordinary policy.
 
 Freeze training budgets, checkpoint-selection rules and unused confirmation worlds before launch.
 Compare complete games against both the unchanged initialization and the qualified baseline, then

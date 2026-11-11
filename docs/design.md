@@ -166,19 +166,20 @@ ordinary weights for Hard `expand` decisions, retaining the existing beam planne
 other difficulties and incomplete entries keep the ordinary policy. Reserved transport keys never
 contribute to ordinary feature scores; support alone does not activate a model or establish its
 qualification.
-The inactive [military model hook](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotMilitaryModel.kt)
+The [military model hook](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotMilitaryModel.kt)
 accepts a unit gate and four absolute card coefficients under `planning.militaryModel.*`.
 It replaces those weights only for Hard play, before any expansion override. Easy and Normal retain
 the ordinary coefficients; missing or incomplete transport data also retains them. Reserved keys
 never contribute to candidate scores. Export must preserve the incumbent raw ordinary weights and
 bind independently qualified military coefficients through this hook, so Hard-only evidence cannot
 change other difficulties. No asset activates the hook merely by including this support.
-The current rules-5 four-player entry combines the independently qualified lambda1 expansion
-coefficients with the fixed token control. Fresh complete-game confirmation and heldout gates compare
-the exact combination against each component separately, with unchanged C purchases and F0 purchase
-prior. The purchase asset binds the complete exported ordinary weights and records the combination
-evidence; legacy entries retain their previous parameters. These comparisons do not establish
-strength against human players.
+The current rules-5 four-player entry combines the independently qualified lambda1 expansion,
+fixed token control and military coefficients. Its purchase actor uses the separately qualified GAE
+checkpoint with the unchanged F0 purchase prior. Fresh complete-game confirmation against mixed
+rivals and heldout evaluation against the complete preceding policy validate this exact checkpoint.
+The purchase asset binds the complete exported ordinary weights and preserves the preceding
+qualification evidence in its provenance; legacy entries retain their previous parameters. These
+comparisons establish neither GAE's superiority over other training methods nor human-level play.
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 

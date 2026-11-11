@@ -9,6 +9,8 @@ const baseline = JSON.parse(readFileSync(new URL('../src/ai/model.json', import.
 const purchaseBundle = JSON.parse(readFileSync(new URL('../src/ai/purchaseModel.json', import.meta.url), 'utf8'));
 const actor = purchaseBundle.models.find(model => model.rulesVersion === 'ah1996-three-epoch-4');
 const currentActor = purchaseBundle.models.find(model => model.rulesVersion === 'ah1996-three-epoch-5');
+const currentParent = currentActor.provenance.parent;
+const gaePolicySha256 = '47f009bd670d1e8f77d10520f8af5e73d3dc96e873cdc7e33658ccae600266c7';
 const configuration = {
     playerCount: 4,
     map: 'STANDARD',
@@ -31,6 +33,13 @@ const expansionWeights = {
     'planning.expansionModel.risk': -6.333220456030338,
     'planning.expansionModel.action.expansion': -0.9230337456001637,
     'planning.expansionModel.action.pass': -0.4816743576485838,
+};
+const militaryWeights = {
+    'planning.militaryModel.enabled': 1,
+    'planning.militaryModel.card.armor': 8.441581297658175,
+    'planning.militaryModel.card.gunpowder': 8.02831771332532,
+    'planning.militaryModel.card.long-bow': 7.375995807614407,
+    'planning.militaryModel.card.stirrups': 8.290650664791212,
 };
 
 // Object keys are sorted recursively; array order and parsed Float64 values are preserved.
@@ -254,18 +263,19 @@ test('the shipped actor retains exact ordinary choices outside its qualified use
     }
 });
 
-test('current rules bind qualified expansion and token controls while preserving the purchase prior', () => {
+test('current rules preserve qualified ordinary controls and the purchase prior', () => {
     assert.equal(purchaseBundle.models.length, 2);
-    assert.equal(currentActor.provenance.sourcePolicySha256,
+    assert.equal(currentParent.provenance.sourcePolicySha256,
         '62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44');
     const ordinary = baseline.models.find(model => model.rulesVersion === currentActor.rulesVersion);
     assert.deepEqual(currentActor.ordinaryBaseline, {schemaVersion: ordinary.schemaVersion, weights: ordinary.weights});
     assert.deepEqual(currentActor.ordinaryBaseline, {
         ...actor.ordinaryBaseline,
-        weights: {...actor.ordinaryBaseline.weights, 'planning.tokenOrderControl.fixed16To15': 1, ...expansionWeights},
+        weights: {...actor.ordinaryBaseline.weights, 'planning.tokenOrderControl.fixed16To15': 1,
+            ...expansionWeights, ...militaryWeights},
     });
     assert.equal(currentActor.configuration.drawThreeKeepTwo, false);
-    const qualified = currentActor.hybridQualification;
+    const qualified = currentParent.hybridQualification;
     assert.equal(qualified.initialization.qualificationTransferred, false);
     assert.equal(qualified.humanStrengthVerified, false);
     for (const [stage, count] of [['confirmation', 2048], ['heldout', 4096]]) {
@@ -275,7 +285,7 @@ test('current rules bind qualified expansion and token controls while preserving
             assert(qualified[stage][metric].lowerConfidence > 0);
         }
     }
-    const token = currentActor.tokenOrderQualification;
+    const token = currentParent.tokenOrderQualification;
     assert.equal(token.control, 'FIXED_16_TO_15');
     assert.equal(token.qualificationPassed, true);
     assert.equal(token.humanStrengthVerified, false);
@@ -290,8 +300,8 @@ test('current rules bind qualified expansion and token controls while preserving
     }
 });
 
-test('the combined current-rules policy passed fresh gates against each component', () => {
-    const qualification = currentActor.expansionTokenQualification;
+test('the parent current-rules policy passed fresh gates against each component', () => {
+    const qualification = currentParent.expansionTokenQualification;
 
     assert.equal(qualification.qualificationPassed, true);
     assert.equal(qualification.qualificationTransferred, false);
@@ -300,7 +310,7 @@ test('the combined current-rules policy passed fresh gates against each componen
     assert.equal(qualification.expansionModelSha256,
         '3b7f677595670972253e8f034fd052178237c1547017c321e33e770e3de176b9');
     assert.equal(qualification.tokenControl, 'FIXED_16_TO_15');
-    assert.equal(qualification.purchasePolicySha256, currentActor.provenance.sourcePolicySha256);
+    assert.equal(qualification.purchasePolicySha256, currentParent.provenance.sourcePolicySha256);
     assert.equal(qualification.frozenPurchasePriorSha256, frozenPurchasePriorSha256);
     assert.equal(qualification.sharedReferenceWorlds, true);
     assert.equal(qualification.comparisonsIndependent, false);
@@ -320,6 +330,50 @@ test('the combined current-rules policy passed fresh gates against each componen
                 assert.equal(reference.metrics[metric].qualificationConfidence, .99);
                 assert(reference.metrics[metric].lowerConfidence > 0);
             }
+        }
+    }
+});
+
+test('the current purchase actor is the exact independently qualified GAE checkpoint', () => {
+    assert.equal(currentActor.provenance.sourcePolicySha256, gaePolicySha256);
+    assert.equal(digest(currentActor.model),
+        '635d4bea49e93c628d9f8997158017663d6fb67aaba622eac6b3bbdcb7c1b1f7');
+    assert.equal(currentActor.provenance.initialPurchasePolicySha256,
+        currentParent.provenance.sourcePolicySha256);
+    assert.equal(currentActor.provenance.trainingGames, 2048);
+    assert.equal(currentActor.provenance.selectedBatch, 8);
+    assert.equal(currentActor.provenance.estimator, 'purchase-gae-1');
+    assert.equal(currentActor.provenance.gamma, 1);
+    assert.equal(currentActor.provenance.lambda, .95);
+    assert.deepEqual(currentActor.baseline, actor.baseline);
+    const qualification = currentActor.hybridQualification;
+    assert.equal(qualification.purchasePolicySha256, gaePolicySha256);
+    assert.equal(qualification.incumbentPurchasePolicySha256, currentParent.provenance.sourcePolicySha256);
+    assert.equal(qualification.qualificationPassed, true);
+    assert.equal(qualification.qualificationTransferred, false);
+    assert.equal(qualification.humanStrengthVerified, false);
+    assert.equal(qualification.difficulty, 'HARD');
+    assert.deepEqual(qualification.scope, {...configuration, drawThreeKeepTwo: false});
+    assert.equal(qualification.frozenPurchasePriorSha256, frozenPurchasePriorSha256);
+    assert.equal(qualification.tokenControl, 'FIXED_16_TO_15');
+    assert.equal(qualification.ordinaryModelSha256,
+        'b7c42a6f347a77c9bd9ff5d29778ea74650a9affe5fdb16738a8bea8d75d17d4');
+    assert.equal(qualification.expansionModelSha256,
+        'feb80d4363a93b266c94bc46e0d75ff4b0cb1f17a55d0f6d77782715862f44ef');
+    assert.deepEqual(qualification.canonicalReplayIndices, [0, 1365, 2730, 4095]);
+    assert(qualification.evidence.some(item => item.path.endsWith('/completion-audit.json')
+        && item.sha256 === '3efe9bb2935c034dcb8166a6ad58f4907533801f84937cd7ae481bcb29c1ace3'));
+    for (const [name, win, reward] of [
+        ['confirm', .030517578125, .028767903645833336],
+        ['heldout', .0330810546875, .03323567708333333],
+    ]) {
+        const stage = qualification.stages[name];
+        assert.equal(stage.winShareDifference.mean, win);
+        assert.equal(stage.rewardDifference.mean, reward);
+        for (const metric of Object.values(stage)) {
+            assert.equal(metric.count, 4096);
+            assert.equal(metric.qualificationConfidence, .99);
+            assert(metric.lowerConfidence > 0);
         }
     }
 });
