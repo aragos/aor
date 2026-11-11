@@ -1,11 +1,8 @@
 package dev.aragos.aor.training
 
-import dev.aragos.aor.DieRoll
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameHeader
-import dev.aragos.aor.GameOutcome
 import dev.aragos.aor.GameState
-import dev.aragos.aor.HandCard
 import dev.aragos.aor.Player
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Prompt
@@ -31,6 +28,7 @@ private constructor(
     initial: GameState,
     private val random: ExperimentRandom,
     private val recordedEntries: MutableList<Entry>?,
+    private val chance: ExperimentChance? = null,
 ) {
     constructor(
         initial: GameState,
@@ -67,6 +65,22 @@ private constructor(
                 state,
                 if (seed == null) random.copy() else ExperimentRandom(seed),
                 recordedEntries?.toMutableList(),
+                chance?.copy(seed),
+            )
+            .also { branch ->
+                branch.decisions = decisions
+                branch.systemTransitions = systemTransitions
+                branch.transitionNanos = transitionNanos
+            }
+
+    /** Start an explicitly versioned, private suffix diagnostic without changing its origin. */
+    internal fun chanceFork(seed: Long, mode: ExperimentChanceMode): ExperimentSession =
+        ExperimentSession(
+                state,
+                ExperimentRandom(seed),
+                mutableListOf(),
+                if (mode == ExperimentChanceMode.LEGACY) null
+                else ExperimentChance(mode, seed, recordTrace = false),
             )
             .also { branch ->
                 branch.decisions = decisions
@@ -126,28 +140,18 @@ private constructor(
         repeat(10000) {
             checkBudget(deadlineNanos)
             val need = (state.prompts().singleOrNull() as? Prompt.System)?.need ?: return
+            val pending =
+                if (need is SystemNeed.Draw) null else chance?.prepare(state, need, random)
+            val requestRandom = pending?.random ?: random
             val outcome =
-                when (need) {
-                    is SystemNeed.Shuffle -> Entry.Shuffle(need.cards.shuffled(random))
-                    is SystemNeed.Draw -> GameOutcome.Draw(need.player, need.reference, need.card)
-                    is SystemNeed.GameRoll ->
-                        GameOutcome.Roll(
-                            need.kind,
-                            List(need.diceCount) { DieRoll(random.nextInt(1, 7)) },
-                            need.players,
-                        )
-                    is SystemNeed.Trade ->
-                        GameOutcome.Trade(
-                            need.owner,
-                            need.recipient,
-                            state
-                                .playerState(need.owner)
-                                .hand
-                                .map(HandCard::reference)
-                                .random(random),
-                        )
-                }
+                ExperimentOutcomes.from(
+                    state,
+                    need,
+                    requestRandom,
+                    chance?.mode == ExperimentChanceMode.LOGICAL_REQUEST_1,
+                )
             stepAuthority(outcome)
+            if (pending != null) chance?.accepted(pending, outcome)
         }
         error("Experiment authority must reach a player decision within 10000 transitions.")
     }
@@ -191,7 +195,7 @@ private constructor(
 }
 
 /** SplitMix64 state is copied explicitly, so branches never share a mutable RNG. */
-private class ExperimentRandom(private var position: Long) : Random() {
+internal class ExperimentRandom(private var position: Long) : Random() {
     fun copy(): ExperimentRandom = ExperimentRandom(position)
 
     override fun nextBits(bitCount: Int): Int {

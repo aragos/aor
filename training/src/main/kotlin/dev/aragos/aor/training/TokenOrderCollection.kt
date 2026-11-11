@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.ai.BotTokenValue
 import dev.aragos.aor.ai.TerritoryEncoder
@@ -215,6 +216,37 @@ internal class TokenOrderCollector(
     private val deadlineNanos: Long,
 ) {
     fun collect(index: Int): TokenOrderOrigin {
+        val captured = capture(index)
+        val session = captured.session ?: return captured.origin
+        val actor = requireNotNull(captured.actor) { "A captured token root requires its actor." }
+        val observation =
+            requireNotNull(captured.origin.observation) {
+                "A captured token root requires its ordinary observation."
+            }
+        val root = TokenValueFrozenRoot(session, actor, captured.commands)
+        val alternatives =
+            captured.origin.proposedIndices.orEmpty().map { action ->
+                val chosen = observation.actions[action].command
+                TokenOrderAlternative(
+                    action,
+                    chosen,
+                    List(specification.continuationReplicates) { replicate ->
+                        val chance =
+                            specification.continuationSeed(captured.origin.gameSeed, replicate)
+                        captured.continuation.finish(
+                            root.branch(chosen, chance, deadlineNanos),
+                            captured.origin.seat,
+                            captured.origin.configuration,
+                            chance,
+                        )
+                    },
+                )
+            }
+        return captured.origin.copy(alternatives = alternatives)
+    }
+
+    /** Reconstruct one original prefix without evaluating any alternative or future stream. */
+    fun capture(index: Int): TokenOrderCapture {
         val lineup = specification.lineup(index)
         val request = specification.request(index)
         val models =
@@ -274,40 +306,38 @@ internal class TokenOrderCollector(
                         )
                     val proposed = TokenOrderPolicy.proposedIndices(ordinary, observation)
                     if (proposed.size >= 2) {
-                        val root = TokenValueFrozenRoot(session, actor, commands)
-                        val alternatives = proposed.map { action ->
-                            val chosen = observation.actions[action].command
-                            TokenOrderAlternative(
-                                action,
-                                chosen,
-                                List(specification.continuationReplicates) { replicate ->
-                                    val chance =
-                                        specification.continuationSeed(lineup.seed, replicate)
-                                    continuation.finish(
-                                        root.branch(chosen, chance, deadlineNanos),
-                                        lineup.seat,
-                                        lineup.configuration.id,
-                                        chance,
-                                    )
-                                },
-                            )
-                        }
-                        return provenance(TokenValueOriginStatus.COLLECTED)
-                            .copy(
-                                actualEpoch = request.epoch,
-                                turn = session.state.turnNumber,
-                                rootDecision = session.decisions,
-                                baselineCommand = command,
-                                observation = observation,
-                                proposedIndices = proposed,
-                                alternatives = alternatives,
-                            )
+                        val origin =
+                            provenance(TokenValueOriginStatus.COLLECTED)
+                                .copy(
+                                    actualEpoch = request.epoch,
+                                    turn = session.state.turnNumber,
+                                    rootDecision = session.decisions,
+                                    baselineCommand = command,
+                                    observation = observation,
+                                    proposedIndices = proposed,
+                                )
+                        return TokenOrderCapture(origin, session, actor, commands, continuation)
                     }
                 }
                 skip = TokenValueSkipReason.PRECOMMITTED_ROOT_INELIGIBLE
             }
             session.apply(commands, deadlineNanos)
         }
-        return provenance(TokenValueOriginStatus.SKIPPED, skip)
+        return TokenOrderCapture(
+            provenance(TokenValueOriginStatus.SKIPPED, skip),
+            null,
+            null,
+            emptyMap(),
+            continuation,
+        )
     }
 }
+
+/** Authority state stays in the executor; only [origin] is suitable for actor-data export. */
+internal data class TokenOrderCapture(
+    val origin: TokenOrderOrigin,
+    val session: ExperimentSession?,
+    val actor: PlayerId?,
+    val commands: Map<PlayerId, String>,
+    val continuation: FrozenPolicyContinuation,
+)
