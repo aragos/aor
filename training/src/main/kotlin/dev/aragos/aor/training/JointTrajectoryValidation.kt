@@ -28,6 +28,7 @@ internal class JointTrajectoryValidation(
                 "purchaseDecisions",
                 "terminal",
             ),
+            if (input.ecology == null) emptySet() else setOf("jointEvidence"),
         )
         require(
             integer(node, "schemaVersion") == 1 &&
@@ -48,6 +49,9 @@ internal class JointTrajectoryValidation(
                 node.required("purchaseModelSha256").asText() == input.bundle.purchase.sha256
         ) {
             "Both joint phase models must belong to the same frozen behavior bundle."
+        }
+        require((input.ecology != null) == node.has("jointEvidence")) {
+            "Only opted-in joint ecology trajectories retain selected-command economic evidence."
         }
         val seat = input.seat(index)
         val steps =
@@ -82,6 +86,9 @@ internal class JointTrajectoryValidation(
             )
         }
         val ordered = (cards + purchases).sortedBy { integer(it, "number") }
+        if (input.ecology != null) {
+            JointDecisionEvidence.validate(node.required("jointEvidence"), ordered)
+        }
         require(
             ordered.zipWithNext().all { (first, second) ->
                 integer(first, "turn") <= integer(second, "turn")

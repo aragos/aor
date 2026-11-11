@@ -14,6 +14,7 @@ internal data class JointCollectionInput(
     val baseline: PurchaseBaselineInput,
     val bundle: JointActorBundle,
     val opponents: List<JointActorBundle>,
+    val ecology: JointEcology? = null,
 ) {
     init {
         require(bundle.card != null) { "The joint learning seat requires both behavior actors." }
@@ -22,7 +23,7 @@ internal data class JointCollectionInput(
         }
         require(
             (opponents + bundle).all {
-                it.configuration == configuration && it.baselineSha256 == baseline.sha256
+                it.configuration == configuration && it.baselineSha256 == purchaseBaseline.sha256
             }
         ) {
             "Every joint role must preserve the same setup and exact F prior."
@@ -36,6 +37,9 @@ internal data class JointCollectionInput(
             "A joint collection requires a bounded, exact arena seed bank."
         }
     }
+
+    val purchaseBaseline: PurchaseBaselineInput
+        get() = ecology?.purchaseBaseline ?: baseline
 
     fun seat(index: Int): Int = index % configuration.playerCount
 
@@ -55,11 +59,15 @@ internal data class JointCollectionInput(
                     bundle.metadata(),
                     opponents.map(JointActorBundle::metadata),
                 )
+                .plus(listOfNotNull(ecology?.identity()))
                 .joinToString("\n")
         )
 
     fun files(): List<Path> =
-        listOf(source, baseline.path) + bundle.files() + opponents.flatMap(JointActorBundle::files)
+        listOf(source, baseline.path) +
+            bundle.files() +
+            opponents.flatMap(JointActorBundle::files) +
+            ecology?.files.orEmpty()
 
     companion object {
         fun read(source: Path): JointCollectionInput {
@@ -78,6 +86,7 @@ internal data class JointCollectionInput(
                     "bundle",
                     "opponents",
                 ),
+                JointEcology.FIELDS,
             )
             require(
                 PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") == 1 &&
@@ -98,19 +107,26 @@ internal data class JointCollectionInput(
                 "Joint games/seed exceed the declared collection bounds."
             }
             fun resolve(text: String): Path = file.parent.resolve(text).normalize().toRealPath()
+            val transfer = ExperimentalRulesTransfer.read(node["experimentalRulesTransfer"])
             val baselinePath = resolve(PurchaseJson.text(node.required("baseline"), "baseline"))
             val baselineHash = PurchaseJson.hash(baselinePath)
             val baseline =
                 PurchaseBaselineInput(
                     baselinePath,
                     baselineHash,
-                    TrainingArtifacts.readModel(baselinePath),
+                    TrainingArtifacts.readModel(baselinePath, transfer),
                 )
+            val opponentPaths = PurchaseJson.strings(node.required("opponents"), "opponents")
+            val ecology =
+                JointEcology.read(file, node, configuration, baseline, opponentPaths.size, games)
             fun bundle(text: String): JointActorBundle =
-                JointActorBundle.read(resolve(text), configuration, baseline)
+                JointActorBundle.read(
+                    resolve(text),
+                    configuration,
+                    ecology?.purchaseBaseline ?: baseline,
+                )
             val own = bundle(PurchaseJson.text(node.required("bundle"), "bundle"))
-            val opponents =
-                PurchaseJson.strings(node.required("opponents"), "opponents").map(::bundle)
+            val opponents = opponentPaths.map(::bundle)
             require(
                 PurchaseJson.hash(file) == hash && PurchaseJson.hash(baselinePath) == baselineHash
             ) {
@@ -125,6 +141,7 @@ internal data class JointCollectionInput(
                 baseline,
                 own,
                 opponents,
+                ecology,
             )
         }
     }

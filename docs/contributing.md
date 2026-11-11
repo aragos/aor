@@ -936,6 +936,27 @@ card play; the learning seat requires both actors.
 python3 scripts/train-opponents.py --mode joint-collect --source joint-collection.json --output .aor-training/joint-data --workers 6 --hours 2
 ```
 
+An explicit `jointStateChronology: "joint-state-chronology-1"` research profile separates the
+ordinary/card `baseline` from `sharedPurchaseBaseline`, which remains the exact prior pinned by
+both purchase bundles. It requires the complete expansion/token roles described above. Legacy
+sources retain their original single-prior behavior. This profile currently omits canonical replay
+indices; a data campaign must separately declare its reproduction procedure before collection.
+
+The profile emits a complete phase-prefixed state dictionary and one chronological state sidecar
+per origin. Features copy only existing encoder state values in their original units; absolute
+decision numbers, turns and phase identifiers remain metadata. Terminal labels, sampled commands,
+probabilities and economic quotes are separate artifacts. Empty phases and entirely empty origins
+remain present. Physical-card/Pass coverage groups protection variants and reports independent-world
+counts; gross Printed Word rebates, protection cash and individual marginal leader credits retain
+separate attribution. The default sampler and reward are unchanged. These sidecars are a data
+prerequisite, not an opt-in to the older joint updater or a new cross-phase learning algorithm.
+
+`--mode joint-state-schema --configuration ID --output DIRECTORY` exports both complete public
+encoder dictionaries and their shared state dictionary without games. Initialize a fresh card head
+with `card_policy.py initialize`: its seeded representation and zero actor head preserve the 97%
+ordinary recommendation prior; greedy parity does not make stochastic collection identical to the
+ordinary policy. Freeze the initialization seed and all model bytes before examining coverage.
+
 The [joint updater](../scripts/joint_trajectory.py) reads the same completed origins and terminal
 labels for both phases, including games with an empty phase array. It keeps separate Adam states
 and fits both actors against their original behavior bundle before publishing the next pair.

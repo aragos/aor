@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import dev.aragos.aor.ai.BotDifficulty
 
 /**
@@ -20,6 +21,8 @@ internal data class JointGameTrajectory(
     val cardDecisions: List<CardDecisionRecord>,
     val purchaseDecisions: List<PurchaseDecisionRecord>,
     val terminal: PurchaseTerminal,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val jointEvidence: List<JointDecisionEvidence>? = null,
 )
 
 /** No callback can expose opponent-private observations or persist an interrupted game's labels. */
@@ -35,16 +38,40 @@ internal class JointCollector(
         val seat = input.seat(index)
         val cards = mutableListOf<CardDecisionRecord>()
         val purchases = mutableListOf<PurchaseDecisionRecord>()
+        val evidence = mutableListOf<JointDecisionEvidence>()
         val opponents = input.opponentIndices(index)
         val controllers =
             opponents.indices.associateWith { player ->
                 val bundle =
                     if (player == seat) input.bundle else input.opponents[opponents[player]]
                 bundle.controller(
-                    input.baseline,
+                    input.purchaseBaseline,
+                    ordinary = input.baseline.model,
                     cardRecord = if (player == seat) ({ cards.add(it) }) else null,
                     purchaseRecord = if (player == seat) ({ purchases.add(it) }) else null,
                 )
+            }
+        val composed = input.ecology?.controllers(input, index, controllers) ?: controllers
+        val observed =
+            if (input.ecology == null) {
+                composed
+            } else {
+                val previous =
+                    requireNotNull(composed[seat]) {
+                        "Joint evidence requires its controlled actor."
+                    }
+                composed +
+                    (seat to
+                        object : SimulationController {
+                            override fun controls(decision: String): Boolean =
+                                previous.controls(decision)
+
+                            override fun choose(decision: SimulationDecision): String? {
+                                val chosen = previous.choose(decision) ?: return null
+                                JointDecisionEvidence.from(decision, chosen)?.let(evidence::add)
+                                return chosen
+                            }
+                        })
             }
         val game =
             Simulation()
@@ -56,7 +83,7 @@ internal class JointCollector(
                             Competitor(input.baseline.model, BotDifficulty.HARD)
                         },
                     deadlineNanos = deadlineNanos,
-                    controllers = controllers,
+                    controllers = observed,
                 )
         return JointGameTrajectory(
             signature = signature,
@@ -72,6 +99,7 @@ internal class JointCollector(
             purchaseModelSha256 = input.bundle.purchase.sha256,
             cardDecisions = cards.toList(),
             purchaseDecisions = purchases.toList(),
+            jointEvidence = if (input.ecology == null) null else evidence.toList(),
             terminal =
                 PurchaseTerminal(
                     game.reward(seat),

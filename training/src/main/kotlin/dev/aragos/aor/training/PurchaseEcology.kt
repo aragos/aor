@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.BotModel
 import java.nio.file.Path
 
 /**
@@ -37,19 +38,35 @@ private constructor(
         index: Int,
         purchase: Map<Int, SimulationController>,
     ): Map<Int, SimulationController> {
-        val playerCount = input.configuration.playerCount
-        val seat = input.seat(index)
-        val indices = input.opponentIndices(index)
+        return controllers(
+            input.configuration.playerCount,
+            input.seat(index),
+            input.opponentIndices(index),
+            input.baseline.model,
+            input.opponents.map { it.model },
+            purchase,
+        )
+    }
+
+    /** Compose the same disjoint overlays around an explicitly supplied typed actor bundle. */
+    fun controllers(
+        playerCount: Int,
+        seat: Int,
+        indices: List<Int>,
+        ordinary: BotModel,
+        opponents: List<BotModel>,
+        purchase: Map<Int, SimulationController>,
+    ): Map<Int, SimulationController> {
         val expansions = expansion.controllers(playerCount, seat, ArenaSide.CANDIDATE, indices)
         val tokenControllers =
             tokens.opponentControllers(
                 playerCount,
                 seat,
                 indices,
-                input.opponents.map { it.model },
+                opponents,
             ) +
                 listOfNotNull(
-                        tokens.controller(ArenaSide.CANDIDATE, input.baseline.model)?.let {
+                        tokens.controller(ArenaSide.CANDIDATE, ordinary)?.let {
                             seat to it
                         }
                     )
@@ -80,6 +97,7 @@ private constructor(
             baseline: PurchaseBaselineInput,
             opponents: List<PurchaseBaselineInput>,
             games: Int,
+            requireReplayIndices: Boolean = true,
         ): PurchaseEcology? {
             if (!node.has("continuationProtocol")) {
                 require(
@@ -116,11 +134,18 @@ private constructor(
             val tokens = ArenaTokenOrderPolicy.read(source, tokenNode)
             tokens.validate(listOf(configuration), opponents.size)
             val indices =
-                PurchaseJson.array(node.required("replayIndices"), "replayIndices").map {
-                    PurchaseJson.integer(it, "purchase replay index")
+                if (!requireReplayIndices) {
+                    require(!node.has("replayIndices")) {
+                        "This typed collection does not declare canonical replay indices."
+                    }
+                    emptyList()
+                } else {
+                    PurchaseJson.array(node.required("replayIndices"), "replayIndices").map {
+                        PurchaseJson.integer(it, "purchase replay index")
+                    }
                 }
             require(
-                indices.size in 1..8 &&
+                (!requireReplayIndices || indices.size in 1..8) &&
                     indices.distinct() == indices &&
                     indices.all { it in 0 until games }
             ) {

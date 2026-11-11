@@ -66,6 +66,13 @@ internal class JointCollectionStore(
         immutableJson("collection.json", manifest())
         snapshot("source.json", input.source, input.sourceSha256)
         snapshot("baseline.json", input.baseline.path, input.baseline.sha256)
+        input.ecology?.snapshot(artifacts)
+        input.ecology?.let {
+            immutableJson(
+                "joint-state-dictionary.json",
+                JointStateChronology.from(input).metadata(),
+            )
+        }
         snapshotBundle("", input.bundle)
         input.opponents.forEachIndexed { index, bundle ->
             snapshotBundle("opponent-$index-", bundle)
@@ -103,19 +110,30 @@ internal class JointCollectionStore(
                 "Completed joint game bytes must match their immutable completion manifest."
             }
         }
-        return input.seeds.indices.filterTo(mutableSetOf()) { index ->
-            val record =
-                CardTrajectoryFiles.readIfPresent(directory.resolve("game-$index.json.gz"))
-                    ?: return@filterTo false
-            validation.validate(record, index)
-            true
+        val completed =
+            input.seeds.indices.filterTo(mutableSetOf()) { index ->
+                val record =
+                    CardTrajectoryFiles.readIfPresent(directory.resolve("game-$index.json.gz"))
+                        ?: return@filterTo false
+                validation.validate(record, index)
+                stateSidecars(record, index)
+                true
+            }
+        if (finished != null) {
+            sidecarHashes().forEach { (name, hashes) ->
+                require(finished[name] == PurchaseJson.mapper.valueToTree<JsonNode>(hashes)) {
+                    "Completed joint sidecar bytes must match their immutable completion manifest."
+                }
+            }
         }
+        return completed
     }
 
     fun save(game: JointGameTrajectory) {
         val document = PurchaseJson.mapper.valueToTree<JsonNode>(game)
         validation.validate(document, game.index)
         CardTrajectoryFiles.save(directory.resolve("game-${game.index}.json.gz"), document)
+        stateSidecars(document, game.index)
     }
 
     fun progress(phase: String, completed: Int) {
@@ -141,6 +159,7 @@ internal class JointCollectionStore(
                         "A completed collection requires every game."
                     }
                 validation.validate(record, index)
+                stateSidecars(record, index)
                 val terminal = record.required("terminal")
                 Totals(
                     terminal.required("reward").doubleValue(),
@@ -163,11 +182,49 @@ internal class JointCollectionStore(
                     "controlledDecisions" to totals.sumOf(Totals::decisions),
                 ),
         )
+        if (input.ecology != null) {
+            val coverage =
+                input.seeds.indices.map { index ->
+                    PurchaseJson.read(directory.resolve("joint-coverage-$index.json"))
+                        .required("worldCoverage")
+                }
+            immutableJson(
+                "joint-coverage-summary.json",
+                identity +
+                    mapOf(
+                        "independentWorlds" to coverage.size,
+                        "worldCounts" to
+                            coverage.first().fieldNames().asSequence().associateWith { name ->
+                                coverage.count { it.required(name).booleanValue() }
+                            },
+                        "interpretation" to
+                            "Counts use independent origins; repeated decisions and protection variants are not independent worlds.",
+                    ),
+            )
+        }
         immutableJson(
             "finished.json",
-            identity + mapOf("games" to totals.size, "gameSha256" to hashes),
+            identity + mapOf("games" to totals.size, "gameSha256" to hashes) + sidecarHashes(),
         )
         progress("complete", totals.size)
+    }
+
+    private fun sidecarHashes(): Map<String, Any> {
+        if (input.ecology == null) return emptyMap()
+        return mapOf(
+                "jointStateSha256" to "state",
+                "jointLabelSha256" to "label",
+                "jointCoverageSha256" to "coverage",
+            )
+            .mapValues { (_, kind) ->
+                input.seeds.indices.map {
+                    PurchaseJson.hash(directory.resolve("joint-$kind-$it.json"))
+                }
+            } +
+            mapOf(
+                "jointCoverageSummarySha256" to
+                    PurchaseJson.hash(directory.resolve("joint-coverage-summary.json"))
+            )
     }
 
     private fun manifest(): Map<String, Any?> =
@@ -194,7 +251,38 @@ internal class JointCollectionStore(
                 "controlledSeat" to "index % playerCount",
                 "opponentRotation" to "(index / playerCount + seat) % opponentCount",
                 "reward" to ".8 * winShare + .2 * rankReward",
+            ) +
+            input.ecology?.metadata().orEmpty()
+
+    private fun stateSidecars(game: JsonNode, index: Int) {
+        if (input.ecology == null) return
+        val provenance =
+            mapOf(
+                "version" to JointEcology.VERSION,
+                "signature" to signature,
+                "originIndex" to index,
+                "sourceGameSha256" to PurchaseJson.hash(directory.resolve("game-$index.json.gz")),
+                "dictionarySha256" to
+                    PurchaseJson.hash(directory.resolve("joint-state-dictionary.json")),
             )
+        val rows = JointStateChronology.from(input).project(game)
+        immutableJson("joint-state-$index.json", provenance + mapOf("rows" to rows))
+        immutableJson(
+            "joint-label-$index.json",
+            provenance + mapOf("terminal" to game.required("terminal")),
+        )
+        immutableJson(
+            "joint-coverage-$index.json",
+            provenance +
+                JointExplorationCoverage.project(
+                    game,
+                    requireNotNull(input.bundle.card) {
+                            "The joint learner retains its card actor."
+                        }
+                        .model,
+                ),
+        )
+    }
 
     private fun snapshotBundle(prefix: String, bundle: JointActorBundle) {
         snapshot("${prefix}bundle.json", bundle.path, bundle.sha256)

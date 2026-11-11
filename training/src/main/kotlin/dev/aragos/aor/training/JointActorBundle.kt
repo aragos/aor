@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.PublicCatalog
+import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.CardFeatureDictionary
 import dev.aragos.aor.ai.CardObservationEncoder
 import dev.aragos.aor.ai.CardPolicy
@@ -85,14 +86,16 @@ internal data class JointActorBundle(
         baseline: PurchaseBaselineInput,
         cardRecord: ((CardDecisionRecord) -> Unit)? = null,
         purchaseRecord: ((PurchaseDecisionRecord) -> Unit)? = null,
+        ordinary: dev.aragos.aor.ai.BotModel = baseline.model,
     ): CardActorController {
         require(baseline.sha256 == baselineSha256) { "A joint actor requires its exact F prior." }
         return CardActorController(
-            baseline.model,
+            ordinary,
             card?.model,
             purchase.model,
             record = cardRecord,
             purchaseRecord = purchaseRecord,
+            purchaseBaseline = baseline.model,
         )
     }
 
