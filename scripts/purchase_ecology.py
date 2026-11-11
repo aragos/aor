@@ -279,9 +279,13 @@ def verify_purchase_roles(source, directory, reports):
             'Historical screen replay changed its exact purchase actor roles or archived bytes.')
 
 
-def arena_replays(protocol, source_path, pairs, output, *, expected_expansion=data.E):
+def arena_replays(protocol, source_path, pairs, output, *, expected_expansion=data.E,
+                  rival_ecology=data.ArenaRivalEcology.MIXED, indices=(0, 170, 341, 511)):
+    require(len(indices) == 4 and len(set(indices)) == 4
+            and all(type(index) is int and 0 <= index < len(pairs) for index in indices),
+            'Declare four distinct historical replay indices within the completed paired bank.')
     source, receipts = read(source_path), []
-    for index in (0, 170, 341, 511):
+    for index in indices:
         for side in ('candidate', 'incumbent'):
             target = output/f'{index}-{side}'
             require(not target.exists(), 'Canonical screen replay permits one attempt.')
@@ -302,7 +306,7 @@ def arena_replays(protocol, source_path, pairs, output, *, expected_expansion=da
                     and search.same_game(replay['game'], pairs[index][side]),
                     'Canonical purchase-screen replay changed the original historical game.')
             data.verify_overlays(source, target, [native, state], arena=True,
-                                 expected_expansion=expected_expansion)
+                                 expected_expansion=expected_expansion, rival_ecology=rival_ecology)
             verify_purchase_roles(source, target, [native, state])
             receipts.append(dict(index=index, side=side, replaySha256=sha(target/'replay.json')))
     return receipts

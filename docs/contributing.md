@@ -843,6 +843,17 @@ bounded comparison; sparse terminal rewards do not guarantee a TD advantage. For
 [DouZero section5.5](https://proceedings.mlr.press/v139/zha21a/zha21a.pdf) found no clear TD benefit in
 its reported card-game comparison. Neither result establishes which estimator works better here.
 
+The [fixed purchase qualification](../scripts/purchase_gae_qualification.py) can independently
+validate one explicitly frozen final actor after the exploratory pilot. It discloses that selection;
+passing validates the exact policy, not the superiority of GAE over Monte Carlo. It performs no
+fitting, reselection, top-ups or automatic successor runs. The first fresh4096-pair bank preserves
+the pilot's mixed qualified rival roles. Both win-share and reward normal99% lower bounds must be
+strictly positive before opening a second fresh4096-pair bank whose rivals all use the qualified
+expansion, token and ordinary components with C64 purchases. The same dual gate is required there.
+The controlled incumbent and F0 prior remain identical in both banks. Eight prospective historical
+side replays per bank verify exact outcomes; qualifying evidence does not activate an application
+profile or establish human-level strength.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It

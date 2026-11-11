@@ -3,6 +3,7 @@
 Environment provenance never becomes a learner input. The existing purchase reader
 still recomputes every action, likelihood and value from actor-visible observations.
 """
+from enum import Enum
 from pathlib import Path
 
 import automata_experiments as exp
@@ -21,21 +22,34 @@ ROLES = ['F1', 'E', 'T', 'E+T']
 FIXED = 'FIXED_16_TO_15'
 
 
-def bindings(expansion, *, arena=False):
+class ArenaRivalEcology(Enum):
+    MIXED = 'mixed-qualified-1'
+    HOMOGENEOUS = 'homogeneous-qualified-1'
+
+
+def bindings(expansion, *, arena=False, rival_ecology=ArenaRivalEcology.MIXED):
     """Role arrays follow ordinary opponent indices, never rotating seat positions."""
+    require(isinstance(rival_ecology, ArenaRivalEcology)
+            and (arena or rival_ecology is ArenaRivalEcology.MIXED),
+            'Explicit homogeneous rivals are supported only by an arena, not collection.')
     models = dict(candidateModel=str(expansion), opponentModels=[None, str(expansion), None, str(expansion)])
     tokens = dict(candidateSelector=FIXED, opponentSelectors=['ORDINARY', 'ORDINARY', FIXED, FIXED])
+    if rival_ecology is ArenaRivalEcology.HOMOGENEOUS:
+        models['opponentModels'] = [str(expansion)] * 4
+        tokens['opponentSelectors'] = [FIXED] * 4
     if arena:
         models['incumbentModel'] = str(expansion)
         tokens['incumbentSelector'] = FIXED
     return dict(expansionImitation=models, tokenOrder=tokens)
 
 
-def verify_overlays(source, directory, reports, *, arena=False, expected_expansion=E):
+def verify_overlays(source, directory, reports, *, arena=False, expected_expansion=E,
+                    rival_ecology=ArenaRivalEcology.MIXED):
     directory = Path(directory)
     expansion = source['expansionImitation']['candidateModel']
-    require(all(source.get(key) == value for key, value in bindings(expansion, arena=arena).items()),
-            'Purchase adaptation must preserve exact E+T and indexed F1/E/T/E+T rival roles.')
+    require(all(source.get(key) == value for key, value in
+                bindings(expansion, arena=arena, rival_ecology=rival_ecology).items()),
+            'Purchase evaluation must preserve the exact controlled and declared rival roles.')
     require(sha(expansion) == expected_expansion,
             'The expansion owner must retain its exact declared qualified bytes.')
     metadata = dict(version='expansion-imitation-1', decision='expand', featureNames=FEATURES)
