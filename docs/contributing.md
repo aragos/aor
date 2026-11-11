@@ -772,6 +772,21 @@ labels, and exact canonical histories. It creates no new origin worlds and canno
 indices or overwrite a prior reproduction. Its `reproduction.json` and `finished.json` receipts
 establish mechanical reproducibility, not playing strength.
 
+[`purchase_ecology.py`](../scripts/purchase_ecology.py) defines a separate descriptive adaptation
+pilot: eight 256-game on-policy batches, an explicitly fresh Adam optimizer followed by exact
+checkpoint carry, and the unchanged purchase PPO recipe. Only the controlled shipping/advance actor
+learns. Ordinary policy, expansion, token control, purchase prior and rival purchase actors remain
+frozen, with rival roles indexed explicitly. Three consecutive updates accepting no epochs stop
+the pilot. Completed trajectories are reproduced before fitting and losslessly archived afterward.
+
+Checkpoints four and eight are frozen before either is screened on the same 512 paired worlds.
+Their incumbent games must match exactly, and each screen includes eight canonical historical
+replays. Both screens are descriptive; neither selects a production model or opens qualification.
+The [supervisor](../scripts/purchase_ecology_campaign.py) permits one four-hour attempt with six
+simulation workers and a separate, pinned one-thread CPU numerical environment. Its exact-child
+preflight validates interpreter, packages, environment and process sampling before freezing the
+campaign. A new experiment requires its own audited world/update seeds and reviewed input package.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It
