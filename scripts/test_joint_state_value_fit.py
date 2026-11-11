@@ -279,7 +279,7 @@ class FitterSeamTests(unittest.TestCase):
 
 
 class SyntheticPipelineTests(unittest.TestCase):
-    def test_two_fits_select_before_test_and_never_predict_nonselected_arm(self):
+    def run_pipeline(self, root, prediction_hook=None):
         # The production dimensions/splits are exercised, but almost all synthetic worlds have
         # no decisions. Only six invented rows are fitted; no retained files enter this test.
         phases = [[] for _ in range(4096)]
@@ -292,31 +292,63 @@ class SyntheticPipelineTests(unittest.TestCase):
         cache.feature_names = joint_names
         declaration = dict(corpus(['training']*3072 + ['validation']*512 + ['test']*512),
                            stateFeatureNames=joint_names, dictionarySha256='synthetic-dictionary')
+        checkpoint = root/'synthetic.pt'
+        original = benchmark.Critic((64,), 71).state_dict()
+        torch.save(original, checkpoint)
+        output = root/'fit'
         actual_predict = benchmark.predict
+
+        def inspect_prediction(model, cache, games, device, guard, **kwargs):
+            if prediction_hook is not None:
+                prediction_hook(model, games, output)
+            return actual_predict(model, cache, games, device, guard, **kwargs)
+
+        with patch.object(joint, 'REFRESHED_SHA', data.sha(checkpoint)), \
+                patch.object(benchmark, 'predict', side_effect=inspect_prediction):
+            report = joint.fit(cache, declaration, output, data.Config(), lambda: None,
+                torch.device('cpu'), purchase_names=purchase_names, joint_names=joint_names,
+                critic_path=checkpoint)
+        return report, original, purchase_names, joint_names
+
+    def test_two_fits_select_before_test_and_never_predict_nonselected_arm(self):
         test_models = []
+
+        def inspect(model, games, output):
+            if any(game >= 3584 for game in games):
+                self.assertTrue((output/'selected.json').is_file())
+                test_models.append(model)
+
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            checkpoint = root/'synthetic.pt'
-            torch.save(benchmark.Critic((64,), 71).state_dict(), checkpoint)
-            output = root/'fit'
-
-            def inspect_prediction(model, cache, games, device, guard, **kwargs):
-                if any(game >= 3584 for game in games):
-                    self.assertTrue((output/'selected.json').is_file())
-                    test_models.append(model)
-                return actual_predict(model, cache, games, device, guard, **kwargs)
-
-            with patch.object(joint, 'REFRESHED_SHA', data.sha(checkpoint)), \
-                    patch.object(benchmark, 'predict', side_effect=inspect_prediction):
-                report = joint.fit(cache, declaration, output, data.Config(), lambda: None,
-                    torch.device('cpu'), purchase_names=purchase_names, joint_names=joint_names,
-                    critic_path=checkpoint)
+            report, *_ = self.run_pipeline(root, inspect)
             self.assertEqual(len(test_models), 1)
             self.assertEqual(report['nonselectedTestEvaluations'], 0)
             self.assertEqual(report['testWorlds'], 512)
             self.assertEqual(report['models']['selected']['phaseBalanced']['excludedWorlds'], 510)
-            self.assertEqual(data.read(output/'finished.json')['actualFits'], 2)
+            self.assertEqual(data.read(root/'fit/finished.json')['actualFits'], 2)
             self.assertFalse(report['qualificationPassed'])
+
+    def test_source_checkpoint_and_expanded_initializer_have_distinct_bound_identities(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            report, *_ = self.run_pipeline(root)
+            selection = data.read(root/'fit/selected.json')
+            expected = dict(path='warm-expanded-initial.pt',
+                sha256=data.sha(root/'fit/warm-expanded-initial.pt'),
+                dictionarySha256='synthetic-dictionary', seed=data.Config().smallSeed)
+            self.assertEqual(selection['warmSourceCheckpointSha256'], data.sha(root/'synthetic.pt'))
+            self.assertEqual(selection['warmExpandedInitial'], expected)
+            self.assertEqual(report['warmExpandedInitial'], expected)
+            self.assertEqual(report['warmSourceCheckpointSha256'], selection['warmSourceCheckpointSha256'])
+            self.assertNotIn('warmInitialSha256', selection)
+
+    def test_saved_warm_initializer_is_the_exact_expanded_tensor_state(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, original, purchase_names, joint_names = self.run_pipeline(root)
+            actual = torch.load(root/'fit/warm-expanded-initial.pt', map_location='cpu', weights_only=True)
+            expected = joint.expand_warm_state(original, purchase_names, joint_names, data.Config().smallSeed)
+            self.assertTrue(all(torch.equal(value, expected[key]) for key, value in actual.items()))
 
 
 if __name__ == '__main__':

@@ -205,6 +205,12 @@ def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_n
     parity = warm_purchase_parity(original, warm, purchase_names, joint_names, synthetic)
     output.mkdir(parents=True)
     data.document(output/'warm-synthetic-parity.json', parity)
+    expanded_path = output/'warm-expanded-initial.pt'
+    torch.save(warm, expanded_path)
+    expanded_identity = dict(path=expanded_path.name, sha256=data.sha(expanded_path),
+        dictionarySha256=corpus['dictionarySha256'], seed=config.smallSeed)
+    # Fit the exact serialized expanded tensor state whose identity is published below.
+    warm = torch.load(expanded_path, map_location='cpu', weights_only=True)
     weights = phase_row_weights(cache)
     models, receipts = {}, {}
     for name, seed in [('warm', config.smallSeed), ('fresh', config.largeSeed)]:
@@ -214,8 +220,11 @@ def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_n
             input_count=len(joint_names), training_row_weights=weights,
             validation_errors=phase_balanced_errors)
     arm = selected_arm(receipts)
+    data.require(data.sha(expanded_path) == expanded_identity['sha256'],
+                 'The expanded warm initializer changed during fitting.')
     selection = dict(kind=KIND, arm=arm, fits=receipts,
-        selectedSha256=receipts[arm]['modelSha256'], warmInitialSha256=REFRESHED_SHA,
+        selectedSha256=receipts[arm]['modelSha256'], warmSourceCheckpointSha256=REFRESHED_SHA,
+        warmExpandedInitial=expanded_identity,
         dictionarySha256=corpus['dictionarySha256'], inputCount=len(joint_names),
         config=asdict(config), testInspected=False,
         selection='Lowest validation phase-balanced whole-world MSE; earlier epoch, then warm ties.',
@@ -237,6 +246,7 @@ def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_n
     data.document(output/'test-game-metrics.json', records)
     report = dict(kind=KIND, selectedArm=arm, selectedSha256=selection['selectedSha256'],
         refreshedPurchaseSha256=REFRESHED_SHA, selectionSha256=data.sha(output/'selected.json'),
+        warmSourceCheckpointSha256=REFRESHED_SHA, warmExpandedInitial=expanded_identity,
         testWorlds=len(games), models=metrics, comparisons=comparisons,
         primaryComparison='phaseBalanced.selected-minus-stitched',
         cardTrainingWorldMean=constant, cardConstantTrainingWorlds=constant_worlds,
