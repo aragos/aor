@@ -9,6 +9,9 @@ internal class JointEcology(
     private val phases: PurchaseEcology,
     private val transfer: ExperimentalRulesTransfer?,
 ) {
+    val replayIndices: List<Int>
+        get() = phases.replayIndices
+
     val files: List<Path>
         get() = listOf(purchaseBaseline.path) + phases.inputPaths
 
@@ -59,6 +62,7 @@ internal class JointEcology(
                 "continuationProtocol",
                 "expansionImitation",
                 "tokenOrder",
+                "replayIndices",
             )
 
         fun read(
@@ -104,7 +108,7 @@ internal class JointEcology(
                         ordinary,
                         List(opponentCount) { ordinary },
                         games,
-                        requireReplayIndices = false,
+                        requireReplayIndices = node.has("replayIndices"),
                     )
                 ) {
                     "Joint ecology requires complete explicit expansion and token roles."

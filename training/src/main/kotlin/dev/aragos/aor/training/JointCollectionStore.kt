@@ -63,7 +63,7 @@ internal class JointCollectionStore(
             startedAt = Instant.now()
             progress("initialized", 0)
         }
-        immutableJson("collection.json", manifest())
+        immutableJson("collection.json", manifest(input, signature))
         snapshot("source.json", input.source, input.sourceSha256)
         snapshot("baseline.json", input.baseline.path, input.baseline.sha256)
         input.ecology?.snapshot(artifacts)
@@ -132,8 +132,24 @@ internal class JointCollectionStore(
     fun save(game: JointGameTrajectory) {
         val document = PurchaseJson.mapper.valueToTree<JsonNode>(game)
         validation.validate(document, game.index)
+        val expectedReplay = game.index in input.ecology?.replayIndices.orEmpty()
+        require(expectedReplay == (game.canonicalReplay != null)) {
+            "Only prospectively declared joint origins retain canonical replay histories."
+        }
         CardTrajectoryFiles.save(directory.resolve("game-${game.index}.json.gz"), document)
         stateSidecars(document, game.index)
+        game.canonicalReplay?.let { replay ->
+            immutableJson(
+                "replay-${game.index}.json",
+                replayDocument(
+                    signature,
+                    game.index,
+                    PurchaseJson.hash(directory.resolve("game-${game.index}.json.gz")),
+                    replay,
+                ),
+            )
+        }
+        validateReplay(game.index)
     }
 
     fun progress(phase: String, completed: Int) {
@@ -160,6 +176,7 @@ internal class JointCollectionStore(
                     }
                 validation.validate(record, index)
                 stateSidecars(record, index)
+                validateReplay(index)
                 val terminal = record.required("terminal")
                 Totals(
                     terminal.required("reward").doubleValue(),
@@ -222,37 +239,15 @@ internal class JointCollectionStore(
                 }
             } +
             mapOf(
+                "canonicalReplaySha256" to
+                    input.ecology.replayIndices.associate { index ->
+                        "replay-$index.json" to
+                            PurchaseJson.hash(directory.resolve("replay-$index.json"))
+                    },
                 "jointCoverageSummarySha256" to
-                    PurchaseJson.hash(directory.resolve("joint-coverage-summary.json"))
+                    PurchaseJson.hash(directory.resolve("joint-coverage-summary.json")),
             )
     }
-
-    private fun manifest(): Map<String, Any?> =
-        identity +
-            mapOf(
-                "schemaVersion" to 1,
-                "trajectoryEncoding" to CardTrajectoryFiles.ENCODING,
-                "mode" to "on-policy",
-                "rulesVersion" to RULES_VERSION,
-                "dataVersion" to DATA_VERSION,
-                "source" to input.source.toString(),
-                "sourceSha256" to input.sourceSha256,
-                "configuration" to input.configuration.id,
-                "games" to input.seeds.size,
-                "seed" to input.seed,
-                "seeds" to input.seeds,
-                "baseline" to
-                    mapOf(
-                        "path" to input.baseline.path.toString(),
-                        "sha256" to input.baseline.sha256,
-                    ),
-                "bundle" to input.bundle.metadata(),
-                "opponents" to input.opponents.map(JointActorBundle::metadata),
-                "controlledSeat" to "index % playerCount",
-                "opponentRotation" to "(index / playerCount + seat) % opponentCount",
-                "reward" to ".8 * winShare + .2 * rankReward",
-            ) +
-            input.ecology?.metadata().orEmpty()
 
     private fun stateSidecars(game: JsonNode, index: Int) {
         if (input.ecology == null) return
@@ -320,5 +315,70 @@ internal class JointCollectionStore(
         } finally {
             Files.deleteIfExists(temporary)
         }
+    }
+
+    private fun validateReplay(index: Int) {
+        if (index !in input.ecology?.replayIndices.orEmpty()) return
+        val replay =
+            requireNotNull(readIfPresent("replay-$index.json")) {
+                "A declared joint history is required."
+            }
+        require(
+            replay["kind"]?.asText() == "joint-canonical-replay-1" &&
+                replay["signature"]?.asText() == signature &&
+                replay["index"]?.intValue() == index &&
+                replay["trajectorySha256"]?.asText() ==
+                    PurchaseJson.hash(directory.resolve("game-$index.json.gz")) &&
+                replay["replayVerified"]?.booleanValue() == true &&
+                replay["header"]?.isObject == true &&
+                replay["entries"]?.isArray == true
+        ) {
+            "A joint canonical history must bind its exact original trajectory."
+        }
+    }
+
+    companion object {
+        internal fun manifest(input: JointCollectionInput, signature: String): Map<String, Any?> =
+            mapOf("kind" to "joint-collect", "signature" to signature) +
+                mapOf(
+                    "schemaVersion" to 1,
+                    "trajectoryEncoding" to CardTrajectoryFiles.ENCODING,
+                    "mode" to "on-policy",
+                    "rulesVersion" to RULES_VERSION,
+                    "dataVersion" to DATA_VERSION,
+                    "source" to input.source.toString(),
+                    "sourceSha256" to input.sourceSha256,
+                    "configuration" to input.configuration.id,
+                    "games" to input.seeds.size,
+                    "seed" to input.seed,
+                    "seeds" to input.seeds,
+                    "baseline" to
+                        mapOf(
+                            "path" to input.baseline.path.toString(),
+                            "sha256" to input.baseline.sha256,
+                        ),
+                    "bundle" to input.bundle.metadata(),
+                    "opponents" to input.opponents.map(JointActorBundle::metadata),
+                    "controlledSeat" to "index % playerCount",
+                    "opponentRotation" to "(index / playerCount + seat) % opponentCount",
+                    "reward" to ".8 * winShare + .2 * rankReward",
+                ) +
+                input.ecology?.metadata().orEmpty()
+
+        internal fun replayDocument(
+            signature: String,
+            index: Int,
+            trajectoryHash: String,
+            replay: PurchaseCanonicalReplay,
+        ): Map<String, Any> =
+            mapOf(
+                "kind" to "joint-canonical-replay-1",
+                "signature" to signature,
+                "index" to index,
+                "trajectorySha256" to trajectoryHash,
+                "replayVerified" to true,
+                "header" to replay.header,
+                "entries" to replay.entries,
+            )
     }
 }
