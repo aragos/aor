@@ -27,6 +27,16 @@ import kotlin.test.assertFailsWith
 
 class PurchasePrivilegedPrefixTest {
     @Test
+    fun originalCanonicalHeaderRetainsStrongPlayerIdentifiers() {
+        val original = state().header
+        val stored = PurchaseJson.mapper.valueToTree<JsonNode>(original)
+
+        val decoded = PurchasePrivilegedFiles.header(stored)
+
+        assertThat(decoded).isEqualTo(original)
+    }
+
+    @Test
     fun privateCountsUseRelativeSeatsAndExcludeOwnCardsAndReferences() {
         val state =
             state()

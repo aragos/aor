@@ -187,11 +187,17 @@ internal object PurchasePrivilegedFiles {
     fun header(node: JsonNode): GameHeader =
         GameHeader(
             node.required("players").map {
-                Player(PlayerId(it.required("id").asText()), it.required("name").asText())
+                Player(playerId(it.required("id")), it.required("name").asText())
             },
-            PlayerId(node.required("creatorId").asText()),
+            playerId(node.required("creatorId")),
             node.required("rulesVersion").asText(),
             node.required("dataVersion").asText(),
             node.required("drawRenaissanceFromTurn").asInt(),
         )
+
+    /** PurchaseJson stores the original strong identifier as an object, not a string alias. */
+    private fun playerId(node: JsonNode): PlayerId {
+        PurchaseJson.fields(node, setOf("value"))
+        return PlayerId(PurchaseJson.text(node.required("value"), "player identifier"))
+    }
 }
