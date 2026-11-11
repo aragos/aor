@@ -596,7 +596,7 @@ def clipped_policy_loss(log_probability, old_log_probability, advantage, clip):
 
 @dataclass(frozen=True)
 class ActorOnlyObjective:
-    """Purchase-only baseline comparison, with a fresh optimizer and frozen value head.
+    """Purchase-only baseline comparison, with explicit optimizer lineage and frozen value head.
 
     External predictions are made before either update, keyed by immutable game bytes and
     decision number. They never replace the recorded behavior value or likelihood. Shared
@@ -1230,7 +1230,7 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 and config.valueCoefficient == config.entropyCoefficient == 0
                 and config.cardReferenceKlCoefficient == 0
                 and purchase_reference is None and offered_reference is None,
-                "Actor-only comparisons require fresh purchase Adam, epoch rollback and no other loss.")
+                "Actor-only comparisons require fresh purchase Adam or typed continuation, epoch rollback and no other loss.")
     require(actor_optimizer_continuation is None or
             (isinstance(actor_optimizer_continuation, ActorAdamContinuation)
              and actor_only is not None and optimizer_from is not None and not resume),
