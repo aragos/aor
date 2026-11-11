@@ -26,13 +26,20 @@ def origin(collection, index, chunk, dictionary, policy_bindings):
         game = json.load(stream)
     state, labels, coverage = [read(path) for path in paths[1:]]
     signature = read(collection / 'collection.json')['signature']
+    return origin_records((game,state,labels,coverage),index,chunk,dictionary,policy_bindings,signature,
+                          {name:sha(path) for name,path in zip(names,paths)})
+
+
+def origin_records(records,index,chunk,dictionary,policy_bindings,signature,member_hashes):
+    """The same pure state/provenance check for bounded streaming audits of archived worlds."""
+    game,state,labels,coverage=records
     require(game['index'] == index and game['gameSeed'] == chunk['seeds'][index]
             and game['controlledSeat'] == index % 4 and game['configuration'] == exp.CONFIGURATION
             and game['signature'] == signature and game['bundleSha256'] == policy_bindings['bundleSha256']
             and game['cardModelSha256'] == policy_bindings['cardModelSha256']
             and game['purchaseModelSha256'] == policy_bindings['purchaseModelSha256'],
             'Joint origin, role or frozen actor identity changed.')
-    game_hash = sha(paths[0])
+    game_hash = member_hashes[world_members(index)[0]]
     for item in (state, labels, coverage):
         require(item['version'] == 'joint-state-chronology-1' and item['signature'] == signature
                 and item['originIndex'] == index and item['sourceGameSha256'] == game_hash
@@ -60,7 +67,7 @@ def origin(collection, index, chunk, dictionary, policy_bindings):
     return dict(id=256*(chunk['index']-1)+index, originKey=f'chunk-{chunk["index"]:02d}/origin-{index:03d}',
         batch=chunk['index'],index=index,split=chunk['split'],gameSeed=game['gameSeed'],seat=index%4,
         decisions=len(expected),nonzeros=sum(value != 0 for row in expected for value in row['stateFeatures'].values()),
-        phaseCounts=counts,sourceGameSha256=game_hash,files={name:sha(path) for name,path in zip(names,paths)})
+        phaseCounts=counts,sourceGameSha256=game_hash,files=member_hashes)
 
 
 def completed_files(directory, expected_games, replay_index):
