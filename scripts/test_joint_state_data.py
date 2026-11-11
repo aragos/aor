@@ -66,6 +66,10 @@ class CorpusTest(unittest.TestCase):
         row=self.origin();self.assertEqual(0,row['id']);self.assertEqual('chunk-01/origin-000',row['originKey'])
         self.assertEqual(dict(CARD=1,PURCHASE=1),row['phaseCounts']);self.assertEqual(2,row['nonzeros'])
         self.assertNotIn('reward',row);self.assertNotIn('private-action',str(row))
+    def test_sparse_entry_count_preserves_explicit_zero_values(self):
+        self.game['cardDecisions'][0]['observation']['stateFeatures']['cash']=0
+        self.write_game()
+        self.assertEqual(2,self.origin()['nonzeros'])
     def test_empty_phases_retain_the_world_without_rows(self):
         self.game.update(cardDecisions=[],purchaseDecisions=[]);self.write_game()
         self.assertEqual(0,self.origin()['decisions']);self.assertEqual(dict(CARD=0,PURCHASE=0),self.origin()['phaseCounts'])

@@ -66,7 +66,7 @@ def origin_records(records,index,chunk,dictionary,policy_bindings,signature,memb
             and coverage['purchaseDecisions']==counts['PURCHASE'], 'Coverage must preserve empty phases/worlds.')
     return dict(id=256*(chunk['index']-1)+index, originKey=f'chunk-{chunk["index"]:02d}/origin-{index:03d}',
         batch=chunk['index'],index=index,split=chunk['split'],gameSeed=game['gameSeed'],seat=index%4,
-        decisions=len(expected),nonzeros=sum(value != 0 for row in expected for value in row['stateFeatures'].values()),
+        decisions=len(expected),nonzeros=sum(len(row['stateFeatures']) for row in expected),
         phaseCounts=counts,sourceGameSha256=game_hash,files=member_hashes)
 
 
