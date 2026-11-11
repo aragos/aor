@@ -229,6 +229,17 @@ internal class TokenOrderCollector(
     private val deadlineNanos: Long,
 ) {
     fun collect(index: Int): TokenOrderOrigin {
+        val captured = capture(index)
+        if (captured.pending == null) return captured.origin
+        val actions =
+            requireNotNull(captured.origin.proposedIndices) {
+                "A captured token root retains its original proposals."
+            }
+        return captured.origin.copy(alternatives = finish(captured, actions))
+    }
+
+    /** Reproduce only the historical prefix, leaving every complete-game branch unopened. */
+    fun capture(index: Int): TokenOrderCapture {
         val lineup = specification.lineup(index)
         val request = specification.request(index)
         val models =
@@ -297,44 +308,63 @@ internal class TokenOrderCollector(
                     }
                     if (proposed.size >= 2) {
                         val root = TokenValueFrozenRoot(session, actor, commands)
-                        val alternatives = proposed.map { action ->
-                            val chosen = observation.actions[action].command
-                            TokenOrderAlternative(
-                                action,
-                                chosen,
-                                List(specification.continuationReplicates) { replicate ->
-                                    val chance =
-                                        specification.continuationSeed(lineup.seed, replicate)
-                                    continuation.finish(
-                                        root.branch(chosen, chance, deadlineNanos),
-                                        lineup.seat,
-                                        lineup.configuration.id,
-                                        chance,
-                                    )
-                                },
-                            )
-                        }
-                        return provenance(TokenValueOriginStatus.COLLECTED)
-                            .copy(
-                                actualEpoch = request.epoch,
-                                turn = session.state.turnNumber,
-                                rootDecision = session.decisions,
-                                baselineCommand = command,
-                                referenceIndex =
-                                    reference.takeIf {
-                                        specification.reference ==
-                                            TokenOrderReference.FIXED_16_TO_15
-                                    },
-                                observation = observation,
-                                proposedIndices = proposed,
-                                alternatives = alternatives,
-                            )
+                        return TokenOrderCapture(
+                            provenance(TokenValueOriginStatus.COLLECTED)
+                                .copy(
+                                    actualEpoch = request.epoch,
+                                    turn = session.state.turnNumber,
+                                    rootDecision = session.decisions,
+                                    baselineCommand = command,
+                                    referenceIndex =
+                                        reference.takeIf {
+                                            specification.reference ==
+                                                TokenOrderReference.FIXED_16_TO_15
+                                        },
+                                    observation = observation,
+                                    proposedIndices = proposed,
+                                ),
+                            TokenOrderPending(root, ordinary, continuation),
+                        )
                     }
                 }
                 skip = TokenValueSkipReason.PRECOMMITTED_ROOT_INELIGIBLE
             }
             session.apply(commands, deadlineNanos)
         }
-        return provenance(TokenValueOriginStatus.SKIPPED, skip)
+        return TokenOrderCapture(provenance(TokenValueOriginStatus.SKIPPED, skip), null)
+    }
+
+    /** Execute only explicitly requested offered branches under the original paired streams. */
+    fun finish(captured: TokenOrderCapture, actions: List<Int>): List<TokenOrderAlternative> {
+        val pending =
+            requireNotNull(captured.pending) {
+                "A skipped token origin cannot generate continuation labels."
+            }
+        val observation =
+            requireNotNull(captured.origin.observation) {
+                "A captured token root retains its public action observation."
+            }
+        require(
+            actions.distinct() == actions && actions.all { it in observation.actions.indices }
+        ) {
+            "Requested continuation actions must be distinct authoritative offered indices."
+        }
+        val lineup = specification.lineup(captured.origin.index)
+        return actions.map { action ->
+            val command = observation.actions[action].command
+            TokenOrderAlternative(
+                action,
+                command,
+                List(specification.continuationReplicates) { replicate ->
+                    val chance = specification.continuationSeed(lineup.seed, replicate)
+                    pending.continuation.finish(
+                        pending.frozen.branch(command, chance, deadlineNanos),
+                        lineup.seat,
+                        lineup.configuration.id,
+                        chance,
+                    )
+                },
+            )
+        }
     }
 }

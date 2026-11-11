@@ -116,6 +116,9 @@ future policy. The `MODEL_FIXED_T_RESIDUAL` selector requires a tagged
 `token-order-fixed-reference-residual-1` artifact and retains fixed T unless an original proposal
 beats it by more than `.02`. Ordinary selectors reject this envelope, and residual selectors reject
 untagged Q models. Rebased ordinary-continuation labels cannot establish fixed-T continuation values.
+The existing eight-tail fitter opts into this contract with `--fixed-reference`; all five exported
+heads use the tagged envelope, and the frozen basis, penalties and admission rules stay unchanged.
+
 The separately tagged `MODEL_FIXED_T_REFERENCE_NEIGHBORS` experiment keeps that ordinary encoded
 baseline and fixed-T fallback. When they differ, proposals are ordinary, fixed T, its offered integer
 neighbors, then the existing diverse proposals with stable deduplication; otherwise the old proposal
@@ -123,8 +126,16 @@ order is exact. Its `token-order-reference-neighbor-residual-1` envelope require
 proposal and selector versions and cannot be substituted for the older residual artifact. A zero
 head still follows fixed T. Experimental rival selectors `FIXED_16_TO_14` and `FIXED_16_TO_13` change
 only an ordinary bid of 16 when their exact target is offered; all other bids remain unchanged.
-The existing eight-tail fitter opts into this contract with `--fixed-reference`; all five exported
-heads use the tagged envelope, and the frozen basis, penalties and admission rules stay unchanged.
+
+`TokenOrderNeighborMainKt` prepares or augments a completed fixed-T bank using a separately pinned
+source and metadata-only missing-action plan. Preparation opens no worlds. Augmentation reconstructs
+only prefixes needing a new action, requires exact original request/observation/reference metadata,
+then runs only missing branches on their original eight paired streams. Sidecars preserve every
+original root, including skips, and retain old outcomes by their unchanged parent file hashes.
+Reproduction opens only predeclared new branches; it does not rerun reference outcomes. Historical
+source relocation requires explicit aliases, exact model bytes and original runtime fingerprints;
+simulation core bytes and unlisted policy classes must remain identical. Reused validation is
+development evidence only. New whole-game gates are required before any qualification claim.
 
 ### Bounded human expansion imitation
 

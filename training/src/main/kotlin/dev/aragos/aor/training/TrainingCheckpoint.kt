@@ -71,8 +71,6 @@ data class TrainingCheckpoint(
  * Fingerprint the actual packaged policy, so resuming cannot mix incompatible feature definitions.
  */
 fun trainingSignature(configuration: String): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    digest.update("$RULES_VERSION\n$DATA_VERSION\n$configuration\n".toByteArray())
     val locations =
         listOf(
                 BotPolicy::class.java,
@@ -81,6 +79,15 @@ fun trainingSignature(configuration: String): String {
             )
             .map { Path.of(it.protectionDomain.codeSource.location.toURI()) }
             .distinct()
+    return trainingSignature(configuration, locations)
+}
+
+/**
+ * Explicit historical-runtime fingerprint; callers must pin and validate all supplied artifacts.
+ */
+internal fun trainingSignature(configuration: String, locations: List<Path>): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    digest.update("$RULES_VERSION\n$DATA_VERSION\n$configuration\n".toByteArray())
     for (location in locations) {
         if (Files.isRegularFile(location)) {
             Files.newInputStream(location).use { input ->

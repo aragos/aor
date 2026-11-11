@@ -109,24 +109,43 @@ object TokenOrderReproduction {
         val files: Map<String, String>,
     )
 
-    internal fun read(directory: Path): Input {
+    internal fun read(directory: Path): Input =
+        readWithSignature(directory, signatureFor = TokenOrderCollectionMain::signature)
+
+    /** Explicit, separately pinned augmentation compatibility; the legacy reader remains strict. */
+    internal fun readParent(
+        directory: Path,
+        runtime: TokenOrderParentRuntime,
+        source: TokenOrderParentSource,
+    ): Input =
+        readWithSignature(directory, source) { specification, sourceHash ->
+            runtime.signature(specification, sourceHash)
+        }
+
+    private fun readWithSignature(
+        directory: Path,
+        historical: TokenOrderParentSource? = null,
+        signatureFor: (TokenOrderSpecification, String) -> String,
+    ): Input {
         val manifest = PurchaseJson.read(directory.resolve("dataset.json"))
         val finished = PurchaseJson.read(directory.resolve("finished.json"))
         val run = PurchaseJson.read(directory.resolve("run.json"))
         val state = PurchaseJson.read(directory.resolve("state.json"))
-        val source = Path.of(PurchaseJson.text(manifest.required("source"), "collection source"))
-        val sourceHash = PurchaseJson.hash(source)
+        val source =
+            historical?.originalPath
+                ?: Path.of(PurchaseJson.text(manifest.required("source"), "collection source"))
+        val sourceHash = historical?.originalSha256 ?: PurchaseJson.hash(source)
         require(
             sourceHash == manifest["sourceSha256"]?.asText() &&
                 sourceHash == PurchaseJson.hash(directory.resolve("source.json"))
         ) {
             "Reproduction requires the unchanged original source and its completed snapshot."
         }
-        val specification = TokenOrderSpecification.read(source)
+        val specification = historical?.specification ?: TokenOrderSpecification.read(source)
         require(specification.continuationProtocol != null) {
             "Token reproduction requires the explicit arena continuation protocol."
         }
-        val signature = TokenOrderCollectionMain.signature(specification, sourceHash)
+        val signature = signatureFor(specification, sourceHash)
         val expectedRun =
             (manifest.deepCopy<JsonNode>() as ObjectNode).apply {
                 remove(listOf("complete", "counts"))
@@ -153,7 +172,8 @@ object TokenOrderReproduction {
             )
         require(
             inputs.all { (key, value) ->
-                manifest[key] == PurchaseJson.mapper.valueToTree<JsonNode>(value)
+                val metadata = PurchaseJson.mapper.valueToTree<JsonNode>(value)
+                manifest[key] == (historical?.originalMetadata(metadata) ?: metadata)
             }
         ) {
             "Completed token continuation, reference, prospective requests or overlay bindings changed."
