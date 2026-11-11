@@ -51,8 +51,9 @@ class FrozenC64(nn.Module):
                              @ self.valueWeights+self.valueBias)
 
 
-def configure():
-    torch.set_num_threads(2)
+def configure(*, threads=2):
+    data.require(type(threads) is int and threads > 0, 'The numerical thread count must be positive.')
+    torch.set_num_threads(threads)
     torch.set_num_interop_threads(1)
     torch.use_deterministic_algorithms(True)
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -93,9 +94,17 @@ def per_game_mse(predictions, cache, games):
                        for g in games], dtype=np.float64)
 
 
-def fit_one(name, widths, seed, cache, corpus, output, config, guard, device, *, initial_state=None):
-    """One fit, best validation epoch only; never accesses test indices or test metrics."""
-    model = Critic(widths, seed).to(device)
+def fit_one(name, widths, seed, cache, corpus, output, config, guard, device, *, initial_state=None,
+            input_count=None, training_row_weights=None, validation_errors=None):
+    """One validation-selected fit; omitted options preserve the purchase-only recipe.
+
+    Explicit row weights sum to one per represented training world. Empty worlds remain in the
+    corpus but not in weighted batches. An optional error callback returns one finite error per
+    represented validation world; it never receives training or test world identifiers.
+    """
+    inputs = data.STATE_COUNT if input_count is None else input_count
+    data.require(type(inputs) is int and inputs > 0, 'The critic input count must be positive.')
+    model = Critic(widths, seed, inputs=inputs).to(device)
     if initial_state is not None:
         # Explicit weight-only warm start; Adam below always starts without moments.
         model.load_state_dict(initial_state, strict=True)
@@ -106,10 +115,23 @@ def fit_one(name, widths, seed, cache, corpus, output, config, guard, device, *,
     data.require(set(training).isdisjoint(validation), 'Whole-game model selection cannot overlap training.')
     a = cache.arrays
     lengths = a['stops']-a['starts']
+    if training_row_weights is not None:
+        training_row_weights = np.asarray(training_row_weights, dtype=np.float64)
+        data.require(training_row_weights.shape == a['rowGame'].shape
+                     and np.isfinite(training_row_weights).all()
+                     and (training_row_weights >= 0).all(), 'Explicit row weights must be finite and nonnegative.')
+        training = [game for game in training if lengths[game] > 0]
+        validation = [game for game in validation if lengths[game] > 0]
+        data.require(training and validation, 'Training and validation each need a represented world.')
+        data.require(all(np.isclose(training_row_weights[int(a['starts'][game]):int(a['stops'][game])].sum(),
+                                    1., rtol=0, atol=1e-12) for game in training),
+                     'Explicit training row weights must total one per represented world.')
     history = []
     best = None
     started = time.monotonic()
-    torch.cuda.reset_peak_memory_stats(device)
+    cuda = torch.device(device).type == 'cuda'
+    if cuda:
+        torch.cuda.reset_peak_memory_stats(device)
     for epoch in range(config.epochs):
         guard()
         model.train()
@@ -123,13 +145,20 @@ def fit_one(name, widths, seed, cache, corpus, output, config, guard, device, *,
                 owners = a['rowGame'][rows]
                 x = torch.from_numpy(cache.dense(rows)).to(device)
                 targets = torch.tensor(a['reward'][owners], dtype=torch.float32, device=device)
-                weights = torch.tensor(game_weights(owners, lengths), dtype=torch.float32, device=device)
+                row_weights = (game_weights(owners, lengths) if training_row_weights is None
+                               else training_row_weights[rows])
+                weights = torch.tensor(row_weights, dtype=torch.float32, device=device)
                 losses = (model(x)-targets).square()*weights
                 (losses.sum()/len(games)).backward()
                 squared_error += float(losses.detach().sum())
             optimizer.step()
         predictions = predict(model, cache, validation, device, guard, maximum=config.maximumDenseRows)
-        validation_mse = float(per_game_mse(predictions, cache, validation).mean())
+        errors = (per_game_mse(predictions, cache, validation) if validation_errors is None
+                  else np.asarray(validation_errors(predictions, cache, validation), dtype=np.float64))
+        if validation_errors is not None:
+            data.require(errors.shape == (len(validation),) and np.isfinite(errors).all(),
+                         'Validation errors must cover each represented world exactly once.')
+        validation_mse = float(errors.mean())
         record = dict(epoch=epoch+1, trainingMse=squared_error/len(training),
                       validationMse=validation_mse, elapsedSeconds=time.monotonic()-started)
         history.append(record)
@@ -139,10 +168,12 @@ def fit_one(name, widths, seed, cache, corpus, output, config, guard, device, *,
             torch.save({key: value.detach().cpu() for key, value in model.state_dict().items()},
                        output/(name+'-best.pt'))
         data.document(output/(name+f'-epoch-{epoch+1:02}.json'), record)
-    torch.cuda.synchronize(device)
+    if cuda:
+        torch.cuda.synchronize(device)
     receipt = dict(name=name, widths=list(widths), seed=seed, parameterCount=sum(p.numel() for p in model.parameters()),
                    optimizer='Adam', config=asdict(config), best=best, history=history,
-                   elapsedSeconds=time.monotonic()-started, peakCudaBytes=torch.cuda.max_memory_allocated(device),
+                   elapsedSeconds=time.monotonic()-started,
+                   peakCudaBytes=torch.cuda.max_memory_allocated(device) if cuda else 0,
                    modelSha256=data.sha(output/(name+'-best.pt')), testInspected=False,
                    dtype='float32', amp=False, tf32=False, qualificationPassed=False)
     data.document(output/(name+'-fit.json'), receipt)
