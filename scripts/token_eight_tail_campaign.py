@@ -1,5 +1,6 @@
 """Exact pure-supervisor preflight and one bounded eight-tail token experiment."""
 import argparse
+import importlib
 import json
 import os
 from pathlib import Path
@@ -9,12 +10,42 @@ import sys
 import time
 
 import automata_campaign as controller
-import automata_token_eight_tail as target
+import automata_token_eight_tail as legacy_target
 
-exp,read,sha,document,require = target.exp,target.read,target.sha,target.document,target.require
+exp,read,sha,document,require = (legacy_target.exp,legacy_target.read,legacy_target.sha,
+                               legacy_target.document,legacy_target.require)
 DYNAMIC_ENV = {'AOR_CAMPAIGN_OUTPUT','AOR_CAMPAIGN_STAGE_ID','AOR_CAMPAIGN_DEADLINE_EPOCH',
                'AOR_CAMPAIGN_STAGE_DEADLINE_EPOCH'}
-STAGES = target.STAGES
+NEIGHBOR_KIND = 'token-reference-neighbor-campaign-1'
+
+
+def target_for(protocol):
+    """Explicit dispatch; legacy protocols keep their original target and scientific contract."""
+    if protocol['kind'] == NEIGHBOR_KIND:
+        return importlib.import_module('automata_token_reference_neighbors')
+    require(protocol['kind'] in (legacy_target.KIND, legacy_target.fixed.CAMPAIGN_KIND),
+            'Unknown explicitly versioned token campaign profile.')
+    return legacy_target
+
+
+def target_script(protocol):
+    return ('automata_token_reference_neighbors.py' if protocol['kind'] == NEIGHBOR_KIND
+            else 'automata_token_eight_tail.py')
+
+
+def allocation_for(protocol):
+    if protocol['kind'] == NEIGHBOR_KIND:
+        return {'thisWorkers':10,'otherDesktopWorkers':0,'desktopLogicalCpus':16}
+    if legacy_target.fixed_reference(protocol):
+        return {'thisWorkers':6,'host':'mac','logicalCpus':os.cpu_count(),'otherMacWorkers':0}
+    return {'thisWorkers':6,'otherDesktopWorkers':10,'desktopLogicalCpus':16}
+
+
+def numerical_inspector(protocol):
+    owner = target_for(protocol).numerical_environment(protocol)
+    if protocol['kind'] == NEIGHBOR_KIND:
+        return owner.inspect_numerical
+    return owner.inspect if legacy_target.fixed_reference(protocol) else owner.inspect_numerical
 
 
 def verify_execution(protocol,path,output):
@@ -33,7 +64,10 @@ def verify_execution(protocol,path,output):
             'Frozen eight-tail token child environment changed.')
     for path,digest in protocol['frozenFiles'].items():
         require(sha(path) == digest,'Frozen eight-tail token package input changed: '+path)
-    for name in ('scripts','runtime','inputs','audit','evidence','sources'):
+    directories = ('scripts','runtime','inputs','audit','evidence','sources')
+    if protocol['kind'] == NEIGHBOR_KIND:
+        directories += ('parent',)
+    for name in directories:
         actual = {str(path) for path in (root/name).rglob('*') if path.is_file()}
         declared = {path for path in protocol['frozenFiles'] if Path(path).is_relative_to(root/name)}
         require(actual == declared,'Unexpected or missing eight-tail token package files in '+name)
@@ -42,23 +76,23 @@ def verify_execution(protocol,path,output):
 
 
 def campaign_spec(root,protocol,files):
+    target = target_for(protocol)
+    stages = target.STAGES
     return dict(schemaVersion=1,kind='automata-campaign',inputs=files,
         limits=dict(maximumSeconds=21600,maximumDataBytes=4*exp.GIB,maximumRssBytes=4*exp.GIB,minimumFreeBytes=2*exp.GIB),
-        stages=[dict(id=name,dependsOn=[] if index == 0 else [STAGES[index-1]],
+        stages=[dict(id=name,dependsOn=[] if index == 0 else [stages[index-1]],
             maximumSeconds=target.CEILINGS[index],maximumAttempts=1,result=f'results/{name}.json',
-            command=[protocol['python']['executable'],'-E','-s','-S','-B',str(root/'scripts/automata_token_eight_tail.py'),'stage',
+            command=[protocol['python']['executable'],'-E','-s','-S','-B',str(root/'scripts'/target_script(protocol)),'stage',
                      '--protocol',str(root/'protocol.json'),'--output','{output}','--stage',name])
-            for index,name in enumerate(STAGES)])
+            for index,name in enumerate(stages)])
 
 
 def preflight_child(path,output):
     protocol = read(path)
     verify_execution(protocol,path,output)
-    target.validate_inputs(protocol)
+    target_for(protocol).validate_inputs(protocol)
     require(not output.exists(),'Preflight must run before any eight-tail token campaign attempt.')
-    numerical = target.numerical_environment(protocol)
-    inspect = numerical.inspect if target.fixed_reference(protocol) else numerical.inspect_numerical
-    require(inspect(protocol['numerical']['executable']) == protocol['numerical'],
+    require(numerical_inspector(protocol)(protocol['numerical']['executable']) == protocol['numerical'],
             'The exact clean child must reproduce its separately pinned CPU numerical environment.')
     samples = controller.processes.sample_group(os.getpgrp())
     own = [sample for sample in samples if sample.pid == os.getpid()]
@@ -71,7 +105,7 @@ def external_child_preflight(root,path):
     protocol = read(path)
     deadline = time.time()+21600
     environment = dict(protocol['environment']['variables'],AOR_CAMPAIGN_OUTPUT=str(root/'run'),
-        AOR_CAMPAIGN_STAGE_ID='collect',AOR_CAMPAIGN_DEADLINE_EPOCH=str(deadline),
+        AOR_CAMPAIGN_STAGE_ID=target_for(protocol).STAGES[0],AOR_CAMPAIGN_DEADLINE_EPOCH=str(deadline),
         AOR_CAMPAIGN_STAGE_DEADLINE_EPOCH=str(deadline))
     command = [protocol['python']['executable'],'-E','-s','-S','-B',str(root/'scripts/token_eight_tail_campaign.py'),
                'preflight-child','--protocol',str(path),'--output',str(root/'run')]
@@ -83,7 +117,7 @@ def external_child_preflight(root,path):
             'Exact eight-tail token preflight did not verify the current protocol.')
     return dict(passed=True,checkedAt=time.time(),command=command,protocolSha256=sha(path),
         environmentSha256=sha(root/'environment.json'),verifierSha256=sha(root/'scripts/token_eight_tail_campaign.py'),
-        validatorSha256=sha(root/'scripts/automata_token_eight_tail.py'),childResult=result,
+        validatorSha256=sha(root/'scripts'/target_script(protocol)),childResult=result,
         stdout=child.stdout,stderr=child.stderr,nativeGames=0)
 
 
@@ -120,7 +154,7 @@ def freeze(root):
             and preflight['protocolSha256'] == sha(root/'preflight-protocol.json')
             and preflight['environmentSha256'] == sha(root/'environment.json')
             and preflight['verifierSha256'] == sha(root/'scripts/token_eight_tail_campaign.py')
-            and preflight['validatorSha256'] == sha(root/'scripts/automata_token_eight_tail.py'),
+            and preflight['validatorSha256'] == sha(root/'scripts'/target_script(protocol)),
             'Freeze requires exact successful child/sampler validation of this package.')
     previous = read(root/'preflight-protocol.json')
     require({k:v for k,v in previous.items() if k != 'frozenFiles'} == protocol,
@@ -128,7 +162,7 @@ def freeze(root):
     for path,digest in previous['frozenFiles'].items():
         require(sha(path) == digest,'A preflight input changed before freeze: '+path)
     protocol['frozenFiles'] = input_files(root,protocol)
-    target.validate_inputs(protocol)
+    target_for(protocol).validate_inputs(protocol)
     document(root/'protocol.json',protocol)
     spec = campaign_spec(root,protocol,dict(protocol['frozenFiles'],**{str(root/'protocol.json'):sha(root/'protocol.json')}))
     controller.validate_spec(spec,root/'run')
@@ -143,15 +177,13 @@ def run(root,options):
     os.environ.clear()
     os.environ.update(protocol['environment']['variables'])
     verify_execution(protocol,root/'protocol.json',root/'run')
-    target.validate_inputs(protocol)
+    target_for(protocol).validate_inputs(protocol)
     expected = campaign_spec(root,protocol,dict(protocol['frozenFiles'],**{str(root/'protocol.json'):options.protocol_sha}))
     require(read(root/'campaign.json') == expected,'Adaptive-token commands, limits or input pins changed.')
     require(not (root/'run').exists(),'One eight-tail token attempt only; no automatic recovery, resume or new campaign.')
-    allocation = ({'thisWorkers':6,'host':'mac','logicalCpus':os.cpu_count(),'otherMacWorkers':0}
-                  if target.fixed_reference(protocol) else
-                  {'thisWorkers':6,'otherDesktopWorkers':10,'desktopLogicalCpus':16})
+    allocation = allocation_for(protocol)
     require(protocol['executionAllocation'] == allocation,
-            'The six-worker experiment must retain its separately reviewed host allocation.')
+            'The experiment must retain its separately reviewed host allocation.')
     document(root/'launch-child-preflight.json',external_child_preflight(root,root/'protocol.json'))
     return controller.main(['--spec',str(root/'campaign.json'),'--output',str(root/'run')])
 
