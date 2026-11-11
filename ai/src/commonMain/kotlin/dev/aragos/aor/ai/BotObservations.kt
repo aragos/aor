@@ -77,10 +77,8 @@ private class ObservationProjection(
     private val catalog =
         requireNotNull(view.catalog) { "Bot observations require a public catalog." }
     private val provinces = catalog.provinces.associateBy(ProvinceDefinition::id)
-    private val endgame =
-        if (view.endingTriggered) 1.0
-        else if (view.currentEpoch == 3) (1.0 - view.deckRemaining / 18.0).coerceIn(0.0, 1.0)
-        else 0.0
+    private val featureContext = BotFeatureContext.from(view)
+    private val endgame = featureContext.endgame
     private val stabilization = (view.stabilizationCost ?: 0L).toDouble()
     private val economic by lazy(LazyThreadSafetyMode.NONE) { BotEconomicProjection(view, seat) }
     private val purchases by lazy(LazyThreadSafetyMode.NONE) { BotPurchaseProjection(view, seat) }
@@ -88,17 +86,6 @@ private class ObservationProjection(
         lazy(LazyThreadSafetyMode.NONE) {
             BotTokenValueProjection(view, seat, endgame)
         }
-    private val conditions =
-        listOf(
-            "count.${view.players.size}",
-            "epoch.${view.currentEpoch}",
-            "map.${view.rules.map.commandValue}",
-            "initial.${view.rules.initialCard.commandValue}",
-        ) +
-            listOfNotNull(
-                "deckModified".takeIf { view.rules.deckModification },
-                "immediateArt".takeIf { view.rules.immediateMasterArtDiscard },
-            )
 
     fun build(): BotObservation {
         val commands =
@@ -152,7 +139,7 @@ private class ObservationProjection(
             expansionPosition = if (decision == "expand") view.expansionPosition else null,
             reserveShortfallBasis =
                 if (decision == "purchase-advances") {
-                    contextualFeatures(mapOf("reserveShortfall" to 1.0))
+                    featureContext.expand(mapOf("reserveShortfall" to 1.0))
                 } else null,
             advancePlanning =
                 if (decision == "purchase-advances") {
@@ -618,23 +605,13 @@ private class ObservationProjection(
         add("action.$family", 1.0)
         return BotCandidate(
             command,
-            contextualFeatures(features),
+            featureContext.expand(features),
             cashCost,
             tokenCost,
             group,
             family,
             playerTarget,
         )
-    }
-
-    /** Candidate values and the per-dollar reserve basis share identical context expansion. */
-    private fun contextualFeatures(base: Map<String, Double>): Map<String, Double> = buildMap {
-        putAll(base)
-        for ((feature, value) in base) {
-            if (feature.startsWith("capitalHand.") || feature.startsWith("planning.")) continue
-            if (endgame != 0.0) put("endgame.$feature", value * endgame)
-            for (condition in conditions) put("$condition.$feature", value)
-        }
     }
 
     private fun addMisery(features: MutableMap<String, Double>, changes: List<MiseryChangeView>) {
