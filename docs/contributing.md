@@ -155,6 +155,26 @@ independent confirmation and heldout gates; every final gate requires both 99% l
 canonical historical replay checks. An eight-hour, one-attempt campaign controller owns the overall
 deadline. No successful result activates a policy or establishes human-level strength.
 
+### Target strength learning
+
+[`expansion_target_search.py`](../scripts/expansion_target_search.py) defines a separate finite
+experiment over only the four public market-target inputs. An immutable coordinate profile fixes
+unit scales, score temperature eight and normalized bounds of ±8. Each candidate exports two
+models with identical target additions: its ordinary F1 model and its expansion E model. All other
+coefficients remain exact, including the existing eight-coordinate difference between F1 and E.
+Evaluated seats retain the qualified fixed token control and every seat shares frozen Purchase C/F0.
+
+Four eight-model generations use fresh common worlds against the frozen cyclic F1/E/T/E+T league.
+The nine-model maximum archive receives a separate selection bank. Only one selected candidate can
+open mixed-league confirmation and then a fresh homogeneous E+T robustness gate; both final gates
+require positive 99% lower bounds for paired win and return differences and canonical replays.
+Positive training means are selection evidence only. A six-hour controller permits one attempt and
+never activates a model or launches another campaign. Host-independent preparation binds the exact
+qualified combined incumbent, native AI/engine/training bytes and all audited seed reservations.
+A separate fixed-weight portability bank verifies execution across hosts and is excluded from
+learning, selection and strength claims. Exact-child environment/process-sampler preflight precedes
+both package freeze and launch.
+
 ### Portable simulation benchmark
 
 For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages
