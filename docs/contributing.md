@@ -116,6 +116,13 @@ future policy. The `MODEL_FIXED_T_RESIDUAL` selector requires a tagged
 `token-order-fixed-reference-residual-1` artifact and retains fixed T unless an original proposal
 beats it by more than `.02`. Ordinary selectors reject this envelope, and residual selectors reject
 untagged Q models. Rebased ordinary-continuation labels cannot establish fixed-T continuation values.
+The separately tagged `MODEL_FIXED_T_REFERENCE_NEIGHBORS` experiment keeps that ordinary encoded
+baseline and fixed-T fallback. When they differ, proposals are ordinary, fixed T, its offered integer
+neighbors, then the existing diverse proposals with stable deduplication; otherwise the old proposal
+order is exact. Its `token-order-reference-neighbor-residual-1` envelope requires the matching
+proposal and selector versions and cannot be substituted for the older residual artifact. A zero
+head still follows fixed T. Experimental rival selectors `FIXED_16_TO_14` and `FIXED_16_TO_13` change
+only an ordinary bid of 16 when their exact target is offered; all other bids remain unchanged.
 The existing eight-tail fitter opts into this contract with `--fixed-reference`; all five exported
 heads use the tagged envelope, and the frozen basis, penalties and admission rules stay unchanged.
 

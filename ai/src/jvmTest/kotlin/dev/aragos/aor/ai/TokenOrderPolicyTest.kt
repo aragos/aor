@@ -241,6 +241,113 @@ class TokenOrderPolicyTest {
         assertThat(command).isEqualTo("buy-tokens -4")
     }
 
+    @Test
+    fun referenceNeighborsIncludeFourteenAndKeepOrdinaryBaseline() {
+        val state = fixture()
+        val observation = encoded(state)
+
+        val proposals =
+            TokenOrderPolicy.referenceNeighborIndices(BotObservations.from(state, own), observation)
+
+        assertThat(proposals.map { observation.actions[it].command })
+            .containsExactly(
+                "buy-tokens 16",
+                "buy-tokens 15",
+                "buy-tokens 14",
+                "buy-tokens 0",
+                "buy-tokens -4",
+                "buy-tokens 8",
+                "buy-tokens 24",
+                "buy-tokens 36",
+            )
+            .inOrder()
+        assertThat(observation.actions[observation.baselineIndex].command)
+            .isEqualTo("buy-tokens 16")
+    }
+
+    @Test
+    fun referenceNeighborsPreserveSignedOrdinaryProposalOrderOutsideTrigger() {
+        val state = fixture()
+        val ordinary = BotObservations.from(state, own)
+        val observation = encoded(state, baseline = "buy-tokens -4")
+
+        val proposals = TokenOrderPolicy.referenceNeighborIndices(ordinary, observation)
+
+        assertThat(proposals).isEqualTo(TokenOrderPolicy.proposedIndices(ordinary, observation))
+    }
+
+    @Test
+    fun referenceNeighborsPreserveFullCashEndpointWithoutInventingQuotes() {
+        val state = fixture()
+        val ordinary = BotObservations.from(state, own)
+        val observation = encoded(state, baseline = "buy-tokens 1000")
+
+        val proposals = TokenOrderPolicy.referenceNeighborIndices(ordinary, observation)
+
+        assertThat(proposals).isEqualTo(TokenOrderPolicy.proposedIndices(ordinary, observation))
+    }
+
+    @Test
+    fun unavailableReferenceNeighborIsOmittedRatherThanClipped() {
+        val state = fixture()
+        val full = encoded(state)
+        val ordinary =
+            BotObservations.from(state, own).let { observation ->
+                observation.copy(
+                    candidates = observation.candidates.filter { it.command != "buy-tokens 14" }
+                )
+            }
+        val actions = full.actions.filter { it.command != "buy-tokens 14" }
+        val observation =
+            full.copy(
+                actions = actions,
+                baselineIndex = actions.indexOfFirst { it.command == "buy-tokens 16" },
+            )
+
+        val proposals = TokenOrderPolicy.referenceNeighborIndices(ordinary, observation)
+
+        assertThat(proposals.map { observation.actions[it].command })
+            .doesNotContain("buy-tokens 14")
+        assertThat(proposals.map { observation.actions[it].command })
+            .doesNotContain("buy-tokens 13")
+    }
+
+    @Test
+    fun referenceNeighborZeroHeadRetainsFixedTExactly() {
+        val state = fixture()
+
+        val command =
+            TokenOrderPolicy.chooseReferenceNeighbors(
+                BotObservations.from(state, own),
+                encoded(state),
+                model(state, 0.0),
+            )
+
+        assertThat(command).isEqualTo("buy-tokens 15")
+    }
+
+    @Test
+    fun referenceNeighborModelCanSelectOfferedFourteen() {
+        val state = fixture()
+        val original = model(state, 1.0)
+        val onlyFourteen =
+            original.copy(
+                actionWeights =
+                    List(original.actionWeights.size) {
+                        if (it == original.actionFeatureNames.indexOf("bid.amount.14")) 8.0 else 0.0
+                    }
+            )
+
+        val command =
+            TokenOrderPolicy.chooseReferenceNeighbors(
+                BotObservations.from(state, own),
+                encoded(state),
+                onlyFourteen,
+            )
+
+        assertThat(command).isEqualTo("buy-tokens 14")
+    }
+
     private fun encoded(
         state: GameState,
         baseline: String = "buy-tokens 16",

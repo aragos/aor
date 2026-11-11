@@ -13,15 +13,21 @@ import dev.aragos.aor.ai.TokenOrderReference
 import java.nio.file.Path
 
 /** Native experiment selectors; none changes the browser policy or the learned model bytes. */
-internal enum class ArenaTokenSelector {
+internal enum class ArenaTokenSelector(val fixedOrdinaryReplacement: Int? = null) {
     /** Original full-proposal Q selection, including its fixed advantage margin. */
     MODEL,
     /** Retain the original Q choice only for a one-token change; never reselect a neighbor. */
     ADJACENT_VETO,
     /** Explicitly tagged Q residuals; proposals stay ordinary-centered and fallback is fixed T. */
     MODEL_FIXED_T_RESIDUAL,
+    /** Fixed-T residual with separately versioned reference-centered neighbor proposals. */
+    MODEL_FIXED_T_REFERENCE_NEIGHBORS,
     /** Replace the actual ordinary bid of 16 with an offered 15; otherwise retain it exactly. */
-    FIXED_16_TO_15,
+    FIXED_16_TO_15(15),
+    /** Diagnostic rival stress: replace only ordinary 16 with an offered 14. */
+    FIXED_16_TO_14(14),
+    /** Diagnostic rival stress: replace only ordinary 16 with an offered 13. */
+    FIXED_16_TO_13(13),
     /**
      * Diagnostic control: subtract two only when the exact ordinary-head alternative is offered.
      */
@@ -40,6 +46,7 @@ internal data class ArenaTokenRole(
                     ArenaTokenSelector.MODEL,
                     ArenaTokenSelector.ADJACENT_VETO,
                     ArenaTokenSelector.MODEL_FIXED_T_RESIDUAL,
+                    ArenaTokenSelector.MODEL_FIXED_T_REFERENCE_NEIGHBORS,
                 )) == (input != null)
         ) {
             "Fixed token controls must omit their model; learned token selectors require a model."
@@ -51,6 +58,8 @@ internal data class ArenaTokenRole(
 internal enum class ArenaTokenOpponentSelector {
     ORDINARY,
     FIXED_16_TO_15,
+    FIXED_16_TO_14,
+    FIXED_16_TO_13,
     /** Subtract two from the actual ordinary bid only when that exact command is offered. */
     ORDINARY_MINUS_TWO,
 }
@@ -110,7 +119,17 @@ private constructor(
 
     internal fun identity(): String {
         val legacy = roles.values.all { it.selector == ArenaTokenSelector.MODEL }
-        val prefix = "${TokenOrderPolicy.SELECTOR_VERSION}:${TokenOrderPolicy.PROPOSAL_VERSION}:"
+        val prefix =
+            if (
+                roles.values.any {
+                    it.selector == ArenaTokenSelector.MODEL_FIXED_T_REFERENCE_NEIGHBORS
+                }
+            ) {
+                "${TokenOrderPolicy.REFERENCE_NEIGHBOR_SELECTOR_VERSION}:" +
+                    "${TokenOrderPolicy.REFERENCE_NEIGHBOR_PROPOSAL_VERSION}:"
+            } else {
+                "${TokenOrderPolicy.SELECTOR_VERSION}:${TokenOrderPolicy.PROPOSAL_VERSION}:"
+            }
         val evaluated =
             if (legacy) {
                 prefix +
@@ -156,6 +175,16 @@ private constructor(
                             TokenOrderController(
                                 opponents[index],
                                 ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_15, null),
+                            )
+                        ArenaTokenOpponentSelector.FIXED_16_TO_14 ->
+                            TokenOrderController(
+                                opponents[index],
+                                ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_14, null),
+                            )
+                        ArenaTokenOpponentSelector.FIXED_16_TO_13 ->
+                            TokenOrderController(
+                                opponents[index],
+                                ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_13, null),
                             )
                         ArenaTokenOpponentSelector.ORDINARY_MINUS_TWO ->
                             TokenMinusTwoController(opponents[index])
@@ -234,7 +263,7 @@ private constructor(
                         requireNotNull(
                             ArenaTokenOpponentSelector.entries.singleOrNull { it.name == name }
                         ) {
-                            "Token opponent selector must be ORDINARY, FIXED_16_TO_15 or ORDINARY_MINUS_TWO."
+                            "Unknown explicit token opponent selector: $name."
                         }
                     }
                 }
@@ -271,8 +300,15 @@ private constructor(
                 source.toAbsolutePath().parent.resolve(PurchaseJson.text(value, field)).toRealPath()
             val hash = PurchaseJson.hash(path)
             val model =
-                if (selector == ArenaTokenSelector.MODEL_FIXED_T_RESIDUAL) {
+                if (
+                    selector in
+                        setOf(
+                            ArenaTokenSelector.MODEL_FIXED_T_RESIDUAL,
+                            ArenaTokenSelector.MODEL_FIXED_T_REFERENCE_NEIGHBORS,
+                        )
+                ) {
                     val node = PurchaseJson.read(path)
+                    val neighbors = selector == ArenaTokenSelector.MODEL_FIXED_T_REFERENCE_NEIGHBORS
                     PurchaseJson.fields(
                         node,
                         setOf(
@@ -282,22 +318,36 @@ private constructor(
                             "proposalVersion",
                             "minimumAdvantage",
                             "model",
-                        ),
+                        ) + if (neighbors) setOf("selectorVersion") else emptySet(),
                     )
+                    val kind =
+                        if (neighbors) {
+                            TokenOrderPolicy.REFERENCE_NEIGHBOR_MODEL_KIND
+                        } else {
+                            TokenOrderPolicy.RESIDUAL_MODEL_KIND
+                        }
+                    val proposal =
+                        if (neighbors) {
+                            TokenOrderPolicy.REFERENCE_NEIGHBOR_PROPOSAL_VERSION
+                        } else {
+                            TokenOrderPolicy.PROPOSAL_VERSION
+                        }
                     require(
                         PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") ==
                             1 &&
-                            node["kind"]?.asText() == TokenOrderPolicy.RESIDUAL_MODEL_KIND &&
+                            node["kind"]?.asText() == kind &&
                             node["referenceProtocol"]?.asText() ==
                                 TokenOrderReference.FIXED_16_TO_15.version &&
-                            node["proposalVersion"]?.asText() ==
-                                TokenOrderPolicy.PROPOSAL_VERSION &&
+                            node["proposalVersion"]?.asText() == proposal &&
+                            (!neighbors ||
+                                node["selectorVersion"]?.asText() ==
+                                    TokenOrderPolicy.REFERENCE_NEIGHBOR_SELECTOR_VERSION) &&
                             PurchaseJson.number(
                                 node.required("minimumAdvantage"),
                                 "minimumAdvantage",
                             ) == TokenOrderPolicy.MINIMUM_ADVANTAGE
                     ) {
-                        "A residual token model must bind its fixed-T reference, ordinary proposals and unchanged margin."
+                        "A residual token model must bind its exact selector, proposal, fixed-T reference and margin."
                     }
                     TerritoryValuePolicyInput.read(node.required("model"))
                 } else TerritoryValuePolicyInput.read(path)
@@ -322,11 +372,17 @@ internal class TokenOrderController(
         }
         val ordinary =
             BotPolicy.choose(decision.observation, BotDifficulty.HARD, decision.seed, baseline)
-        if (role.selector == ArenaTokenSelector.FIXED_16_TO_15) {
-            return TokenOrderReference.FIXED_16_TO_15.command(
-                ordinary,
-                decision.observation.candidates.map { it.command },
-            )
+        val fixedAmount = role.selector.fixedOrdinaryReplacement
+        if (fixedAmount != null) {
+            val alternative = "buy-tokens $fixedAmount"
+            return if (
+                ordinary == "buy-tokens 16" &&
+                    decision.observation.candidates.any { it.command == alternative }
+            ) {
+                alternative
+            } else {
+                ordinary
+            }
         }
         val input = requireNotNull(role.input) { "A learned token role retains its Q model." }
         val observation =
@@ -339,6 +395,13 @@ internal class TokenOrderController(
             )
         if (role.selector == ArenaTokenSelector.MODEL_FIXED_T_RESIDUAL) {
             return TokenOrderPolicy.chooseResidual(decision.observation, observation, input.model)
+        }
+        if (role.selector == ArenaTokenSelector.MODEL_FIXED_T_REFERENCE_NEIGHBORS) {
+            return TokenOrderPolicy.chooseReferenceNeighbors(
+                decision.observation,
+                observation,
+                input.model,
+            )
         }
         val selected = TokenOrderPolicy.choose(decision.observation, observation, input.model)
         if (role.selector == ArenaTokenSelector.MODEL || selected == ordinary) return selected

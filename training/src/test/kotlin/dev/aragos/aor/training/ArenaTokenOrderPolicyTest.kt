@@ -23,6 +23,140 @@ import kotlin.test.assertFailsWith
 
 class ArenaTokenOrderPolicyTest {
     @Test
+    fun referenceNeighborSelectorRejectsTheOldResidualEnvelope() {
+        ArenaPurchaseFixture().use { fixture ->
+            residualArtifact(fixture)
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(fixture, neighborFields())
+            }
+        }
+    }
+
+    @Test
+    fun referenceNeighborEnvelopeCannotRunUnderTheOldResidualSelector() {
+        ArenaPurchaseFixture().use { fixture ->
+            neighborArtifact(fixture)
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(fixture, residualFields())
+            }
+        }
+    }
+
+    @Test
+    fun referenceNeighborEnvelopeRequiresItsExactSelectorVersion() {
+        ArenaPurchaseFixture().use { fixture ->
+            neighborArtifact(fixture)
+            val node = PurchaseJson.read(fixture.directory.resolve("residual.json")) as ObjectNode
+            node.put("selectorVersion", TokenOrderPolicy.SELECTOR_VERSION)
+            fixture.artifacts.write("residual.json", node)
+
+            assertFailsWith<IllegalArgumentException> {
+                tokenRoles(fixture, neighborFields())
+            }
+        }
+    }
+
+    @Test
+    fun referenceNeighborZeroHeadMatchesExplicitFixedTFallback() {
+        ArenaPurchaseFixture().use { fixture ->
+            neighborArtifact(fixture)
+            val specification =
+                tokenRoles(fixture, neighborFields() + ("incumbentSelector" to "FIXED_16_TO_15"))
+                    .copy(candidate = testBaseline, incumbent = testBaseline)
+            val decision = tokenDecision(fixture)
+
+            val choices =
+                ArenaSide.entries.map { side ->
+                    specification.controllers(4, 0, side, testBaseline)[0]?.choose(decision)
+                }
+
+            assertThat(choices).containsExactly("buy-tokens 15", "buy-tokens 15").inOrder()
+        }
+    }
+
+    @Test
+    fun conditionalStressRivalsUseTheirBoundFourteenAndThirteenRoles() {
+        ArenaPurchaseFixture().use { fixture ->
+            val policy =
+                ArenaTokenOrderPolicy.read(
+                    fixture.source,
+                    PurchaseJson.mapper.valueToTree(
+                        mapOf("opponentSelectors" to listOf("FIXED_16_TO_14", "FIXED_16_TO_13"))
+                    ),
+                )
+            val decision = tokenDecision(fixture)
+
+            val controllers =
+                policy.opponentControllers(
+                    4,
+                    0,
+                    listOf(0, 0, 1, 0),
+                    listOf(testBaseline, testBaseline),
+                )
+
+            assertThat(controllers[1]?.choose(decision)).isEqualTo("buy-tokens 14")
+            assertThat(controllers[2]?.choose(decision)).isEqualTo("buy-tokens 13")
+        }
+    }
+
+    @Test
+    fun conditionalStressRivalsLeaveSignedOrdinaryChoicesUnchanged() {
+        ArenaPurchaseFixture().use { fixture ->
+            val decision = tokenDecision(fixture, amount = -4)
+
+            val choices =
+                listOf(ArenaTokenSelector.FIXED_16_TO_14, ArenaTokenSelector.FIXED_16_TO_13).map {
+                    TokenOrderController(testBaseline, ArenaTokenRole(it, null)).choose(decision)
+                }
+
+            assertThat(choices).containsExactly("buy-tokens -4", "buy-tokens -4").inOrder()
+        }
+    }
+
+    @Test
+    fun conditionalStressRivalNeverClipsAnUnavailableTarget() {
+        ArenaPurchaseFixture().use { fixture ->
+            val initial = tokenDecision(fixture)
+            val decision =
+                initial.copy(
+                    observation =
+                        initial.observation.copy(
+                            candidates =
+                                initial.observation.candidates.filter {
+                                    it.command != "buy-tokens 14"
+                                }
+                        )
+                )
+            val controller =
+                TokenOrderController(
+                    testBaseline,
+                    ArenaTokenRole(ArenaTokenSelector.FIXED_16_TO_14, null),
+                )
+
+            val choice = controller.choose(decision)
+
+            assertThat(choice).isEqualTo("buy-tokens 16")
+        }
+    }
+
+    private fun neighborFields(): Map<String, Any> =
+        mapOf(
+            "candidateSelector" to "MODEL_FIXED_T_REFERENCE_NEIGHBORS",
+            "candidateModel" to "residual.json",
+        )
+
+    private fun neighborArtifact(fixture: ArenaPurchaseFixture) {
+        residualArtifact(fixture)
+        val node = PurchaseJson.read(fixture.directory.resolve("residual.json")) as ObjectNode
+        node.put("kind", TokenOrderPolicy.REFERENCE_NEIGHBOR_MODEL_KIND)
+        node.put("proposalVersion", TokenOrderPolicy.REFERENCE_NEIGHBOR_PROPOSAL_VERSION)
+        node.put("selectorVersion", TokenOrderPolicy.REFERENCE_NEIGHBOR_SELECTOR_VERSION)
+        fixture.artifacts.write("residual.json", node)
+    }
+
+    @Test
     fun residualSelectorRejectsAnUntaggedOrdinaryModel() {
         ArenaPurchaseFixture().use { fixture ->
             tokenInput(fixture, "ordinary.json", emptyMap())
