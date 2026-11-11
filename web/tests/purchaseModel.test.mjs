@@ -9,8 +9,10 @@ const baseline = JSON.parse(readFileSync(new URL('../src/ai/model.json', import.
 const purchaseBundle = JSON.parse(readFileSync(new URL('../src/ai/purchaseModel.json', import.meta.url), 'utf8'));
 const actor = purchaseBundle.models.find(model => model.rulesVersion === 'ah1996-three-epoch-4');
 const currentActor = purchaseBundle.models.find(model => model.rulesVersion === 'ah1996-three-epoch-5');
-const currentParent = currentActor.provenance.parent;
-const gaePolicySha256 = '47f009bd670d1e8f77d10520f8af5e73d3dc96e873cdc7e33658ccae600266c7';
+const gaeParent = currentActor.provenance.parent;
+const currentParent = gaeParent.provenance.parent;
+const gaePolicySha256 = '09e29e5b25b76bdad3c2e082e210322d16851bfd8a978ce123b6a8b0fbf8b2af';
+const previousGaePolicySha256 = '47f009bd670d1e8f77d10520f8af5e73d3dc96e873cdc7e33658ccae600266c7';
 const configuration = {
     playerCount: 4,
     map: 'STANDARD',
@@ -337,18 +339,19 @@ test('the parent current-rules policy passed fresh gates against each component'
 test('the current purchase actor is the exact independently qualified GAE checkpoint', () => {
     assert.equal(currentActor.provenance.sourcePolicySha256, gaePolicySha256);
     assert.equal(digest(currentActor.model),
-        '635d4bea49e93c628d9f8997158017663d6fb67aaba622eac6b3bbdcb7c1b1f7');
+        '49a5b5dfa7b8525e5f05995a8a89460819bcb12b63517fe77cc990b8006d0d7b');
     assert.equal(currentActor.provenance.initialPurchasePolicySha256,
-        currentParent.provenance.sourcePolicySha256);
-    assert.equal(currentActor.provenance.trainingGames, 2048);
-    assert.equal(currentActor.provenance.selectedBatch, 8);
+        previousGaePolicySha256);
+    assert.equal(currentActor.provenance.additionalTrainingGames, 16384);
+    assert.equal(currentActor.provenance.selectedBatch, 64);
     assert.equal(currentActor.provenance.estimator, 'purchase-gae-1');
     assert.equal(currentActor.provenance.gamma, 1);
     assert.equal(currentActor.provenance.lambda, .95);
     assert.deepEqual(currentActor.baseline, actor.baseline);
     const qualification = currentActor.hybridQualification;
     assert.equal(qualification.purchasePolicySha256, gaePolicySha256);
-    assert.equal(qualification.incumbentPurchasePolicySha256, currentParent.provenance.sourcePolicySha256);
+    assert.equal(qualification.incumbentPurchasePolicySha256, previousGaePolicySha256);
+    assert.equal(qualification.rivalPurchasePolicySha256, previousGaePolicySha256);
     assert.equal(qualification.qualificationPassed, true);
     assert.equal(qualification.qualificationTransferred, false);
     assert.equal(qualification.humanStrengthVerified, false);
@@ -362,10 +365,10 @@ test('the current purchase actor is the exact independently qualified GAE checkp
         'feb80d4363a93b266c94bc46e0d75ff4b0cb1f17a55d0f6d77782715862f44ef');
     assert.deepEqual(qualification.canonicalReplayIndices, [0, 1365, 2730, 4095]);
     assert(qualification.evidence.some(item => item.path.endsWith('/completion-audit.json')
-        && item.sha256 === '3efe9bb2935c034dcb8166a6ad58f4907533801f84937cd7ae481bcb29c1ace3'));
+        && item.sha256 === '622d806700b9b19e22909d01929c9896a73c2838cfcd556965f19a5444537f34'));
     for (const [name, win, reward] of [
-        ['confirm', .030517578125, .028767903645833336],
-        ['heldout', .0330810546875, .03323567708333333],
+        ['confirm', .065673828125, .06547037760416667],
+        ['heldout', .0615234375, .06171875],
     ]) {
         const stage = qualification.stages[name];
         assert.equal(stage.winShareDifference.mean, win);
@@ -376,6 +379,16 @@ test('the current purchase actor is the exact independently qualified GAE checkp
             assert(metric.lowerConfidence > 0);
         }
     }
+});
+
+test('the prior GAE qualification remains ancestry without transferring its claim', () => {
+    assert.equal(gaeParent.provenance.sourcePolicySha256, previousGaePolicySha256);
+    assert.equal(gaeParent.provenance.trainingGames, 2048);
+    assert.equal(gaeParent.provenance.selectedBatch, 8);
+    assert.equal(gaeParent.hybridQualification.purchasePolicySha256, previousGaePolicySha256);
+    assert(gaeParent.hybridQualification.evidence.some(item => item.path.endsWith('/completion-audit.json')
+        && item.sha256 === '3efe9bb2935c034dcb8166a6ad58f4907533801f84937cd7ae481bcb29c1ace3'));
+    assert.equal(currentActor.hybridQualification.qualificationTransferred, false);
 });
 
 test('current-rules actor preserves its frozen purchase prior over signed seeds', async () => {
