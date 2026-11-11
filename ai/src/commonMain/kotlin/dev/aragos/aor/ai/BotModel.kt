@@ -196,6 +196,10 @@ data class BotModel(val schemaVersion: Int = 1, val weights: Map<String, Double>
 
 /** Initial policy prior; offline self-play can replace these weights without changing rules. */
 object BotModels {
+    /** Controller parameters never act as ordinary candidate or planning features. */
+    internal fun reservedFeature(name: String): Boolean =
+        BotTokenValue.reserved(name) || BotExpansionModel.reserved(name)
+
     /**
      * Schema-one wire weights are overrides of the prior. Explicit zeros disable prior features,
      * and unknown learned feature names retain their supplied values. This contract is shared by
