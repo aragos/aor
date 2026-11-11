@@ -967,6 +967,20 @@ actor/prior. Explicit arrays bind identity and metadata; omission preserves exis
 identity. Search and root collection reject these arena-only roles.
 
 
+The native `expansion-opportunity-collect` diagnostic uses an arena-shaped `SCREENING` source
+with `diagnosticRoots` (1–128, default 128), exactly two `continuationReplicates`, identical ordinary
+candidate/incumbent models, and shared `frozenPurchase`. It rejects token and side-specific Purchase
+overlays. Each prospective origin selects the first ordinary expansion pass with remaining public
+pool tokens and another legal action in its predeclared epoch (`index % 3 + 1`). Missing roots are
+recorded as skips without replacement. A fixed public sampler selects up to three distinct offered
+action families. Baseline and alternatives share each origin's two future streams and unchanged
+ordinary/Purchase policies. Outputs retain EXPANSION_2 observations, full canonical prefix/tail
+replay evidence and paired terminal deltas grouped by origin; no best-arm labels, fitting or policy
+qualification occurs. A weak mean across these sampled alternatives does not establish that passing
+is optimal: this tests recoverable opportunity under the fixed proposal rule, not exhaustive search.
+Use `--mode expansion-opportunity-collect --source JSON --output NEW_PATH
+--hours H --workers N`; the native allowance is at most two hours and existing attempts cannot resume.
+
 The experimental `token-value-pilot` mode learns from complete-game continuations at ordinary
 token-purchase decisions. Start from a frozen arena specification and add `trainingRoots`,
 `validationRoots`, `continuationReplicates` and `regularization`. The

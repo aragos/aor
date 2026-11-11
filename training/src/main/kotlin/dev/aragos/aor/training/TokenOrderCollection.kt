@@ -1,12 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
-import dev.aragos.aor.ai.BotDifficulty
-import dev.aragos.aor.ai.BotModel
-import dev.aragos.aor.ai.BotObservation
-import dev.aragos.aor.ai.BotPolicy
 import dev.aragos.aor.ai.BotTokenValue
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
@@ -127,82 +122,6 @@ internal data class TokenOrderOrigin(
     val alternatives: List<TokenOrderAlternative>? = null,
 )
 
-/** Shared controller routing for every prefix/tail; sealed choices use one untouched state. */
-internal class TokenOrderContinuation(
-    private val models: List<BotModel>,
-    private val purchase: Map<Int, SimulationController>,
-    private val seed: Int,
-    private val deadlineNanos: Long,
-) {
-    fun check(session: ExperimentSession) {
-        checkTokenValueDeadline(deadlineNanos)
-        check(session.decisions < 12000) { "A token-order continuation exceeded 12000 decisions." }
-    }
-
-    fun commands(
-        session: ExperimentSession,
-        observations: Map<PlayerId, BotObservation>,
-    ): Map<PlayerId, String> =
-        observations.entries
-            .mapIndexed { actorIndex, (actor, observation) ->
-                val seat = session.state.playerIds.indexOf(actor)
-                val policySeed = seed xor (session.decisions * 65537 + seat * 8191)
-                val controller = purchase[seat]?.takeIf { it.controls(observation.decision) }
-                val command =
-                    controller?.choose(
-                        SimulationDecision(
-                            number = session.decisions + actorIndex,
-                            seat = seat,
-                            seed = policySeed,
-                            view = session.state.viewForPlayer(actor),
-                            observation = observation,
-                            batchStartNumber = session.decisions,
-                        )
-                    ) ?: BotPolicy.choose(observation, BotDifficulty.HARD, policySeed, models[seat])
-                actor to command
-            }
-            .toMap()
-
-    fun finish(
-        session: ExperimentSession,
-        seat: Int,
-        configuration: String,
-        chanceSeed: Long,
-    ): TokenValueOutcome {
-        while (session.state.stage != Stage.FINISHED) {
-            check(session)
-            session.apply(
-                commands(session, session.actors().associateWith(session::observation)),
-                deadlineNanos,
-            )
-        }
-        val game =
-            SimulatedGame(
-                configuration,
-                seed,
-                session.decisions,
-                session.state.publicView().scores,
-                GameCoverage(
-                    emptyMap(),
-                    emptyMap(),
-                    emptySet(),
-                    emptySet(),
-                    emptySet(),
-                    emptySet(),
-                ),
-                0,
-            )
-        return TokenValueOutcome(
-            game.reward(seat),
-            game.winShare(seat),
-            game.rankReward(seat),
-            game.scores.map(PilotReplayScore::from),
-            game.steps,
-            chanceSeed,
-        )
-    }
-}
-
 /** One prospective root per fresh game, followed by paired complete-game continuations. */
 internal class TokenOrderCollector(
     private val specification: TokenOrderSpecification,
@@ -222,7 +141,7 @@ internal class TokenOrderCollector(
                     "A validated token-order specification retains its frozen Purchase environment."
                 }
                 .controllers(models.size, lineup.seat, side = null)
-        val continuation = TokenOrderContinuation(models, purchase, lineup.seed, deadlineNanos)
+        val continuation = FrozenPolicyContinuation(models, purchase, lineup.seed, deadlineNanos)
         val session = ExperimentSession.start(lineup.configuration, lineup.seed.toLong())
         val actor = session.state.playerIds[lineup.seat]
         fun provenance(status: TokenValueOriginStatus, skip: TokenValueSkipReason? = null) =
