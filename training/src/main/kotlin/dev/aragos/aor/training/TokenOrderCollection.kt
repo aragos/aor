@@ -20,7 +20,11 @@ internal data class TokenOrderSpecification(
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
             "Token-order collection requires one SCREENING configuration."
         }
-        require(arena.candidate == arena.incumbent && arena.tokenOrder == null) {
+        require(
+            arena.candidate == arena.incumbent &&
+                arena.tokenOrder == null &&
+                arena.expansionImitation == null
+        ) {
             "Token-order roots require identical ordinary baselines without a learned token overlay."
         }
         val purchase =

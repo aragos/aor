@@ -11,6 +11,10 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "expansion-imitation-fit") }) {
+        ExpansionImitationMain.run(arguments.toList())
+        return
+    }
     if (
         arguments.toList().windowed(2).any {
             it == listOf("--mode", "expansion-opportunity-collect")
@@ -95,6 +99,7 @@ fun main(arguments: Array<String>) {
             --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
             --mode pilot-diagnose --source PATH --output PATH --samples N --seed N
             --mode arena --source COMPARISON_JSON --output PATH --hours HOURS --workers N
+            --mode expansion-imitation-fit --source IMITATION_JSON --output NEW_PATH
             --mode strategy-search --source SEARCH_JSON --output PATH --hours HOURS --workers N
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
             --mode expansion-opportunity-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N

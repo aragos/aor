@@ -35,6 +35,7 @@ data class ArenaSpecification(
     val seed: Int,
     val frozenPurchase: ArenaPurchasePolicy? = null,
     val tokenOrder: ArenaTokenOrderPolicy? = null,
+    val expansionImitation: ArenaExpansionImitation? = null,
     val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
     private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
     private val initializationSource: ModelInitializationSource? = null,
@@ -57,6 +58,7 @@ data class ArenaSpecification(
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
         frozenPurchase?.validate(configurations)
         tokenOrder?.validate(configurations, opponents.size)
+        expansionImitation?.validate(candidate, incumbent, opponents)
     }
 
     fun identity(): String =
@@ -72,6 +74,7 @@ data class ArenaSpecification(
                 listOfNotNull(
                     frozenPurchase?.identity(),
                     tokenOrder?.identity(),
+                    expansionImitation?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
@@ -89,29 +92,38 @@ data class ArenaSpecification(
         opponentIndices: List<Int>? = null,
     ): Map<Int, SimulationController> {
         val purchase = frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
-        val policy = tokenOrder ?: return purchase
-        val evaluated = policy.controller(side, ordinary)
+        val policy = tokenOrder
+        val evaluated = policy?.controller(side, ordinary)
         val tokens =
-            policy.opponentControllers(playerCount, controlledSeat, opponentIndices, opponents) +
-                listOfNotNull(evaluated?.let { controlledSeat to it }).toMap()
-        return purchase +
-            tokens.mapValues { (seat, token) ->
-                val previous = purchase[seat]
-                object : SimulationController {
-                    override fun controls(decision: String): Boolean =
-                        token.controls(decision) || previous?.controls(decision) == true
+            policy
+                ?.opponentControllers(playerCount, controlledSeat, opponentIndices, opponents)
+                .orEmpty() + listOfNotNull(evaluated?.let { controlledSeat to it }).toMap()
+        val expansion =
+            expansionImitation
+                ?.controllers(playerCount, controlledSeat, side, opponentIndices)
+                .orEmpty()
+        return listOf(tokens, expansion).fold(purchase) { existing, overlay ->
+            existing +
+                overlay.mapValues { (seat, controller) ->
+                    val previous = existing[seat]
+                    object : SimulationController {
+                        override fun controls(decision: String): Boolean =
+                            controller.controls(decision) || previous?.controls(decision) == true
 
-                    override fun choose(decision: SimulationDecision): String? =
-                        if (token.controls(decision.observation.decision)) token.choose(decision)
-                        else previous?.choose(decision)
+                        override fun choose(decision: SimulationDecision): String? =
+                            if (controller.controls(decision.observation.decision))
+                                controller.choose(decision)
+                            else previous?.choose(decision)
+                    }
                 }
-            }
+        }
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
         mapOf("rulesVersion" to RULES_VERSION, "dataVersion" to DATA_VERSION) +
             frozenPurchase?.metadata().orEmpty() +
             tokenOrder?.metadata().orEmpty() +
+            expansionImitation?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -151,6 +163,7 @@ data class ArenaSpecification(
     internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
         frozenPurchase?.snapshot(artifacts)
         tokenOrder?.snapshot(artifacts)
+        expansionImitation?.snapshot(artifacts)
     }
 
     companion object {
@@ -230,6 +243,10 @@ data class ArenaSpecification(
                             ArenaPurchasePolicy.read(source, it, transfer)
                         },
                     tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
+                    expansionImitation =
+                        node["expansionImitation"]?.let {
+                            ArenaExpansionImitation.read(source, it)
+                        },
                     experimentalRulesTransfer = transfer,
                     ordinaryModelSources = modelSources,
                     initializationSource =
