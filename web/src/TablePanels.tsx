@@ -201,6 +201,7 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
             <h3>{label(category, 'category')}{me && <> <small>{advances.filter(advance => advance.category === category && me.advances.includes(advance.id)).length}</small></>}</h3>
             <div className="advance-tiles">{advances.filter(advance => advance.category === category).map(advance => {
                 const offer = snapshot.game.advanceOffers.find(candidate => candidate.advance === advance.id);
+                const owners = snapshot.game.players.filter(player => player.advances.includes(advance.id));
                 const owned = me?.advances.includes(advance.id);
                 const available = offer?.unavailableReason === null && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
                 return <div className={`object-control advance-control ${owned ? 'owned' : ''} ${available ? 'available' : ''}`} key={advance.id}><button type="button" data-advance={advance.id} className={`advance-tile ${owned ? 'owned' : ''} ${available ? 'available' : ''} ${offer?.leaderDiscounts?.length ? 'discounted' : ''}`} key={advance.id}
@@ -213,6 +214,12 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                     }}>
                     <span className="advance-letter">{advance.letter}</span><strong>{advanceName(advance.id)}</strong>
                     <AdvancePrice offer={offer} printedCost={advance.cost} compact/>
+                    {owners.length > 0 && <span className="advance-owner-symbols">
+                        <span className="sr-only">{t('advance.owners')}: </span>
+                        {owners.map(player => <span key={player.id} title={playerName(snapshot, player.id)}>
+                            <Emblem player={player} size={15}/><span className="sr-only">{playerName(snapshot, player.id)} </span>
+                        </span>)}
+                    </span>}
                     {owned && <small className="advance-owned">{t('table.owned')}</small>}
                     {available && <small className="advance-available">{t('table.available')}</small>}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}

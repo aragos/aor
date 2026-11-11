@@ -48,6 +48,37 @@ export async function checkMarketInsights(page, web, baseline) {
     const circles = await page.evaluate(`[...document.querySelector('[data-advance="${advance.id}"]').parentElement.querySelectorAll('.unplayed-leader')].map(button => ({leader: button.dataset.unplayedLeader, epoch: button.textContent.trim()}))`);
     assert.deepEqual(circles, expected, 'One circle per authoritative leader, labeled with its printed epoch');
     assert.equal(await page.evaluate(`document.querySelector('.advance-tile .unplayed-leader')`), null, 'Leader inspection controls are separate from the advance selection button');
+    const owners = baseline.game.players.map(player => ({...player, advances: [advance.id]}));
+    const unowned = baseline.game.catalog.advances.find(candidate => candidate.id !== advance.id);
+    for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        await show({game: {players: owners}});
+        const symbols = `[data-advance="${advance.id}"] .advance-owner-symbols`;
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('${symbols} [data-piece-owner]')].map(symbol => symbol.dataset.pieceOwner)`),
+            owners.map(player => player.capital), 'Every owner has their capital symbol, including other players');
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('${symbols} > [title]')].map(owner => ({title: owner.title, text: owner.textContent.trim()}))`),
+            owners.map(player => ({title: player.capital.replace(/\b\w/g, letter => letter.toUpperCase()),
+                text: player.capital.replace(/\b\w/g, letter => letter.toUpperCase())})),
+            'Owner symbols retain hover names and accessible text');
+        assert.equal(await page.evaluate(`document.querySelector('[data-advance="${unowned.id}"] .advance-owner-symbols')`), null,
+            'Unowned advances have no owner symbols');
+        await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').scrollIntoView({block: 'center'})`);
+        assert(await page.evaluate(`(() => {
+            const tile = document.querySelector('[data-advance="${advance.id}"]');
+            const bounds = tile.getBoundingClientRect();
+            return [...tile.querySelectorAll('.advance-owner-symbols svg')].every(symbol => {
+                const rect = symbol.getBoundingClientRect();
+                return rect.width === 15 && rect.height === 15 && rect.left >= bounds.left && rect.right <= bounds.right;
+            }) && tile.scrollWidth <= tile.clientWidth && document.documentElement.scrollWidth <= innerWidth;
+        })()`), `All six owner symbols fit the advance tile at ${width}px`);
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-advance-owners-${width}.png`));
+        await show({game: {players: owners.map((player, index) => ({...player, advances: index ? [advance.id] : []}))}});
+        assert.equal(await page.evaluate(`document.querySelectorAll('${symbols} svg').length`), owners.length - 1,
+            'Ownership symbols follow public updates without changing the prepared card');
+        assert.equal(await page.evaluate(`document.querySelector('.decision-actions .play-card-action').disabled`), false,
+            'Ownership updates preserve the prepared commodity play');
+    }
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
     const leaderName = await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').parentElement.querySelector('.unplayed-leader').getAttribute('aria-label').split(' · ')[0]`);
     await page.evaluate(`document.querySelector('[data-advance="${advance.id}"]').parentElement.querySelector('.unplayed-leader').focus(); document.activeElement.click()`);
     await page.wait(`document.querySelector('.card-inspection-dialog[open]')`, 'Unplayed leader popup');
