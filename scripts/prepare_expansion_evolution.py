@@ -90,7 +90,7 @@ def prepare(options):
     require(exp.distribution_hashes(runtime_source) == exp.distribution_hashes(root / "runtime"),
             "Frozen expansion runtime changed during preparation.")
     shutil.copytree(screen_root / "scripts", root / "scripts")
-    for name in ("expansion_evolution.py", "prepare_expansion_evolution.py", "test_expansion_evolution.py",
+    for name in ("expansion_evolution.py", "evolution_coordinates.py", "prepare_expansion_evolution.py", "test_expansion_evolution.py",
                  "test_prepare_expansion_evolution.py"):
         copy_file(Path(__file__).with_name(name), "scripts/" + name)
     require(sha(root / "scripts/expansion_arena.py") == sha(Path(__file__).with_name("expansion_arena.py")),

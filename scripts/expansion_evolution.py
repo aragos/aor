@@ -8,16 +8,13 @@ one candidate for independent confirmation and heldout opponents.
 """
 
 import argparse
-import copy
-import json
-import math
 from pathlib import Path
-import random
 import sys
 
 import automata_experiments as exp
 import automata_policy_search as search
 import expansion_arena as arena
+import evolution_coordinates as coordinate
 
 read, sha, document, require = exp.read, exp.sha, exp.document, exp.require
 VERSION = "expansion-evolution-1"
@@ -35,41 +32,25 @@ AUDIT_BANK_NAMES = {**{f"generation-{i}": f"generation{i}" for i in range(GENERA
 CRITICAL_99 = 2.5758293035489004
 
 
-def finite(value):
-    return type(value) in (int, float) and math.isfinite(value)
-
-
-def weights(model):
-    result = model.get("weights")
-    require(model.get("schemaVersion") == 1 and isinstance(result, dict)
-            and len(result) <= 4096 and all(isinstance(k, str) and 1 <= len(k) <= 120
-            and finite(v) and abs(v) <= 1e6 for k, v in result.items()),
-            "Expansion models require bounded finite schema-one weights.")
-    return result
-
-
-def model_key(model):
-    # Explicit zero and absent zero have identical semantics after prior expansion.
-    return json.dumps({k: float(v) for k, v in weights(model).items() if v != 0},
-                      sort_keys=True, separators=(",", ":"), allow_nan=False)
+finite, weights, model_key = coordinate.finite, coordinate.weights, coordinate.model_key
 
 
 def validate_normalization(normalization):
-    require(set(normalization) == {"features", "temperature"}
-            and len(normalization["features"]) == len(FEATURES)
-            and all(finite(v) and v >= 1 for v in normalization["features"])
-            and finite(normalization["temperature"]) and normalization["temperature"] >= 1,
-            "Evolution requires the frozen training-only pilot normalization.")
+    coordinate.validate_normalization(normalization, FEATURES)
+
+
+def profile(normalization, bounds=None):
+    validate_normalization(normalization)
+    return coordinate.CoordinateProfile(FEATURES, tuple(normalization['features']),
+        normalization['temperature'], tuple(bounds if bounds is not None else [8.] * len(FEATURES)))
 
 
 def coordinates(model, baseline, normalization):
-    validate_normalization(normalization)
     original, actual = weights(baseline), weights(model)
     require(all(actual.get(k, 0) == original.get(k, 0)
                 for k in set(original) | set(actual) if k not in FEATURES),
-            "Evolution may change only the eight declared expansion coefficients.")
-    return [(actual.get(k, 0) - original.get(k, 0)) * scale / normalization["temperature"]
-            for k, scale in zip(FEATURES, normalization["features"])]
+            'Evolution may change only the eight declared expansion coefficients.')
+    return coordinate.coordinates(model, baseline, profile(normalization))
 
 
 def coordinate_bounds(initial, baseline, normalization):
@@ -78,70 +59,12 @@ def coordinate_bounds(initial, baseline, normalization):
 
 
 def export_model(values, baseline, normalization, bounds, target_rules):
-    validate_normalization(normalization)
-    require(len(values) == len(bounds) == len(FEATURES)
-            and all(finite(b) and b >= 8 for b in bounds)
-            and all(finite(v) and abs(v) <= b for v, b in zip(values, bounds)),
-            "Mutation coordinates must stay within the precommitted finite bounds.")
-    original = weights(baseline)
-    result = {"schemaVersion": 1, "rulesVersion": target_rules,
-              "dataVersion": baseline["dataVersion"], "weights": dict(original)}
-    result["weights"].update({name: original.get(name, 0) + normalization["temperature"] * value / scale
-                              for name, value, scale in zip(FEATURES, values, normalization["features"])})
-    coordinates(result, baseline, normalization)
-    return result
+    return coordinate.export_model(values, baseline, profile(normalization, bounds), target_rules)
 
 
 def population(baseline, parents, normalization, bounds, seed, target_rules):
-    """Anchor, up to two exact parents, then fixed-sigma Gaussian children.
-
-    A duplicate consumes its proposal attempt and RNG values, but not a child
-    index. The child-index sigma/center schedule never reacts to game outcomes.
-    Clipping is coordinatewise. Failure to make eight unique models within the
-    fixed attempt ceiling fails closed without changing proposal mechanics.
-    """
-    require(type(seed) is int and seed >= 0 and len(parents) <= 2,
-            "Each generation requires its declared seed and at most two prior elites.")
-    anchor = export_model([0.] * len(FEATURES), baseline, normalization, bounds, target_rules)
-    require(model_key(anchor) == model_key(baseline), "The anchor must preserve exact F1 weights.")
-    require(len({model_key(model) for model in [anchor, *parents]}) == 1 + len(parents),
-            "Initial elites must be distinct from one another and F1.")
-    parent_coordinates = [[0.] * len(FEATURES)] + [coordinates(model, baseline, normalization) for model in parents]
-    require(all(abs(v) <= bound + 1e-10 for row in parent_coordinates for v, bound in zip(row, bounds)),
-            "An elite cannot enlarge the precommitted coordinate bounds.")
-    # Undo only serialization-scale roundoff at a boundary; bounds never expand.
-    parent_coordinates = [[max(-bound, min(bound, value)) for value, bound in zip(row, bounds)]
-                          for row in parent_coordinates]
-    result = [{"candidateIndex": index, "kind": "anchor" if index == 0 else "elite",
-               "model": copy.deepcopy(model), "coordinates": parent_coordinates[index]}
-              for index, model in enumerate([anchor, *parents])]
-    seen = {model_key(row["model"]) for row in result}
-    generator = random.Random(seed)
-    child = 0
-    for attempt in range(MAX_PROPOSALS):
-        if len(result) == POPULATION:
-            return result
-        first = generator.randrange(len(parent_coordinates))
-        parent_ids = [first]
-        if child % 2 and len(parent_coordinates) > 1:
-            second = generator.randrange(len(parent_coordinates) - 1)
-            parent_ids.append(second + (second >= first))
-        center = [sum(parent_coordinates[parent][index] for parent in parent_ids) / len(parent_ids)
-                  for index in range(len(FEATURES))]
-        sigma = SIGMAS[child % len(SIGMAS)]
-        noise = [generator.gauss(0., 1.) for _ in FEATURES]
-        values = [max(-bound, min(bound, mean + sigma * perturbation))
-                  for mean, perturbation, bound in zip(center, noise, bounds)]
-        model = export_model(values, baseline, normalization, bounds, target_rules)
-        key = model_key(model)
-        if key in seen:
-            continue
-        result.append({"candidateIndex": len(result), "kind": "mutation", "childIndex": child,
-                       "attempt": attempt, "parentIndices": parent_ids, "sigma": sigma,
-                       "center": center, "gaussianNoise": noise, "coordinates": values, "model": model})
-        seen.add(key)
-        child += 1
-    raise ValueError("Generation exhausted its fixed proposal ceiling; no adaptive retry is permitted.")
+    return coordinate.population(baseline, parents, profile(normalization, bounds), seed, target_rules,
+        maximum_proposals=MAX_PROPOSALS, population_size=POPULATION, sigmas=SIGMAS)
 
 
 def ranking(row):
