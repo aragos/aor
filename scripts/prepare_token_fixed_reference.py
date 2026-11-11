@@ -56,8 +56,10 @@ def prepare(options):
     require(audit['allIntersectionsZero'] and set(audit['seedBanks']) == set(target.COUNTS),
             'Use the complete fresh origin, continuation, ordinal and final-world audit.')
     equivalence = read(proof)
-    require(equivalence['passed'] and equivalence['newGames'] == 0 and equivalence['actualFits'] == 0,
-            'Require completed zero-head equivalence on the sanitized saved actor observations.')
+    target.validate_zero_head(equivalence, implementation['trainingJarSha256'])
+    require(equivalence['files'] and all(Path(path).is_absolute() and sha(path) == digest
+            for path,digest in equivalence['files'].items()),
+            'Zero-head historical inference evidence must retain every original artifact hash.')
     identity = numerical.inspect(options.numerical_python)
     python, java = pure_identity(), target.exp.java_identity(options.java)
     require(identity['resolvedExecutable'] == python['executable']
@@ -93,6 +95,7 @@ def prepare(options):
         nativeImplementationSha256=IMPLEMENTATION, numericalRequirementsLockSha256=LOCK,
         zeroHeadEquivalence=str(root/'evidence/zero-head-equivalence.json'),
         zeroHeadEquivalenceSha256=sha(proof),
+        externalEvidenceFiles=equivalence['files'],
         executionAllocation=dict(thisWorkers=6,host='mac',logicalCpus=os.cpu_count(),otherMacWorkers=0),
         limitation='Fixed-T residual evidence in one fixed M8/E/C64 ecology; unchanged proposals and .02 margin. No guaranteed improvement.')
     for key in ('baseline','expansionModel','runtime','scripts','seedAudit','initializer',

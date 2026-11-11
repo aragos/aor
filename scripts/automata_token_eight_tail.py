@@ -22,6 +22,7 @@ CEILINGS = (21600, 600, 1800, 3600, 7200)
 REPLAY_ORIGINS = [0, 170, 341, 511, 512, 555, 598, 639]
 FIT = dict(ridgePenalties=[.0001, .001, .01, .1, 1.], maxSeconds=600.)
 SCREEN = previous.SCREEN
+SAVED_OBSERVATIONS = 'b171078633390048e543ef74fefe0940a030ab00b28f8b324c355c61af416cbc'
 
 
 def fixed_reference(protocol):
@@ -34,6 +35,14 @@ def numerical_environment(protocol):
         return purchase_ecology_environment
     import adaptive_token_environment
     return adaptive_token_environment
+
+
+def validate_zero_head(proof, runtime_sha):
+    require(proof['passed'] and proof['newGames'] == 0 and proof['actualFits'] == 0
+            and proof['fixtureSha256'] == SAVED_OBSERVATIONS
+            and proof['ordinaryModelSha256'] == BASELINE and proof['initializerSha256'] == INITIALIZER
+            and proof['trainingJarSha256'] == runtime_sha and proof['tokenObservations'] == 27,
+            'Require exact zero-head equivalence on all 27 saved token observations and declared models/runtime.')
 
 
 def collection_source(protocol):
@@ -67,8 +76,7 @@ def validate_inputs(protocol):
                 and sha(protocol['zeroHeadEquivalence']) == protocol['zeroHeadEquivalenceSha256'],
                 'Residual collection, runtime reference and same-interpreter numerical ownership must be explicit.')
         proof = read(protocol['zeroHeadEquivalence'])
-        require(proof['passed'] and proof['newGames'] == 0 and proof['actualFits'] == 0,
-                'Residual preparation requires the reviewed saved-observation zero-head equivalence proof.')
+        validate_zero_head(proof, protocol['runtimeTrainingJarSha256'])
     require(sha(protocol['baseline']) == protocol['baselineSha256'] == BASELINE
             and sha(protocol['expansionModel']) == protocol['expansionSha256'] == EXPANSION
             and {key:sha(path) for key,path in protocol['frozenPurchase'].items()}

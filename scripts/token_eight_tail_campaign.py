@@ -92,6 +92,11 @@ def input_files(root,protocol):
     files.update(protocol['java']['files'])
     files.update(protocol['python']['files'])
     files.update(protocol['numerical']['files'])
+    for path,digest in protocol.get('externalEvidenceFiles',{}).items():
+        require(Path(path).is_absolute() and sha(path) == digest
+                and (path not in files or files[path] == digest),
+                'External historical inference evidence changed or conflicts with another frozen input.')
+        files[path] = digest
     return files
 
 

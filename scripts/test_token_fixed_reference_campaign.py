@@ -1,6 +1,7 @@
 """Residual profile ownership and bounded stages; no collected banks or fitting."""
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -77,6 +78,26 @@ class ResidualSupervisorTest(unittest.TestCase):
         with patch.object(target,'read',return_value=artifact):
             with self.assertRaisesRegex(ValueError,'exact fresh eight-tail'):
                 target.verify_fit(residual(),Path('/run'))
+
+    def test_zero_head_proof_rejects_a_different_fixture_or_runtime(self):
+        valid = dict(passed=True,newGames=0,actualFits=0,fixtureSha256=target.SAVED_OBSERVATIONS,
+            ordinaryModelSha256=target.BASELINE,initializerSha256=target.INITIALIZER,
+            trainingJarSha256='jar',tokenObservations=27)
+        target.validate_zero_head(valid,'jar')
+        for field in ('fixtureSha256','ordinaryModelSha256','initializerSha256','trainingJarSha256','tokenObservations'):
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError,'all 27 saved'):
+                    target.validate_zero_head(dict(valid,**{field:'changed'}),'jar')
+
+    def test_freeze_rejects_changed_historical_proof_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = root/'observation.json'
+            artifact.write_text('changed')
+            frozen = dict(java={'files':{}},python={'files':{}},numerical={'files':{}},
+                          externalEvidenceFiles={str(artifact):'0'*64})
+            with self.assertRaisesRegex(ValueError,'historical inference evidence changed'):
+                campaign.input_files(root,frozen)
 
 
 if __name__ == '__main__':
