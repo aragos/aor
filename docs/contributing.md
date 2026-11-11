@@ -136,6 +136,24 @@ including authoritative advance savings, Printed Word rebates and patronage. The
 and one-game inference limits apply. `scripts/analyze_leader_hold.py` verifies the completed bank
 and reports each fixed-policy difference without fitting or promotion.
 
+The `leader-coordination-prepare` / `leader-coordination-run` profile instead samples fresh,
+homogeneous frozen-policy worlds. Preparation validates the protocol and stream banks without
+creating a game. Run scans exactly 128 worlds, rotating the controlled seat, and retains the first
+eligible baseline-selected leader per world. Eligibility and its single target come only from the
+deterministic post-play actor view: positive actual marginal leader saving, current eligibility and
+affordability. Targets sort by saving descending, quoted price ascending, then printed letter.
+The first 32 eligible world indices are retained regardless of worker completion order; fewer than
+16 stops with coverage evidence and no tails. Every retained root executes the same leader command
+under two fixed policies and 16 paired evaluation streams. The option protects its target's current
+quoted budget during shipping and buys it when offered; changed eligibility/cash/credit aborts, and
+purchase or turn expiry releases the commitment. Other cards and the frozen Purchase policy remain
+unchanged. Three workers share one sixty-minute attempt; no retries, target selection from returns,
+fitting, or promotion is supported. Canonical origin histories, all skips, exact suffixes and abort
+receipts remain available for replay. A discounted alternative need not be strategically better;
+terminal returns test that claim. `scripts/analyze_leader_coordination.py` checks bank identities and
+reports origin-level comparisons, preserving the condition that an eligible leader opportunity was
+reached under the unchanged policy.
+
 ### Bounded human expansion imitation
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic

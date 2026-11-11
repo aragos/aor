@@ -15,6 +15,18 @@ fun main(arguments: Array<String>) {
         arguments.toList().windowed(2).any {
             it in
                 listOf(
+                    listOf("--mode", "leader-coordination-prepare"),
+                    listOf("--mode", "leader-coordination-run"),
+                )
+        }
+    ) {
+        LeaderCoordinationMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it in
+                listOf(
                     listOf("--mode", "recorded-leader-hold-prepare"),
                     listOf("--mode", "recorded-leader-hold-run"),
                 )

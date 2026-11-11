@@ -52,36 +52,7 @@ internal data class RecordedPrefixInput(
         require(streams.distinct().size == streams.size) {
             "Recorded roots require distinct proposal, chance and continuation policy streams."
         }
-        require(
-            arena.configurations.size == 1 &&
-                arena.configurations.single().playerCount == header.players.size &&
-                arena.candidate == arena.incumbent &&
-                arena.opponents == listOf(arena.candidate) &&
-                arena.frozenPurchase != null &&
-                arena.expansionImitation != null &&
-                arena.tokenOrder != null
-        ) {
-            "Recorded diagnostics require a single homogeneous frozen ordinary/overlay environment."
-        }
-        val metadata = PurchaseJson.mapper.valueToTree<JsonNode>(arena.overlayMetadata())
-        val expansion = metadata.required("expansionImitation")
-        val expansionHash = expansion.required("candidateModel").required("sha256")
-        require(
-            expansion.required("incumbentModel").required("sha256") == expansionHash &&
-                expansion.required("opponentModels").size() == 1 &&
-                expansion.required("opponentModels")[0]?.get("sha256") == expansionHash
-        ) {
-            "Every recorded diagnostic seat must use the identical expansion overlay."
-        }
-        val tokens = metadata.required("tokenOrder")
-        require(
-            tokens["candidateSelector"]?.asText() == "FIXED_16_TO_15" &&
-                tokens["incumbentSelector"]?.asText() == "FIXED_16_TO_15" &&
-                tokens["opponentSelectors"]?.map { it.asText() } == listOf("FIXED_16_TO_15")
-        ) {
-            "Every recorded diagnostic seat must use the frozen fixed token control."
-        }
-        arena.frozenPurchase.controllers(header.players.size, 0, side = null)
+        FrozenDiagnosticArena.validate(arena, header.players.size)
     }
 
     /**
