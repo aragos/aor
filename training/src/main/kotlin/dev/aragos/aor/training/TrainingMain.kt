@@ -11,6 +11,18 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (
+        arguments.toList().windowed(2).any {
+            it in
+                listOf(
+                    listOf("--mode", "recorded-prefix-prepare"),
+                    listOf("--mode", "recorded-prefix-run"),
+                )
+        }
+    ) {
+        RecordedPrefixMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "expansion-imitation-fit") }) {
         ExpansionImitationMain.run(arguments.toList())
         return

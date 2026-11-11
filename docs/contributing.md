@@ -97,6 +97,33 @@ diagnostic `candidate.json`. Schema/rules/catalog metadata protects inference co
 matching metadata alone establishes no playing-strength claim. Broader qualification remains
 [open work](follow-ups.md).
 
+### Recorded game prefix diagnosis
+
+`--mode recorded-prefix-prepare` and `--mode recorded-prefix-run` provide a separate local diagnostic
+for predeclared expansion passes and leader plays from a completed game. The local-only
+`scripts/sanitize_recorded_game.py` whitelist exports the typed engine header and effective canonical
+history, applying every `replaceFrom` truncation before appending revision deltas. It rejects missing
+archive prefixes, checks the original source hash before and after export, and excludes server,
+storage and authentication metadata. Keep the original save unchanged and all diagnostic data in a
+private directory; canonical histories retain hidden draws and must never become policy inputs.
+
+Preparation verifies complete terminal replay and exact actor-observation parity at every prefix,
+then freezes at most four offered commands: recorded, current frozen policy, pass where offered, and
+public card/province-group diversity. All later seats, including a former human seat, use the same
+frozen ordinary, expansion, token and Purchase policies. Run mode requires the exact source and
+preparation hashes, a fresh output directory, six workers and one ninety-minute allowance. Each arm
+gets 32 paired future chance/policy streams and exact suffix replay. The first sixteen streams select
+an arm using terminal reward; the other sixteen evaluate it. No resume, fitting or model activation
+is supported. `scripts/analyze_recorded_prefix.py` validates all completed tail hashes and reports
+conditional per-root differences, including terminal scores without using them for selection. The
+canonical suffix replay also retains next-turn boundary income/commodity-market projections and
+root-turn receipts for newly played own leaders: offered Printed Word rebates, actual play cash
+changes, effective advance savings under the authoritative price floor, and patronage payments.
+These descriptive receipts never select an alternative; later-turn leader benefits are represented
+only by the terminal outcomes and retained histories. Roots
+from one game are dependent: neither a root-averaged confidence interval nor a playing-strength claim
+is justified. This is a realized-hidden-world teacher diagnosis, not an information-safe oracle.
+
 ### Bounded human expansion imitation
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic
