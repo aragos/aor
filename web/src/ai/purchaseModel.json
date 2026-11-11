@@ -3047,7 +3047,7 @@
           "tokenPreference": 13.25445053241261,
           "tokens": 1.8211396802069946,
           "windmill": 1.4064759373147095,
-          "planning.tokenOrderControl.fixed16To15": 1.0,
+          "planning.tokenOrderControl.fixed16To15": 1,
           "planning.expansionModel.enabled": 1,
           "planning.expansionModel.tokens": 0.3852349799156729,
           "planning.expansionModel.progress": -0.4442306548798427,
@@ -3056,7 +3056,12 @@
           "planning.expansionModel.income": 5.327806045472258,
           "planning.expansionModel.risk": -6.333220456030338,
           "planning.expansionModel.action.expansion": -0.9230337456001637,
-          "planning.expansionModel.action.pass": -0.4816743576485838
+          "planning.expansionModel.action.pass": -0.4816743576485838,
+          "planning.militaryModel.card.armor": 8.441581297658175,
+          "planning.militaryModel.card.gunpowder": 8.02831771332532,
+          "planning.militaryModel.card.long-bow": 7.375995807614407,
+          "planning.militaryModel.card.stirrups": 8.290650664791212,
+          "planning.militaryModel.enabled": 1
         }
       },
       "model": {
@@ -240405,6 +240410,233 @@
             "sha256": "94d0560f3d0bdce26680e1029cd42d36edee1a2d689a9156ab66d74c37de92f2"
           }
         ]
+      },
+      "militaryCombinationQualification": {
+        "browserSupportCommit": "6b690398913e1df4cd7e63d1ebba16fe136de185",
+        "components": {
+          "expansion-plus-8.json": "feb80d4363a93b266c94bc46e0d75ff4b0cb1f17a55d0f6d77782715862f44ef",
+          "lambda-1.0.json": "3b7f677595670972253e8f034fd052178237c1547017c321e33e770e3de176b9",
+          "ordinary-f1.json": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+          "ordinary-plus-8.json": "b7c42a6f347a77c9bd9ff5d29778ea74650a9affe5fdb16738a8bea8d75d17d4",
+          "purchase-c-p64.json": "62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44",
+          "purchase-prior-f0.json": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0"
+        },
+        "confirmationRivals": [
+          "F1",
+          "E",
+          "T",
+          "E+T"
+        ],
+        "evaluatedReference": "Exact E+T with shared C/F0",
+        "evidence": [
+          {
+            "path": "automata-military-combination-qualification-20261111/campaign.json",
+            "sha256": "834736c46fe0cc1d3a10128fd8fa4b32b134ea33cfb1343791e5906c8661c744"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/protocol.json",
+            "sha256": "adb0c01717cf17c3531e2a9af9603d7180fbccc9299b9edcba8edaf090210a56"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/completion-audit.json",
+            "sha256": "d78e141f6dd1c2b09425911997f9b7fbd5c2c04587f86b7662ed87c837366a3a"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/run/campaign-state.json",
+            "sha256": "93d251a89d6aedfe50cc627f999d7f45697f5c81399730098da400c27eeb06c5"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/watch-audits/confirm.json",
+            "sha256": "c08ec449d7df265d6f535e2e0ddb220fd6285548113a0cb9732a14fbfb71d07c"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/run/confirm-report.json",
+            "sha256": "bad3a763cb7ad0b1f80d7b466fbaf331d47177d427b34e3ad6a49270426e03f0"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/run/results/confirm.json",
+            "sha256": "14dbf8dd1dd19aaef387cad4bc0d0f120d805c9389f3dd956d1f8022bb7bd950"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/watch-audits/heldout.json",
+            "sha256": "e73bbff35379acbfb5a5baf7d13fc4d5586aad799a9e9e4d154d365b85b6c825"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/run/heldout-report.json",
+            "sha256": "113169a4b2ba8957d1de7a459e7ad583d3e68b39598e0faa81314bae0b8bbac0"
+          },
+          {
+            "path": "automata-military-combination-qualification-20261111/run/results/heldout.json",
+            "sha256": "2260aa07772c0cecee156655715fc65b6dc771c8f04d1e20650094817e63a6dc"
+          },
+          {
+            "path": "automata-military-combination-preview-20261111/hard-only/proof/parity-frozen-result.json",
+            "sha256": "9c7e7c55db975f35ce8dc9e733984418a9f6126caa0dc62cbde18153b57936dd"
+          }
+        ],
+        "expansionValues": "Eight absolute replacement coefficients on HARD expand only; military biases preserved.",
+        "heldoutRivals": [
+          "E+T"
+        ],
+        "humanStrengthVerified": false,
+        "limitation": "Fixed four-player configuration and these declared rival populations; human strength is not established.",
+        "militaryBiasDelta": 8,
+        "militaryDifficulty": "HARD",
+        "militaryFeatures": [
+          "card.armor",
+          "card.stirrups",
+          "card.long-bow",
+          "card.gunpowder"
+        ],
+        "militaryModelGate": "planning.militaryModel.enabled",
+        "militaryValues": "Four absolute replacement coefficients on HARD only; raw ordinary weights retained for EASY/NORMAL.",
+        "productionActivation": false,
+        "qualificationConfidence": 0.99,
+        "qualificationPassed": true,
+        "qualificationTransferred": false,
+        "rulesVersion": "ah1996-three-epoch-5",
+        "runtimeCommit": "75ff100",
+        "runtimeTrainingJarSha256": "21d5698aa264e7d830a29945bfa5e98e6237ab825b5ebd37b9d3dfc13937a304",
+        "scope": {
+          "deckModification": true,
+          "drawThreeKeepTwo": false,
+          "immediateMasterArtDiscard": true,
+          "initialCard": "NO_CRUSADES",
+          "map": "STANDARD",
+          "playerCount": 4
+        },
+        "sourceCampaign": "automata-military-combination-qualification-20261111",
+        "stages": {
+          "confirm": {
+            "canonicalReplaysVerified": 8,
+            "descriptiveReplaySample": {
+              "candidate": {
+                "attacks": 125,
+                "attacksAfterMilitary": 0,
+                "games": 4,
+                "normalMilitaryPlays": 1,
+                "tokensDiscarded": 45
+              },
+              "incumbent": {
+                "attacks": 127,
+                "attacksAfterMilitary": 3,
+                "games": 4,
+                "normalMilitaryPlays": 1,
+                "tokensDiscarded": 38
+              }
+            },
+            "frozenPinsVerified": 864,
+            "humanStrengthVerified": false,
+            "lineup": {
+              "controlledSeatCounts": [
+                512,
+                512,
+                512,
+                512
+              ],
+              "rivalSeatOccurrences": {
+                "E": 1536,
+                "E+T": 1536,
+                "F1": 1536,
+                "T": 1536
+              },
+              "rolesByOpponentIndex": [
+                "F1",
+                "E",
+                "T",
+                "E+T"
+              ]
+            },
+            "metrics": {
+              "rewardDifference": {
+                "count": 2048,
+                "lower95": 0.04331456162520441,
+                "lowerConfidence": 0.0379615593888333,
+                "mean": 0.060351562500000004,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.0773885633747956
+              },
+              "winShareDifference": {
+                "count": 2048,
+                "lower95": 0.04224322276607649,
+                "lowerConfidence": 0.036338823118249,
+                "mean": 0.06103515625,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.07982708973392351
+              }
+            },
+            "pairedWorldsVerified": 2048,
+            "productionActivation": false,
+            "qualificationPassed": false,
+            "reportSha256": "bad3a763cb7ad0b1f80d7b466fbaf331d47177d427b34e3ad6a49270426e03f0",
+            "sourceReceiptSha256": "14dbf8dd1dd19aaef387cad4bc0d0f120d805c9389f3dd956d1f8022bb7bd950",
+            "stage": "confirm",
+            "stageArtifactHashesVerified": 2220,
+            "status": "passed"
+          },
+          "heldout": {
+            "canonicalReplaysVerified": 8,
+            "descriptiveReplaySample": {
+              "candidate": {
+                "attacks": 94,
+                "attacksAfterMilitary": 5,
+                "games": 4,
+                "normalMilitaryPlays": 3,
+                "tokensDiscarded": 37
+              },
+              "incumbent": {
+                "attacks": 98,
+                "attacksAfterMilitary": 0,
+                "games": 4,
+                "normalMilitaryPlays": 0,
+                "tokensDiscarded": 51
+              }
+            },
+            "frozenPinsVerified": 864,
+            "humanStrengthVerified": false,
+            "lineup": {
+              "controlledSeatCounts": [
+                1024,
+                1024,
+                1024,
+                1024
+              ],
+              "rivalSeatOccurrences": {
+                "E+T": 12288
+              },
+              "rolesByOpponentIndex": [
+                "E+T"
+              ]
+            },
+            "metrics": {
+              "rewardDifference": {
+                "count": 4096,
+                "lower95": 0.04477915158572471,
+                "lowerConfidence": 0.04121082416416892,
+                "mean": 0.056136067708333334,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.06749298383094196
+              },
+              "winShareDifference": {
+                "count": 4096,
+                "lower95": 0.0435003273658113,
+                "lowerConfidence": 0.03960178987228964,
+                "mean": 0.055908203125,
+                "qualificationConfidence": 0.99,
+                "upper95": 0.0683160788841887
+              }
+            },
+            "pairedWorldsVerified": 4096,
+            "productionActivation": false,
+            "qualificationPassed": true,
+            "reportSha256": "113169a4b2ba8957d1de7a459e7ad583d3e68b39598e0faa81314bae0b8bbac0",
+            "sourceReceiptSha256": "2260aa07772c0cecee156655715fc65b6dc771c8f04d1e20650094817e63a6dc",
+            "stage": "heldout",
+            "stageArtifactHashesVerified": 4232,
+            "status": "passed"
+          }
+        },
+        "tokenControl": "FIXED_16_TO_15"
       }
     },
     {

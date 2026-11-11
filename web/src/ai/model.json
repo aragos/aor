@@ -1521,7 +1521,7 @@
         "tokenPreference": 13.25445053241261,
         "tokens": 1.8211396802069946,
         "windmill": 1.4064759373147095,
-        "planning.tokenOrderControl.fixed16To15": 1.0,
+        "planning.tokenOrderControl.fixed16To15": 1,
         "planning.expansionModel.enabled": 1,
         "planning.expansionModel.tokens": 0.3852349799156729,
         "planning.expansionModel.progress": -0.4442306548798427,
@@ -1530,7 +1530,12 @@
         "planning.expansionModel.income": 5.327806045472258,
         "planning.expansionModel.risk": -6.333220456030338,
         "planning.expansionModel.action.expansion": -0.9230337456001637,
-        "planning.expansionModel.action.pass": -0.4816743576485838
+        "planning.expansionModel.action.pass": -0.4816743576485838,
+        "planning.militaryModel.card.armor": 8.441581297658175,
+        "planning.militaryModel.card.gunpowder": 8.02831771332532,
+        "planning.militaryModel.card.long-bow": 7.375995807614407,
+        "planning.militaryModel.card.stirrups": 8.290650664791212,
+        "planning.militaryModel.enabled": 1
       },
       "configuration": {
         "playerCount": 4,
