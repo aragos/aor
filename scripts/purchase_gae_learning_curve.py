@@ -51,22 +51,22 @@ def arena_source(protocol,index,model):
             candidatePolicy=str(model),incumbentPolicy=protocol['initialActor']))
 
 
-def validate_initial(protocol):
-    """Bind unchanged44 bytes and the actual actor-only optimizer, not reconstructed moments."""
+def validate_initial(protocol,*,initial_files=INITIAL_FILES):
+    """Bind reviewed initialization bytes and its actual actor-only optimizer moments."""
     initial=Path(protocol['initialOptimizer']).parent
     require(Path(protocol['initialActor'])==initial/'policy.json'
         and Path(protocol['initialOptimizer'])==initial/'checkpoint.json'
-        and all(sha(initial/name)==digest for name,digest in INITIAL_FILES.items()),
-        'Continuation requires all four exact completed44 final GAE checkpoint files.')
+        and all(sha(initial/name)==digest for name,digest in initial_files.items()),
+        'Continuation requires all four exact completed initialization checkpoint files.')
     payload=ecology.checkpoint(initial/'checkpoint.json',initial/'policy.json')
     identity,finished=read(initial/'identity.json'),read(initial/'finished.json')
     objective=identity['actorOnlyObjective']
     require(payload['identitySha256']==finished['identitySha256']==legacy.digest(identity)
-        and finished['outputModelSha256']==qualified.CANDIDATE
+        and finished['outputModelSha256']==initial_files['policy.json']
         and finished['acceptedEpochs']==payload['epoch']==4
         and objective['version']=='purchase-precomputed-advantage-1'
         and objective['estimator']==pilot.ESTIMATOR,
-        'Initial actor must retain the completed44 GAE estimator and audited optimizer history.')
+        'Initial actor must retain the reviewed GAE estimator and audited optimizer history.')
     predictor=objective['frozenStatePredictions']['predictor']
     owners={'sourceSha256':'purchase_actor_baseline.py','criticCodeSha256':'purchase_value_benchmark.py',
             'encoderCodeSha256':'purchase_value_data.py'}
@@ -76,7 +76,7 @@ def validate_initial(protocol):
         and predictor['stateDictionarySha256']==sha(protocol['stateDictionary'])
         and predictor['inferenceContractSha256']==sha(protocol['inferenceContract'])
         and predictor['device']=='cpu' and predictor['dtype']=='float32' and predictor['threads']==1,
-        'Exact44 optimizer continuation cannot change its frozen predictor or numerical contract.')
+        'Optimizer continuation cannot change its frozen predictor or numerical contract.')
     require({k:v for k,v in identity['config'].items() if k!='seed'}==
         {k:v for k,v in pilot.update_config(protocol,1).items() if k!='seed'},
         'Continuation must preserve the original PPO recipe, including all optimizer settings.')
@@ -124,12 +124,12 @@ def validate_inputs(protocol):
     validate_initial(protocol)
 
 
-def numerical_preflight(protocol):
+def numerical_preflight(protocol,*,initial_files=INITIAL_FILES):
     """Validate the real continuation owner without predictions, fitting or game execution."""
     import purchase_ecology_environment as environment
     import purchase_policy as learner
     environment.verify(protocol['numerical'])
-    payload,identity=validate_initial(protocol)
+    payload,identity=validate_initial(protocol,initial_files=initial_files)
     receipt=learner.ActorAdamContinuation().validate(protocol['initialOptimizer'],
         identity['actorOnlyObjective'],read(protocol['initialActor']),
         learner.UpdateConfig(**pilot.update_config(protocol,1)))
@@ -179,12 +179,12 @@ def checkpoint(protocol,path,output,index,model):
     return report
 
 
-def progress(path,output,batches,checks,reason,streak):
-    """Only the final64 checkpoint is eligible for later review; earlier actors never substitute."""
-    completed=len(batches);final=completed==64 and any(row['batch']==64 for row in checks)
+def progress(path,output,batches,checks,reason,streak,*,final_batch=64,checkpoint_pairs=512):
+    """Only the declared final checkpoint is eligible for review; earlier actors never substitute."""
+    completed=len(batches);final=completed==final_batch and any(row['batch']==final_batch for row in checks)
     value=dict(protocolSha256=sha(path),completedBatches=completed,completedCheckpoints=[r['batch'] for r in checks],
         stopReason=reason,consecutiveZeroAcceptedBatches=streak,
-        scientificTerminalGames=completed*256+len(checks)*1024,
+        scientificTerminalGames=completed*256+len(checks)*checkpoint_pairs*2,
         historicalReproductions=completed*4+len(checks)*8,
         finalCheckpointEligibleForReview=final,eligibleActorSha256=batches[-1]['modelSha256'] if final else None,
         qualificationPassed=False,productionActivation=False,automaticNextCampaign=False,
@@ -193,17 +193,20 @@ def progress(path,output,batches,checks,reason,streak):
     return value
 
 
-def train_batch(protocol,path,output,index,model):
+def train_batch(protocol,path,output,index,model,*,source_builder=batch_source,
+                collection_verifier=data.verify_collection,
+                reader_path=Path(__file__).with_name('purchase_actor_baseline.py'),
+                numeric_entrypoint=Path(__file__).resolve()):
     directory=output/'batches'/f'batch-{index}'/'gae'
     require(not directory.exists(),'Each fresh on-policy batch permits one attempt.')
-    source=directory/'collection-source.json';document(source,batch_source(protocol,index,model))
+    source=directory/'collection-source.json';document(source,source_builder(protocol,index,model))
     exp.native(protocol,'purchase-collect',source,directory/'collection',
                extra=('--workers',str(protocol['workers'])))
-    provenance,decisions=data.verify_collection(directory/'collection',expected_ordinary=matched.ORDINARY,
+    provenance,decisions=collection_verifier(directory/'collection',expected_ordinary=matched.ORDINARY,
                                                expected_expansion=matched.EXPANSION)
-    provenance['readerSha256']=sha(Path(__file__).with_name('purchase_actor_baseline.py'))
+    provenance['readerSha256']=sha(reader_path)
     ecology.reproduction(protocol,directory)
-    command=[protocol['numerical']['executable'],'-E','-s','-B',str(Path(__file__).resolve()),
+    command=[protocol['numerical']['executable'],'-E','-s','-B',str(numeric_entrypoint),
              'numeric','--protocol',str(path),'--output',str(directory),'--index',str(index)]
     ecology.run_child(protocol,command,directory/'numeric.log')
     update=pilot.verify_update(protocol,directory,index,'gae',model,provenance,
@@ -250,14 +253,14 @@ def train(protocol,path,output):
     return exp.stage_result(output,'learn',True,'Bounded learning curve finished; no qualification.',report,artifacts)
 
 
-def campaign_spec(root,protocol,files):
+def campaign_spec(root,protocol,files,*,maximum_seconds=21600,script_name='purchase_gae_learning_curve.py'):
     """Reuse the existing external process-group/resource supervisor; one stage/attempt only."""
     return dict(schemaVersion=1,kind='automata-campaign',inputs=files,
-        limits=dict(maximumSeconds=21600,maximumDataBytes=8*exp.GIB,
+        limits=dict(maximumSeconds=maximum_seconds,maximumDataBytes=8*exp.GIB,
                     maximumRssBytes=6*exp.GIB,minimumFreeBytes=8*exp.GIB),
-        stages=[dict(id='learn',dependsOn=[],maximumSeconds=21600,maximumAttempts=1,
+        stages=[dict(id='learn',dependsOn=[],maximumSeconds=maximum_seconds,maximumAttempts=1,
             result='results/learn.json',command=[protocol['python']['executable'],'-E','-s','-S','-B',
-                str(root/'scripts/purchase_gae_learning_curve.py'),'stage','--protocol',str(root/'protocol.json'),
+                str(root/'scripts'/script_name),'stage','--protocol',str(root/'protocol.json'),
                 '--output','{output}'])])
 
 

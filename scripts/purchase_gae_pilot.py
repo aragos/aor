@@ -72,18 +72,19 @@ def previous_optimizer(directory,index,arm,initial_optimizer=None):
             if index>1 else initial_optimizer)
 
 
-def numeric(protocol,directory,index,arm,*,initial_optimizer=None):
+def numeric(protocol,directory,index,arm,*,initial_optimizer=None,collection_adapter=None):
     import purchase_actor_baseline as baseline
     import purchase_gae as gae
     import purchase_policy as learner
     import purchase_ecology_environment as environment
     environment.verify(protocol['numerical'])
+    adapter=baseline if collection_adapter is None else collection_adapter
     model=Path(read(directory/'collection-source.json')['policy'])
     previous=previous_optimizer(directory,index,arm,initial_optimizer)
     prediction=directory/'external-baselines.json'
-    baseline.predict(directory/'collection',model,protocol['critic'],protocol['inferenceContract'],
+    adapter.predict(directory/'collection',model,protocol['critic'],protocol['inferenceContract'],
                      protocol['stateDictionary'],prediction,expected_model_sha=sha(model))
-    rows,provenance=baseline.read_collection(directory/'collection',model,read(model),
+    rows,provenance=adapter.read_collection(directory/'collection',model,read(model),
                                            contract=learner.PURCHASE_CONTRACT)
     targets=directory/'advantages.json'
     if arm=='gae':gae.targets(rows,provenance,sha(model),prediction,targets)
@@ -92,7 +93,8 @@ def numeric(protocol,directory,index,arm,*,initial_optimizer=None):
         targetsSha256=sha(targets) if arm=='gae' else None,newCriticFits=0))
     document(directory/'critic-metrics.json',gae.critic_metrics(rows,provenance,prediction))
     gae.update(directory/'collection',model,learner.UpdateConfig(**update_config(protocol,index)),
-               prediction,targets,directory/'update',arm,optimizer_from=previous)
+               prediction,targets,directory/'update',arm,optimizer_from=previous,
+               collection_reader=adapter.read_collection)
     freeze=read(directory/'baseline-freeze.json')
     require(sha(prediction)==freeze['predictionsSha256']
         and (arm!='gae' or sha(targets)==freeze['targetsSha256']),

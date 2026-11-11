@@ -39,10 +39,10 @@ def critic_metrics(rows, provenance, baseline_file):
 
 
 def update(collection, model_path, config, baseline_file, target_file, output, arm,
-           optimizer_from=None):
+           optimizer_from=None, *, collection_reader=baseline.read_collection):
     policy.require(arm in ('mc','gae'),'Only the matched externalMC and GAE arms are supported.')
     objective=(policy.ActorOnlyObjective('external',str(baseline_file)) if arm=='mc' else
                policy.PurchaseAdvantageTargets(str(target_file)))
     return policy.update(model_path,collection,config,output,optimizer_from=optimizer_from,
-        collection_reader=baseline.read_collection,entrypoint=Path(__file__),actor_only=objective,
+        collection_reader=collection_reader,entrypoint=Path(__file__),actor_only=objective,
         actor_optimizer_continuation=policy.ActorAdamContinuation() if optimizer_from else None)

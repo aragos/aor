@@ -870,6 +870,19 @@ top-ups, automatic qualification or activation is allowed. A failed deployment g
 evidence that continued training is futile; fixed-critic bias and rival-pool overfitting remain
 limitations of this development curve.
 
+The [strong-opponent curriculum](../scripts/purchase_strong_curriculum.py) separately continues the
+completed46 final actor and its Adam state for at most32 batches. Every rival keeps that initial
+purchase actor with homogeneous ETM8/F0 roles; rivals do not track the learner. The native collector
+already supports these explicit roles. A typed collection-ecology argument and separately bound
+reader permit them without changing legacy defaults or the original state predictor's source bytes,
+weights, feature units or numerical identity. GAE and PPO retain the same recipe.
+
+Only the final32 actor receives one fresh1024-pair comparison against its initialization with the
+same fixed rivals. Four consecutive zero-accepted-epoch batches or the original four-hour deadline
+stop the single attempt. There are no intermediate statistical looks, checkpoint fallback,
+automatic qualification, activation or successor. Its seed reservation uses only explicitly frozen
+reviewed ancestry; current human-game directories and live metadata are not scanned.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It
