@@ -1014,12 +1014,15 @@ a larger change retains the baseline without reselecting a neighbor. `FIXED_16_T
 side's model and changes only an ordinary bid of 16 to an offered legal 15. Selector roles are bound
 into experiment identity and metadata; model roles retain immutable snapshots. Token replay
 decisions record `ordinaryTokenBaseline`, including the ordinary policy's token heads, separately
-from immediate linear scores. These controls do not change collection, fitting or browser play.
+from immediate linear scores. The model-free evaluated `ORDINARY_MINUS_TWO` control uses the same
+implementation as the rival diagnostic below: subtract two from the actual ordinary token-head
+choice only when that exact command is offered. It supplies a descriptive comparison, never a
+learned-model fallback or qualification. These controls do not change fitting or browser play.
 
 An optional `tokenOrder.opponentSelectors` array assigns one role per entry of the ordinary
 `opponents` pool, in that exact model-index order. Arena and replay map those indices through each
 rotated lineup, excluding the evaluated seat. Entries are `ORDINARY`, `FIXED_16_TO_15`, or the
-rival-only diagnostic `ORDINARY_MINUS_TWO` (actual ordinary token-head choice minus two, only if
+diagnostic `ORDINARY_MINUS_TWO` (actual ordinary token-head choice minus two, only if
 that exact amount is offered). Every rival keeps its own ordinary baseline and the shared Purchase
 actor/prior. Explicit arrays bind identity and metadata; omission preserves existing roles and
 identity. Search and legacy root collection reject these arena-only roles.

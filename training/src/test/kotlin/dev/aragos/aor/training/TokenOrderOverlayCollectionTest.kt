@@ -14,6 +14,19 @@ import kotlin.test.assertFailsWith
 
 class TokenOrderOverlayCollectionTest {
     @Test
+    fun evaluatedMinusTwoCannotReplaceTheCollectionReference() {
+        TokenOrderOverlayFixture().use { fixture ->
+            fixture.edit {
+                (this["tokenOrder"] as ObjectNode).put("candidateSelector", "ORDINARY_MINUS_TWO")
+            }
+
+            val failure = assertFailsWith<IllegalArgumentException> { fixture.specification }
+
+            assertThat(failure).hasMessageThat().contains("ordinary token reference")
+        }
+    }
+
+    @Test
     fun legacySourceCannotDeclareEvenAnEmptyReplayList() {
         ArenaPurchaseFixture().use { fixture ->
             val source = PurchaseJson.read(fixture.source) as ObjectNode

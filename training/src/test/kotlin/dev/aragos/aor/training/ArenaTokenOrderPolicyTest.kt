@@ -23,6 +23,90 @@ import kotlin.test.assertFailsWith
 
 class ArenaTokenOrderPolicyTest {
     @Test
+    fun evaluatedMinusTwoReusesTheRivalControlAndRetainsTheOtherSide() {
+        ArenaPurchaseFixture().use { fixture ->
+            val specification =
+                tokenRoles(
+                        fixture,
+                        mapOf(
+                            "candidateSelector" to "ORDINARY_MINUS_TWO",
+                            "incumbentSelector" to "FIXED_16_TO_15",
+                            "opponentSelectors" to listOf("ORDINARY_MINUS_TWO"),
+                        ),
+                    )
+                    .copy(
+                        candidate = testBaseline,
+                        incumbent = testBaseline,
+                        opponents = listOf(testBaseline),
+                    )
+            val decision = tokenDecision(fixture)
+            val candidate =
+                specification.controllers(
+                    4,
+                    0,
+                    ArenaSide.CANDIDATE,
+                    testBaseline,
+                    listOf(0, 0, 0, 0),
+                )
+            val incumbent =
+                specification.controllers(
+                    4,
+                    0,
+                    ArenaSide.INCUMBENT,
+                    testBaseline,
+                    listOf(0, 0, 0, 0),
+                )
+
+            assertThat(candidate[0]?.choose(decision)).isEqualTo("buy-tokens 14")
+            assertThat(candidate[1]?.choose(decision)).isEqualTo(candidate[0]?.choose(decision))
+            assertThat(incumbent[0]?.choose(decision)).isEqualTo("buy-tokens 15")
+            assertThat(candidate[0]?.controls("purchase-advances")).isTrue()
+        }
+    }
+
+    @Test
+    fun evaluatedMinusTwoRetainsTheHeadWhenTheExactAlternativeIsMissing() {
+        ArenaPurchaseFixture().use { fixture ->
+            val initial = tokenDecision(fixture)
+            val decision =
+                initial.copy(
+                    observation =
+                        initial.observation.copy(
+                            candidates =
+                                initial.observation.candidates.filter {
+                                    it.command != "buy-tokens 14"
+                                }
+                        )
+                )
+            val controller =
+                TokenOrderController(
+                    testBaseline,
+                    ArenaTokenRole(ArenaTokenSelector.ORDINARY_MINUS_TWO, null),
+                )
+
+            assertThat(controller.choose(decision)).isEqualTo("buy-tokens 16")
+        }
+    }
+
+    @Test
+    fun evaluatedMinusTwoReplaysTheExactWholeGameWithItsBoundRole() {
+        ArenaPurchaseFixture().use { fixture ->
+            val specification =
+                tokenRoles(fixture, mapOf("candidateSelector" to "ORDINARY_MINUS_TWO"))
+            val game = StrategyArena.game(specification, 0, ArenaSide.CANDIDATE, Long.MAX_VALUE)
+
+            val replay = StrategyReplays.play(specification, 0, StrategyReplaySide.CANDIDATE)
+
+            assertThat(replay.replayVerified).isTrue()
+            assertThat(replay.game.scores).isEqualTo(game.scores)
+            assertThat(replay.game.decisions).isEqualTo(game.decisions)
+            assertThat(specification.overlayMetadata()["tokenOrder"])
+                .isEqualTo(mapOf("candidateSelector" to "ORDINARY_MINUS_TWO"))
+            assertThat(specification.identity()).contains("ORDINARY_MINUS_TWO")
+        }
+    }
+
+    @Test
     fun explicitSidesSelectDifferentTokenActorsEvenWithEqualOrdinaryModels() {
         ArenaPurchaseFixture().use { fixture ->
             val specification = withTokenRoles(fixture)
@@ -388,6 +472,10 @@ class ArenaTokenOrderPolicyTest {
                         "candidateSelector" to "FIXED_16_TO_15",
                         "candidateModel" to "model.json",
                     ),
+                    mapOf(
+                        "candidateSelector" to "ORDINARY_MINUS_TWO",
+                        "candidateModel" to "model.json",
+                    ),
                     mapOf("candidateSelector" to "UNKNOWN"),
                 )
 
@@ -504,7 +592,7 @@ class ArenaTokenOrderPolicyTest {
 
     private fun tokenRoles(
         fixture: ArenaPurchaseFixture,
-        fields: Map<String, String>,
+        fields: Map<String, Any>,
     ): ArenaSpecification {
         val source = PurchaseJson.read(fixture.source) as ObjectNode
         source.set<JsonNode>("tokenOrder", PurchaseJson.mapper.valueToTree(fields))

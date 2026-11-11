@@ -19,6 +19,10 @@ internal enum class ArenaTokenSelector {
     ADJACENT_VETO,
     /** Replace the actual ordinary bid of 16 with an offered 15; otherwise retain it exactly. */
     FIXED_16_TO_15,
+    /**
+     * Diagnostic control: subtract two only when the exact ordinary-head alternative is offered.
+     */
+    ORDINARY_MINUS_TWO,
 }
 
 /** A fixed control has no unused model; both learned selectors require their frozen Q model. */
@@ -27,8 +31,11 @@ internal data class ArenaTokenRole(
     val input: TerritoryValueInput?,
 ) {
     init {
-        require((selector == ArenaTokenSelector.FIXED_16_TO_15) == (input == null)) {
-            "Fixed token control must omit its model; learned token selectors require a model."
+        require(
+            (selector in setOf(ArenaTokenSelector.MODEL, ArenaTokenSelector.ADJACENT_VETO)) ==
+                (input != null)
+        ) {
+            "Fixed token controls must omit their model; learned token selectors require a model."
         }
     }
 }
@@ -230,7 +237,7 @@ private constructor(
                 selector?.let { value ->
                     val name = PurchaseJson.text(value, selectorField(side))
                     requireNotNull(ArenaTokenSelector.entries.singleOrNull { it.name == name }) {
-                        "Token selector must be MODEL, ADJACENT_VETO or FIXED_16_TO_15."
+                        "Token selector must be MODEL, ADJACENT_VETO, FIXED_16_TO_15 or ORDINARY_MINUS_TWO."
                     }
                 } ?: ArenaTokenSelector.MODEL
             return ArenaTokenRole(selected, model?.let { readModel(source, it, modelField(side)) })
@@ -257,6 +264,9 @@ internal class TokenOrderController(
     override fun controls(decision: String): Boolean = decision == "buy-tokens"
 
     override fun choose(decision: SimulationDecision): String {
+        if (role.selector == ArenaTokenSelector.ORDINARY_MINUS_TWO) {
+            return TokenMinusTwoController(baseline).choose(decision)
+        }
         val ordinary =
             BotPolicy.choose(decision.observation, BotDifficulty.HARD, decision.seed, baseline)
         if (role.selector == ArenaTokenSelector.FIXED_16_TO_15) {
@@ -284,7 +294,7 @@ internal class TokenOrderController(
     }
 }
 
-/** Diagnostic rival only; uses its own ordinary head and never clips to an unoffered amount. */
+/** Shared diagnostic control; uses the actual ordinary head and never clips to an unoffered bid. */
 private class TokenMinusTwoController(private val baseline: BotModel) : SimulationController {
     override fun controls(decision: String): Boolean = decision == "buy-tokens"
 
