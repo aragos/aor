@@ -745,6 +745,33 @@ completed batches need no extraction. For manual inspection, run `purchase_stora
 storage layout. Archives never overwrite conflicting evidence. The campaign keeps its four-GiB
 output/RSS limits and two-GiB free-space reserve.
 
+## Purchase collection with a frozen expansion/token ecology
+
+`purchase-collect` may opt into `continuationProtocol: "ARENA_OVERLAYS_1"`. It then requires
+`expansionImitation` with a `candidateModel` and one nullable `opponentModels` entry per ordinary
+opponent, plus `tokenOrder` with `candidateSelector: "FIXED_16_TO_15"` and indexed
+`opponentSelectors` limited to `ORDINARY` or `FIXED_16_TO_15`. The candidate role follows the rotating
+learning seat. These native arena controls own only expansion and token decisions; `policy`,
+`opponentPurchasePolicy` and `sharedPurchaseBaseline` retain exclusive ownership of sampled
+shipping/advance decisions and are all required. Other phases retain each seat's ordinary model.
+
+The opt-in also requires one through eight distinct `replayIndices`, fixed before collection.
+Those games have separate `replay-N.json` sidecars containing the full verified canonical history,
+bound to the corresponding trajectory bytes. Completion hashes cover both artifacts. Authority
+history never enters the unchanged purchase observations or training rows. Omitting the protocol
+retains the legacy identity formula, metadata shape and collection behavior; stray ecology fields
+without opt-in are rejected.
+
+```sh
+training/build/install/training/bin/training --mode purchase-replay --source COMPLETED_COLLECTION --output NEW_DIRECTORY --hours 1
+```
+
+This read-only reproduction uses exactly the predeclared games and unchanged original inputs. It
+requires exact trajectory bytes, including actor sampling, offers, features, likelihoods and terminal
+labels, and exact canonical histories. It creates no new origin worlds and cannot select different
+indices or overwrite a prior reproduction. Its `reproduction.json` and `finished.json` receipts
+establish mechanical reproducibility, not playing strength.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It

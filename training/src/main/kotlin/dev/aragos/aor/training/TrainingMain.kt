@@ -68,6 +68,10 @@ fun main(arguments: Array<String>) {
         PurchaseCollectionMain.run(arguments.toList())
         return
     }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "purchase-replay") }) {
+        PurchaseReproduction.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-value-pilot") }) {
         TokenValuePilotMain.run(arguments.toList())
         return
@@ -110,6 +114,7 @@ fun main(arguments: Array<String>) {
             --mode token-order-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode token-order-replay --source COMPLETED_COLLECTION --output NEW_PATH --hours HOURS
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
+            --mode purchase-replay --source COMPLETED_COLLECTION --output NEW_PATH --hours HOURS
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode joint-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode territory-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N

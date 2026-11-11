@@ -19,7 +19,8 @@ object PurchaseCollectionMain {
                     input.policyPath,
                     input.opponentPurchasePolicy?.path,
                     input.sharedPurchaseBaseline?.path,
-                )
+                ) +
+                input.ecology?.inputPaths.orEmpty()
         Files.createDirectories(options.output)
         val output = options.output.toRealPath()
         require(inputs.none { it.startsWith(output) }) {

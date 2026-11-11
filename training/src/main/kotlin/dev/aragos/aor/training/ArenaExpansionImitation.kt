@@ -102,6 +102,8 @@ private constructor(
                 input?.let { "expansion-imitation-opponent-$index.json" to it }
             }
 
+    internal fun inputPaths(): List<Path> = inputs().map { it.second.path }
+
     internal fun metadata(): Map<String, Any> =
         mapOf(
             "expansionImitation" to
