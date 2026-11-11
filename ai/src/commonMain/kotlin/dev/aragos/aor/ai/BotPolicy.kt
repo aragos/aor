@@ -30,7 +30,8 @@ object BotPolicy {
         }
         require(observation.candidates.isNotEmpty()) { "A bot decision requires a candidate." }
         require(observation.candidates.size <= 1024) { "A bot decision has too many candidates." }
-        val activeModel = BotExpansionModel.forObservation(observation, difficulty, model)
+        val militaryModel = BotMilitaryModel.forDifficulty(difficulty, model)
+        val activeModel = BotExpansionModel.forObservation(observation, difficulty, militaryModel)
         val ordinaryScores =
             observation.candidates.associate { candidate ->
                 candidate.command to score(candidate, activeModel)
