@@ -21,6 +21,17 @@ const originalPolicySha256 = '3802440bc84830724e32c8f32f273648f38128fc7fc1774a9c
 const sourceBaselineSha256 = 'ca5a700523e29d5084bf754d6a19ff2051d618ee844ec8a617aee53701bed140';
 const ordinaryModelSha256 = '0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b';
 const frozenPurchasePriorSha256 = 'c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0';
+const expansionWeights = {
+    'planning.expansionModel.enabled': 1,
+    'planning.expansionModel.tokens': 0.3852349799156729,
+    'planning.expansionModel.progress': -0.4442306548798427,
+    'planning.expansionModel.reach': 0.6836511007417405,
+    'planning.expansionModel.commodity': 2.826326400381829,
+    'planning.expansionModel.income': 5.327806045472258,
+    'planning.expansionModel.risk': -6.333220456030338,
+    'planning.expansionModel.action.expansion': -0.9230337456001637,
+    'planning.expansionModel.action.pass': -0.4816743576485838,
+};
 
 // Object keys are sorted recursively; array order and parsed Float64 values are preserved.
 function canonical(value) {
@@ -243,7 +254,7 @@ test('the shipped actor retains exact ordinary choices outside its qualified use
     }
 });
 
-test('current rules bind qualified F1 token control while preserving the purchase prior', () => {
+test('current rules bind qualified expansion and token controls while preserving the purchase prior', () => {
     assert.equal(purchaseBundle.models.length, 2);
     assert.equal(currentActor.provenance.sourcePolicySha256,
         '62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44');
@@ -251,7 +262,7 @@ test('current rules bind qualified F1 token control while preserving the purchas
     assert.deepEqual(currentActor.ordinaryBaseline, {schemaVersion: ordinary.schemaVersion, weights: ordinary.weights});
     assert.deepEqual(currentActor.ordinaryBaseline, {
         ...actor.ordinaryBaseline,
-        weights: {...actor.ordinaryBaseline.weights, 'planning.tokenOrderControl.fixed16To15': 1},
+        weights: {...actor.ordinaryBaseline.weights, 'planning.tokenOrderControl.fixed16To15': 1, ...expansionWeights},
     });
     assert.equal(currentActor.configuration.drawThreeKeepTwo, false);
     const qualified = currentActor.hybridQualification;
@@ -274,6 +285,40 @@ test('current rules bind qualified F1 token control while preserving the purchas
                 assert.equal(pool[stage].metrics[metric].count, count);
                 assert.equal(pool[stage].metrics[metric].qualificationConfidence, .99);
                 assert(pool[stage].metrics[metric].lowerConfidence > 0);
+            }
+        }
+    }
+});
+
+test('the combined current-rules policy passed fresh gates against each component', () => {
+    const qualification = currentActor.expansionTokenQualification;
+
+    assert.equal(qualification.qualificationPassed, true);
+    assert.equal(qualification.qualificationTransferred, false);
+    assert.equal(qualification.humanStrengthVerified, false);
+    assert.equal(qualification.sourceOrdinaryModelSha256, ordinaryModelSha256);
+    assert.equal(qualification.expansionModelSha256,
+        '3b7f677595670972253e8f034fd052178237c1547017c321e33e770e3de176b9');
+    assert.equal(qualification.tokenControl, 'FIXED_16_TO_15');
+    assert.equal(qualification.purchasePolicySha256, currentActor.provenance.sourcePolicySha256);
+    assert.equal(qualification.frozenPurchasePriorSha256, frozenPurchasePriorSha256);
+    assert.equal(qualification.sharedReferenceWorlds, true);
+    assert.equal(qualification.comparisonsIndependent, false);
+    assert(qualification.evidence.some(item => item.path.endsWith('/completion-audit.json')
+        && item.sha256 === 'b19ca00a45e6af165c31ae537ef430610b20d10e0e6bdff2a8b8a6d5418d0064'));
+    for (const [stage, count] of [['confirm', 2048], ['heldout', 4096]]) {
+        const result = qualification.stages[stage];
+        assert.equal(result.status, 'passed');
+        assert.equal(result.exactCandidateParityWorlds, count);
+        assert.equal(result.canonicalReplays, 16);
+        for (const name of ['fixed-reference', 'expansion-reference']) {
+            const reference = result.references[name];
+            assert.equal(reference.pairs, count);
+            assert.equal(reference.canonicalReplays, 8);
+            for (const metric of ['winShareDifference', 'rewardDifference']) {
+                assert.equal(reference.metrics[metric].count, count);
+                assert.equal(reference.metrics[metric].qualificationConfidence, .99);
+                assert(reference.metrics[metric].lowerConfidence > 0);
             }
         }
     }

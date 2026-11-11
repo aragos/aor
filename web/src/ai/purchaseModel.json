@@ -3047,7 +3047,16 @@
           "tokenPreference": 13.25445053241261,
           "tokens": 1.8211396802069946,
           "windmill": 1.4064759373147095,
-          "planning.tokenOrderControl.fixed16To15": 1.0
+          "planning.tokenOrderControl.fixed16To15": 1.0,
+          "planning.expansionModel.enabled": 1,
+          "planning.expansionModel.tokens": 0.3852349799156729,
+          "planning.expansionModel.progress": -0.4442306548798427,
+          "planning.expansionModel.reach": 0.6836511007417405,
+          "planning.expansionModel.commodity": 2.826326400381829,
+          "planning.expansionModel.income": 5.327806045472258,
+          "planning.expansionModel.risk": -6.333220456030338,
+          "planning.expansionModel.action.expansion": -0.9230337456001637,
+          "planning.expansionModel.action.pass": -0.4816743576485838
         }
       },
       "model": {
@@ -240205,6 +240214,195 @@
           {
             "path": "automata-remote-dispatch-20261110/population-completion/population-qualification-20261110/completion-audit.json",
             "sha256": "a1819bc38252f9eba94a8c3c51db9b5ab9684f10c726a858459eafdddfc2605d"
+          }
+        ]
+      },
+      "expansionTokenQualification": {
+        "qualificationPassed": true,
+        "humanStrengthVerified": false,
+        "qualificationConfidence": 0.99,
+        "sourceCampaign": "expansion-combination-v2-20261111",
+        "rulesVersion": "ah1996-three-epoch-5",
+        "scope": {
+          "playerCount": 4,
+          "map": "STANDARD",
+          "initialCard": "NO_CRUSADES",
+          "deckModification": true,
+          "immediateMasterArtDiscard": true,
+          "drawThreeKeepTwo": false
+        },
+        "sourceOrdinaryModelSha256": "0c24593a456816c9b6616b6ade2aa7b74ac3c41f0cbd0745b5b912675caa835b",
+        "expansionModelSha256": "3b7f677595670972253e8f034fd052178237c1547017c321e33e770e3de176b9",
+        "expansionModelGate": "planning.expansionModel.enabled",
+        "expansionCoordinates": [
+          "tokens",
+          "progress",
+          "reach",
+          "commodity",
+          "income",
+          "risk",
+          "action.expansion",
+          "action.pass"
+        ],
+        "expansionValues": "absolute replacement coefficients on HARD expand only",
+        "tokenControl": "FIXED_16_TO_15",
+        "tokenModelGate": "planning.tokenOrderControl.fixed16To15",
+        "purchasePolicySha256": "62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44",
+        "frozenPurchasePriorSha256": "c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0",
+        "qualificationTransferred": false,
+        "runtimeCommit": "75ff100",
+        "runtimeTrainingJarSha256": "21d5698aa264e7d830a29945bfa5e98e6237ab825b5ebd37b9d3dfc13937a304",
+        "sharedReferenceWorlds": true,
+        "comparisonsIndependent": false,
+        "stages": {
+          "confirm": {
+            "canonicalReplays": 16,
+            "exactCandidateParityWorlds": 2048,
+            "references": {
+              "expansion-reference": {
+                "candidateWinShare": 0.66357421875,
+                "canonicalReplays": 8,
+                "metrics": {
+                  "rewardDifference": {
+                    "count": 2048,
+                    "lower95": 0.14911218248982117,
+                    "lowerConfidence": 0.1421953763992524,
+                    "mean": 0.17112630208333335,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.19314042167684553
+                  },
+                  "winShareDifference": {
+                    "count": 2048,
+                    "lower95": 0.1617402196470423,
+                    "lowerConfidence": 0.15410678398991773,
+                    "mean": 0.18603515625,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.2103300928529577
+                  }
+                },
+                "pairs": 2048,
+                "passed": true,
+                "referenceWinShare": 0.4775390625
+              },
+              "fixed-reference": {
+                "candidateWinShare": 0.66357421875,
+                "canonicalReplays": 8,
+                "metrics": {
+                  "rewardDifference": {
+                    "count": 2048,
+                    "lower95": 0.06857260872346117,
+                    "lowerConfidence": 0.06141365177723465,
+                    "mean": 0.091357421875,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.11414223502653882
+                  },
+                  "winShareDifference": {
+                    "count": 2048,
+                    "lower95": 0.0724163774304942,
+                    "lowerConfidence": 0.06456275284116766,
+                    "mean": 0.097412109375,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.1224078413195058
+                  }
+                },
+                "pairs": 2048,
+                "passed": true,
+                "referenceWinShare": 0.566162109375
+              }
+            },
+            "reportSha256": "72e9f624739a0a937f7eaf03b46a53c0816a99c34fcbc973a3509a19cc16582d",
+            "resultSha256": "13453060e9d3f7ceffc25d01c8878da0aa54f3df9a6c976f3f72421d23116ef0",
+            "status": "passed"
+          },
+          "heldout": {
+            "canonicalReplays": 16,
+            "exactCandidateParityWorlds": 4096,
+            "references": {
+              "expansion-reference": {
+                "candidateWinShare": 0.60107421875,
+                "canonicalReplays": 8,
+                "metrics": {
+                  "rewardDifference": {
+                    "count": 4096,
+                    "lower95": 0.14882096401578426,
+                    "lowerConfidence": 0.14404487915269,
+                    "mean": 0.16402180989583334,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.17922265577588242
+                  },
+                  "winShareDifference": {
+                    "count": 4096,
+                    "lower95": 0.16145276698087244,
+                    "lowerConfidence": 0.156183690843526,
+                    "mean": 0.17822265625,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.19499254551912756
+                  }
+                },
+                "pairs": 4096,
+                "passed": true,
+                "referenceWinShare": 0.4228515625
+              },
+              "fixed-reference": {
+                "candidateWinShare": 0.60107421875,
+                "canonicalReplays": 8,
+                "metrics": {
+                  "rewardDifference": {
+                    "count": 4096,
+                    "lower95": 0.07507812447788587,
+                    "lowerConfidence": 0.07005524201000007,
+                    "mean": 0.091064453125,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.10705078177211413
+                  },
+                  "winShareDifference": {
+                    "count": 4096,
+                    "lower95": 0.07941481058033079,
+                    "lowerConfidence": 0.07391350135565777,
+                    "mean": 0.096923828125,
+                    "qualificationConfidence": 0.99,
+                    "upper95": 0.11443284566966921
+                  }
+                },
+                "pairs": 4096,
+                "passed": true,
+                "referenceWinShare": 0.504150390625
+              }
+            },
+            "reportSha256": "4afc7b1c2823d0a1d4bf365d144e43825aec871ea0778539d3a43e4af1dc29a1",
+            "resultSha256": "94d0560f3d0bdce26680e1029cd42d36edee1a2d689a9156ab66d74c37de92f2",
+            "status": "passed"
+          }
+        },
+        "limitation": "Original ordinary rival pools only; stronger-rival robustness and human strength are not established.",
+        "evidence": [
+          {
+            "path": "expansion-combination-v2-20261111/campaign.json",
+            "sha256": "3bb730678fde779af31158f6e05d036db4729d6dec839988bd95643f9c79e887"
+          },
+          {
+            "path": "expansion-combination-v2-20261111/protocol.json",
+            "sha256": "6c9050864b318ec30376c521bfdf4838a52420e516d8a3e40316fd113e38ef77"
+          },
+          {
+            "path": "expansion-combination-v2-20261111/completion-audit.json",
+            "sha256": "b19ca00a45e6af165c31ae537ef430610b20d10e0e6bdff2a8b8a6d5418d0064"
+          },
+          {
+            "path": "expansion-combination-v2-20261111/run/confirm-report.json",
+            "sha256": "72e9f624739a0a937f7eaf03b46a53c0816a99c34fcbc973a3509a19cc16582d"
+          },
+          {
+            "path": "expansion-combination-v2-20261111/run/heldout-report.json",
+            "sha256": "4afc7b1c2823d0a1d4bf365d144e43825aec871ea0778539d3a43e4af1dc29a1"
+          },
+          {
+            "path": "expansion-combination-v2-20261111/run/results/confirm.json",
+            "sha256": "13453060e9d3f7ceffc25d01c8878da0aa54f3df9a6c976f3f72421d23116ef0"
+          },
+          {
+            "path": "expansion-combination-v2-20261111/run/results/heldout.json",
+            "sha256": "94d0560f3d0bdce26680e1029cd42d36edee1a2d689a9156ab66d74c37de92f2"
           }
         ]
       }

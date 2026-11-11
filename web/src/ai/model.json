@@ -1521,7 +1521,16 @@
         "tokenPreference": 13.25445053241261,
         "tokens": 1.8211396802069946,
         "windmill": 1.4064759373147095,
-        "planning.tokenOrderControl.fixed16To15": 1.0
+        "planning.tokenOrderControl.fixed16To15": 1.0,
+        "planning.expansionModel.enabled": 1,
+        "planning.expansionModel.tokens": 0.3852349799156729,
+        "planning.expansionModel.progress": -0.4442306548798427,
+        "planning.expansionModel.reach": 0.6836511007417405,
+        "planning.expansionModel.commodity": 2.826326400381829,
+        "planning.expansionModel.income": 5.327806045472258,
+        "planning.expansionModel.risk": -6.333220456030338,
+        "planning.expansionModel.action.expansion": -0.9230337456001637,
+        "planning.expansionModel.action.pass": -0.4816743576485838
       },
       "configuration": {
         "playerCount": 4,

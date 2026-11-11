@@ -168,6 +168,12 @@ ordinary weights for Hard `expand` decisions, retaining the existing beam planne
 other difficulties and incomplete entries keep the ordinary policy. Reserved transport keys never
 contribute to ordinary feature scores; support alone does not activate a model or establish its
 qualification.
+The current rules-5 four-player entry combines the independently qualified lambda1 expansion
+coefficients with the fixed token control. Fresh complete-game confirmation and heldout gates compare
+the exact combination against each component separately, with unchanged C purchases and F0 purchase
+prior. The purchase asset binds the complete exported ordinary weights and records the combination
+evidence; legacy entries retain their previous parameters. These comparisons do not establish
+strength against human players.
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 
