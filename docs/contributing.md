@@ -813,6 +813,36 @@ configuration and epoch shuffles. The common-world screens verify exact incumben
 reporting external-minus-recorded paired intervals. This finite diagnostic selects and activates
 nothing; improved state prediction alone is not playing-strength evidence.
 
+### Matched finite-horizon purchase advantages
+
+The [GAE pilot](../scripts/purchase_gae_pilot.py) keeps the external Monte Carlo control and
+compares eight fixed on-policy batches per arm. `PurchaseAdvantageTargets` owns an explicit
+sampled-continuation target file; it is not a state-baseline file. Frozen state predictions are
+validated separately. Original returns, behavior values and likelihoods remain unchanged.
+
+`purchase_gae` uses gamma1 and lambda.95 per recorded controlled purchase decision, including
+forced one-action rows. It derives targets within each complete game's original order before
+minibatch shuffling. Intermediate rewards are zero; the last recorded purchase receives the actual
+terminal composite reward, with next value zero, even if play continues or that seat later enters
+chaos. A singleton gives terminal return minus its frozen value. Empty games retain their outcomes
+and provenance but create no targets; an entirely empty batch fails the existing no-rows guard.
+Lambda1 telescopes to the existing Monte Carlo advantage. No shaped reward, additional model input
+or engine-transition clock is introduced.
+
+`ActorAdamContinuation` explicitly carries only the matching completed actor and its five actor
+parameter slots within one estimator arm. It rejects different estimators, predictors, recipes and
+value-head optimizer slots. Both arms start from C64 with fresh Adam, freeze the value head, retain
+the original PPO/KL rules, and share prospective world banks and epoch shuffles. Only their final
+eighth actors enter the common-bank screen; no intermediate selection or automatic successor is
+allowed. Complete trajectories use the existing verified lossless purchase archive owner.
+
+GAE trades Monte Carlo variance for bootstrapping bias; the frozen critic comes from older behavior
+ecologies, and omitted game actions can separate adjacent purchase decisions. Its error and phase
+metrics remain descriptive. The [GAE formulation](https://arxiv.org/pdf/1506.02438) motivates the
+bounded comparison; sparse terminal rewards do not guarantee a TD advantage. For example,
+[DouZero section5.5](https://proceedings.mlr.press/v139/zha21a/zha21a.pdf) found no clear TD benefit in
+its reported card-game comparison. Neither result establishes which estimator works better here.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It

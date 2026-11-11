@@ -19,10 +19,10 @@ ARMS = ('recorded','external')
 STAGES = ('train','screen')
 
 
-def collection_source(protocol):
+def collection_source(protocol, model=None):
     return dict(schemaVersion=1,configuration=exp.CONFIGURATION,games=256,
         seed=protocol['banks']['training']['nativeOffset'],baseline=protocol['baseline'],
-        opponents=protocol['opponents'],policy=protocol['purchasePolicy'],
+        opponents=protocol['opponents'],policy=protocol['purchasePolicy'] if model is None else str(model),
         opponentPurchasePolicy=protocol['purchasePolicy'],sharedPurchaseBaseline=protocol['prior'],
         **legacy.transfer_source(protocol),continuationProtocol=data.CONTINUATION,
         replayIndices=data.REPLAY_INDICES,**data.bindings(protocol['expansionModel']))

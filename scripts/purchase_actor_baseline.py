@@ -44,12 +44,13 @@ def state_values(critic, rows, names, maximum=256):
     return result
 
 
-def predict(collection, model_path, checkpoint, contract_path, feature_path, output):
+def predict(collection, model_path, checkpoint, contract_path, feature_path, output,
+            *, expected_model_sha=ecology.C):
     policy.require(not Path(output).exists(), 'Preserve previously frozen baseline predictions.')
     policy.require(policy.file_digest(checkpoint) == CRITIC
         and policy.file_digest(contract_path) == CONTRACT and policy.file_digest(feature_path) == FEATURES
-        and policy.file_digest(model_path) == ecology.C,
-        'Use only the independently audited fresh64 critic and original C64 behavior actor.')
+        and policy.file_digest(model_path) == expected_model_sha,
+        'Use only the independently audited fresh64 critic and exact declared behavior actor.')
     torch.set_num_threads(1)
     torch.use_deterministic_algorithms(True)
     model = policy.validate_model(policy.read_json(model_path))

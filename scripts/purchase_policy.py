@@ -636,7 +636,116 @@ class ActorOnlyObjective:
         return [{**row, "_actorOnlyBaseline": value} for row, value in zip(rows, values)], identity
 
 
-def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False):
+PURCHASE_GAE_ESTIMATOR = {
+    "version": "purchase-gae-1", "gamma": 1., "lambda": .95,
+    "clock": "recorded-controlled-purchase-decision-1", "forcedRowsIncluded": True,
+    "intermediateReward": 0., "terminalValue": 0.,
+}
+
+
+def purchase_gae(rows, values, lambda_value=.95):
+    """Gamma1 GAE, with one tick per recorded purchase (including forced decisions).
+
+    Intermediate reward is zero. The last recorded purchase receives the actual terminal
+    composite reward; its next value is zero even if play continues after that purchase.
+    Empty games create no rows. Values and targets are detached Python scalars.
+    """
+    number(lambda_value, "Purchase GAE lambda", 0, 1)
+    require(len(rows) == len(values), "Every purchase row requires its frozen state value.")
+    groups = {}
+    for index, (row, value) in enumerate(zip(rows, values)):
+        number(value, "Frozen purchase state value", 0, 1)
+        groups.setdefault(row["originIndex"], []).append(index)
+    advantages = [0.] * len(rows)
+    for indices in groups.values():
+        require(all(rows[a]["number"] < rows[b]["number"] for a, b in zip(indices, indices[1:])),
+                "Derive GAE from ordered purchases before minibatch shuffling.")
+        reward = number(rows[indices[-1]]["return"], "Terminal composite reward", 0, 1)
+        require(all(row["return"] == reward for row in (rows[index] for index in indices)),
+                "All purchases from one game must retain the same actual terminal reward.")
+        next_value = next_advantage = 0.
+        for index in reversed(indices):
+            immediate = reward if index == indices[-1] else 0.
+            delta = immediate + next_value - values[index]
+            advantages[index] = delta + lambda_value * next_advantage
+            next_value, next_advantage = values[index], advantages[index]
+    return advantages
+
+
+@dataclass(frozen=True)
+class PurchaseAdvantageTargets:
+    """Explicit sampled-continuation targets, never represented as state-only baselines."""
+    targetsFile: str
+
+    def bind(self, rows, provenance, model_sha):
+        path = Path(self.targetsFile).resolve()
+        targets = read_json(path)
+        estimator = PURCHASE_GAE_ESTIMATOR
+        require(targets.get("kind") == "purchase-precomputed-advantages-1"
+                and targets.get("estimator") == estimator
+                and targets.get("collectionSha256") == provenance["collectionSha256"]
+                and targets.get("gameHashes") == provenance["gameHashes"]
+                and targets.get("behaviorModelSha256") == model_sha,
+                "Precomputed advantages require the declared estimator and exact completed collection.")
+        baseline = targets["frozenStatePredictions"]
+        require(file_digest(baseline["path"]) == baseline["sha256"],
+                "GAE must preserve its separately frozen state predictions.")
+        bound, state_identity = ActorOnlyObjective("external", baseline["path"]).bind(
+            rows, provenance, model_sha)
+        expected = purchase_gae(rows, [row["_actorOnlyBaseline"] for row in bound])
+        actual = targets.get("advantages")
+        require(isinstance(actual, list) and len(actual) == len(rows),
+                "GAE must cover each recorded purchase exactly once.")
+        for row, value, target in zip(rows, expected, actual):
+            require(target.get("gameSha256") == provenance["gameHashes"][row["originIndex"]]
+                    and type(target.get("decision")) is int and target["decision"] == row["number"]
+                    and abs(number(target.get("advantage"), "Precomputed actor advantage") - value) <= 1e-12,
+                    "A precomputed advantage differs from its original ordered purchase continuation.")
+        identity = {"version": "purchase-precomputed-advantage-1", "estimator": estimator,
+                    "targetsFile": str(path), "targetsSha256": file_digest(path),
+                    "frozenStatePredictions": {key: state_identity[key] for key in
+                                               ("externalFile", "externalSha256", "predictor")},
+                    "frozenParameters": ["valueWeights", "valueBias"],
+                    "optimizerInitialization": "fresh-adam"}
+        return [{**row, "_actorOnlyAdvantage": value} for row, value in zip(rows, expected)], identity
+
+
+@dataclass(frozen=True)
+class ActorAdamContinuation:
+    """Carry only a completed matching actor-only optimizer within the same estimator arm."""
+    version: str = "purchase-actor-adam-continuation-1"
+
+    def validate(self, checkpoint_path, objective, model, config):
+        require(self.version == "purchase-actor-adam-continuation-1",
+                "Unsupported actor-only optimizer continuation.")
+        path = Path(checkpoint_path)
+        previous, identity = read_checkpoint(path), read_json(path.parent / "identity.json")
+        finished = read_json(path.parent / "finished.json")
+        require(previous["identitySha256"] == finished["identitySha256"] == digest(identity)
+                and previous["model"] == model and finished["outputModelSha256"] == file_digest(path.parent / "policy.json")
+                and read_json(path.parent / "policy.json") == model,
+                "Carried actor-only Adam requires its exact completed preceding actor and identity.")
+        old = identity.get("actorOnlyObjective", {})
+        fields = ("version", "baseline", "estimator", "frozenParameters")
+        require(all(old.get(name) == objective.get(name) for name in fields)
+                and {k:v for k,v in identity["config"].items() if k != "seed"}
+                == {k:v for k,v in asdict(config).items() if k != "seed"},
+                "Actor-only Adam cannot cross estimator arms or change the PPO recipe.")
+        def predictor(value):
+            return value.get("predictor", value.get("frozenStatePredictions", {}).get("predictor"))
+        require(predictor(old) == predictor(objective),
+                "Actor-only continuation must retain the same frozen state predictor and numerical contract.")
+        optimizer = previous.get("optimizer")
+        require(isinstance(optimizer, dict) and len(optimizer["param_groups"]) == 1
+                and len(optimizer["param_groups"][0]["params"]) == len(PARAMETERS) - 2
+                and len(optimizer["state"]) <= len(PARAMETERS) - 2,
+                "Carried actor-only Adam must exclude value-head parameters and momentum.")
+        return {"version": self.version, "checkpointSha256": file_digest(path),
+                "previousIdentitySha256": digest(identity)}
+
+
+def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
+                           precomputed_advantages=False):
     config.validate_reference(policy.contract)
     probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
@@ -646,8 +755,12 @@ def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False):
     if actor_only:
         require(policy.contract == PURCHASE_CONTRACT and config.valueCoefficient == 0,
                 "Actor-only objectives require purchase rows and zero critic coefficient.")
-    baseline_key = "_actorOnlyBaseline" if actor_only else "behaviorValue"
-    advantages = returns - torch.tensor([row[baseline_key] for row in rows], dtype=DTYPE)
+    if precomputed_advantages:
+        require(actor_only, "Explicit precomputed advantages require the actor-only objective.")
+        advantages = torch.tensor([row["_actorOnlyAdvantage"] for row in rows], dtype=DTYPE)
+    else:
+        baseline_key = "_actorOnlyBaseline" if actor_only else "behaviorValue"
+        advantages = returns - torch.tensor([row[baseline_key] for row in rows], dtype=DTYPE)
     actor = clipped_policy_loss(chosen, old, advantages, config.clip).mean()
     critic = 0.5 * (values - returns).square().mean()
     entropy = torch.stack([-(value.exp() * value).sum() for value in probabilities]).mean()
@@ -666,7 +779,7 @@ def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False):
 
 
 def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_reference=None,
-                  actor_only=False):
+                  actor_only=False, precomputed_advantages=False):
     require(purchase_reference is None or offered_reference is None,
             "A typed actor cannot use two offered reference objectives.")
     if offered_reference is not None:
@@ -676,7 +789,8 @@ def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_refe
         require(isinstance(purchase_reference, PurchaseReferenceObjective),
                 "Purchase reference must be an explicit typed objective.")
         purchase_reference.validate(policy.contract)
-    ordinary = ordinary_loss_for_rows(policy, rows, config, actor_only=actor_only)
+    ordinary = ordinary_loss_for_rows(policy, rows, config, actor_only=actor_only,
+                                     precomputed_advantages=precomputed_advantages)
     if purchase_reference is None and offered_reference is None:
         return ordinary
     # Match the reviewed LAB objective's separate forward and operation order exactly.
@@ -717,13 +831,14 @@ def epoch_batches(rows, config, epoch):
 
 
 def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None,
-                  offered_reference=None, actor_only=False):
+                  offered_reference=None, actor_only=False, precomputed_advantages=False):
     require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
     optimizer.zero_grad(set_to_none=True)
     if actor_only:
         require(purchase_reference is None and offered_reference is None,
                 "Actor-only baseline comparisons cannot add another objective.")
-        loss = loss_for_rows(policy, batch, config, actor_only=True)
+        loss = loss_for_rows(policy, batch, config, actor_only=True,
+                             precomputed_advantages=precomputed_advantages)
     elif offered_reference is not None:
         loss = loss_for_rows(policy, batch, config, purchase_reference=purchase_reference,
                              offered_reference=offered_reference)
@@ -737,10 +852,12 @@ def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_refere
     optimizer.step()
 
 
-def fit_epoch(policy, optimizer, rows, config, epoch, deadline, *, actor_only=False):
+def fit_epoch(policy, optimizer, rows, config, epoch, deadline, *, actor_only=False,
+              precomputed_advantages=False):
     for batch in epoch_batches(rows, config, epoch):
         if actor_only:
-            fit_minibatch(policy, optimizer, batch, config, deadline, actor_only=True)
+            fit_minibatch(policy, optimizer, batch, config, deadline, actor_only=True,
+                          precomputed_advantages=precomputed_advantages)
         else:
             fit_minibatch(policy, optimizer, batch, config, deadline)
 
@@ -1097,7 +1214,7 @@ def validate_checked_prefix_checkpoint(checkpoint, identity, rows):
 def update(model_path, collection_path, config, output, resume=False, optimizer_from=None,
            *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE,
            purchase_reference=None, collection_reader=None, offered_reference=None,
-           actor_only=None):
+           actor_only=None, actor_optimizer_continuation=None):
     """Fit one typed actor; optional readers own completed-data/likelihood validation.
 
     A custom reader has read_collection's signature and returns rows plus provenance containing
@@ -1107,12 +1224,17 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     require(update_mode in (LEGACY_UPDATE_MODE, CHECKED_PREFIX_MODE), "Unsupported PPO update mode.")
     config.validate(contract)
     if actor_only is not None:
-        require(isinstance(actor_only, ActorOnlyObjective) and contract == PURCHASE_CONTRACT
-                and update_mode == LEGACY_UPDATE_MODE and not resume and optimizer_from is None
+        require(isinstance(actor_only, (ActorOnlyObjective, PurchaseAdvantageTargets)) and contract == PURCHASE_CONTRACT
+                and update_mode == LEGACY_UPDATE_MODE and not resume
+                and (optimizer_from is None or isinstance(actor_optimizer_continuation, ActorAdamContinuation))
                 and config.valueCoefficient == config.entropyCoefficient == 0
                 and config.cardReferenceKlCoefficient == 0
                 and purchase_reference is None and offered_reference is None,
                 "Actor-only comparisons require fresh purchase Adam, epoch rollback and no other loss.")
+    require(actor_optimizer_continuation is None or
+            (isinstance(actor_optimizer_continuation, ActorAdamContinuation)
+             and actor_only is not None and optimizer_from is not None and not resume),
+            "Explicit actor-only continuation requires its preceding optimizer and typed objective.")
     validate_purchase_reference(purchase_reference, contract, update_mode)
     validate_offered_reference(offered_reference, contract, update_mode)
     require(purchase_reference is None or offered_reference is None,
@@ -1133,6 +1255,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     actor_only_identity = None
     if actor_only is not None:
         rows, actor_only_identity = actor_only.bind(rows, provenance, file_digest(model_path))
+    carry_identity = None
+    if actor_optimizer_continuation is not None:
+        carry_identity = actor_optimizer_continuation.validate(
+            optimizer_from, actor_only_identity, model, config)
+        actor_only_identity["optimizerInitialization"] = "matching-actor-adam"
     if reader_source is not None:
         require(file_digest(reader_source["path"]) == reader_source["sha256"]
                 and provenance.get("readerSha256") == reader_source["sha256"],
@@ -1158,6 +1285,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         identity["collectionReaderSource"] = reader_source
     if actor_only_identity is not None:
         identity["actorOnlyObjective"] = actor_only_identity
+    if carry_identity is not None:
+        identity["actorOptimizerContinuation"] = carry_identity
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
     started_path = output / ("block-started.json" if update_mode == CHECKED_PREFIX_MODE
@@ -1246,7 +1375,7 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline)
             else:
                 fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline,
-                          actor_only=True)
+                          actor_only=True, precomputed_advantages=isinstance(actor_only, PurchaseAdvantageTargets))
         except ValueError as failure:
             if "elapsed-time budget" not in str(failure):
                 raise
