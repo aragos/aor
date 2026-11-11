@@ -243,8 +243,10 @@ def train(protocol,path,output):
     report=dict(progress(path,output,batches,checks,reason,streak),batches=batches,checkpoints=checks,
         inference='Fixed exploratory learning curve versus44 GAE; no qualification or GAE-versus-MC claim.')
     document(output/'learning-curve-report.json',report)
-    artifacts=[p for p in output.rglob('*') if p.is_file() and p.name!='campaign-state.json'
-               and 'logs' not in p.relative_to(output).parts and 'results' not in p.relative_to(output).parts]
+    artifacts=[output/'progress.json',output/'learning-curve-report.json',
+               *output.glob('checkpoint-*-source.json'),*output.glob('checkpoint-*-report.json')]
+    for root in (output/'batches',output/'screens',output/'replays'):
+        artifacts.extend(p for p in root.rglob('*') if p.is_file())
     return exp.stage_result(output,'learn',True,'Bounded learning curve finished; no qualification.',report,artifacts)
 
 
