@@ -491,6 +491,26 @@ its own prior; rivals retain the shared frozen actor and prior. A named ordinary
 its actor override. These roles bind experiment identity and metadata and require explicit arena
 sides. With a null ordinary `incumbent`, this compares against the built-in default opponent.
 
+Native arena sources can bind `expansionImitation.candidateModel`, `incumbentModel` and optional
+`opponentModels` by original opponent-pool index. Each full ordinary model may replace only the
+eight expansion coefficients declared by `ExpansionImitationProtocol`; other phases retain the
+actual ordinary model. `tokenOrder.opponentSelectors` likewise follows pool indices rather than
+rotated seats. Each role is hashed, snapshotted and included in identity and canonical replay.
+
+The native research opt-in `cathedralTactics: {"version": "public-cathedral-two-action-1",
+"candidateEnabled": true}` wraps the complete candidate controller after purchase, token and
+expansion composition. It requires the exact separate expansion model and rejects browser-gated
+ordinary substitutes. Incumbent and rivals retain their complete controllers. Omission preserves
+legacy identity and JSON; explicit false retains behavior while declaring a distinct research
+identity. Weight-only search and the legacy token collector reject these new overlays.
+Run/evaluation metadata and paired/replay results bind the wrapper contract; replay rejects changed
+or missing bindings before simulation. Replay-only `cathedralDecisions` records the complete
+incumbent, activation, chosen root, values and truncation/leaf counters for candidate expansion
+choices. Summaries from sampled histories are descriptive, not full-arena activation estimates.
+The [engine contract](engine.md#opponent-policies) states utility and victory-horizon limitations.
+Compare enabled and disabled controllers on the same engine; imported role composition does not
+establish parity with historical executors or qualify this research selector.
+
 For direct compact token-head search, copy the frozen baseline and set every reserved
 `planning.tokenValue.*` coefficient to zero except `planning.tokenValue.enabled = 1`. Search only
 named existing [token feature definitions](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotTokenValue.kt),

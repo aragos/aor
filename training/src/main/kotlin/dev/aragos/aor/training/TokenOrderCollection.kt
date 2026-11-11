@@ -25,6 +25,9 @@ internal data class TokenOrderSpecification(
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
             "Token-order collection requires one SCREENING configuration."
         }
+        require(arena.expansionImitation == null && arena.cathedralTactics == null) {
+            "This legacy token collector does not support native expansion or Cathedral research overlays."
+        }
         require(arena.candidate == arena.incumbent && arena.tokenOrder == null) {
             "Token-order roots require identical ordinary baselines without a learned token overlay."
         }

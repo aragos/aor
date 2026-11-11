@@ -121,6 +121,9 @@ data class StrategySearchSpecification(
         require(arena.experimentalRulesTransfer == null) {
             "Experimental rules transfer supports arena, token-order and purchase collection, not ordinary model search."
         }
+        require(arena.expansionImitation == null && arena.cathedralTactics == null) {
+            "Ordinary weight search does not support native expansion or Cathedral research overlays."
+        }
         require(arena.tokenOrder == null) {
             "Ordinary model search cannot assign token-order actor roles."
         }

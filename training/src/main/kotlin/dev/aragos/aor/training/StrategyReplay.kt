@@ -63,6 +63,10 @@ data class StrategyReplay(
     val game: ArenaGame,
     val replayVerified: Boolean,
     val historicalPairVerified: Boolean,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val cathedralTactics: CathedralTacticsConfiguration? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val cathedralDecisions: List<CathedralTacticalDecision>? = null,
 )
 
 /**
@@ -74,6 +78,13 @@ class StrategyReplayPair private constructor(private val record: JsonNode) {
 
     fun opponentIndices(specification: ArenaSpecification, index: Int): List<Int> {
         val lineup = StrategyArena.lineup(specification, index)
+        val expectedTactics =
+            specification.cathedralTactics?.configuration?.let {
+                ObjectMapper().valueToTree<JsonNode>(it)
+            }
+        require(record["cathedralTactics"] == expectedTactics) {
+            "Recorded arena Cathedral tactics differ from the specification."
+        }
         require(integer("index") == index) { "Recorded arena pair index does not match --index." }
         require(record["configuration"]?.asText() == lineup.configuration.id) {
             "Recorded arena pair configuration does not match the specification."
@@ -185,6 +196,7 @@ object StrategyReplays {
         val lineup = StrategyArena.lineup(specification, index)
         val opponentIndices = pair?.opponentIndices(specification, index) ?: lineup.opponentIndices
         val recording = StrategyRecording(lineup.seat, lineup.seed)
+        val cathedralDecisions = mutableListOf<CathedralTacticalDecision>()
         val game =
             Simulation()
                 .play(
@@ -210,6 +222,8 @@ object StrategyReplays {
                             lineup.seat,
                             side.arenaSide,
                             side.model(specification),
+                            opponentIndices,
+                            cathedralRecord = cathedralDecisions::add,
                         ),
                 )
         val terminal = ArenaGame.from(game)
@@ -230,6 +244,9 @@ object StrategyReplays {
             game = terminal,
             replayVerified = true,
             historicalPairVerified = pair != null,
+            cathedralTactics = specification.cathedralTactics?.configuration,
+            cathedralDecisions =
+                specification.cathedralTactics?.let { cathedralDecisions.toList() },
         )
     }
 }

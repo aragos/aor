@@ -99,3 +99,19 @@ option counts alongside deterministic truncation, keeps actor and defender Cathe
 separate, and resolves all supplied dice triples through the ordinary competition owner. Conditional
 dice counts do not predict whether an opponent will decline. No economic utility or playing policy
 is assigned; unresolved victories remain explicit continuation boundaries.
+
+The JVM-only [Cathedral research selector](../ai/src/jvmMain/kotlin/dev/aragos/aor/ai/BotCathedralTactics.kt)
+may wrap the complete native incumbent controller through an explicit arena opt-in. It activates only
+when that incumbent attacks an eligible opposing Cathedral. It compares offered pass and at most
+sixteen legal roots: the incumbent, seven highest nominal alternatives, then cheapest remaining
+probes. Settled losses and peaceful roots may take one fresh full-market attack or stop. Actor
+responses maximize, defenders minimize including decline, and chance uses all 216 dice triples.
+
+Its new result-conditioned utility uses the fixed expansion coefficients with actual root-relative
+control, presence, ordinary income, raw commodity telescope and own/public portfolio changes, plus
+spent pool tokens and newly committed tokens lost in resolved attacks. It excludes nominal action
+intercepts, fabricated reach, bonus cards and unresolved victory bookkeeping. Shared context
+expansion preserves existing features exactly. Victories remain terminal leaves even when a further
+attack might be legal, whereas settled losses can continue: this asymmetric horizon may undervalue
+successful cheap attacks. Caps and sampled diagnostics describe bounded search, not optimal play.
+This selector has no browser activation or qualification implied by its synthetic tests.

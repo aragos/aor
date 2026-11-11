@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.DATA_VERSION
 import dev.aragos.aor.RULES_VERSION
@@ -35,6 +36,8 @@ data class ArenaSpecification(
     val seed: Int,
     val frozenPurchase: ArenaPurchasePolicy? = null,
     val tokenOrder: ArenaTokenOrderPolicy? = null,
+    val expansionImitation: ArenaExpansionImitation? = null,
+    val cathedralTactics: ArenaCathedralTactics? = null,
     val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
     private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
     private val initializationSource: ModelInitializationSource? = null,
@@ -56,7 +59,9 @@ data class ArenaSpecification(
         }
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
         frozenPurchase?.validate(configurations)
-        tokenOrder?.validate(configurations)
+        tokenOrder?.validate(configurations, opponents.size)
+        expansionImitation?.validate(candidate, incumbent, opponents)
+        cathedralTactics?.validate(candidate, expansionImitation)
     }
 
     fun identity(): String =
@@ -72,38 +77,71 @@ data class ArenaSpecification(
                 listOfNotNull(
                     frozenPurchase?.identity(),
                     tokenOrder?.identity(),
+                    expansionImitation?.identity(),
+                    cathedralTactics?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
                 ))
             .joinToString("\n")
 
-    /** Phase-disjoint overlays retain their own priors and never replace a rival's token policy. */
+    /**
+     * Phase-disjoint overlays retain each seat's actual ordinary token baseline and Purchase prior.
+     */
     internal fun controllers(
         playerCount: Int,
         controlledSeat: Int,
         side: ArenaSide?,
         ordinary: BotModel,
+        opponentIndices: List<Int>? = null,
+        cathedralRecord: ((CathedralTacticalDecision) -> Unit)? = null,
     ): Map<Int, SimulationController> {
         val purchase = frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
-        val token = tokenOrder?.controller(side, ordinary) ?: return purchase
-        val previous = purchase[controlledSeat]
-        val combined =
-            object : SimulationController {
-                override fun controls(decision: String): Boolean =
-                    token.controls(decision) || previous?.controls(decision) == true
+        val policy = tokenOrder
+        val evaluated = policy?.controller(side, ordinary)
+        val tokens =
+            policy
+                ?.opponentControllers(playerCount, controlledSeat, opponentIndices, opponents)
+                .orEmpty() + listOfNotNull(evaluated?.let { controlledSeat to it }).toMap()
+        val expansion =
+            expansionImitation
+                ?.controllers(playerCount, controlledSeat, side, opponentIndices)
+                .orEmpty()
+        val composed =
+            listOf(tokens, expansion).fold(purchase) { existing, overlay ->
+                existing +
+                    overlay.mapValues { (seat, controller) ->
+                        val previous = existing[seat]
+                        object : SimulationController {
+                            override fun controls(decision: String): Boolean =
+                                controller.controls(decision) ||
+                                    previous?.controls(decision) == true
 
-                override fun choose(decision: SimulationDecision): String? =
-                    if (token.controls(decision.observation.decision)) token.choose(decision)
-                    else previous?.choose(decision)
+                            override fun choose(decision: SimulationDecision): String? =
+                                if (controller.controls(decision.observation.decision)) {
+                                    controller.choose(decision)
+                                } else {
+                                    previous?.choose(decision)
+                                }
+                        }
+                    }
             }
-        return purchase + (controlledSeat to combined)
+        return cathedralTactics?.wrap(
+            composed,
+            controlledSeat,
+            side,
+            ordinary,
+            expansionImitation,
+            cathedralRecord,
+        ) ?: composed
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
         mapOf("rulesVersion" to RULES_VERSION, "dataVersion" to DATA_VERSION) +
             frozenPurchase?.metadata().orEmpty() +
             tokenOrder?.metadata().orEmpty() +
+            expansionImitation?.metadata().orEmpty() +
+            cathedralTactics?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -143,6 +181,7 @@ data class ArenaSpecification(
     internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
         frozenPurchase?.snapshot(artifacts)
         tokenOrder?.snapshot(artifacts)
+        expansionImitation?.snapshot(artifacts)
     }
 
     companion object {
@@ -222,6 +261,12 @@ data class ArenaSpecification(
                             ArenaPurchasePolicy.read(source, it, transfer)
                         },
                     tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
+                    expansionImitation =
+                        node["expansionImitation"]?.let {
+                            ArenaExpansionImitation.read(source, it)
+                        },
+                    cathedralTactics =
+                        node["cathedralTactics"]?.let { ArenaCathedralTactics.read(it) },
                     experimentalRulesTransfer = transfer,
                     ordinaryModelSources = modelSources,
                     initializationSource =
@@ -276,6 +321,8 @@ data class ArenaPair(
     val opponentIndices: List<Int>,
     val candidate: ArenaGame,
     val incumbent: ArenaGame,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val cathedralTactics: CathedralTacticsConfiguration? = null,
 )
 
 object StrategyArena {
@@ -356,6 +403,7 @@ object StrategyArena {
                             lineup.seat,
                             side,
                             model,
+                            lineup.opponentIndices,
                         ),
                 )
         )
@@ -377,6 +425,7 @@ object StrategyArena {
             lineup.opponentIndices,
             candidate,
             incumbent,
+            specification.cathedralTactics?.configuration,
         )
     }
 
