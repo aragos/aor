@@ -198,7 +198,9 @@ data class BotModel(val schemaVersion: Int = 1, val weights: Map<String, Double>
 object BotModels {
     /** Controller parameters never act as ordinary candidate or planning features. */
     internal fun reservedFeature(name: String): Boolean =
-        BotTokenValue.reserved(name) || BotExpansionModel.reserved(name)
+        BotTokenValue.reserved(name) ||
+            BotExpansionModel.reserved(name) ||
+            BotMilitaryModel.reserved(name)
 
     /**
      * Schema-one wire weights are overrides of the prior. Explicit zeros disable prior features,

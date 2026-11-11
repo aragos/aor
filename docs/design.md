@@ -166,6 +166,13 @@ ordinary weights for Hard `expand` decisions, retaining the existing beam planne
 other difficulties and incomplete entries keep the ordinary policy. Reserved transport keys never
 contribute to ordinary feature scores; support alone does not activate a model or establish its
 qualification.
+The inactive [military model hook](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/BotMilitaryModel.kt)
+accepts a unit gate and four absolute card coefficients under `planning.militaryModel.*`.
+It replaces those weights only for Hard play, before any expansion override. Easy and Normal retain
+the ordinary coefficients; missing or incomplete transport data also retains them. Reserved keys
+never contribute to candidate scores. Export must preserve the incumbent raw ordinary weights and
+bind independently qualified military coefficients through this hook, so Hard-only evidence cannot
+change other difficulties. No asset activates the hook merely by including this support.
 The current rules-5 four-player entry combines the independently qualified lambda1 expansion
 coefficients with the fixed token control. Fresh complete-game confirmation and heldout gates compare
 the exact combination against each component separately, with unchanged C purchases and F0 purchase
