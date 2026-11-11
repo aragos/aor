@@ -195,6 +195,15 @@ desktop-ten portability bank. Preparation binds the exact normalization source a
 both passed military gates and the terminal audit. The anchor choice cannot change after freezing.
 The four-coordinate profile retains its existing behavior and six-worker host finalization.
 
+The same preparer accepts `--local-step --prior-audit PATH` for the separately versioned
+`expansion-joint-local-step-search-1` profile. It uses the fixed sigma schedule
+`[.025, .05, .1, .2]`, one tenth of the original schedule, with the same coordinates, scales,
+qualified military anchor, population sizes and qualification gates. The executor passes the
+declared schedule to the coordinate generator; omitted legacy parameters retain their original
+defaults. This single scale hypothesis binds the completed broader-search audit and fresh world
+and mutation seeds. Failure stops this weight-search family pending a new mechanism; it cannot
+trigger another scale, retry or automatic activation.
+
 ### Portable simulation benchmark
 
 For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages

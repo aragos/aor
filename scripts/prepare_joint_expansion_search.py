@@ -37,6 +37,15 @@ def configure(root,protocol,options,copy):
         qualificationRule='Only selected candidate:2048 fresh mixed then4096 homogeneous current-anchor pairs; both reward/win99 percent lower bounds>0;8 exact replays per gate.',
         limitation='Joint12-coordinate search around the current qualified anchor; eight coordinates affect expansion only, four public target coefficients affect both model files. Every mixed rival shares the frozen military setting. No human-strength or activation claim.')
     protocol['portability']['coordinates'] = target_portability.JOINT_COORDINATES
+    if getattr(options,'local_step',False):
+        joint.require(options.military_root is not None and options.prior_audit is not None,
+                      'Local steps require the qualified military anchor and completed broader-search audit.')
+        prior = copy(options.prior_audit,'evidence/local-step/prior-audit.json')
+        protocol.update(kind=joint.LOCAL_VERSION,sigmas=list(joint.LOCAL_SIGMAS),
+            localStep=dict(priorAudit=dict(path=prior,sha256=joint.sha(prior)),failurePolicy=joint.FAILURE_POLICY))
+        joint.validate_local_step(protocol)
+        protocol['localStep']['priorAudit']['path'] = str(Path(prior).relative_to(root))
+        protocol['limitation'] += ' This is one smaller-step hypothesis; failure stops this weight-search family pending a new mechanism.'
     for key in ('baseline','expansionModel'):
         protocol[key] = str(Path(protocol[key]).relative_to(root))
     settings['normalizationSource']['path'] = str(Path(normalization).relative_to(root))
@@ -51,6 +60,8 @@ if __name__ == '__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--normalization-source',type=Path,required=True)
     parser.add_argument('--military-root',type=Path)
+    parser.add_argument('--local-step',action='store_true',help='Opt into the fixed one-tenth mutation schedule.')
+    parser.add_argument('--prior-audit',type=Path)
     options = parser.parse_args()
     options.joint_expansion = True
     target_prepare.prepare(options)

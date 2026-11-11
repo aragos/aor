@@ -11,6 +11,10 @@ import expansion_evolution as evolution
 
 read, sha, require = evolution.read, evolution.sha, evolution.require
 VERSION = 'expansion-joint-search-1'
+LOCAL_VERSION = 'expansion-joint-local-step-search-1'
+LOCAL_SIGMAS = (.025, .05, .1, .2)
+PRIOR_AUDIT = '6b4c12071b0dde1bb50cd818eefae3a0350d302de46576a6287832ec233ea896'
+FAILURE_POLICY = 'STOP_JOINT_WEIGHT_SEARCH_FAMILY_PENDING_NEW_MECHANISM'
 TARGET_FEATURES = ('expansion.targetMarket', 'expansion.targetIncomeShare',
                    'expansion.targetAdvanceShare', 'expansion.targetCashShare')
 FEATURES = (*evolution.FEATURES, *TARGET_FEATURES)
@@ -26,6 +30,33 @@ PURCHASE = {
     'baseline': 'c4dd1609c737151caadfe0cb85efe406cee84f02b801877af35d65128488bcb0',
     'policy': '62dae4a44c84fca9ae39a50fdf93e1001d4b3e1ef55db736b1d7e387559a5a44',
 }
+
+
+def mutation_sigmas(kind):
+    require(kind in (VERSION, LOCAL_VERSION), 'Unknown versioned joint mutation profile.')
+    return LOCAL_SIGMAS if kind == LOCAL_VERSION else coordinate.DEFAULT_SIGMAS
+
+
+def validate_local_step(protocol):
+    """One predeclared scale hypothesis, with the rejected broader search retained."""
+    local = protocol['kind'] == LOCAL_VERSION
+    require(local == ('localStep' in protocol), 'Local mutation semantics require their explicit versioned owner.')
+    if not local:
+        return
+    settings = protocol['localStep']
+    require(set(settings) == {'priorAudit','failurePolicy'}
+            and settings['failurePolicy'] == FAILURE_POLICY
+            and protocol['jointExpansion']['anchor'] == 'E+T+M8',
+            'The local-step study keeps the qualified military anchor and stops this search family on failure.')
+    prior = settings['priorAudit']
+    require(set(prior) == {'path','sha256'} and sha(prior['path']) == prior['sha256'] == PRIOR_AUDIT,
+            'The local-scale hypothesis requires the exact completed broad-search audit.')
+    audit = read(prior['path'])
+    require(audit['status'] == 'passed-completed-rejection-audit'
+            and audit['allPairsRecomputed'] == 4096 and len(audit['mutants']) == 28
+            and audit['positiveRewardMutants'] == audit['positiveWinMutants'] == 0
+            and audit['freshFinalBanksUnopened'],
+            'Retain the rejected broad-search evidence without reusing its candidate selection or final banks.')
 
 
 def profile(settings):

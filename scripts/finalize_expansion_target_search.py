@@ -109,6 +109,9 @@ def finalize(root,request_path,request_sha,manifest_sha):
         settings['normalizationSource']['path'] = str(portability.member(root,settings['normalizationSource']['path']))
         for item in (settings['militaryQualification'] or {}).values():
             item['path'] = str(portability.member(root,item['path']))
+        if 'localStep' in protocol:
+            item = protocol['localStep']['priorAudit']
+            item['path'] = str(portability.member(root,item['path']))
     protocol.update(java=java,python=python,workers=workers,environment=environment,
         transportManifestSha256=manifest_sha,hostRequestSha256=request_sha,
         weightedPortabilitySha256=declaration['sha256'],weightedPortabilityVerified=True)

@@ -7,6 +7,7 @@ import random
 
 from automata_experiments import require
 
+DEFAULT_SIGMAS = (.25, .5, 1., 2.)
 
 @dataclass(frozen=True)
 class CoordinateProfile:
@@ -84,7 +85,7 @@ def export_model(values, baseline, profile, target_rules):
 
 
 def population(baseline, parents, profile, seed, target_rules,
-               maximum_proposals=4096, population_size=8, sigmas=(.25, .5, 1., 2.)):
+               maximum_proposals=4096, population_size=8, sigmas=DEFAULT_SIGMAS):
     """Anchor, up to two exact parents, then fixed-sigma Gaussian children.
 
     A duplicate consumes its proposal attempt and RNG values, but not a child
@@ -93,6 +94,8 @@ def population(baseline, parents, profile, seed, target_rules,
     fixed attempt ceiling fails closed without changing proposal mechanics.
     """
     features, bounds = profile.features, profile.bounds
+    require(type(sigmas) is tuple and len(sigmas) > 0 and all(finite(value) and value > 0 for value in sigmas),
+            'Mutation scales require an immutable, nonempty schedule of finite positive sigmas.')
     require(type(seed) is int and seed >= 0 and len(parents) <= 2,
             "Each generation requires its declared seed and at most two prior elites.")
     anchor = export_model([0.] * len(features), baseline, profile, target_rules)

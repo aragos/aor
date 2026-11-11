@@ -79,7 +79,10 @@ def prepare(options):
             'Target preparation needs exactly seven learning/final banks plus independent portability.')
     world_banks = {name:audit['seedBanks'][name] for name in target.COUNTS}
     portable_bank = audit['seedBanks']['portability']
-    require(portable_bank['count'] == 32 and portable_bank['nativeOffset'] == (34000100 if joint else 28000100),
+    local = getattr(options,'local_step',False)
+    expected_portability = (portable_bank['nativeOffset'] >= 39000100 if local
+                            else portable_bank['nativeOffset'] == (34000100 if joint else 28000100))
+    require(portable_bank['count'] == 32 and expected_portability,
             'Keep the separately reserved32-world operational portability bank outside learning.')
     provenance = []
     def copy(source,relative):

@@ -89,7 +89,10 @@ def evolve(protocol,output):
         root.mkdir(parents=True,exist_ok=False)
         proposal_parents = [read(models.verify_bundle(path,protocol)[role]['path']) for path in parents]
         proposals = models.coordinate.population(basis,proposal_parents,profile,
-            protocol['proposalSeeds'][generation],protocol['targetRulesVersion'])
+            protocol['proposalSeeds'][generation],protocol['targetRulesVersion'],
+            maximum_proposals=protocol.get('maximumProposalAttempts',4096),
+            population_size=protocol.get('populationSize',8),
+            sigmas=tuple(protocol.get('sigmas',models.coordinate.DEFAULT_SIGMAS)))
         paths = [models.export_bundle(root/f'model-{row["candidateIndex"]}',row['model'],baseline,expansion,
                                       protocol.get('jointExpansion'))
                  for row in proposals]
@@ -178,16 +181,18 @@ def final(protocol,output,stage):
 
 
 def validate_protocol(protocol):
-    joint = protocol['kind'] == models.joint.VERSION
+    joint = protocol['kind'] in (models.joint.VERSION,models.joint.LOCAL_VERSION)
     require(joint == ('jointExpansion' in protocol), 'The joint profile requires its explicit versioned protocol.')
+    models.joint.validate_local_step(protocol)
     profile = models.profile(protocol)
-    require(protocol['kind'] in (VERSION,models.joint.VERSION) and protocol['schemaVersion'] == 1
+    expected_sigmas = models.joint.mutation_sigmas(protocol['kind']) if joint else models.coordinate.DEFAULT_SIGMAS
+    require(protocol['kind'] in (VERSION,models.joint.VERSION,models.joint.LOCAL_VERSION) and protocol['schemaVersion'] == 1
             and protocol['learningMethod'] == 'bounded-whole-game-evolution'
             and protocol['featureNames'] == list(profile.features)
             and protocol['normalization'] == profile.normalization()
             and protocol['coordinateBounds'] == list(profile.bounds)
             and protocol['generations'] == 4 and protocol['populationSize'] == 8
-            and protocol['sigmas'] == [.25,.5,1.,2.] and protocol['maximumProposalAttempts'] == 4096
+            and protocol['sigmas'] == list(expected_sigmas) and protocol['maximumProposalAttempts'] == 4096
             and protocol['maximumArchiveModels'] == 9 and protocol['initialModels'] == []
             and protocol['maximumSeconds'] == 21600 and protocol['maximumAttempts'] == 1
             and protocol['maximumTerminalGames'] == 29696 and protocol['maximumHistoricalReplays'] == 16
