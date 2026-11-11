@@ -854,6 +854,22 @@ The controlled incumbent and F0 prior remain identical in both banks. Eight pros
 side replays per bank verify exact outcomes; qualifying evidence does not activate an application
 profile or establish human-level strength.
 
+The [bounded GAE learning curve](../scripts/purchase_gae_learning_curve.py) separately tests
+whether more on-policy data improves the exact exploratory44 GAE actor. It carries that completed
+actor's original Adam moments and step counters, freezes the same critic and recipe, and collects
+at most64 new256-game batches against the unchanged mixed rival roles. Fresh512-pair development
+checks occur only after batches16,32,64, always against the initial44 actor with homogeneous
+qualified ETM8/C64 rivals. Qualification results cannot redefine that baseline.
+
+Only the final64 checkpoint is eligible for later review. A single cost-control decision at32
+stops when the incremental win gain's one-sided95% upper bound is strictly below.03; four consecutive
+batches accepting zero epochs also stop. These rules do not establish that later learning could
+never improve. The existing supervisor enforces one attempt and an original six-hour deadline;
+partial batches cannot automatically resume or renew it. No checkpoint selection, extra looks,
+top-ups, automatic qualification or activation is allowed. A failed deployment gate alone is not
+evidence that continued training is futile; fixed-critic bias and rival-pool overfitting remain
+limitations of this development curve.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It

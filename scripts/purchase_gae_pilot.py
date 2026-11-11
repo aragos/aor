@@ -66,14 +66,20 @@ def validate_inputs(protocol):
     exp.validate_banks({name:bank['seeds'] for name,bank in protocol['banks'].items()})
 
 
-def numeric(protocol,directory,index,arm):
+def previous_optimizer(directory,index,arm,initial_optimizer=None):
+    """An explicit completed starting checkpoint permits a new bounded continuation campaign."""
+    return (directory.parent.parent/f'batch-{index-1}'/arm/'update/checkpoint.json'
+            if index>1 else initial_optimizer)
+
+
+def numeric(protocol,directory,index,arm,*,initial_optimizer=None):
     import purchase_actor_baseline as baseline
     import purchase_gae as gae
     import purchase_policy as learner
     import purchase_ecology_environment as environment
     environment.verify(protocol['numerical'])
     model=Path(read(directory/'collection-source.json')['policy'])
-    previous=directory.parent.parent/f'batch-{index-1}'/arm/'update/checkpoint.json' if index>1 else None
+    previous=previous_optimizer(directory,index,arm,initial_optimizer)
     prediction=directory/'external-baselines.json'
     baseline.predict(directory/'collection',model,protocol['critic'],protocol['inferenceContract'],
                      protocol['stateDictionary'],prediction,expected_model_sha=sha(model))
@@ -93,11 +99,11 @@ def numeric(protocol,directory,index,arm):
         'Frozen state predictions or explicit advantage targets changed during the update.')
 
 
-def verify_update(protocol,directory,index,arm,model,provenance):
+def verify_update(protocol,directory,index,arm,model,provenance,*,initial_optimizer=None):
     update=directory/'update';initial=read(model);candidate=read(update/'policy.json')
     payload=ecology.checkpoint(update/'checkpoint.json',update/'policy.json')
     identity,report=read(update/'identity.json'),read(update/'finished.json')
-    previous=directory.parent.parent/f'batch-{index-1}'/arm/'update/checkpoint.json' if index>1 else None
+    previous=previous_optimizer(directory,index,arm,initial_optimizer)
     objective=identity.get('actorOnlyObjective',{})
     require(identity['data']==provenance and identity['modelSha256']==sha(model)
         and identity['config']==update_config(protocol,index)
@@ -109,7 +115,7 @@ def verify_update(protocol,directory,index,arm,model,provenance):
         and payload['identitySha256']==legacy.digest(identity),
         'The exact arm, current behavior actor, collection or optimizer lineage changed.')
     require(objective['frozenParameters']==['valueWeights','valueBias']
-        and objective['optimizerInitialization']==('fresh-adam' if index==1 else 'matching-actor-adam'),
+        and objective['optimizerInitialization']==('matching-actor-adam' if previous else 'fresh-adam'),
         'Both arms must freeze the original value head and carry only their own actor Adam.')
     if arm=='mc':
         require(objective['version']=='purchase-actor-only-baseline-1' and objective['baseline']=='external',
