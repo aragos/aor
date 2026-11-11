@@ -427,6 +427,8 @@ p { line-height: 1.55; } a { color: var(--link); text-underline-offset: 3px; } l
 .advance-control.available { border: 2px solid #3b7752; background: #edf5e5; }
 .advance-control > .advance-tile { height: auto; flex: 1; }
 .advance-control > .unplayed-leaders { margin: 0 .75rem .65rem; }
+.advance-tile > .advance-owner-symbols { grid-column: 2; display: flex; flex-wrap: wrap; gap: .35rem; }
+.advance-owner-symbols > span:not(.sr-only) { display: inline-flex; }
 .player-white-markers { display: flex; gap: .4rem; align-items: center; font-size: .75rem; }
 .event-die.die-green { color: #263f3d; background: #e0eddc; border-color: #83a373; }
 .event-die.die-black { background: #29342e; border-color: #29342e; color: #fffef8; }
