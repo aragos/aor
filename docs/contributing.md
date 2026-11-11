@@ -128,6 +128,24 @@ for the fixed fit and
 [`ArenaExpansionImitation`](../training/src/main/kotlin/dev/aragos/aor/training/ArenaExpansionImitation.kt)
 for role and replay contracts.
 
+### Bounded expansion evolution
+
+[`prepare_expansion_evolution.py`](../scripts/prepare_expansion_evolution.py) freezes a separate
+whole-game learning campaign after the fixed imitation screen has a verified terminal receipt.
+Only validation-selected rivals surviving that screen's original collapse exclusion may seed it.
+The preparer binds that receipt, the pilot's training-only normalization, the exact four training
+and two heldout rivals, frozen Purchase environment, native runtime, and an independent reservation
+of all game and proposal streams. It copies no original human save or server credentials.
+
+[`expansion_evolution.py`](../scripts/expansion_evolution.py) owns the finite algorithm: four
+eight-model generations, fixed Gaussian perturbations of eight expansion coefficients, a bounded
+unique archive and a separate common-world selection race. Each generation and the selection race
+include an exact ordinary-policy anchor and verify identical incumbent outcomes across candidates.
+Positive generation means are selection evidence only. One frozen selected candidate may open
+independent confirmation and heldout gates; every final gate requires both 99% lower bounds and
+canonical historical replay checks. An eight-hour, one-attempt campaign controller owns the overall
+deadline. No successful result activates a policy or establishes human-level strength.
+
 ### Portable simulation benchmark
 
 For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages
