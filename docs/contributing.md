@@ -961,6 +961,14 @@ with `card_policy.py initialize`: its seeded representation and zero actor head 
 ordinary recommendation prior; greedy parity does not make stochastic collection identical to the
 ordinary policy. Freeze the initialization seed and all model bytes before examining coverage.
 
+The bounded [joint data executor](../scripts/joint_state_data.py) uses sixteen fixed 256-world
+chunks and one prospective historical reproduction per chunk. It never fits or selects a policy.
+Each complete chunk is cross-checked, losslessly archived and verified before its expanded files
+are removed. The portable corpus indexes archive members relative to the corpus directory;
+native absolute paths are provenance only. Archive ordering groups each origin's trajectory,
+state, label and coverage files so a remote reader needs only one world in memory. A partial
+attempt retains its evidence and cannot silently resume with a renewed deadline.
+
 The [joint updater](../scripts/joint_trajectory.py) reads the same completed origins and terminal
 labels for both phases, including games with an empty phase array. It keeps separate Adam states
 and fits both actors against their original behavior bundle before publishing the next pair.

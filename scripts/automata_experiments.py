@@ -375,11 +375,15 @@ def remaining_seconds():
     return remaining
 
 
-def native(protocol, mode, source, output, extra=(), allow_insufficient=False):
+def native(protocol, mode, source, output, extra=(), allow_insufficient=False, *, create_output=True):
     """No detached supervisor: the controller's process group contains Java and this adapter."""
     remaining = remaining_seconds()
     output = Path(output)
-    output.mkdir(parents=True, exist_ok=True)
+    if create_output:
+        output.mkdir(parents=True, exist_ok=True)
+    else:
+        require(not output.exists(), "This native mode requires a fresh output directory.")
+        output.parent.mkdir(parents=True, exist_ok=True)
     command = [protocol["java"]["executable"], f'-Xmx{protocol["heapMiB"]}m',
                f'-XX:ActiveProcessorCount={protocol["workers"]}', "-XX:ParallelGCThreads=1",
                "-XX:ConcGCThreads=1", "-cp", str(Path(protocol["runtime"]) / "lib/*"),
