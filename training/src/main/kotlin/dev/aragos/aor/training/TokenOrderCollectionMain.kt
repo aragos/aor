@@ -300,10 +300,10 @@ object TokenOrderCollectionMain {
             val outcomes = alternative.required("outcomes")
             require(
                 alternative["command"] == actions[action]["command"] &&
-                    outcomes.size() == 2 &&
+                    outcomes.size() == specification.continuationReplicates &&
                     outcomes.withIndex().all { (replicate, outcome) ->
                         outcome.required("continuationSeed").asLong() ==
-                            TokenValueCollector.continuationSeed(lineup.seed, replicate) &&
+                            specification.continuationSeed(lineup.seed, replicate) &&
                             listOf("reward", "winShare", "rankReward").all { key ->
                                 PurchaseJson.number(outcome.required(key), key) in 0.0..1.0
                             } &&

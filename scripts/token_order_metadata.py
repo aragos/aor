@@ -15,6 +15,7 @@ PROPOSALS = "token-order-proposals-1"
 CONFIGURATION = "players-4/standard/no-crusades/deck-true/art-true"
 SELECTION = "PRECOMMITTED_ORDINAL_V1"
 ARENA_CONTINUATION = "ARENA_OVERLAYS_1"
+EIGHT_TAIL_CONTINUATION = "ARENA_OVERLAYS_EIGHT_TAILS_1"
 EXPANSION_FEATURES = ("tokens", "progress", "reach", "commodity", "income", "risk",
                       "action.expansion", "action.pass")
 TOKEN_REFERENCE_VERSION = "ordinary-token-reference-1"
@@ -60,7 +61,7 @@ def transfer_metadata(source, manifest, snapshots):
                 "Transferred ordinary bytes differ from their source identity: " + role)
 
 
-def continuation_metadata(directory, source, manifest, snapshots):
+def continuation_metadata(directory, source, manifest, snapshots, *, eight_tails=False):
     """Opt-in arena roles bind archived inputs; they never become learning features.
 
     This contract requires identical serialized non-expansion coefficients, including
@@ -74,8 +75,9 @@ def continuation_metadata(directory, source, manifest, snapshots):
                         for key in ("tokenOrder", "expansionImitation")),
                 "Legacy token collection cannot contain undeclared continuation overlays.")
         return {}
+    expected = EIGHT_TAIL_CONTINUATION if eight_tails else ARENA_CONTINUATION
     require(source["continuationProtocol"] == manifest.get("continuationProtocol")
-            == ARENA_CONTINUATION, "Unsupported token continuation protocol.")
+            == expected, "Unsupported token continuation protocol.")
     origins = source.get("replayOrigins")
     count = manifest["trainingRoots"] + manifest["validationRoots"]
     require(isinstance(origins, list) and 1 <= len(origins) <= 8
@@ -153,7 +155,7 @@ def continuation_metadata(directory, source, manifest, snapshots):
     return pins
 
 
-def collection_metadata(directory, manifest, finished):
+def collection_metadata(directory, manifest, finished, *, eight_tails=False):
     """Bind completed data to its prospective request table and archived environment."""
     require(manifest.get("kind") == finished.get("kind") == KIND
             and manifest["signature"] == finished["signature"]
@@ -173,8 +175,12 @@ def collection_metadata(directory, manifest, finished):
             and manifest["configuration"] == CONFIGURATION
             and set(source["frozenPurchase"]) == {"baseline", "policy"},
             "Token collection requires the fixed shared purchase environment without side overrides.")
+    replicates = 8 if eight_tails else 2
+    if eight_tails:
+        require(source.get("continuationProtocol") == EIGHT_TAIL_CONTINUATION,
+                "Eight-tail loading requires its explicit versioned continuation protocol.")
     for key, lower, upper in (("trainingRoots", 2, 8192), ("validationRoots", 2, 8192),
-                              ("continuationReplicates", 2, 2), ("seed", 0, 99999999)):
+                              ("continuationReplicates", replicates, replicates), ("seed", 0, 99999999)):
         integer(manifest[key], key, lower, upper)
         require(source[key] == manifest[key], "Token source and manifest disagree: " + key)
     opponents = source["opponents"]
@@ -195,5 +201,5 @@ def collection_metadata(directory, manifest, finished):
         pins[name] = frozen[role]["sha256"]
     for name, expected in pins.items():
         require(sha(directory / name) == expected, "Token environment snapshot changed: " + name)
-    pins.update(continuation_metadata(directory, source, manifest, snapshots))
+    pins.update(continuation_metadata(directory, source, manifest, snapshots, eight_tails=eight_tails))
     return source, pins

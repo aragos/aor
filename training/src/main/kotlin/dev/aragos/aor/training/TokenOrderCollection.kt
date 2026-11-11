@@ -10,8 +10,9 @@ import dev.aragos.aor.ai.TokenOrderPolicy
 import java.nio.file.Path
 
 /** Explicit continuation semantics; omission retains the historical purchase-only collector. */
-internal enum class TokenOrderContinuationProtocol {
-    ARENA_OVERLAYS_1
+internal enum class TokenOrderContinuationProtocol(val replicates: Int) {
+    ARENA_OVERLAYS_1(2),
+    ARENA_OVERLAYS_EIGHT_TAILS_1(8),
 }
 
 /** Fresh, precommitted origin banks; validation is model selection, never final confirmation. */
@@ -64,13 +65,27 @@ internal data class TokenOrderSpecification(
         require(trainingRoots in 2..8192 && validationRoots in 2..8192) {
             "Token-order banks require two through 8192 origin games each."
         }
-        require(continuationReplicates == 2) {
-            "Token-order collection uses exactly two paired full-tail chance streams."
+        require(continuationReplicates == (continuationProtocol?.replicates ?: 2)) {
+            "Token-order chance-stream count must match its explicit continuation protocol."
         }
     }
 
     val origins: Int
         get() = trainingRoots + validationRoots
+
+    /** Eight-tail opt-in extends the same seed prefix without changing legacy value collectors. */
+    fun continuationSeed(originSeed: Int, replicate: Int): Long {
+        require(replicate in 0 until continuationReplicates) {
+            "A token-order continuation must belong to its declared stream prefix."
+        }
+        return if (
+            continuationProtocol == TokenOrderContinuationProtocol.ARENA_OVERLAYS_EIGHT_TAILS_1
+        ) {
+            (originSeed.toLong() shl 3) xor replicate.toLong() xor 0x6f20a5319dL
+        } else {
+            TokenValueCollector.continuationSeed(originSeed, replicate)
+        }
+    }
 
     fun split(index: Int): TokenValueSplit {
         require(index in 0 until origins) {
@@ -267,7 +282,7 @@ internal class TokenOrderCollector(
                                 chosen,
                                 List(specification.continuationReplicates) { replicate ->
                                     val chance =
-                                        TokenValueCollector.continuationSeed(lineup.seed, replicate)
+                                        specification.continuationSeed(lineup.seed, replicate)
                                     continuation.finish(
                                         root.branch(chosen, chance, deadlineNanos),
                                         lineup.seat,

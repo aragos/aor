@@ -142,7 +142,7 @@ def origin_request(manifest, index, opponents):
     return {**identity, "requestedOrdinal": request["requestedOrdinal"]}
 
 
-def collection(directory, seed, *, supplied_initializer=None):
+def collection(directory, seed, *, supplied_initializer=None, eight_tails=False):
     """Validate one completed bank against a generated or explicitly supplied Q initializer.
 
     A supplied initializer retains its exact basis; the seed is then unused. Its caller
@@ -150,7 +150,7 @@ def collection(directory, seed, *, supplied_initializer=None):
     """
     directory = Path(directory).resolve(strict=True)
     manifest, finished = read(directory / "dataset.json"), read(directory / "finished.json")
-    source, pins = collection_metadata(directory, manifest, finished)
+    source, pins = collection_metadata(directory, manifest, finished, eight_tails=eight_tails)
     if supplied_initializer is None:
         model = q.initialize(manifest, seed, "token")
     else:
@@ -174,7 +174,8 @@ def collection(directory, seed, *, supplied_initializer=None):
                 and row["schemaVersion"] == 1 and row["signature"] == manifest["signature"]
                 and row["configuration"] == manifest["configuration"],
                 "Token origin identity differs from its prospective request.")
-        chance = [(row["gameSeed"] << 3) ^ replicate ^ 0x6f20a5319d for replicate in range(2)]
+        chance = [(row["gameSeed"] << 3) ^ replicate ^ 0x6f20a5319d
+                  for replicate in range(manifest["continuationReplicates"])]
         require(row["gameSeed"] not in worlds and not streams.intersection(chance),
                 "Token origins and continuation worlds must be distinct across banks.")
         worlds.add(row["gameSeed"])
@@ -201,7 +202,7 @@ def collection(directory, seed, *, supplied_initializer=None):
         pins[name] = sha(directory / name)
     provenance = {"source": str(directory), "signature": manifest["signature"],
                   "files": pins, "collected": len(rows), "skipped": skipped}
-    if source.get("continuationProtocol") == ARENA_CONTINUATION:
+    if source.get("continuationProtocol") in (ARENA_CONTINUATION, metadata.EIGHT_TAIL_CONTINUATION):
         provenance["metadataValidatorSha256"] = sha(metadata.__file__)
     return model, rows, provenance
 

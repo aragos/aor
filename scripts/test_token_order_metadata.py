@@ -71,6 +71,48 @@ def add_overlay_metadata(root):
     write_collection_metadata(root, source, manifest)
 
 
+class EightTailMetadataTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        collection_fixture(self.root)
+        add_overlay_metadata(self.root)
+        self.source = learner.read(self.root / "source.json")
+        self.manifest = learner.read(self.root / "run.json")
+        for value in (self.source, self.manifest):
+            value.update(continuationProtocol=learner.EIGHT_TAIL_CONTINUATION,
+                         continuationReplicates=8)
+        write_collection_metadata(self.root, self.source, self.manifest)
+
+    def collect(self, **kwargs):
+        return learner.collection_metadata(self.root, learner.read(self.root / "dataset.json"),
+                                           learner.read(self.root / "finished.json"), **kwargs)
+
+    def test_eight_streams_require_explicit_loader_opt_in(self):
+        with self.assertRaisesRegex(ValueError, "must be an integer in \\[2, 2\\]"):
+            self.collect()
+
+    def test_explicit_eight_stream_metadata_preserves_all_overlay_pins(self):
+        source, pins = self.collect(eight_tails=True)
+        self.assertEqual(learner.EIGHT_TAIL_CONTINUATION, source["continuationProtocol"])
+        self.assertIn("expansion-imitation-candidate.json", pins)
+
+    def test_eight_stream_loader_rejects_legacy_protocol(self):
+        for value in (self.source, self.manifest):
+            value["continuationProtocol"] = learner.ARENA_CONTINUATION
+        write_collection_metadata(self.root, self.source, self.manifest)
+        with self.assertRaisesRegex(ValueError, "explicit versioned"):
+            self.collect(eight_tails=True)
+
+    def test_eight_stream_protocol_rejects_two_outcomes(self):
+        for value in (self.source, self.manifest):
+            value["continuationReplicates"] = 2
+        write_collection_metadata(self.root, self.source, self.manifest)
+        with self.assertRaisesRegex(ValueError, "must be an integer in \\[8, 8\\]"):
+            self.collect(eight_tails=True)
+
+
 class LegacyMetadataTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

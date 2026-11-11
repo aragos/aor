@@ -123,9 +123,7 @@ object TokenOrderReproduction {
             "Reproduction requires the unchanged original source and its completed snapshot."
         }
         val specification = TokenOrderSpecification.read(source)
-        require(
-            specification.continuationProtocol == TokenOrderContinuationProtocol.ARENA_OVERLAYS_1
-        ) {
+        require(specification.continuationProtocol != null) {
             "Token reproduction requires the explicit arena continuation protocol."
         }
         val signature = TokenOrderCollectionMain.signature(specification, sourceHash)

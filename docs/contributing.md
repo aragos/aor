@@ -97,7 +97,19 @@ diagnostic `candidate.json`. Schema/rules/catalog metadata protects inference co
 matching metadata alone establishes no playing-strength claim. Broader qualification remains
 [open work](follow-ups.md).
 
+### Eight-tail token evidence
+
+The separate `ARENA_OVERLAYS_EIGHT_TAILS_1` token collection contract requires exactly eight
+continuations per proposal. Its first two chance streams retain the original seed semantics;
+legacy and `ARENA_OVERLAYS_1` collections still require exactly two. Historical origin reproduction
+checks every declared outcome. `token_order_eight_tail.py` reuses the original zero-head initializer
+with explicit basis provenance on a fresh collection, without relaxing the retained-bank ridge
+contract. It fits the same five ridge penalties using eight-tail labels and training-only scales.
+Two- and four-tail prefix metrics are computed after selection and cannot select a model or
+change admission. Fresh whole-game gates remain necessary before activation.
+
 ### Bounded human expansion imitation
+
 
 `--mode expansion-imitation-fit --source PATH --output NEW_PATH` runs one native, deterministic
 pilot from a sanitized actor-visible observation JSONL, with a ten-minute fitting ceiling. The
