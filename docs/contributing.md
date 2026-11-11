@@ -954,6 +954,22 @@ Use a fixed prospective recipe and fresh factorial evaluation to separate card g
 gains and their interaction. Synthetic coordination results and training losses do not establish
 game strength or authorize replacing the playable policy.
 
+The [detached joint-credit prerequisite](../scripts/joint_credit_targets.py) derives two explicitly
+versioned GAE clocks from one frozen shared state-value file. The chronological clock follows every
+recorded controlled card/purchase decision; the phase-separated control skips the other phase.
+Both use gamma 1, lambda .95, forced rows, zero intermediate rewards and zero terminal value. Each
+clock assigns the actual terminal reward to its last recorded row. Empty worlds retain their
+identity without invented targets. Prediction bindings include complete game hashes, absolute
+decision number, phase, within-world phase row, both behavior heads and a frozen predictor descriptor.
+
+The adapter partitions detached advantages back into the original typed phase-reader order;
+observations, actions, behavior likelihoods/values and terminal labels remain unchanged. It performs
+no inference or updates and does not certify the supplied predictor's math. The existing joint
+reader's support for a separate purchase prior and arena continuations, plus an explicit typed card
+actor-only update contract, remain prerequisites for a full joint-credit pilot. Existing reader and
+optimizer guards remain active. Synthetic checks: `python -m unittest test_joint_credit_targets
+test_purchase_gae.PurchaseGaeMathTest` from `scripts` in the numerical environment.
+
 ### Token and expansion learning
 
 The experimental `territory-collect` mode learns token commitments and repeated expansion
