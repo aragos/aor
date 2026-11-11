@@ -11,6 +11,10 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "joint-state-schema") }) {
+        JointStateSchema.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "expansion-imitation-fit") }) {
         ExpansionImitationMain.run(arguments.toList())
         return
