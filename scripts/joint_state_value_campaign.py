@@ -46,6 +46,9 @@ def validate_inputs(protocol, *, corpus_required):
         'The expanded critic must retain exact refreshed49 purchase weights and input columns.')
     proof = data.read(protocol['warmParity'])
     data.require(proof['passed'] and proof['newGames'] == proof['actualFits'] == 0
+        and proof['criticSha256'] == data.sha(protocol['critic'])
+        and proof['jointDictionarySha256'] == data.sha(protocol['jointDictionary'])
+        and proof['purchaseDictionarySha256'] == data.sha(protocol['purchaseDictionary'])
         and proof['actualTrainingStates']['rows'] == 144
         and proof['actualTrainingStates']['maximumAbsoluteError'] <= 2e-6
         and proof['validationOrTestStatesUsed'] is False and proof['warmSeed'] == 52001001,

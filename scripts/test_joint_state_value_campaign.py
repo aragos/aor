@@ -29,6 +29,8 @@ def fixture():
         critic='critic', warmParity='parity', gpuEnvironment='environment')
     files = dict(seeds=dict(allIntersectionsZero=True,seedBanks=banks), purchase=names,
         joint=dictionary, parity=dict(passed=True,newGames=0,actualFits=0,
+            criticSha256=campaign.REFRESHED,jointDictionarySha256='joint-digest',
+            purchaseDictionarySha256='purchase-digest',
             actualTrainingStates=dict(rows=144,maximumAbsoluteError=0.),
             validationOrTestStatesUsed=False,warmSeed=52001001),
         environment=dict(cpuThreads=1,variables=campaign.VARIABLES))
@@ -37,7 +39,8 @@ def fixture():
 
 class DriverTest(unittest.TestCase):
     def validate(self, protocol, files):
-        hashes = {'critic':campaign.REFRESHED,'seeds':campaign.SEED_AUDIT}
+        hashes = {'critic':campaign.REFRESHED,'seeds':campaign.SEED_AUDIT,
+                  'joint':'joint-digest','purchase':'purchase-digest'}
         with patch.object(data, 'read', side_effect=lambda path:files[str(path)]), \
                 patch.object(data, 'sha', side_effect=lambda path:hashes[str(path)]):
             return campaign.validate_inputs(protocol, corpus_required=False)
@@ -58,10 +61,15 @@ class DriverTest(unittest.TestCase):
         protocol, files = fixture(); files['parity']['validationOrTestStatesUsed']=True
         with self.assertRaisesRegex(ValueError,'training-only'): self.validate(protocol,files)
 
+    def test_parity_cannot_be_reused_for_an_unrelated_dictionary(self):
+        protocol, files = fixture(); files['parity']['jointDictionarySha256']='another-dictionary'
+        with self.assertRaisesRegex(ValueError,'training-only'): self.validate(protocol,files)
+
     def test_corpus_requires_its_completed_identity(self):
         protocol, files = fixture()
         with patch.object(data,'read',side_effect=lambda path:files[str(path)]), \
-                patch.object(data,'sha',side_effect=lambda path:{'critic':campaign.REFRESHED,'seeds':campaign.SEED_AUDIT}[str(path)]):
+                patch.object(data,'sha',side_effect=lambda path:{'critic':campaign.REFRESHED,
+                    'seeds':campaign.SEED_AUDIT,'joint':'joint-digest','purchase':'purchase-digest'}[str(path)]):
             with self.assertRaises(KeyError): campaign.validate_inputs(protocol,corpus_required=True)
 
     def test_sparse_payload_estimate_counts_all_eight_arrays_and_empty_worlds(self):
