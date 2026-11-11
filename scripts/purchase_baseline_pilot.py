@@ -213,8 +213,13 @@ def main():
     validate_inputs(protocol);verify_execution(protocol)
     if options.command=='preflight':
         require(not options.output.exists(),'The actual child preflight precedes any native work.')
+        import automata_campaign as controller
+        own=[process for process in controller.processes.sample_group(os.getpgrp())
+             if process.pid==os.getpid()]
+        require(len(own)==1 and own[0].rss_bytes>0,'Actual child process sampling must work.')
         import json
-        print(json.dumps(dict(passed=True,newGames=0,actualFits=0,protocolSha256=sha(options.protocol))))
+        print(json.dumps(dict(passed=True,newGames=0,actualFits=0,externalPsSamplerPassed=True,
+                              protocolSha256=sha(options.protocol))))
     elif options.command=='numeric':numeric(protocol,options.output)
     elif options.stage=='train':train(protocol,options.protocol,options.output)
     else:screen(protocol,options.protocol,options.output)
