@@ -69,15 +69,19 @@ def finalize(root,request_path,request_sha,manifest_sha):
     verify_transport(root,manifest_sha)
     require(sha(request_path) == request_sha,'Reviewed target host request changed.')
     request = read(request_path)
+    template = read(root/'protocol-template.json')
+    workers = 10 if 'jointExpansion' in template else 6
     require(request_path.resolve() == root/'host-request.json' and request['root'] == str(root)
-            and request['workers'] == 6 and request['platform'] == platform.platform()
+            and request['workers'] == workers and request['platform'] == platform.platform()
             and request['machine'] == platform.machine() and request['logicalCpus'] == os.cpu_count()
             and request['python'] == str(Path(sys.executable).resolve()) and request['pythonVersion'] == sys.version
             and sys.flags.ignore_environment and sys.flags.no_site and sys.flags.no_user_site and sys.dont_write_bytecode,
-            'Finalize only the reviewed six-worker Mac or desktop clean interpreter.')
+            'Finalize only the reviewed profile-specific worker count and clean interpreter.')
     require((platform.system(),platform.machine()) in (('Darwin','arm64'),('Linux','x86_64')),
             'Target execution is restricted to the two reviewed hosts.')
-    protocol = copy.deepcopy(read(root/'protocol-template.json'))
+    require('jointExpansion' not in template or platform.system() == 'Linux',
+            'The joint campaign is reserved for the reviewed desktop host.')
+    protocol = copy.deepcopy(template)
     declaration = read(root/'weighted-portability.json')
     receipt = portability.verify(root/'portability',declaration['sha256'],protocol)
     require(receipt['seedAuditSha256'] == sha(root/protocol['seedAudit']),
@@ -100,7 +104,12 @@ def finalize(root,request_path,request_sha,manifest_sha):
     for key in ('baseline','expansionModel','runtime','seedAudit'):
         protocol[key] = str(portability.member(root,protocol[key]))
     protocol['frozenPurchase'] = {key:str(portability.member(root,path)) for key,path in protocol['frozenPurchase'].items()}
-    protocol.update(java=java,python=python,workers=6,environment=environment,
+    if 'jointExpansion' in protocol:
+        settings = protocol['jointExpansion']
+        settings['normalizationSource']['path'] = str(portability.member(root,settings['normalizationSource']['path']))
+        for item in (settings['militaryQualification'] or {}).values():
+            item['path'] = str(portability.member(root,item['path']))
+    protocol.update(java=java,python=python,workers=workers,environment=environment,
         transportManifestSha256=manifest_sha,hostRequestSha256=request_sha,
         weightedPortabilitySha256=declaration['sha256'],weightedPortabilityVerified=True)
     document(root/'environment.json',environment)

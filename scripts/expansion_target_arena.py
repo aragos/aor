@@ -24,7 +24,8 @@ def verify_overlay(protocol, source, directory, reports):
                       models.bindings(protocol,candidate,expansion,lineup).items())]
     expected_lineup = 'homogeneous' if source['seed'] == protocol['worldBanks']['heldout']['nativeOffset'] else 'mixed'
     require(matches == [expected_lineup],'Target search must retain its exact bank-specific rival/evaluated roles.')
-    models.verify_models(read(candidate),read(expansion),read(protocol['baseline']),read(protocol['expansionModel']))
+    models.verify_models(read(candidate),read(expansion),read(protocol['baseline']),read(protocol['expansionModel']),
+                         protocol.get('jointExpansion'))
     token.verify_environment(protocol,source,directory,reports)
     expected = dict(version='expansion-imitation-1',decision='expand',featureNames=list(FEATURES))
     def metadata(path,snapshot):

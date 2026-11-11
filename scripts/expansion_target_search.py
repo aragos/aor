@@ -25,7 +25,15 @@ RUNTIME_JARS = {
 
 def bundle_key(path,protocol):
     bundle = models.verify_bundle(path,protocol)
+    if 'jointExpansion' in protocol:
+        return tuple(evolution.model_key(read(bundle[role]['path'])) for role in ('ordinary','expansion'))
     return evolution.model_key(read(bundle['ordinary']['path']))
+
+
+def anchor_key(protocol):
+    if 'jointExpansion' in protocol:
+        return tuple(evolution.model_key(read(protocol[key])) for key in ('baseline','expansionModel'))
+    return evolution.model_key(read(protocol['baseline']))
 
 
 def archive_append(archive,paths,protocol):
@@ -61,8 +69,8 @@ def run_arena(protocol,directory,bundle_path,bank):
     return metrics,pairs,source_path
 
 
-def result(output,stage,passed,summary,metrics,paths):
-    report = dict(kind=VERSION,stage=stage,summary=summary,metrics=metrics,
+def result(output,stage,passed,summary,metrics,paths,kind=VERSION):
+    report = dict(kind=kind,stage=stage,summary=summary,metrics=metrics,
         learningMethod='bounded-whole-game-evolution',qualificationPassed=stage == 'heldout' and passed,
         productionActivation=False,humanStrengthVerified=False)
     path = output/(stage+'-report.json')
@@ -72,19 +80,22 @@ def result(output,stage,passed,summary,metrics,paths):
 
 def evolve(protocol,output):
     baseline,expansion = read(protocol['baseline']),read(protocol['expansionModel'])
+    profile,role = models.profile(protocol),models.proposal_role(protocol)
+    basis = expansion if role == 'expansion' else baseline
     parents,archive,generations = [],[],[]
     any_elite = False
     for generation in range(4):
         root = output/f'generation-{generation}'
         root.mkdir(parents=True,exist_ok=False)
-        ordinary_parents = [read(models.verify_bundle(path,protocol)['ordinary']['path']) for path in parents]
-        proposals = models.coordinate.population(baseline,ordinary_parents,models.PROFILE,
+        proposal_parents = [read(models.verify_bundle(path,protocol)[role]['path']) for path in parents]
+        proposals = models.coordinate.population(basis,proposal_parents,profile,
             protocol['proposalSeeds'][generation],protocol['targetRulesVersion'])
-        paths = [models.export_bundle(root/f'model-{row["candidateIndex"]}',row['model'],baseline,expansion)
+        paths = [models.export_bundle(root/f'model-{row["candidateIndex"]}',row['model'],baseline,expansion,
+                                      protocol.get('jointExpansion'))
                  for row in proposals]
         document(root/'proposals.json',dict(generation=generation,proposalSeed=protocol['proposalSeeds'][generation],
             parents=[dict(path=path,sha256=sha(path)) for path in parents],
-            profile=dict(featureNames=list(models.FEATURES),**models.PROFILE.normalization(),bounds=list(models.PROFILE.bounds)),
+            profile=dict(featureNames=list(profile.features),**profile.normalization(),bounds=list(profile.bounds)),
             proposals=[dict({key:value for key,value in row.items() if key != 'model'},
                 bundle=paths[row['candidateIndex']],bundleSha256=sha(paths[row['candidateIndex']])) for row in proposals]))
         if generation == 0:
@@ -113,7 +124,8 @@ def evolve(protocol,output):
     return result(output,'evolve',any_elite,
         'Fixed target generations complete.' if any_elite else 'No positive generation elite; stop before fresh selection.',
         dict(generations=generations,archiveSize=len(archive)),
-        [path for i in range(4) for path in (output/f'generation-{i}').rglob('*') if path.is_file()]+[output/'archive.json'])
+        [path for i in range(4) for path in (output/f'generation-{i}').rglob('*') if path.is_file()]+[output/'archive.json'],
+        protocol.get('kind',VERSION))
 
 
 def select_archive(protocol,output):
@@ -126,7 +138,7 @@ def select_archive(protocol,output):
         require(sha(path) == item['sha256'],'Archived paired model receipt changed.')
         metrics,pairs,_ = run_arena(protocol,output/'selection'/f'candidate-{index}',path,'selection')
         if reference is None:
-            require(bundle_key(path,protocol) == evolution.model_key(read(protocol['baseline']))
+            require(bundle_key(path,protocol) == anchor_key(protocol)
                     and all(search.same_game(pair['candidate'],pair['incumbent']) for pair in pairs),
                     'Target archive must begin with exact E+T anchor parity.')
             reference = pairs
@@ -137,7 +149,8 @@ def select_archive(protocol,output):
     document(output/'selected.json',dict(candidate=winner,rows=rows))
     return result(output,'select',winner is not None,
         'One target candidate frozen.' if winner else 'No dual-positive archive candidate; final banks unopened.',
-        dict(candidate=winner,rows=rows),[path for path in (output/'selection').rglob('*') if path.is_file()]+[output/'selected.json'])
+        dict(candidate=winner,rows=rows),[path for path in (output/'selection').rglob('*') if path.is_file()]+[output/'selected.json'],
+        protocol.get('kind',VERSION))
 
 
 def final(protocol,output,stage):
@@ -157,26 +170,38 @@ def final(protocol,output,stage):
     passed,estimates = evolution.qualification(metrics,stage)
     payload = dict(passed=passed,candidateBundleSha256=candidate['bundleSha256'],estimates=estimates,replays=replays,
                    lineup='homogeneous-E+T' if stage == 'heldout' else 'mixed-F1-E-T-E+T')
+    if 'jointExpansion' in protocol:
+        payload['frozenAnchor'] = protocol['jointExpansion']['anchor']
     return result(output,stage,passed,f'{stage} dual99 percent gate {"passed" if passed else "rejected"}.',payload,
-        [path for directory in (output/stage,output/'replays'/stage) for path in directory.rglob('*') if path.is_file()])
+        [path for directory in (output/stage,output/'replays'/stage) for path in directory.rglob('*') if path.is_file()],
+        protocol.get('kind',VERSION))
 
 
 def validate_protocol(protocol):
-    require(protocol['kind'] == VERSION and protocol['schemaVersion'] == 1
+    joint = protocol['kind'] == models.joint.VERSION
+    require(joint == ('jointExpansion' in protocol), 'The joint profile requires its explicit versioned protocol.')
+    profile = models.profile(protocol)
+    require(protocol['kind'] in (VERSION,models.joint.VERSION) and protocol['schemaVersion'] == 1
             and protocol['learningMethod'] == 'bounded-whole-game-evolution'
-            and protocol['featureNames'] == list(models.FEATURES)
-            and protocol['normalization'] == models.PROFILE.normalization()
-            and protocol['coordinateBounds'] == list(models.PROFILE.bounds)
+            and protocol['featureNames'] == list(profile.features)
+            and protocol['normalization'] == profile.normalization()
+            and protocol['coordinateBounds'] == list(profile.bounds)
             and protocol['generations'] == 4 and protocol['populationSize'] == 8
             and protocol['sigmas'] == [.25,.5,1.,2.] and protocol['maximumProposalAttempts'] == 4096
             and protocol['maximumArchiveModels'] == 9 and protocol['initialModels'] == []
             and protocol['maximumSeconds'] == 21600 and protocol['maximumAttempts'] == 1
             and protocol['maximumTerminalGames'] == 29696 and protocol['maximumHistoricalReplays'] == 16
-            and protocol['workers'] in (6,10) and protocol['productionActivation'] is False
+            and protocol['workers'] in ((10,) if joint else (6,10)) and protocol['productionActivation'] is False
             and protocol['automaticNextCampaign'] is False,
-            'Target search must retain the exact finite four-coordinate protocol.')
-    require(sha(protocol['baseline']) == F1 and sha(protocol['expansionModel']) == E,
-            'Target search must preserve the exact qualified E+T components.')
+            'Expansion search must retain its exact finite declared coordinate protocol.')
+    if joint:
+        models.joint.validate_anchor(protocol)
+        require(protocol['frozenPurchaseSha256'] == models.joint.PURCHASE
+                and {role:sha(path) for role,path in protocol['frozenPurchase'].items()} == models.joint.PURCHASE,
+                'Joint search must preserve the exact qualified C64 Purchase actor and F0 prior.')
+    else:
+        require(sha(protocol['baseline']) == F1 and sha(protocol['expansionModel']) == E,
+                'Target search must preserve the exact qualified E+T components.')
     require(protocol['runtimeComponentSha256'] == RUNTIME_JARS
             and all(sha(Path(protocol['runtime'])/'lib'/name) == digest for name,digest in RUNTIME_JARS.items()),
             'Use the exact target-feature AI, engine and training runtime, including the new AI bytes.')
@@ -199,6 +224,7 @@ def validate_protocol(protocol):
     portable_bank = protocol['portability']['bank']
     require(portable_bank == audit['seedBanks']['portability'] and portable_bank['count'] == 32
             and portable_bank['seeds'] == exp.arena_seeds(portable_bank['nativeOffset'],32)
+            and (not joint or protocol['portability']['coordinates'] == [1.,-1.,2.,-2.]*3)
             and protocol['portability']['usedForSelection'] is False
             and protocol['portability']['usedForStrength'] is False,
             'Portability worlds must remain a separate fixed operational-only bank.')

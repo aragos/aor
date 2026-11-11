@@ -3,6 +3,7 @@ from pathlib import Path
 
 import evolution_coordinates as coordinate
 import expansion_evolution as evolution
+import expansion_joint_models as joint
 
 read, sha, document, require = evolution.read, evolution.sha, evolution.document, evolution.require
 FEATURES = ('expansion.targetMarket', 'expansion.targetIncomeShare',
@@ -11,13 +12,23 @@ PROFILE = coordinate.CoordinateProfile(FEATURES, (1.,) * 4, 8., (8.,) * 4)
 LINEUPS = {'mixed': ('F1', 'E', 'T', 'E+T'), 'homogeneous': ('E+T',)}
 
 
+def profile(protocol):
+    return joint.profile(protocol['jointExpansion']) if 'jointExpansion' in protocol else PROFILE
+
+
+def proposal_role(protocol):
+    return 'expansion' if 'jointExpansion' in protocol else 'ordinary'
+
+
 def expansion_model(ordinary, baseline, expansion):
     """Apply identical target additions so the native eight-coordinate role contract holds."""
     coordinates = coordinate.coordinates(ordinary, baseline, PROFILE)
     return coordinate.export_model(coordinates, expansion, PROFILE, ordinary['rulesVersion'])
 
 
-def verify_models(ordinary, expanded, baseline, expansion):
+def verify_models(ordinary, expanded, baseline, expansion, settings=None):
+    if settings is not None:
+        return joint.verify_models(ordinary, expanded, baseline, expansion, settings)
     for model, original in ((ordinary, baseline), (expanded, expansion)):
         require({k:v for k,v in model.items() if k not in ('weights','rulesVersion')}
                 == {k:v for k,v in original.items() if k not in ('weights','rulesVersion')},
@@ -34,10 +45,13 @@ def verify_models(ordinary, expanded, baseline, expansion):
         evolution.FEATURES, (1.,)*8, 1., (8.,)*8))
 
 
-def export_bundle(directory, ordinary, baseline, expansion):
+def export_bundle(directory, ordinary, baseline, expansion, settings=None):
     directory.mkdir(parents=True, exist_ok=False)
-    expanded = expansion_model(ordinary,baseline,expansion)
-    verify_models(ordinary,expanded,baseline,expansion)
+    if settings is None:
+        expanded = expansion_model(ordinary,baseline,expansion)
+    else:
+        ordinary, expanded = joint.export_models(ordinary,baseline,expansion,settings)
+    verify_models(ordinary,expanded,baseline,expansion,settings)
     receipt = {}
     for role, model in (('ordinary',ordinary),('expansion',expanded)):
         path = directory / (role + '.json')
@@ -55,7 +69,7 @@ def verify_bundle(path,protocol):
         require(set(item) == {'path','sha256'} and sha(item['path']) == item['sha256'],
                 'Target bundle model bytes changed.')
     verify_models(read(bundle['ordinary']['path']),read(bundle['expansion']['path']),
-                  read(protocol['baseline']),read(protocol['expansionModel']))
+                  read(protocol['baseline']),read(protocol['expansionModel']),protocol.get('jointExpansion'))
     return bundle
 
 

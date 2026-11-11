@@ -181,6 +181,20 @@ interpreter, JDK and environment; preparation and launch each validate the actua
 external process sampler. The weighted proof must preserve failed operational attempts when a
 separately authorized mechanical recovery was needed.
 
+The opt-in [joint expansion preparer](../scripts/prepare_joint_expansion_search.py) uses the same
+executor and gates around the exact qualified E+T anchor, optionally with the separately qualified
+fixed military change. Its twelve-coordinate profile retains the original eight expansion scales
+from the human pilot's training decisions and the four target scales above. Eight coefficients
+change only the expansion model; the four target coefficients change both models identically.
+Military, card, token and Purchase behavior remain frozen. Every mixed rival shares the chosen
+military setting, and heldout rivals use the complete current anchor. Archive identity includes
+both model files, so different expansion policies with identical ordinary files remain distinct.
+
+This profile reserves ten desktop workers and a separate nonzero twelve-coordinate Mac-one versus
+desktop-ten portability bank. Preparation binds the exact normalization source and, when used,
+both passed military gates and the terminal audit. The anchor choice cannot change after freezing.
+The four-coordinate profile retains its existing behavior and six-worker host finalization.
+
 ### Portable simulation benchmark
 
 For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages

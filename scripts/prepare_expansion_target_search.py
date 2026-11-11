@@ -68,6 +68,7 @@ def python_identity():
 
 def prepare(options):
     root,parent,runtime = options.output.resolve(),options.combination_root.resolve(),options.runtime.resolve()
+    joint = getattr(options,'joint_expansion',False)
     require(root.exists() and {path.name for path in root.iterdir()} <= {'audit'},
             'Prepare only into the fresh audited target directory.')
     require(sys.flags.ignore_environment and sys.flags.no_site and sys.flags.no_user_site and sys.dont_write_bytecode,
@@ -78,7 +79,7 @@ def prepare(options):
             'Target preparation needs exactly seven learning/final banks plus independent portability.')
     world_banks = {name:audit['seedBanks'][name] for name in target.COUNTS}
     portable_bank = audit['seedBanks']['portability']
-    require(portable_bank['count'] == 32 and portable_bank['nativeOffset'] == 28000100,
+    require(portable_bank['count'] == 32 and portable_bank['nativeOffset'] == (34000100 if joint else 28000100),
             'Keep the separately reserved32-world operational portability bank outside learning.')
     provenance = []
     def copy(source,relative):
@@ -119,6 +120,9 @@ def prepare(options):
         qualificationRule='Selected candidate only:2048 fresh mixed then4096 fresh homogeneous E+T; both reward/win99 percent lower bounds>0;8 exact replays per gate.',
         limitation='Finite learning in one configuration against fixed stronger rivals; no human-level or production-activation claim.',
         portability=dict(bank=portable_bank,coordinates=[1.,-1.,2.,-2.],usedForSelection=False,usedForStrength=False))
+    if joint:
+        import prepare_joint_expansion_search
+        prepare_joint_expansion_search.configure(root,protocol,options,copy)
     document(root/'provenance.json',provenance)
     document(root/'protocol-template.json',protocol)
     print(dict(templateSha256=sha(root/'protocol-template.json'),newGames=0,
