@@ -44,7 +44,7 @@ def verify_overlay(protocol, source, directory, reports, *, collection=False):
         stage, model, control = 'collect', None, False
     else:
         matches = [name for name in ('screen', 'confirm', 'heldout')
-                   if source['seed'] == protocol['banks'][name]['nativeOffset']]
+                   if name in protocol['banks'] and source['seed'] == protocol['banks'][name]['nativeOffset']]
         require(len(matches) == 1, 'The arena must belong to one declared world bank.')
         stage, model = matches[0], source.get('tokenOrder', {}).get('candidateModel')
         control = source.get('tokenOrder', {}).get('candidateSelector') == 'ORDINARY_MINUS_TWO'
