@@ -160,7 +160,8 @@ fun main(arguments: Array<String>) {
             "limitations" to
                 listOf(
                     "Original action/chance seed coupling remains.",
-                    "44 contains32 independent worlds across64 paired-arm histories.",
+                    "44's retained canonical replay subset contains32 independent worlds " +
+                        "across64 paired-arm histories.",
                     "Extraction establishes no prediction or policy-strength result.",
                 ),
         ),
