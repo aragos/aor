@@ -112,7 +112,7 @@ def clean_environment():
     return dict(PATH='/usr/bin:/bin:/usr/lib/wsl/lib', LANG='C.UTF-8', **VARIABLES)
 
 
-def synthetic(output):
+def synthetic(output, bindings):
     """CPU/GPU forward and gradient parity on generated states; no retained states/labels."""
     import numpy as np
     import torch
@@ -141,7 +141,7 @@ def synthetic(output):
     data.require(np.isclose(np.mean(first), np.sum(repeated*np.asarray([1/3, 1/3, 1/3, 1]))/2),
                  'Synthetic whole-game weighting changed under row duplication.')
     data.document(output, dict(kind='purchase-value-synthetic-preflight-1', passed=True,
-                               comparisons=comparisons, actualFitGames=0, retainedLabelsOpened=0,
+                               comparisons=comparisons, bindings=bindings, actualFitGames=0, retainedLabelsOpened=0,
                                actualModelFits=0, cudaAvailable=True))
 
 
@@ -155,6 +155,11 @@ def child(root, manifest_sha, deadline):
 def run(root, manifest_sha):
     protocol = verify_package(root, manifest_sha)
     expected = data.read(root/'environment.json')
+    proof = data.read(root/'synthetic-preflight.json')
+    data.require(proof['passed'] and proof['bindings'] == dict(
+        manifestSha256=data.sha(root/'preflight-manifest.json'),
+        protocolSha256=data.sha(root/'protocol.json'), environmentSha256=data.sha(root/'environment.json')),
+        'Run requires the exact successful synthetic preflight bound to its frozen inputs.')
     data.require(not (root/'run').exists() and not (root/'attempt.json').exists(),
                  'One explicit benchmark attempt only; no resume or automatic successor.')
     data.require(shutil.disk_usage(root).free >= protocol['minimumFreeBytes'], 'Insufficient free disk.')
@@ -196,7 +201,8 @@ def main():
     elif options.mode == 'preflight':
         verify_package(root, options.manifest_sha)
         verify_environment(data.read(root/'environment.json'))
-        synthetic(root/'synthetic-preflight.json')
+        synthetic(root/'synthetic-preflight.json', dict(manifestSha256=options.manifest_sha,
+            protocolSha256=data.sha(root/'protocol.json'), environmentSha256=data.sha(root/'environment.json')))
     elif options.mode == 'child':
         child(root, options.manifest_sha, options.deadline)
     else:

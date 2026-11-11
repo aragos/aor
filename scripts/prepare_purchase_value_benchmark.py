@@ -80,14 +80,36 @@ def freeze(root):
                and '__pycache__' not in p.parts}, noActualFits=True, noNewGames=True))
 
 
+def finalize(root):
+    """Bind the successful zero-fit proof; preserve the exact preflight manifest."""
+    root = Path(root)
+    proof = data.read(root/'synthetic-preflight.json')
+    data.require(proof['passed'] and proof['actualModelFits'] == proof['retainedLabelsOpened'] == 0
+                 and proof['bindings'] == dict(manifestSha256=data.sha(root/'manifest.json'),
+                    protocolSha256=data.sha(root/'protocol.json'),
+                    environmentSha256=data.sha(root/'environment.json')),
+                 'Final freeze requires the exact successful synthetic preflight.')
+    previous = data.read(root/'manifest.json')
+    data.require(all(data.sha(root/name) == digest for name, digest in previous['files'].items()),
+                 'A scientific input changed after preflight.')
+    data.require(not (root/'preflight-manifest.json').exists(), 'Preserve any prior finalization.')
+    (root/'manifest.json').rename(root/'preflight-manifest.json')
+    data.document(root/'manifest.json', dict(kind='purchase-value-frozen-package-1',
+        files={str(p.relative_to(root)): data.sha(p) for p in root.rglob('*') if p.is_file()
+               and p.name != 'manifest.json' and '__pycache__' not in p.parts},
+        noActualFits=True, noNewGames=True))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('prepare', 'freeze'))
+    parser.add_argument('mode', choices=('prepare', 'freeze', 'finalize'))
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--inventory', type=Path)
     parser.add_argument('--c64', type=Path)
     options = parser.parse_args()
     if options.mode == 'prepare':
         prepare(options.inventory, options.c64, options.root)
-    else:
+    elif options.mode == 'freeze':
         freeze(options.root)
+    else:
+        finalize(options.root)

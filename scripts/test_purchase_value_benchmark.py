@@ -9,6 +9,7 @@ import torch
 import purchase_value_data as data
 import purchase_value_benchmark as benchmark
 import purchase_value_campaign as campaign
+import prepare_purchase_value_benchmark as preparer
 
 class SplitTests(unittest.TestCase):
     def test_old_rule_banks_are_training(self):
@@ -91,8 +92,27 @@ class SupervisorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'deadline expired'):campaign.guard(Path(temp),10,{})
     def test_existing_attempt_blocks_launch(self):
         with TemporaryDirectory() as temp:
-            root=Path(temp);data.document(root/'attempt.json',{});data.document(root/'environment.json',{})
+            root=Path(temp);data.document(root/'attempt.json',{});data.document(root/'environment.json',{});data.document(root/'protocol.json',{});data.document(root/'preflight-manifest.json',{})
+            data.document(root/'synthetic-preflight.json',dict(passed=True,bindings=dict(manifestSha256=data.sha(root/'preflight-manifest.json'),protocolSha256=data.sha(root/'protocol.json'),environmentSha256=data.sha(root/'environment.json'))))
             with patch.object(campaign,'verify_package',return_value={}):
                 with self.assertRaisesRegex(ValueError,'One explicit'):campaign.run(root,'test')
+
+
+class FreezeTests(unittest.TestCase):
+    def prepared(self, root):
+        data.document(root/'protocol.json',{'science':'fixed'})
+        data.document(root/'environment.json',{'library':'pinned'})
+        data.document(root/'manifest.json',{'files':{name:data.sha(root/name) for name in ('protocol.json','environment.json')}})
+        data.document(root/'synthetic-preflight.json',dict(passed=True,actualModelFits=0,retainedLabelsOpened=0,bindings=dict(manifestSha256=data.sha(root/'manifest.json'),protocolSha256=data.sha(root/'protocol.json'),environmentSha256=data.sha(root/'environment.json'))))
+    def test_final_freeze_binds_proof_and_preserves_original_manifest(self):
+        with TemporaryDirectory() as temp:
+            root=Path(temp);self.prepared(root);old=data.sha(root/'manifest.json')
+            preparer.finalize(root)
+            self.assertEqual(data.sha(root/'preflight-manifest.json'),old)
+            self.assertEqual(data.read(root/'manifest.json')['files']['synthetic-preflight.json'],data.sha(root/'synthetic-preflight.json'))
+    def test_post_preflight_scientific_change_is_rejected(self):
+        with TemporaryDirectory() as temp:
+            root=Path(temp);self.prepared(root);(root/'protocol.json').write_text('{"science":"changed"}')
+            with self.assertRaisesRegex(ValueError,'exact successful'):preparer.finalize(root)
 
 if __name__=='__main__':unittest.main()
