@@ -112,17 +112,17 @@ class BotLeaderCashTest {
     }
 
     @Test
-    fun finalCardProtectionKeepsTheRebateWithoutInventingAnotherIncomeReceipt() {
+    fun finalCardPlayKeepsTheRebateWithoutInventingAnotherIncomeReceipt() {
         val state =
             fixture(owned = printedWord + AdvanceId.INTEREST_PROFIT)
                 .copy(stage = Stage.FINAL_CARD_PLAY, endingTriggered = true)
-        val protected = candidate(state, "play held protect 5")
+        val plain = candidate(state, "play held")
 
-        val played = state.step(TextCodec.parse("p1: ${protected.command}"))
+        val played = state.step(TextCodec.parse("p1: ${plain.command}"))
 
-        assertThat(played.playerState(buyer).cash).isEqualTo(25)
-        assertThat(protected.features["cash"]).isEqualTo(16.0)
-        assertThat(protected.features).doesNotContainKey(interest)
+        assertThat(played.playerState(buyer).cash).isEqualTo(30)
+        assertThat(plain.features["cash"]).isEqualTo(21.0)
+        assertThat(plain.features).doesNotContainKey(interest)
     }
 
     @Test

@@ -71,6 +71,9 @@ One economic evaluator serves Easy (reasonable variation), Normal (current ranki
 resource planning). Refresh authoritative offers after every action; no unseen-card knowledge or
 full-game search. Capital evaluation includes initial hand, nearby opportunities, count and map;
 epoch/variant features permit tuning without duplicating rules.
+Final-card proposals omit positive leader protection because there is no later purchase window for
+Patronage claims. Unprotected forced plays and immediate Printed Word rebates remain available;
+ordinary-window protection proposals and engine legality are unchanged.
 
 [Training](../training/src/main/kotlin/dev/aragos/aor/training/) supplies ordinary sampled outcomes;
 policies see only their seat, and sealed decisions share the pre-batch position. Fixtures/whole games

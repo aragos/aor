@@ -1,6 +1,7 @@
 package dev.aragos.aor.ai
 
 import dev.aragos.aor.AdvanceId
+import dev.aragos.aor.CardChoice
 import dev.aragos.aor.CardChoiceKind
 import dev.aragos.aor.CardChoiceView
 import dev.aragos.aor.CardCommand
@@ -20,6 +21,7 @@ import dev.aragos.aor.Prompt
 import dev.aragos.aor.ProvinceDefinition
 import dev.aragos.aor.ProvinceId
 import dev.aragos.aor.RULES_VERSION
+import dev.aragos.aor.Stage
 import kotlin.math.abs
 
 /**
@@ -111,7 +113,8 @@ private class ObservationProjection(
                 else -> choices.commands
             }
         val augmented = commands + expansionCommands() + subsetCommands() + cardCommands()
-        val candidates = augmented.distinct().map(::candidate)
+        val candidates =
+            augmented.distinct().filterNot(::positiveFinalLeaderProtection).map(::candidate)
         require(candidates.isNotEmpty()) { "No bot candidate for $decision." }
         require(candidates.size <= 1024) { "Bot projection exceeded its candidate bound." }
         return BotObservation(
@@ -164,6 +167,13 @@ private class ObservationProjection(
                     BotLeaderProjection.from(view, seat, candidates, endgame)
                 } else null,
         )
+    }
+
+    private fun positiveFinalLeaderProtection(command: String): Boolean {
+        if (view.stage != Stage.FINAL_CARD_PLAY || !command.startsWith("play ")) return false
+        // Final card play has no later purchase window in which protection could collect Patronage.
+        val choice = CardCommand.PlayCard.parse(command.split(' ').drop(1)).choice
+        return choice is CardChoice.LeaderProtection && choice.cash > 0
     }
 
     private fun expansionCommands(): List<String> {
