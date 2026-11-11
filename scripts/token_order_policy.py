@@ -22,6 +22,7 @@ import time
 import purchase_policy as b
 import territory_value as q
 import token_order_metadata as metadata
+import token_order_fixed_reference as fixed
 
 
 KIND = metadata.KIND
@@ -81,7 +82,7 @@ def proposal_indices(observation):
     return list(dict.fromkeys(proposed))
 
 
-def validate_root(row, model, replicates):
+def validate_root(row, model, replicates, *, fixed_reference=False):
     observation = row["observation"]
     b.validate_observation(observation, model, contract=q.TOKEN_CONTRACT_2)
     indices = row["proposedIndices"]
@@ -91,6 +92,14 @@ def validate_root(row, model, replicates):
             and all(type(index) is int and 0 <= index < len(observation["actions"]) for index in indices),
             "A collected token root requires baseline-first distinct offered proposals.")
     require(indices == proposal_indices(observation), "Token root differs from the fixed proposal selector.")
+    if fixed_reference:
+        require(type(row.get("referenceIndex")) is int
+                and row["referenceIndex"] == fixed.expected_reference_index(observation)
+                and row["referenceIndex"] in indices,
+                "Residual root requires its exact offered fixed-T reference index.")
+    else:
+        require("referenceIndex" not in row, "Ordinary roots cannot declare a residual reference index.")
+    reference = fixed.reference_index(row)
     commands = [action["command"] for action in observation["actions"]]
     require(commands[baseline] == row["baselineCommand"], "Root baseline command differs from its observation.")
     amount = int(commands[baseline].removeprefix("buy-tokens "))
@@ -121,9 +130,12 @@ def validate_root(row, model, replicates):
             values.append(reward)
         returns[index] = values
     targets = {index: statistics.mean(after-before for after, before in
-                zip(returns[index], returns[baseline])) for index in indices}
-    return {"observation": observation, "indices": indices, "targets": targets,
-            "origin": row["index"], "split": row["split"]}
+                zip(returns[index], returns[reference])) for index in indices}
+    result = {"observation": observation, "indices": indices, "targets": targets,
+              "origin": row["index"], "split": row["split"]}
+    if fixed_reference:
+        result["referenceIndex"] = reference
+    return result
 
 
 def origin_request(manifest, index, opponents):
@@ -142,7 +154,7 @@ def origin_request(manifest, index, opponents):
     return {**identity, "requestedOrdinal": request["requestedOrdinal"]}
 
 
-def collection(directory, seed, *, supplied_initializer=None, eight_tails=False):
+def collection(directory, seed, *, supplied_initializer=None, eight_tails=False, fixed_reference=False):
     """Validate one completed bank against a generated or explicitly supplied Q initializer.
 
     A supplied initializer retains its exact basis; the seed is then unused. Its caller
@@ -150,7 +162,8 @@ def collection(directory, seed, *, supplied_initializer=None, eight_tails=False)
     """
     directory = Path(directory).resolve(strict=True)
     manifest, finished = read(directory / "dataset.json"), read(directory / "finished.json")
-    source, pins = collection_metadata(directory, manifest, finished, eight_tails=eight_tails)
+    source, pins = collection_metadata(directory, manifest, finished, eight_tails=eight_tails,
+                                       fixed_reference=fixed_reference)
     if supplied_initializer is None:
         model = q.initialize(manifest, seed, "token")
     else:
@@ -182,6 +195,7 @@ def collection(directory, seed, *, supplied_initializer=None, eight_tails=False)
         streams.update(chance)
         if row["status"] == "SKIPPED":
             require(row.get("observation") is None and not row.get("alternatives")
+                    and "referenceIndex" not in row
                     and not row.get("proposedIndices") and row.get("skipReason") in
                     ("REQUESTED_ROOT_NOT_REACHED", "PRECOMMITTED_ROOT_INELIGIBLE"),
                     "Skipped origins cannot supply fitting labels.")
@@ -197,24 +211,29 @@ def collection(directory, seed, *, supplied_initializer=None, eight_tails=False)
             for outcome in alternative["outcomes"]:
                 require(len(outcome["scores"]) == 4, "Token terminal outcome requires all four scores.")
                 b.integer(outcome["decisions"], "Terminal decision count", row["rootDecision"], 12000)
-        rows.append(validate_root(row, model, manifest["continuationReplicates"]))
+        rows.append(validate_root(row, model, manifest["continuationReplicates"],
+                                  fixed_reference=fixed_reference))
     for name in ("dataset.json", "finished.json", "run.json"):
         pins[name] = sha(directory / name)
     provenance = {"source": str(directory), "signature": manifest["signature"],
                   "files": pins, "collected": len(rows), "skipped": skipped}
     if source.get("continuationProtocol") in (ARENA_CONTINUATION, metadata.EIGHT_TAIL_CONTINUATION):
         provenance["metadataValidatorSha256"] = sha(metadata.__file__)
+    if fixed_reference:
+        provenance.update(metadataValidatorSha256=sha(metadata.__file__),
+                          referenceCodecSha256=sha(fixed.__file__),
+                          tokenReference=manifest["tokenReference"])
     return model, rows, provenance
 
 
 def select(values, row):
-    baseline = row["observation"]["baselineIndex"]
+    baseline = fixed.reference_index(row)
     best = max(row["indices"], key=lambda index: values[index])
     return best if values[best] - values[baseline] > MARGIN else baseline
 
 
 def paired_loss(values, row):
-    baseline = row["observation"]["baselineIndex"]
+    baseline = fixed.reference_index(row)
     alternatives = [index for index in row["indices"] if index != baseline]
     return b.torch.stack([(values[index] - values[baseline] - row["targets"][index])**2
                           for index in alternatives]).mean()
@@ -231,9 +250,13 @@ def measure(actor, rows):
                 errors.append(float(paired_loss(result, row)))
                 choice = select(result.tolist(), row)
                 deltas.append(row["targets"][choice])
-                selected.append({"origin": row["origin"], "index": choice,
-                                 "baseline": row["observation"]["baselineIndex"],
-                                 "observedDifference": row["targets"][choice]})
+                selection = {"origin": row["origin"], "index": choice,
+                             "baseline": fixed.reference_index(row),
+                             "observedDifference": row["targets"][choice]}
+                if "referenceIndex" in row:
+                    selection.update(referenceIndex=row["referenceIndex"],
+                                     ordinaryBaseline=row["observation"]["baselineIndex"])
+                selected.append(selection)
     margin = 1.96*statistics.stdev(deltas)/math.sqrt(len(deltas)) if len(deltas) > 1 else None
     positive = [value for value in deltas if value > 0]
     return {"origins": len(rows), "pairedMse": statistics.mean(errors),
