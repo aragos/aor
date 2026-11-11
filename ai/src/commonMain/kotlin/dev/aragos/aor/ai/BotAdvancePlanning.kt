@@ -154,7 +154,7 @@ private constructor(
                         } else {
                             -candidate.features.entries
                                 .filter { (name, _) ->
-                                    !BotTokenValue.reserved(name) &&
+                                    !BotModels.reservedFeature(name) &&
                                         (name == "cash" || name.endsWith(".cash"))
                                 }
                                 .sumOf { (name, value) -> value * (model.weights[name] ?: 0.0) } /

@@ -222,7 +222,7 @@ internal object BotLeaderTiming {
                 candidate.features.entries.sumOf { (name, amount) ->
                     if (
                         name == "discount" ||
-                            name.endsWith(".discount") && !BotTokenValue.reserved(name)
+                            name.endsWith(".discount") && !BotModels.reservedFeature(name)
                     )
                         amount * (model.weights[name] ?: 0.0)
                     else 0.0
