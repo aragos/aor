@@ -32,6 +32,7 @@ distributions {
                     "card_continuation_analysis.py",
                     "card_policy_coupling_experiment.py",
                     "card_policy_coupling_analysis.py",
+                    "chance_coupling_diagnostic.py",
                     "joint_economy_experiment.py",
                     "joint_economy.py",
                     "joint_trajectory.py",

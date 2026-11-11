@@ -830,6 +830,21 @@ game strength or authorize replacing the playable policy.
 
 ### Token and expansion learning
 
+The experimental `chance-coupling` diagnostic compares unchanged sequential chance with an explicit
+logical-request random table on retained training roots. Its separate source binds the original
+collection, eligible roots, offered action pairs and fresh paired future streams. Prefix reconstruction
+must preserve the original actor observation and frozen continuation roles. Request keys, hidden
+inventories and occurrence counters stay executor-only; production randomness and omitted legacy
+sources are unchanged. A new stream changes future randomness without resampling existing hands or
+deck. `chance-coupling-prepare`, `chance-coupling-vectors` and `chance-coupling-prefix-check` provide
+zero-tail validation; the last reconstructs only the declared original prefixes.
+
+The diagnostic alternates mode/action order prospectively and measures simulation thread CPU time
+separately from wall time. Canonical outcome/key replay happens outside the timed path. Its analyzer
+extends the existing coupling statistics owner with whole-root variance-times-cost uncertainty;
+retained future replicas are not independent worlds. Missing CPU timing or incomplete roots cannot
+justify adoption. This experiment performs no fitting, model selection, qualification or activation.
+
 The experimental `territory-collect` mode learns token commitments and repeated expansion
 choices while holding an explicit card/purchase bundle fixed. Its
 [source contract](../training/src/main/kotlin/dev/aragos/aor/training/TerritoryCollectionInput.kt)

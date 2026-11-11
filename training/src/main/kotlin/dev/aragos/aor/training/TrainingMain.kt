@@ -11,6 +11,20 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (
+        arguments.toList().windowed(2).any {
+            it in
+                listOf(
+                    listOf("--mode", "chance-coupling"),
+                    listOf("--mode", "chance-coupling-prepare"),
+                    listOf("--mode", "chance-coupling-prefix-check"),
+                    listOf("--mode", "chance-coupling-vectors"),
+                )
+        }
+    ) {
+        ChanceCouplingMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "expansion-imitation-fit") }) {
         ExpansionImitationMain.run(arguments.toList())
         return

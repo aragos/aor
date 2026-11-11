@@ -246,7 +246,7 @@ internal class TokenOrderCollector(
     }
 
     /** Reconstruct one original prefix without evaluating any alternative or future stream. */
-    fun capture(index: Int): TokenOrderCapture {
+    fun capture(index: Int, recordPrefix: Boolean = false): TokenOrderCapture {
         val lineup = specification.lineup(index)
         val request = specification.request(index)
         val models =
@@ -261,7 +261,12 @@ internal class TokenOrderCollector(
                 lineup.seed,
                 deadlineNanos,
             )
-        val session = ExperimentSession.start(lineup.configuration, lineup.seed.toLong())
+        val session =
+            ExperimentSession.start(
+                lineup.configuration,
+                lineup.seed.toLong(),
+                recordEntries = recordPrefix,
+            )
         val actor = session.state.playerIds[lineup.seat]
         fun provenance(status: TokenValueOriginStatus, skip: TokenValueSkipReason? = null) =
             TokenOrderOrigin(

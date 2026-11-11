@@ -210,10 +210,11 @@ class Completed:
         return values if root['alternativeIndex'] is not None else None, audit
 
 
-def moments(baseline, alternative):
+def moments(baseline, alternative, replicates=8):
     f = np.asarray(baseline, dtype=np.float64); a = np.asarray(alternative, dtype=np.float64)
-    require(f.shape == a.shape == (8,) and np.isfinite(f).all() and np.isfinite(a).all(),
-            'Each arm requires eight finite paired returns.')
+    require(replicates >= 2 and f.shape == a.shape == (replicates,)
+            and np.isfinite(f).all() and np.isfinite(a).all(),
+            'Each arm requires its declared finite paired returns.')
     d = a-f; covariance = float(np.cov(f, a, ddof=1)[0, 1])
     result = {'meanF': float(f.mean()), 'meanA': float(a.mean()), 'meanD': float(d.mean()),
               'varF': float(f.var(ddof=1)), 'varA': float(a.var(ddof=1)),
@@ -221,6 +222,52 @@ def moments(baseline, alternative):
     require(abs(result['varD']-(result['varF']+result['varA']-2*covariance)) < 1e-12,
             'Paired variance decomposition is inconsistent.')
     return result
+
+
+def chance_cost_statistics(worlds, bootstrap_seed, bootstraps=10000):
+    """Authority-only diagnostic: equal original-root weights and sixteen nested future streams.
+
+    Cost is simulation thread CPU seconds per paired replicate, excluding retrospective replay.
+    Existing policy-coupling schedules/statistics retain their unchanged default contract.
+    """
+    require(worlds and type(bootstrap_seed) is int and bootstrap_seed >= 0,
+            'Chance statistics require retained roots and an audited nonnegative analysis seed.')
+    modes = ('LEGACY', 'LOGICAL_REQUEST_1')
+    rows = []
+    for world in worlds:
+        require(set(world) == set(modes), 'Every root requires both frozen chance modes.')
+        row = {}
+        for mode in modes:
+            cell = world[mode]
+            costs = np.asarray(cell['cpuSeconds'], dtype=np.float64)
+            require(costs.shape == (16,) and np.isfinite(costs).all() and (costs > 0).all(),
+                    'Each chance arm requires sixteen positive measured paired CPU costs.')
+            row[mode] = dict(moments(cell['reference'], cell['alternative'], 16),
+                             meanCpuSeconds=float(costs.mean()))
+        rows.append(row)
+    variances = np.asarray([[row[mode]['varD'] for mode in modes] for row in rows])
+    costs = np.asarray([[row[mode]['meanCpuSeconds'] for mode in modes] for row in rows])
+    products = variances.mean(0) * costs.mean(0)
+    ratio = float(products[1]/products[0]) if products[0] > 0 else None
+    rng = np.random.default_rng(bootstrap_seed)
+    ratios = []
+    for start in range(0, bootstraps, 250):
+        indices = rng.integers(0, len(rows), (min(250, bootstraps-start), len(rows)))
+        values = variances[indices].mean(1) * costs[indices].mean(1)
+        ratios.extend(np.divide(values[:, 1], values[:, 0],
+            out=np.full(len(values), np.inf), where=values[:, 0] > 0))
+    upper = percentile(ratios, .975)
+    summaries = {mode: {key:float(np.mean([row[mode][key] for row in rows]))
+                       for key in rows[0][mode]} for mode in modes}
+    return dict(worlds=len(rows), modes=summaries, perWorld=rows,
+        primary=dict(ratio=ratio, lower95=percentile(ratios, .025), upper95=upper,
+            varianceCostProducts={mode:float(products[i]) for i, mode in enumerate(modes)},
+            undefinedBootstrapDraws=int(np.sum(~np.isfinite(ratios))),
+            gatePassed=len(rows) >= 24 and ratio is not None and ratio <= .75
+                       and upper is not None and upper < 1,
+            metric='Equal-root mean paired-return variance times equal-root mean paired simulation CPU seconds.'),
+        bootstrap=dict(seed=bootstrap_seed, resamples=bootstraps, unit='whole original root'),
+        limitation='Conditional variance on retained training worlds; no marginal-equivalence or playing-strength claim.')
 
 
 def percentile(values, quantile):
