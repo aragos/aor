@@ -1520,7 +1520,8 @@
         "stabilizeCash": 0.2520252237725352,
         "tokenPreference": 13.25445053241261,
         "tokens": 1.8211396802069946,
-        "windmill": 1.4064759373147095
+        "windmill": 1.4064759373147095,
+        "planning.tokenOrderControl.fixed16To15": 1.0
       },
       "configuration": {
         "playerCount": 4,

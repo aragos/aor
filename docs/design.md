@@ -154,6 +154,11 @@ ordered schema-1 `models` bundle with explicitly qualified entries for each rule
 single-asset files remain supported. Each entry retains its frozen prior and ordinary-model binding.
 Current-rules entries carry independent complete-game qualification; missing or incompatible entries
 use the ordinary fallback.
+The current four-player entry applies the qualified `planning.tokenOrderControl.fixed16To15` gate
+after the ordinary token selector: a choice of 16 becomes 15 only when 15 is offered. Its purchase
+asset binds that exact ordinary model while retaining the frozen purchase prior. Separate token
+qualification records the ordinary and varied-token rival comparisons; it does not establish human
+playing strength. Legacy entries retain their original choices.
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 
