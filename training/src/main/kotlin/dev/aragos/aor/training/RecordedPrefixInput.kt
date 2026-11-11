@@ -183,9 +183,11 @@ internal data class RecordedPrefixInput(
                     )
                     RecordedPrefixRequest(
                         PurchaseJson.integer(it.required("entry"), "entry"),
-                        if (proposalSampling)
+                        if (proposalSampling) {
                             PurchaseJson.integer(it.required("proposalSeed"), "proposalSeed")
-                        else null,
+                        } else {
+                            null
+                        },
                         PurchaseJson.array(it.required("chanceSeeds"), "chanceSeeds").map { seed ->
                             PurchaseJson.integer(seed, "chanceSeed")
                         },

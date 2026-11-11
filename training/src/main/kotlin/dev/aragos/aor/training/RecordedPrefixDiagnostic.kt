@@ -119,7 +119,7 @@ internal class RecordedPrefixDiagnostic(private val input: RecordedPrefixInput) 
                             input.arena.candidate,
                         )
                 val commands =
-                    if (proposalSampling)
+                    if (proposalSampling) {
                         RecordedPrefixProposals.commands(
                             observation,
                             recorded,
@@ -128,7 +128,9 @@ internal class RecordedPrefixDiagnostic(private val input: RecordedPrefixInput) 
                                 "Action sampling requires its frozen proposal stream."
                             },
                         )
-                    else listOf(recorded)
+                    } else {
+                        listOf(recorded)
+                    }
                 val receipt =
                     mapOf(
                         "entry" to request.entry,
