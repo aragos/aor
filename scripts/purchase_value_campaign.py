@@ -55,7 +55,7 @@ def environment(executable):
                 venvMaximumBytes=12*GIB, freeMinimumBytes=8*GIB)
 
 
-def verify_environment(expected):
+def verify_environment(expected, *, variables=None):
     import numpy as np
     import torch
     data.require(str(Path(sys.executable).absolute()) == expected['executable']
@@ -65,7 +65,8 @@ def verify_environment(expected):
                  and torch.cuda.get_device_name(0) == expected['gpu']
                  and list(torch.cuda.get_device_capability(0)) == expected['capability'],
                  'The pinned numerical interpreter, CUDA stack or GPU changed.')
-    data.require(all(os.environ.get(k) == v for k, v in VARIABLES.items()),
+    required_variables = VARIABLES if variables is None else variables
+    data.require(all(os.environ.get(k) == v for k, v in required_variables.items()),
                  'The numerical child requires exact deterministic/thread environment settings.')
     for name, digest in expected['files'].items():
         data.require(data.sha(name) == digest, 'Numerical environment file changed: '+name)
