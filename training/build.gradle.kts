@@ -41,6 +41,8 @@ distributions {
                     "token_order_eight_tail.py",
                     "token_order_metadata.py",
                     "token_order_fixed_reference.py",
+                    "token_order_proposals.py",
+                    "token_order_reference_neighbors.py",
                     "expansion_policy.py",
                     "territory_trajectory.py",
                     "territory_value.py",
