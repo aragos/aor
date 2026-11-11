@@ -119,10 +119,10 @@ def paired_features(actor, row):
     Only the head requires gradients, and nothing updates any parameter. This avoids
     reimplementing ActionValue's sparse encoder, activations or feature ordering.
     """
-    baseline = row["observation"]["baselineIndex"]
+    baseline = token.fixed.reference_index(row)
     indices = [index for index in row["indices"] if index != baseline]
     b.require(indices and row["targets"][baseline] == 0.,
-              "Paired features require alternatives and the zero ordinary-baseline target.")
+              "Paired features require alternatives and the zero declared-reference target.")
     values = actor([row["observation"]])[0]
     features = b.torch.stack([
         b.torch.autograd.grad(values[index]-values[baseline], actor.outputWeights,

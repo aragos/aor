@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from automata_experiments import require, sha
+import token_order_fixed_reference as fixed
 
 
 KIND = "token-order-collection"
@@ -61,7 +62,8 @@ def transfer_metadata(source, manifest, snapshots):
                 "Transferred ordinary bytes differ from their source identity: " + role)
 
 
-def continuation_metadata(directory, source, manifest, snapshots, *, eight_tails=False):
+def continuation_metadata(directory, source, manifest, snapshots, *, eight_tails=False,
+                          fixed_reference=False):
     """Opt-in arena roles bind archived inputs; they never become learning features.
 
     This contract requires identical serialized non-expansion coefficients, including
@@ -75,7 +77,8 @@ def continuation_metadata(directory, source, manifest, snapshots, *, eight_tails
                         for key in ("tokenOrder", "expansionImitation")),
                 "Legacy token collection cannot contain undeclared continuation overlays.")
         return {}
-    expected = EIGHT_TAIL_CONTINUATION if eight_tails else ARENA_CONTINUATION
+    expected = fixed.PROTOCOL if fixed_reference else (
+        EIGHT_TAIL_CONTINUATION if eight_tails else ARENA_CONTINUATION)
     require(source["continuationProtocol"] == manifest.get("continuationProtocol")
             == expected, "Unsupported token continuation protocol.")
     origins = source.get("replayOrigins")
@@ -84,18 +87,27 @@ def continuation_metadata(directory, source, manifest, snapshots, *, eight_tails
             and all(type(index) is int and 0 <= index < count for index in origins)
             and len(origins) == len(set(origins)) and manifest.get("replayOrigins") == origins,
             "Arena continuation requires one through eight distinct predeclared replay origins.")
-    require(manifest.get("tokenReference") == {
-                "version": TOKEN_REFERENCE_VERSION, "ordinaryModelSnapshot": "initial.json",
-                "ordinaryModelSha256": snapshots["initial.json"]},
+    reference = {"version": TOKEN_REFERENCE_VERSION, "ordinaryModelSnapshot": "initial.json",
+                 "ordinaryModelSha256": snapshots["initial.json"]}
+    if fixed_reference:
+        reference.update(version=fixed.REFERENCE, selector=fixed.SELECTOR,
+                         proposalReference=TOKEN_REFERENCE_VERSION)
+    require(manifest.get("tokenReference") == reference,
             "Token reference must identify the exact ordinary candidate snapshot.")
     for name in ("initial.json", "incumbent.json"):
         require(read(directory / name)["weights"].get("planning.tokenOrderControl.fixed16To15") != 1,
                 "Controlled token reference cannot enable the fixed token gate.")
     token = source.get("tokenOrder")
+    if fixed_reference:
+        require(isinstance(token, dict) and token.get("candidateSelector") == fixed.SELECTOR,
+                "Fixed-reference collection requires the exact controlled fixed-T selector.")
     if token is None:
         require(manifest.get("tokenOrder") is None, "Token rival selectors were not declared.")
     else:
-        require(isinstance(token, dict) and set(token) == {"opponentSelectors"},
+        keys = {"opponentSelectors", "candidateSelector"} if fixed_reference else {"opponentSelectors"}
+        require(isinstance(token, dict) and set(token) == keys,
+                "Fixed-reference collection permits only fixed T and indexed opponent selectors."
+                if fixed_reference else
                 "Collection permits only opponent token selectors, never controlled token overlays.")
         selectors = token["opponentSelectors"]
         require(isinstance(selectors, list) and len(selectors) == len(source["opponents"])
@@ -155,7 +167,7 @@ def continuation_metadata(directory, source, manifest, snapshots, *, eight_tails
     return pins
 
 
-def collection_metadata(directory, manifest, finished, *, eight_tails=False):
+def collection_metadata(directory, manifest, finished, *, eight_tails=False, fixed_reference=False):
     """Bind completed data to its prospective request table and archived environment."""
     require(manifest.get("kind") == finished.get("kind") == KIND
             and manifest["signature"] == finished["signature"]
@@ -175,9 +187,12 @@ def collection_metadata(directory, manifest, finished, *, eight_tails=False):
             and manifest["configuration"] == CONFIGURATION
             and set(source["frozenPurchase"]) == {"baseline", "policy"},
             "Token collection requires the fixed shared purchase environment without side overrides.")
+    require(not fixed_reference or eight_tails,
+            "Fixed-reference residual loading requires the explicit eight-tail loader.")
     replicates = 8 if eight_tails else 2
     if eight_tails:
-        require(source.get("continuationProtocol") == EIGHT_TAIL_CONTINUATION,
+        expected = fixed.PROTOCOL if fixed_reference else EIGHT_TAIL_CONTINUATION
+        require(source.get("continuationProtocol") == expected,
                 "Eight-tail loading requires its explicit versioned continuation protocol.")
     for key, lower, upper in (("trainingRoots", 2, 8192), ("validationRoots", 2, 8192),
                               ("continuationReplicates", replicates, replicates), ("seed", 0, 99999999)):
@@ -201,5 +216,6 @@ def collection_metadata(directory, manifest, finished, *, eight_tails=False):
         pins[name] = frozen[role]["sha256"]
     for name, expected in pins.items():
         require(sha(directory / name) == expected, "Token environment snapshot changed: " + name)
-    pins.update(continuation_metadata(directory, source, manifest, snapshots, eight_tails=eight_tails))
+    pins.update(continuation_metadata(directory, source, manifest, snapshots,
+                                     eight_tails=eight_tails, fixed_reference=fixed_reference))
     return source, pins
