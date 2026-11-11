@@ -1436,3 +1436,23 @@ Its omitted argument preserves the original fresh-fit path. A fresh and a warm f
 then warm arm on exact ties). Only the selected critic and unchanged original critic enter the final
 whole-game paired MSE test. This is predictive evidence under fixed play, without actor updates,
 playing-strength qualification, activation, automatic retries or a successor.
+
+The opt-in [shared-state reader](../scripts/joint_state_value_data.py) verifies lossless joint
+collection archives without reopening the original host's absolute paths. It reconstructs every
+chronological card/purchase state from the original actor observations and keeps terminal labels,
+actions, coverage and provenance outside the input tensor. Its phase-prefixed dictionary preserves
+existing encoder units. Empty phases and worlds remain in their fixed whole-world splits; worlds
+without decisions have no invented training row.
+
+The [shared-state fitter](../scripts/joint_state_value_fit.py) gives each nonempty world equal
+weight, then each nonempty phase equal weight within that world. Its explicit input-width,
+row-weight and validation-error arguments leave the existing purchase fitter's defaults unchanged.
+Fresh and warm-expanded 64-unit critics retain the original optimizer recipe. The warm model
+copies the refreshed purchase critic's input columns and later layers, with seeded new card
+columns; purchase-only prefit predictions must agree within the declared Float32 tolerance.
+Validation alone selects epoch and arm. The final stitched comparator uses a training-world card
+mean for card states and the frozen purchase critic for purchase states. Report phase-balanced,
+raw whole-world and separate phase errors with explicit empty-world denominators. This remains a
+predictive diagnostic, without actor updates or playing-strength qualification. Focused checks:
+`python -m unittest discover -s scripts -p 'test_joint_state_value_*.py'` in the dedicated
+numerical environment.
