@@ -883,6 +883,22 @@ stop the single attempt. There are no intermediate statistical looks, checkpoint
 automatic qualification, activation or successor. Its seed reservation uses only explicitly frozen
 reviewed ancestry; current human-game directories and live metadata are not scanned.
 
+The [matched critic refresh](../scripts/purchase_critic_refresh.py) starts both GAE arms from the
+same qualified actor with fresh Adam. The old and refreshed frozen64 critics have explicit
+checkpoint/descriptor identities while sharing unchanged state-only inference, units and dictionary.
+Collection-reader provenance is separate. Existing predictor and Adam-continuation guards remain
+strict: each arm carries only its own immediately preceding actor/optimizer and fixed critic.
+
+Both arms receive at most16×256 on-policy games against the fixed initial purchase actor and
+homogeneous ETM8/F0 rivals, with common world banks and four matched epoch shuffles per batch.
+Four consecutive zero-accepted-epoch batches stop that arm only; the other may finish16. These
+terminal actors receive three1024-pair comparisons on one common final bank: each against the
+initial actor and refreshed against old. Actual batch/epoch counts are reported; the last contrast
+is primary and anchor comparisons are contextual. Shared actor/anchor terminal games must match
+across comparisons. This fixed-budget recipe has one three-hour attempt, no intermediate arena,
+checkpoint selection, automatic qualification, activation or successor. Historical reproductions
+and terminal comparisons cap execution at14,488 games; no critic is fitted during this study.
+
 ## Card policy learning
 
 The experimental card actor learns repeated choices within ordinary and final card windows. It
