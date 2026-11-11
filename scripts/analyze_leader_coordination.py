@@ -46,6 +46,9 @@ def analyze_root(arms, root):
     ended = Counter(row['coordination']['ended'] for row in option)
     interventions = [sum(d['ordinaryCommand'] != d['command'] for d in row['coordination']['decisions'])
                      for row in option]
+    for left, right, changed in zip(baseline, option, interventions):
+        if changed == 0 and any(left[name] != right[name] for name in ('entries', 'terminal', 'economics')):
+            raise ValueError('An option with no changed command must retain exact baseline gameplay')
     def economics(rows):
         return [{'ownLeaderSaving': sum(p['ownNewLeaderEffectiveSaving'] for p in row['economics']['rootTurnPurchases']),
                  'boundaryCash': row['economics']['nextBoundary']['cash'],
@@ -55,6 +58,7 @@ def analyze_root(arms, root):
     return {'world': root['world'], 'rootIndex': root['rootIndex'], 'target': root['target'],
             'evaluation': evaluation, 'optionEndReasons': dict(ended),
             'intervenedTails': sum(count > 0 for count in interventions),
+            'noInterventionExactParityTails': sum(count == 0 for count in interventions),
             'shippingReservations': sum(d['phase'] == 'purchase-shipping' and d['ordinaryCommand'] != d['command']
                                         for row in option for d in row['coordination']['decisions']),
             'economicDeltas': {name: moments([b[name] - a[name] for a, b in zip(left, right)]) for name in left[0]}}

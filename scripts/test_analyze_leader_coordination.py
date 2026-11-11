@@ -6,7 +6,7 @@ def fixture():
     target = {'advance': 'INSTITUTIONAL_RESEARCH', 'leaderCardId': 'nicolaus-copernicus', 'priceAtRoot': 80, 'savingAtRoot': 20}
     root = {'world': 5, 'rootIndex': 0, 'target': target, 'command': 'play hand-1'}
     arms = [[{'action': action, 'replicate': replicate, 'split': 'evaluation', 'target': target,
-              'command': 'play hand-1', 'terminal': {'reward': action / 10, 'winShare': 0, 'rankReward': action / 2},
+              'command': 'play hand-1', 'entries': ['p2: play hand-1'], 'terminal': {'reward': 0, 'winShare': 0, 'rankReward': 0},
               'economics': {'rootTurnPurchases': [], 'nextBoundary': {'cash': 80, 'markers': 5}},
               'coordination': {'ended': 'INSUFFICIENT_CASH', 'decisions': []} if action else None}
              for replicate in range(16)] for action in range(2)]
@@ -18,8 +18,14 @@ class CoordinationAnalysisTest(unittest.TestCase):
         root, arms = fixture()
         result = analyze_root(arms, root)
         self.assertEqual(16, result['optionEndReasons']['INSUFFICIENT_CASH'])
-        self.assertAlmostEqual(.1, result['evaluation']['reward']['mean'])
+        self.assertAlmostEqual(0, result['evaluation']['reward']['mean'])
         self.assertEqual(16, result['evaluation']['reward']['samples'])
+
+    def test_an_inactive_option_cannot_change_gameplay(self):
+        root, arms = fixture()
+        arms[1][0]['entries'] = ['p2: pass']
+        with self.assertRaises(ValueError):
+            analyze_root(arms, root)
 
     def test_changed_root_command_is_rejected(self):
         root, arms = fixture()
