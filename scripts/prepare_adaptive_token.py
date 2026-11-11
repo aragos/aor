@@ -110,7 +110,8 @@ def prepare(options):
     shutil.copytree(parent/'scripts', root/'scripts')
     for name in SCRIPT_NAMES:
         copy(Path(__file__).parent/name, 'scripts/'+name)
-    for name in ('token_order_policy.py', 'token_order_metadata.py', 'test_token_order_metadata.py', 'test_token_order_policy.py'):
+    for name in ('token_order_policy.py', 'token_order_metadata.py', 'token_order_fixed_reference.py',
+                 'token_order_proposals.py', 'token_order_reference_neighbors.py', 'test_token_order_metadata.py', 'test_token_order_policy.py'):
         copy(native/'scripts'/name, 'scripts/'+name)
     # Benchmark verifier and its dependencies retain their qualified desktop bytes.
     for name in ('ordinary-f1.json', 'lambda-1.0.json', 'purchase-prior-f0.json', 'purchase-c-p64.json'):
