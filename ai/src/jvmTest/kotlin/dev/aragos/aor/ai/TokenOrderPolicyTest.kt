@@ -327,6 +327,25 @@ class TokenOrderPolicyTest {
     }
 
     @Test
+    fun referenceNeighborZeroHeadMatchesFixedTForEveryOfferedBaseline() {
+        val state = fixture()
+        val ordinary = BotObservations.from(state, own)
+        val commands = ordinary.candidates.map(BotCandidate::command)
+        val zero = model(state, 0.0)
+
+        val choices = commands.map { command ->
+            TokenOrderPolicy.chooseReferenceNeighbors(
+                ordinary,
+                encoded(state, baseline = command),
+                zero,
+            )
+        }
+
+        assertThat(choices)
+            .isEqualTo(commands.map { TokenOrderReference.FIXED_16_TO_15.command(it, commands) })
+    }
+
+    @Test
     fun referenceNeighborModelCanSelectOfferedFourteen() {
         val state = fixture()
         val original = model(state, 1.0)

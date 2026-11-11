@@ -29,6 +29,10 @@ internal class TokenOrderParentRuntime private constructor(private val paths: Li
                     "TokenOrderController",
                     "TokenMinusTwoController",
                     "TokenOrderCollector",
+                    // Shared-source debug tables changed; original instructions were independently
+                    // compared with javap -c -p before allowing these unchanged owner methods.
+                    "TokenOrderSpecification",
+                    "TrainingCheckpoint\$Companion",
                     "TokenOrderCapture",
                     "TokenOrderPending",
                     "TokenOrderReproduction",
