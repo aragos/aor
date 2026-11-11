@@ -939,8 +939,12 @@ python3 scripts/train-opponents.py --mode joint-collect --source joint-collectio
 An explicit `jointStateChronology: "joint-state-chronology-1"` research profile separates the
 ordinary/card `baseline` from `sharedPurchaseBaseline`, which remains the exact prior pinned by
 both purchase bundles. It requires the complete expansion/token roles described above. Legacy
-sources retain their original single-prior behavior. This profile currently omits canonical replay
-indices; a data campaign must separately declare its reproduction procedure before collection.
+sources retain their original single-prior behavior. Optional `replayIndices`
+retain one through eight prospective canonical histories, verified by the existing simulation replay
+owner and bound separately to the original compressed trajectories. `--mode joint-replay --source
+COMPLETED_COLLECTION --output NEW_DIRECTORY --hours HOURS` reproduces only those origins through the
+same joint collector and compares complete typed records and canonical entries. Omission retains
+the original no-history behavior; histories never enter state inputs.
 
 The profile emits a complete phase-prefixed state dictionary and one chronological state sidecar
 per origin. Features copy only existing encoder state values in their original units; absolute

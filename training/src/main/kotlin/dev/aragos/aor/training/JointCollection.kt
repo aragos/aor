@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
 import dev.aragos.aor.ai.BotDifficulty
 
@@ -23,6 +24,7 @@ internal data class JointGameTrajectory(
     val terminal: PurchaseTerminal,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val jointEvidence: List<JointDecisionEvidence>? = null,
+    @get:JsonIgnore val canonicalReplay: PurchaseCanonicalReplay? = null,
 )
 
 /** No callback can expose opponent-private observations or persist an interrupted game's labels. */
@@ -73,6 +75,9 @@ internal class JointCollector(
                             }
                         })
             }
+        val trace =
+            if (index in input.ecology?.replayIndices.orEmpty()) PurchaseCanonicalTrace(seat)
+            else null
         val game =
             Simulation()
                 .play(
@@ -84,6 +89,7 @@ internal class JointCollector(
                         },
                     deadlineNanos = deadlineNanos,
                     controllers = observed,
+                    trace = trace,
                 )
         return JointGameTrajectory(
             signature = signature,
@@ -100,6 +106,7 @@ internal class JointCollector(
             cardDecisions = cards.toList(),
             purchaseDecisions = purchases.toList(),
             jointEvidence = if (input.ecology == null) null else evidence.toList(),
+            canonicalReplay = trace?.result(),
             terminal =
                 PurchaseTerminal(
                     game.reward(seat),

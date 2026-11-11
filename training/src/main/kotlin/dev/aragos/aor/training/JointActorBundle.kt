@@ -86,7 +86,7 @@ internal data class JointActorBundle(
         baseline: PurchaseBaselineInput,
         cardRecord: ((CardDecisionRecord) -> Unit)? = null,
         purchaseRecord: ((PurchaseDecisionRecord) -> Unit)? = null,
-        ordinary: dev.aragos.aor.ai.BotModel = baseline.model,
+        ordinary: BotModel = baseline.model,
     ): CardActorController {
         require(baseline.sha256 == baselineSha256) { "A joint actor requires its exact F prior." }
         return CardActorController(
