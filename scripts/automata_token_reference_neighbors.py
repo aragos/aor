@@ -7,6 +7,7 @@ import argparse
 from dataclasses import asdict
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -112,7 +113,8 @@ def native(protocol,output,mode):
     if mode=='replay':
         command.append(str(output/'augmentation'))
     with (output/(mode+'-native.log')).open('x') as log:
-        child=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=remaining,check=False)
+        child=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=remaining,check=False,
+            env=dict(os.environ,AOR_TRAINING_MACHINE_CPUS=str(os.cpu_count() or 1)))
     require(child.returncode==0,'Native missing-branch augmentation failed; no automatic recovery.')
     attempt=read(directory/'attempt.json')
     start=datetime.fromisoformat(attempt['startedAt'].replace('Z','+00:00')).timestamp()
