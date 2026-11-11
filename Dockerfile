@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jdk-noble AS server
+FROM eclipse-temurin:25-jdk-noble AS server
 WORKDIR /build
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
@@ -19,7 +19,7 @@ COPY web ./web
 COPY --from=server /build/ai/build/dist/js/productionLibrary ./ai/build/dist/js/productionLibrary
 RUN npm run build
 
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:25-jre-noble
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 aor && useradd --uid 10001 --gid 10001 --no-create-home aor
