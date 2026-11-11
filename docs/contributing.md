@@ -1022,7 +1022,30 @@ rotated lineup, excluding the evaluated seat. Entries are `ORDINARY`, `FIXED_16_
 rival-only diagnostic `ORDINARY_MINUS_TWO` (actual ordinary token-head choice minus two, only if
 that exact amount is offered). Every rival keeps its own ordinary baseline and the shared Purchase
 actor/prior. Explicit arrays bind identity and metadata; omission preserves existing roles and
-identity. Search and root collection reject these arena-only roles.
+identity. Search and legacy root collection reject these arena-only roles.
+
+Token collection may explicitly opt into `continuationProtocol: "ARENA_OVERLAYS_1"` with one
+`expansionImitation.candidateModel` and optional per-opponent expansion models and token selectors.
+The controlled seat keeps its actual ordinary token head throughout the prefix and every tail;
+candidate/incumbent token roles and an active browser fixed-token gate on that ordinary model are
+rejected. Rival selectors are limited to `ORDINARY` and `FIXED_16_TO_15`, mapped by original opponent
+index through each lineup. All seats retain the shared Purchase actor/prior. Expansion snapshots
+must preserve the ordinary snapshot's explicit serialized coefficient dictionary outside the eight
+declared expansion coefficients, so offline validation does not reconstruct native prior defaults.
+Omission preserves the original collector identity, metadata and behavior; the token encoder,
+proposal set, loss and inference selector remain unchanged.
+
+The opt-in source also predeclares `replayOrigins`, one through eight distinct indices across both
+banks. Completed metadata binds the protocol, those indices, the actual ordinary token reference
+snapshot/hash, all overlay snapshots and every prospective root request. Run
+`--mode token-order-replay --source COMPLETED_COLLECTION --output NEW_PATH --hours H` with the same
+frozen native runtime to reproduce exactly those completed origins, including skips. The separate
+receipt compares every observation, baseline, proposal and paired continuation outcome plus exact
+serialized hashes. It never mutates the bank or selects replacement roots. The ordinary source,
+snapshot files and completed receipts must remain available and unchanged. Reproduction proves
+determinism; it supplies no new independent worlds or policy qualification. The offline fitter
+validates this explicit protocol and includes its metadata validator hash in new-protocol provenance;
+legacy input and provenance behavior remain unchanged.
 
 
 The native `expansion-opportunity-collect` diagnostic uses an arena-shaped `SCREENING` source

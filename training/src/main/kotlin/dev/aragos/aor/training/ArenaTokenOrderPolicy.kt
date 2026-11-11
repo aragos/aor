@@ -47,6 +47,21 @@ private constructor(
     private val roles: Map<ArenaSide, ArenaTokenRole>,
     private val opponentSelectors: List<ArenaTokenOpponentSelector>?,
 ) {
+    /** Root collection keeps the controlled seat's actual ordinary token-head reference. */
+    internal fun validateCollectionContinuation() {
+        require(roles.isEmpty()) {
+            "Token collection cannot replace the controlled seat's ordinary token reference."
+        }
+        require(
+            opponentSelectors?.all {
+                it == ArenaTokenOpponentSelector.ORDINARY ||
+                    it == ArenaTokenOpponentSelector.FIXED_16_TO_15
+            } == true
+        ) {
+            "Token collection requires explicit ordinary or fixed token rival selectors."
+        }
+    }
+
     internal fun validate(configurations: List<TrainingConfiguration>, opponentCount: Int) {
         require(opponentSelectors == null || opponentSelectors.size == opponentCount) {
             "Token opponent selectors must contain exactly one entry per ordinary opponent model."

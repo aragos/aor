@@ -20,15 +20,21 @@ import time
 
 import purchase_policy as b
 import territory_value as q
+import token_order_metadata as metadata
 
 
-KIND = "token-order-collection"
-PROPOSALS = "token-order-proposals-1"
+KIND = metadata.KIND
+PROPOSALS = metadata.PROPOSALS
 MARGIN = .02
-CONFIGURATION = "players-4/standard/no-crusades/deck-true/art-true"
-SELECTION = "PRECOMMITTED_ORDINAL_V1"
-RULES_TRANSFER = {"sourceRulesVersion": "ah1996-three-epoch-4",
-                  "targetRulesVersion": "ah1996-three-epoch-5"}
+CONFIGURATION = metadata.CONFIGURATION
+SELECTION = metadata.SELECTION
+ARENA_CONTINUATION = metadata.ARENA_CONTINUATION
+EXPANSION_FEATURES = metadata.EXPANSION_FEATURES
+TOKEN_REFERENCE_VERSION = metadata.TOKEN_REFERENCE_VERSION
+RULES_TRANSFER = metadata.RULES_TRANSFER
+transfer_metadata = metadata.transfer_metadata
+continuation_metadata = metadata.continuation_metadata
+collection_metadata = metadata.collection_metadata
 read, sha, require = b.read_json, b.file_digest, b.require
 
 
@@ -119,75 +125,6 @@ def validate_root(row, model, replicates):
             "origin": row["index"], "split": row["split"]}
 
 
-def transfer_metadata(source, manifest, snapshots):
-    """Transferred weights retain their original bytes and never import source qualification."""
-    transfer = source.get("experimentalRulesTransfer")
-    actual = manifest.get("experimentalRulesTransfer")
-    if transfer is None:
-        require(actual is None, "Token data contains an undeclared rules transfer.")
-        return
-    require(transfer == RULES_TRANSFER and actual == dict(RULES_TRANSFER,
-                initializationOnly=True, qualificationTransferred=False)
-            and manifest.get("rulesVersion") == RULES_TRANSFER["targetRulesVersion"],
-            "Token rules transfer must identify unqualified rules4 initialization evaluated under rules5.")
-    references = {"candidate": source["candidate"], "incumbent": source["incumbent"],
-                  **{f"opponent-{index}": path for index, path in enumerate(source["opponents"])}}
-    expected = {role for role, path in references.items() if path is not None}
-    inputs = manifest["ordinaryModelSources"]
-    require(set(inputs) == expected, "Transfer must retain every explicit ordinary source identity.")
-    source_directory = Path(manifest["source"]).parent
-    for role, item in inputs.items():
-        name = "initial.json" if role == "candidate" else f"{role}.json"
-        require(item == {"path": str((source_directory / references[role]).resolve()),
-                         "sha256": snapshots[name], "snapshot": name},
-                "Transferred ordinary bytes differ from their source identity: " + role)
-
-
-def collection_metadata(directory, manifest, finished):
-    """Bind completed data to its prospective request table and archived environment."""
-    require(manifest.get("kind") == finished.get("kind") == KIND
-            and manifest["signature"] == finished["signature"]
-            and manifest.get("complete") is True and manifest.get("originSchemaVersion") == 1
-            and manifest["encoderVersion"] == q.TOKEN_ENCODER_2
-            and manifest["proposalVersion"] == PROPOSALS
-            and manifest.get("selectionProtocol") == SELECTION,
-            "Use a complete token-order collection with the exact encoder and proposal contract.")
-    prospective = read(directory / "run.json")
-    require(prospective == {key: value for key, value in manifest.items() if key not in ("complete", "counts")},
-            "Completed token metadata differs from its prospective run manifest.")
-    source = read(directory / "source.json")
-    require(sha(directory / "source.json") == manifest["sourceSha256"],
-            "Token source snapshot changed.")
-    require(source.get("schemaVersion") == 1 and source.get("purpose") == "SCREENING"
-            and source.get("configurations") == [CONFIGURATION]
-            and manifest["configuration"] == CONFIGURATION and not source.get("tokenOrder")
-            and set(source["frozenPurchase"]) == {"baseline", "policy"},
-            "Token collection requires the fixed shared purchase environment without side overrides.")
-    for key, lower, upper in (("trainingRoots", 2, 8192), ("validationRoots", 2, 8192),
-                              ("continuationReplicates", 2, 2), ("seed", 0, 99999999)):
-        b.integer(manifest[key], key, lower, upper)
-        require(source[key] == manifest[key], "Token source and manifest disagree: " + key)
-    opponents = source["opponents"]
-    require(isinstance(opponents, list) and 1 <= len(opponents) <= 16,
-            "Token collection needs a bounded frozen rival pool.")
-    snapshots = manifest["ordinaryModelSnapshots"]
-    expected_names = {"initial.json", "incumbent.json"} | {f"opponent-{i}.json" for i in range(len(opponents))}
-    require(set(snapshots) == expected_names, "Token collection must bind every ordinary model snapshot.")
-    transfer_metadata(source, manifest, snapshots)
-    require(read(directory / "initial.json")["weights"] == read(directory / "incumbent.json")["weights"],
-            "Token collection must use identical ordinary candidate and incumbent policies.")
-    pins = {"source.json": manifest["sourceSha256"], **snapshots}
-    frozen = manifest["frozenPurchase"]
-    require(set(frozen) == {"baseline", "policy"}, "Purchase roles must remain shared during collection.")
-    for role in ("baseline", "policy"):
-        name = f"frozen-purchase-{role}.json"
-        require(frozen[role]["snapshot"] == name, "Unexpected frozen purchase snapshot name.")
-        pins[name] = frozen[role]["sha256"]
-    for name, expected in pins.items():
-        require(sha(directory / name) == expected, "Token environment snapshot changed: " + name)
-    return source, pins
-
-
 def origin_request(manifest, index, opponents):
     """Check arithmetic bank identity; Kotlin's sampled ordinal comes from the prospective table."""
     validation = index >= manifest["trainingRoots"]
@@ -249,8 +186,11 @@ def collection(directory, seed):
         rows.append(validate_root(row, model, manifest["continuationReplicates"]))
     for name in ("dataset.json", "finished.json", "run.json"):
         pins[name] = sha(directory / name)
-    return model, rows, {"source": str(directory), "signature": manifest["signature"],
-                         "files": pins, "collected": len(rows), "skipped": skipped}
+    provenance = {"source": str(directory), "signature": manifest["signature"],
+                  "files": pins, "collected": len(rows), "skipped": skipped}
+    if source.get("continuationProtocol") == ARENA_CONTINUATION:
+        provenance["metadataValidatorSha256"] = sha(metadata.__file__)
+    return model, rows, provenance
 
 
 def select(values, row):

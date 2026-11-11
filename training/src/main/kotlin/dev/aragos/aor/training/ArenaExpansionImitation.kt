@@ -14,6 +14,13 @@ private constructor(
 ) {
     private data class Input(val path: Path, val sha256: String, val model: BotModel)
 
+    /** Collection has one controlled continuation, explicitly bound to the candidate side. */
+    internal fun validateCollectionContinuation() {
+        require(roles.keys == setOf(ArenaSide.CANDIDATE)) {
+            "Token collection requires one candidate expansion continuation and no unused incumbent role."
+        }
+    }
+
     internal fun validate(
         candidate: BotModel,
         incumbent: BotModel,

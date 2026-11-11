@@ -55,7 +55,7 @@ object TokenOrderCollectionMain {
         require(PurchaseJson.hash(source) == sourceHash) {
             "Token-order source changed while reading."
         }
-        val signature = trainingSignature("$KIND-1:$sourceHash:${specification.identity()}")
+        val signature = signature(specification, sourceHash)
         val artifacts = TrainingArtifacts(output)
         val previous = artifacts.read("state.json")
         require(
@@ -97,51 +97,10 @@ object TokenOrderCollectionMain {
             )
         require(remaining > 0) { "Token-order collection exhausted its original time allowance." }
         val deadline = System.nanoTime() + remaining
-        val configuration = specification.arena.configurations.single()
-        val dictionary =
-            TokenObservationEncoder.dictionary(
-                PublicCatalog.forPlayers(configuration.playerCount, configuration.rules),
-                TerritoryEncoder.TOKEN_2,
-            )
         val originFiles = (0 until specification.origins).map { "origin-$it.json" }
-        val modelFiles =
-            listOf("initial.json", "incumbent.json") +
-                specification.arena.opponents.indices.map { "opponent-$it.json" }
-        val rootRequests =
-            (0 until specification.origins).map { index ->
-                val lineup = specification.lineup(index)
-                val request = specification.request(index)
-                mapOf(
-                    "index" to index,
-                    "split" to specification.split(index).name,
-                    "gameSeed" to lineup.seed,
-                    "seat" to lineup.seat,
-                    "opponentIndices" to lineup.opponentIndices,
-                    "requestedEpoch" to request.epoch,
-                    "requestedOrdinal" to request.ordinal,
-                )
-            }
         val metadata =
-            identity +
-                specification.arena.overlayMetadata("initial.json") +
+            inputMetadata(specification, source, sourceHash, signature, output) +
                 mapOf(
-                    "originSchemaVersion" to 1,
-                    "source" to source.toString(),
-                    "sourceSha256" to sourceHash,
-                    "configuration" to configuration.id,
-                    "encoderVersion" to TerritoryEncoder.TOKEN_2.version,
-                    "proposalVersion" to TokenOrderPolicy.PROPOSAL_VERSION,
-                    "selectionProtocol" to TokenValueSelectionProtocol.PRECOMMITTED_ORDINAL_V1,
-                    "stateFeatureNames" to dictionary.stateFeatureNames,
-                    "actionFeatureNames" to dictionary.actionFeatureNames,
-                    "trainingRoots" to specification.trainingRoots,
-                    "validationRoots" to specification.validationRoots,
-                    "continuationReplicates" to specification.continuationReplicates,
-                    "seed" to specification.arena.seed,
-                    "originFiles" to originFiles,
-                    "rootRequests" to rootRequests,
-                    "ordinaryModelSnapshots" to
-                        modelFiles.associateWith { PurchaseJson.hash(output.resolve(it)) },
                     "startedAt" to started.toString(),
                     "deadlineAt" to deadlineAt.toString(),
                     "workers" to workers,
@@ -204,6 +163,65 @@ object TokenOrderCollectionMain {
             "Token-order collection complete; fitting and independent confirmation remain separate."
         )
     }
+
+    /** Immutable input metadata is shared by collection and read-only origin reproduction. */
+    internal fun inputMetadata(
+        specification: TokenOrderSpecification,
+        source: Path,
+        sourceHash: String,
+        signature: String,
+        output: Path,
+    ): Map<String, Any> {
+        val configuration = specification.arena.configurations.single()
+        val dictionary =
+            TokenObservationEncoder.dictionary(
+                PublicCatalog.forPlayers(configuration.playerCount, configuration.rules),
+                TerritoryEncoder.TOKEN_2,
+            )
+        val originFiles = (0 until specification.origins).map { "origin-$it.json" }
+        val modelFiles =
+            listOf("initial.json", "incumbent.json") +
+                specification.arena.opponents.indices.map { "opponent-$it.json" }
+        val rootRequests =
+            (0 until specification.origins).map { index ->
+                val lineup = specification.lineup(index)
+                val request = specification.request(index)
+                mapOf(
+                    "index" to index,
+                    "split" to specification.split(index).name,
+                    "gameSeed" to lineup.seed,
+                    "seat" to lineup.seat,
+                    "opponentIndices" to lineup.opponentIndices,
+                    "requestedEpoch" to request.epoch,
+                    "requestedOrdinal" to request.ordinal,
+                )
+            }
+        return mapOf("kind" to KIND, "signature" to signature) +
+            specification.arena.overlayMetadata("initial.json") +
+            TokenOrderContinuationArtifacts.metadata(specification, output) +
+            mapOf(
+                "originSchemaVersion" to 1,
+                "source" to source.toString(),
+                "sourceSha256" to sourceHash,
+                "configuration" to configuration.id,
+                "encoderVersion" to TerritoryEncoder.TOKEN_2.version,
+                "proposalVersion" to TokenOrderPolicy.PROPOSAL_VERSION,
+                "selectionProtocol" to TokenValueSelectionProtocol.PRECOMMITTED_ORDINAL_V1,
+                "stateFeatureNames" to dictionary.stateFeatureNames,
+                "actionFeatureNames" to dictionary.actionFeatureNames,
+                "trainingRoots" to specification.trainingRoots,
+                "validationRoots" to specification.validationRoots,
+                "continuationReplicates" to specification.continuationReplicates,
+                "seed" to specification.arena.seed,
+                "originFiles" to originFiles,
+                "rootRequests" to rootRequests,
+                "ordinaryModelSnapshots" to
+                    modelFiles.associateWith { PurchaseJson.hash(output.resolve(it)) },
+            )
+    }
+
+    internal fun signature(specification: TokenOrderSpecification, sourceHash: String): String =
+        trainingSignature("$KIND-1:$sourceHash:${specification.identity()}")
 
     /** A direct resume may shorten its segment but cannot renew the original native allowance. */
     internal fun originalDeadline(output: Path, started: Instant, hours: Double): Instant {

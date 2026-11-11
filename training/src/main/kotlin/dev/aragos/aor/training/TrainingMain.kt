@@ -27,6 +27,10 @@ fun main(arguments: Array<String>) {
         TokenOrderCollectionMain.run(arguments.toList())
         return
     }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-order-replay") }) {
+        TokenOrderReproduction.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "territory-value-schema") }) {
         TerritoryValueSchema.run(arguments.toList())
         return
@@ -104,6 +108,7 @@ fun main(arguments: Array<String>) {
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
             --mode expansion-opportunity-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode token-order-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
+            --mode token-order-replay --source COMPLETED_COLLECTION --output NEW_PATH --hours HOURS
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode joint-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N

@@ -10,7 +10,7 @@ import dev.aragos.aor.ai.BotPolicy
 /** Shared controller routing for every prefix/tail; sealed choices use one untouched state. */
 internal class FrozenPolicyContinuation(
     private val models: List<BotModel>,
-    private val purchase: Map<Int, SimulationController>,
+    private val controllers: Map<Int, SimulationController>,
     private val seed: Int,
     private val deadlineNanos: Long,
 ) {
@@ -29,7 +29,7 @@ internal class FrozenPolicyContinuation(
             .mapIndexed { actorIndex, (actor, observation) ->
                 val seat = session.state.playerIds.indexOf(actor)
                 val policySeed = seed xor (session.decisions * 65537 + seat * 8191)
-                val controller = purchase[seat]?.takeIf { it.controls(observation.decision) }
+                val controller = controllers[seat]?.takeIf { it.controls(observation.decision) }
                 val command =
                     controller?.choose(
                         SimulationDecision(
