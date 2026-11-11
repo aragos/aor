@@ -34,7 +34,10 @@ def validate_inputs(protocol):
         and protocol['maximumScientificTerminalGames']==4096
         and protocol['maximumHistoricalTerminalReproductions']==64
         and protocol['maximumTerminalExecutions']==4160
+        and protocol['maximumDataBytes']==8*exp.GIB and protocol['maximumRssBytes']==6*exp.GIB
+        and protocol['minimumFreeBytes']==4*exp.GIB
         and protocol['splitCounts']==data.SPLITS and protocol['batches']==16
+        and protocol['collectionEcology']==strong.ECOLOGY.value
         and protocol['testModels']==['validation-selected','original-fresh64']
         and all(protocol[key] is False for key in ('qualificationPassed','productionActivation',
             'automaticNextCampaign','actorTraining','automaticResume')),
@@ -116,8 +119,11 @@ def study(protocol,path,output):
     summary=dict(report,completedBatches=len(batches),scientificTerminalGames=4096,
         historicalReproductions=64,totalTerminalExecutions=4160,actualFits=2,protocolSha256=sha(path))
     document(output/'study-report.json',summary)
+    artifacts=[output/name for name in ('progress.json','corpus.json','numeric.log','study-report.json')]
+    for directory in (output/'batches',output/'value'):
+        artifacts.extend(p for p in directory.rglob('*') if p.is_file())
     return exp.stage_result(output,'study',True,'Bounded predictive-value study completed; no strength qualification.',
-        summary,[p for p in output.rglob('*') if p.is_file()])
+        summary,artifacts)
 
 
 def main():
