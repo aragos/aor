@@ -6,9 +6,7 @@ import dev.aragos.aor.CardChoiceView
 import dev.aragos.aor.CardCommand
 import dev.aragos.aor.CardKind
 import dev.aragos.aor.CardOfferView
-import dev.aragos.aor.Commodity
 import dev.aragos.aor.ExpansionAction
-import dev.aragos.aor.ExpansionOfferView
 import dev.aragos.aor.GameState
 import dev.aragos.aor.GameView
 import dev.aragos.aor.LegalChoices
@@ -288,7 +286,11 @@ private class ObservationProjection(
             "choose-capital" -> {
                 val province = provinces[ProvinceId(parts[1])]
                 add("capital.${parts[1]}", 1.0)
-                add("commodity", province?.commodities?.sumOf { commodityMarginal(it) } ?: 0.0)
+                add(
+                    "commodity",
+                    province?.commodities?.sumOf(economic.expansionValues::commodityMarginal)
+                        ?: 0.0,
+                )
                 val connections =
                     catalog.landBorders.count {
                         it.first == province?.id || it.second == province?.id
@@ -306,8 +308,8 @@ private class ObservationProjection(
                 add(
                     "capitalOpportunity",
                     available.sumOf { candidate ->
-                        (candidate.commodities.sumOf(::commodityMarginal) + 2.0) /
-                            candidate.marketNumber
+                        (candidate.commodities.sumOf(economic.expansionValues::commodityMarginal) +
+                            2.0) / candidate.marketNumber
                     },
                 )
                 for (card in view.hand) {
@@ -322,14 +324,15 @@ private class ObservationProjection(
                             .filter {
                                 it in province?.commodities.orEmpty()
                             }
-                            .sumOf(::commodityMarginal),
+                            .sumOf(economic.expansionValues::commodityMarginal),
                     )
                     add(
                         "capitalCommodityPotential",
                         available.sumOf { candidate ->
                             candidate.commodities
                                 .intersect(inspection.commodities)
-                                .sumOf(::commodityMarginal) / candidate.marketNumber
+                                .sumOf(economic.expansionValues::commodityMarginal) /
+                                candidate.marketNumber
                         },
                     )
                     add(
@@ -435,7 +438,13 @@ private class ObservationProjection(
                     }
                 tokenCost =
                     if (parts.first() == "attack") offer.requiredTokens else parts[1].toInt()
-                expansionFeatures(features, province, offer, tokenCost)
+                features.putAll(
+                    economic.expansionValues.nominalFeatures(
+                        province,
+                        BotExpansionActionInputs.from(offer),
+                        tokenCost,
+                    )
+                )
                 economic.expansion(province, offer, tokenCost).forEach { (name, amount) ->
                     add(name, amount)
                 }
@@ -628,33 +637,6 @@ private class ObservationProjection(
         }
     }
 
-    private fun expansionFeatures(
-        features: MutableMap<String, Double>,
-        province: ProvinceId,
-        offer: ExpansionOfferView,
-        tokens: Int,
-    ) {
-        val definition =
-            requireNotNull(provinces[province]) { "Expansion requires a known province." }
-        val complete = tokens >= offer.requiredTokens
-        val chance = if (offer.uncertain) offer.competitionWinProbability ?: 0.5 else 1.0
-        val fraction =
-            if (complete) 1.0 else tokens.toDouble() / offer.requiredTokens.coerceAtLeast(1)
-        features["tokens"] = -tokens.toDouble()
-        features["progress"] = fraction
-        features["reach"] = if (definition.isSatellite) 1.5 * chance else fraction * chance
-        features["commodity"] =
-            definition.commodities.sumOf(::commodityMarginal) * fraction * chance * 0.25
-        features["income"] =
-            when {
-                !complete || definition.isSatellite -> 0.0
-                offer.incomeAfter != null && offer.incomeBefore != null ->
-                    ((offer.incomeAfter ?: 0) - (offer.incomeBefore ?: 0)).toDouble()
-                else -> 2.0 * chance
-            }
-        features["risk"] = if (offer.uncertain) (1.0 - chance) * tokens else 0.0
-    }
-
     private fun addMisery(features: MutableMap<String, Double>, changes: List<MiseryChangeView>) {
         for (change in changes) {
             val own = change.player == seat
@@ -668,7 +650,7 @@ private class ObservationProjection(
     private fun provinceValue(province: ProvinceId): Double {
         val definition = provinces[province] ?: return 0.0
         return 2.0 +
-            definition.commodities.sumOf(::commodityMarginal) * 0.25 +
+            definition.commodities.sumOf(economic.expansionValues::commodityMarginal) * 0.25 +
             if (self.capital == province.value) 8.0 else 0.0
     }
 
@@ -682,17 +664,6 @@ private class ObservationProjection(
                 }
             }
             .toSet()
-
-    private fun commodityMarginal(commodity: Commodity): Double {
-        val owned =
-            view.commodityPayouts
-                .firstOrNull { it.commodity == commodity }
-                ?.owners
-                ?.firstOrNull { it.player == seat }
-                ?.marketCount ?: 0
-        val base = catalog.commodities.firstOrNull { it.id == commodity }?.baseValue ?: 0
-        return base * (2.0 * owned + 1.0)
-    }
 
     private fun cardValue(reference: String): Double {
         if (reference in view.burdenReferences) return 0.0

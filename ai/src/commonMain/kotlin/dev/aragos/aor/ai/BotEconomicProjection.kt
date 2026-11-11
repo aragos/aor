@@ -3,13 +3,9 @@ package dev.aragos.aor.ai
 import dev.aragos.aor.AccessRequirement
 import dev.aragos.aor.AdvanceId
 import dev.aragos.aor.CardChoiceView
-import dev.aragos.aor.CardEffectData
-import dev.aragos.aor.CardEffectSpec
-import dev.aragos.aor.CardRules
 import dev.aragos.aor.Commodity
 import dev.aragos.aor.ExpansionOfferView
 import dev.aragos.aor.GameView
-import dev.aragos.aor.HandCard
 import dev.aragos.aor.PieceSide
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ProvinceDefinition
@@ -67,50 +63,13 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
         }
     private val provinces = catalog.provinces.associateBy(ProvinceDefinition::id)
     private val occupied = view.board.associateBy { it.id }
-    private val forecasts = view.commodityPayouts.associateBy { it.commodity }
-    private val bases = catalog.commodities.associate { it.id to it.baseValue }
-    private val ownCards =
-        view.hand
-            .mapNotNull { card ->
-                commodities(card).takeIf { it.isNotEmpty() }?.let { card.reference to it }
-            }
-            .toMap()
-    private val ownCardCounts =
-        Commodity.entries.associateWith { commodity ->
-            ownCards.values.count { commodity in it }
-        }
-    private val outsideCardCounts =
-        view.commodityCards.associate { count ->
-            count.commodity to
-                ((count.unplayed ?: 0) - (ownCardCounts[count.commodity] ?: 0)).coerceAtLeast(0)
-        }
+    val expansionValues = BotExpansionValueInputs.from(view, seat)
     private val directLandMarkets by lazy(LazyThreadSafetyMode.NONE) { directLandMarkets() }
-    private val commodityForecasts by
-        lazy(LazyThreadSafetyMode.NONE) {
-            Commodity.entries.map { commodity ->
-                BotPlanningCommodity(
-                    commodity = commodity,
-                    markets = count(seat, commodity),
-                    baseValue =
-                        checkNotNull(bases[commodity]) {
-                            "Every planning commodity requires its public base value."
-                        },
-                    adjustmentOffset =
-                        forecasts[commodity]?.adjustments?.firstOrNull()?.payoutOffset ?: 0,
-                    outsideCards = outsideCardCounts[commodity] ?: 0,
-                )
-            }
-        }
 
     /**
      * Public payout facts and own physical cards, independent of current legal expansion offers.
      */
-    fun portfolio(): BotCommodityPortfolio =
-        BotCommodityPortfolio(
-            industry = AdvanceId.INDUSTRY in self.advances,
-            commodities = commodityForecasts,
-            heldCards = ownCards.values.toList(),
-        )
+    fun portfolio(): BotCommodityPortfolio = expansionValues.portfolio()
 
     /** Share the same public forecast and physical own cards with bounded bundle evaluation. */
     fun planning(candidates: List<BotCandidate>): BotExpansionPlanning {
@@ -151,8 +110,8 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
         return BotExpansionPlanning(
             markerStock = self.stockMarkers,
             industry = AdvanceId.INDUSTRY in self.advances,
-            commodities = commodityForecasts,
-            heldCards = ownCards.values.toList(),
+            commodities = expansionValues.commodityForecasts,
+            heldCards = expansionValues.ownCards.values.toList(),
             steps = steps,
             overseasSlots = self.overseasSlots,
         )
@@ -162,53 +121,8 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
         province: ProvinceId,
         offer: ExpansionOfferView,
         tokens: Int,
-    ): Map<String, Double> {
-        if (!offer.establishesMarker || offer.requiredTokens <= 0) return emptyMap()
-        val definition =
-            checkNotNull(provinces[province]) {
-                "An economic expansion feature requires a public destination."
-            }
-        val fraction = (tokens.toDouble() / offer.requiredTokens).coerceAtMost(1.0)
-        val chance = if (offer.uncertain) offer.competitionWinProbability ?: 0.5 else 1.0
-        val scale = fraction * chance
-        val gains =
-            definition.commodities.associateWith { commodity ->
-                payout(seat, commodity, count(seat, commodity) + 1) - payout(seat, commodity)
-            }
-        val held =
-            ownCards.values.sumOf { choices ->
-                val before = choices.maxOf { payout(seat, it) }
-                val after = choices.maxOf { payout(seat, it) + (gains[it] ?: 0.0) }
-                after - before
-            }
-        val public =
-            gains.entries.sumOf { (commodity, gain) ->
-                gain * (outsideCardCounts[commodity] ?: 0)
-            }
-        val defender = occupied[province]?.marker?.owner?.takeUnless { it == seat }
-        val denied =
-            if (defender == null) {
-                0.0
-            } else {
-                definition.commodities.sumOf { commodity ->
-                    val before = payout(defender, commodity)
-                    val after =
-                        payout(
-                            defender,
-                            commodity,
-                            (count(defender, commodity) - 1).coerceAtLeast(0),
-                        )
-                    (before - after) *
-                        (view.commodityCards.firstOrNull { it.commodity == commodity }?.unplayed
-                            ?: 0)
-                }
-            }
-        return features(
-            BotEconomicFeature.HELD_COMMODITY to held * scale,
-            BotEconomicFeature.PUBLIC_COMMODITY to public * scale,
-            BotEconomicFeature.COMMODITY_DENIAL to denied * scale,
-        )
-    }
+    ): Map<String, Double> =
+        expansionValues.economicFeatures(province, BotExpansionActionInputs.from(offer), tokens)
 
     /**
      * One lost marker is one control unit; removed square tokens contribute their fraction of the
@@ -239,9 +153,9 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
     }
 
     fun card(reference: String): Map<String, Double> {
-        val choices = ownCards[reference] ?: return emptyMap()
+        val choices = expansionValues.ownCards[reference] ?: return emptyMap()
         if (view.stage == Stage.FINAL_CARD_PLAY) return emptyMap()
-        val before = choices.maxOf { payout(seat, it) }
+        val before = choices.maxOf { expansionValues.payout(seat, it) }
         val after = choices.maxOf { commodity ->
             expandedPayout(
                 commodity,
@@ -301,7 +215,11 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
             if (cost.overseas) slots--
             acquired++
         }
-        return payout(seat, commodity, count(seat, commodity) + acquired)
+        return expansionValues.payout(
+            seat,
+            commodity,
+            expansionValues.count(seat, commodity) + acquired,
+        )
     }
 
     private fun directLandMarkets(): List<ProvinceDefinition> {
@@ -344,31 +262,6 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
                 ?.filter { it.owner == seat }
                 ?.sumOf { it.coloured + it.white } ?: 0)
 
-    private fun count(player: PlayerId, commodity: Commodity): Int =
-        forecasts[commodity]?.owners?.firstOrNull { it.player == player }?.marketCount ?: 0
-
-    private fun payout(
-        player: PlayerId,
-        commodity: Commodity,
-        markets: Int = count(player, commodity),
-    ): Double {
-        val owner = view.players.single { it.id == player }
-        if (owner.misery.value == null) return 0.0
-        val offset = forecasts[commodity]?.adjustments?.firstOrNull()?.payoutOffset ?: 0
-        val box =
-            CardRules.commodityPayoutBox(
-                marketCount = markets,
-                industry = AdvanceId.INDUSTRY in owner.advances,
-                adjustmentOffset = offset,
-            )
-        return (bases[commodity] ?: 0).toDouble() * box * box
-    }
-
     private fun features(vararg values: Pair<BotEconomicFeature, Double>): Map<String, Double> =
         values.filter { it.second != 0.0 }.associate { it.first.key to it.second }
-
-    private fun commodities(card: HandCard): Set<Commodity> =
-        (CardEffectData.forCard(card.definition.id) as? CardEffectSpec.CommodityChoices)
-            ?.choices
-            .orEmpty()
 }

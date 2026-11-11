@@ -42,6 +42,18 @@ data class IncomeQuote(
         get() = income + interestProfit
 }
 
+/** Public inputs for an active player's income; cash is held before either income receipt. */
+data class PlayerIncomeInputs(
+    val cash: Int,
+    val middleClass: Boolean,
+    val interestProfit: Boolean,
+    val newWorld: Boolean,
+) {
+    init {
+        require(cash >= 0) { "Income cash must be nonnegative." }
+    }
+}
+
 /**
  * Pure player-local economy. The caller enforces phase/substep order, supplies current board
  * counts, and handles the global consequences reported by [EconomyResult]. No board count or credit
@@ -160,20 +172,38 @@ object PlayerEconomy {
         boardMarkerCount: Int,
     ): IncomeQuote {
         player.requireActive()
+        return incomeQuote(
+            PlayerIncomeInputs(
+                cash = player.cash,
+                middleClass = player.advances.owns(AdvanceId.MIDDLE_CLASS),
+                interestProfit = player.advances.owns(AdvanceId.INTEREST_PROFIT),
+                newWorld = player.advances.owns(AdvanceId.NEW_WORLD),
+            ),
+            initialPlayerCount,
+            boardMarkerCount,
+        )
+    }
+
+    /** Same quote from public facts; callers exclude Chaos and supply the actual board count. */
+    fun incomeQuote(
+        inputs: PlayerIncomeInputs,
+        initialPlayerCount: Int,
+        boardMarkerCount: Int,
+    ): IncomeQuote {
         require(boardMarkerCount in 0..25) { "Income requires zero through 25 dominated markets." }
         val baseIncome = EconomyTables.incomeFor(initialPlayerCount)[boardMarkerCount]
-        val middleClass = middleClassIncomeBonus(player.advances.owns(AdvanceId.MIDDLE_CLASS))
+        val middleClass = middleClassIncomeBonus(inputs.middleClass)
         val income = baseIncome + middleClass
         return IncomeQuote(
             baseIncome = baseIncome,
             middleClassBonus = middleClass,
             interestProfit =
-                if (player.advances.owns(AdvanceId.INTEREST_PROFIT)) {
-                    minOf(player.cash, income)
+                if (inputs.interestProfit) {
+                    minOf(inputs.cash, income)
                 } else {
                     0
                 },
-            newWorldRelief = if (player.advances.owns(AdvanceId.NEW_WORLD)) 1 else 0,
+            newWorldRelief = if (inputs.newWorld) 1 else 0,
         )
     }
 

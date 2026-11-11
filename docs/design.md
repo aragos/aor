@@ -190,7 +190,12 @@ chosen candidate still requires independent confirmation. Training checks covera
 retains compatible fallbacks when promotion evidence is insufficient.
 [Contributing](contributing.md#opponent-training) owns operation and resource limits.
 
-Planning inputs remain projections of public facts and the acting seat's own hand. Current-route
+Planning inputs remain projections of public facts and the acting seat's own hand.
+`BotExpansionValueInputs` shares the existing nominal expansion features and commodity calculations
+without depending on offers after extraction. Its board replacement uses authoritative marker and
+commodity counts; the public-input `PlayerEconomy.incomeQuote` overload owns income calculations.
+These facts do not resolve victory interruptions, award bonus cards, or define a search utility;
+nominal attack features retain their historical dice-only estimates and existing policy behavior. Current-route
 [expansion forecasts](../core/src/commonMain/kotlin/dev/aragos/aor/ExpansionForecastView.kt)
 support card timing and token purchases without authorizing future actions. Shared resource budgets
 constrain combinations; new white pieces never create an invented same-turn route. The controller
