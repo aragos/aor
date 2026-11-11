@@ -15,7 +15,7 @@ MILITARY_REVIEW = '1164c871a0a7c035c94671510d44f24a863e55a21a46265d3a50f9dc628b2
 NATIVE_RECEIPT = 'cce36d98d93890934d2fad30b81bafa7dcff145a53bbf90ebe996ee837adeaeb'
 SCRIPT_NAMES = (*previous.SCRIPT_NAMES, 'token_order_policy.py','token_order_metadata.py',
     'token_order_fixed_reference.py', 'token_order_proposals.py', 'token_order_reference_neighbors.py',
-    'token_order_ridge.py','token_order_eight_tail.py','automata_token_eight_tail.py',
+    'token_order_augmentation.py','token_order_ridge.py','token_order_eight_tail.py','automata_token_eight_tail.py',
     'token_eight_tail_campaign.py','prepare_token_eight_tail.py','finalize_token_eight_tail.py',
     'test_token_order_eight_tail.py','test_token_eight_tail_campaign.py')
 

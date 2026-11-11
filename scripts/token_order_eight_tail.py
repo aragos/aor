@@ -12,6 +12,7 @@ import sys
 import time
 
 import token_order_ridge as ridge
+import token_order_augmentation as augmentation
 
 b, q, token = ridge.b, ridge.q, ridge.token
 KIND = 'token-order-fresh-eight-tail-ridge-1'
@@ -70,16 +71,20 @@ def fresh_collection(bindings, *, fixed_reference=False):
     return model, rows, provenance
 
 
-def prefix_rows(collection, model, rows, count, *, fixed_reference=False):
+def prefix_rows(collection, model, rows, count, *, fixed_reference=False, derived_view=None):
     """Read-only diagnostic label prefixes after model selection; never fit another model."""
     b.require(count in (2, 4), 'Only the predeclared two/four-stream diagnostic prefixes are available.')
     result = []
     for row in rows:
-        native = b.read_json(Path(collection)/f'origin-{row["origin"]}.json')
+        native = (augmentation.read_effective_origin(derived_view, row['origin']) if derived_view is not None
+                  else b.read_json(Path(collection)/f'origin-{row["origin"]}.json'))
         diagnostic = copy.deepcopy(native)
         for alternative in diagnostic['alternatives']:
             alternative['outcomes'] = alternative['outcomes'][:count]
-        result.append(token.validate_root(diagnostic, model, count, fixed_reference=fixed_reference))
+        profile = (augmentation.proposals.ProposalProfile.REFERENCE_NEIGHBORS if derived_view is not None
+                   else augmentation.proposals.ProposalProfile.ORDINARY)
+        result.append(token.validate_root(diagnostic, model, count, fixed_reference=fixed_reference,
+                                          proposal_profile=profile))
     return result
 
 
@@ -100,8 +105,13 @@ def fit(bindings, output, config, *, fixed_reference=False):
     deadline = started + config.maxSeconds
     b.torch.set_num_threads(1)
     b.torch.use_deterministic_algorithms(True)
-    model, rows, provenance = fresh_collection(bindings, fixed_reference=fixed_reference)
-    kind = FIXED_REFERENCE_KIND if fixed_reference else KIND
+    derived = isinstance(bindings, augmentation.AugmentedBindings)
+    b.require(not derived or fixed_reference, 'Derived neighbor evidence requires the explicit fixed-T reference.')
+    model, rows, provenance = (augmentation.load_collection(bindings) if derived
+                              else fresh_collection(bindings, fixed_reference=fixed_reference))
+    derived_view = b.read_json(bindings.view) if derived else None
+    codec = augmentation.codec if derived else token.fixed
+    kind = augmentation.FIT_KIND if derived else (FIXED_REFERENCE_KIND if fixed_reference else KIND)
     training = [row for row in rows if row['split'] == 'TRAINING']
     validation = [row for row in rows if row['split'] == 'VALIDATION']
     b.require(min(len(training), len(validation)) >= 2, 'Both prospective splits need collected roots.')
@@ -115,18 +125,22 @@ def fit(bindings, output, config, *, fixed_reference=False):
         torchVersion=b.torch.__version__, dtype='float64', threads=1, startedEpoch=started,
         deadlineEpoch=deadline, additionalRandomStreams=0, primaryContinuationReplicates=8,
         diagnosticPrefixes=[2, 4], diagnosticPrefixesAffectSelection=False,
-        validationPreviouslyInspected=False, validationPurpose='MODEL_SELECTION_ONLY',
+        validationPreviouslyInspected=derived,
+        validationPurpose='REUSED_DEVELOPMENT_SELECTION_ONLY' if derived else 'MODEL_SELECTION_ONLY',
         selection='Lowest eight-tail validation paired MSE strictly below initializer; ties prefer larger penalty.',
         objective='Equal root weight then equal nonbaseline proposal weight; targets average all eight paired tails.',
         normalization='Training-only weighted RMS; no centering; exact zero columns remain zero.',
-        proposalVersion=token.PROPOSALS, minimumAdvantage=token.MARGIN,
+        proposalVersion=augmentation.codec.PROPOSALS if derived else token.PROPOSALS, minimumAdvantage=token.MARGIN,
         qualificationPassed=False, productionActivation=False)
     if fixed_reference:
         identity.update(referenceProtocol=token.fixed.REFERENCE,
-            referenceCodecSha256=b.file_digest(token.fixed.__file__),
+            referenceCodecSha256=b.file_digest(codec.__file__),
             proposalReference=token.TOKEN_REFERENCE_VERSION,
             objective='Equal root weight then equal nonreference proposal weight; targets average all eight paired tails.',
-            selector='MODEL_FIXED_T_RESIDUAL', modelArtifactKind=token.fixed.KIND)
+            selector=codec.SELECTOR if derived else 'MODEL_FIXED_T_RESIDUAL', modelArtifactKind=codec.KIND)
+    if derived:
+        identity.update(derivedViewBackendSha256=b.file_digest(augmentation.__file__),
+                        selectorVersion=codec.SELECTOR_VERSION, reusedDevelopmentRoots=104)
     b.atomic_json(output/'identity.json', identity)
     design = ridge.training_design(model, training, deadline)
     b.atomic_json(output/'training-design.json', dict(trainingOrigins=list(design.origins),
@@ -143,7 +157,7 @@ def fit(bindings, output, config, *, fixed_reference=False):
         report = dict(index=index, ridgePenalty=penalty, training=token.measure(actor, training),
             validation=token.measure(actor, validation), frozenBasisSha256=ridge.basis_digest(artifact),
             onlyOutputWeightsChanged=True, outputBiasUnchanged=artifact['outputBias'] == .5)
-        b.atomic_json(output/f'model-{index}.json', token.fixed.wrap(artifact) if fixed_reference else artifact)
+        b.atomic_json(output/f'model-{index}.json', codec.wrap(artifact) if fixed_reference else artifact)
         report['modelSha256'] = b.file_digest(output/f'model-{index}.json')
         reports.append(report)
         b.atomic_json(output/f'fit-{index}.json', report)
@@ -151,7 +165,7 @@ def fit(bindings, output, config, *, fixed_reference=False):
     report = dict(schemaVersion=1, kind=kind, identitySha256=b.file_digest(output/'identity.json'),
         initializerValidation=initial_validation, fits=reports, selected=selected,
         scalingDiagnosticPassed=scaling_passes(selected), primaryContinuationReplicates=8,
-        validationPreviouslyInspected=False, selectionOnly=True, qualificationPassed=False,
+        validationPreviouslyInspected=derived, selectionOnly=True, qualificationPassed=False,
         humanStrengthVerified=False, productionActivation=False, freshWholeGameGatesRequired=True)
     if selected:
         b.atomic_json(output/'candidate.json', b.read_json(output/f'model-{selected["index"]}.json'))
@@ -161,12 +175,13 @@ def fit(bindings, output, config, *, fixed_reference=False):
         primaryContinuationReplicates=8, prefixDiagnosticsUsed=False))
     diagnostic_model = b.read_json(output/'candidate.json') if selected else model
     if fixed_reference and selected:
-        diagnostic_model = token.fixed.unwrap(diagnostic_model)
+        diagnostic_model = codec.unwrap(diagnostic_model)
     diagnostics = {}
     for count in (2, 4):
         ridge.check_deadline(deadline)
         diagnostics[str(count)] = {split:token.measure(q.ActionValue(diagnostic_model, 'token'),
-            prefix_rows(bindings.collection, model, split_rows, count, fixed_reference=fixed_reference))
+            prefix_rows(None if derived else bindings.collection, model, split_rows, count,
+                        fixed_reference=fixed_reference, derived_view=derived_view))
             for split, split_rows in (('TRAINING', training), ('VALIDATION', validation))}
     b.atomic_json(output/'prefix-diagnostics.json', dict(kind='post-selection-prefix-diagnostics-1',
         selectionSha256=b.file_digest(output/'selection.json'), modelSha256=b.digest(diagnostic_model),
