@@ -151,6 +151,7 @@ private class ObservationProjection(
                     drawThreeKeepTwo = view.rules.drawThreeKeepTwo,
                 ),
             expansionPlanning = if (decision == "expand") economic.planning(candidates) else null,
+            expansionPosition = if (decision == "expand") view.expansionPosition else null,
             reserveShortfallBasis =
                 if (decision == "purchase-advances") {
                     contextualFeatures(mapOf("reserveShortfall" to 1.0))

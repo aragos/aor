@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentMapOf
 
@@ -15,6 +16,84 @@ class ExpansionPositionTest {
     private val ids = listOf(p1, p2, p3)
     private val win = CompetitionRoll(DieRoll(1), DieRoll(6), DieRoll(1))
     private val loss = CompetitionRoll(DieRoll(6), DieRoll(1), DieRoll(1))
+
+    @Test
+    fun publicPositionRoundTripPreservesRetainedBasesAndAllPublicRuleInputs() {
+        val board =
+            BoardState(
+                persistentMapOf(id("florence") to ProvincePieces.Marker(p1, PieceSide.WHITE, true))
+            )
+        val initial = fixture(board, advances = mapOf(p2 to setOf(AdvanceId.CATHEDRAL)))
+        val state =
+            initial.copy(
+                flow =
+                    initial.flow.copy(
+                        shipped = mapOf(p1 to mapOf(id("rome") to 3)),
+                        cathedralUses = setOf(p2 to p1),
+                    )
+            )
+
+        val projected =
+            requireNotNull(state.viewForDecision(p1).expansionPosition) {
+                "The ready fixture requires its public expansion position."
+            }
+
+        assertEquals(setOf(id("florence")), projected.retainedColouredBases)
+        assertEquals(position(state), projected.toPosition())
+    }
+
+    @Test
+    fun publicPositionIsAbsentForOtherSeatsAndSpectators() {
+        val state = fixture(BoardState())
+
+        assertNull(state.viewForPlayer(p2).expansionPosition)
+        assertNull(state.publicView().expansionPosition)
+    }
+
+    @Test
+    fun publicPositionIsAbsentWhileAnExpansionResponseIsPending() {
+        val state =
+            fixture(
+                    BoardState().placeMarker(id("florence"), p2).board,
+                    advances = mapOf(p2 to setOf(AdvanceId.CATHEDRAL)),
+                )
+                .act("attack florence")
+
+        assertNull(state.viewForPlayer(p1).expansionPosition)
+        assertNull(state.viewForPlayer(p2).expansionPosition)
+    }
+
+    @Test
+    fun publicPositionDoesNotDependOnAnyPrivateHand() {
+        val state = fixture(BoardState())
+        val changed =
+            state.copy(
+                players =
+                    state.players.mapValues { (_, player) ->
+                        player.copy(
+                            hand =
+                                listOf(
+                                    HandCard(
+                                        "unrelated-private-card",
+                                        CardData.definition("gold-3"),
+                                    )
+                                )
+                        )
+                    }
+            )
+
+        assertEquals(
+            state.viewForDecision(p1).expansionPosition,
+            changed.viewForDecision(p1).expansionPosition,
+        )
+    }
+
+    @Test
+    fun publicPositionIsAbsentOutsideExpansion() {
+        val state = fixture(BoardState()).copy(stage = Stage.PLAY_CARDS)
+
+        assertNull(state.viewForPlayer(p1).expansionPosition)
+    }
 
     @Test
     fun blockingACheapSatelliteAttackLeavesTheSameDefenderUnableToBlockTheNextMarket() {

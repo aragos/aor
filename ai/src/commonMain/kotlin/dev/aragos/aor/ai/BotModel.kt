@@ -3,6 +3,7 @@ package dev.aragos.aor.ai
 import dev.aragos.aor.CardChoice
 import dev.aragos.aor.CardCommand
 import dev.aragos.aor.CatalogVersion
+import dev.aragos.aor.ExpansionPositionView
 import dev.aragos.aor.InitialCardRule
 import dev.aragos.aor.LEGACY_RULES_VERSION
 import dev.aragos.aor.MapRule
@@ -59,6 +60,10 @@ data class BotObservation(
     val reserveShortfallBasis: Map<String, Double>? = null,
     val advancePlanning: BotAdvancePlanning? = null,
     val leaderPlanning: BotLeaderPlanning? = null,
+    /**
+     * Optional exact public position; nominal features and existing selectors do not consume it.
+     */
+    val expansionPosition: ExpansionPositionView? = null,
 ) {
     init {
         require(schemaVersion == 1) { "Unsupported bot observation schema: $schemaVersion." }
@@ -73,6 +78,12 @@ data class BotObservation(
         }
         require(candidates.size in 1..1024) {
             "A bot observation requires 1 through 1024 candidates."
+        }
+        require(
+            expansionPosition == null ||
+                decision == "expand" && expansionPosition.actor.value == playerId
+        ) {
+            "Public expansion inputs must belong to the deciding expansion actor."
         }
         val byCommand = candidates.associateBy(BotCandidate::command)
         require(byCommand.size == candidates.size) {

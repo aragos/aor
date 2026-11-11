@@ -54,6 +54,7 @@ internal fun readBotObservation(observationJson: String): BotObservation {
             dataVersion = raw.dataVersion as String,
             configuration = readConfiguration(raw.configuration),
             expansionPlanning = readExpansionPlanning(raw.expansionPlanning),
+            expansionPosition = readExpansionPosition(raw.expansionPosition),
             reserveShortfallBasis =
                 if (raw.reserveShortfallBasis == null) null
                 else numberMap(raw.reserveShortfallBasis),
@@ -298,7 +299,7 @@ private fun readAdvancePlanning(raw: dynamic): BotAdvancePlanning? {
     )
 }
 
-private fun planningArray(raw: dynamic, name: String): Array<dynamic> {
+internal fun planningArray(raw: dynamic, name: String): Array<dynamic> {
     require(js("Array.isArray(raw)") as Boolean) { "Planning $name must be an array." }
     return raw as Array<dynamic>
 }
@@ -306,7 +307,7 @@ private fun planningArray(raw: dynamic, name: String): Array<dynamic> {
 private fun planningCommodities(raw: dynamic): Set<Commodity> =
     planningArray(raw, "card or market choices").map { Commodity.valueOf(it as String) }.toSet()
 
-private fun planningInteger(raw: dynamic, name: String): Int {
+internal fun planningInteger(raw: dynamic, name: String): Int {
     require(jsTypeOf(raw) == "number") { "Planning $name must be numerical." }
     val value = (raw as Number).toDouble()
     require(value.isFinite() && value == value.toInt().toDouble()) {

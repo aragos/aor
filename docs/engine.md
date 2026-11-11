@@ -86,6 +86,13 @@ through the ordinary competition rules. Fresh follow-up evaluations use the resu
 pool, shipping and used Cathedral pairs. Victories explicitly leave optional continuations unresolved;
 the type does not simulate private cards, marker bonuses or phase progression and is not a planner.
 
+The nullable `GameView.expansionPosition` is a derived public projection only for the viewer's ready
+Expansion decision. Its explicit wire inputs retain converted coloured bases and complete shipment
+usage; `toPosition()` restores those typed inputs without a synthetic game state or offers. It adds
+no saved fields, policy behavior, private cards or authority outcomes. The same optional typed facts
+pass through `BotObservation` and its browser decoder; existing selectors ignore them. Older views
+and observations may omit the field.
+
 [ExpansionTacticalFrontier](../core/src/commonMain/kotlin/dev/aragos/aor/ExpansionTacticalFrontier.kt)
 adds bounded factual attack/response enumeration for local diagnostics. It reports complete legal
 option counts alongside deterministic truncation, keeps actor and defender Cathedral choices

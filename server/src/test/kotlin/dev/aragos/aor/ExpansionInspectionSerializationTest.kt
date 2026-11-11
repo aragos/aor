@@ -9,6 +9,56 @@ class ExpansionInspectionSerializationTest {
     private val p3 = PlayerId("p3")
 
     @Test
+    fun publicPositionSerializesOnlyExplicitPublicInputsWithCanonicalKeys() {
+        val initial = state()
+        val before =
+            initial.copy(
+                flow =
+                    initial.flow.copy(
+                        shipped = mapOf(p1 to mapOf(ProvinceId("rome") to 3)),
+                        cathedralUses = setOf(p2 to p1),
+                    )
+            )
+
+        val serialized =
+            json
+                .readTree(json.writeValueAsString(before.viewForPlayer(p1)))
+                .path("expansionPosition")
+
+        assertThat(serialized.fieldNames().asSequence().toSet())
+            .containsExactly(
+                "playerCount",
+                "rules",
+                "catalogVersion",
+                "board",
+                "retainedColouredBases",
+                "players",
+                "shipped",
+                "militaryPlays",
+                "actor",
+                "poolTokens",
+                "stockTokens",
+                "orderBox",
+                "turnOrder",
+                "cathedralUsedAgainst",
+            )
+        assertThat(serialized["actor"].asText()).isEqualTo("p1")
+        assertThat(serialized["shipped"]["p1"]["rome"].intValue()).isEqualTo(3)
+        assertThat(serialized["cathedralUsedAgainst"]["p2"].single().asText()).isEqualTo("p1")
+        assertThat(serialized["players"].first()["ships"])
+            .isEqualTo(json.readTree("""{"fleet":"NONE","level":0}"""))
+        assertThat(serialized["players"].first().fieldNames().asSequence().toSet())
+            .containsExactly("player", "capital", "advances", "ships", "chaos")
+    }
+
+    @Test
+    fun unavailablePublicPositionSerializesAsNull() {
+        val serialized = json.readTree(json.writeValueAsString(state().viewForPlayer(p2)))
+
+        assertThat(serialized["expansionPosition"].isNull).isTrue()
+    }
+
+    @Test
     fun aFilteredPoolFailureStillSerializesItsAuthoritativeInspection() {
         val before =
             state().copy(board = BoardState().placeMarker(ProvinceId("florence"), p2).board)

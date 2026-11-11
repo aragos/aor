@@ -139,6 +139,8 @@ data class GameView(
     val purchaseShippingForecast: ShippingOfferView? = null,
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
     val windmillOffer: WindmillOfferView? = null,
+    /** Optional public tactical inputs; absent outside the viewer's ready Expansion decision. */
+    val expansionPosition: ExpansionPositionView? = null,
 ) {
     companion object {
         internal fun forViewer(
@@ -151,6 +153,7 @@ data class GameView(
             val expansionInspections =
                 viewer?.let { ExpansionProjection.inspections(state, it) }.orEmpty()
             return GameView(
+                expansionPosition = viewer?.let { ExpansionPositionView.from(state, it) },
                 stage = state.stage,
                 currentEpoch = state.currentEpoch.number,
                 rules = state.rules,
