@@ -116,6 +116,8 @@ future policy. The `MODEL_FIXED_T_RESIDUAL` selector requires a tagged
 `token-order-fixed-reference-residual-1` artifact and retains fixed T unless an original proposal
 beats it by more than `.02`. Ordinary selectors reject this envelope, and residual selectors reject
 untagged Q models. Rebased ordinary-continuation labels cannot establish fixed-T continuation values.
+The existing eight-tail fitter opts into this contract with `--fixed-reference`; all five exported
+heads use the tagged envelope, and the frozen basis, penalties and admission rules stay unchanged.
 
 ### Bounded human expansion imitation
 

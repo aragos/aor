@@ -158,7 +158,8 @@ def prepare(options):
     provenance = []
     for name in (Path(__file__).name, "automata_campaign.py", "automata_experiments.py", "automata_evolution.py",
                  "automata_policy_search.py", "automata_purchase_continuation.py", "purchase_storage.py",
-                 "purchase_policy.py", "purchase_policy_toy.py", "territory_value.py", "token_order_policy.py", "train-opponents.py"):
+                 "purchase_policy.py", "purchase_policy_toy.py", "territory_value.py", "token_order_policy.py",
+                 "token_order_metadata.py", "token_order_fixed_reference.py", "train-opponents.py"):
         exp.copy_input(scripts / name, root / "scripts" / name, provenance)
     def copied(path, name):
         return str(exp.copy_input(path, root / "inputs" / name, provenance))
