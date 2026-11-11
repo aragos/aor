@@ -97,33 +97,33 @@ class WarmTests(unittest.TestCase):
             joint.purchase_columns(self.purchase, list(reversed(self.joint)))
 
     def test_warm_purchase_columns_are_exact_copies(self):
-        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23)
+        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23, shared_raw_names=[])
         self.assertTrue(torch.equal(expanded['layers.0.weight'][:, [2, 1]], self.original['layers.0.weight']))
 
     def test_warm_noninput_parameters_are_exact_copies(self):
-        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23)
+        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23, shared_raw_names=[])
         for key in ('layers.0.bias', 'layers.2.weight', 'layers.2.bias'):
             self.assertTrue(torch.equal(expanded[key], self.original[key]), key)
 
     def test_warm_card_columns_retain_its_fresh_expanded_initializer(self):
         fresh = benchmark.Critic((64,), 23, inputs=3).state_dict()
-        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23)
+        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23, shared_raw_names=[])
         self.assertTrue(torch.equal(expanded['layers.0.weight'][:, 0], fresh['layers.0.weight'][:, 0]))
 
     def test_warm_expansion_does_not_mutate_source(self):
         before = {key: value.clone() for key, value in self.original.items()}
-        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23)
+        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23, shared_raw_names=[])
         expanded['layers.0.bias'].add_(1)
         self.assertTrue(all(torch.equal(value, before[key]) for key, value in self.original.items()))
 
     def test_purchase_only_predictions_preserve_fp32_function(self):
-        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23)
+        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23, shared_raw_names=[])
         receipt = joint.warm_purchase_parity(self.original, expanded, self.purchase, self.joint,
                                            [[0., 0.], [1., -1.], [.33, -.25]])
         self.assertLessEqual(receipt['maximumAbsoluteError'], 2e-6)
 
     def test_wrong_output_bias_fails_purchase_parity(self):
-        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23)
+        expanded = joint.expand_warm_state(self.original, self.purchase, self.joint, 23, shared_raw_names=[])
         expanded['layers.2.bias'].add_(.1)
         with self.assertRaisesRegex(ValueError, 'parity exceeded'):
             joint.warm_purchase_parity(self.original, expanded, self.purchase, self.joint, [[1., -1.]])
@@ -131,7 +131,62 @@ class WarmTests(unittest.TestCase):
     def test_non_fp32_source_is_rejected(self):
         original = {key: value.double() for key, value in self.original.items()}
         with self.assertRaisesRegex(ValueError, 'finite FP32'):
-            joint.expand_warm_state(original, self.purchase, self.joint, 23)
+            joint.expand_warm_state(original, self.purchase, self.joint, 23, shared_raw_names=[])
+
+
+class SharedRawWarmTests(unittest.TestCase):
+    def setUp(self):
+        self.purchase = ['cash', 'decision.purchase', 'tokens']
+        self.names = ['card.cardWindow.normal', 'card.cash', 'card.decision.play-cards',
+                      'card.handPlayable.leader', 'card.tokens',
+                      'purchase.cash', 'purchase.decision.purchase', 'purchase.tokens']
+        self.shared = ['cash', 'tokens']
+        self.original = benchmark.Critic((64,), 19, inputs=3).state_dict()
+
+    def expanded(self):
+        return joint.expand_warm_state(self.original, self.purchase, self.names, 23,
+                                       shared_raw_names=self.shared)
+
+    def test_shared_card_columns_copy_the_exact_matching_purchase_coefficients(self):
+        expanded = self.expanded()
+        self.assertTrue(torch.equal(expanded['layers.0.weight'][:, [1, 4]],
+                                    self.original['layers.0.weight'][:, [0, 2]]))
+
+    def test_genuinely_card_only_columns_keep_their_seeded_initializer(self):
+        expanded = self.expanded()
+        fresh = benchmark.Critic((64,), 23, inputs=len(self.names)).state_dict()
+        self.assertTrue(torch.equal(expanded['layers.0.weight'][:, [0, 2, 3]],
+                                    fresh['layers.0.weight'][:, [0, 2, 3]]))
+
+    def test_identical_shared_raw_facts_have_matching_card_and_purchase_values(self):
+        receipt = joint.warm_shared_raw_parity(self.expanded(), self.purchase, self.names,
+            self.shared, [[0., 0.], [.25, -.5], [1., 1.]])
+        self.assertLessEqual(receipt['maximumAbsoluteError'], 2e-6)
+
+    def test_copying_card_columns_preserves_purchase_only_forward_parity(self):
+        receipt = joint.warm_purchase_parity(self.original, self.expanded(), self.purchase,
+            self.names, [[0., 1., 0.], [.25, 1., -.5]])
+        self.assertLessEqual(receipt['maximumAbsoluteError'], 2e-6)
+
+    def test_incomplete_explicit_mapping_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'complete sorted phase dictionary intersection'):
+            joint.expand_warm_state(self.original, self.purchase, self.names, 23,
+                                   shared_raw_names=['cash'])
+
+    def test_phase_specific_decision_cannot_be_added_to_transfer_map(self):
+        with self.assertRaisesRegex(ValueError, 'complete sorted phase dictionary intersection'):
+            joint.expand_warm_state(self.original, self.purchase, self.names, 23,
+                                   shared_raw_names=self.purchase)
+
+    def test_mapping_must_be_supplied_explicitly(self):
+        with self.assertRaises(TypeError):
+            joint.expand_warm_state(self.original, self.purchase, self.names, 23)
+
+    def test_corrupted_shared_card_column_fails_cross_phase_parity(self):
+        expanded = self.expanded()
+        expanded['layers.0.weight'][:, 1].add_(.5)
+        with self.assertRaisesRegex(ValueError, 'CARD/PURCHASE FP32 parity exceeded'):
+            joint.warm_shared_raw_parity(expanded, self.purchase, self.names, self.shared, [[1., 0.]])
 
 
 class SelectionTests(unittest.TestCase):
@@ -287,7 +342,8 @@ class SyntheticPipelineTests(unittest.TestCase):
             phases[game] = items
         cache = DenseCache(phases, np.linspace(0, 1, 4096), inputs=7241)
         purchase_names = [f'feature.{index:04}' for index in range(3556)]
-        joint_names = sorted([f'card.feature.{index:04}' for index in range(3685)]
+        joint_names = sorted([f'card.feature.{index:04}' for index in range(3554)]
+                             + [f'card.only.{index:04}' for index in range(131)]
                              + ['purchase.' + name for name in purchase_names])
         cache.feature_names = joint_names
         declaration = dict(corpus(['training']*3072 + ['validation']*512 + ['test']*512),
@@ -307,7 +363,8 @@ class SyntheticPipelineTests(unittest.TestCase):
                 patch.object(benchmark, 'predict', side_effect=inspect_prediction):
             report = joint.fit(cache, declaration, output, data.Config(), lambda: None,
                 torch.device('cpu'), purchase_names=purchase_names, joint_names=joint_names,
-                critic_path=checkpoint)
+                critic_path=checkpoint, shared_raw_names=purchase_names[:3554],
+                shared_raw_mapping_sha256='d'*64)
         return report, original, purchase_names, joint_names
 
     def test_two_fits_select_before_test_and_never_predict_nonselected_arm(self):
@@ -335,7 +392,9 @@ class SyntheticPipelineTests(unittest.TestCase):
             selection = data.read(root/'fit/selected.json')
             expected = dict(path='warm-expanded-initial.pt',
                 sha256=data.sha(root/'fit/warm-expanded-initial.pt'),
-                dictionarySha256='synthetic-dictionary', seed=data.Config().smallSeed)
+                dictionarySha256='synthetic-dictionary', seed=data.Config().smallSeed,
+                sharedRawMappingSha256='d'*64, transferCounts=dict(purchaseColumns=3556,
+                    sharedRawCardColumns=3554, seededCardColumns=131))
             self.assertEqual(selection['warmSourceCheckpointSha256'], data.sha(root/'synthetic.pt'))
             self.assertEqual(selection['warmExpandedInitial'], expected)
             self.assertEqual(report['warmExpandedInitial'], expected)
@@ -347,7 +406,8 @@ class SyntheticPipelineTests(unittest.TestCase):
             root = Path(directory)
             _, original, purchase_names, joint_names = self.run_pipeline(root)
             actual = torch.load(root/'fit/warm-expanded-initial.pt', map_location='cpu', weights_only=True)
-            expected = joint.expand_warm_state(original, purchase_names, joint_names, data.Config().smallSeed)
+            expected = joint.expand_warm_state(original, purchase_names, joint_names, data.Config().smallSeed,
+                                                shared_raw_names=purchase_names[:3554])
             self.assertTrue(all(torch.equal(value, expected[key]) for key, value in actual.items()))
 
 

@@ -17,6 +17,7 @@ import purchase_value_campaign as gpu
 KIND = 'joint-state-value-gpu-1'
 REFRESHED = 'c2ea78e7a225998e7c690bdce852f3502d8198a464f37fd1674bbc01142b7f17'
 SEED_AUDIT = '6e36f2486e72b9f3d15a6a452a984aa01eb8d7b42db317ea52eb61504f7925a2'
+SHARED_RAW_MAPPING = '1e475df5d4d6ce6649e38740d113d1f09444b3f2b68a18d3f80d1efb6dade574'
 VARIABLES = dict(gpu.VARIABLES, OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
                  OPENBLAS_NUM_THREADS='1', NUMEXPR_NUM_THREADS='1')
 GIB = 1024**3
@@ -44,11 +45,21 @@ def validate_inputs(protocol, *, corpus_required):
             == {'purchase.'+name for name in purchase_names}
         and data.sha(protocol['critic']) == REFRESHED,
         'The expanded critic must retain exact refreshed49 purchase weights and input columns.')
+    mapping = data.read(protocol['sharedRawMapping'])
+    data.require(data.sha(protocol['sharedRawMapping']) == protocol['sharedRawMappingSha256'] == SHARED_RAW_MAPPING
+        and mapping['version'] == 'joint-shared-raw-transfer-1'
+        and mapping['purchaseDictionarySha256'] == data.sha(protocol['purchaseDictionary'])
+        and mapping['jointDictionarySha256'] == data.sha(protocol['jointDictionary'])
+        and len(mapping['sharedRawNames']) == 3554
+        and mapping['sharedRawNames'] == sorted(set(purchase_names) & {
+            name.removeprefix('card.') for name in names if name.startswith('card.')}),
+        'Warm transfer requires the exact verified shared-raw mapping and both subject dictionaries.')
     proof = data.read(protocol['warmParity'])
     data.require(proof['passed'] and proof['newGames'] == proof['actualFits'] == 0
         and proof['criticSha256'] == data.sha(protocol['critic'])
         and proof['jointDictionarySha256'] == data.sha(protocol['jointDictionary'])
         and proof['purchaseDictionarySha256'] == data.sha(protocol['purchaseDictionary'])
+        and proof['sharedRawMappingSha256'] == SHARED_RAW_MAPPING
         and proof['actualTrainingStates']['rows'] == 144
         and proof['actualTrainingStates']['maximumAbsoluteError'] <= 2e-6
         and proof['validationOrTestStatesUsed'] is False and proof['warmSeed'] == 52001001,
@@ -110,7 +121,8 @@ def synthetic_preflight(protocol, output):
     joint_names = data.read(protocol['jointDictionary'])['stateFeatureNames']
     original = torch.load(protocol['critic'], map_location='cpu', weights_only=True)
     expanded = fit.expand_warm_state(original, purchase_names, joint_names,
-        data.config(protocol['banks']).smallSeed)
+        data.config(protocol['banks']).smallSeed,
+        shared_raw_names=data.read(protocol['sharedRawMapping'])['sharedRawNames'])
     # Deterministic generated rows consume no reserved scientific random stream.
     states = ((torch.arange(19*7241).reshape(19,7241) % 17)-8).float()/8
     cpu = benchmark.Critic((64,), 0, inputs=7241); cpu.load_state_dict(expanded)
@@ -127,7 +139,7 @@ def synthetic_preflight(protocol, output):
         newGames=0, actualFits=0, corpusOpened=False, resources=resources,
         maximumOutputDifference=float((left-right.cpu()).abs().max().detach()),
         maximumGradientDifference=max(differences), criticSha256=data.sha(protocol['critic']),
-        dictionarySha256=data.sha(protocol['jointDictionary'])))
+        dictionarySha256=data.sha(protocol['jointDictionary']), sharedRawMappingSha256=SHARED_RAW_MAPPING))
 
 
 def completed_artifacts(output):
@@ -148,7 +160,9 @@ def study(protocol, output):
         exp.remaining_seconds, torch.device('cuda:0'),
         purchase_names=data.read(protocol['purchaseDictionary']),
         joint_names=data.read(protocol['jointDictionary'])['stateFeatureNames'],
-        critic_path=protocol['critic'])
+        critic_path=protocol['critic'],
+        shared_raw_names=data.read(protocol['sharedRawMapping'])['sharedRawNames'],
+        shared_raw_mapping_sha256=protocol['sharedRawMappingSha256'])
     return exp.stage_result(output, 'study', True,
         'Completed predictive state-value study; no action ranking or play-strength qualification.',
         report, completed_artifacts(output))

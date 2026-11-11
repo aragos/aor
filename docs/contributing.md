@@ -1448,8 +1448,11 @@ The [shared-state fitter](../scripts/joint_state_value_fit.py) gives each nonemp
 weight, then each nonempty phase equal weight within that world. Its explicit input-width,
 row-weight and validation-error arguments leave the existing purchase fitter's defaults unchanged.
 Fresh and warm-expanded 64-unit critics retain the original optimizer recipe. The warm model
-copies the refreshed purchase critic's input columns and later layers, with seeded new card
-columns; purchase-only prefit predictions must agree within the declared Float32 tolerance.
+copies the refreshed purchase critic's input columns and later layers. An explicit, hash-bound
+mapping also copies the 3,554 shared raw-state columns into their card namespace; the 131 genuinely
+card-only inputs retain their seeded initializer. The saved expanded initializer binds the mapping,
+column counts, dictionary and seed. Purchase-only predictions and equal raw facts projected into
+either phase with phase-specific extras zero must agree within the declared Float32 tolerance.
 Validation alone selects epoch and arm. The final stitched comparator uses a training-world card
 mean for card states and the frozen purchase critic for purchase states. Report phase-balanced,
 raw whole-world and separate phase errors with explicit empty-world denominators. This remains a

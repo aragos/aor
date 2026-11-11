@@ -37,9 +37,23 @@ def purchase_columns(purchase_names, joint_names):
     return np.asarray([indices['purchase.' + name] for name in purchase_names], dtype=np.int64)
 
 
-def expand_warm_state(original, purchase_names, joint_names, seed):
-    """Copy purchase columns and every bias/output tensor; retain fresh seeded card columns."""
+def shared_raw_columns(purchase_names, joint_names, shared_raw_names):
+    """Check the explicitly supplied transfer map; never infer extra semantic equivalences."""
+    purchase_columns(purchase_names, joint_names)
+    shared = sorted(set(purchase_names) & {name.removeprefix('card.') for name in joint_names
+                                         if name.startswith('card.')})
+    data.require(isinstance(shared_raw_names, list) and shared_raw_names == shared,
+                 'Explicit shared raw names must match the complete sorted phase dictionary intersection.')
+    original = {name: index for index, name in enumerate(purchase_names)}
+    expanded = {name: index for index, name in enumerate(joint_names)}
+    return (np.asarray([original[name] for name in shared_raw_names], dtype=np.int64),
+            np.asarray([expanded['card.' + name] for name in shared_raw_names], dtype=np.int64))
+
+
+def expand_warm_state(original, purchase_names, joint_names, seed, *, shared_raw_names):
+    """Copy purchase and verified shared raw card columns; seed only genuinely new card inputs."""
     columns = purchase_columns(purchase_names, joint_names)
+    source_columns, card_columns = shared_raw_columns(purchase_names, joint_names, shared_raw_names)
     shapes = {'layers.0.weight': (64, len(purchase_names)), 'layers.0.bias': (64,),
               'layers.2.weight': (1, 64), 'layers.2.bias': (1,)}
     data.require(set(original) == set(shapes) and all(
@@ -48,6 +62,7 @@ def expand_warm_state(original, purchase_names, joint_names, seed):
         for key, shape in shapes.items()), 'The warm source must be the finite FP32 64-unit critic.')
     expanded = benchmark.Critic((64,), seed, inputs=len(joint_names)).state_dict()
     expanded['layers.0.weight'][:, columns] = original['layers.0.weight'].detach().cpu()
+    expanded['layers.0.weight'][:, card_columns] = original['layers.0.weight'].detach().cpu()[:, source_columns]
     for key in shapes:
         if key != 'layers.0.weight':
             expanded[key] = original[key].detach().cpu().clone()
@@ -73,6 +88,26 @@ def warm_purchase_parity(original, expanded, purchase_names, joint_names, states
     data.require(maximum <= PARITY_TOLERANCE, 'Warm purchase-only FP32 parity exceeded 2e-6.')
     return dict(rows=len(states), maximumAbsoluteError=maximum, tolerance=PARITY_TOLERANCE,
                 dtype='float32', unchangedPurchaseFunction=True)
+
+
+def warm_shared_raw_parity(expanded, purchase_names, joint_names, shared_raw_names, states):
+    """Identical raw facts with phase-specific extras zero must have the same FP32 value."""
+    source_columns, card_columns = shared_raw_columns(purchase_names, joint_names, shared_raw_names)
+    purchase = purchase_columns(purchase_names, joint_names)[source_columns]
+    states = np.asarray(states, dtype=np.float32)
+    data.require(states.ndim == 2 and states.shape[1] == len(shared_raw_names)
+                 and len(states) > 0 and np.isfinite(states).all(),
+                 'Cross-phase parity requires finite rows in the explicit shared raw dictionary.')
+    actor = benchmark.Critic((64,), 0, inputs=len(joint_names))
+    actor.load_state_dict(expanded, strict=True)
+    left = np.zeros((len(states), len(joint_names)), dtype=np.float32)
+    right = np.zeros_like(left)
+    left[:, card_columns], right[:, purchase] = states, states
+    with torch.no_grad():
+        maximum = float((actor(torch.from_numpy(left)) - actor(torch.from_numpy(right))).abs().max())
+    data.require(maximum <= PARITY_TOLERANCE, 'Shared raw CARD/PURCHASE FP32 parity exceeded 2e-6.')
+    return dict(rows=len(states), sharedRawColumns=len(shared_raw_names), maximumAbsoluteError=maximum,
+                tolerance=PARITY_TOLERANCE, dtype='float32', phaseSpecificExtrasZero=True)
 
 
 def phase_row_weights(cache):
@@ -183,7 +218,8 @@ def evaluate_selected(selected, baseline, cache, corpus, config):
     return metrics, comparisons, records
 
 
-def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_names, critic_path):
+def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_names, critic_path,
+        shared_raw_names, shared_raw_mapping_sha256):
     """Fit exactly two critics; caller owns the frozen corpus, runtime and absolute deadline."""
     output, critic_path = Path(output), Path(critic_path)
     data.require(not output.exists(), 'The joint critic fit is one attempt in a new output directory.')
@@ -191,6 +227,11 @@ def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_n
                  and corpus['stateFeatureNames'] == joint_names == cache.feature_names,
                  'The frozen card/purchase dictionary or cache binding changed.')
     purchase_columns(purchase_names, joint_names)
+    shared_raw_columns(purchase_names, joint_names, shared_raw_names)
+    data.require(len(shared_raw_names) == 3554 and isinstance(shared_raw_mapping_sha256, str)
+                 and len(shared_raw_mapping_sha256) == 64
+                 and all(char in '0123456789abcdef' for char in shared_raw_mapping_sha256),
+                 'The fixed52 warm transfer requires its explicit3554-column mapping and raw SHA256.')
     data.require({part: sum(g['split'] == part for g in corpus['games'])
                   for part in ('training', 'validation', 'test')}
                  == dict(training=3072, validation=512, test=512), 'Whole-world split counts changed.')
@@ -199,16 +240,24 @@ def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_n
                  'The original optimizer, dense bound and bootstrap recipe must remain fixed.')
     data.require(data.sha(critic_path) == REFRESHED_SHA, 'The exact refreshed49 purchase critic changed.')
     original = torch.load(critic_path, map_location='cpu', weights_only=True)
-    warm = expand_warm_state(original, purchase_names, joint_names, config.smallSeed)
+    warm = expand_warm_state(original, purchase_names, joint_names, config.smallSeed,
+                             shared_raw_names=shared_raw_names)
     synthetic = ((np.arange(16 * len(purchase_names)).reshape(16, -1) % 17) - 8).astype(np.float32) / 8
     synthetic[0] = 0
     parity = warm_purchase_parity(original, warm, purchase_names, joint_names, synthetic)
+    source_columns, _ = shared_raw_columns(purchase_names, joint_names, shared_raw_names)
+    shared_parity = warm_shared_raw_parity(warm, purchase_names, joint_names, shared_raw_names,
+                                           synthetic[:, source_columns])
     output.mkdir(parents=True)
     data.document(output/'warm-synthetic-parity.json', parity)
+    data.document(output/'warm-shared-raw-parity.json', shared_parity)
     expanded_path = output/'warm-expanded-initial.pt'
     torch.save(warm, expanded_path)
     expanded_identity = dict(path=expanded_path.name, sha256=data.sha(expanded_path),
-        dictionarySha256=corpus['dictionarySha256'], seed=config.smallSeed)
+        dictionarySha256=corpus['dictionarySha256'], seed=config.smallSeed,
+        sharedRawMappingSha256=shared_raw_mapping_sha256,
+        transferCounts=dict(purchaseColumns=len(purchase_names), sharedRawCardColumns=len(shared_raw_names),
+                            seededCardColumns=len(joint_names)-len(purchase_names)-len(shared_raw_names)))
     # Fit the exact serialized expanded tensor state whose identity is published below.
     warm = torch.load(expanded_path, map_location='cpu', weights_only=True)
     weights = phase_row_weights(cache)
@@ -229,7 +278,7 @@ def fit(cache, corpus, output, config, guard, device, *, purchase_names, joint_n
         config=asdict(config), testInspected=False,
         selection='Lowest validation phase-balanced whole-world MSE; earlier epoch, then warm ties.',
         weighting='Equal represented world, then equal nonempty phase, then equal rows within phase.',
-        warmOptimizer='Fresh Adam; copied purchase columns, biases and output; freshly seeded card columns.',
+        warmOptimizer='Fresh Adam; copied purchase/shared-raw card columns, biases and output; seeded card-only columns.',
         qualificationPassed=False, productionActivation=False)
     data.document(output/'selected.json', selection)
     data.require(all(data.sha(output/(name+'-best.pt')) == item['modelSha256']

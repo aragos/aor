@@ -18,7 +18,8 @@ def fixture():
         bootstrap=[52001023]).items()}
     names = [f'input-{index:04d}' for index in range(3556)]
     dictionary = dict(version=data.VERSION, stateFeatureNames=sorted(
-        ['purchase.'+name for name in names]+[f'card.input-{index:04d}' for index in range(3685)]),
+        ['purchase.'+name for name in names]+[f'card.input-{index:04d}' for index in range(3554)]
+        +[f'card.only-{index:04d}' for index in range(131)]),
         units='unchanged-existing-phase-encoder-units', missingValue=0.)
     protocol = dict(kind=campaign.KIND, maximumSeconds=3600, maximumAttempts=1, cpuThreads=1,
         maximumRssBytes=6*campaign.GIB, maximumDataBytes=8*campaign.GIB,
@@ -26,21 +27,25 @@ def fixture():
         newGames=0, actorTraining=False, qualificationPassed=False, productionActivation=False,
         automaticNextCampaign=False, automaticResume=False, seedAudit='seeds', banks=banks,
         fitConfig=asdict(data.config(banks)), purchaseDictionary='purchase', jointDictionary='joint',
-        critic='critic', warmParity='parity', gpuEnvironment='environment')
+        critic='critic', warmParity='parity', gpuEnvironment='environment',
+        sharedRawMapping='mapping', sharedRawMappingSha256=campaign.SHARED_RAW_MAPPING)
     files = dict(seeds=dict(allIntersectionsZero=True,seedBanks=banks), purchase=names,
         joint=dictionary, parity=dict(passed=True,newGames=0,actualFits=0,
             criticSha256=campaign.REFRESHED,jointDictionarySha256='joint-digest',
             purchaseDictionarySha256='purchase-digest',
+            sharedRawMappingSha256=campaign.SHARED_RAW_MAPPING,
             actualTrainingStates=dict(rows=144,maximumAbsoluteError=0.),
             validationOrTestStatesUsed=False,warmSeed=52001001),
-        environment=dict(cpuThreads=1,variables=campaign.VARIABLES))
+        environment=dict(cpuThreads=1,variables=campaign.VARIABLES),
+        mapping=dict(version='joint-shared-raw-transfer-1', sharedRawNames=names[:3554],
+            purchaseDictionarySha256='purchase-digest', jointDictionarySha256='joint-digest'))
     return protocol, files
 
 
 class DriverTest(unittest.TestCase):
     def validate(self, protocol, files):
         hashes = {'critic':campaign.REFRESHED,'seeds':campaign.SEED_AUDIT,
-                  'joint':'joint-digest','purchase':'purchase-digest'}
+                  'joint':'joint-digest','purchase':'purchase-digest','mapping':campaign.SHARED_RAW_MAPPING}
         with patch.object(data, 'read', side_effect=lambda path:files[str(path)]), \
                 patch.object(data, 'sha', side_effect=lambda path:hashes[str(path)]):
             return campaign.validate_inputs(protocol, corpus_required=False)
@@ -57,6 +62,18 @@ class DriverTest(unittest.TestCase):
         protocol, files = fixture(); protocol['maximumFits']=3
         with self.assertRaisesRegex(ValueError,'finite two-critic'): self.validate(protocol,files)
 
+    def test_changed_transfer_mapping_hash_is_rejected(self):
+        protocol, files = fixture(); protocol['sharedRawMappingSha256'] = '0'*64
+        with self.assertRaisesRegex(ValueError, 'verified shared-raw mapping'): self.validate(protocol, files)
+
+    def test_mapping_must_cover_exact_shared_dictionary_intersection(self):
+        protocol, files = fixture(); files['mapping']['sharedRawNames'][-1] = 'input-3554'
+        with self.assertRaisesRegex(ValueError, 'verified shared-raw mapping'): self.validate(protocol, files)
+
+    def test_warm_parity_cannot_bind_the_previous_unshared_initializer(self):
+        protocol, files = fixture(); files['parity']['sharedRawMappingSha256'] = '0'*64
+        with self.assertRaisesRegex(ValueError, 'training-only'): self.validate(protocol, files)
+
     def test_heldout_warm_parity_inputs_are_rejected(self):
         protocol, files = fixture(); files['parity']['validationOrTestStatesUsed']=True
         with self.assertRaisesRegex(ValueError,'training-only'): self.validate(protocol,files)
@@ -69,8 +86,9 @@ class DriverTest(unittest.TestCase):
         protocol, files = fixture()
         with patch.object(data,'read',side_effect=lambda path:files[str(path)]), \
                 patch.object(data,'sha',side_effect=lambda path:{'critic':campaign.REFRESHED,
-                    'seeds':campaign.SEED_AUDIT,'joint':'joint-digest','purchase':'purchase-digest'}[str(path)]):
-            with self.assertRaises(KeyError): campaign.validate_inputs(protocol,corpus_required=True)
+                    'seeds':campaign.SEED_AUDIT,'joint':'joint-digest','purchase':'purchase-digest',
+                    'mapping':campaign.SHARED_RAW_MAPPING}[str(path)]):
+            with self.assertRaisesRegex(KeyError, 'corpusRoot'): campaign.validate_inputs(protocol,corpus_required=True)
 
     def test_sparse_payload_estimate_counts_all_eight_arrays_and_empty_worlds(self):
         corpus=dict(nonzeros=100,rows=20,games=[{}, {}, {}])
