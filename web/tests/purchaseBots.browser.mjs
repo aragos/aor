@@ -240,6 +240,15 @@ try {
         workerRoundtripTiming: {cold: timing(replies.filter(item => item.cold)), warm: timing(replies.filter(item => !item.cold)),
             coldPurchase: timing(purchases.filter(item => item.cold)), warmPurchase: timing(purchases.filter(item => !item.cold)),
             meaning: 'PostMessage to actual reply receipt; cold includes module import/model parsing. Includes event scheduling and transfer, excludes server projection/API. Descriptive roundtrip timing for the reported web mode, not isolated neural inference or a tuning gate.'}};
+    if (process.env.AOR_PURCHASE_EXPORT_INPUTS === '1') {
+        // Synthetic actor-visible inputs only: omit credentials, game IDs and lease/submission data.
+        const inputs = purchases.map(({input, reply}) => ({observation: input.observation,
+            purchase: input.purchase, difficulty: input.difficulty, seed: input.seed, command: reply.command}));
+        writeFileSync(join(process.env.AOR_BROWSER_ARTIFACTS, 'purchase-worker-inputs.json'),
+            JSON.stringify({kind: 'sanitized-purchase-worker-inputs-1',
+                baselineSha256: report.baselineSha256, actorAssetSha256: report.actorAssetSha256,
+                inputs}, null, 2) + '\n', {flag: 'wx'});
+    }
     writeFileSync(join(process.env.AOR_BROWSER_ARTIFACTS, 'purchase-bots-lifecycle.json'), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify(report));
 } finally {
