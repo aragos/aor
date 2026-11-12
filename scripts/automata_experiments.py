@@ -385,7 +385,7 @@ def native(protocol, mode, source, output, extra=(), allow_insufficient=False):
                "-XX:ConcGCThreads=1", "-cp", str(Path(protocol["runtime"]) / "lib/*"),
                "dev.aragos.aor.training.TrainingMainKt", "--mode", mode,
                "--source", str(source), "--output", str(output),
-               "--hours", str(min(12.0, remaining / 3600))]
+               "--hours", str(min(1.0 if mode == "strategy-replay" else 12.0, remaining / 3600))]
     if mode in ("token-value-pilot", "arena"):
         command += ["--workers", str(protocol["workers"])]
     command += list(extra)
