@@ -78,6 +78,14 @@ count may change. Sampled process-group limits cap CPU at 80% of logical cores a
 memory; they do not reserve hardware. Logs/checkpoints stay in ignored `.aor-training/`; training
 never reads production games or secrets.
 
+For long experiments, retain closed replay evidence with
+[`training_evidence_archive.py`](../scripts/training_evidence_archive.py). Its explicit file manifest
+requires a successful terminal audit; it never discovers or cleans active runs. `pack --plan PLAN
+--archive ARCHIVE --receipt RECEIPT --prune` verifies every archived file before removing expanded
+copies. `verify --receipt RECEIPT` checks retained evidence, and `restore --receipt RECEIPT` restores
+the original paths, bytes, modes and timestamps. Keep the receipt and terminal audit expanded.
+Use `prune --receipt RECEIPT` to finish an interrupted cleanup; changed files prevent further removal.
+
 For throughput work, run `./gradlew :training:benchmark --args=".aor-training/before.json"`,
 then repeat after the change with `--args=".aor-training/after.json .aor-training/before.json"`.
 The benchmark warms up before measuring 24 repeated games across 3–6 players, both maps and
