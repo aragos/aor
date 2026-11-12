@@ -134,6 +134,7 @@ function CardPurchasePlanner({snapshot, planner, busy}: {
     const view = snapshot.planning!;
     const saved = view.saved;
     const acting = snapshot.prompt?.messageId === 'prompt.buy-card' && snapshot.prompt.players.includes(snapshot.viewerId!);
+    const renaissance = snapshot.prompt?.messageId === 'prompt.renaissance';
     const offer = snapshot.game.cardPurchaseOffer;
     const choice = saved?.actions[0]?.command;
     if (!choice && (acting || !offer || offer.blockers.length > 0)) return null;
@@ -142,12 +143,16 @@ function CardPurchasePlanner({snapshot, planner, busy}: {
     const passLabel = t('plan.passOnTurn');
     return <section className="card-purchase-planner" aria-label={t('table.prompt.buy-card')}>
         {!acting && <>
+            <h3>{t('plan.cardPurchaseOnTurn')}</h3>
             <p>{t('plan.cardChoiceTiming')}</p>
+            {renaissance && <p>{t('plan.cardChoiceAfterRenaissance')}</p>}
             {offer && offer.blockers.length === 0 && <p>{t('plan.cashAfterCard', {cash: offer.cashAfter})}</p>}
-            <DecisionAction disabled={disabled || !view.canArm || !offer || offer.blockers.length > 0 || saved?.armed && choice === 'buy-card'}
+            <div className="card-purchase-choices">
+            <DecisionAction inline={renaissance} disabled={disabled || !view.canArm || !offer || offer.blockers.length > 0 || saved?.armed && choice === 'buy-card'}
                 aria-pressed={!!saved?.armed && choice === 'buy-card'} onClick={() => {void planner.chooseCardPurchase('buy-card');}}>{buyLabel}</DecisionAction>
-            <DecisionAction className="secondary" disabled={disabled || !view.canArm || saved?.armed && choice === 'pass'}
+            <DecisionAction inline={renaissance} className="secondary" disabled={disabled || !view.canArm || saved?.armed && choice === 'pass'}
                 aria-pressed={!!saved?.armed && choice === 'pass'} onClick={() => {void planner.chooseCardPurchase('pass');}}>{passLabel}</DecisionAction>
+            </div>
         </>}
         {choice && <>
             <p role="status">{t(saved?.armed ? 'plan.cardChoiceScheduled' : 'plan.cardChoiceNeedsReview',

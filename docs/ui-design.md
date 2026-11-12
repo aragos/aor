@@ -51,6 +51,8 @@ Paths are relative to [web/src](../web/src/).
   return without changing drafts. Keep draw-pile size separate and forecasts distinct from payouts.
 - Keep grouped action buttons equally tall when labels wrap; place help beside the button with a
   separate hit target outside its border.
+- Patronage commits directly from the exposed leader beside its protection cost and projected cash
+  balances. Keep one claim action per leader, including while preparing a plan.
 - Table tools use a stable tab row; reselecting the active tab closes it. Open panels also show a
   Close action in the upper left, above the scrolling content; closed panels show no Close action.
   Content scrolls above the row on desktop and below it in the phone Players workspace. Personal
@@ -97,7 +99,9 @@ draws/changed consequences pause, editing confirms disarm. [Architecture](design
 Card purchases offer one Buy/Pass choice while waiting, scheduling it directly with cancellation;
 on the player's turn, ordinary Buy/Pass actions commit directly. Existing plans that include discards
 remain reviewable through the full planner. Renaissance decisions allow scheduling card purchases;
-they delay execution. Planned relief declines remain visible, and active drafts offer an explicit
+they delay execution without disabling Renaissance. **Keep turn order** resolves Renaissance;
+scheduled card choices say **on my turn** and stay beside their timing explanation during that window.
+Planned relief declines remain visible, and active drafts offer an explicit
 Save and execute action.
 
 Undo first withdraws unrevealed submissions; otherwise Linear game reviews server-offered targets and

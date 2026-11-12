@@ -70,7 +70,7 @@ function choose(state) {
 const simple = ['buy-card', 'buy-expansion-card', 'windmill', 'written-record', 'cathedral', 'stabilize cash', 'stabilize misery'];
 function finite(commands) {
     return commands.filter(command => !simple.includes(command) &&
-        ['swap-order ', 'cancel-adjustment ', 'civil-war-loss ', 'cathedral ', 'patronize ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
+        ['swap-order ', 'cancel-adjustment ', 'civil-war-loss ', 'cathedral ', 'reduce-marker '].some(prefix => command.startsWith(prefix)));
 }
 
 async function playCard(state, command) {
@@ -110,6 +110,10 @@ async function perform(state, command) {
         return click('.decision-actions .capital-confirmation, .decision-actions .turn-confirmation');
     }
     if (verb === 'play') return playCard(state, command);
+    if (verb === 'patronize') {
+        await click('#tab-advances');
+        return click(`[data-played-leader="${argument.toUpperCase().replace(/-/g, '_')}"] .patronage-action`);
+    }
     if (verb === 'buy-advance') {
         await click('#tab-advances');
         const index = state.game.catalog.advances.findIndex(advance => advance.letter === argument);
