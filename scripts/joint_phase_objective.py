@@ -101,6 +101,18 @@ class JointPhaseAdamContinuation:
             and set(optimizer['state']) <= {str(index) for index in parameters},
             'Joint Adam slots must identify exactly the five actor parameters in their original order.')
         actor = policy.ResidualPolicy(model, joint.CONTRACTS[phase.value])
+        fresh = policy.torch.optim.Adam([getattr(actor,name) for name in policy.PARAMETERS[:-2]],
+                                       lr=config.learningRate, foreach=False)
+        policy.require(optimizer['param_groups'] == policy.encode_optimizer(fresh)['param_groups'],
+            'Joint Adam must retain the exact original learning rate and intrinsic optimizer recipe.')
+        inherited = identity.get('jointActorOptimizerContinuation')
+        inherited_steps = 0 if inherited is None else policy.integer(
+            inherited.get('actorAdamSteps'), 'Inherited joint Adam steps', 0, 2**53)
+        complete = {str(index) for index in parameters}
+        policy.require(set(optimizer['state']) == complete or
+            (not optimizer['state'] and previous['epoch'] == 0 and inherited_steps == 0),
+            'Joint Adam must retain all five moments after any accepted step.')
+        steps = []
         for index, name in enumerate(policy.PARAMETERS[:-2]):
             state = optimizer['state'].get(str(index))
             if state is None:
@@ -115,11 +127,18 @@ class JointPhaseAdamContinuation:
                 policy.require(value.shape == getattr(actor,name).shape
                     and bool(policy.torch.isfinite(value).all()),
                     'Joint actor moments must match the corresponding finite parameter shape.')
+                if key == 'exp_avg_sq':
+                    policy.require(bool((value >= 0).all()),
+                        'Joint Adam squared moments must remain nonnegative.')
             step = state['step']
             policy.require(set(step) == {'tensor','dtype'} and step['dtype'] == 'torch.float32',
                 'Joint Adam steps must retain the original Float32 scalar counter.')
             number = policy.number(step['tensor'],'Joint Adam step',0)
-            policy.require(number == int(number), 'Joint Adam steps must be whole counters.')
-        return dict(version=self.version,phase=objective['phase'],
+            policy.require(number == int(number) and number > 0,
+                'Populated joint Adam slots require positive whole step counters.')
+            steps.append(int(number))
+        policy.require(not steps or len(set(steps)) == 1 and steps[0] >= inherited_steps,
+            'Every joint actor Adam slot must retain the same cumulative step count.')
+        return dict(version=self.version,phase=objective['phase'],actorAdamSteps=steps[0] if steps else 0,
             checkpointSha256=policy.file_digest(checkpoint_path),
             previousIdentitySha256=policy.digest(identity))
