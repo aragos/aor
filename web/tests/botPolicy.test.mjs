@@ -65,3 +65,48 @@ test('a malformed optional projection is omitted while the ordinary input stays 
 
     assert.equal(await run({...job, purchase: circular}), 'baseline');
 });
+
+test('joint runner passes only optional actor projections and constructs once', async () => {
+    const calls = [];
+    let constructions = 0;
+    class Joint {
+        constructor(...inputs) {constructions++; assert.equal(inputs[2], '{"joint":true}');}
+        choose(...inputs) {calls.push(inputs); return 'play card';}
+    }
+    const run = createBotPolicyRunner(async () => ({chooseBotMove: () => 'ordinary', JointBotSelector: Joint}), baseline, {}, {joint: true});
+    const card = {stateFeatures: {ownCard: 1}};
+
+    assert.equal(await run({...job, card}), 'play card');
+    assert.equal(await run({...job, card, seed: -1}), 'play card');
+    assert.equal(constructions, 1);
+    assert.deepEqual(calls[0], [JSON.stringify(job.observation), JSON.stringify(job.purchase), JSON.stringify(card), 'HARD', 19]);
+});
+
+test('joint construction failure retains the qualified incumbent purchase actor', async () => {
+    const run = createBotPolicyRunner(async () => ({
+        chooseBotMove: () => 'ordinary',
+        PurchaseBotSelector: class {choose() {return 'incumbent';}},
+        JointBotSelector: class {constructor() {throw new Error('Invalid joint bundle');}},
+    }), baseline, {}, {});
+
+    assert.equal(await run(job), 'incumbent');
+});
+
+test('joint decision failure retains the qualified incumbent purchase actor', async () => {
+    const run = createBotPolicyRunner(async () => ({
+        chooseBotMove: () => 'ordinary',
+        PurchaseBotSelector: class {choose() {return 'incumbent';}},
+        JointBotSelector: class {choose() {throw new Error('Invalid projection');}},
+    }), baseline, {}, {});
+
+    assert.equal(await run(job), 'incumbent');
+});
+
+test('inactive joint asset does not construct a joint selector', async () => {
+    const run = createBotPolicyRunner(async () => ({
+        chooseBotMove: () => 'ordinary',
+        JointBotSelector: class {constructor() {assert.fail('Inactive joint actor constructed');}},
+    }), baseline, null, null);
+
+    assert.equal(await run(job), 'ordinary');
+});

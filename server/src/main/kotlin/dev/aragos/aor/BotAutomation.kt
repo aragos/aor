@@ -3,6 +3,9 @@ package dev.aragos.aor
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
+import dev.aragos.aor.ai.CardObservationEncoder
+import dev.aragos.aor.ai.CardProjection
+import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicyScope
 import dev.aragos.aor.ai.PurchaseProjection
@@ -104,6 +107,8 @@ data class BotDecisionWork(
     val observation: BotObservation,
     /** Optional ordinary actor facts; a browser binds its own compatible baseline model. */
     val purchase: PurchaseProjection? = null,
+    /** Optional actor-visible card facts; no authority state or embedded recommendation. */
+    val card: CardProjection? = null,
 )
 
 /** Creator-only work; each observation belongs to exactly one automated seat. */
@@ -387,6 +392,19 @@ internal object BotAutomation {
                             purchase =
                                 if (PurchasePolicyScope.supports(observation, bot.difficulty)) {
                                     PurchaseObservationEncoder.project(
+                                        state.viewForPlayer(seat),
+                                        seat,
+                                        observation,
+                                    )
+                                } else {
+                                    null
+                                },
+                            card =
+                                if (
+                                    observation.decision == "play-cards" &&
+                                        JointPolicyScope.supports(observation, bot.difficulty)
+                                ) {
+                                    CardObservationEncoder.project(
                                         state.viewForPlayer(seat),
                                         seat,
                                         observation,

@@ -38,22 +38,7 @@ class PurchaseBotSelector(baselineModelJson: String, purchaseModelJson: String) 
             return baseline
         }
         return try {
-            require(purchaseJson.length <= 8_000_000) {
-                "Purchase projection exceeds its transport bound."
-            }
-            val raw = JSON.parse<dynamic>(purchaseJson)
-            val projection =
-                PurchaseProjection(
-                    encoderVersion = purchaseString(raw.encoderVersion),
-                    stateFeatures = purchaseMap(raw.stateFeatures),
-                    actions =
-                        purchaseArray(raw.actions).map { action ->
-                            PurchaseAction(
-                                purchaseString(action.command),
-                                purchaseMap(action.features),
-                            )
-                        },
-                )
+            val projection = readPurchaseProjection(purchaseJson)
             require(
                 projection.actions.map(PurchaseAction::command) ==
                     observation.candidates.map(BotCandidate::command).sorted()
@@ -136,12 +121,25 @@ private fun readQualifiedPurchaseAsset(raw: dynamic): QualifiedPurchaseAsset? =
         null
     }
 
-private fun readPurchaseBaseline(raw: dynamic): BotModel {
+internal fun readPurchaseBaseline(raw: dynamic): BotModel {
     require(raw != null && jsTypeOf(raw) == "object" && !(js("Array.isArray(raw)") as Boolean)) {
         "A qualified purchase baseline must be a model object."
     }
     return BotModels.fromSerializedWeights(
         schemaVersion = purchaseInteger(raw.schemaVersion),
         weights = purchaseMap(raw.weights),
+    )
+}
+
+internal fun readPurchaseProjection(json: String): PurchaseProjection {
+    require(json.length <= 8_000_000) { "Purchase projection exceeds its transport bound." }
+    val raw = JSON.parse<dynamic>(json)
+    return PurchaseProjection(
+        encoderVersion = purchaseString(raw.encoderVersion),
+        stateFeatures = purchaseMap(raw.stateFeatures),
+        actions =
+            purchaseArray(raw.actions).map { action ->
+                PurchaseAction(purchaseString(action.command), purchaseMap(action.features))
+            },
     )
 }

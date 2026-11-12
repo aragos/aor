@@ -173,6 +173,8 @@ export interface BotJob {
     submissionVersion: string | null; observation: unknown;
     /** Optional actor-safe purchase projection; its versioned schema belongs to the shared AI. */
     purchase?: unknown;
+    /** Optional actor-visible card projection; authority and hidden opponent state are excluded. */
+    card?: unknown;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;

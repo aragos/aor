@@ -185,6 +185,14 @@ comparisons establish neither GAE's superiority over other training methods nor 
 Unscoped legacy entries keep their existing compatibility behavior. Model selection changes future
 choices only; it neither rewrites recorded commands nor requires a saved-game migration.
 
+The optional [joint selector](../ai/src/jsMain/kotlin/dev/aragos/aor/ai/JointBotExports.kt)
+loads card and purchase actors atomically for the exact current Hard configuration. Its transient
+card projection contains only the acting seat's encoded facts and offered actions; the browser
+binds the declared ordinary card prior and purchase prior independently. Both heads retain native
+seeded sampling. Missing components, incompatible scopes or malformed projections preserve the
+existing selector. The joint asset remains disabled until the complete bundle is independently
+qualified and native/browser inference parity is verified; no persisted game fields are added.
+
 [Full-game experiments](contributing.md#full-game-strategy-experiments) freeze the candidate,
 incumbent and opponent population, rotate the replacement seat and pair chance seeds. Low-dimensional
 search changes only named planning weights and uses separate screening and selection banks; its
