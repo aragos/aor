@@ -48,7 +48,7 @@ def phase_inputs(targets, configs, checkpoints):
         continuation = None
         if carries[phase] is not None:
             path = joint.pin(carries[phase], pins)
-            for name in ('identity.json', 'finished.json'):
+            for name in ('identity.json', 'finished.json', 'policy.json'):
                 joint.pin(path.parent/name, pins)
             continuation = objective.JointPhaseAdamContinuation().validate(path, identity,
                 collection.models[phase], config)

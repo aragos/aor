@@ -1021,6 +1021,13 @@ phase leaves diagnostic evidence without a partial bundle; there is no implicit 
 The existing checked-prefix `joint_trajectory.update_pair` remains unchanged. Synthetic checks:
 `python -m unittest test_joint_credit_update`.
 
+The [frozen shared predictor](../scripts/joint_state_predictor.py) projects only original
+phase-prefixed state features into the selected shared critic. Its stable per-environment descriptor
+binds the checkpoint, dictionary, numerical contract and code owners. Predictions retain every
+original game/decision/phase identity and both behavior heads; actor inputs never receive values or
+terminal labels. The existing FP32 critic supplies the inference math in bounded one-thread batches.
+Synthetic checks: `python -m unittest test_joint_state_predictor`.
+
 The chronological clock includes more decisions than its phase-separated control. With lambda .95
 per decision, it also has a shorter effective horizon measured in turns; a future comparison tests
 both cross-phase credit and this horizon change, rather than isolating coordination alone.
