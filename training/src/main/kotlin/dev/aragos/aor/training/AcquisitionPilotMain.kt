@@ -40,8 +40,8 @@ object AcquisitionPilotMain {
             if (collect) {
                 requireNotNull(fields["--seconds"]?.toIntOrNull()) { "Seconds must be an integer." }
             } else 0
-        require(!collect || workers in 1..6 && seconds in 1..21600) {
-            "Collection permits at most six workers and one original six-hour native allowance."
+        require(!collect || workers in 1..10 && seconds in 1..7200) {
+            "Collection permits at most ten workers and one original two-hour native allowance."
         }
         Files.createDirectories(output.parent)
         // One attempt; no resume, overwrite, refill or automatic retry.
