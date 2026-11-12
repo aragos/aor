@@ -4,6 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.AdvanceAcquisition
+import dev.aragos.aor.AdvanceId
+import dev.aragos.aor.CardData
+import dev.aragos.aor.HandCard
+import dev.aragos.aor.MiseryStep
+import dev.aragos.aor.PlayerAdvances
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.PurchaseStep
 import dev.aragos.aor.Stage
@@ -532,6 +538,152 @@ class ArenaJointPolicyTest {
 
     private fun json(value: Any): JsonNode = PurchaseJson.mapper.valueToTree(value)
 
+    @Test
+    fun omittedSupportPreservesOriginalJointIdentityAndBindingShape() {
+        ArenaJointFixture().use { fixture ->
+            val policy =
+                requireNotNull(fixture.specification.jointPolicy) { "Joint fixture required." }
+            val binding = json(policy.binding())
+            val roles = listOf("sharedBundle", "candidateBundle", "incumbentBundle")
+            val original =
+                "arena-joint-policy-1:${binding["source"]["sha256"].asText()}:${binding["baseline"]["sha256"].asText()}:" +
+                    roles.joinToString(":") { "$it=${binding[it]["sha256"].asText()}" }
+
+            assertThat(policy.identity()).isEqualTo(original)
+            assertThat(binding.has("candidateSupport")).isFalse()
+        }
+    }
+
+    @Test
+    fun explicitSupportHasSeparateVersionedBehaviorMetadata() {
+        ArenaJointFixture().use { fixture ->
+            fixture.support()
+            val policy =
+                requireNotNull(fixture.specification.jointPolicy) { "Joint fixture required." }
+            val binding = json(policy.binding())["candidateSupport"]
+
+            assertThat(binding["profile"].asText()).isEqualTo("KNOWN_OWN_CHAOS_1")
+            assertThat(binding["version"].asText()).isEqualTo("known-own-chaos-support-1")
+            assertThat(policy.identity()).endsWith(":candidateSupport:known-own-chaos-support-1")
+        }
+    }
+
+    @Test
+    fun unknownSupportCannotSilentlyUseLegacySampling() {
+        ArenaJointFixture().use { fixture ->
+            fixture.edit { (this["jointPolicy"] as ObjectNode).put("candidateSupport", "future") }
+
+            assertFailsWith<IllegalArgumentException> { fixture.specification }
+        }
+    }
+
+    @Test
+    fun supportRejectsMissingCandidateCardHead() {
+        ArenaJointFixture().use { fixture ->
+            fixture.support()
+            fixture.edit {
+                (this["jointPolicy"] as ObjectNode).put("candidateBundle", "rival.json")
+            }
+
+            assertFailsWith<IllegalArgumentException> { fixture.specification }
+        }
+    }
+
+    @Test
+    fun onlyControlledCandidateReceivesConditionalCardSupport() {
+        ArenaJointFixture().use { fixture ->
+            fixture.support()
+            fixture.edit {
+                (this["jointPolicy"] as ObjectNode)
+                    .put("sharedBundle", "bundle.json")
+                    .put("incumbentBundle", "bundle.json")
+            }
+            val spec = fixture.specification
+            val initial = jointStateFixture()
+            val state =
+                initial.copy(
+                    players =
+                        initial.players.mapValues { (id, p) ->
+                            if (id == PlayerId("p1"))
+                                p.copy(
+                                    misery = MiseryStep.THOUSAND,
+                                    advances =
+                                        PlayerAdvances(
+                                            listOf(AdvanceAcquisition(AdvanceId.PATRONAGE, 1))
+                                        ),
+                                    hand =
+                                        listOf(
+                                            HandCard(
+                                                "danger",
+                                                CardData.definition("religious-strife"),
+                                            )
+                                        ),
+                                )
+                            else p
+                        }
+                )
+            val raw = BotObservations.from(state, PlayerId("p1"))
+            val decision = SimulationDecision(4, 0, 71, state.viewForPlayer(PlayerId("p1")), raw)
+            val candidate =
+                spec.controllers(4, 0, ArenaSide.CANDIDATE, spec.candidate, listOf(0, 0, 0, 0))
+            val incumbent =
+                spec.controllers(4, 0, ArenaSide.INCUMBENT, spec.incumbent, listOf(0, 0, 0, 0))
+            val base = fixture.base.input.bundle
+            val normal = base.controller(fixture.base.input.baseline, ordinary = spec.incumbent)
+            val rivals =
+                base.controller(fixture.base.input.baseline, ordinary = spec.opponents.single())
+
+            for (seed in 0..63) {
+                val current = decision.copy(seed = seed)
+                assertThat(candidate[0]?.choose(current)).isEqualTo("pass")
+                assertThat(incumbent[0]?.choose(current)).isEqualTo(normal.choose(current))
+                assertThat(candidate[1]?.choose(current.copy(seat = 1)))
+                    .isEqualTo(rivals.choose(current.copy(seat = 1)))
+            }
+        }
+    }
+
+    @Test
+    fun supportRejectsLegacyCardRecorderBeforeAnyChoice() {
+        JointCollectionFixture().use { fixture ->
+            val input = fixture.input
+
+            assertFailsWith<IllegalArgumentException> {
+                input.bundle.controller(
+                    input.baseline,
+                    cardRecord = {},
+                    support = ArenaCandidateSupport.KNOWN_OWN_CHAOS_1,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun supportRejectsLegacyPurchaseRecorderBeforeAnyChoice() {
+        JointCollectionFixture().use { fixture ->
+            val input = fixture.input
+
+            assertFailsWith<IllegalArgumentException> {
+                input.bundle.controller(
+                    input.baseline,
+                    purchaseRecord = {},
+                    support = ArenaCandidateSupport.KNOWN_OWN_CHAOS_1,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun legacyCollectionRejectsMaskedProfileAtItsStrictBoundary() {
+        JointCollectionFixture().use { fixture ->
+            val node = PurchaseJson.read(fixture.source) as ObjectNode
+            node.put("candidateSupport", "KNOWN_OWN_CHAOS_1")
+            fixture.artifacts.write("source.json", node)
+
+            assertFailsWith<IllegalArgumentException> { fixture.input }
+        }
+    }
+
     companion object {
         private val terminal = ArenaGame(emptyList(), emptyList(), emptyList(), emptyList(), 0, 0)
     }
@@ -582,6 +734,10 @@ private class ArenaJointFixture : AutoCloseable {
         val node = PurchaseJson.read(source) as ObjectNode
         node.change()
         base.artifacts.write("arena.json", node)
+    }
+
+    fun support() {
+        edit { (this["jointPolicy"] as ObjectNode).put("candidateSupport", "KNOWN_OWN_CHAOS_1") }
     }
 
     fun cardDecision(): SimulationDecision {

@@ -7,6 +7,7 @@ import dev.aragos.aor.ai.BotPolicy
 import dev.aragos.aor.ai.CardObservationEncoder
 import dev.aragos.aor.ai.CardPolicy
 import dev.aragos.aor.ai.CardPolicyModel
+import dev.aragos.aor.ai.KnownOwnChaosSupport
 import dev.aragos.aor.ai.PurchasePolicyModel
 
 /**
@@ -24,10 +25,41 @@ internal class CardActorController(
     private val audit: ((CardPurchaseAudit) -> Unit)? = null,
     purchaseRecord: ((PurchaseDecisionRecord) -> Unit)? = null,
     purchaseBaseline: BotModel = baseline,
+    private val support: ArenaCandidateSupport? = null,
     private val record: ((CardDecisionRecord) -> Unit)? = null,
 ) : SimulationController {
+    /** Preserve the original positional callback signature as well as trailing-lambda callers. */
+    constructor(
+        baseline: BotModel,
+        policy: CardPolicyModel?,
+        frozenPurchasePolicy: PurchasePolicyModel,
+        audit: ((CardPurchaseAudit) -> Unit)?,
+        purchaseRecord: ((PurchaseDecisionRecord) -> Unit)?,
+        purchaseBaseline: BotModel,
+        record: ((CardDecisionRecord) -> Unit)?,
+    ) : this(
+        baseline,
+        policy,
+        frozenPurchasePolicy,
+        audit,
+        purchaseRecord,
+        purchaseBaseline,
+        null,
+        record,
+    )
+
+    init {
+        require(support == null || policy != null && record == null && purchaseRecord == null) {
+            "Conditional support requires both learned heads and rejects legacy recording."
+        }
+    }
+
     private val purchase =
-        PurchaseActorController(purchaseBaseline, frozenPurchasePolicy, purchaseRecord)
+        if (support == null) {
+            PurchaseActorController(purchaseBaseline, frozenPurchasePolicy, purchaseRecord)
+        } else {
+            PurchaseActorController(support, purchaseBaseline, frozenPurchasePolicy, purchaseRecord)
+        }
 
     override fun controls(decision: String): Boolean =
         decision == "play-cards" || purchase.controls(decision)
@@ -57,6 +89,17 @@ internal class CardActorController(
                 recommendation,
             )
         val actorSeed = CardPolicy.actorSeed(decision.seed)
+        if (support != null) {
+            return KnownOwnChaosSupport.card(
+                    observation,
+                    CardPolicy.evaluate(
+                        observation,
+                        requireNotNull(policy) { "Conditional card support requires its head." },
+                    ),
+                    CardPolicy.uniform(actorSeed),
+                )
+                .command
+        }
         val chosen = policy?.let { CardPolicy.choose(observation, it, actorSeed) }
         val selected = chosen?.index ?: observation.baselineIndex
         record?.invoke(

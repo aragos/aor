@@ -14,7 +14,14 @@ private constructor(
     private val source: ModelInitializationSource,
     private val baseline: PurchaseBaselineInput,
     private val bundles: Map<Role, JointActorBundle>,
+    private val candidateSupport: ArenaCandidateSupport?,
 ) {
+    init {
+        require(candidateSupport == null || bundle(Role.CANDIDATE).card != null) {
+            "Candidate conditional support requires both learned joint heads."
+        }
+    }
+
     private enum class Role(val field: String, val prefix: String) {
         SHARED("sharedBundle", "joint-shared"),
         CANDIDATE("candidateBundle", "joint-candidate"),
@@ -34,7 +41,8 @@ private constructor(
         "$VERSION:${source.sha256}:${baseline.sha256}:" +
             Role.entries.joinToString(":") { role ->
                 "${role.field}=${bundle(role).sha256}"
-            }
+            } +
+            (candidateSupport?.let { ":candidateSupport:${it.version}" } ?: "")
 
     internal fun controllers(
         playerCount: Int,
@@ -63,6 +71,10 @@ private constructor(
                 .controller(
                     baseline,
                     ordinary = if (seat == controlledSeat) ordinary else opponents[indices[seat]],
+                    support =
+                        candidateSupport.takeIf {
+                            seat == controlledSeat && side == ArenaSide.CANDIDATE
+                        },
                 )
         }
     }
@@ -101,7 +113,10 @@ private constructor(
                                     "${role.prefix}-purchase-policy.json",
                                 ),
                         ))
-            }
+            } +
+            (candidateSupport?.let {
+                mapOf("candidateSupport" to mapOf("profile" to it.name, "version" to it.version))
+            } ?: emptyMap())
 
     internal fun metadata(): Map<String, Any> = mapOf("jointPolicy" to binding())
 
@@ -150,7 +165,18 @@ private constructor(
         ): ArenaJointPolicy {
             val sourceInput =
                 ModelInitializationSource(source.toRealPath(), PurchaseJson.hash(source))
-            PurchaseJson.fields(node, setOf("baseline") + Role.entries.map { it.field })
+            PurchaseJson.fields(
+                node,
+                setOf("baseline") + Role.entries.map { it.field },
+                setOf("candidateSupport"),
+            )
+            val support =
+                node["candidateSupport"]?.let { value ->
+                    val name = PurchaseJson.text(value, "candidateSupport")
+                    requireNotNull(ArenaCandidateSupport.entries.singleOrNull { it.name == name }) {
+                        "Unknown candidate-only joint support profile."
+                    }
+                }
             require(configurations.size == 1 && configurations.single().id == CONFIGURATION) {
                 "Joint arena actors require the single supported four-player configuration."
             }
@@ -178,7 +204,7 @@ private constructor(
             require(PurchaseJson.hash(sourceInput.path) == sourceInput.sha256) {
                 "The joint arena source changed while reading its roles."
             }
-            return ArenaJointPolicy(sourceInput, baseline, bundles)
+            return ArenaJointPolicy(sourceInput, baseline, bundles, support)
         }
     }
 }

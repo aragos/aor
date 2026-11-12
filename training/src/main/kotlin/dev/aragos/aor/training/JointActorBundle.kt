@@ -87,6 +87,7 @@ internal data class JointActorBundle(
         cardRecord: ((CardDecisionRecord) -> Unit)? = null,
         purchaseRecord: ((PurchaseDecisionRecord) -> Unit)? = null,
         ordinary: BotModel = baseline.model,
+        support: ArenaCandidateSupport? = null,
     ): CardActorController {
         require(baseline.sha256 == baselineSha256) { "A joint actor requires its exact F prior." }
         return CardActorController(
@@ -96,6 +97,7 @@ internal data class JointActorBundle(
             record = cardRecord,
             purchaseRecord = purchaseRecord,
             purchaseBaseline = baseline.model,
+            support = support,
         )
     }
 
