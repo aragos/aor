@@ -2,84 +2,52 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.ActivityPlanning
 import dev.aragos.aor.AdvanceCategory
-import dev.aragos.aor.AdvanceData
 import dev.aragos.aor.AdvanceId
 import dev.aragos.aor.GameState
 import dev.aragos.aor.GameView
-import dev.aragos.aor.MiseryStep
 import dev.aragos.aor.PlanBoundary
 import dev.aragos.aor.PlannedAction
 import dev.aragos.aor.PlayerId
-import dev.aragos.aor.Stage
-import dev.aragos.aor.TextCodec
-import dev.aragos.aor.TurnCommand
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
+import dev.aragos.aor.ai.PurchaseSupport
+import dev.aragos.aor.ai.PurchaseSupportExclusion
+import dev.aragos.aor.ai.PurchaseSupportFacts
 
 /** Source-only diagnostic profile; these limits are not a playing-policy qualification. */
 internal object PurchaseSequenceProtocol {
     const val VERSION = "purchase-sequence-teacher-1"
     const val ORIGINS = 32
     const val PLANS = 8
-    const val FIRST_ACTIONS = 4
+    const val FIRST_ACTIONS = PurchaseSupport.FIRST_ACTIONS
     const val STREAMS = 2
     const val MAXIMUM_TAILS = ORIGINS * PLANS * 2 * STREAMS
     const val MAXIMUM_TERMINALS = MAXIMUM_TAILS + ORIGINS
     const val DECISION = "purchase-advances"
 }
 
-internal enum class PurchaseRootExclusion {
-    WRONG_DECISION,
-    INCUMBENT_CONTINUES,
-    NO_POSITIVE_MR,
-    NO_POSITIVE_MISERY,
-    NOT_ONE_MISSING_CATEGORY,
-    NO_OFFERED_COMPLETION,
-}
+internal typealias PurchaseRootExclusion = PurchaseSupportExclusion
 
 /** Eligibility reads only an ordinary actor view and the command actually selected by its actor. */
 internal object PurchaseSequenceEligibility {
-    fun missingCategory(view: GameView, actor: PlayerId): AdvanceCategory? {
-        val owned = view.players.single { it.id == actor }.advances
-        return AdvanceCategory.entries.singleOrNull { category ->
-            owned.none { AdvanceData.definition(it).category == category }
-        }
-    }
+    fun missingCategory(view: GameView, actor: PlayerId): AdvanceCategory? =
+        PurchaseSupportFacts.from(view, actor, PurchaseSequenceProtocol.DECISION).missingCategory
 
     fun exclusion(
         view: GameView,
         observation: BotObservation,
         chosen: String,
-    ): PurchaseRootExclusion? {
-        if (
-            view.stage != Stage.PURCHASE ||
-                observation.decision != PurchaseSequenceProtocol.DECISION
-        ) {
-            return PurchaseRootExclusion.WRONG_DECISION
-        }
-        if (chosen != "pass") return PurchaseRootExclusion.INCUMBENT_CONTINUES
-        if (view.reliefRatingAvailable <= 0) return PurchaseRootExclusion.NO_POSITIVE_MR
-        val actor = PlayerId(observation.playerId)
-        val misery = view.players.single { it.id == actor }.misery
-        if (misery == MiseryStep.ZERO || misery == MiseryStep.CHAOS) {
-            return PurchaseRootExclusion.NO_POSITIVE_MISERY
-        }
-        val missing =
-            missingCategory(view, actor) ?: return PurchaseRootExclusion.NOT_ONE_MISSING_CATEGORY
-        return if (observation.candidates.none { completion(it.command, missing) }) {
-            PurchaseRootExclusion.NO_OFFERED_COMPLETION
-        } else {
-            null
-        }
-    }
+    ): PurchaseRootExclusion? =
+        PurchaseSupport.exclusion(
+            PurchaseSupportFacts.from(view, PlayerId(observation.playerId), observation.decision),
+            observation.candidates.map { it.command },
+            incumbentContinues = chosen != "pass",
+        )
 
     fun completion(command: String, category: AdvanceCategory): Boolean =
-        advance(command)?.let { AdvanceData.definition(it).category == category } == true
+        PurchaseSupport.completion(command, category)
 
-    fun advance(command: String): AdvanceId? =
-        (TextCodec.parseCommand(command) as? TurnCommand.BuyAdvance)?.let {
-            AdvanceId.fromLetter(it.letter)
-        }
+    fun advance(command: String): AdvanceId? = PurchaseSupport.advance(command)
 }
 
 /** Forced advance prefix; later stabilization/relief always belong to the unchanged controller. */
@@ -143,13 +111,7 @@ internal object PurchaseSequencePlans {
                 "An eligible root has exactly one missing category."
             }
         val first =
-            observation.candidates
-                .map { it.command }
-                .filter { PurchaseSequenceEligibility.advance(it) != null }
-                .sortedWith(
-                    compareBy<String> { !PurchaseSequenceEligibility.completion(it, missing) }
-                        .thenBy { it }
-                )
+            PurchaseSupport.orderedAdvances(observation.candidates.map { it.command }, missing)
         val selected = first.take(PurchaseSequenceProtocol.FIRST_ACTIONS)
         val singles = selected.map { complete(state, actor, listOf(it)) }
         val doubles = selected.flatMap { command ->

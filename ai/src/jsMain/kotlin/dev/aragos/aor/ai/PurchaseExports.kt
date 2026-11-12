@@ -13,20 +13,28 @@ fun evaluatePurchasePolicy(observationJson: String, modelJson: String, uniform: 
     require(observationJson.length <= 8_000_000 && modelJson.length <= 24_000_000) {
         "Purchase inference input exceeds its transport bound."
     }
-    val input = JSON.parse<dynamic>(observationJson)
-    val observation =
-        PurchaseObservation(
-            encoderVersion = purchaseString(input.encoderVersion),
-            stateFeatures = purchaseMap(input.stateFeatures),
-            actions =
-                purchaseArray(input.actions).map { action ->
-                    PurchaseAction(purchaseString(action.command), purchaseMap(action.features))
-                },
-            baselineIndex = purchaseInteger(input.baselineIndex),
-        )
+    val observation = readPurchaseObservation(JSON.parse<dynamic>(observationJson))
     val model = readPurchaseModel(JSON.parse<dynamic>(modelJson))
     val evaluation = PurchasePolicy.evaluate(observation, model)
     val choice = PurchasePolicy.select(observation, evaluation, uniform)
+    return purchaseEvaluationJson(evaluation, choice)
+}
+
+internal fun readPurchaseObservation(input: dynamic): PurchaseObservation =
+    PurchaseObservation(
+        encoderVersion = purchaseString(input.encoderVersion),
+        stateFeatures = purchaseMap(input.stateFeatures),
+        actions =
+            purchaseArray(input.actions).map { action ->
+                PurchaseAction(purchaseString(action.command), purchaseMap(action.features))
+            },
+        baselineIndex = purchaseInteger(input.baselineIndex),
+    )
+
+internal fun purchaseEvaluationJson(
+    evaluation: PurchasePolicyEvaluation,
+    choice: PurchasePolicyChoice,
+): String {
     val result = js("({})")
     result.logits = evaluation.logits.toTypedArray()
     result.probabilities = evaluation.probabilities.toTypedArray()

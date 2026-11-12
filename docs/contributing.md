@@ -1610,3 +1610,30 @@ return is distinct from its first action under ordinary continuation; no per-hid
 plan is a policy target. A future experiment still requires frozen input/model snapshots, a
 reviewed runner/resource contract and source/evidence validation before games. Focused synthetic
 checks: `./gradlew :training:test --tests '*PurchaseSequence*Test'`.
+
+### Supported purchase improvement prerequisite
+
+`PurchaseSupport` owns the actor-visible relief-capacity gate and prospective first-action ordering
+shared by the teacher and the inactive `PurchaseSupportedPolicy` wrapper. The wrapper keeps the
+reference distribution exact outside that gate. Inside it, unmeasured offers retain their original
+probabilities; only the existing mass of PASS and the first four declared advances is redistributed.
+Half follows the reference and half follows the candidate's conditional distribution on that support.
+Both models use the original full purchase observation and actual F0 recommendation. Only the
+candidate's 64 actor output weights may differ. The reference value and common sampled selection
+remain unchanged. Exporting candidate weights alone would implement a different policy.
+
+The separate `purchase_supported_fit.py` objective consumes paired **first-action-only** returns,
+with equal weight per independent origin. Full-prefix returns cannot label a first action followed
+by the ordinary controller. The fixed offline objective subtracts a soft `.01 * KL(wrapped distribution || reference)`
+penalty. Fresh Adam with learning rate `.001` updates only the actor head for 500 full-training
+steps; validation every ten steps retains the earliest strict improvement, including unchanged G2.
+This is not on-policy PPO and does not change existing trajectory, optimizer or PPO continuation
+guards. Test labels are excluded from the fitter. Whole-origin partitions and
+minimum eligible counts must be fixed before effects, and no missing roots are refilled.
+
+The source prerequisite does not enable a browser worker, run a fit or qualify a model. PASS-selected
+teacher roots underrepresent eligible states where G2 continues; neither two future streams nor the
+offline objective correct that distribution shift. Any complete wrapper still requires separate
+validation and independent whole-game qualification before activation. The common wrapper tests
+run on JVM and JS; factual native exports bind actual F0 recommendations and actor seeds instead of
+assuming the observed G2 PASS was its prior recommendation.
