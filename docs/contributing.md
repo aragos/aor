@@ -542,6 +542,13 @@ Explicit roles have separate hashes and immutable snapshots, and canonical repla
 side-specific actor. This permits comparing learned purchase actors with identical ordinary models.
 Weight-only strategy search rejects these overrides because its cache identifies ordinary models.
 
+Direct arenas may opt into `candidateSelection: "MAXIMUM_PROBABILITY"` inside `frozenPurchase`.
+Only the controlled candidate seat takes the first canonical maximum of the unchanged purchase
+actor probabilities; the incumbent and every rival continue sampling. Explicit `"SAMPLE"` is also
+accepted. The field binds identity and metadata, requires an explicit arena side, and conflicts with
+an ordinary candidate. Omission preserves the exact previous identity, metadata and sampled behavior.
+Deterministic selection cannot attach a trajectory recorder; collection defaults remain sampled.
+
 For comparison with an ordinary opponent, direct arenas may instead declare
 `ordinaryEvaluatedSides: ["INCUMBENT"]` inside `frozenPurchase` (or `"CANDIDATE"`, or both).
 The evaluated seat on each named side uses its ordinary model for purchase decisions, including

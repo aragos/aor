@@ -18,6 +18,7 @@ private constructor(
     private val candidatePolicy: PurchaseActorInput?,
     private val incumbentPolicy: PurchaseActorInput?,
     private val ordinaryEvaluatedSides: Set<ArenaSide>,
+    private val candidateSelection: PurchaseActorSelection?,
 ) {
     init {
         require(ArenaSide.CANDIDATE !in ordinaryEvaluatedSides || candidatePolicy == null) {
@@ -25,6 +26,9 @@ private constructor(
         }
         require(ArenaSide.INCUMBENT !in ordinaryEvaluatedSides || incumbentPolicy == null) {
             "An ordinary incumbent cannot also declare a purchase actor override."
+        }
+        require(ArenaSide.CANDIDATE !in ordinaryEvaluatedSides || candidateSelection == null) {
+            "An ordinary candidate cannot also declare purchase actor selection."
         }
     }
 
@@ -71,7 +75,8 @@ private constructor(
                 .filter { it in ordinaryEvaluatedSides }
                 .joinToString("") {
                     ":ordinary-evaluated-side:$it"
-                }
+                } +
+            (candidateSelection?.let { ":candidate-selection:$it" } ?: "")
 
     /** Null [side] preserves the shared environment and rejects ambiguous override routing. */
     internal fun controllers(
@@ -86,7 +91,8 @@ private constructor(
             side != null ||
                 candidatePolicy == null &&
                     incumbentPolicy == null &&
-                    ordinaryEvaluatedSides.isEmpty()
+                    ordinaryEvaluatedSides.isEmpty() &&
+                    candidateSelection == null
         ) {
             "Purchase actor overrides require an explicit candidate or incumbent arena side."
         }
@@ -103,6 +109,12 @@ private constructor(
                 PurchaseActorController(
                     baseline.model,
                     if (seat == controlledSeat) controlledPolicy.model else policy.model,
+                    selection =
+                        if (seat == controlledSeat && side == ArenaSide.CANDIDATE) {
+                            candidateSelection ?: PurchaseActorSelection.SAMPLE
+                        } else {
+                            PurchaseActorSelection.SAMPLE
+                        },
                 )
             }
     }
@@ -126,14 +138,18 @@ private constructor(
                                 "snapshot" to role.snapshot,
                             )
                     } +
-                    if (ordinaryEvaluatedSides.isEmpty()) emptyMap()
-                    else
+                    (if (ordinaryEvaluatedSides.isEmpty()) {
+                        emptyMap()
+                    } else {
                         mapOf(
                             "ordinaryEvaluatedSides" to
                                 ArenaSide.entries
                                     .filter { it in ordinaryEvaluatedSides }
                                     .map { it.name }
                         )
+                    }) +
+                    (candidateSelection?.let { mapOf("candidateSelection" to it.name) }
+                        ?: emptyMap())
         )
 
     internal fun snapshot(artifacts: TrainingArtifacts) {
@@ -158,7 +174,12 @@ private constructor(
             PurchaseJson.fields(
                 node,
                 setOf("baseline", "policy"),
-                setOf("candidatePolicy", "incumbentPolicy", "ordinaryEvaluatedSides"),
+                setOf(
+                    "candidatePolicy",
+                    "incumbentPolicy",
+                    "ordinaryEvaluatedSides",
+                    "candidateSelection",
+                ),
             )
             fun path(name: String): Path =
                 source
@@ -187,6 +208,15 @@ private constructor(
             val policy = actor("policy")
             val candidate = node["candidatePolicy"]?.let { actor("candidatePolicy") }
             val incumbent = node["incumbentPolicy"]?.let { actor("incumbentPolicy") }
+            val selection =
+                node["candidateSelection"]?.let { value ->
+                    val name = PurchaseJson.text(value, "candidateSelection")
+                    requireNotNull(
+                        PurchaseActorSelection.entries.singleOrNull { it.name == name }
+                    ) {
+                        "Candidate purchase selection must be SAMPLE or MAXIMUM_PROBABILITY."
+                    }
+                }
             val ordinary =
                 node["ordinaryEvaluatedSides"]
                     ?.let { values ->
@@ -206,7 +236,7 @@ private constructor(
             require(PurchaseJson.hash(baselinePath) == baselineHash) {
                 "A frozen arena purchase input changed while being read."
             }
-            return ArenaPurchasePolicy(baseline, policy, candidate, incumbent, ordinary)
+            return ArenaPurchasePolicy(baseline, policy, candidate, incumbent, ordinary, selection)
         }
     }
 }
