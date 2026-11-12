@@ -172,10 +172,16 @@ def run(protocol, protocol_path, output):
             document(output/'finished.json',dict(kind=VERSION,complete=False,stopReason='four-no-progress-batches',
                 completedBatches=index,scientificWorlds=index*256,historicalReproductions=index,eligibleFinalActor=False))
             return
-        if index==4 and not plan.prefix_passed(receipts,exp.remaining_seconds()):
-            document(output/'finished.json',dict(kind=VERSION,complete=False,stopReason='operational-prefix-gate',
-                completedBatches=4,scientificWorlds=1024,historicalReproductions=4,eligibleFinalActor=False))
-            return
+        if index==4:
+            remaining=exp.remaining_seconds();passed=plan.prefix_passed(receipts,remaining)
+            document(output/'operational-prefix.json',dict(kind='expansion-operational-prefix-1',
+                completedBatches=4,passed=passed,remainingSeconds=remaining,
+                receiptSha256={str(i):sha(output/'batches'/f'batch-{i:02d}'/'receipt.json') for i in range(1,5)},
+                qualityInspected=False))
+            if not passed:
+                document(output/'finished.json',dict(kind=VERSION,complete=False,stopReason='operational-prefix-gate',
+                    completedBatches=4,scientificWorlds=1024,historicalReproductions=4,eligibleFinalActor=False))
+                return
     document(output/'finished.json',dict(kind=VERSION,complete=True,completedBatches=64,
         scientificWorlds=16384,historicalReproductions=64,actor=str(actor),actorSha256=sha(actor),
         eligibleFinalActor=True,qualification=False,automaticSuccessor=False))
