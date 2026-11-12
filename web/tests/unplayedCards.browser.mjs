@@ -10,6 +10,21 @@ export async function checkUnplayedCards(page, web) {
     const list = '#unplayed-cards [data-unplayed-card]';
     const detail = '.card-inspection-dialog[open]:not(:has(#unplayed-cards))';
     const ids = () => page.evaluate(`[...document.querySelectorAll('${list}')].map(card => card.dataset.unplayedCard)`);
+    const assertCardOrder = async snapshot => {
+        const displayed = await page.evaluate(`[...document.querySelectorAll('${list}')].map(card => ({
+            id: card.dataset.unplayedCard, name: card.textContent.trim(),
+        }))`);
+        assert.deepEqual(displayed.map(card => card.id).sort(), snapshot.game.unplayedCards.map(card => card.id).sort(),
+            'Every public physical card appears, including held cards and duplicate commodities');
+        const kinds = displayed.map(card => snapshot.game.unplayedCards.find(definition => definition.id === card.id).kind);
+        assert.deepEqual(kinds, ['commodity', 'event', 'leader'].flatMap(kind => kinds.filter(value => value === kind)),
+            'Remaining cards keep commodities, events and leaders together in type order');
+        for (const kind of new Set(kinds)) {
+            const names = displayed.filter((_, index) => kinds[index] === kind).map(card => card.name);
+            assert.deepEqual(names, [...names].sort((first, second) => first.localeCompare(second)),
+                `Remaining ${kind} cards are alphabetical within their type`);
+        }
+    };
     const escape = async () => {
         await page.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
         await page.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
@@ -92,7 +107,7 @@ export async function checkUnplayedCards(page, web) {
         assert.match(await page.evaluate(`document.querySelector('.epoch-progress ${opener}').textContent`), /Epoch .*cards remaining/);
         assert.equal(await page.evaluate(`document.querySelector('.epoch-progress .help-link')`), null, 'The counter is its own lookup link');
         await inspect();
-        assert.deepEqual(await ids(), baseline.game.unplayedCards.map(card => card.id), 'Every public physical card appears, including held cards and duplicate commodities');
+        await assertCardOrder(baseline);
         assert.equal(await page.evaluate(`document.querySelector('.reference-dialog').scrollWidth <= document.querySelector('.reference-dialog').clientWidth`), true, 'List fits the popup');
         assert.equal(await page.evaluate(`document.querySelector('.reference-dialog').getBoundingClientRect().right <= innerWidth`), true, 'Popup stays inside the viewport');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `unplayed-cards-${width}.png`));
@@ -148,7 +163,7 @@ export async function checkUnplayedCards(page, web) {
     await inspect();
     assert(!(await ids()).includes(card.definition.id), 'Played card leaves the public list');
     const after = await game.snapshot(actor);
-    assert.deepEqual(await ids(), after.game.unplayedCards.map(card => card.id));
+    await assertCardOrder(after);
     let nextCard;
     for (let step = 0; step < 100; step++) {
         const current = await game.snapshot(actor);
@@ -169,8 +184,9 @@ export async function checkUnplayedCards(page, web) {
     }
     assert(nextCard, 'Another live card play updates the open popup');
     const updated = await game.snapshot(actor);
-    const expectedIds = updated.game.unplayedCards.map(card => card.id);
-    await page.wait(`JSON.stringify([...document.querySelectorAll('${list}')].map(card => card.dataset.unplayedCard)) === ${JSON.stringify(JSON.stringify(expectedIds))}`, 'open list follows accepted polling');
+    const expectedIds = updated.game.unplayedCards.map(card => card.id).sort();
+    await page.wait(`JSON.stringify([...document.querySelectorAll('${list}')].map(card => card.dataset.unplayedCard).sort()) === ${JSON.stringify(JSON.stringify(expectedIds))}`, 'open list follows accepted polling');
+    await assertCardOrder(updated);
     await close();
     console.log('Passed: public unplayed list, event/leader/commodity inspection, shared commodity switching, desktop/phone fit, keyboard and Escape focus return, bid and live card draft preservation, successful play cleanup and live popup updates.');
 }
