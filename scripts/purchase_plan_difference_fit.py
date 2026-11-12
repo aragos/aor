@@ -7,13 +7,13 @@ terminal histories. The old point-target critic fitter and all original guards r
 """
 from dataclasses import asdict, dataclass
 from pathlib import Path
-import math
 import time
 
 import numpy as np
 import torch
 
 import purchase_plan_predictor as frozen
+import purchase_plan_difference_data as paired
 import purchase_value_benchmark as benchmark
 import purchase_value_data as data
 
@@ -52,6 +52,12 @@ def validate_cache(cache, corpus, names):
         and isinstance(corpus['sourceSha256'], str) and len(corpus['sourceSha256']) == 64
         and all(c in '0123456789abcdef' for c in corpus['sourceSha256']),
         'Corpus provenance must bind the exact warm67 checkpoint, dictionary and source digest.')
+    data.require(cache.metadata['corpusCanonicalSha256'] == paired.canonical_sha(corpus)
+        and cache.metadata['sourceSha256'] == corpus['sourceSha256']
+        and cache.metadata['dictionarySha256'] == corpus['dictionarySha256']
+        and isinstance(cache.metadata['corpusSha256'], str) and len(cache.metadata['corpusSha256']) == 64
+        and all(c in '0123456789abcdef' for c in cache.metadata['corpusSha256']),
+        'The immutable cache must bind this exact original corpus and its raw-file digest.')
     origins = corpus['origins']
     data.require(len(origins) == WORLDS and [o['index'] for o in origins] == list(range(WORLDS)),
                  'Retain all2048 prospective origins, including missing and unsupported roots.')
@@ -147,6 +153,9 @@ def predict(model, cache, worlds, device, guard):
             guard()
             rows = rows_for(cache, worlds[offset:offset + 64])
             result[rows] = values(model, cache, rows, device).cpu().numpy()
+            exact = np.asarray(cache.arrays['exactValue'][rows], dtype=np.float64)
+            known = np.isfinite(exact)
+            result[rows[known]] = exact[known]
     return result
 
 
@@ -190,15 +199,7 @@ def batch_loss(model, cache, worlds, frozen_values, device):
     return pair + .1 * anchor, pair, anchor
 
 
-def choose(records):
-    """Strict VAL error selection: unchanged67, then earliest epoch, then head-only on ties."""
-    data.require(records and all(math.isfinite(r['validationMse']) and r['validationMse'] >= 0
-        and r['arm'] in ('unchanged', *ARMS) and type(r['epoch']) is int
-        and ((r['arm'] == 'unchanged' and r['epoch'] == 0)
-             or (r['arm'] in ARMS and 1 <= r['epoch'] <= 20)) for r in records),
-        'Selection requires only original67 or the forty prescribed validation candidates.')
-    return min(records, key=lambda r: (r['validationMse'], r['arm'] != 'unchanged',
-                                      r['epoch'], 0 if r['arm'] == 'head' else 1))
+choose = paired.select_validation
 
 
 def _save(model, path):
@@ -258,6 +259,9 @@ def fit(cache, corpus, output, config, guard, device, *, checkpoint, dictionary)
     config.validate()
     checkpoint, dictionary, names, original = frozen.load_subjects(checkpoint, dictionary)
     groups = validate_cache(cache, corpus, names)
+    cache_path = cache.directory / 'cache.json'
+    data.require(data.read(cache_path) == cache.metadata, 'The loaded cache metadata changed before fitting.')
+    cache_sha = data.sha(cache_path)
     data.require(len(groups['TRAIN']) >= 1200 and len(groups['VALIDATION']) >= 160,
                  'Insufficient prospectively admitted paired TRAIN/VALIDATION origins; do not refill.')
     output = Path(output)
@@ -289,11 +293,12 @@ def fit(cache, corpus, output, config, guard, device, *, checkpoint, dictionary)
     selected = dict(kind='purchase-plan-paired-difference-selection-1', **chosen, unchanged=unchanged,
         modelFile=model_file, modelSha256=model_sha, warmCheckpointSha256=frozen.CHECKPOINT,
         dictionarySha256=frozen.DICTIONARY, sourceSha256=corpus['sourceSha256'],
+        corpusSha256=cache.metadata['corpusSha256'], cacheSha256=cache_sha,
         config=asdict(config), trainingOrigins=len(groups['TRAIN']), validationOrigins=len(groups['VALIDATION']),
         ownerSha256=data.sha(__file__), criticOwnerSha256=data.sha(benchmark.__file__),
         fits=2, testInspected=False, testPermitted=not unchanged, qualificationPassed=False,
         elapsedSeconds=time.monotonic() - started)
-    data.require(data.sha(checkpoint) == frozen.CHECKPOINT and data.sha(dictionary) == frozen.DICTIONARY,
-                 'Original67 subjects changed during fitting.')
+    data.require(data.sha(checkpoint) == frozen.CHECKPOINT and data.sha(dictionary) == frozen.DICTIONARY
+        and data.sha(cache_path) == cache_sha, 'Original67 subjects or cache identity changed during fitting.')
     data.document(output / 'selected.json', selected)
     return selected

@@ -54,6 +54,8 @@ def corpus_fixture():
         plans=[dict(index=i, status='SUPPORTED', aliasOf=None) for i in range(2)])
     corpus = dict(origins=origins, dictionarySha256=fit.frozen.DICTIONARY,
                   warmCheckpointSha256=fit.frozen.CHECKPOINT, sourceSha256='a' * 64)
+    cache.metadata = dict(corpusSha256='b'*64, corpusCanonicalSha256=fit.paired.canonical_sha(corpus),
+        sourceSha256=corpus['sourceSha256'], dictionarySha256=corpus['dictionarySha256'])
     return cache, corpus
 
 
@@ -74,6 +76,17 @@ class FixedContractTests(unittest.TestCase):
         cache, corpus = corpus_fixture()
         self.assertEqual({'TRAIN': [0], 'VALIDATION': []},
                          fit.validate_cache(cache, corpus, cache.feature_names))
+
+    def test_changed_corpus_rejected_by_cache_subject(self):
+        cache, corpus = corpus_fixture()
+        corpus['sourceSha256'] = 'c'*64
+        with self.assertRaises(ValueError): fit.validate_cache(cache, corpus, cache.feature_names)
+
+    def test_changed_cache_dictionary_rejected_before_features(self):
+        cache, corpus = corpus_fixture()
+        cache.metadata['dictionarySha256'] = 'd'*64
+        with self.assertRaises(ValueError): fit.validate_cache(cache, corpus, cache.feature_names)
+        self.assertEqual([], cache.requested)
 
     def test_test_partition_is_rejected_before_feature_read(self):
         cache, corpus = corpus_fixture()
@@ -114,6 +127,13 @@ class FixedContractTests(unittest.TestCase):
 
 
 class ObjectiveTests(unittest.TestCase):
+    def test_nonbinary_authoritative_prediction_remains_exact_float64(self):
+        cache = Cache([2], exact=[1/3, 0.])
+        model = fit.make_model(state(), 'head', 'cpu')
+        with mock.patch.object(model, 'forward', side_effect=AssertionError('Exact bypass entered critic')):
+            values = fit.predict(model, cache, [0], 'cpu', lambda: None)
+        self.assertEqual(1/3, values[0])
+
     def test_pair_loss_averages_worlds_not_plan_rows(self):
         cache = Cache([2, 4], deltas=[np.nan, .1, np.nan, .3, .3, .3])
         model = fit.make_model(state(), 'head', 'cpu')

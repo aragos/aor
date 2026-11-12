@@ -75,6 +75,20 @@ unsupported references stay missing. The separate PASS comparison includes only 
 references. These are bounded root interventions, not playing-strength or repeated-policy
 estimates; no model fitting, browser integration or activation is part of this mode.
 
+The separate `purchase_plan_difference.py` research driver reuses that unchanged native
+execution contract for eight independent chunks, grouped six/one/one into TRAIN/VALIDATION/TEST.
+Its two fixed warm critics learn four-future plan-minus-G3 differences over unique canonical
+siblings, balanced by informative origin, with an anchor to the original critic. Public support
+determines coverage before labels; no-alternative READY origins stay in policy comparisons but
+have no fabricated pair-loss row. Native collection necessarily writes terminal outcomes, while
+corpus admission hashes TEST members as opaque bytes. DEVELOPMENT and TEST feature caches remain
+separate. Validation selects one checkpoint including unchanged67; if unchanged wins, TEST is
+not opened. Otherwise all selected/frozen predictions and choices are persisted before the
+separate TEST label reader. The primary interval uses every READY TEST origin; supported-PASS
+comparisons have their own denominator. These critic artifacts do not update an actor or enable
+a playing policy. The fixed external controller owns one global deadline and verified
+archive-before-prune progression; source preparation alone authorizes no scientific execution.
+
 Build once; the complete distribution runs independently with JDK 21+ and Python 3.10+ on macOS/Linux.
 Keep `bin/` and `lib/` together; `:training:distZip` produces a portable zip.
 
