@@ -150,7 +150,7 @@ def validate_origin(origin, names):
         require(alias is None or type(alias) is int and 0 <= alias < index,
                 'A logical alias must reference an earlier retained plan.')
         if alias is not None:
-            require(all(plan[key] == plans[alias][key] for key in
+            require(plans[alias]['aliasOf'] is None and all(plan[key] == plans[alias][key] for key in
                         ('actions', 'status', 'exclusion', 'leaf')),
                     'An alias must retain exactly the same commands, feasibility and public leaf.')
     require((origin['status'] == 'READY') == (plans[0]['status'] == 'SUPPORTED'),

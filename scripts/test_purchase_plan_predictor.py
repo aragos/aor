@@ -190,6 +190,19 @@ class PlanPredictorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'same commands'):
             predictor.rank_origin(self.actor, origin)
 
+    def test_alias_chain_is_rejected_like_the_native_canonical_execution_owner(self):
+        origin = self.origin()
+        origin['plans'][1]['aliasOf'] = 0
+        origin['plans'][7]['aliasOf'] = 1
+        with self.assertRaisesRegex(ValueError, 'same commands'):
+            predictor.rank_origin(self.actor, origin)
+
+    def test_actual_duplicate_inputs_have_exactly_equal_logical_values(self):
+        origin = self.origin()
+        origin['plans'][7]['aliasOf'] = 0
+        result = predictor.rank_origin(self.actor, origin)
+        self.assertEqual(result['plans'][0]['value'], result['plans'][7]['value'])
+
     def test_unsupported_alternative_is_retained_without_value(self):
         origin = self.unsupported(self.origin(), 4)
         with patch.object(self.actor, 'values', return_value=[.5] * 7):
