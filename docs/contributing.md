@@ -1062,6 +1062,25 @@ paths through verified archive member receipts instead of reopening deleted dupl
 carry stays live; portable terminal bundles change component paths only and preserve raw actor bytes.
 Checks: `python -m unittest test_joint_credit_trial test_joint_credit_storage test_purchase_storage`.
 
+The fixed [chronological continuation](../scripts/joint_chrono_continuation.py) starts from both
+qualified G3 heads and their actual completed Mac Adam checkpoints. A zero-update preflight uses
+the unchanged typed continuation owner to require the original predictor, numerical environment,
+five actor slots and PPO recipe. Rivals remain the complete frozen G3 bundle with separate M8/F0
+priors and E/T overlays. No critic is fitted. Learning stops after 64 batches or four consecutive
+batches with no accepted epoch in either head; previous numeric evidence is archived only after
+the next completed pair consumes both carries.
+
+Only prescribed checkpoints 16, 32 and 64 reached before scientific termination are eligible for
+development screening. All eligible checkpoints then share one 1,024-world bank against G3,
+processed in two verified 512-pair chunks with eight historical side reproductions each. Exact
+incumbent games must agree across comparisons. Positive paired win and reward means permit a
+nominee; highest win mean wins, with an exact tie resolved toward the later checkpoint. Reusing
+this bank for selection is explicit: a nominee still needs fresh independent qualification.
+There is no arbitrary stopped-actor fallback, automatic retry or activation. The learning and
+screening host packages retain separate one-attempt six-hour/two-hour ceilings and explicit input
+pins. Checks: `python -m unittest test_joint_chrono_continuation` alongside the existing joint
+trial, numeric storage and chunk evidence tests.
+
 ### Token and expansion learning
 
 The experimental `territory-collect` mode learns token commitments and repeated expansion
