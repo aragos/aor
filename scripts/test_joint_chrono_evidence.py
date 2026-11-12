@@ -54,6 +54,120 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(source['tokenOrder']['opponentSelectors'],['FIXED_16_TO_15']*4)
         self.assertEqual(source['purpose'],'CONFIRMATION')
 
+    def successor_protocol(self):
+        return dict(self.protocol, jointRivalProfile='g3-successor-league-1',
+                    anchorBundle='learned-G3',
+                    rivalBundles=dict(C64='raw-card-C64', G1='raw-card-G1', G2='raw-card-G2', G3='learned-G3'))
+
+    def test_successor_confirmation_uses_the_fixed_four_bundle_league_twice(self):
+        protocol = self.successor_protocol()
+        sources = [evidence.source(protocol,'confirm',chunk) for chunk in range(8)]
+        self.assertEqual([source['jointPolicy']['sharedBundle'] for source in sources],
+                         ['raw-card-C64','raw-card-G1','raw-card-G2','learned-G3'] * 2)
+        self.assertTrue(all(source['jointPolicy']['incumbentBundle'] == 'learned-G3' for source in sources))
+        self.assertTrue(all(source['jointPolicy']['candidateBundle'] == 'chronological' for source in sources))
+
+    def test_successor_confirmation_keeps_all_sides_and_rivals_on_exact_expansion_tokens(self):
+        source = evidence.source(self.successor_protocol(),'confirm',0)
+        self.assertEqual(source['expansionImitation'], dict(candidateModel='E',incumbentModel='E',opponentModels=['E']*4))
+        self.assertEqual(source['tokenOrder'], dict(candidateSelector='FIXED_16_TO_15',
+            incumbentSelector='FIXED_16_TO_15',opponentSelectors=['FIXED_16_TO_15']*4))
+
+    def test_successor_heldout_has_only_the_actual_g3_shared_bundle(self):
+        protocol = self.successor_protocol()
+        self.assertEqual([evidence.source(protocol,'heldout',chunk)['jointPolicy']['sharedBundle']
+                          for chunk in range(8)], ['learned-G3']*8)
+
+    def test_omitted_profile_ignores_new_protocol_metadata_and_keeps_all_legacy_sources_identical(self):
+        extra = dict(self.protocol,rivalBundles=self.successor_protocol()['rivalBundles'])
+        for stage in evidence.STAGES:
+            for chunk in range(8):
+                self.assertEqual(evidence.source(self.protocol,stage,chunk), evidence.source(extra,stage,chunk))
+
+    def test_unknown_explicit_profile_is_rejected(self):
+        with self.assertRaisesRegex(ValueError,'Unsupported explicit'):
+            evidence.source(dict(self.successor_protocol(),jointRivalProfile='unknown'),'confirm',0)
+
+    def test_incomplete_successor_league_is_rejected(self):
+        protocol = self.successor_protocol()
+        del protocol['rivalBundles']['G1']
+        with self.assertRaisesRegex(ValueError,'four explicit'):
+            evidence.source(protocol,'confirm',0)
+
+    def test_changed_successor_chunk_bundle_is_not_another_valid_source(self):
+        protocol = self.successor_protocol()
+        source = evidence.source(protocol,'confirm',1)
+        source['jointPolicy']['sharedBundle'] = protocol['rivalBundles']['G3']
+        with self.assertRaisesRegex(ValueError,'all actor roles'):
+            evidence.source_slot(protocol,source)
+
+    def successor_evidence(self, *, anchor_card=True):
+        prior = self.root/'F0.json'
+        exp.document(prior,dict(synthetic='prior'))
+        guard = patch.object(evidence.ecology,'F0',exp.sha(prior))
+        guard.start();self.addCleanup(guard.stop)
+        def bundle(name,card):
+            components = {}
+            for phase in evidence.joint.PHASES:
+                if phase == 'card' and not card:
+                    components[phase] = None
+                    continue
+                path = self.root/f'{name}-{phase}.json'
+                exp.document(path,dict(encoderVersion=f'aor-{phase}-observation-1',
+                    stateFeatureNames=['synthetic-state'], actionFeatureNames=['synthetic-action'], role=name))
+                components[phase] = dict(path=path.name,sha256=exp.sha(path))
+            path = self.root/f'{name}-bundle.json'
+            exp.document(path,dict(schemaVersion=1,kind='joint-card-purchase-1',configuration=exp.CONFIGURATION,
+                baselineSha256=exp.sha(prior),**components))
+            return str(path)
+        rivals = {name:bundle(name, anchor_card if name == 'G3' else False) for name in ('C64','G1','G2','G3')}
+        protocol = dict(self.successor_protocol(),prior=str(prior),anchorBundle=rivals['G3'],
+                        candidateBundle=bundle('candidate',True),rivalBundles=rivals)
+        source = self.root/'source.json'
+        exp.document(source,evidence.source(protocol,'confirm',0))
+        expected = evidence.joint.joint_binding(source)
+        directory = self.root/'snapshots';directory.mkdir()
+        subjects = [expected['source'],expected['baseline']]
+        for role in ('sharedBundle','candidateBundle','incumbentBundle'):
+            current = expected[role]
+            subjects += [current] + [current[p] for p in evidence.joint.PHASES if current[p] is not None]
+        for item in subjects:
+            (directory/item['snapshot']).write_bytes(Path(item['path']).read_bytes())
+        return protocol,source,directory,expected
+
+    def test_successor_roles_bind_actual_bundle_components_and_homogeneous_overlays(self):
+        protocol,source,directory,expected = self.successor_evidence()
+        with patch.object(evidence.ecology,'verify_overlays') as overlays, \
+             patch.object(evidence.legacy,'verify_transferred_sources'):
+            actual = evidence.verify_roles(protocol,source,directory,[dict(jointPolicy=expected)])
+        self.assertEqual(expected,actual)
+        self.assertEqual(evidence.ecology.ArenaRivalEcology.HOMOGENEOUS,overlays.call_args.kwargs['rival_ecology'])
+        self.assertIsNotNone(actual['incumbentBundle']['card'])
+        self.assertIsNone(actual['sharedBundle']['card'])
+
+    def test_successor_rejects_null_card_g3_anchor(self):
+        protocol,source,directory,expected = self.successor_evidence(anchor_card=False)
+        with self.assertRaisesRegex(ValueError,'learned-card G3'):
+            evidence.verify_roles(protocol,source,directory,[dict(jointPolicy=expected)])
+
+    def test_successor_rejects_changed_raw_component_snapshot(self):
+        protocol,source,directory,expected = self.successor_evidence()
+        (directory/expected['incumbentBundle']['card']['snapshot']).write_text('{}')
+        with self.assertRaisesRegex(ValueError,'snapshots changed'):
+            evidence.verify_roles(protocol,source,directory,[dict(jointPolicy=expected)])
+
+    def test_successor_rejects_consistently_relabelled_wrong_g3_bundle(self):
+        protocol,source,directory,expected = self.successor_evidence()
+        protocol['rivalBundles']['G3'] = protocol['candidateBundle']
+        with self.assertRaisesRegex(ValueError,'same actual learned-card G3'):
+            evidence.verify_roles(protocol,source,directory,[dict(jointPolicy=expected)])
+
+    def test_successor_rejects_changed_original_model_component(self):
+        protocol,source,directory,expected = self.successor_evidence()
+        Path(expected['incumbentBundle']['purchase']['path']).write_text('{}')
+        with self.assertRaisesRegex(ValueError,'component changed'):
+            evidence.verify_roles(protocol,source,directory,[dict(jointPolicy=expected)])
+
     def test_all_chunks_preserve_the_whole_stage_seed_bank_and_global_lineups(self):
         seeds=[]
         for chunk in range(8):

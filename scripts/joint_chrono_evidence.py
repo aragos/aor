@@ -1,5 +1,6 @@
 """Pure chunk identities, streamed native verification and lossless60 evidence storage."""
 import json
+from enum import Enum
 from pathlib import Path, PurePosixPath
 import tarfile
 
@@ -17,6 +18,39 @@ STAGES = ('confirm','heldout')
 IDENTITY = ('index','configuration','seed','seat','opponentIndices')
 
 
+class JointRivalProfile(Enum):
+    G3_SUCCESSOR_LEAGUE = 'g3-successor-league-1'
+
+
+def rival_profile(protocol):
+    """Omission retains60 exactly; the explicit successor profile owns its finite role map."""
+    if 'jointRivalProfile' not in protocol:
+        return None
+    require(protocol['jointRivalProfile'] == JointRivalProfile.G3_SUCCESSOR_LEAGUE.value,
+            'Unsupported explicit joint rival profile.')
+    bundles = protocol.get('rivalBundles')
+    require(isinstance(bundles, dict) and set(bundles) == {'C64', 'G1', 'G2', 'G3'}
+            and all(isinstance(path, str) and path for path in bundles.values()),
+            'The G3 successor league requires exactly four explicit frozen rival bundle paths.')
+    return JointRivalProfile.G3_SUCCESSOR_LEAGUE
+
+
+def shared_bundle(protocol, stage, chunk_index):
+    """One common native rival bundle per chunk; no per-seat JVM API is introduced."""
+    require(stage in STAGES and type(chunk_index) is int and 0 <= chunk_index < CHUNKS,
+            'A shared rival must belong to one declared stage/chunk.')
+    if rival_profile(protocol) is None:
+        return protocol['anchorBundle']
+    role = ('C64', 'G1', 'G2', 'G3')[chunk_index % 4] if stage == 'confirm' else 'G3'
+    return protocol['rivalBundles'][role]
+
+
+def overlay_ecology(protocol, stage):
+    require(stage in STAGES, 'Only the declared confirmation and heldout stages exist.')
+    return (rival_ecology(stage) if rival_profile(protocol) is None
+            else ecology.ArenaRivalEcology.HOMOGENEOUS)
+
+
 def rival_ecology(stage):
     require(stage in STAGES, 'Only the declared confirmation and heldout stages exist.')
     return (ecology.ArenaRivalEcology.MIXED if stage == 'confirm'
@@ -31,7 +65,7 @@ def replay_slot(global_index):
 
 def source(protocol, stage, chunk_index):
     """Native indices stay local; offsets preserve the global4096-world/seat/role scheduler."""
-    rivals = rival_ecology(stage)
+    rivals = overlay_ecology(protocol, stage)
     require(type(chunk_index) is int and 0 <= chunk_index < CHUNKS, 'Use chunk indices0..7.')
     bank = protocol['banks'][stage]
     require(bank['count'] == STAGE_PAIRS and bank['seeds'] == exp.arena_seeds(bank['nativeOffset'],STAGE_PAIRS),
@@ -42,7 +76,7 @@ def source(protocol, stage, chunk_index):
                               purpose='CONFIRMATION')
     return dict(result,experimentalRulesTransfer=legacy.RULES_TRANSFER,
                 **ecology.bindings(protocol['expansion'],arena=True,rival_ecology=rivals),
-                jointPolicy=dict(baseline=protocol['prior'],sharedBundle=protocol['anchorBundle'],
+                jointPolicy=dict(baseline=protocol['prior'],sharedBundle=shared_bundle(protocol,stage,chunk_index),
                     candidateBundle=protocol['candidateBundle'],incumbentBundle=protocol['anchorBundle']))
 
 
@@ -55,7 +89,7 @@ def source_slot(protocol, document):
 
 def verify_roles(protocol, source_path, directory, reports):
     document = read(source_path)
-    stage,_ = source_slot(protocol,document)
+    stage,chunk = source_slot(protocol,document)
     expected = joint.joint_binding(source_path)
     require(all(report.get('jointPolicy') == expected for report in reports),
             'Every report must bind exact sampled candidate/incumbent/shared roles.')
@@ -65,17 +99,42 @@ def verify_roles(protocol, source_path, directory, reports):
         subjects += [bundle]+[bundle[phase] for phase in joint.PHASES if bundle[phase] is not None]
     require(all(sha(directory/item['snapshot']) == item['sha256'] for item in subjects),
             'Raw joint bundle/phase/source/prior snapshots changed.')
-    require(expected['sharedBundle']['card'] is expected['incumbentBundle']['card'] is None
-            and expected['sharedBundle']['purchase']['sha256'] == joint.G2
-            and expected['incumbentBundle']['purchase']['sha256'] == joint.G2
-            and expected['baseline']['sha256'] == ecology.F0,
-            'The strength anchor and every rival retain ordinary cards, exactG2 and separateF0.')
+    if rival_profile(protocol) is None:
+        require(expected['sharedBundle']['card'] is expected['incumbentBundle']['card'] is None
+                and expected['sharedBundle']['purchase']['sha256'] == joint.G2
+                and expected['incumbentBundle']['purchase']['sha256'] == joint.G2
+                and expected['baseline']['sha256'] == ecology.F0,
+                'The strength anchor and every rival retain ordinary cards, exactG2 and separateF0.')
+    else:
+        verify_successor_roles(protocol,stage,chunk,expected)
     ecology.verify_overlays(document,directory,reports,arena=True,expected_expansion=joint.E,
-                            rival_ecology=rival_ecology(stage))
+                            rival_ecology=overlay_ecology(protocol,stage))
     references = {role:protocol['ordinary'] for role in ('candidate','incumbent',*[f'opponent-{i}' for i in range(4)])}
     for report in reports:
         legacy.verify_transferred_sources(document,report,directory,references)
     return expected
+
+
+def verify_successor_roles(protocol, stage, chunk, expected):
+    """Bind actual raw subjects, not a symbolic G3 label or null-card approximation."""
+    declarations = {'candidateBundle':protocol['candidateBundle'],
+                    'incumbentBundle':protocol['anchorBundle'],
+                    'sharedBundle':shared_bundle(protocol,stage,chunk)}
+    subjects = {role:joint.bundle_subjects(path) for role,path in declarations.items()}
+    anchor = subjects['incumbentBundle']
+    g3 = joint.bundle_subjects(protocol['rivalBundles']['G3'])
+    require(anchor['card'] is not None and anchor['purchase'] is not None
+            and anchor['sha256'] == g3['sha256'] and expected['baseline']['sha256'] == ecology.F0,
+            'Successor qualification requires the same actual learned-card G3 anchor and league role, with F0.')
+    for role, subject in subjects.items():
+        actual = expected[role]
+        require(all(actual[key] == subject[key] for key in
+                    ('path','sha256','kind','configuration','baselineSha256'))
+                and all((actual[phase] is None and subject[phase] is None) or
+                        (actual[phase] is not None and subject[phase] is not None
+                         and all(actual[phase][key] == value for key,value in subject[phase].items()))
+                        for phase in joint.PHASES),
+                'A successor candidate, incumbent or scheduled rival differs from its exact raw bundle/components.')
 
 
 def compact_pair(pair, expected, local_index, global_index, seed, pair_sha, source_sha):
