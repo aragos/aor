@@ -220,7 +220,6 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
                             <Emblem player={player} size={15}/><span className="sr-only">{playerName(snapshot, player.id)} </span>
                         </span>)}
                     </span>}
-                    {owned && <small className="advance-owned">{t('table.owned')}</small>}
                     {available && <small className="advance-available">{t('table.available')}</small>}
                     {offer?.unavailableReason && <small>{t(`error.${offer.unavailableReason}`)}</small>}
                 </button><UnplayedLeaders snapshot={snapshot} advance={advance.id}/></div>;
