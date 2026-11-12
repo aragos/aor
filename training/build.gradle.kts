@@ -35,6 +35,8 @@ distributions {
                     "joint_economy_experiment.py",
                     "joint_economy.py",
                     "joint_trajectory.py",
+                    "joint_current_ecology.py",
+                    "joint_credit_targets.py",
                     "token_policy.py",
                     "token_order_policy.py",
                     "token_order_metadata.py",
