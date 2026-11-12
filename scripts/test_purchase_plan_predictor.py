@@ -178,7 +178,7 @@ class PlanPredictorTests(unittest.TestCase):
     def test_alias_is_retained_and_does_not_gain_an_extra_vote(self):
         origin = self.origin()
         origin['plans'][7]['aliasOf'] = 0
-        with patch.object(self.actor, 'values', return_value=[.5] * 8):
+        with patch.object(self.actor, 'values', return_value=[.5] * 7):
             result = predictor.rank_origin(self.actor, origin)
         self.assertEqual(0, result['selectedIndex'])
         self.assertEqual(0, result['plans'][7]['aliasOf'])
@@ -202,6 +202,16 @@ class PlanPredictorTests(unittest.TestCase):
         origin['plans'][7]['aliasOf'] = 0
         result = predictor.rank_origin(self.actor, origin)
         self.assertEqual(result['plans'][0]['value'], result['plans'][7]['value'])
+
+    def test_only_canonical_leaves_are_evaluated_and_alias_values_are_copied(self):
+        origin = self.origin()
+        origin['plans'][1]['aliasOf'] = 0
+        origin['plans'][7]['aliasOf'] = 2
+        with patch.object(self.actor, 'values', wraps=self.actor.values) as values:
+            result = predictor.rank_origin(self.actor, origin)
+        values.assert_called_once_with([origin['plans'][index]['leaf'] for index in (0, 2, 3, 4, 5, 6)])
+        self.assertIs(result['plans'][0]['value'], result['plans'][1]['value'])
+        self.assertIs(result['plans'][2]['value'], result['plans'][7]['value'])
 
     def test_unsupported_alternative_is_retained_without_value(self):
         origin = self.unsupported(self.origin(), 4)

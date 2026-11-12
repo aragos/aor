@@ -224,10 +224,15 @@ def rank_origin(predictor, origin):
     chosen = 0 if plans else None
     fallback = None if origin['status'] == 'READY' else origin['status']
     if fallback is None:
-        supported = [plan for plan in plans if plan['status'] == 'SUPPORTED']
-        values = predictor.values([plan['leaf'] for plan in supported])
-        for plan, value in zip(supported, values, strict=True):
+        canonical = [plan for plan in plans
+                     if plan['status'] == 'SUPPORTED' and plan['aliasOf'] is None]
+        values = predictor.values([plan['leaf'] for plan in canonical])
+        for plan, value in zip(canonical, values, strict=True):
             scores[plan['index']] = value
+        # Identical logical plans share one computed value, independently of FP32 batch kernels.
+        for plan in plans:
+            if plan['aliasOf'] is not None:
+                scores[plan['index']] = scores[plan['aliasOf']]
         for index, value in enumerate(scores):
             if value is not None and value > scores[chosen]:
                 chosen = index
