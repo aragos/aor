@@ -402,7 +402,8 @@ class ResidualPolicy(nn.Module):
                                    torch.cat([item.action_values for item in prepared]))
         return state, action, torch.tensor(owners)
 
-    def forward(self, observations):
+    def actor_basis(self, observations):
+        """Shared hidden calculations; callers may cache only when every basis tensor is frozen."""
         require(1 <= len(observations) <= 256, "A numerical batch requires 1–256 decisions.")
         count = sum(item.action_count if isinstance(item, _PreparedObservation)
                     else len(item["actions"]) for item in observations)
@@ -412,6 +413,10 @@ class ResidualPolicy(nn.Module):
         hidden = torch.tanh(state @ self.stateWeights.T + self.stateBias)
         action_hidden = torch.tanh(
             hidden[owners] + action @ self.actionWeights.T + self.actionBias)
+        return prepared, hidden, action_hidden
+
+    def actor_log_probabilities(self, prepared, action_hidden):
+        """The same clipped residual/prior calculation for fresh or frozen cached inputs."""
         residuals = torch.clamp(action_hidden @ self.actorWeights,
                                 -RESIDUAL_LIMIT, RESIDUAL_LIMIT)
         log_probabilities = []
@@ -427,6 +432,11 @@ class ResidualPolicy(nn.Module):
                 log_probability = log_probability + (prior - log_probability).detach()
             log_probabilities.append(log_probability)
             cursor += size
+        return log_probabilities
+
+    def forward(self, observations):
+        prepared, hidden, action_hidden = self.actor_basis(observations)
+        log_probabilities = self.actor_log_probabilities(prepared, action_hidden)
         values = torch.sigmoid(hidden @ self.valueWeights + self.valueBias)
         return log_probabilities, values
 
