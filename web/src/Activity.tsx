@@ -273,18 +273,23 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
         </button>}
         <div className="activity-body">
             {rows.length === 0 && <p>{t('table.noActivity')}</p>}
-            <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...rows].reverse().map(([event, ...following]) => <li key={event.id} data-event-id={event.id}>
-                <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
-                <div className={event.marketRoll ? 'market-roll-round' : 'activity-group'}>
-                    {event.marketRoll && <span>{t('activity.marketAdjustments')}</span>}
-                    {[event, ...following].map((member, index) => <div key={member.id}
-                        className={index > 0 && member.kind !== event.kind ? 'activity-following' : undefined}
-                        data-activity-member={member.id} data-market-roll-id={member.marketRoll ? member.id : undefined}>
-                        <EventContent event={member} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections}
-                            onInspectCard={onInspectCard} marketRoll={!!member.marketRoll} cause={index > 0 ? event : undefined}/>
-                    </div>)}
-                </div>
-            </li>)}</ol>
+            <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...rows].reverse().map(row => {
+                const [event, ...following] = row;
+                const competition = row.find(member => member.competition);
+                const outcome = competition ? viewerOutcome(competition, snapshot.viewerId) : '';
+                return <li key={event.id} data-event-id={event.id}>
+                    <small>{event.turnNumber !== null ? `${t('game.turn')} ${event.turnNumber}` : t(`stage.${event.stage}`)}</small>
+                    <div className={event.marketRoll ? 'market-roll-round' : `activity-group${outcome ? ` competition-activity${outcome}` : ''}`}>
+                        {event.marketRoll && <span>{t('activity.marketAdjustments')}</span>}
+                        {[event, ...following].map((member, index) => <div key={member.id}
+                            className={index > 0 && member.kind !== event.kind ? 'activity-following' : undefined}
+                            data-activity-member={member.id} data-market-roll-id={member.marketRoll ? member.id : undefined}>
+                            <EventContent event={member} track={snapshot.game.catalog} cardInspections={snapshot.game.cardInspections}
+                                onInspectCard={onInspectCard} marketRoll={!!member.marketRoll} cause={index > 0 ? event : undefined}/>
+                        </div>)}
+                    </div>
+                </li>;
+            })}</ol>
         </div>
     </section>;
 }

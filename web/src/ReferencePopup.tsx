@@ -68,7 +68,9 @@ export default function ReferencePopup({initialTopic, close, catalog: gameCatalo
                 <h2>{t('reference.unplayedCardsTitle')}</h2>
                 <p>{t('reference.unplayedCardsHint')}</p>
                 {current?.unplayedCards?.length ? <ul className="unplayed-card-list">
-                    {current.unplayedCards.map(card => {
+                    {[...current.unplayedCards].sort((first, second) =>
+                        first.kind.localeCompare(second.kind) ||
+                        t(first.messageId).localeCompare(t(second.messageId))).map(card => {
                         const commodities = current.cardInspections.find(info => info.definition.id === card.id)?.commodities ?? [];
                         const [firstCommodity] = commodities;
                         return <li key={card.id} data-unplayed-card={card.id}>
