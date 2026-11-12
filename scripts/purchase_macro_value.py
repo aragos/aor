@@ -15,6 +15,8 @@ from typing import Mapping
 
 import numpy as np
 
+from weighted_ridge import weighted_solve
+
 DICTIONARY = Path(__file__).with_name('purchase_macro_features.json')
 FEATURE_NAMES = tuple(json.loads(DICTIONARY.read_text())['featureNames'])
 DICTIONARY_SHA = hashlib.sha256(DICTIONARY.read_bytes()).hexdigest()
@@ -171,21 +173,8 @@ class MacroRidge:
 
 
 def _weighted_solve(x, y, weights):
-    """Single deterministic no-intercept solve; lambda is fixed, never a caller option."""
-    x, y, weights = (np.asarray(v, dtype=np.float64) for v in (x, y, weights))
-    require(x.ndim == 2 and x.shape[1] == DIMENSION and len(x) > 0
-            and y.shape == weights.shape == (len(x),) and
-            all(np.isfinite(v).all() for v in (x, y, weights)) and np.all(weights > 0),
-            'Require finite supported rows/targets and positive whole-origin weights.')
-    weights = weights / np.sum(weights)
-    rms = np.sqrt(np.sum(weights[:, None] * x * x, axis=0))
-    zero = rms == 0; scale = np.where(zero, 1., rms)
-    normalized = x / scale
-    coefficients = np.linalg.solve(normalized.T @ (weights[:, None] * normalized) +
-                                   RIDGE * np.eye(DIMENSION), normalized.T @ (weights * y))
-    coefficients[zero] = 0.
-    require(np.isfinite(coefficients).all(), 'The single ridge solve must be finite.')
-    return tuple(map(float, scale)), tuple(map(float, coefficients)), tuple(map(int, np.flatnonzero(zero)))
+    """Fixed macro recipe; the shared owner preserves the original Float64 operation order."""
+    return weighted_solve(x, y, weights, dimension=DIMENSION, penalty=RIDGE)
 
 
 def fit(training):
