@@ -163,10 +163,16 @@ def verify_arena(protocol, source_path, directory):
             {role:protocol['ordinary'] for role in ('candidate','incumbent',*[f'opponent-{i}' for i in range(4)])})
     require({path.name for path in directory.glob('pair-*.json')} == {f'pair-{i}.json' for i in range(PAIRS)},
             'Only the complete2048 paired terminal bank is permitted.')
-    pairs = [read(directory/f'pair-{i}.json') for i in range(PAIRS)]
-    for index, pair in enumerate(pairs):
+    pairs = []
+    for index in range(PAIRS):
+        pair = read(directory/f'pair-{index}.json')
         search.validate_pair(pair,index,protocol['banks']['screen']['seeds'][index],4)
         require(pair.get('jointPolicy') == expected, 'Each pair must retain exact sampled role identities.')
+        # Descriptor dictionaries dominate decoded rows. Verify every original first, then share
+        # the identical read-only binding instead of retaining thousands of independent copies.
+        # Pair values, native bytes, ordering and all downstream numerical operations stay exact.
+        pair['jointPolicy'] = expected
+        pairs.append(pair)
     metrics = search.comparison(pairs)
     search.verify_metrics(report['overall'],metrics)
     return pairs,metrics

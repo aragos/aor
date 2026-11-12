@@ -1,5 +1,6 @@
 """Synthetic driver/role contracts; no native games or scientific actor updates."""
 from copy import deepcopy
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -159,6 +160,56 @@ class TrialContracts(unittest.TestCase):
              patch.object(trial.execution,'java_command',return_value=[]):
             trial.train_batch(protocol,source,self.root,2,bundle)
         self.assertEqual(events,['raw-archive','old-carry-archive'])
+
+
+class JointArenaMemory(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.source = self.root / 'source.json'
+        exp.document(self.source, {})
+        self.binding = {'policySha256': 'fixed', 'stateFeatureNames': [f'feature.{i}' for i in range(2000)]}
+        self.protocol = dict(workers=6, ordinary='M8', banks={'screen': {'seeds': [101, 102, 103, 104]}})
+        self.originals = []
+        for index in range(4):
+            candidate = dict(wins=[1, 0, 0, 0], rewards=[1., .5, .25, 0.],
+                             ranks=[1., .5, .25, 0.], scores=[100, 70, 40, 10], decisions=10)
+            incumbent = dict(wins=[0, 1, 0, 0], rewards=[.5, 1., 0., .25],
+                             ranks=[.5, 1., 0., .25], scores=[70, 100, 10, 40], decisions=11)
+            row = dict(index=index, seed=101 + index, seat=index, configuration=exp.CONFIGURATION,
+                       opponentIndices=[0, 1, 2, 3], candidate=candidate, incumbent=incumbent,
+                       jointPolicy=deepcopy(self.binding))
+            self.originals.append(row)
+            exp.document(self.root / f'pair-{index}.json', row)
+        self.expected_metrics = data.search.comparison(self.originals)
+        exp.document(self.root / 'evaluation.json', {'overall': self.expected_metrics})
+        exp.document(self.root / 'run.json', dict(kind='strategy-arena', signature='fixed',
+                     source=str(self.source), workers=6))
+        exp.document(self.root / 'state.json', dict(kind='strategy-arena', signature='fixed'))
+
+    def verify(self):
+        with patch.object(data, 'PAIRS', 4), \
+             patch.object(exp, 'verify_arena'), \
+             patch.object(data, 'verify_joint_roles', return_value=self.binding), \
+             patch.object(data.legacy, 'verify_transferred_sources'):
+            return data.verify_arena(self.protocol, self.source, self.root)
+
+    def test_full_pair_values_metrics_and_source_bytes_survive_descriptor_sharing(self):
+        before = {path.name: path.read_bytes() for path in self.root.iterdir()}
+        pairs, metrics = self.verify()
+        self.assertEqual(self.originals, pairs)
+        self.assertEqual(self.expected_metrics, metrics)
+        self.assertTrue(all(pair['jointPolicy'] is self.binding for pair in pairs))
+        self.assertEqual(before, {path.name: path.read_bytes() for path in self.root.iterdir()})
+
+    def test_one_wrong_descriptor_is_rejected_before_it_can_be_shared(self):
+        path = self.root / 'pair-3.json'
+        altered = exp.read(path)
+        altered['jointPolicy']['policySha256'] = 'different'
+        path.write_text(json.dumps(altered))
+        with self.assertRaisesRegex(ValueError, 'exact sampled role identities'):
+            self.verify()
 
 
 if __name__=='__main__':unittest.main()
