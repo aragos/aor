@@ -12,17 +12,7 @@ fun evaluateCardPolicy(observationJson: String, modelJson: String, uniform: Doub
     require(observationJson.length <= 32_000_000 && modelJson.length <= 24_000_000) {
         "Card inference input exceeds its transport bound."
     }
-    val input = JSON.parse<dynamic>(observationJson)
-    val observation =
-        CardObservation(
-            encoderVersion = purchaseString(input.encoderVersion),
-            stateFeatures = purchaseMap(input.stateFeatures),
-            actions =
-                purchaseArray(input.actions).map { action ->
-                    CardAction(purchaseString(action.command), purchaseMap(action.features))
-                },
-            baselineIndex = purchaseInteger(input.baselineIndex),
-        )
+    val observation = readCardObservation(observationJson)
     val model = readCardModel(JSON.parse<dynamic>(modelJson))
     val evaluation = CardPolicy.evaluate(observation, model)
     val choice = CardPolicy.select(observation, evaluation, uniform)
@@ -34,6 +24,20 @@ fun evaluateCardPolicy(observationJson: String, modelJson: String, uniform: Doub
     result.command = choice.command
     result.logProbability = choice.logProbability
     return JSON.stringify(result)
+}
+
+internal fun readCardObservation(json: String): CardObservation {
+    require(json.length <= 32_000_000) { "Card observation exceeds its transport bound." }
+    val input = JSON.parse<dynamic>(json)
+    return CardObservation(
+        encoderVersion = purchaseString(input.encoderVersion),
+        stateFeatures = purchaseMap(input.stateFeatures),
+        actions =
+            purchaseArray(input.actions).map { action ->
+                CardAction(purchaseString(action.command), purchaseMap(action.features))
+            },
+        baselineIndex = purchaseInteger(input.baselineIndex),
+    )
 }
 
 internal fun readCardModel(raw: dynamic): CardPolicyModel =

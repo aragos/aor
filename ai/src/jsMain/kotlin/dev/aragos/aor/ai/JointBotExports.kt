@@ -5,6 +5,7 @@ package dev.aragos.aor.ai
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JSON
 import kotlin.js.JsExport
+import kotlin.js.jsTypeOf
 
 /**
  * Atomic optional card/purchase actor. Both components must parse under one exact scope and
@@ -46,12 +47,18 @@ class JointBotSelector(
                     )
                 requireOfferedCommands(observation, projection.actions.map(CardAction::command))
                 val prior = BotPolicy.choose(observation, level, seed, selected.cardBaseline)
-                CardPolicy.choose(
-                        projection.bindBaseline(prior),
-                        selected.card,
-                        CardPolicy.actorSeed(seed),
-                    )
-                    .command
+                val bound = projection.bindBaseline(prior)
+                val actorSeed = CardPolicy.actorSeed(seed)
+                if (selected.support == null) {
+                    CardPolicy.choose(bound, selected.card, actorSeed).command
+                } else {
+                    KnownOwnChaosSupport.card(
+                            bound,
+                            CardPolicy.evaluate(bound, selected.card),
+                            CardPolicy.uniform(actorSeed),
+                        )
+                        .command
+                }
             } else {
                 val projection =
                     readPurchaseProjection(
@@ -59,12 +66,18 @@ class JointBotSelector(
                     )
                 requireOfferedCommands(observation, projection.actions.map(PurchaseAction::command))
                 val prior = BotPolicy.choose(observation, level, seed, selected.purchaseBaseline)
-                PurchasePolicy.choose(
-                        projection.bindBaseline(prior),
-                        selected.purchase,
-                        PurchasePolicy.actorSeed(seed),
-                    )
-                    .command
+                val bound = projection.bindBaseline(prior)
+                val actorSeed = PurchasePolicy.actorSeed(seed)
+                if (selected.support == null) {
+                    PurchasePolicy.choose(bound, selected.purchase, actorSeed).command
+                } else {
+                    KnownOwnChaosSupport.purchase(
+                            bound,
+                            PurchasePolicy.evaluate(bound, selected.purchase),
+                            PurchasePolicy.uniform(actorSeed),
+                        )
+                        .command
+                }
             }
         } catch (_: Throwable) {
             incumbent.choose(observationJson, purchaseJson, difficulty, seed)
@@ -84,7 +97,23 @@ private data class QualifiedJointAsset(
     val purchaseBaseline: BotModel,
     val card: CardPolicyModel,
     val purchase: PurchasePolicyModel,
+    val support: JointSupportProfile?,
 )
+
+/** Optional inference identity, separate from the immutable trained actor qualification. */
+private enum class JointSupportProfile(val version: String) {
+    KNOWN_OWN_CHAOS_1(KnownOwnChaosSupport.VERSION);
+
+    companion object {
+        fun read(raw: dynamic): JointSupportProfile? {
+            if (jsTypeOf(raw) == "undefined") return null
+            val version = purchaseString(raw)
+            return requireNotNull(entries.singleOrNull { it.version == version }) {
+                "Unknown joint actor support profile."
+            }
+        }
+    }
+}
 
 private fun readQualifiedJointAsset(json: String): QualifiedJointAsset? =
     try {
@@ -109,6 +138,7 @@ private fun readQualifiedJointAsset(json: String): QualifiedJointAsset? =
             purchaseBaseline = readPurchaseBaseline(raw.purchaseBaseline),
             card = readCardModel(raw.cardModel),
             purchase = readPurchaseModel(raw.purchaseModel),
+            support = JointSupportProfile.read(raw.supportProfile),
         )
     } catch (_: Throwable) {
         null

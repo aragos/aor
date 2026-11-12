@@ -246,6 +246,8 @@ try {
     };
     const report = {kind: 'real-server-purchase-browser-lifecycle', activeActor: actor !== null, javaHome, javaVersion,
         jointActorActive: jointAsset !== null, jointAssetSha256: createHash('sha256').update(jointBytes).digest('hex'),
+        jointBehaviorIdentity: jointAsset?.behaviorIdentity ?? null,
+        jointSupportProfile: jointAsset?.supportProfile ?? null,
         webMode: process.env.AOR_BROWSER_PREVIEW === '1' ? 'built-production' : 'vite-development',
         baselineSha256: createHash('sha256').update(baselineBytes).digest('hex'), actorAssetSha256: createHash('sha256').update(actorBytes).digest('hex'),
         replies: replies.length, purchaseReplies: purchases.length, learnedDeviations: nonbaseline,

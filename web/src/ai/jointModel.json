@@ -503377,7 +503377,7 @@
     ],
     "valueBias": 0.0783380608793071
   },
-  "qualification": {
+  "trainedPolicyQualification": {
     "qualificationPassed": true,
     "humanLevelEstablished": false,
     "productionActivation": false,
@@ -503477,5 +503477,15 @@
     "selectionDisclosure": "Chronological final bundle selected after exploratory family53 had the higher anchor-comparison mean. The chronological-versus-separated contrast was inconclusive. Family53 native final screen was operationally incomplete; its direct contrast was independently derived from exact common candidate games. Family60 independently qualifies only this exact bundle.",
     "recoveryDisclosure": "Family60 retained its first512 complete pairs after a replay CLI parse failure. The reviewed replay-hours-only recovery reused those bytes exactly once; both4096-pair gates and all16 historical side replays completed under the original clocks.",
     "limitation": "Qualification is against the declared automated rival ecologies; human-level strength and superiority of chronological credit assignment are not established."
+  },
+  "supportProfile": "known-own-chaos-support-1",
+  "behaviorIdentity": {
+    "version": "joint-browser-behavior-1",
+    "name": "G3+support1",
+    "trainedPolicy": "G3",
+    "supportProfile": "known-own-chaos-support-1",
+    "independentlyQualified": false,
+    "productionActivation": false,
+    "qualificationScope": "The original family60 qualification applies only to the unchanged full-support trained G3 policy. This conditional eligibility fix has not been independently strength-qualified."
   }
 }
