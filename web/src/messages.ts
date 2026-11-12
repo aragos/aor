@@ -418,7 +418,6 @@ export const en: Record<string, string> = {
     'table.markets': 'Commodities',
     'table.payoutBox': 'Payout box',
     'table.noOwners': 'No qualifying markets',
-    'table.owned': 'Owned',
     'table.selectedProvince': 'Selected province',
     'table.compete': 'Competition',
     'table.establishMarker': 'Establish marker',
