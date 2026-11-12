@@ -52,13 +52,13 @@ object WindmillMain {
         input.snapshot(artifacts)
         val metadata =
             mapOf(
-                "kind" to "windmill-data-1",
+                "kind" to input.kind,
                 "signature" to input.signature,
                 "sourceSha256" to input.sourceSha256,
                 "arenaSha256" to input.arenaSha256,
                 "configuration" to input.configuration.id,
                 "policyBindings" to input.arena.overlayMetadata(),
-                "requests" to (0 until 256).map(::WindmillRequest),
+                "requests" to (0 until 256).map { input.requestMetadata(WindmillRequest(it)) },
                 "origins" to input.origins,
                 "maximumOriginPrefixes" to 256,
                 "maximumTailGames" to 2048,
@@ -74,7 +74,7 @@ object WindmillMain {
                     "retain only root-attempt immediate actor-safe offer observation and normal choice",
                 "targetContract" to
                     "all paired first-action returns under frozen continuation; no winner labels",
-            )
+            ) + input.profileMetadata()
         artifacts.write("prepared.json", metadata)
         if (!collect) return
         artifacts.write(

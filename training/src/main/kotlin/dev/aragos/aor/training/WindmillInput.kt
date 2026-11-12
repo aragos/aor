@@ -4,6 +4,18 @@ import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.BotObservation
 import java.nio.file.Path
 
+/** Prospective root coverage only; neither profile changes any prefix or continuation choice. */
+internal enum class WindmillRootProfile {
+    ASSIGNED_EPOCH,
+    FIRST_BURDEN_WINDMILL;
+
+    fun eligible(assignedEpoch: Int, actualEpoch: Int, ownBurdenPresent: Boolean): Boolean =
+        when (this) {
+            ASSIGNED_EPOCH -> actualEpoch == assignedEpoch
+            FIRST_BURDEN_WINDMILL -> ownBurdenPresent
+        }
+}
+
 /** Epoch assignment depends only on the prospective origin index, never on outcomes or scores. */
 internal data class WindmillRequest(val index: Int) {
     init {
@@ -15,8 +27,14 @@ internal data class WindmillRequest(val index: Int) {
     val epoch: Int = 1 + index % 3
     val seat: Int = index % 4
 
-    fun captures(epoch: Int, seat: Int, observation: BotObservation): Boolean =
-        epoch == this.epoch &&
+    fun captures(
+        epoch: Int,
+        seat: Int,
+        observation: BotObservation,
+        profile: WindmillRootProfile = WindmillRootProfile.ASSIGNED_EPOCH,
+        ownBurdenPresent: Boolean = false,
+    ): Boolean =
+        profile.eligible(this.epoch, epoch, ownBurdenPresent) &&
             seat == this.seat &&
             observation.decision == "windmill" &&
             observation.candidates.size == 2 &&
@@ -41,10 +59,33 @@ private constructor(
     val arenaSha256: String,
     val arena: ArenaSpecification,
     val origins: List<WindmillSeeds>,
+    val kind: String,
+    val declaredProfile: WindmillRootProfile?,
 ) {
     val configuration = arena.configurations.single()
-    val signature =
-        trainingSignature("windmill-data-1:$sourceSha256:$arenaSha256:${arena.identity()}")
+    val rootProfile = declaredProfile ?: WindmillRootProfile.ASSIGNED_EPOCH
+    val signature = trainingSignature("$kind:$sourceSha256:$arenaSha256:${arena.identity()}")
+
+    val originKind = if (declaredProfile == null) "windmill-origin-1" else "windmill-origin-2"
+
+    /**
+     * Version one retains its original exact request shape; version two makes coverage explicit.
+     */
+    fun requestMetadata(request: WindmillRequest): Any =
+        if (declaredProfile == null) {
+            request
+        } else {
+            mapOf(
+                "index" to request.index,
+                "seat" to request.seat,
+                "epoch" to
+                    if (rootProfile == WindmillRootProfile.ASSIGNED_EPOCH) request.epoch else null,
+                "rootProfile" to rootProfile,
+            )
+        }
+
+    fun profileMetadata(): Map<String, Any> =
+        declaredProfile?.let { mapOf("rootProfile" to it) } ?: emptyMap()
 
     fun controllers(seat: Int): Map<Int, SimulationController> =
         arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
@@ -71,10 +112,11 @@ private constructor(
             val source = path.toRealPath()
             val sourceHash = PurchaseJson.hash(source)
             val node = PurchaseJson.read(source)
-            PurchaseJson.fields(node, setOf("kind", "arena", "origins"))
-            require(node["kind"]?.asText() == "windmill-data-1") {
-                "Windmill source requires windmill-data-1."
+            val kind = requireNotNull(node["kind"]?.asText()) { "Source kind is required." }
+            require(kind in setOf("windmill-data-1", "windmill-data-2")) {
+                "Windmill source requires explicit version one or two."
             }
+            val profile = readProfile(node, kind)
             val arenaPath =
                 source.parent
                     .resolve(PurchaseJson.text(node.required("arena"), "arena"))
@@ -126,7 +168,27 @@ private constructor(
             ) {
                 "Windmill sources changed while being read."
             }
-            return WindmillInput(source, sourceHash, arenaPath, arenaHash, arena, origins)
+            return WindmillInput(
+                source,
+                sourceHash,
+                arenaPath,
+                arenaHash,
+                arena,
+                origins,
+                kind,
+                profile,
+            )
+        }
+
+        internal fun readProfile(node: JsonNode, kind: String): WindmillRootProfile? {
+            val profileFields = if (kind == "windmill-data-2") setOf("rootProfile") else emptySet()
+            PurchaseJson.fields(node, setOf("kind", "arena", "origins") + profileFields)
+            if (kind == "windmill-data-1") return null
+            require(kind == "windmill-data-2") { "Unknown Windmill source profile version." }
+            val name = PurchaseJson.text(node.required("rootProfile"), "rootProfile")
+            return requireNotNull(WindmillRootProfile.entries.firstOrNull { it.name == name }) {
+                "Windmill profile must be ASSIGNED_EPOCH or FIRST_BURDEN_WINDMILL."
+            }
         }
 
         internal fun validateEcology(arena: ArenaSpecification) {

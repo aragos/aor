@@ -20,3 +20,11 @@ terminal returns stay separate from actor inputs and reproduce every completed b
 Collection is bounded to ten workers, two hours and at most 2,304 terminal executions: 2,048 tails
 plus 256 potentially missing full prefixes. Preparation performs no simulations. All prospective
 origins and missing cases are retained; there is no refill, resume, retry, fitting or activation.
+
+Version two requires an explicit `rootProfile`. `ASSIGNED_EPOCH` preserves the original
+epoch schedule. `FIRST_BURDEN_WINDMILL` captures the first controlled-seat Windmill window
+at any epoch with nonempty actor-safe `burdenReferences`. Earlier choices remain exact
+normal choices; no forced PASS or continuation change occurs. Version two records the
+profile, nullable target epoch, and each window's own-burden eligibility. Version one
+inputs, request metadata and behavior remain unchanged. Oversampled burden coverage is
+development data, not a runtime-average sampling claim.

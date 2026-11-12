@@ -16,7 +16,7 @@ import dev.aragos.aor.ai.BotObservations
 internal data class WindmillActorInput(val view: GameView, val observation: BotObservation)
 
 /**
- * Capture the first controlled-seat Windmill opportunity in its prospective assigned epoch. Every
+ * Capture the first controlled-seat Windmill opportunity satisfying its prospective profile. Every
  * seat uses the identical frozen G3 card/purchase bundle and complete E/T/M8/F0 roles. Fork seeds
  * retain existing hands/deck. Paired returns are conditional on an independent origin, never
  * information-safe winner labels. All policies receive only their ordinary actor observation.
@@ -55,8 +55,17 @@ internal class WindmillCollector(
                 }
                 val incumbent = requireNotNull(commands[actor]) { "The incumbent is required." }
                 val seat = session.state.playerIds.indexOf(actor)
+                val ownBurdenPresent =
+                    input.declaredProfile != null &&
+                        session.state.viewForDecision(actor).burdenReferences.isNotEmpty()
                 val captures =
-                    request.captures(session.state.currentEpoch.number, seat, observation)
+                    request.captures(
+                        session.state.currentEpoch.number,
+                        seat,
+                        observation,
+                        input.rootProfile,
+                        ownBurdenPresent,
+                    )
                 windows +=
                     mapOf(
                         "absolutePlayerDecision" to session.decisions,
@@ -69,7 +78,12 @@ internal class WindmillCollector(
                         "offered" to offered,
                         "incumbentCommand" to incumbent,
                         "captured" to captures,
-                    )
+                    ) +
+                        if (input.declaredProfile == null) {
+                            emptyMap()
+                        } else {
+                            mapOf("ownBurdenPresent" to ownBurdenPresent)
+                        }
                 if (captures) {
                     return identity(request, seeds, prefix(session), windows) +
                         evaluate(seeds, session, seat, incumbent)
@@ -80,7 +94,13 @@ internal class WindmillCollector(
         return identity(request, seeds, prefix(session), windows) +
             mapOf(
                 "status" to "MISSING",
-                "reason" to "NO_CONTROLLED_WINDMILL_IN_ASSIGNED_EPOCH",
+                "reason" to
+                    when (input.rootProfile) {
+                        WindmillRootProfile.ASSIGNED_EPOCH ->
+                            "NO_CONTROLLED_WINDMILL_IN_ASSIGNED_EPOCH"
+                        WindmillRootProfile.FIRST_BURDEN_WINDMILL ->
+                            "NO_CONTROLLED_WINDMILL_WITH_OWN_BURDEN"
+                    },
                 "arms" to emptyList<Any>(),
             )
     }
@@ -119,9 +139,9 @@ internal class WindmillCollector(
         windows: List<Map<String, Any>>,
     ): Map<String, Any> =
         mapOf(
-            "kind" to "windmill-origin-1",
+            "kind" to input.originKind,
             "signature" to input.signature,
-            "request" to request,
+            "request" to input.requestMetadata(request),
             "gameSeed" to seeds.gameSeed,
             "chanceSeeds" to seeds.future,
             "prefix" to prefix,
