@@ -990,10 +990,23 @@ decision number, phase, within-world phase row, both behavior heads and a frozen
 The adapter partitions detached advantages back into the original typed phase-reader order;
 observations, actions, behavior likelihoods/values and terminal labels remain unchanged. It performs
 no inference or updates and does not certify the supplied predictor's math. The existing joint
-reader's support for a separate purchase prior and arena continuations, plus an explicit typed card
-actor-only update contract, remain prerequisites for a full joint-credit pilot. Existing reader and
-optimizer guards remain active. Synthetic checks: `python -m unittest test_joint_credit_targets
+reader's support for a separate purchase prior and arena continuations remains a prerequisite
+for a full joint-credit pilot. Synthetic checks: `python -m unittest test_joint_credit_targets
 test_purchase_gae.PurchaseGaeMathTest` from `scripts` in the numerical environment.
+
+The [typed phase objective](../scripts/joint_phase_objective.py) opts one card or purchase actor
+into detached joint targets, with separate objective and Adam identities. Legacy purchase-only
+objectives and continuation guards remain unchanged. Both behavior heads, the original collection,
+phase, clock and real shared predictor descriptor are bound before fitting. The value-head parameters
+and their momentum are excluded; shared actor embeddings may still change their reported value.
+The original PPO clipping and whole-epoch KL rollback apply. Continuation requires the exact
+completed phase actor, unchanged clock/predictor/recipe and five correctly shaped actor Adam slots.
+This source prerequisite provides no two-actor loop or new experiment. Its UNIT tests use synthetic
+optimizer steps only: `python -m unittest test_joint_phase_actor_only test_purchase_gae`.
+
+The chronological clock includes more decisions than its phase-separated control. With lambda .95
+per decision, it also has a shorter effective horizon measured in turns; a future comparison tests
+both cross-phase credit and this horizon change, rather than isolating coordination alone.
 
 ### Token and expansion learning
 
