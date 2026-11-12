@@ -4,13 +4,15 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {open} from './browser-support.mjs';
-import {chooseBotMove, PurchaseBotSelector} from '../../ai/build/dist/js/productionLibrary/aor-ai.mjs';
+import {chooseBotMove, JointBotSelector, PurchaseBotSelector} from '../../ai/build/dist/js/productionLibrary/aor-ai.mjs';
 
 const api = process.env.MAP_API_URL;
 const web = process.env.MAP_WEB_URL;
 const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const baselineBytes = readFileSync(new URL('../src/ai/model.json', import.meta.url), 'utf8');
 const actorBytes = readFileSync(new URL('../src/ai/purchaseModel.json', import.meta.url), 'utf8');
+const jointBytes = readFileSync(new URL('../src/ai/jointModel.json', import.meta.url), 'utf8');
+const jointAsset = JSON.parse(jointBytes);
 const purchaseAsset = JSON.parse(actorBytes);
 const actor = purchaseAsset.models?.find(model => model.rulesVersion === 'ah1996-three-epoch-5') ?? purchaseAsset;
 const javaHome = process.env.JAVA_HOME ?? null;
@@ -18,6 +20,7 @@ const javaVersion = javaHome ? execFileSync(join(javaHome, 'bin/java'), ['--vers
 if (process.env.AOR_PURCHASE_EXPECT_ACTIVE === '1') assert.match(javaVersion ?? '', /(?:openjdk|java) 21\./, 'Active browser proof requires the explicitly supplied JDK21.');
 if (process.env.AOR_PURCHASE_EXPECT_ACTIVE === '1') assert(actor?.model, 'The qualified asset must be installed before the active-actor proof.');
 const selector = new PurchaseBotSelector(baselineBytes, actorBytes);
+const jointSelector = jointAsset === null ? null : new JointBotSelector(baselineBytes, actorBytes, jointBytes);
 const page = await open(web);
 const collected = [];
 let gameId, token;
@@ -208,12 +211,24 @@ try {
     for (const {input, reply} of replies) {
         assert(reply.command && !reply.error, JSON.stringify(reply));
         assert(input.observation.candidates.some(candidate => candidate.command === reply.command), 'Worker response must be an actual offered command.');
-        assert.deepEqual(Object.keys(input).sort(), input.purchase ? ['difficulty', 'id', 'observation', 'purchase', 'seed'] : ['difficulty', 'id', 'observation', 'seed']);
+        assert.deepEqual(Object.keys(input).sort(), ['difficulty', 'id', 'observation', 'seed',
+            ...(input.purchase ? ['purchase'] : []), ...(input.card ? ['card'] : [])].sort());
         if (input.purchase) {
             assert.equal('baselineIndex' in input.purchase, false, 'Server never manufactures the actor recommendation.');
             assert.deepEqual(input.purchase.actions.map(action => action.command), input.observation.candidates.map(candidate => candidate.command).sort());
         }
-        const expected = selector.choose(JSON.stringify(input.observation), input.purchase ? JSON.stringify(input.purchase) : null, input.difficulty, input.seed);
+        if (input.card) {
+            assert.equal(input.difficulty, 'HARD');
+            assert.equal(input.observation.decision, 'play-cards');
+            assert.deepEqual(Object.keys(input.card).sort(), ['actions', 'encoderVersion', 'stateFeatures']);
+            assert.deepEqual(input.card.actions.map(action => action.command), input.observation.candidates.map(candidate => candidate.command).sort());
+            assert.equal(input.purchase, undefined, 'A card job contains no purchase projection.');
+        }
+        const observation = JSON.stringify(input.observation);
+        const purchase = input.purchase ? JSON.stringify(input.purchase) : null;
+        const expected = jointSelector
+            ? jointSelector.choose(observation, purchase, input.card ? JSON.stringify(input.card) : null, input.difficulty, input.seed)
+            : selector.choose(observation, purchase, input.difficulty, input.seed);
         assert.equal(reply.command, expected, 'Actual browser worker agrees with cached generated selector on the exact server input.');
         if (input.purchase && reply.command !== chooseBotMove(JSON.stringify(input.observation), baselineBytes, input.difficulty, input.seed)) nonbaseline++;
     }
@@ -230,6 +245,7 @@ try {
             p50Ms: values[Math.floor((values.length - 1) * .5)], p95Ms: values[Math.floor((values.length - 1) * .95)], maxMs: values.at(-1)};
     };
     const report = {kind: 'real-server-purchase-browser-lifecycle', activeActor: actor !== null, javaHome, javaVersion,
+        jointActorActive: jointAsset !== null, jointAssetSha256: createHash('sha256').update(jointBytes).digest('hex'),
         webMode: process.env.AOR_BROWSER_PREVIEW === '1' ? 'built-production' : 'vite-development',
         baselineSha256: createHash('sha256').update(baselineBytes).digest('hex'), actorAssetSha256: createHash('sha256').update(actorBytes).digest('hex'),
         replies: replies.length, purchaseReplies: purchases.length, learnedDeviations: nonbaseline,
