@@ -134,6 +134,7 @@ class TripleCollection:
             readerSha256=joint.sha(__file__))
         for module in (joint,current,expansion,policy,mc):self.pin(module.__file__)
         self.pin(__file__)
+        self._collection_seal = self.collection_digest()
         self.unchanged()
 
     def pin(self, path):
@@ -245,6 +246,8 @@ class TripleCollection:
 
     def unchanged(self):
         joint.unchanged(self.pins)
+        require(self.collection_digest() == self._collection_seal,
+            'Original in-memory triple models, roles or collection provenance changed.')
         require(set(self.rows) == set(mc.PHASES), 'Triple phase views changed after validation.')
         for phase in mc.PHASES:
             rows, seals = self.rows[phase], self._row_seals[phase]
@@ -252,6 +255,11 @@ class TripleCollection:
                 and row.get('_prepared') is prepared and self.prepared_digest(prepared) == prepared_digest
                 for row,(digest,prepared,prepared_digest) in zip(rows,seals)),
                 'Original in-memory triple observations, behavior, returns or prepared inputs changed.')
+
+    def collection_digest(self):
+        return policy.digest(dict(common=self.common,ecology=self.ecology,heads=self.heads,
+            models=self.models,bundle=self.bundle,origins=self.origins,
+            configuration=self.configuration,baselineSha256=self.baseline_sha))
 
     @staticmethod
     def row_digest(row):

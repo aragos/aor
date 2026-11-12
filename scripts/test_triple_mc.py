@@ -330,5 +330,17 @@ class TripleUpdateTests(TripleFixture):
             update.update_triple(c,self.configs,self.root/'invalid')
         step.assert_not_called()
 
+    def test_post_validation_later_head_edit_rejects_before_any_update(self):
+        c=self.collection();c.models['purchase']['actorWeights'][0]=.2
+        with patch.object(policy,'update') as step,self.assertRaisesRegex(ValueError,'models, roles or collection'):
+            update.update_triple(c,self.configs,self.root/'invalid')
+        step.assert_not_called()
+
+    def test_post_validation_provenance_edit_rejects_before_any_update(self):
+        c=self.collection();c.common['gameMeanReward']=.123
+        with patch.object(policy,'update') as step,self.assertRaisesRegex(ValueError,'models, roles or collection'):
+            update.update_triple(c,self.configs,self.root/'invalid')
+        step.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()
