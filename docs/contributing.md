@@ -1605,3 +1605,12 @@ failures; derived analyses of older incomplete runs are disclosed separately fro
 The adapter and its Python closure are frozen alongside an unchanged native distribution, rather
 than replacing the native launcher. Focused checks:
 `python -m unittest discover -s scripts -p 'test_joint_chrono_*.py'`.
+
+The explicit [successor admission](../scripts/joint_successor_qualification.py) reuses that executor
+for a nominated bundle against the actual learned-card G3 incumbent. Its versioned rival profile
+cycles frozen homogeneous historical/current tables across confirmation chunks, then uses G3
+throughout heldout; every table keeps the same token, expansion and purchase-prior roles. Nomination
+requires complete shared-bank development evidence and lossless retention before fresh qualification.
+Omitting the profile preserves the original raw-card qualification sources and bindings. Run
+`python -m unittest discover -s scripts -p 'test_joint_successor_qualification.py'` with the focused
+joint evidence/qualification tests when changing this boundary.

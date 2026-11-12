@@ -35,6 +35,10 @@ DISCLOSURE = ('One exact chronological terminal bundle selected for its higher e
 
 
 def validate_inputs(protocol):
+    if protocol.get('kind') == 'joint-successor-fixed-qualification-1':
+        import joint_successor_qualification as successor
+        successor.validate_inputs(protocol)
+        return
     require(protocol['kind'] == KIND and protocol['configuration'] == exp.CONFIGURATION
         and protocol['workers'] == 10 and protocol['heapMiB'] == 4096
         and protocol['maximumSeconds'] == 28800 and protocol['stageSeconds'] == 14400
@@ -91,13 +95,20 @@ def gate(metrics):
                for name in ('winShareDifference','rewardDifference'))
 
 
-def heldout_ready(output):
+def candidate_identity(protocol=None):
+    if protocol is not None and protocol.get('kind') == 'joint-successor-fixed-qualification-1':
+        import joint_successor_qualification as successor
+        return successor.CANDIDATE, successor.CARD, successor.PURCHASE
+    return CANDIDATE, CARD, PURCHASE
+
+
+def heldout_ready(output, protocol=None):
     state = read(output/'campaign-state.json')['stages']['confirm']
     result = controller.validate_result(output/'results/confirm.json',output)
     report = read(output/'confirm-report.json')
     require(state['status'] == result['status'] == 'passed'
         and state['resultSha256'] == sha(output/'results/confirm.json')
-        and report['candidateBundleSha256'] == CANDIDATE and gate(report['metrics'])
+        and report['candidateBundleSha256'] == candidate_identity(protocol)[0] and gate(report['metrics'])
         and result['metrics'] == report,
         'Heldout opens only after the same exact actor passes both complete confirmation99% gates.')
 
@@ -130,7 +141,7 @@ def compact_rows(path, rows):
 def stage(protocol, protocol_path, output, name):
     require(name in STAGES,'Only the two fixed qualification stages are permitted.')
     if name == 'heldout':
-        heldout_ready(output)
+        heldout_ready(output, protocol)
     root = output/name
     require(not root.exists(),'No chunk retry, top-up or resumed scientific stage is permitted.')
     root.mkdir(parents=True)
@@ -169,12 +180,13 @@ def stage(protocol, protocol_path, output, name):
         'Only complete declared worlds and all eight exact historical sides can enter the gate.')
     metrics = search.comparison(all_rows)
     passed = gate(metrics)
-    report = dict(kind=KIND,stage=name,protocolSha256=sha(protocol_path),
-        candidateBundleSha256=CANDIDATE,candidateCardSha256=CARD,candidatePurchaseSha256=PURCHASE,
+    candidate, card, purchase = candidate_identity(protocol)
+    report = dict(kind=protocol['kind'],stage=name,protocolSha256=sha(protocol_path),
+        candidateBundleSha256=candidate,candidateCardSha256=card,candidatePurchaseSha256=purchase,
         anchorBundleSha256=sha(protocol['anchorBundle']),metrics=estimates(metrics),
         chunks=receipts,replays=replays,passed=passed,qualificationPassed=name=='heldout' and passed,
         scientificTerminalGames=8192,historicalReproductions=8,totalTerminalExecutions=8200,
-        actualFits=0,productionActivation=False,selectionDisclosure=DISCLOSURE)
+        actualFits=0,productionActivation=False,selectionDisclosure=protocol['selectionDisclosure'])
     path = output/f'{name}-report.json'
     document(path,report)
     artifacts = [path,*[file for file in root.rglob('*') if file.is_file()]]
