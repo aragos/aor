@@ -182,7 +182,7 @@ private constructor(
             )
         }
 
-        private fun validateEcology(arena: ArenaSpecification) {
+        internal fun validateEcology(arena: ArenaSpecification) {
             require(arena.configurations.size == 1 && arena.purpose == ArenaPurpose.SCREENING) {
                 "Acquisition collection requires one SCREENING configuration."
             }
