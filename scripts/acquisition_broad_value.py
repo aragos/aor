@@ -94,6 +94,7 @@ def prepare(desktop, mac, output):
                 limits=dict(seconds=600, attempts=1), fullDataFit=False, actorExport=False,
                 limitations=['Development cross-validation with overlapping training folds',
                              'Origin-level intervals are descriptive, not a fresh qualification',
+                             'Compact linear features omit detailed board and own-card identities; a null result cannot rule out conditional acquisition value',
                              'Two streams retain the same origin hidden hands and fixed deck',
                              'Acquisition-rival exploration may create weaker opponents',
                              'Root intervention proxy does not establish closed-loop strength'])
