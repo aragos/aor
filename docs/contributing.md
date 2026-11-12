@@ -58,6 +58,23 @@ checks keep using the development server.
 
 ## Opponent training
 
+The opt-in `purchase-plan-public` and `purchase-plan-tails` research modes are separate from
+playing policies. Their fixed source binds a normal joint collection, a versioned afterstate
+predictor descriptor and six proposal/four continuation streams per origin. Public collection
+retains all 256 assigned origins, chooses the first branching advance purchase at the assigned
+seat/epoch, and proposes eight complete owner activities through authoritative previews. It
+compares the entire supported incumbent plan to the unchanged canonical backbone only after
+proposal generation. Canonical history is executor evidence, never a proposal or predictor input.
+
+`purchase_plan_ranking.py` seals fixed predictions before the tail mode can start. Unsupported
+information/intervening-choice boundaries remain explicit; own Chaos is a natural supported
+finish with an exact zero value. Aliases share exactly the same prediction and execution.
+The primary diagnostic includes every READY origin, including unchanged choices, and averages
+four paired futures within each origin before computing an across-origin interval. Missing or
+unsupported references stay missing. The separate PASS comparison includes only supported PASS
+references. These are bounded root interventions, not playing-strength or repeated-policy
+estimates; no model fitting, browser integration or activation is part of this mode.
+
 Build once; the complete distribution runs independently with JDK 21+ and Python 3.10+ on macOS/Linux.
 Keep `bin/` and `lib/` together; `:training:distZip` produces a portable zip.
 

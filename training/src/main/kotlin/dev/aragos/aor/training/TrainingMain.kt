@@ -13,6 +13,14 @@ import kotlin.random.Random
 fun main(arguments: Array<String>) {
     if (
         arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in setOf("purchase-plan-public", "purchase-plan-tails")
+        }
+    ) {
+        PurchasePlanMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
             it[0] == "--mode" && it[1] in setOf("afterstate-collect", "afterstate-replay")
         }
     ) {
