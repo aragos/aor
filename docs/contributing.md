@@ -1025,8 +1025,8 @@ phase, clock and real shared predictor descriptor are bound before fitting. The 
 and their momentum are excluded; shared actor embeddings may still change their reported value.
 The original PPO clipping and whole-epoch KL rollback apply. Continuation requires the exact
 completed phase actor, unchanged clock/predictor/recipe and five correctly shaped actor Adam slots.
-This source prerequisite provides no two-actor loop or new experiment. Its UNIT tests use synthetic
-optimizer steps only: `python -m unittest test_joint_phase_actor_only test_purchase_gae`.
+Its UNIT tests use synthetic optimizer steps only:
+`python -m unittest test_joint_phase_actor_only test_purchase_gae`.
 
 The [joint-credit pair publisher](../scripts/joint_credit_update.py) binds both original heads,
 the shared prediction file and the chosen clock before either update. Both heads start with fresh
@@ -1044,8 +1044,23 @@ terminal labels. The existing FP32 critic supplies the inference math in bounded
 Synthetic checks: `python -m unittest test_joint_state_predictor`.
 
 The chronological clock includes more decisions than its phase-separated control. With lambda .95
-per decision, it also has a shorter effective horizon measured in turns; a future comparison tests
+per decision, it also has a shorter effective horizon measured in turns; a comparison tests
 both cross-phase credit and this horizon change, rather than isolating coordination alone.
+
+The bounded [joint-credit runner](../scripts/joint_credit_trial.py) collects each arm's current
+bundle against frozen raw-card/G2 rivals, reproduces its prescribed historical origin, then uses
+the shared predictor and atomic pair publisher. Four consecutive batches with zero accepted epochs
+across both heads stop that arm. Only each recipe's terminal actor enters the three common-world
+development comparisons. Native evaluation retains sampled card/purchase inference and a separate
+null-card anchor; the learning initializer's .97 card prior is not the actual raw-card anchor.
+Different numerical hosts and trace horizons limit causal interpretation of the arm contrast.
+
+Completed raw evidence is losslessly archived after numerical validation. The
+[numeric storage owner](../scripts/joint_credit_storage.py) archives old optimizer/target evidence
+only after the next completed batch binds both preceding checkpoints. Audits resolve exact original
+paths through verified archive member receipts instead of reopening deleted duplicates. The latest
+carry stays live; portable terminal bundles change component paths only and preserve raw actor bytes.
+Checks: `python -m unittest test_joint_credit_trial test_joint_credit_storage test_purchase_storage`.
 
 ### Token and expansion learning
 
