@@ -21,61 +21,63 @@ import kotlin.js.jsTypeOf
 @JsExport
 fun quoteAdjustmentCancellations(contextJson: String): String {
     require(contextJson.length <= 500_000) { "Cancellation context exceeds its transport bound." }
-    val raw = JSON.parse<dynamic>(contextJson)
-    fields(raw, setOf("actor", "cash", "offers", "payouts"))
-    val context =
-        AdjustmentCancellationContext(
-            actor = player(raw.actor),
-            cash = purchaseInteger(raw.cash),
-            offers =
-                purchaseArray(raw.offers).map { offer ->
-                    fields(offer, setOf("command", "commodities", "cost", "cashAfter"))
-                    AdjustmentCancellationOffer(
-                        purchaseString(offer.command),
-                        purchaseArray(offer.commodities)
-                            .map { Commodity.valueOf(purchaseString(it)) }
-                            .toSet(),
-                        purchaseInteger(offer.cost),
-                        purchaseInteger(offer.cashAfter),
-                    )
-                },
-            payouts =
-                purchaseArray(raw.payouts).map { forecast ->
-                    fields(forecast, setOf("commodity", "adjustments", "owners"))
-                    CommodityPayoutView(
-                        Commodity.valueOf(purchaseString(forecast.commodity)),
-                        purchaseArray(forecast.adjustments).map {
-                            CommodityAdjustment.valueOf(purchaseString(it))
-                        },
-                        purchaseArray(forecast.owners).map { owner ->
-                            fields(
-                                owner,
-                                setOf(
-                                    "player",
-                                    "provinces",
-                                    "marketCount",
-                                    "effectiveBox",
-                                    "payout",
-                                    "industryBonus",
-                                ),
-                            )
-                            CommodityOwnerView(
-                                player(owner.player),
-                                purchaseArray(owner.provinces).map { province ->
-                                    fields(province, setOf("value"))
-                                    ProvinceId(purchaseString(province.value))
-                                },
-                                purchaseInteger(owner.marketCount),
-                                purchaseInteger(owner.effectiveBox),
-                                purchaseInteger(owner.payout),
-                                purchaseInteger(owner.industryBonus),
-                            )
-                        },
-                    )
-                },
-        )
+    val context = readCancellationContext(JSON.parse<dynamic>(contextJson))
     return JSON.stringify(
         AdjustmentCancellationProjection.quotes(context).map(::wire).toTypedArray()
+    )
+}
+
+internal fun readCancellationContext(raw: dynamic): AdjustmentCancellationContext {
+    fields(raw, setOf("actor", "cash", "offers", "payouts"))
+    return AdjustmentCancellationContext(
+        actor = player(raw.actor),
+        cash = purchaseInteger(raw.cash),
+        offers =
+            purchaseArray(raw.offers).map { offer ->
+                fields(offer, setOf("command", "commodities", "cost", "cashAfter"))
+                AdjustmentCancellationOffer(
+                    purchaseString(offer.command),
+                    purchaseArray(offer.commodities)
+                        .map { Commodity.valueOf(purchaseString(it)) }
+                        .toSet(),
+                    purchaseInteger(offer.cost),
+                    purchaseInteger(offer.cashAfter),
+                )
+            },
+        payouts =
+            purchaseArray(raw.payouts).map { forecast ->
+                fields(forecast, setOf("commodity", "adjustments", "owners"))
+                CommodityPayoutView(
+                    Commodity.valueOf(purchaseString(forecast.commodity)),
+                    purchaseArray(forecast.adjustments).map {
+                        CommodityAdjustment.valueOf(purchaseString(it))
+                    },
+                    purchaseArray(forecast.owners).map { owner ->
+                        fields(
+                            owner,
+                            setOf(
+                                "player",
+                                "provinces",
+                                "marketCount",
+                                "effectiveBox",
+                                "payout",
+                                "industryBonus",
+                            ),
+                        )
+                        CommodityOwnerView(
+                            player(owner.player),
+                            purchaseArray(owner.provinces).map { province ->
+                                fields(province, setOf("value"))
+                                ProvinceId(purchaseString(province.value))
+                            },
+                            purchaseInteger(owner.marketCount),
+                            purchaseInteger(owner.effectiveBox),
+                            purchaseInteger(owner.payout),
+                            purchaseInteger(owner.industryBonus),
+                        )
+                    },
+                )
+            },
     )
 }
 

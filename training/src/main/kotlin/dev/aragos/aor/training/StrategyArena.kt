@@ -41,6 +41,7 @@ data class ArenaSpecification(
     private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
     private val initializationSource: ModelInitializationSource? = null,
     val jointPolicy: ArenaJointPolicy? = null,
+    val cancellationValue: ArenaCancellationValue? = null,
 ) {
     init {
         require(
@@ -63,6 +64,7 @@ data class ArenaSpecification(
         }
         frozenPurchase?.validate(configurations)
         jointPolicy?.validate(configurations)
+        cancellationValue?.validate(configurations)
         tokenOrder?.validate(configurations, opponents.size)
         expansionImitation?.validate(candidate, incumbent, opponents)
     }
@@ -80,6 +82,7 @@ data class ArenaSpecification(
                 listOfNotNull(
                     frozenPurchase?.identity(),
                     jointPolicy?.identity(),
+                    cancellationValue?.identity(),
                     tokenOrder?.identity(),
                     expansionImitation?.identity(),
                     experimentalRulesTransfer?.metadata(),
@@ -117,7 +120,9 @@ data class ArenaSpecification(
             expansionImitation
                 ?.controllers(playerCount, controlledSeat, side, opponentIndices)
                 .orEmpty()
-        return listOf(tokens, expansion).fold(purchase) { existing, overlay ->
+        val cancellation =
+            listOfNotNull(cancellationValue?.controller(side)?.let { controlledSeat to it }).toMap()
+        return listOf(tokens, expansion, cancellation).fold(purchase) { existing, overlay ->
             existing +
                 overlay.mapValues { (seat, controller) ->
                     val previous = existing[seat]
@@ -138,6 +143,7 @@ data class ArenaSpecification(
         mapOf("rulesVersion" to RULES_VERSION, "dataVersion" to DATA_VERSION) +
             frozenPurchase?.metadata().orEmpty() +
             jointPolicy?.metadata().orEmpty() +
+            cancellationValue?.metadata().orEmpty() +
             tokenOrder?.metadata().orEmpty() +
             expansionImitation?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
@@ -179,6 +185,7 @@ data class ArenaSpecification(
     internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
         frozenPurchase?.snapshot(artifacts)
         jointPolicy?.snapshot(artifacts)
+        cancellationValue?.snapshot(artifacts)
         tokenOrder?.snapshot(artifacts)
         expansionImitation?.snapshot(artifacts)
     }
@@ -263,6 +270,8 @@ data class ArenaSpecification(
                         node["jointPolicy"]?.let {
                             ArenaJointPolicy.read(source, it, configurations, transfer)
                         },
+                    cancellationValue =
+                        node["cancellationValue"]?.let { ArenaCancellationValue.read(source, it) },
                     tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
                     expansionImitation =
                         node["expansionImitation"]?.let {
