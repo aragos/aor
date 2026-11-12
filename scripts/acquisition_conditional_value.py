@@ -284,42 +284,69 @@ def validate_plan(output):
     return plan
 
 
+def origin_rows(origin, index, local_index, source_sha256):
+    """Keep actor-only extraction and paired labels identical across single/multi-chunk corpora."""
+    rows, features, labels, missing = [], [], [], []
+    require(origin["request"]["index"] == local_index, "Origin file and recorded local index must agree.")
+    collected = [root for root in origin["roots"] if root["status"] == "COLLECTED"]
+    require(len({root["route"] for root in collected}) == len(collected), "Routes must be unique per origin.")
+    if not collected:
+        missing.append(index)
+    for root in collected:
+        route = root["route"]
+        reference = root["provenance"]["incumbentCommand"]
+        row_features = extract(root["actorInput"], route, reference)
+        arms = {arm["role"]: arm for arm in root["arms"]}
+        require(set(arms) == {"BUY", "REFERENCE"} and arms["REFERENCE"]["command"] == reference,
+                "Labels must refer to the exact two prospectively fixed arms.")
+        require(arms["BUY"]["command"] == ("buy-card" if route == "CASH" else "buy-expansion-card"),
+                "The BUY outcome command must equal the offered acquisition command.")
+        differences = []
+        for replicate in range(2):
+            outcomes = {}
+            for arm, item in arms.items():
+                matching = [outcome for outcome in item["outcomes"] if outcome["replicate"] == replicate]
+                require(len(matching) == 1 and matching[0]["replayVerified"], "Each arm requires two audited outcomes.")
+                outcomes[arm] = matching[0]["terminal"]
+            require(outcomes["BUY"]["continuationSeed"] == outcomes["REFERENCE"]["continuationSeed"],
+                    "Paired future streams must match between arms.")
+            differences.append(numeric(outcomes["BUY"]["reward"]) - numeric(outcomes["REFERENCE"]["reward"]))
+        rows.append({"index": index, "route": route, "fold": index % FOLDS,
+                     "weight": 1.0 / len(collected), "sourceSha256": source_sha256})
+        features.append(row_features)
+        labels.append(float(np.mean(differences)))
+    return rows, features, labels, missing
+
+
 def load_rows(plan):
     """Feature extraction sees only actorInput; labels are read separately after its row is fixed."""
     rows, features, labels, missing = [], [], [], []
     dataset = Path(plan["dataset"])
     for index in range(256):
         path = dataset / f"completion/run/native/origin-{index}.json"
-        origin = read(path)
-        require(origin["request"]["index"] == index, "Origin file and recorded index must agree.")
-        collected = [root for root in origin["roots"] if root["status"] == "COLLECTED"]
-        require(len({root["route"] for root in collected}) == len(collected), "Routes must be unique per origin.")
-        if not collected:
-            missing.append(index)
-        for root in collected:
-            route = root["route"]
-            reference = root["provenance"]["incumbentCommand"]
-            row_features = extract(root["actorInput"], route, reference)
-            arms = {arm["role"]: arm for arm in root["arms"]}
-            require(set(arms) == {"BUY", "REFERENCE"} and arms["REFERENCE"]["command"] == reference,
-                    "Labels must refer to the exact two prospectively fixed arms.")
-            require(arms["BUY"]["command"] == ("buy-card" if route == "CASH" else "buy-expansion-card"),
-                    "The BUY outcome command must equal the offered acquisition command.")
-            differences = []
-            for replicate in range(2):
-                outcomes = {}
-                for arm, item in arms.items():
-                    matching = [outcome for outcome in item["outcomes"] if outcome["replicate"] == replicate]
-                    require(len(matching) == 1 and matching[0]["replayVerified"], "Each arm requires two audited outcomes.")
-                    outcomes[arm] = matching[0]["terminal"]
-                require(outcomes["BUY"]["continuationSeed"] == outcomes["REFERENCE"]["continuationSeed"],
-                        "Paired future streams must match between arms.")
-                differences.append(numeric(outcomes["BUY"]["reward"]) - numeric(outcomes["REFERENCE"]["reward"]))
-            rows.append({"index": index, "route": route, "fold": index % FOLDS,
-                         "weight": 1.0 / len(collected), "sourceSha256": plan["inputFiles"][str(path)]})
-            features.append(row_features)
-            labels.append(float(np.mean(differences)))
+        batch = origin_rows(read(path), index, index, plan["inputFiles"][str(path)])
+        for output, values in zip((rows, features, labels, missing), batch):
+            output.extend(values)
     return rows, np.asarray(features, dtype=np.float64), np.asarray(labels, dtype=np.float64), missing
+
+
+def cross_validate(rows, x, y):
+    """Exactly five original ridge fits; each route remains with its independent origin."""
+    weights = np.array([row["weight"] for row in rows], dtype=np.float64)
+    fitted = np.full(len(y), np.nan)
+    baseline = np.full(len(y), np.nan)
+    folds = []
+    for fold in range(FOLDS):
+        train, heldout = partition(rows, fold)
+        fit = fit_ridge(x[train], y[train], weights[train])
+        means = route_means(rows, y, weights, train)
+        fitted[heldout] = predict(fit, x[heldout])
+        baseline[heldout] = [means[rows[i]["route"]] for i in heldout]
+        folds.append({"fold": fold, "trainRows": train.tolist(),
+              "heldoutRows": heldout.tolist(), "trainingWorlds": len({rows[i]["index"] for i in train}),
+              "heldoutWorlds": len({rows[i]["index"] for i in heldout}), "fit": fit, "routeMeans": means})
+    require(np.isfinite(fitted).all() and np.isfinite(baseline).all(), "Every retained route needs one out-of-origin prediction.")
+    return fitted, baseline, folds
 
 
 def run(output):
@@ -331,19 +358,9 @@ def run(output):
     rows, x, y, missing = load_rows(plan)
     write(output / "features.json", {"featureNames": list(FEATURE_NAMES), "rows": rows, "values": x.tolist()})
     write(output / "labels.json", {"targets": y.tolist(), "target": plan["target"]})
-    weights = np.array([row["weight"] for row in rows], dtype=np.float64)
-    fitted = np.full(len(y), np.nan)
-    baseline = np.full(len(y), np.nan)
-    for fold in range(FOLDS):
-        train, heldout = partition(rows, fold)
-        fit = fit_ridge(x[train], y[train], weights[train])
-        means = route_means(rows, y, weights, train)
-        fitted[heldout] = predict(fit, x[heldout])
-        baseline[heldout] = [means[rows[i]["route"]] for i in heldout]
-        write(output / f"fold-{fold}.json", {"fold": fold, "trainRows": train.tolist(),
-              "heldoutRows": heldout.tolist(), "trainingWorlds": len({rows[i]["index"] for i in train}),
-              "heldoutWorlds": len({rows[i]["index"] for i in heldout}), "fit": fit, "routeMeans": means})
-    require(np.isfinite(fitted).all() and np.isfinite(baseline).all(), "Every retained route needs one out-of-origin prediction.")
+    fitted, baseline, folds = cross_validate(rows, x, y)
+    for fold in folds:
+        write(output / f"fold-{fold['fold']}.json", fold)
     write(output / "predictions.json", {"rows": rows, "ridge": fitted.tolist(), "routeMean": baseline.tolist()})
     result = {"kind": KIND, "originWorlds": 256, "rootedWorlds": len({row["index"] for row in rows}),
               "noRootWorlds": missing, "rows": len(rows), "features": x.shape[1], "fits": FOLDS,
