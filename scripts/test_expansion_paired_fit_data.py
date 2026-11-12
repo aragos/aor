@@ -105,9 +105,12 @@ class BoundaryTests(unittest.TestCase):
                              for r in rows if r['status']=='COLLECTED'] for e in epochs}
         value=dict(kind='expansion-paired-predictions-1',corpusSha256=self.corpus.sha256,
                    partition=part,epochs=epochs,predictions=predictions,
-                   checkpoints={str(e):dict(path=f'epoch-{e}.json',sha256='b'*64) for e in epochs},
+                   checkpoints={str(e):dict(path=f'epoch-{e:02d}.json',sha256='b'*64) for e in epochs},
                    publicSha256=self.corpus.public_hashes(part))
-        if part=='TEST':value['selectionSha256']=selection.sha256
+        if part=='TEST':
+            value['selectionSha256']=selection.sha256
+            selected=selection.read(self.corpus.sha256)
+            value['checkpoints'][str(selected['epoch'])]=selected['checkpoint']
         directory=tempfile.TemporaryDirectory();self.addCleanup(directory.cleanup)
         path=Path(directory.name)/'predictions.json';data.document(path,value)
         return data.PredictionSeal(path,data.sha(path))
@@ -115,9 +118,17 @@ class BoundaryTests(unittest.TestCase):
     def selection(self):
         directory=tempfile.TemporaryDirectory();self.addCleanup(directory.cleanup)
         path=Path(directory.name)/'selection.json'
+        model=path.parent/'epoch-03.json';data.document(model,{'syntheticCheckpoint':True})
+        checkpoint=dict(path=model.name,sha256=data.sha(model))
+        validation=path.parent/'validation-predictions.json'
+        data.document(validation,dict(kind='expansion-paired-predictions-1',partition='VALIDATION',
+            corpusSha256=self.corpus.sha256,epochs=list(range(1,21)),
+            predictions={str(e):[] for e in range(1,21)},
+            checkpoints={str(e):checkpoint if e==3 else dict(path=f'epoch-{e:02d}.json',sha256='b'*64)
+                         for e in range(1,21)}))
         data.document(path,dict(kind='expansion-paired-selection-1',corpusSha256=self.corpus.sha256,
-            epoch=3,validationGain=.1,checkpoint=dict(path='epoch-3.json',sha256='b'*64),
-            validationPredictionsSha256='c'*64,metrics={str(e):dict(
+            epoch=3,validationGain=.1,checkpoint=checkpoint,
+            validationPredictionsSha256=data.sha(validation),metrics={str(e):dict(
                 gain={'reward':{'mean':.1 if e==3 else 0.}},pairedMse=.1) for e in range(1,21)}))
         return data.SelectionSeal(path,data.sha(path))
 
@@ -231,6 +242,20 @@ class BoundaryTests(unittest.TestCase):
         selection=data.SelectionSeal(selection.path,data.sha(selection.path))
         with self.assertRaisesRegex(ValueError,'prescribed complete'):
             selection.read(self.corpus.sha256)
+
+    def test_changed_selected_checkpoint_cannot_invoke_test_projector(self):
+        selection=self.selection()
+        (selection.path.parent/'epoch-03.json').write_text('{"changed":true}')
+        self.corpus.test_projector=lambda _:self.fail('TEST must stay closed after checkpoint mutation')
+        with self.assertRaisesRegex(ValueError,'actual selected checkpoint'):
+            self.corpus.public('TEST',selection)
+
+    def test_changed_validation_receipt_cannot_invoke_test_projector(self):
+        selection=self.selection()
+        (selection.path.parent/'validation-predictions.json').write_text('{"changed":true}')
+        self.corpus.test_projector=lambda _:self.fail('TEST must stay closed after validation mutation')
+        with self.assertRaisesRegex(ValueError,'actual validation prediction'):
+            self.corpus.public('TEST',selection)
 
 
 if __name__=='__main__':unittest.main()

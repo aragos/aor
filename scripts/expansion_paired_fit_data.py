@@ -191,6 +191,22 @@ class SelectionSeal:
         require(validation_choice(metrics) == value['epoch']
                 and value['validationGain'] == metrics[value['epoch']]['gain']['reward']['mean'],
                 'The selected epoch must equal the prescribed complete validation comparison.')
+        checkpoint = value['checkpoint']
+        name = Path(checkpoint['path'])
+        require(name.name == str(name) and name.name == f"epoch-{value['epoch']:02d}.json"
+                and sha(self.path.parent/name) == checkpoint['sha256'],
+                'The actual selected checkpoint must remain intact before TEST features open.')
+        validation = self.path.parent/'validation-predictions.json'
+        require(sha(validation) == value['validationPredictionsSha256'],
+                'The actual validation prediction receipt changed before TEST admission.')
+        proof = read(validation)
+        require(proof['kind'] == 'expansion-paired-predictions-1'
+                and proof['partition'] == 'VALIDATION' and proof['corpusSha256'] == corpus_sha
+                and proof['epochs'] == list(range(1, 21))
+                and set(proof['checkpoints']) == {str(e) for e in range(1, 21)}
+                and set(proof['predictions']) == {str(e) for e in range(1, 21)}
+                and proof['checkpoints'][str(value['epoch'])] == checkpoint,
+                'The chosen checkpoint must bind the complete sealed validation comparison.')
         return value
 
 

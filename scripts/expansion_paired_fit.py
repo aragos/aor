@@ -254,8 +254,8 @@ def fit(corpus, purchase_path, recipe, output, *, seconds=1800):
     selection_seal = data.SelectionSeal(output/'selection.json',data.sha(output/'selection.json'))
     test = None
     if epoch is not None and corpus.counts['TEST']['ready'] >= 64:
-        budget(); rows = [r for r in corpus.public('TEST',selection_seal) if r['status']=='COLLECTED']
-        actor = ActionValue(checkpoint_model(output,checkpoints[epoch])).to(recipe.device)
+        budget(); actor = ActionValue(checkpoint_model(output,checkpoints[epoch])).to(recipe.device)
+        rows = [r for r in corpus.public('TEST',selection_seal) if r['status']=='COLLECTED']
         test_predictions = predict(actor,rows); test_path = output/'test-predictions.json'
         data.document(test_path,dict(kind='expansion-paired-predictions-1',corpusSha256=corpus.sha256,
             partition='TEST',epochs=[epoch],checkpoints={str(epoch):checkpoints[epoch]},
