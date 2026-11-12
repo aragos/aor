@@ -278,7 +278,18 @@ internal object ActivityPlans {
         return if (game.status == GameStatus.ACTIVE) reconcile(disarmed) else disarmed
     }
 
-    fun afterManual(game: StoredGame, owner: PlayerId): StoredGame {
+    fun afterManual(
+        before: StoredGame,
+        game: StoredGame,
+        owner: PlayerId,
+        command: Command?,
+    ): StoredGame {
+        val prompt = before.state().prompts().singleOrNull() as? Prompt.SinglePlayer
+        // Renaissance precedes the planned activity; answering it does not replace that intent.
+        val answersRenaissance = command == TurnCommand.Pass || command is TurnCommand.SwapOrder
+        if (answersRenaissance && prompt?.player == owner && prompt.choice == "renaissance") {
+            return reconcile(game)
+        }
         val plan = game.plans[owner] ?: return reconcile(game)
         return reconcile(
             replace(game, owner, plan.copy(signature = null, pause = PlanPause.MANUAL))

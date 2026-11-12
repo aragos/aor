@@ -24,6 +24,7 @@ export function provinceName(id: string): string { return label(id, 'province');
 /** Purchase continuations name the next step; interruptions retain their own Pass action. */
 export function purchasePassLabel(snapshot: Snapshot): string {
     switch (snapshot.prompt?.messageId) {
+        case 'prompt.renaissance': return t('action.keepTurnOrder');
         case 'prompt.purchase-shipping': return t('action.continueToAdvances');
         case 'prompt.purchase-advances': return t('action.continueToStabilization');
         case 'prompt.purchase-relief': return t('action.finishPurchase');

@@ -51,7 +51,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     const personalOptions = usePersonalOptions(liveSnapshot, requestBusy, sendCommand);
     const planner = useActivityPlanner(liveSnapshot, writePlan, quotePlan);
     const snapshot = planner.effective;
-    const busy = requestBusy || planner.loading || !!liveSnapshot.planning?.saved?.armed;
+    const busy = requestBusy || planner.loading ||
+        !!liveSnapshot.planning?.saved?.armed && liveSnapshot.prompt?.messageId !== 'prompt.renaissance';
     const actuallyActing = liveSnapshot.viewerId !== null && (liveSnapshot.prompt?.players.includes(liveSnapshot.viewerId) ?? false);
     const spectator = snapshot.viewerId === null;
     const [expansionPass, setExpansionPass] = useState<number | null>(null);
@@ -270,7 +271,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <div id="workspace-markets" role="tabpanel" aria-labelledby="tab-markets" hidden={workspace !== 'markets'}><Markets snapshot={liveSnapshot}/></div>
                 <div id="workspace-advances" role="tabpanel" aria-labelledby="tab-advances" hidden={workspace !== 'advances'}>{snapshot.game.effects.papalCategory && <p className="papal-decree-banner" role="status">
                     <strong>{t('game.forbiddenCategory')}</strong>: {label(snapshot.game.effects.papalCategory, 'category')}
-                </p>}<AdvanceTiles snapshot={snapshot}/></div>
+                </p>}<PlanningActions active={planner.open}><AdvanceTiles snapshot={snapshot} busy={busy} submit={submit}/></PlanningActions></div>
                 {inspectedAdvance && !inspectedCard && <section className="inspection-panel" aria-label={t('table.inspection')}>
                     <AdvanceDecision mode="inspection" inspectedId={inspectedAdvance} closeInspection={closeInspection} snapshot={snapshot} busy={busy} submit={submit}/>
                 </section>}
@@ -280,7 +281,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             <div className="workspace-side">
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
-                        <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
+                        <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''} ${snapshot.prompt?.messageId === 'prompt.renaissance' ? 'renaissance-pass' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
                     <div className={`decision-toolbar ${objectAction ? 'object-heading' : ''}`}>
                         <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
                         {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
@@ -327,7 +328,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                     <PlanningActions active={planner.open}>{cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : province && !picker && <ProvinceActions key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit}/>}
-                    {!spectator && !inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy || !!liveSnapshot.planning?.saved?.armed} submit={submit} quotePurchase={quotePurchase}/>}
+                    {!spectator && !inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
                     </PlanningActions>
                     {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
                     {(requestBusy || saved && !planner.supported && !['BIDDING', 'TOKEN_PURCHASE'].includes(snapshot.game.stage)) && <p className="save-status" aria-live="polite">{t(requestBusy ? 'status.working' : 'status.saved')}</p>}

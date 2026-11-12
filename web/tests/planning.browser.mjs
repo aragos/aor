@@ -6,6 +6,7 @@ import {checkPurchaseClarity} from './purchaseClarity.browser.mjs';
 import {checkReferenceUx} from './referenceUx.browser.mjs';
 import {checkBottomHand} from './bottomHand.browser.mjs';
 import {checkTable} from './table.browser.mjs';
+import {checkLivePurchaseDecisions} from './purchaseDecisions.browser.mjs';
 
 async function purchaseGame(undoPolicy = 'competitive') {
     const game = await createGame(3, {undoPolicy});
@@ -264,7 +265,7 @@ export async function checkParallelPlanning(page, web) {
     assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), 'Pass');
     await visit(2, '.card-purchase-planner');
     const cardChoice = text => `[...document.querySelectorAll('.decision-actions button')].find(button => button.textContent === ${JSON.stringify(text)})`;
-    const buyCard = 'Buy card · $10';
+    const buyCard = 'Buy on my turn · $10';
     for (const [width, height, mobile] of [[1280, 900, false], [390, 844, true]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         assert.equal(await page.evaluate(`document.querySelector('.activity-planner')`), null,
@@ -279,13 +280,13 @@ export async function checkParallelPlanning(page, web) {
         await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `aor-card-purchase-waiting-${width}.png`), width, height, mobile);
     }
     const beforeChoice = await game.snapshot(game.links[2]);
-    await page.click('Pass');
-    await page.wait(`${cardChoice('Pass')}?.getAttribute('aria-pressed') === 'true'`, 'Pass schedules in one click');
+    await page.click('Pass on my turn');
+    await page.wait(`${cardChoice('Pass on my turn')}?.getAttribute('aria-pressed') === 'true'`, 'Pass schedules in one click');
     const passChoice = await game.snapshot(game.links[2]);
     assert.deepEqual(passChoice.planning.saved.actions, [{decision: 'buy-card', command: 'pass'}]);
     assert.deepEqual(passChoice.history, beforeChoice.history, 'Choosing while waiting commits no game action');
     await page.reload();
-    await page.wait(`${cardChoice('Pass')}?.getAttribute('aria-pressed') === 'true'`, 'The scheduled choice survives reload');
+    await page.wait(`${cardChoice('Pass on my turn')}?.getAttribute('aria-pressed') === 'true'`, 'The scheduled choice survives reload');
     await page.click(buyCard);
     await page.wait(`${cardChoice(buyCard)}?.getAttribute('aria-pressed') === 'true'`, 'Buy replaces Pass in one click');
     await page.click('Cancel choice');
@@ -316,6 +317,7 @@ export async function checkParallelPlanning(page, web) {
     assert.equal(afterDraw.game.hand.length, beforeDraw.game.hand.length + 1);
     assert.equal(afterDraw.history.filter(line => line === `${game.links[2].id}: buy-card`).length, 1);
     console.log('Passed: live private planning, reload, phone layout, cancellation, reconsideration under Competitive undo, offline ordered execution and card draw boundary.');
+    await checkLivePurchaseDecisions(page, web);
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

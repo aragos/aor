@@ -105,7 +105,9 @@ warnings. Reads/replay never execute.
 Validate a whole deterministic segment, then atomically append owner-authored command revisions and
 progress. Stop at missing answers, authority outcomes or the activity boundary. Draws resolve normally
 and disarm the suffix; changed consequences pause without substituting commands. Manual actions
-cancel owner authorization, edits disarm, phase completion expires, and inactive games cannot execute.
+cancel owner authorization, except answering Renaissance before the planned activity. Its pending
+authorization survives Keep/swap and still checks consequences before execution. Edits disarm,
+phase completion expires, and inactive games cannot execute.
 Failed writes consume no progress.
 
 ## Automated seats

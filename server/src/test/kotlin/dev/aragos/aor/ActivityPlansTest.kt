@@ -41,6 +41,27 @@ class ActivityPlansTest {
     }
 
     @Test
+    fun manualPurchasePassStillCancelsOwnerAuthorization() {
+        val fixture = fileFixture()
+        fixture.toPurchase()
+        fixture.plan(1, PlanOperation.SAVE, purchase)
+        fixture.plan(1, PlanOperation.ARM)
+        fixture.store.update(fixture.game.gameId) { game ->
+            listOf("pass", "pass", "stabilize cash").fold(game) { current, command ->
+                GameDriver(FixedRandom()).submit(current, PlayerId("p1"), command)
+            }
+        }
+
+        fixture.submit(1, "pass")
+
+        val after = fixture.view(1)
+        assertThat(after.planning?.saved?.armed).isFalse()
+        assertThat(after.planning?.saved?.pause).isEqualTo(PlanPause.MANUAL)
+        assertThat(after.planning?.executions).isEmpty()
+        assertThat(after.game.players[1].advances).doesNotContain(AdvanceId.URBAN_ASCENDANCY)
+    }
+
+    @Test
     fun recoveryIgnoresLegacyDocumentsWithoutPlans() {
         val fixture = fileFixture()
         val legacyId = UUID.randomUUID().toString()
