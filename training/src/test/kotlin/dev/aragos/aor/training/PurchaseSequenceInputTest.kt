@@ -346,4 +346,156 @@ class PurchaseSequenceInputTest {
             }
         }
     }
+
+    @Test
+    fun omittedProfileKeepsOriginalManifestShapeAndLimits() {
+        Fixture().use { fixture ->
+            val input = PurchaseSequenceInput.read(fixture.source)
+            val manifest = input.manifest()
+
+            assertThat(input.study.profile).isEqualTo(PurchaseSequenceProfile.PILOT_32)
+            assertThat(manifest).doesNotContainKey("profile")
+            assertThat(manifest["maximumSimulatedTerminals"]).isEqualTo(1056)
+            assertThat(manifest["maximumSimulatedTails"]).isEqualTo(1024)
+            assertThat(manifest["maximumPartialPrefixReconstructions"]).isEqualTo(32)
+        }
+    }
+
+    @Test
+    fun enlargedSourceRequiresExplicitProfile() {
+        Fixture().use { fixture ->
+            fixture.artifacts.write(
+                "teacher.json",
+                fixture.document + ("origins" to corpusOrigins()),
+            )
+
+            assertFailsWith<IllegalArgumentException> { PurchaseSequenceInput.read(fixture.source) }
+        }
+    }
+
+    @Test
+    fun explicitCorpusRequiresAll512ProspectiveOrigins() {
+        Fixture().use { fixture ->
+            fixture.artifacts.write(
+                "teacher.json",
+                fixture.document + ("profile" to "CORPUS_512_1"),
+            )
+
+            assertFailsWith<IllegalArgumentException> { PurchaseSequenceInput.read(fixture.source) }
+        }
+    }
+
+    @Test
+    fun corpusManifestBindsItsDistinctLimits() {
+        Fixture().use { fixture ->
+            corpusSource(fixture)
+            val input = PurchaseSequenceInput.read(fixture.source)
+            val manifest = input.manifest()
+
+            assertThat(input.study.origins).hasSize(512)
+            assertThat(manifest["profile"]).isEqualTo("CORPUS_512_1")
+            assertThat(manifest["maximumSimulatedTerminals"]).isEqualTo(16896)
+            assertThat(manifest["maximumSimulatedTails"]).isEqualTo(16384)
+        }
+    }
+
+    @Test
+    fun unknownCorpusProfileCannotSilentlySelectVolume() {
+        Fixture().use { fixture ->
+            fixture.artifacts.write("teacher.json", fixture.document + ("profile" to "CORPUS_1024"))
+
+            assertFailsWith<IllegalArgumentException> { PurchaseSequenceInput.read(fixture.source) }
+        }
+    }
+
+    @Test
+    fun numericProfileIsRejectedAtItsOwner() {
+        assertFailsWith<IllegalArgumentException> {
+            PurchaseSequenceProfile.read(PurchaseJson.mapper.readTree("512"))
+        }
+    }
+
+    @Test
+    fun legacySourceCannotRequestTheCorpusTimeAllowance() {
+        Fixture().use { fixture ->
+            assertFailsWith<IllegalArgumentException> {
+                PurchaseSequenceOptions.parse(describeArguments(fixture) + listOf("--hours", "4"))
+            }
+        }
+    }
+
+    @Test
+    fun explicitCorpusPermitsFourHoursWithoutStartingGames() {
+        Fixture().use { fixture ->
+            corpusSource(fixture)
+
+            val options =
+                PurchaseSequenceOptions.parse(describeArguments(fixture) + listOf("--hours", "4"))
+
+            assertThat(options.profile).isEqualTo(PurchaseSequenceProfile.CORPUS_512_1)
+            assertThat(options.hours).isEqualTo(4.0)
+            assertThat(Files.exists(fixture.output)).isFalse()
+        }
+    }
+
+    @Test
+    fun corpusCannotExceedItsTimeAllowance() {
+        Fixture().use { fixture ->
+            corpusSource(fixture)
+
+            assertFailsWith<IllegalArgumentException> {
+                PurchaseSequenceOptions.parse(describeArguments(fixture) + listOf("--hours", "4.1"))
+            }
+        }
+    }
+
+    @Test
+    fun largerStoreFinishesOnlyAfterAll512IncrementalResults() {
+        Fixture().use { fixture ->
+            corpusSource(fixture)
+            val input = PurchaseSequenceInput.read(fixture.source)
+            val store = PurchaseSequenceStore(input, fixture.output)
+            input.study.origins.indices.forEach { store.save(syntheticResult(store, input, it)) }
+
+            store.finish(Long.MAX_VALUE)
+
+            val finished = PurchaseJson.read(fixture.output.resolve("finished.json"))
+            assertThat(finished.required("profile").asText()).isEqualTo("CORPUS_512_1")
+            assertThat(finished.required("origins").intValue()).isEqualTo(512)
+            assertThat(finished.required("simulatedTails").intValue()).isEqualTo(2048)
+        }
+    }
+
+    private fun describeArguments(fixture: Fixture): List<String> =
+        listOf(
+            "--mode",
+            "purchase-sequence",
+            "--source",
+            fixture.source.toString(),
+            "--describe",
+            "true",
+            "--workers",
+            "1",
+        )
+
+    private fun corpusOrigins(): List<Map<String, Any>> =
+        List(512) { index ->
+            mapOf(
+                "gameSeed" to index,
+                "seat" to index % 4,
+                "opponentIndices" to List(4) { 0 },
+                "continuationSeeds" to listOf(1000L + index * 2, 1001L + index * 2),
+            )
+        }
+
+    private fun corpusSource(fixture: Fixture) {
+        fixture.artifacts.write(
+            "teacher.json",
+            fixture.document +
+                mapOf(
+                    "profile" to "CORPUS_512_1",
+                    "origins" to corpusOrigins(),
+                ),
+        )
+    }
 }

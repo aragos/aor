@@ -43,6 +43,7 @@ internal data class PurchaseSequenceOrigin(
 internal class PurchaseSequenceStudy(
     val arena: ArenaSpecification,
     val origins: List<PurchaseSequenceOrigin>,
+    val profile: PurchaseSequenceProfile = PurchaseSequenceProfile.PILOT_32,
 ) {
     val configuration: TrainingConfiguration =
         requireNotNull(arena.configurations.singleOrNull()) {
@@ -54,10 +55,10 @@ internal class PurchaseSequenceStudy(
             "This bounded teacher profile requires four players."
         }
         require(
-            origins.size == PurchaseSequenceProtocol.ORIGINS &&
+            origins.size == profile.origins &&
                 origins.map { it.gameSeed }.distinct().size == origins.size
         ) {
-            "The study requires 32 independent prospective origins, including any missing roots."
+            "The study requires ${profile.origins} independent origins, including missing roots."
         }
         require(
             origins.all { origin -> origin.opponentIndices.all { it in arena.opponents.indices } }

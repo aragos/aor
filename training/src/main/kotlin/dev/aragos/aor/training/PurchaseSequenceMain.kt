@@ -11,6 +11,9 @@ internal object PurchaseSequenceMain {
         val started = System.nanoTime()
         val options = PurchaseSequenceOptions.parse(arguments)
         val input = PurchaseSequenceInput.read(options.source)
+        require(options.profile == input.study.profile) {
+            "The source profile changed between option parsing and complete input validation."
+        }
         if (options.describe) {
             println(PurchaseJson.mapper.writeValueAsString(input.manifest()))
             return
@@ -41,9 +44,7 @@ internal object PurchaseSequenceMain {
                 ) {
                     completed++
                     store.progress("collecting", completed)
-                    println(
-                        "Purchase sequence origins $completed/${PurchaseSequenceProtocol.ORIGINS}."
-                    )
+                    println("Purchase sequence origins $completed/${input.study.profile.origins}.")
                 }
             }
             checkTokenValueDeadline(deadline)
@@ -61,6 +62,7 @@ internal data class PurchaseSequenceOptions(
     val workers: Int,
     val hours: Double,
     val describe: Boolean,
+    val profile: PurchaseSequenceProfile = PurchaseSequenceProfile.PILOT_32,
 ) {
     companion object {
         fun parse(arguments: List<String>): PurchaseSequenceOptions {
@@ -110,10 +112,11 @@ internal data class PurchaseSequenceOptions(
                 "Use 1–$maximum workers under the unchanged native CPU allowance."
             }
             val hours = fields["--hours"]?.toDouble() ?: 1.0
-            require(hours.isFinite() && hours > 0 && hours <= 3) {
-                "Teacher hours must be finite, positive and at most three."
+            val profile = PurchaseSequenceProfile.read(PurchaseJson.read(source)["profile"])
+            require(hours.isFinite() && hours > 0 && hours <= profile.maximumHours) {
+                "Teacher hours must be finite, positive and at most ${profile.maximumHours}."
             }
-            return PurchaseSequenceOptions(source, output, workers, hours, describe)
+            return PurchaseSequenceOptions(source, output, workers, hours, describe, profile)
         }
     }
 }
@@ -193,7 +196,7 @@ internal class PurchaseSequenceStore(
             }
         val tails = origins.sumOf { it.first }
         val missing = origins.count { it.second }
-        check(tails <= PurchaseSequenceProtocol.MAXIMUM_TAILS) {
+        check(tails <= input.study.profile.maximumTails) {
             "Completed tails exceed the fixed study allowance."
         }
         var incidentalFinderFiles = 0
@@ -234,7 +237,7 @@ internal class PurchaseSequenceStore(
                 "qualification" to false,
                 "activation" to false,
                 "artifactSha256" to hashes,
-            ),
+            ) + input.study.profile.metadata(),
         )
         progress("completed", origins.size)
     }

@@ -48,14 +48,14 @@ private constructor(
                     input?.metadata("ordinary-$role-input.json")
                 },
             "overlays" to study.arena.overlayMetadata(),
-            "maximumSimulatedTerminals" to PurchaseSequenceProtocol.MAXIMUM_TERMINALS,
-            "maximumSimulatedTails" to PurchaseSequenceProtocol.MAXIMUM_TAILS,
-            "maximumFullCanonicalTraversals" to PurchaseSequenceProtocol.MAXIMUM_TERMINALS,
-            "maximumPartialPrefixReconstructions" to PurchaseSequenceProtocol.ORIGINS,
+            "maximumSimulatedTerminals" to study.profile.maximumTerminals,
+            "maximumSimulatedTails" to study.profile.maximumTails,
+            "maximumFullCanonicalTraversals" to study.profile.maximumTerminals,
+            "maximumPartialPrefixReconstructions" to study.profile.origins,
             "additionalFullPolicyReproductions" to 0,
             "qualification" to false,
             "activation" to false,
-        )
+        ) + study.profile.metadata()
 
     fun snapshot(directory: Path) {
         val artifacts = TrainingArtifacts(directory)
@@ -89,7 +89,12 @@ private constructor(
             val source = path.toRealPath()
             val sourceSha = PurchaseJson.hash(source)
             val node = PurchaseJson.read(source)
-            PurchaseJson.fields(node, setOf("schemaVersion", "protocol", "arena", "origins"))
+            PurchaseJson.fields(
+                node,
+                setOf("schemaVersion", "protocol", "arena", "origins"),
+                setOf("profile"),
+            )
+            val profile = PurchaseSequenceProfile.read(node["profile"])
             require(
                 PurchaseJson.integer(node.required("schemaVersion"), "schemaVersion") == 1 &&
                     PurchaseJson.text(node.required("protocol"), "protocol") ==
@@ -179,7 +184,7 @@ private constructor(
                     sourceSha,
                     arenaSource,
                     arenaHash,
-                    PurchaseSequenceStudy(arena, origins),
+                    PurchaseSequenceStudy(arena, origins, profile),
                     ordinary,
                 )
                 .also(PurchaseSequenceInput::verifySources)

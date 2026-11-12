@@ -1596,6 +1596,14 @@ The store snapshots raw sources/models and completes only after every origin/res
 passes. An existing directory is refused; missing roots remain results rather than refill requests.
 The unchanged native CPU budget permits six workers on a ten-logical-CPU Mac.
 
+An optional source `profile: "CORPUS_512_1"` requires exactly 512 prospective origins and permits
+at most four hours. Omission preserves the original 32-origin metadata and limits. The larger
+profile changes only volume: the same eligibility, plan cap, two streams and first-action controls
+remain, with a conservative maximum of 16,384 tails plus 512 backbone games. Each worker persists
+its result and canonical evidence before returning only an integer index; completed worker futures
+do not retain histories. Final verification reads one origin at a time. No profile enables resume,
+refill, fitting or activation.
+
 There is no seed allocation, campaign or fitter in this owner. Hidden authority remains inside
 the executor and separate canonical evidence, never proposals or learned inputs. A compound plan's
 return is distinct from its first action under ordinary continuation; no per-hidden-world winning
