@@ -1196,6 +1196,14 @@ Measure collection, replay memory, fitting and checkpoint costs before freezing 
 budget. Qualify the final policy on fresh games; synthetic recovery tests do not establish
 playing strength or authorize changing the browser policy.
 
+The separate [paired expansion research recipe](expansion-paired-fit.md) fits one sigmoid Q
+model to frozen first-action proposals under unchanged continuation. Its versioned
+[reader](../scripts/expansion_paired_fit_data.py) separates public projections from paired labels;
+the [fitter](../scripts/expansion_paired_fit.py) selects by sealed validation decisions, preserving
+the explicit E fallback and a closed TEST partition until admission. This contract has no native
+or browser policy loader. Source-level synthetic checks do not authorize reading real inputs or
+running its fit.
+
 ### Paired card advantage experiments
 
 The separate [advantage collector](../training/src/main/kotlin/dev/aragos/aor/training/CardAdvantageCollectionInput.kt)

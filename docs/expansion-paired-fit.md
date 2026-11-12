@@ -8,15 +8,25 @@ continuation. The frozen family72 TRAIN/VALIDATION/TEST partition and missing re
 ## Fixed model and objective
 
 Use one 64-wide network: `h=tanh(Ws*x+bs)`, `z=tanh(h+Wa*a+ba)`,
-`q=sigmoid(w*z+b)`. Warm only state columns whose names and units are verified against the common
+`q=sigmoid(w*z+b)`, with the existing purchase learner's Float64 units/arithmetic. The scientific
+backend is CUDA, with deterministic operations, one CPU thread and TF32 disabled; CPU execution is
+used only for source-level synthetic tests. Warm only state columns whose names and units are verified against the common
 `RawActorState` owner, plus the state bias, from the exact G3 PURCHASE head. Unmatched state columns
 and action bias are zero; the action matrix has one prospectively frozen Glorot initialization;
 the scalar head is zero. Transfer no action/value weights or optimizer state. Initial Q is 0.5
 for every action. Verify the actual hidden-state function on shared-column synthetic inputs;
 constant output predictions cannot establish transfer parity.
 
+The common-column map is every original purchase state name except the two `decision.*` flags,
+which the shared owner explicitly adds separately. Require every common name in the new complete
+dictionary. Action weights use `random.Random(initializationSeed).uniform(-s,s)` in row-major
+order, where `s=sqrt(6/(64+actionFeatureCount))`. The execution package pins the exact qualified
+G3 purchase bytes, dictionary and all three encoder owners. There is no inferred feature scaling.
+
 Train every parameter with fresh Adam, learning rate 0.001, for all 20 epochs, with batches of
-64 whole origins and prospectively frozen initialization/shuffle streams. No hyperparameter grid,
+64 whole origins and prospectively frozen initialization/shuffle streams. Each epoch uses its own
+declared PCG64 permutation stream through the existing numerical order helper. Adam retains the
+existing betas `(0.9,0.999)`, epsilon `1e-8`, zero weight decay and no AMSGrad. No hyperparameter grid,
 early stopping, reseeding or optimizer restart is permitted. Each captured origin contributes
 equally. Its loss is the mean squared error of `q(action)-q(E)` against the mean of its two paired
 terminal-return differences, over non-E arms, plus 0.1 times mean absolute-return squared error
@@ -49,6 +59,14 @@ returns. Report equal-origin paired reward gain and a fixed 95% interval; win an
 are descriptive. A positive lower reward bound supports ranking within the sampled action sets
 under G3 continuation, not unrestricted action selection or whole-game strength. No alternate
 epoch, threshold change, refit or fallback follows TEST.
+
+Public preparation exports only TRAIN and VALIDATION. The Jackson streaming adapter skips original
+outcome, private view and prefix trees, retaining the encoder and original offered proposal subset.
+TEST readiness uses only completed-native status receipts. A separately pinned lazy projector may
+open TEST actor inputs only after the selected-model receipt and metadata gate; its exact projection
+hashes are then sealed with that one model's predictions. No TEST features are pre-exported.
+The label reader independently joins original source hashes, commands, E reference, paired streams
+and reward units to the exported public subset. Missing roots remain visible but unlabeled.
 
 ## Execution boundary
 
