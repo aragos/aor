@@ -11,6 +11,10 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "purchase-sequence") }) {
+        PurchaseSequenceMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "joint-replay") }) {
         JointReproduction.run(arguments.toList())
         return

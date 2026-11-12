@@ -39,7 +39,7 @@ internal data class PurchaseSequenceOrigin(
     }
 }
 
-/** No parser, campaign, seed allocation or fitting entry point is activated by this prototype. */
+/** A fixed parsed study; seed allocation, campaign supervision and fitting remain external. */
 internal class PurchaseSequenceStudy(
     val arena: ArenaSpecification,
     val origins: List<PurchaseSequenceOrigin>,

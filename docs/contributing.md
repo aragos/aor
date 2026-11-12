@@ -1568,9 +1568,9 @@ predictive diagnostic, without actor updates or playing-strength qualification. 
 `python -m unittest discover -s scripts -p 'test_joint_state_value_*.py'` in the dedicated
 numerical environment.
 
-### Purchase-sequence teacher prerequisite
+### Bounded purchase-sequence diagnostic
 
-The source-only `PurchaseSequenceTeacher` prototype captures the first actual incumbent advance
+The `PurchaseSequenceTeacher` diagnostic captures the first actual incumbent advance
 pass with positive current-turn MR, positive misery, no complete tier and a directly offered advance
 in the sole missing category. Its 32 prospective origins are never refilled when a root is missing.
 This root is already past shipping. `ActivityPlanning.preview` supplies authoritative child offers;
@@ -1588,9 +1588,17 @@ authoritative canonical reconstructions are additionally counted, without fresh 
 The prototype performs no additional full-policy reproduction runs: each backbone and tail has
 one canonical traversal, and each captured root has one partial-prefix reconstruction.
 
-This prerequisite has no CLI, seed allocation, campaign or fitter. Hidden authority remains inside
+The explicit native mode is `--mode purchase-sequence --source SOURCE --output NEW_DIRECTORY
+--workers N --hours HOURS` (at most three hours). `--describe true` validates the source without
+creating output or running games. The source binds an existing arena and exactly 32 explicit
+`{gameSeed, seat, opponentIndices, continuationSeeds}` origins, each with two distinct streams.
+The store snapshots raw sources/models and completes only after every origin/result/evidence hash
+passes. An existing directory is refused; missing roots remain results rather than refill requests.
+The unchanged native CPU budget permits six workers on a ten-logical-CPU Mac.
+
+There is no seed allocation, campaign or fitter in this owner. Hidden authority remains inside
 the executor and separate canonical evidence, never proposals or learned inputs. A compound plan's
 return is distinct from its first action under ordinary continuation; no per-hidden-world winning
 plan is a policy target. A future experiment still requires frozen input/model snapshots, a
 reviewed runner/resource contract and source/evidence validation before games. Focused synthetic
-checks: `./gradlew :training:test --tests '*PurchaseSequenceTeacherTest'`.
+checks: `./gradlew :training:test --tests '*PurchaseSequence*Test'`.

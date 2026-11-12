@@ -151,6 +151,26 @@ class PurchaseSequenceTeacherTest {
     }
 
     @Test
+    fun harmfulLegalCompletionsRemainOfferedAndAreCountedSeparately() {
+        val original =
+            state(
+                advances =
+                    acquisitions.filter { it.advance != AdvanceId.PATRONAGE } +
+                        AdvanceAcquisition(AdvanceId.WRITTEN_RECORD, 1)
+            )
+        val owner = requireNotNull(original.players[actor]) { "The synthetic owner must exist." }
+        val state =
+            original.copy(
+                players = original.players + (actor to owner.copy(misery = MiseryStep.THOUSAND))
+            )
+        val proposals =
+            PurchaseSequencePlans.propose(state, actor, BotObservations.from(state, actor))
+        assertThat(proposals.completionCoverage.chaos).isGreaterThan(0)
+        assertThat(proposals.completionCoverage.nonChaos).isEqualTo(0)
+        assertThat(proposals.plans.map { it.commands.first() }).contains("buy-advance E")
+    }
+
+    @Test
     fun eachProposedChildUsesFreshAuthoritativeOffers() {
         val state = state()
         val proposals =

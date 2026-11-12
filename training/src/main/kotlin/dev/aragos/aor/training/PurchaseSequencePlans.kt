@@ -103,6 +103,8 @@ internal data class PurchaseSequencePlan(
     }
 }
 
+internal data class PurchaseCompletionCoverage(val nonChaos: Int, val chaos: Int)
+
 internal data class PurchaseSequenceProposals(
     val plans: List<PurchaseSequencePlan>,
     val availableFirstActions: Int,
@@ -110,6 +112,7 @@ internal data class PurchaseSequenceProposals(
     val legalTwoAdvancePrefixes: Int,
     val excludedFirstActions: List<String>,
     val truncatedTwoAdvancePrefixes: Int,
+    val completionCoverage: PurchaseCompletionCoverage,
 )
 
 /**
@@ -180,6 +183,13 @@ internal object PurchaseSequencePlans {
             legalTwoAdvancePrefixes = doubles.size,
             excludedFirstActions = first.drop(selected.size),
             truncatedTwoAdvancePrefixes = doubles.size - retainedDoubles.size,
+            completionCoverage =
+                observation.candidates
+                    .filter { PurchaseSequenceEligibility.completion(it.command, missing) }
+                    .let { completions ->
+                        val chaos = completions.count { (it.features["chaos"] ?: 0.0) > 0.0 }
+                        PurchaseCompletionCoverage(completions.size - chaos, chaos)
+                    },
         )
     }
 
