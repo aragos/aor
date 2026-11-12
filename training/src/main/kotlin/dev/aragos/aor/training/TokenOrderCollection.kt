@@ -31,6 +31,9 @@ internal data class TokenOrderSpecification(
         require(arena.candidate == arena.incumbent) {
             "Token-order roots require identical ordinary candidate and incumbent baselines."
         }
+        require(arena.jointPolicy == null) {
+            "Joint actor roles are supported only by complete arena and strategy replay."
+        }
         if (continuationProtocol == null) {
             require(arena.tokenOrder == null && arena.expansionImitation == null) {
                 "Legacy token-order roots require ordinary baselines without a learned token overlay or expansion imitation."

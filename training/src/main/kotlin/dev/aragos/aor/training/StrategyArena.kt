@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.DATA_VERSION
 import dev.aragos.aor.RULES_VERSION
@@ -39,6 +40,7 @@ data class ArenaSpecification(
     val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
     private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
     private val initializationSource: ModelInitializationSource? = null,
+    val jointPolicy: ArenaJointPolicy? = null,
 ) {
     init {
         require(
@@ -56,7 +58,11 @@ data class ArenaSpecification(
             "An arena requires 1–10000 pairs per configuration and at most 100000 pairs overall."
         }
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
+        require(frozenPurchase == null || jointPolicy == null) {
+            "Frozen purchase and joint actor roles are mutually exclusive."
+        }
         frozenPurchase?.validate(configurations)
+        jointPolicy?.validate(configurations)
         tokenOrder?.validate(configurations, opponents.size)
         expansionImitation?.validate(candidate, incumbent, opponents)
     }
@@ -73,6 +79,7 @@ data class ArenaSpecification(
             ) +
                 listOfNotNull(
                     frozenPurchase?.identity(),
+                    jointPolicy?.identity(),
                     tokenOrder?.identity(),
                     expansionImitation?.identity(),
                     experimentalRulesTransfer?.metadata(),
@@ -91,7 +98,15 @@ data class ArenaSpecification(
         ordinary: BotModel,
         opponentIndices: List<Int>? = null,
     ): Map<Int, SimulationController> {
-        val purchase = frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
+        val purchase =
+            jointPolicy?.controllers(
+                playerCount,
+                controlledSeat,
+                side,
+                ordinary,
+                opponentIndices,
+                opponents,
+            ) ?: frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
         val policy = tokenOrder
         val evaluated = policy?.controller(side, ordinary)
         val tokens =
@@ -122,6 +137,7 @@ data class ArenaSpecification(
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
         mapOf("rulesVersion" to RULES_VERSION, "dataVersion" to DATA_VERSION) +
             frozenPurchase?.metadata().orEmpty() +
+            jointPolicy?.metadata().orEmpty() +
             tokenOrder?.metadata().orEmpty() +
             expansionImitation?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
@@ -162,6 +178,7 @@ data class ArenaSpecification(
 
     internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
         frozenPurchase?.snapshot(artifacts)
+        jointPolicy?.snapshot(artifacts)
         tokenOrder?.snapshot(artifacts)
         expansionImitation?.snapshot(artifacts)
     }
@@ -242,6 +259,10 @@ data class ArenaSpecification(
                         node["frozenPurchase"]?.let {
                             ArenaPurchasePolicy.read(source, it, transfer)
                         },
+                    jointPolicy =
+                        node["jointPolicy"]?.let {
+                            ArenaJointPolicy.read(source, it, configurations, transfer)
+                        },
                     tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
                     expansionImitation =
                         node["expansionImitation"]?.let {
@@ -301,6 +322,7 @@ data class ArenaPair(
     val opponentIndices: List<Int>,
     val candidate: ArenaGame,
     val incumbent: ArenaGame,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
 )
 
 object StrategyArena {
@@ -403,6 +425,7 @@ object StrategyArena {
             lineup.opponentIndices,
             candidate,
             incumbent,
+            specification.jointPolicy?.binding(),
         )
     }
 

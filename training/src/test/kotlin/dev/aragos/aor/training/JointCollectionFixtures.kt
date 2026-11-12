@@ -14,13 +14,16 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /** Complete four-player dictionaries with small independent bundle/source fixtures. */
-internal class JointCollectionFixture(games: Int = 1, learnedRivals: Boolean = false) :
-    AutoCloseable {
+internal class JointCollectionFixture(
+    games: Int = 1,
+    learnedRivals: Boolean = false,
+    val configuration: TrainingConfiguration =
+        TrainingMatrix.stratified.first { it.playerCount == 4 },
+) : AutoCloseable {
     val directory: Path = Files.createTempDirectory("aor-joint-collection-")
     val artifacts = TrainingArtifacts(directory.resolve("inputs"))
     val source: Path = artifacts.directory.resolve("source.json")
     val output: Path = directory.resolve("output")
-    val configuration = TrainingMatrix.stratified.first { it.playerCount == 4 }
 
     init {
         artifacts.model(BotModels.default, "baseline.json")

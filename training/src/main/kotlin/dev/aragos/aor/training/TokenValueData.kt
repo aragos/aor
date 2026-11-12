@@ -90,6 +90,9 @@ data class TokenValueSpecification(
         require(arena.frozenPurchase == null) {
             "Token-value collection does not support an arena frozenPurchase environment."
         }
+        require(arena.jointPolicy == null) {
+            "Joint actor roles are supported only by complete arena and strategy replay."
+        }
         require(arena.tokenOrder == null) {
             "Token-value collection cannot apply a tokenOrder overlay."
         }

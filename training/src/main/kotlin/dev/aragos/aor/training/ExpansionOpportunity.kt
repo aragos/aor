@@ -25,6 +25,9 @@ internal data class ExpansionOpportunitySpecification(
     val continuationReplicates: Int = 2,
 ) {
     init {
+        require(arena.jointPolicy == null) {
+            "Joint actor roles are supported only by complete arena and strategy replay."
+        }
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
             "Expansion diagnostics require exactly one SCREENING configuration."
         }
