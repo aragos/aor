@@ -13,17 +13,7 @@ fun evaluatePurchasePolicy(observationJson: String, modelJson: String, uniform: 
     require(observationJson.length <= 8_000_000 && modelJson.length <= 24_000_000) {
         "Purchase inference input exceeds its transport bound."
     }
-    val input = JSON.parse<dynamic>(observationJson)
-    val observation =
-        PurchaseObservation(
-            encoderVersion = purchaseString(input.encoderVersion),
-            stateFeatures = purchaseMap(input.stateFeatures),
-            actions =
-                purchaseArray(input.actions).map { action ->
-                    PurchaseAction(purchaseString(action.command), purchaseMap(action.features))
-                },
-            baselineIndex = purchaseInteger(input.baselineIndex),
-        )
+    val observation = readPurchaseObservation(observationJson)
     val model = readPurchaseModel(JSON.parse<dynamic>(modelJson))
     val evaluation = PurchasePolicy.evaluate(observation, model)
     val choice = PurchasePolicy.select(observation, evaluation, uniform)
@@ -35,6 +25,20 @@ fun evaluatePurchasePolicy(observationJson: String, modelJson: String, uniform: 
     result.command = choice.command
     result.logProbability = choice.logProbability
     return JSON.stringify(result)
+}
+
+internal fun readPurchaseObservation(json: String): PurchaseObservation {
+    require(json.length <= 8_000_000) { "Purchase observation exceeds its transport bound." }
+    val input = JSON.parse<dynamic>(json)
+    return PurchaseObservation(
+        encoderVersion = purchaseString(input.encoderVersion),
+        stateFeatures = purchaseMap(input.stateFeatures),
+        actions =
+            purchaseArray(input.actions).map { action ->
+                PurchaseAction(purchaseString(action.command), purchaseMap(action.features))
+            },
+        baselineIndex = purchaseInteger(input.baselineIndex),
+    )
 }
 
 internal fun readPurchaseModel(raw: dynamic): PurchasePolicyModel =

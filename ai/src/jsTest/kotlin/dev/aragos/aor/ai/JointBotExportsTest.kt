@@ -150,6 +150,168 @@ class JointBotExportsTest {
         )
     }
 
+    @Test
+    fun supportedCardProfileExcludesOnlyKnownOwnChaos() {
+        val projected = JSON.parse<dynamic>(projection("card"))
+        projected.actions[1].features["effect.role.0.chaos"] = 1.0
+        val selector = JointBotSelector(baseline(), incumbent(), supportedAsset())
+
+        listOf(0, 17, Int.MIN_VALUE, Int.MAX_VALUE).forEach { seed ->
+            assertEquals(
+                "pass",
+                selector.choose(
+                    observation("play-cards"),
+                    null,
+                    JSON.stringify(projected),
+                    "HARD",
+                    seed,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun supportedPurchaseProfileRetainsTheSurvivingAlternative() {
+        val projected = JSON.parse<dynamic>(projection("purchase"))
+        projected.actions[0].features.chaos = 1.0
+        val selector = JointBotSelector(baseline(), incumbent(), supportedAsset())
+
+        assertEquals(
+            "pass",
+            selector.choose(
+                observation("purchase-advances"),
+                JSON.stringify(projected),
+                null,
+                "HARD",
+                17,
+            ),
+        )
+    }
+
+    @Test
+    fun uncertainCardConsequencePreservesTheOriginalSample() {
+        val projected = JSON.parse<dynamic>(projection("card"))
+        projected.actions[1].features["effect.role.0.chaos"] = 1.0
+        projected.actions[1].features["effect.role.0.miseryUncertain"] = 1.0
+        val raw = JointBotSelector(baseline(), incumbent(), asset())
+        val supported = JointBotSelector(baseline(), incumbent(), supportedAsset())
+        val input = observation("play-cards")
+        val facts = JSON.stringify(projected)
+
+        listOf(0, 17, Int.MIN_VALUE, Int.MAX_VALUE).forEach { seed ->
+            assertEquals(
+                raw.choose(input, null, facts, "HARD", seed),
+                supported.choose(input, null, facts, "HARD", seed),
+            )
+        }
+    }
+
+    @Test
+    fun allKnownChaosCardActionsPreserveTheOriginalSample() {
+        val projected = JSON.parse<dynamic>(projection("card"))
+        projected.actions[0].features["effect.role.0.chaos"] = 1.0
+        projected.actions[1].features["effect.role.0.chaos"] = 1.0
+        val raw = JointBotSelector(baseline(), incumbent(), asset())
+        val supported = JointBotSelector(baseline(), incumbent(), supportedAsset())
+        val input = observation("play-cards")
+        val facts = JSON.stringify(projected)
+
+        listOf(0, 17, Int.MIN_VALUE, Int.MAX_VALUE).forEach { seed ->
+            assertEquals(
+                raw.choose(input, null, facts, "HARD", seed),
+                supported.choose(input, null, facts, "HARD", seed),
+            )
+        }
+    }
+
+    @Test
+    fun supportDoesNotEnterEasyNormalOrOtherSetupScopes() {
+        val raw = JointBotSelector(baseline(), incumbent(), asset())
+        val supported = JointBotSelector(baseline(), incumbent(), supportedAsset())
+        val projected = JSON.parse<dynamic>(projection("purchase"))
+        projected.actions[0].features.chaos = 1.0
+        val facts = JSON.stringify(projected)
+        val input = observation("purchase-advances")
+        val cases =
+            listOf(
+                input to "EASY",
+                input to "NORMAL",
+                input.replace("\"playerCount\":4", "\"playerCount\":3") to "HARD",
+                observation("expand") to "HARD",
+            )
+
+        cases.forEach { (ordinary, difficulty) ->
+            assertEquals(
+                raw.choose(ordinary, facts, null, difficulty, 17),
+                supported.choose(ordinary, facts, null, difficulty, 17),
+            )
+        }
+    }
+
+    @Test
+    fun unknownSupportProfileCannotSilentlyInstallAnUnrecognizedBehavior() {
+        val raw = JSON.parse<dynamic>(supportedAsset())
+        raw.supportProfile = "future-support"
+        val selector = JointBotSelector(baseline(), incumbent(), JSON.stringify(raw))
+        val fallback = PurchaseBotSelector(baseline(), incumbent())
+        val input = observation("purchase-advances")
+
+        assertEquals(
+            fallback.choose(input, projection("purchase"), "HARD", 17),
+            selector.choose(input, projection("purchase"), null, "HARD", 17),
+        )
+    }
+
+    @Test
+    fun supportedDiagnosticExportsExposeConditionalProbabilityAndUnchangedValue() {
+        val raw = JSON.parse<dynamic>(projection("card"))
+        raw.baselineIndex = 0
+        raw.actions[1].features["effect.role.0.chaos"] = 1.0
+        val input = JSON.stringify(raw)
+        val modelJson = model("card", active = true)
+        val original = JSON.parse<dynamic>(evaluateCardPolicy(input, modelJson, .5))
+        val supported = JSON.parse<dynamic>(evaluateKnownOwnChaosCardPolicy(input, modelJson, .5))
+
+        assertEquals(KnownOwnChaosSupport.VERSION, purchaseString(supported.supportProfile))
+        assertEquals("pass", purchaseString(supported.command))
+        assertEquals(1.0, purchaseNumber(supported.probabilities[0]))
+        assertEquals(0.0, purchaseNumber(supported.probabilities[1]))
+        assertEquals(1, purchaseInteger(supported.excludedIndices[0]))
+        assertEquals(0.0, purchaseNumber(supported.logProbability))
+        assertEquals(purchaseNumber(original.value), purchaseNumber(supported.value))
+        assertEquals(
+            JSON.stringify(original.probabilities),
+            JSON.stringify(supported.originalProbabilities),
+        )
+    }
+
+    @Test
+    fun supportedPurchaseExportPreservesTheOriginalProbabilityReference() {
+        val raw = JSON.parse<dynamic>(projection("purchase"))
+        raw.baselineIndex = 1
+        raw.actions[0].features.chaos = 1.0
+        val input = JSON.stringify(raw)
+        val modelJson = model("purchase", active = true)
+        val original = JSON.parse<dynamic>(evaluatePurchasePolicy(input, modelJson, .5))
+        val supported =
+            JSON.parse<dynamic>(evaluateKnownOwnChaosPurchasePolicy(input, modelJson, .5))
+
+        assertEquals("pass", purchaseString(supported.command))
+        assertEquals(0.0, purchaseNumber(supported.probabilities[0]))
+        assertEquals(1.0, purchaseNumber(supported.probabilities[1]))
+        assertEquals(purchaseNumber(original.value), purchaseNumber(supported.value))
+        assertEquals(
+            JSON.stringify(original.probabilities),
+            JSON.stringify(supported.originalProbabilities),
+        )
+    }
+
+    private fun supportedAsset(): String {
+        val raw = JSON.parse<dynamic>(asset())
+        raw.supportProfile = KnownOwnChaosSupport.VERSION
+        return JSON.stringify(raw)
+    }
+
     private fun baseline() = """{"schemaVersion":1,"weights":{"test.baseline":1}}"""
 
     private fun configuration() =
@@ -178,12 +340,24 @@ class JointBotExportsTest {
     private fun vector(value: Double = 0.0) =
         List(64) { value }.joinToString(prefix = "[", postfix = "]")
 
-    private fun model(phase: String, active: Boolean): String =
-        """{"schemaVersion":1,"encoderVersion":"aor-$phase-observation-1","hiddenSize":64,
-        "baselineProbability":0.97,"stateFeatureNames":["root"],"actionFeatureNames":["choice"],
-        "stateWeights":${vector()},"stateBias":${vector()},"actionWeights":${vector(if (active) 1.0 else 0.0)},
+    private fun model(phase: String, active: Boolean): String {
+        val features =
+            if (phase == "card") {
+                listOf("choice", "effect.role.0.chaos", "effect.role.0.miseryUncertain")
+            } else {
+                listOf("chaos", "choice")
+            }
+        val names = features.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+        val weights =
+            List(64) { features.map { if (active && it == "choice") 1.0 else 0.0 } }
+                .flatten()
+                .joinToString(prefix = "[", postfix = "]")
+        return """{"schemaVersion":1,"encoderVersion":"aor-$phase-observation-1","hiddenSize":64,
+        "baselineProbability":0.97,"stateFeatureNames":["root"],"actionFeatureNames":$names,
+        "stateWeights":${vector()},"stateBias":${vector()},"actionWeights":$weights,
         "actionBias":${vector()},"actorWeights":${vector(if (active) 1.0 else 0.0)},
         "valueWeights":${vector()},"valueBias":0}"""
+    }
 
     private fun incumbent() =
         """{"schemaVersion":1,"actorVersion":"aor-purchase-policy-1",
