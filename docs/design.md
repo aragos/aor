@@ -188,8 +188,11 @@ loads card and purchase actors atomically for the exact current Hard configurati
 card projection contains only the acting seat's encoded facts and offered actions; the browser
 binds the declared ordinary card prior and purchase prior independently. Both heads retain native
 seeded sampling. Missing components, incompatible scopes or malformed projections preserve the
-existing selector. The joint asset remains disabled until the complete bundle is independently
-qualified and native/browser inference parity is verified; no persisted game fields are added.
+existing selector. The current joint asset uses the independently qualified chronological bundle,
+with raw M8 as its card prior and F0 as its purchase prior. Two fresh complete-game banks validate
+the exact bundle against the preceding G2 policy; native and browser checks preserve sampled
+commands. This does not establish chronological credit assignment's superiority or human-level
+strength. The preceding purchase selector remains the fallback; no persisted game fields are added.
 
 [Full-game experiments](contributing.md#full-game-strategy-experiments) freeze the candidate,
 incumbent and opponent population, rotate the replacement seat and pair chance seeds. Low-dimensional
