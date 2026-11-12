@@ -1567,3 +1567,22 @@ raw whole-world and separate phase errors with explicit empty-world denominators
 predictive diagnostic, without actor updates or playing-strength qualification. Focused checks:
 `python -m unittest discover -s scripts -p 'test_joint_state_value_*.py'` in the dedicated
 numerical environment.
+
+### Fixed joint-policy qualification
+
+The standalone [qualification adapter](../scripts/joint_chrono_qualification.py) evaluates one
+already selected, byte-frozen card/purchase bundle against the actual qualified raw-card anchor.
+Both roles retain the sampled native policy contract and the exact ordinary, token, expansion and
+purchase-prior bindings. Eight 512-pair native chunks preserve each 4,096-world bank's original
+seed, controlled seat and rival schedule. No chunk result selects a candidate or opens another bank;
+both complete paired win-share and reward 99% lower bounds must be positive. Confirmation failure
+leaves heldout unexecuted, with no fallback actor or automatic successor.
+
+The [evidence owner](../scripts/joint_chrono_evidence.py) validates every full native role descriptor
+before retaining compact outcomes, then verifies a lossless archive before removing expanded chunk
+files. Fixed historical side replays remain part of that archive. This bounds native and Python
+retention without changing model inference, game math or terminal evidence. Native failures remain
+failures; derived analyses of older incomplete runs are disclosed separately from qualification.
+The adapter and its Python closure are frozen alongside an unchanged native distribution, rather
+than replacing the native launcher. Focused checks:
+`python -m unittest discover -s scripts -p 'test_joint_chrono_*.py'`.
