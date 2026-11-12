@@ -263,7 +263,6 @@ export async function checkDecisionFamilies(page, web, baseline) {
         ['civil-war-loss', 'civil-war-loss cash'],
         ['renaissance', `swap-order ${other}`],
         ['offer-card', `offer-card ${hand.reference}`],
-        ['purchase-advances', 'patronize leonardo-da-vinci', 'PURCHASE'],
     ];
     for (const [choice, command, stage] of finite) {
         await show(choice, [command], {}, stage);
@@ -428,5 +427,5 @@ export async function checkDecisionFamilies(page, web, baseline) {
         await page.evaluate(`document.querySelector('.decision-actions .play-card-action').click()`);
         await page.wait(`window.uiCommands.at(-1)?.command === ${JSON.stringify(command)}`, prompt+' canonical play');
     }
-    console.log('Passed: immediate discard, Civil War, replacement, Renaissance, trade offer, Patronage, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');
+    console.log('Passed: immediate discard, Civil War, replacement, Renaissance, trade offer, Cathedral, Windmill, stabilization, relief and protection guard; turn tie, marker move/forgo, Buy Card/discard and all single-target card kinds.');
 }

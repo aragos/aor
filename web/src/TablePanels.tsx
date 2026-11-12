@@ -11,6 +11,13 @@ import {useMapSelection} from './map/MapSelection';
 import {LeaderCredit} from './LeaderCredit';
 import {AdvancePrice} from './AdvancePrice';
 import {finiteDecisions, leaderReference} from './decisionOffers';
+import {DecisionAction} from './DecisionActions';
+
+interface AdvanceActions {
+    snapshot: Snapshot;
+    busy: boolean;
+    submit: (command: string) => Promise<boolean>;
+}
 
 export function Emblem({player, size = 20}: {player: Pick<PlayerView, 'capital'>; size?: number}) {
     return <svg width={size} height={size} viewBox="-28 -28 56 56" aria-hidden="true">
@@ -190,13 +197,13 @@ export function Markets({snapshot}: {snapshot: Snapshot}) {
     </section>;
 }
 
-export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
+export function AdvanceTiles({snapshot, busy, submit}: AdvanceActions) {
     const {selectedAdvance, setSelectedAdvance, setSelected, setSelectedCard, setPicker, setInspection, setSelectedAction} = useMapSelection();
     const me = snapshot.game.players.find(player => player.id === snapshot.viewerId);
     const advances = snapshot.game.catalog?.advances ?? [];
     const categories = [...new Set(advances.map(advance => advance.category))];
     return <section className="advances-workspace" aria-label={t('game.advances')}>
-        <PlayedLeaders snapshot={snapshot}/>
+        <PlayedLeaders snapshot={snapshot} busy={busy} submit={submit}/>
         {categories.map(category => <div className="advance-category" key={category}>
             <h3>{label(category, 'category')}{me && <> <small>{advances.filter(advance => advance.category === category && me.advances.includes(advance.id)).length}</small></>}</h3>
             <div className="advance-tiles">{advances.filter(advance => advance.category === category).map(advance => {
@@ -228,18 +235,18 @@ export function AdvanceTiles({snapshot}: {snapshot: Snapshot}) {
     </section>;
 }
 
-export function PlayedLeaders({snapshot}: {snapshot: Snapshot}) {
-    const {selectedAction, setSelectedAction, setInspection} = useMapSelection();
+export function PlayedLeaders({snapshot, busy, submit}: AdvanceActions) {
+    const {setInspection} = useMapSelection();
     const leaders = snapshot.game.effects.leaders;
     if (!leaders.length) return null;
     return <section className="leader-list" aria-label={t('game.leaders')}><h3>{t('game.leaders')}</h3>{leaders.map(leader => {
         const credits = snapshot.game.playedLeaderDiscounts?.find(candidate => candidate.leader === leader.leader);
         const inBox = leader.role === 'DISPLAY';
         const claim = finiteDecisions(snapshot).find(offer => offer.kind === 'patronage' && offer.subject.id === leaderReference(leader.leader));
+        const payment = snapshot.game.patronageOffers?.find(offer => offer.command === claim?.command);
         return <article key={leader.leader} className={inBox ? 'leader-in-box' : 'leader-exposed'} data-played-leader={leader.leader}>
             <span className="leader-role">{inBox ? t('table.inTheBox') : label(leader.role, 'leaderRole')}</span>
             <button type="button" className="map-link" onClick={() => setInspection({kind: 'history-card', id: leaderReference(leader.leader)})}>{label(leader.leader, 'leader')}</button>
-            {claim && <button type="button" className="secondary" aria-pressed={selectedAction === claim.command} onClick={() => setSelectedAction(claim.command)}>{t('action.patronize')}</button>}
             <p className="small"><PlayerLabel snapshot={snapshot} id={leader.owner}/></p>
             {leader.mongolEnhanced && <p className="small leader-enhancement">{t('table.mongolEnhanced')}</p>}
             {credits && <><p className="leader-credits-label">{t(credits.usable ? 'table.yourLeaderCredits' : 'table.leaderCredits')}</p>
@@ -249,6 +256,12 @@ export function PlayedLeaders({snapshot}: {snapshot: Snapshot}) {
                 </div>)}</>}
             {leader.role === 'EXPOSED' && <p className="small">{t('game.protection')}: ${leader.protectionCash}</p>}
             {leader.patronageClaimants.length > 0 && <p className="small">{t('game.claimants')}: <PlayerLabels snapshot={snapshot} ids={leader.patronageClaimants}/></p>}
+            {claim && payment && <div className="patronage-purchase">
+                <p><PlayerLabel snapshot={snapshot} id={payment.payer}/>: ${snapshot.game.players.find(player => player.id === payment.payer)?.cash} → ${payment.payerCashAfter}</p>
+                <p><PlayerLabel snapshot={snapshot} id={payment.recipient}/>: ${snapshot.game.players.find(player => player.id === payment.recipient)?.cash} → ${payment.recipientCashAfter}</p>
+                <DecisionAction inline className="patronage-action" disabled={busy}
+                    onClick={() => {void submit(claim.command);}}>{t('action.patronize')} {label(leader.leader, 'leader')} · ${payment.cost}</DecisionAction>
+            </div>}
         </article>;
     })}</section>;
 }

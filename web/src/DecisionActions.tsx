@@ -46,14 +46,15 @@ export function DecisionForm({id, ...props}: FormHTMLAttributes<HTMLFormElement>
     return <ActionForm.Provider value={formId}><form {...props} id={formId}/></ActionForm.Provider>;
 }
 
-export function DecisionAction({type = 'button', form, notice, help, ...props}: ButtonHTMLAttributes<HTMLButtonElement> & {
+export function DecisionAction({type = 'button', form, notice, help, inline = false, ...props}: ButtonHTMLAttributes<HTMLButtonElement> & {
     notice?: ReactNode;
     help?: {topic: string; label: string};
+    inline?: boolean;
 }) {
     const planning = useContext(PlanningContext);
     const target = useContext(ActionTarget);
     const formId = useContext(ActionForm);
     const button = <button {...props} type={type} form={form ?? formId}>{planning && <>{t('plan.add')} · </>}{props.children}</button>;
     const content = <>{notice}{help ? <ButtonHelp {...help}>{button}</ButtonHelp> : button}</>;
-    return target === undefined ? content : target && createPortal(content, target);
+    return inline || target === undefined ? content : target && createPortal(content, target);
 }

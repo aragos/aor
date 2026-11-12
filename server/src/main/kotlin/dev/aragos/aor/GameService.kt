@@ -346,7 +346,7 @@ class GameService(
                         } else reconciled
                     if (text.trim() == "undo" || text.trim().startsWith("undo ")) {
                         ActivityPlans.afterUndo(current, saved, player)
-                    } else ActivityPlans.afterManual(saved, player)
+                    } else ActivityPlans.afterManual(current, saved, player, command)
                 } catch (failure: CardRuleViolation) {
                     throw ServiceFailure(
                         422,
