@@ -50,12 +50,18 @@ actor only after its update and input checks complete; never modify G3 C/P artif
 
 The intended first scientific protocol is one retained four-by-256-world operational prefix,
 followed by the same attempt through exactly 64 batches if predeclared integrity, exposure,
-throughput and storage gates pass. These gates cannot inspect returns or policy quality. The
+throughput, storage and actual actor/Adam progress gates pass. These gates cannot inspect returns or policy quality. The
 prefix is part of the 64 batches, not warmup or repeat data. All missing/empty cases and failed
 attempts remain explicit. One fixed historical reproduction per batch uses the same collector.
 No intermediate strength looks, implicit retries, shortened successful candidate, fallback or
 automatic successor are permitted. Only an exact completed final actor could enter separately
 reviewed fresh development and qualification; this source milestone creates neither bank.
+
+Four consecutive batches without an accepted actor change and advancing validated Adam stop
+the attempt, preserving the completed prefix without making it eligible as a final candidate.
+Native workers write/verify one compressed origin and return only its index. Python retains only
+actor records, prepared sparse inputs and small provenance; canonical histories remain archived
+evidence and are not loaded into the learner.
 
 The finite runner should reuse the existing controller, bounded child deadlines and lossless
 batch/optimizer archives. Resources and the throughput gate remain unresolved until synthetic

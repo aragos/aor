@@ -64,6 +64,7 @@ class PolicyContract:
     frozenPurchase: bool = False
     maxCommand: int = 200
     trajectoryEncoding: str = "json-v1"
+    schemaVersion: int = 1
 
 
 PURCHASE_CONTRACT = PolicyContract(ENCODER_VERSION, ACTOR_VERSION, "purchase", 128)
@@ -194,8 +195,8 @@ def names(value, label, maximum):
 
 
 def validate_model(model, *, contract=PURCHASE_CONTRACT):
-    require(model.get("schemaVersion") == 1 and type(model["schemaVersion"]) is int,
-            "Purchase model requires schemaVersion 1.")
+    require(model.get("schemaVersion") == contract.schemaVersion and type(model["schemaVersion"]) is int,
+            f"{contract.label.capitalize()} model requires schemaVersion {contract.schemaVersion}.")
     require(model.get("encoderVersion") == contract.encoder,
             f"{contract.label.capitalize()} model encoder version is unsupported.")
     require(model.get("hiddenSize") == HIDDEN and type(model["hiddenSize"]) is int,
@@ -228,7 +229,7 @@ def initialize(schema, seed, *, contract=PURCHASE_CONTRACT):
         scale = 1.0 / math.sqrt(size)
         return [rng.uniform(-scale, scale) for _ in range(HIDDEN * size)]
     return validate_model({
-        "schemaVersion": 1, "encoderVersion": contract.encoder,
+        "schemaVersion": contract.schemaVersion, "encoderVersion": contract.encoder,
         "hiddenSize": HIDDEN, "baselineProbability": 0.97,
         "stateFeatureNames": states, "actionFeatureNames": actions,
         "stateWeights": weights(len(states)), "stateBias": [0.0] * HIDDEN,
@@ -731,6 +732,54 @@ def actor_adam_slots(previous):
             "Carried actor-only Adam must exclude value-head parameters and momentum.")
 
 
+def validated_actor_adam_steps(previous, model, config, contract, inherited_steps):
+    """Validate intrinsic five-slot Adam payload; typed callers own lineage and recipe identity."""
+    actor_adam_slots(previous)
+    optimizer = previous['optimizer']
+    parameters = list(range(len(PARAMETERS)-2))
+    require(optimizer['param_groups'][0]['params'] == parameters
+        and all(type(index) is int for index in optimizer['param_groups'][0]['params'])
+        and set(optimizer['state']) <= {str(index) for index in parameters},
+        'Actor-only Adam slots must identify exactly the five actor parameters in their original order.')
+    actor = ResidualPolicy(model, contract)
+    fresh = torch.optim.Adam([getattr(actor,name) for name in PARAMETERS[:-2]],
+                                   lr=config.learningRate, foreach=False)
+    require(optimizer['param_groups'] == encode_optimizer(fresh)['param_groups'],
+        'Actor-only Adam must retain the exact original learning rate and intrinsic optimizer recipe.')
+    complete = {str(index) for index in parameters}
+    require(set(optimizer['state']) == complete or
+        (not optimizer['state'] and previous['epoch'] == 0 and inherited_steps == 0),
+        'Actor-only Adam must retain all five moments after any accepted step.')
+    steps = []
+    for index, name in enumerate(PARAMETERS[:-2]):
+        state = optimizer['state'].get(str(index))
+        if state is None:
+            continue
+        require(set(state) == {'step','exp_avg','exp_avg_sq'},
+            'Actor-only Adam must retain only its step and two original moments.')
+        for key in ('exp_avg','exp_avg_sq'):
+            item = state[key]
+            require(set(item) == {'tensor','dtype'} and item['dtype'] == str(DTYPE),
+                'Actor-only moments must retain their original Float64 representation.')
+            value = torch.tensor(item['tensor'], dtype=DTYPE)
+            require(value.shape == getattr(actor,name).shape
+                and bool(torch.isfinite(value).all()),
+                'Actor-only moments must match the corresponding finite parameter shape.')
+            if key == 'exp_avg_sq':
+                require(bool((value >= 0).all()),
+                    'Actor-only Adam squared moments must remain nonnegative.')
+        step = state['step']
+        require(set(step) == {'tensor','dtype'} and step['dtype'] == 'torch.float32',
+            'Actor-only Adam steps must retain the original Float32 scalar counter.')
+        step_count = number(step['tensor'],'Actor-only Adam step',0)
+        require(step_count == int(step_count) and step_count > 0,
+            'Populated actor-only Adam slots require positive whole step counters.')
+        steps.append(int(step_count))
+    require(not steps or len(set(steps)) == 1 and steps[0] >= inherited_steps,
+        'Every actor-only Adam slot must retain the same cumulative step count.')
+    return steps[0] if steps else 0
+
+
 @dataclass(frozen=True)
 class ActorAdamContinuation:
     """Carry only a completed matching actor-only optimizer within the same estimator arm."""
@@ -756,7 +805,7 @@ class ActorAdamContinuation:
 
 
 def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
-                           precomputed_advantages=False, joint_actor_only=None):
+                           precomputed_advantages=False, joint_actor_only=None, expansion_mc=None):
     config.validate_reference(policy.contract)
     probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
@@ -771,8 +820,14 @@ def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
         require(isinstance(joint_actor_only, JointPhaseActorOnlyObjective) and not actor_only
                 and precomputed_advantages, "Joint credit requires its explicit typed precomputed objective.")
         joint_actor_only.validate(policy.contract, config)
+    if expansion_mc is not None:
+        from expansion_mc import ExpansionMcObjective
+        require(isinstance(expansion_mc, ExpansionMcObjective) and not actor_only
+                and joint_actor_only is None and precomputed_advantages,
+                "Expansion MC requires its separate typed detached objective.")
+        expansion_mc.validate(policy.contract, config)
     if precomputed_advantages:
-        require(actor_only or joint_actor_only is not None,
+        require(actor_only or joint_actor_only is not None or expansion_mc is not None,
                 "Explicit precomputed advantages require the actor-only objective.")
         advantages = torch.tensor([row["_actorOnlyAdvantage"] for row in rows], dtype=DTYPE)
     else:
@@ -796,7 +851,10 @@ def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
 
 
 def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_reference=None,
-                  actor_only=False, precomputed_advantages=False, joint_actor_only=None):
+                  actor_only=False, precomputed_advantages=False, joint_actor_only=None, expansion_mc=None):
+    require(expansion_mc is None or (not actor_only and joint_actor_only is None
+            and purchase_reference is None and offered_reference is None),
+            "Expansion MC cannot combine another objective.")
     require(joint_actor_only is None or (not actor_only and purchase_reference is None and offered_reference is None),
             "Joint actor credit cannot combine another actor-only or reference objective.")
     require(purchase_reference is None or offered_reference is None,
@@ -810,7 +868,7 @@ def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_refe
         purchase_reference.validate(policy.contract)
     ordinary = ordinary_loss_for_rows(policy, rows, config, actor_only=actor_only,
                                      precomputed_advantages=precomputed_advantages,
-                                     joint_actor_only=joint_actor_only)
+                                     joint_actor_only=joint_actor_only, expansion_mc=expansion_mc)
     if purchase_reference is None and offered_reference is None:
         return ordinary
     # Match the reviewed LAB objective's separate forward and operation order exactly.
@@ -852,10 +910,14 @@ def epoch_batches(rows, config, epoch):
 
 def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None,
                   offered_reference=None, actor_only=False, precomputed_advantages=False,
-                  joint_actor_only=None):
+                  joint_actor_only=None, expansion_mc=None):
     require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
     optimizer.zero_grad(set_to_none=True)
-    if joint_actor_only is not None:
+    if expansion_mc is not None:
+        require(not actor_only and joint_actor_only is None and purchase_reference is None
+                and offered_reference is None, "Expansion MC cannot add another objective.")
+        loss = loss_for_rows(policy, batch, config, expansion_mc=expansion_mc, precomputed_advantages=True)
+    elif joint_actor_only is not None:
         require(not actor_only and purchase_reference is None and offered_reference is None,
                 "Joint actor credit cannot add a legacy or reference objective.")
         loss = loss_for_rows(policy, batch, config, joint_actor_only=joint_actor_only,
@@ -879,11 +941,15 @@ def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_refere
 
 
 def fit_epoch(policy, optimizer, rows, config, epoch, deadline, *, actor_only=False,
-              precomputed_advantages=False, joint_actor_only=None):
+              precomputed_advantages=False, joint_actor_only=None, expansion_mc=None):
     require(joint_actor_only is None or not actor_only,
             "A joint epoch cannot also select the legacy purchase-only objective.")
+    require(expansion_mc is None or (not actor_only and joint_actor_only is None),
+            "An expansion MC epoch cannot also select another objective.")
     for batch in epoch_batches(rows, config, epoch):
-        if joint_actor_only is not None:
+        if expansion_mc is not None:
+            fit_minibatch(policy, optimizer, batch, config, deadline, expansion_mc=expansion_mc)
+        elif joint_actor_only is not None:
             fit_minibatch(policy, optimizer, batch, config, deadline, joint_actor_only=joint_actor_only)
         elif actor_only:
             fit_minibatch(policy, optimizer, batch, config, deadline, actor_only=True,
@@ -1245,7 +1311,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
            *, contract=PURCHASE_CONTRACT, entrypoint=None, update_mode=LEGACY_UPDATE_MODE,
            purchase_reference=None, collection_reader=None, offered_reference=None,
            actor_only=None, actor_optimizer_continuation=None,
-           joint_actor_only=None, joint_optimizer_continuation=None):
+           joint_actor_only=None, joint_optimizer_continuation=None,
+           expansion_mc=None, expansion_optimizer_continuation=None):
     """Fit one typed actor; optional readers own completed-data/likelihood validation.
 
     A custom reader has read_collection's signature and returns rows plus provenance containing
@@ -1281,6 +1348,22 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         require(isinstance(joint_optimizer_continuation, JointPhaseAdamContinuation)
                 and joint_actor_only is not None and optimizer_from is not None and not resume,
                 "Joint continuation requires its preceding phase optimizer and explicit joint objective.")
+    if expansion_mc is not None:
+        from expansion_mc import ExpansionMcObjective, ExpansionMcAdamContinuation
+        require(isinstance(expansion_mc, ExpansionMcObjective)
+                and actor_only is None and actor_optimizer_continuation is None
+                and joint_actor_only is None and joint_optimizer_continuation is None
+                and update_mode == LEGACY_UPDATE_MODE and not resume
+                and purchase_reference is None and offered_reference is None
+                and collection_reader == expansion_mc.phase_reader
+                and (optimizer_from is None or isinstance(expansion_optimizer_continuation, ExpansionMcAdamContinuation)),
+                "Expansion MC requires its original typed reader, epoch rollback and separate actor Adam.")
+        expansion_mc.validate(contract, config)
+    if expansion_optimizer_continuation is not None:
+        from expansion_mc import ExpansionMcAdamContinuation
+        require(isinstance(expansion_optimizer_continuation, ExpansionMcAdamContinuation)
+                and expansion_mc is not None and optimizer_from is not None and not resume,
+                "Expansion continuation requires its previous exact checkpoint and MC objective.")
     validate_purchase_reference(purchase_reference, contract, update_mode)
     validate_offered_reference(offered_reference, contract, update_mode)
     require(purchase_reference is None or offered_reference is None,
@@ -1304,6 +1387,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     joint_identity = None
     if joint_actor_only is not None:
         rows, joint_identity = joint_actor_only.bind(rows, provenance, file_digest(model_path))
+    expansion_identity = None
+    if expansion_mc is not None:
+        rows, expansion_identity = expansion_mc.bind(rows, provenance, file_digest(model_path))
     carry_identity = None
     if actor_optimizer_continuation is not None:
         carry_identity = actor_optimizer_continuation.validate(
@@ -1314,6 +1400,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         joint_carry_identity = joint_optimizer_continuation.validate(
             optimizer_from, joint_identity, model, config)
         joint_identity["optimizerInitialization"] = "matching-joint-phase-adam"
+    expansion_carry_identity = None
+    if expansion_optimizer_continuation is not None:
+        expansion_carry_identity = expansion_optimizer_continuation.validate(
+            optimizer_from, expansion_identity, model, config)
+        expansion_identity["optimizerInitialization"] = "matching-expansion-mc-adam"
     if reader_source is not None:
         require(file_digest(reader_source["path"]) == reader_source["sha256"]
                 and provenance.get("readerSha256") == reader_source["sha256"],
@@ -1346,6 +1437,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         identity["jointActorObjectiveSha256"] = file_digest(inspect.getsourcefile(type(joint_actor_only)))
     if joint_carry_identity is not None:
         identity["jointActorOptimizerContinuation"] = joint_carry_identity
+    if expansion_identity is not None:
+        identity["expansionMcObjective"] = expansion_identity
+        identity["expansionMcOwnerSha256"] = file_digest(inspect.getsourcefile(type(expansion_mc)))
+    if expansion_carry_identity is not None:
+        identity["expansionMcOptimizerContinuation"] = expansion_carry_identity
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
     started_path = output / ("block-started.json" if update_mode == CHECKED_PREFIX_MODE
@@ -1387,10 +1483,10 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 "Existing epoch marker belongs to a different purchase update.")
     policy = ResidualPolicy(checkpoint["model"], contract)
     behavior = ResidualPolicy(model, contract)
-    if actor_only is not None or joint_actor_only is not None:
+    if actor_only is not None or joint_actor_only is not None or expansion_mc is not None:
         policy.valueWeights.requires_grad_(False)
         policy.valueBias.requires_grad_(False)
-    parameters = (policy.parameters() if actor_only is None and joint_actor_only is None else
+    parameters = (policy.parameters() if actor_only is None and joint_actor_only is None and expansion_mc is None else
                   [parameter for parameter in policy.parameters() if parameter.requires_grad])
     optimizer = torch.optim.Adam(parameters, lr=config.learningRate, foreach=False)
     if checkpoint["optimizer"] is not None:
@@ -1430,7 +1526,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         before = copy.deepcopy(policy.state_dict())
         old_optimizer = copy.deepcopy(optimizer.state_dict())
         try:
-            if joint_actor_only is not None:
+            if expansion_mc is not None:
+                fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline, expansion_mc=expansion_mc)
+            elif joint_actor_only is not None:
                 fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline,
                           joint_actor_only=joint_actor_only)
             elif actor_only is None:
@@ -1476,7 +1574,7 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         report["purchaseReferenceObjective"] = asdict(purchase_reference)
     if offered_reference is not None:
         report["offeredReferenceObjective"] = asdict(offered_reference)
-    if actor_only_identity is not None or joint_identity is not None:
+    if actor_only_identity is not None or joint_identity is not None or expansion_identity is not None:
         require(policy.artifact()["valueWeights"] == model["valueWeights"]
                 and policy.artifact()["valueBias"] == model["valueBias"],
                 "Actor-only optimization must preserve both original value-head parameters.")
@@ -1487,6 +1585,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
             report["actorOnlyObjective"] = actor_only_identity
         if joint_identity is not None:
             report["jointActorOnlyObjective"] = joint_identity
+        if expansion_identity is not None:
+            report["expansionMcObjective"] = expansion_identity
     atomic_json(output / "finished.json", report)
     return report
 
