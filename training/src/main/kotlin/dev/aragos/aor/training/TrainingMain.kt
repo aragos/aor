@@ -13,6 +13,20 @@ import kotlin.random.Random
 fun main(arguments: Array<String>) {
     if (
         arguments.toList().windowed(2).any {
+            it[0] == "--mode" &&
+                it[1] in
+                    setOf(
+                        "expansion-on-policy-prepare",
+                        "expansion-on-policy-collect",
+                        "expansion-on-policy-reproduce",
+                    )
+        }
+    ) {
+        ExpansionOnPolicyMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
             it[0] == "--mode" && it[1] in setOf("purchase-plan-public", "purchase-plan-tails")
         }
     ) {
