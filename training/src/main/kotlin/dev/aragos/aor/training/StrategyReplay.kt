@@ -64,6 +64,7 @@ data class StrategyReplay(
     val replayVerified: Boolean,
     val historicalPairVerified: Boolean,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
 )
 
 /**
@@ -88,6 +89,13 @@ class StrategyReplayPair private constructor(private val record: JsonNode) {
             }
         require(record["jointPolicy"]?.takeUnless(JsonNode::isNull) == expectedJoint) {
             "Recorded arena pair joint actor roles differ from the replay specification."
+        }
+        val expectedExpansion =
+            specification.expansionActor?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["expansionActor"]?.takeUnless(JsonNode::isNull) == expectedExpansion) {
+            "Recorded arena pair expansion actor roles differ from the replay specification."
         }
         val opponents = record.required("opponentIndices")
         require(opponents.isArray && opponents.size() == lineup.configuration.playerCount) {
@@ -240,6 +248,7 @@ object StrategyReplays {
             replayVerified = true,
             historicalPairVerified = pair != null,
             jointPolicy = specification.jointPolicy?.binding(),
+            expansionActor = specification.expansionActor?.binding(),
         )
     }
 }

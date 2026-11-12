@@ -41,6 +41,7 @@ data class ArenaSpecification(
     private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
     private val initializationSource: ModelInitializationSource? = null,
     val jointPolicy: ArenaJointPolicy? = null,
+    val expansionActor: ArenaExpansionActor? = null,
 ) {
     init {
         require(
@@ -65,6 +66,7 @@ data class ArenaSpecification(
         jointPolicy?.validate(configurations)
         tokenOrder?.validate(configurations, opponents.size)
         expansionImitation?.validate(candidate, incumbent, opponents)
+        expansionActor?.validate(this)
     }
 
     fun identity(): String =
@@ -82,6 +84,7 @@ data class ArenaSpecification(
                     jointPolicy?.identity(),
                     tokenOrder?.identity(),
                     expansionImitation?.identity(),
+                    expansionActor?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
@@ -117,21 +120,24 @@ data class ArenaSpecification(
             expansionImitation
                 ?.controllers(playerCount, controlledSeat, side, opponentIndices)
                 .orEmpty()
-        return listOf(tokens, expansion).fold(purchase) { existing, overlay ->
-            existing +
-                overlay.mapValues { (seat, controller) ->
-                    val previous = existing[seat]
-                    object : SimulationController {
-                        override fun controls(decision: String): Boolean =
-                            controller.controls(decision) || previous?.controls(decision) == true
+        val composed =
+            listOf(tokens, expansion).fold(purchase) { existing, overlay ->
+                existing +
+                    overlay.mapValues { (seat, controller) ->
+                        val previous = existing[seat]
+                        object : SimulationController {
+                            override fun controls(decision: String): Boolean =
+                                controller.controls(decision) ||
+                                    previous?.controls(decision) == true
 
-                        override fun choose(decision: SimulationDecision): String? =
-                            if (controller.controls(decision.observation.decision))
-                                controller.choose(decision)
-                            else previous?.choose(decision)
+                            override fun choose(decision: SimulationDecision): String? =
+                                if (controller.controls(decision.observation.decision))
+                                    controller.choose(decision)
+                                else previous?.choose(decision)
+                        }
                     }
-                }
-        }
+            }
+        return expansionActor?.controllers(composed, controlledSeat, side) ?: composed
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
@@ -140,6 +146,7 @@ data class ArenaSpecification(
             jointPolicy?.metadata().orEmpty() +
             tokenOrder?.metadata().orEmpty() +
             expansionImitation?.metadata().orEmpty() +
+            expansionActor?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -181,6 +188,7 @@ data class ArenaSpecification(
         jointPolicy?.snapshot(artifacts)
         tokenOrder?.snapshot(artifacts)
         expansionImitation?.snapshot(artifacts)
+        expansionActor?.snapshot(artifacts)
     }
 
     companion object {
@@ -269,6 +277,8 @@ data class ArenaSpecification(
                             ArenaExpansionImitation.read(source, it)
                         },
                     experimentalRulesTransfer = transfer,
+                    expansionActor =
+                        node["expansionActor"]?.let { ArenaExpansionActor.read(source, it) },
                     ordinaryModelSources = modelSources,
                     initializationSource =
                         transfer?.let {
@@ -323,6 +333,7 @@ data class ArenaPair(
     val candidate: ArenaGame,
     val incumbent: ArenaGame,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
 )
 
 object StrategyArena {
@@ -353,6 +364,15 @@ object StrategyArena {
         index: Int,
         side: ArenaSide,
         deadlineNanos: Long,
+    ): ArenaGame = tracedGame(specification, index, side, deadlineNanos, null)
+
+    /** Optional canonical recording shares the exact existing explicit-side game factory. */
+    internal fun tracedGame(
+        specification: ArenaSpecification,
+        index: Int,
+        side: ArenaSide,
+        deadlineNanos: Long,
+        trace: SimulationTrace?,
     ): ArenaGame =
         game(
             specification,
@@ -363,6 +383,7 @@ object StrategyArena {
             },
             deadlineNanos,
             side,
+            trace,
         )
 
     /**
@@ -381,6 +402,7 @@ object StrategyArena {
         model: BotModel,
         deadlineNanos: Long,
         side: ArenaSide?,
+        trace: SimulationTrace? = null,
     ): ArenaGame {
         val lineup = lineup(specification, index)
         return ArenaGame.from(
@@ -397,6 +419,7 @@ object StrategyArena {
                             )
                         },
                     deadlineNanos = deadlineNanos,
+                    trace = trace,
                     controllers =
                         specification.controllers(
                             lineup.configuration.playerCount,
@@ -426,6 +449,7 @@ object StrategyArena {
             candidate,
             incumbent,
             specification.jointPolicy?.binding(),
+            specification.expansionActor?.binding(),
         )
     }
 
