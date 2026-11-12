@@ -339,7 +339,7 @@ internal object TurnEngine {
             Stage.PLAY_CARDS -> open(state, Stage.PURCHASE)
             Stage.PURCHASE -> open(state, Stage.EXPANSION)
             Stage.EXPANSION -> {
-                val winner = expansionBonusWinner(state)
+                val winner = ExpansionBonusProjection.from(state).leader
                 val next = open(state, Stage.INCOME)
                 if (winner == null) next else next.queueDraw(winner)
             }
@@ -351,26 +351,6 @@ internal object TurnEngine {
                 )
             else -> state
         }
-
-    private fun expansionBonusWinner(state: GameState): PlayerId? =
-        state.turnOrder
-            .filter { id -> state.playerState(id).misery != MiseryStep.CHAOS }
-            .map { id ->
-                val count =
-                    state.board.pieces.count { (province, pieces) ->
-                        pieces is ProvincePieces.Marker &&
-                            pieces.owner == id &&
-                            pieces.side == PieceSide.WHITE &&
-                            state.rebuiltMarkerBonus.counts(
-                                state.flow.markerOrigins[province]
-                                    ?: MarkerPlacementOrigin.EXPANSION
-                            )
-                    }
-                id to count
-            }
-            .maxByOrNull { (_, count) -> count }
-            ?.takeIf { (_, count) -> count > 0 }
-            ?.first
 
     private fun open(state: GameState, stage: Stage): GameState =
         state.copy(
