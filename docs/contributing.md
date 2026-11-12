@@ -954,6 +954,14 @@ Use a fixed prospective recipe and fresh factorial evaluation to separate card g
 gains and their interaction. Synthetic coordination results and training losses do not establish
 game strength or authorize replacing the playable policy.
 
+`JointCollection(..., ecology=JointEcology.CURRENT)` explicitly enables the current raw-directory
+[evidence reader](../scripts/joint_current_ecology.py). It binds M8 ordinary/card play, the separate
+F0 purchase prior, qualified expansion/token roles, rules transfer, complete phase dictionaries,
+state/label/coverage sidecars and prospective canonical history hashes before consuming behavior.
+Actor weights remain bound to the collecting bundle and may evolve; original observations, choices,
+likelihoods and sampler seeds retain their existing checks. Omission preserves legacy behavior and
+provenance. This reader neither opens portable archives nor replays the engine or trains a model.
+
 The [detached joint-credit prerequisite](../scripts/joint_credit_targets.py) derives two explicitly
 versioned GAE clocks from one frozen shared state-value file. The chronological clock follows every
 recorded controlled card/purchase decision; the phase-separated control skips the other phase.
@@ -965,8 +973,8 @@ decision number, phase, within-world phase row, both behavior heads and a frozen
 The adapter partitions detached advantages back into the original typed phase-reader order;
 observations, actions, behavior likelihoods/values and terminal labels remain unchanged. It performs
 no inference or updates and does not certify the supplied predictor's math. The existing joint
-reader's support for a separate purchase prior and arena continuations, plus an explicit typed card
-actor-only update contract, remain prerequisites for a full joint-credit pilot. Existing reader and
+reader now has an explicit current-ecology opt-in; an explicit typed card actor-only update contract
+remains a prerequisite for a full joint-credit pilot. Existing reader and
 optimizer guards remain active. Synthetic checks: `python -m unittest test_joint_credit_targets
 test_purchase_gae.PurchaseGaeMathTest` from `scripts` in the numerical environment.
 
