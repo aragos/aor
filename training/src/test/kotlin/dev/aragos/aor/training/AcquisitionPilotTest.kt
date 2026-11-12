@@ -266,6 +266,83 @@ class AcquisitionPilotTest {
         }
     }
 
+    @Test
+    fun omittedRivalProfileKeepsOriginalSignatureFormulaAndMetadata() {
+        ArenaPurchaseFixture().use { fixture ->
+            val input = input(fixture)
+
+            assertThat(input.profileMetadata()).isEmpty()
+            assertThat(input.rivalAcquisition).isNull()
+            assertThat(input.signature)
+                .isEqualTo(
+                    trainingSignature(
+                        "acquisition-data-pilot-1:${input.sourceSha256}:" +
+                            "${input.arenaSha256}:${input.arena.identity()}"
+                    )
+                )
+        }
+    }
+
+    @Test
+    fun explicitRivalProfileBindsItsNameAndOriginSeed() {
+        ArenaPurchaseFixture().use { fixture ->
+            input(fixture)
+            val path = fixture.directory.resolve("pilot.json")
+            val source = PurchaseJson.read(path) as ObjectNode
+            source.put("rivalAcquisition", "TURN_ROUTE_HALF_1")
+            fixture.artifacts.write("pilot.json", source)
+            val profiled = AcquisitionPilotInput.read(path)
+
+            assertThat(profiled.rivalAcquisition)
+                .isEqualTo(AcquisitionRivalProfile.TURN_ROUTE_HALF_1)
+            assertThat(profiled.profileMetadata().keys).containsExactly("rivalAcquisition")
+            assertThat(profiled.controllers(2, 2)[2]?.controls("buy-card")).isFalse()
+            assertThat(profiled.controllers(2, 2)[1]?.controls("buy-card")).isTrue()
+        }
+    }
+
+    @Test
+    fun profiledControllerRequiresOriginalWorldSeed() {
+        ArenaPurchaseFixture().use { fixture ->
+            input(fixture)
+            val path = fixture.directory.resolve("pilot.json")
+            val source = PurchaseJson.read(path) as ObjectNode
+            source.put("rivalAcquisition", "TURN_ROUTE_HALF_1")
+            fixture.artifacts.write("pilot.json", source)
+
+            assertFailsWith<IllegalArgumentException> {
+                AcquisitionPilotInput.read(path).controllers(2)
+            }
+        }
+    }
+
+    @Test
+    fun unknownRivalProfileCannotSilentlyChangeEcology() {
+        ArenaPurchaseFixture().use { fixture ->
+            input(fixture)
+            val path = fixture.directory.resolve("pilot.json")
+            val source = PurchaseJson.read(path) as ObjectNode
+            source.put("rivalAcquisition", "ALWAYS_BUY")
+            fixture.artifacts.write("pilot.json", source)
+
+            assertFailsWith<IllegalArgumentException> { AcquisitionPilotInput.read(path) }
+        }
+    }
+
+    @Test
+    fun profileTamperCannotReplaceLoadedSourceSnapshot() {
+        ArenaPurchaseFixture().use { fixture ->
+            val input = input(fixture)
+            val source = PurchaseJson.read(input.source) as ObjectNode
+            source.put("rivalAcquisition", "TURN_ROUTE_HALF_1")
+            fixture.artifacts.write("pilot.json", source)
+
+            assertFailsWith<IllegalArgumentException> {
+                input.snapshot(TrainingArtifacts(fixture.directory.resolve("snapshot")))
+            }
+        }
+    }
+
     private fun input(fixture: ArenaPurchaseFixture): AcquisitionPilotInput {
         fixture.artifacts.model(BotModels.default, "expansion.json")
         val arena = PurchaseJson.read(fixture.source) as ObjectNode

@@ -147,7 +147,7 @@ internal class AcquisitionPilotCollector(
                     deadlineNanos = deadlineNanos,
                     verifyReplay = true,
                     trace = trace,
-                    controllers = input.controllers(request.seat),
+                    controllers = input.controllers(request.seat, seeds.gameSeed),
                 )
         val roots =
             AcquisitionRoute.entries.map { route ->
@@ -174,7 +174,7 @@ internal class AcquisitionPilotCollector(
                     "replayVerified" to true,
                 ),
             "roots" to roots,
-        )
+        ) + input.profileMetadata()
     }
 
     private fun evaluate(
@@ -205,7 +205,7 @@ internal class AcquisitionPilotCollector(
         val continuation =
             FrozenPolicyContinuation(
                 List(4) { input.arena.candidate },
-                input.controllers(trace.seat),
+                input.controllers(trace.seat, seeds.gameSeed),
                 seeds.gameSeed,
                 deadlineNanos,
                 decisionOffset = root.number,

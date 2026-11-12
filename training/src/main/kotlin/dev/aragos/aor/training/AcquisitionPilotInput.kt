@@ -76,7 +76,7 @@ internal data class AcquisitionRequest(val index: Int) {
             }
 }
 
-/** Exact homogeneous sampled ecology; concrete M8/E/G2/F0 bytes are pinned by the source. */
+/** Exact sampled ecology with an optional training-only rival acquisition profile. */
 internal class AcquisitionPilotInput
 private constructor(
     val source: Path,
@@ -85,13 +85,25 @@ private constructor(
     val arenaSha256: String,
     val arena: ArenaSpecification,
     val origins: List<AcquisitionOriginSeeds>,
+    val rivalAcquisition: AcquisitionRivalProfile?,
 ) {
     val configuration = arena.configurations.single()
     val signature =
         trainingSignature("acquisition-data-pilot-1:$sourceSha256:$arenaSha256:${arena.identity()}")
 
-    fun controllers(seat: Int): Map<Int, SimulationController> =
-        arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
+    fun controllers(seat: Int, originSeed: Int? = null): Map<Int, SimulationController> {
+        val ordinary =
+            arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
+        return rivalAcquisition?.controllers(
+            seat,
+            requireNotNull(originSeed) { "Rival acquisition requires the original world seed." },
+            ordinary,
+        ) ?: ordinary
+    }
+
+    /** Omission preserves legacy metadata; profile identity is already bound by sourceSha256. */
+    fun profileMetadata(): Map<String, Any> =
+        rivalAcquisition?.let { mapOf("rivalAcquisition" to it.metadata()) }.orEmpty()
 
     fun snapshot(artifacts: TrainingArtifacts) {
         artifacts.ensureFileSnapshot(source, sourceSha256, "pilot-source.json")
@@ -108,7 +120,7 @@ private constructor(
             val source = path.toRealPath()
             val hash = PurchaseJson.hash(source)
             val node = PurchaseJson.read(source)
-            PurchaseJson.fields(node, setOf("kind", "arena", "origins"))
+            PurchaseJson.fields(node, setOf("kind", "arena", "origins"), setOf("rivalAcquisition"))
             require(node["kind"]?.asText() == "acquisition-data-pilot-1") {
                 "Acquisition source requires acquisition-data-pilot-1."
             }
@@ -119,6 +131,15 @@ private constructor(
             val arenaHash = PurchaseJson.hash(arenaPath)
             val arena = ArenaSpecification.read(arenaPath)
             validateEcology(arena)
+            val profile =
+                node["rivalAcquisition"]?.let { value ->
+                    require(value.isTextual) { "Rival acquisition profile must be a known name." }
+                    requireNotNull(
+                        AcquisitionRivalProfile.entries.singleOrNull { it.name == value.asText() }
+                    ) {
+                        "Unsupported rival acquisition profile."
+                    }
+                }
             val values = node.required("origins")
             require(values.isArray && values.size() == 256) {
                 "An acquisition pilot declares exactly 256 origins, without refill."
@@ -150,7 +171,15 @@ private constructor(
             ) {
                 "Acquisition inputs changed while being read."
             }
-            return AcquisitionPilotInput(source, hash, arenaPath, arenaHash, arena, origins)
+            return AcquisitionPilotInput(
+                source,
+                hash,
+                arenaPath,
+                arenaHash,
+                arena,
+                origins,
+                profile,
+            )
         }
 
         private fun validateEcology(arena: ArenaSpecification) {

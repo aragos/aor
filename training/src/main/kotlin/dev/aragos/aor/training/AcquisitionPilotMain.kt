@@ -69,7 +69,7 @@ object AcquisitionPilotMain {
                     "canonical evidence stays outside actor inputs; fork retains hands and deck",
                 "targetContract" to
                     "all paired first-action returns under frozen continuation; no winner labels",
-            )
+            ) + input.profileMetadata()
         artifacts.write("prepared.json", metadata)
         if (!collect) return
         artifacts.write(
