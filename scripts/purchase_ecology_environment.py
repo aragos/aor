@@ -35,6 +35,13 @@ def interpreter_files():
     return standard, paths
 
 
+def library_files(library):
+    """Numerical package subjects exclude bytecode caches and Finder directory metadata only."""
+    return {path.resolve() for path in library.rglob('*')
+            if path.is_file() and '__pycache__' not in path.parts
+            and path.suffix not in ('.pyc', '.pyo') and path.name != '.DS_Store'}
+
+
 def current():
     require(sys.flags.ignore_environment and sys.flags.no_user_site
             and not sys.flags.no_site and sys.dont_write_bytecode,
@@ -53,8 +60,7 @@ def current():
     library = Path(sysconfig.get_path('purelib')).resolve(strict=True)
     require(library.is_relative_to(prefix), 'Numerical package files must belong to the venv.')
     standard, paths = interpreter_files()
-    paths.update(path.resolve() for path in library.rglob('*')
-                 if path.is_file() and '__pycache__' not in path.parts and path.suffix not in ('.pyc', '.pyo'))
+    paths.update(library_files(library))
     # The already-installed desktop venv has separate pip receipts; Mac's original single
     # receipt and complete identity remain byte-compatible. No packages are installed here.
     install_names = (('torch-install.json', 'numpy-install.json') if sys.platform == 'linux'
