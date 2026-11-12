@@ -1013,6 +1013,14 @@ completed phase actor, unchanged clock/predictor/recipe and five correctly shape
 This source prerequisite provides no two-actor loop or new experiment. Its UNIT tests use synthetic
 optimizer steps only: `python -m unittest test_joint_phase_actor_only test_purchase_gae`.
 
+The [joint-credit pair publisher](../scripts/joint_credit_update.py) binds both original heads,
+the shared prediction file and the chosen clock before either update. Both heads start with fresh
+actor-only Adam or continue their separately validated histories. It publishes a new native bundle
+only after both phase completions pass and all original inputs remain unchanged. A failed or timed-out
+phase leaves diagnostic evidence without a partial bundle; there is no implicit resume or retry.
+The existing checked-prefix `joint_trajectory.update_pair` remains unchanged. Synthetic checks:
+`python -m unittest test_joint_credit_update`.
+
 The chronological clock includes more decisions than its phase-separated control. With lambda .95
 per decision, it also has a shorter effective horizon measured in turns; a future comparison tests
 both cross-phase credit and this horizon change, rather than isolating coordination alone.
