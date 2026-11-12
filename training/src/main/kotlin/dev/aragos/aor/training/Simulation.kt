@@ -80,6 +80,17 @@ interface SimulationTrace {
     fun verified(header: GameHeader, entries: List<String>)
 }
 
+/**
+ * Native research inspection only, separate from every policy/controller input. Implementations
+ * must publish only the selected seat's public/own projection. Called after choice and before
+ * applying that exact action; it may neither select commands nor advance the authority.
+ */
+interface SimulationStateObserver {
+    val seat: Int
+
+    fun chosen(state: GameState, number: Int, observation: BotObservation, command: String)
+}
+
 /** Public coverage facts; no actual hidden hand or deck order is retained in training reports. */
 data class GameCoverage(
     val decisions: Map<String, Int>,
@@ -132,6 +143,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
         verifyReplay: Boolean = false,
         trace: SimulationTrace? = null,
         controllers: Map<Int, SimulationController> = emptyMap(),
+        stateObserver: SimulationStateObserver? = null,
     ): SimulatedGame {
         require(competitors.size == configuration.playerCount) {
             "Every simulated seat requires one competitor."
@@ -141,6 +153,9 @@ class Simulation(private val maxDecisions: Int = 12000) {
         }
         require(controllers.keys.all { it in competitors.indices }) {
             "A simulation controller requires a registered seat."
+        }
+        require(stateObserver == null || stateObserver.seat in competitors.indices) {
+            "A simulation state observer requires a registered seat."
         }
         val controlled = controllers.toMap()
         checkDeadline(deadlineNanos)
@@ -242,6 +257,9 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 decisions[observation.decision] = (decisions[observation.decision] ?: 0) + 1
                 families[candidate.family] = (families[candidate.family] ?: 0) + 1
                 val action = TextCodec.parseAction(candidate.command, state, actor = actor)
+                if (stateObserver?.seat == seat) {
+                    stateObserver.chosen(state, step + actorIndex, observation, candidate.command)
+                }
                 if (candidate.command.startsWith("play ")) {
                     val reference = candidate.command.split(' ').getOrNull(1)
                     state

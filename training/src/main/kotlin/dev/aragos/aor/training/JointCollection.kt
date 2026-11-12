@@ -33,7 +33,7 @@ internal class JointCollector(
     private val signature: String,
     private val deadlineNanos: Long,
 ) {
-    fun collect(index: Int): JointGameTrajectory {
+    fun collect(index: Int, stateObserver: SimulationStateObserver? = null): JointGameTrajectory {
         require(index in input.seeds.indices) {
             "A joint game index must belong to the frozen bank."
         }
@@ -90,6 +90,7 @@ internal class JointCollector(
                     deadlineNanos = deadlineNanos,
                     controllers = observed,
                     trace = trace,
+                    stateObserver = stateObserver,
                 )
         return JointGameTrajectory(
             signature = signature,

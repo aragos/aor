@@ -1605,3 +1605,38 @@ failures; derived analyses of older incomplete runs are disclosed separately fro
 The adapter and its Python closure are frozen alongside an unchanged native distribution, rather
 than replacing the native launcher. Focused checks:
 `python -m unittest discover -s scripts -p 'test_joint_chrono_*.py'`.
+
+## Afterstate value prerequisite
+
+The explicit `afterstate-collect` research mode wraps an unchanged `joint-collect` source with
+`kind: "aor-afterstate-value-1"`, a `collection: {path, sha256}` subject and the exact
+`legacyDictionary: {path, sha256}` subject. It requires the complete current ecology, identical
+fixed sampled joint actors in every seat, at most 256 worlds and one prospective canonical
+reproduction index. `--describe true` writes only source/dictionary metadata to a new output;
+`afterstate-replay` reproduces that prescribed origin from a completed chunk. Both require fresh
+output and never resume. The existing modes retain their default controller behavior.
+
+The observer runs after actual policy choice and before execution. CARD, shipping and advance
+states must equal the existing encoder records exactly. Stabilization and relief use the same
+public/own raw-state owner. A purchase-owner-exit state is the actual selected command's
+`ActivityPlanning.preview(...).game` at `FINISHED`, before next-owner normalisation. It is not a
+relabeled advances state or the next actor's view. Information boundaries and intervening choices
+remain explicit exclusions. Synthetic core tests compare these preview views against real-state
+command application and owner-bounded normalisation; no new core transition rule is introduced.
+
+The dictionary preserves all 7,241 original columns and appends only the three statically proven
+context keys. State files contain no actions or outcomes. Terminal labels and prescribed canonical
+histories are separate. Exact own-Chaos and game-terminal rows retain coverage but bypass learned
+loss/inference. Empty contexts/worlds remain in their prospective split. Workers persist one
+complete origin and return only its index; completion verifies one origin at a time.
+
+The fixed benchmark is a fresh 16-chunk corpus with 12/2/2 whole-chunk TRAIN/VALIDATION/TEST splits.
+One width-64 critic copies the frozen shared critic's old columns, biases and output tensors;
+appended columns begin at zero. The original 20-epoch Adam recipe uses equal whole-world weight,
+then equal weight across nonempty contexts and their rows. Validation alone selects the earliest
+best epoch. Development CSR reads only the first 14 chunks. After fixed selection, the separate
+TEST cache reads public states only; persisted predictions precede semantic TEST label decoding.
+Per-context TRAIN constants and the original critic on its original contexts are predictive
+comparators. Missing contexts remain missing, and fewer than 64 independent TEST worlds in a new
+context is explicitly insufficient coverage. This is a value-prediction prerequisite, not a planner,
+policy update, qualification, or browser activation.
