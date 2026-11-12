@@ -731,10 +731,19 @@ object CardRules {
         val payments =
             context.activePlayers.mapValues { (id, _) ->
                 val box = commodityPayoutBox(context, id, commodity, basis)
-                definition.baseValue * box * box
+                commodityPayout(definition.baseValue, box)
             }
         return CardResolution.CommodityPayment(commodity, payments, adjustment)
     }
+
+    /** Current-board dollar payout for a quoted nonnegative box; not a forecast of card arrival. */
+    fun commodityPayout(commodity: Commodity, box: Int): Int {
+        require(box >= 0) { "A commodity payout box must be nonnegative." }
+        val definition = CommodityData.definitions.single { it.id == commodity }
+        return commodityPayout(definition.baseValue, box)
+    }
+
+    private fun commodityPayout(baseValue: Int, box: Int): Int = baseValue * box * box
 
     /**
      * Marker ownership only, excluding square tokens. The default preserves actual card payments

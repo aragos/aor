@@ -62,6 +62,13 @@ unchanged. Do not alter live actor/offers. Apply a reachable prefix, returning t
 results; stop at missing answers, unknown draws, authority requests or the boundary.
 [Architecture](design.md#private-plans) owns persistence/execution.
 
+`AdjustmentCancellationProjection` quotes only current public commodity payouts after an offered
+cancellation or PASS. Its context is derived from the actual first player's cancellation view;
+marker removal and payout arithmetic share the command/card rule owners. Gold/Ivory remains one
+payment with separate commodity queues and owners. Quotes neither advance a phase nor draw cards,
+predict card arrival or authorize execution. The experimental JSON bridge exposes these public
+quotes without installing a bot policy.
+
 ## Opponent policies
 
 [AI](../ai/src/commonMain/kotlin/dev/aragos/aor/ai/) consumes numerical viewer-safe observations,

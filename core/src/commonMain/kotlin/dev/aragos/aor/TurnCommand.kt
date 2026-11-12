@@ -133,14 +133,7 @@ sealed interface TurnCommand : Command {
             state.requireActor(actor, Stage.DRAW_CARD)
             val quote = AdjustmentCancellation.quote(state, actor, commodity, adjustment)
             val player = state.playerState(actor)
-            val updated =
-                state.adjustments.mapValues { (id, previous) ->
-                    if (id in quote.commodities) {
-                        previous.toMutableList().apply { remove(adjustment) }.toList()
-                    } else {
-                        previous
-                    }
-                }
+            val updated = AdjustmentCancellation.removeMarkers(state.adjustments, quote, adjustment)
             return state
                 .replacePlayer(player.copy(cash = quote.cashAfter))
                 .copy(adjustments = updated)

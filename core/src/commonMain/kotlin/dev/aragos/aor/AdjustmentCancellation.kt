@@ -9,6 +9,19 @@ data class AdjustmentCancellationOffer(
 )
 
 internal object AdjustmentCancellation {
+    /** Remove the first matching occurrence in each quoted physical commodity queue. */
+    fun removeMarkers(
+        adjustments: Map<Commodity, List<CommodityAdjustment>>,
+        offer: AdjustmentCancellationOffer,
+        adjustment: CommodityAdjustment,
+    ): Map<Commodity, List<CommodityAdjustment>> = adjustments.mapValues { (commodity, previous) ->
+        if (commodity in offer.commodities) {
+            previous.toMutableList().apply { remove(adjustment) }.toList()
+        } else {
+            previous
+        }
+    }
+
     fun quote(
         state: GameState,
         actor: PlayerId,
