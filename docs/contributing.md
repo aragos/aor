@@ -1610,3 +1610,36 @@ return is distinct from its first action under ordinary continuation; no per-hid
 plan is a policy target. A future experiment still requires frozen input/model snapshots, a
 reviewed runner/resource contract and source/evidence validation before games. Focused synthetic
 checks: `./gradlew :training:test --tests '*PurchaseSequence*Test'`.
+
+### Offline complete purchase-macro prerequisite
+
+`PurchaseMacroProjection` projects the existing teacher's complete command prefixes through
+`ActivityPlanning.preview`. It preserves the original plan order and cap, with PASS as the zero
+feature reference. A supported prefix executes at most two advances then PASS, or finishes naturally
+when its owner or game ends. Natural Chaos remains supported; changed offers, information boundaries
+and intervening choices retain explicit exclusions before labels are read. Conditional stabilization
+and relief quotes describe authoritative available choices, without forcing those later choices.
+The fixed 169-column dictionary contains only own/public facts and consequences, never hidden hands,
+decks, seeds or continuation outcomes. No live selector or command queue is installed.
+
+The separate `PurchaseMacroExport` entry point accepts a frozen manifest and new JSONL path. It
+replays only each recorded prefix, verifies the exact original sampled G2 PASS and teacher proposals,
+and skips every tail tree. `PurchaseMacroLabels` is a separately admitted entry point: it requires
+the frozen factual export first and reads only matching supported COMPLETE_PREFIX returns under
+both original streams. It rejects changed commands or incomplete execution; FIRST_ACTION_ONLY and
+unsupported outcomes are skipped. Both entry points admit only original TRAIN/VALIDATION indices.
+`purchase_macro_data.py` binds those detached labels to exact support, commands and source hashes.
+
+`purchase_macro_value.py` fits one Float64 no-intercept ridge with penalty 0.01 and uncentered RMS
+scales learned only from TRAIN. Each eligible origin has equal weight, split across all its supported
+non-PASS plans. There is one fit, no parameter search. The public rule chooses the highest strictly
+positive prediction, retains teacher order for ties, and otherwise chooses PASS. The primary
+validation proxy gives each eligible supported origin one vote; missing or unsupported roots remain
+missing rather than becoming zero effects. Teacher index 1 is a separate descriptive baseline on
+its own supported subset. The fixed whole-origin split is 384/64/64, with minimum eligible counts
+160/24/24; TEST, fitting, candidate export and eventual runtime integration require separate admission.
+Recorded first-PASS curriculum and frozen continuation are limitations of this proxy, not a claim
+about repeated decisions or whole-game strength. Focused synthetic checks are
+`./gradlew :training:test --tests '*PurchaseMacro*Test'` and
+`python -m unittest discover -s scripts -p 'test_purchase_macro_*.py'` in the dedicated numerical
+environment.
