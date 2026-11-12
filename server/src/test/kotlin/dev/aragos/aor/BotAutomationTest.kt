@@ -3,6 +3,7 @@ package dev.aragos.aor
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.CardObservationEncoder
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import java.nio.file.Files
 import java.util.UUID
@@ -21,6 +22,58 @@ class BotAutomationTest(private val postgres: Boolean) {
         @Parameterized.Parameters(name = "postgres={0}")
         fun backends(): List<Array<Any>> = listOf(arrayOf<Any>(false), arrayOf<Any>(true))
     }
+
+    @Test
+    fun currentHardCardWorkContainsOnlyUnboundActorFacts() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.prepareCards(PlayerId("p4"))
+            val state = fixture.service.store.read(fixture.game.gameId).state()
+
+            val job = fixture.claim().observations.single()
+
+            assertThat(job.card)
+                .isEqualTo(
+                    CardObservationEncoder.project(
+                        state.viewForPlayer(job.seat),
+                        job.seat,
+                        job.observation,
+                    )
+                )
+            val wire = json.readTree(json.writeValueAsString(job))["card"]
+            assertThat(wire.fieldNames().asSequence().toSet())
+                .containsExactly("encoderVersion", "stateFeatures", "actions")
+            assertThat(job.purchase).isNull()
+        }
+
+    @Test
+    fun legacyCardWorkRetainsItsOriginalPayload() =
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.prepareCards(PlayerId("p4"))
+
+                val job = fixture.claim().observations.single()
+
+                assertThat(job.card).isNull()
+            }
+
+    @Test
+    fun normalCardWorkDoesNotRequestJointActorInputs() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.prepareCards(PlayerId("p3"))
+
+            val job = fixture.claim().observations.single()
+
+            assertThat(job.difficulty).isEqualTo(BotDifficulty.NORMAL)
+            assertThat(job.card).isNull()
+        }
 
     @Test
     fun automatedSeatsHaveOrdinaryIdentityWithoutHumanCredentials() =
@@ -876,6 +929,24 @@ private class AutomationFixture(
                 current = service.driver.submit(current, prompt.player, command)
             }
             error("The fixture must reach the requested first-turn purchase decision.")
+        }
+    }
+
+    fun prepareCards(actor: PlayerId) {
+        prepareFirstTurn()
+        service.store.update(game.gameId) { initial ->
+            var current = initial
+            repeat(100) {
+                val state = current.state()
+                val prompt = state.prompts().single() as Prompt.SinglePlayer
+                if (state.stage == Stage.PLAY_CARDS && prompt.player == actor) {
+                    return@update current
+                }
+                val choices = state.legalChoices(prompt.player).commands
+                val command = if ("pass" in choices) "pass" else choices.first()
+                current = service.driver.submit(current, prompt.player, command)
+            }
+            error("The fixture must reach the requested first-turn card decision.")
         }
     }
 
