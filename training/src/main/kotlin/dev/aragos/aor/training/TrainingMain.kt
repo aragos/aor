@@ -13,6 +13,14 @@ import kotlin.random.Random
 fun main(arguments: Array<String>) {
     if (
         arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in TripleCollectionMain.modes
+        }
+    ) {
+        TripleCollectionMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
             it[0] == "--mode" && it[1] in ExpansionFinalMain.modes
         }
     ) {

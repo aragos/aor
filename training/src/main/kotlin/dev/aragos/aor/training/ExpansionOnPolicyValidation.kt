@@ -1,12 +1,6 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
-import dev.aragos.aor.ai.TerritoryAction
-import dev.aragos.aor.ai.TerritoryEncoder
-import dev.aragos.aor.ai.TerritoryObservation
-import dev.aragos.aor.ai.TerritoryPhase
-import dev.aragos.aor.ai.TerritoryPolicy
-import kotlin.math.abs
 
 /** New typed trajectory boundary; no existing token/expansion-v1 reader is relaxed. */
 internal class ExpansionOnPolicyValidation(private val input: ExpansionOnPolicyInput) {
@@ -72,76 +66,12 @@ internal class ExpansionOnPolicyValidation(private val input: ExpansionOnPolicyI
     }
 
     internal fun decision(node: JsonNode, index: Int) {
-        PurchaseJson.fields(
+        ExpansionBehaviorValidation.validate(
             node,
-            setOf(
-                "number",
-                "batchStartNumber",
-                "botSeed",
-                "actorSeed",
-                "decision",
-                "turn",
-                "observation",
-                "selectedIndex",
-                "behaviorLogProbability",
-                "behaviorValue",
-            ),
+            input.seeds[index],
+            input.seat(index),
+            input.actor.model,
         )
-        val number = integer(node, "number")
-        val batch = integer(node, "batchStartNumber")
-        require(
-            number >= 0 &&
-                batch == number &&
-                integer(node, "turn") > 0 &&
-                node["decision"].asText() == "expand"
-        ) {
-            "Expansion is a single-actor ordinary window at its actual absolute PLAYER number."
-        }
-        val botSeed = simulationPolicySeed(input.seeds[index], batch, input.seat(index))
-        val actorSeed = TerritoryPolicy.actorSeed(TerritoryPhase.EXPANSION, botSeed)
-        require(integer(node, "botSeed") == botSeed && integer(node, "actorSeed") == actorSeed) {
-            "Expansion sampling must retain the original game/batch/seat seed and phase salt."
-        }
-        val encoded = node.required("observation")
-        PurchaseJson.fields(
-            encoded,
-            setOf("encoderVersion", "stateFeatures", "actions", "baselineIndex"),
-        )
-        val observation =
-            TerritoryObservation(
-                PurchaseJson.text(encoded["encoderVersion"], "encoderVersion"),
-                features(encoded["stateFeatures"]),
-                PurchaseJson.array(encoded["actions"], "actions").map { action ->
-                    PurchaseJson.fields(action, setOf("command", "features"))
-                    TerritoryAction(
-                        PurchaseJson.text(action["command"], "command"),
-                        features(action["features"]),
-                    )
-                },
-                integer(encoded, "baselineIndex"),
-            )
-        require(observation.encoderVersion == TerritoryEncoder.EXPANSION_2.version) {
-            "Only explicit full-offer expansion-v2 records belong to this collector."
-        }
-        val choice = TerritoryPolicy.choose(observation, input.actor.model, actorSeed)
-        require(
-            integer(node, "selectedIndex") == choice.index &&
-                abs(
-                    PurchaseJson.number(node["behaviorLogProbability"], "behaviorLogProbability") -
-                        choice.logProbability
-                ) <= 1e-9 &&
-                abs(PurchaseJson.number(node["behaviorValue"], "behaviorValue") - choice.value) <=
-                    1e-9
-        ) {
-            "Selected command, log probability and value must reproduce the actual behavior actor."
-        }
-    }
-
-    private fun features(node: JsonNode): Map<String, Double> {
-        require(node.isObject) { "Expansion sparse features require a numeric named object." }
-        return node.properties().associate { (name, value) ->
-            name to PurchaseJson.number(value, name)
-        }
     }
 
     private fun integer(node: JsonNode, name: String): Int =
