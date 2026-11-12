@@ -259,6 +259,53 @@ class JointActorUnitTests(unittest.TestCase):
             objective.JointPhaseAdamContinuation().validate(checkpoint, self.identity(second),
                 second.targets.collection.models['card'], self.config)
 
+    def test_carry_rejects_a_missing_accepted_actor_moment(self):
+        _, second, checkpoint = self.carried()
+        payload = policy.read_checkpoint(checkpoint)
+        del payload['optimizer']['state']['0']
+        policy.save_checkpoint(checkpoint, payload)
+        with self.assertRaisesRegex(ValueError, 'all five moments'):
+            objective.JointPhaseAdamContinuation().validate(checkpoint, self.identity(second),
+                second.targets.collection.models['card'], self.config)
+
+    def test_carry_rejects_reset_of_all_accepted_actor_moments(self):
+        _, second, checkpoint = self.carried()
+        payload = policy.read_checkpoint(checkpoint)
+        payload['optimizer']['state'] = {}
+        policy.save_checkpoint(checkpoint, payload)
+        with self.assertRaisesRegex(ValueError, 'all five moments'):
+            objective.JointPhaseAdamContinuation().validate(checkpoint, self.identity(second),
+                second.targets.collection.models['card'], self.config)
+
+    def test_carry_rejects_changed_intrinsic_adam_recipe(self):
+        _, second, checkpoint = self.carried()
+        payload = policy.read_checkpoint(checkpoint)
+        payload['optimizer']['param_groups'][0]['eps'] = .1
+        policy.save_checkpoint(checkpoint, payload)
+        with self.assertRaisesRegex(ValueError, 'intrinsic optimizer recipe'):
+            objective.JointPhaseAdamContinuation().validate(checkpoint, self.identity(second),
+                second.targets.collection.models['card'], self.config)
+
+    def test_carry_rejects_negative_squared_moments(self):
+        _, second, checkpoint = self.carried()
+        payload = policy.read_checkpoint(checkpoint)
+        item = payload['optimizer']['state']['0']['exp_avg_sq']
+        item['tensor'] = (-policy.torch.ones_like(policy.torch.tensor(item['tensor']))).tolist()
+        policy.save_checkpoint(checkpoint, payload)
+        with self.assertRaisesRegex(ValueError, 'nonnegative'):
+            objective.JointPhaseAdamContinuation().validate(checkpoint, self.identity(second),
+                second.targets.collection.models['card'], self.config)
+
+    def test_zero_step_fresh_checkpoint_can_carry_empty_adam(self):
+        first = self.batch('first')
+        with patch.object(policy, 'behavior_metrics', return_value=dict(behaviorKl=3., priorKl=0., valueMse=0.)):
+            self.update(first, 'first-update')
+        second = self.batch('second', heads={'card':first.targets.collection.models['card']})
+        self.update(second, 'second-update', carry=self.root/'first-update/checkpoint.json',
+            continuation=objective.JointPhaseAdamContinuation())
+        self.assertEqual(policy.read_json(self.root/'second-update/identity.json')
+                         ['jointActorOptimizerContinuation']['actorAdamSteps'], 0)
+
     def test_joint_loss_is_exact_legacy_purchase_precomputed_math(self):
         obj = self.batch(phase=objective.Phase.PURCHASE)
         collection = obj.targets.collection
