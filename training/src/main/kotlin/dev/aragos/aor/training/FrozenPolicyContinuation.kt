@@ -13,10 +13,18 @@ internal class FrozenPolicyContinuation(
     private val controllers: Map<Int, SimulationController>,
     private val seed: Int,
     private val deadlineNanos: Long,
+    /** Original absolute player-command index; authority entry counts are never policy offsets. */
+    private val decisionOffset: Int = 0,
 ) {
+    init {
+        require(decisionOffset in 0 until 12000) {
+            "Continuation offset must be a valid player-command index."
+        }
+    }
+
     fun check(session: ExperimentSession) {
         checkTokenValueDeadline(deadlineNanos)
-        check(session.decisions < 12000) {
+        check(decisionOffset + session.decisions < 12000) {
             "A frozen-policy continuation exceeded 12000 decisions."
         }
     }
@@ -28,17 +36,18 @@ internal class FrozenPolicyContinuation(
         observations.entries
             .mapIndexed { actorIndex, (actor, observation) ->
                 val seat = session.state.playerIds.indexOf(actor)
-                val policySeed = seed xor (session.decisions * 65537 + seat * 8191)
+                val policySeed =
+                    simulationPolicySeed(seed, decisionOffset + session.decisions, seat)
                 val controller = controllers[seat]?.takeIf { it.controls(observation.decision) }
                 val command =
                     controller?.choose(
                         SimulationDecision(
-                            number = session.decisions + actorIndex,
+                            number = decisionOffset + session.decisions + actorIndex,
                             seat = seat,
                             seed = policySeed,
                             view = session.state.viewForPlayer(actor),
                             observation = observation,
-                            batchStartNumber = session.decisions,
+                            batchStartNumber = decisionOffset + session.decisions,
                         )
                     ) ?: BotPolicy.choose(observation, BotDifficulty.HARD, policySeed, models[seat])
                 actor to command
@@ -62,7 +71,7 @@ internal class FrozenPolicyContinuation(
             SimulatedGame(
                 configuration,
                 seed,
-                session.decisions,
+                decisionOffset + session.decisions,
                 session.state.publicView().scores,
                 GameCoverage(
                     emptyMap(),

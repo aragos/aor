@@ -1567,3 +1567,30 @@ raw whole-world and separate phase errors with explicit empty-world denominators
 predictive diagnostic, without actor updates or playing-strength qualification. Focused checks:
 `python -m unittest discover -s scripts -p 'test_joint_state_value_*.py'` in the dedicated
 numerical environment.
+
+### Purchase-sequence teacher prerequisite
+
+The source-only `PurchaseSequenceTeacher` prototype captures the first actual incumbent advance
+pass with positive current-turn MR, positive misery, no complete tier and a directly offered advance
+in the sole missing category. Its 32 prospective origins are never refilled when a root is missing.
+This root is already past shipping. `ActivityPlanning.preview` supplies authoritative child offers;
+first-tier completions precede canonical command order. The fixed cap retains incumbent pass, four
+single-advance prefixes and then two-advance children, up to eight plans, recording truncation.
+
+Each plan has two shared future streams and a separate first-action-only control. Stabilization and
+relief use the unchanged full controller, as do later phases. Every intermediate purchase choice,
+all sibling terminal returns and separate canonical evidence are retained. Live execution checks the
+actual offered command and stops forcing at changed decisions/offers or information boundaries.
+The original absolute player-command index owns continuation seeds, including sealed batches;
+canonical entry counts never substitute for it. Fresh controller composition must reproduce the
+captured pass before tails run. The conservative cap is 1,024 tails plus 32 backbone games;
+authoritative canonical reconstructions are additionally counted, without fresh sampled worlds.
+The prototype performs no additional full-policy reproduction runs: each backbone and tail has
+one canonical traversal, and each captured root has one partial-prefix reconstruction.
+
+This prerequisite has no CLI, seed allocation, campaign or fitter. Hidden authority remains inside
+the executor and separate canonical evidence, never proposals or learned inputs. A compound plan's
+return is distinct from its first action under ordinary continuation; no per-hidden-world winning
+plan is a policy target. A future experiment still requires frozen input/model snapshots, a
+reviewed runner/resource contract and source/evidence validation before games. Focused synthetic
+checks: `./gradlew :training:test --tests '*PurchaseSequenceTeacherTest'`.
