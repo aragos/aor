@@ -52,3 +52,16 @@ internal fun readCardModel(raw: dynamic): CardPolicyModel =
         valueWeights = purchaseArray(raw.valueWeights).map(::purchaseNumber),
         valueBias = purchaseNumber(raw.valueBias),
     )
+
+internal fun readCardProjection(json: String): CardProjection {
+    require(json.length <= 32_000_000) { "Card projection exceeds its transport bound." }
+    val raw = JSON.parse<dynamic>(json)
+    return CardProjection(
+        encoderVersion = purchaseString(raw.encoderVersion),
+        stateFeatures = purchaseMap(raw.stateFeatures),
+        actions =
+            purchaseArray(raw.actions).map { action ->
+                CardAction(purchaseString(action.command), purchaseMap(action.features))
+            },
+    )
+}

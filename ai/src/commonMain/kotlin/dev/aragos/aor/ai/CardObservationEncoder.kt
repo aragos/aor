@@ -98,7 +98,14 @@ object CardObservationEncoder {
         seat: PlayerId,
         observation: BotObservation,
         baselineCommand: String,
-    ): CardObservation {
+    ): CardObservation = project(view, seat, observation).bindBaseline(baselineCommand)
+
+    /** Project the original ordinary actor facts before a separately loaded model recommends. */
+    fun project(
+        view: GameView,
+        seat: PlayerId,
+        observation: BotObservation,
+    ): CardProjection {
         require(
             view.stage in setOf(Stage.PLAY_CARDS, Stage.FINAL_CARD_PLAY) &&
                 observation.decision == "play-cards"
@@ -119,10 +126,9 @@ object CardObservationEncoder {
             observation.candidates.sortedBy(BotCandidate::command).map { candidate ->
                 CardAction(candidate.command, action(view, seat, candidate.command))
             }
-        return CardObservation(
+        return CardProjection(
             stateFeatures = state,
             actions = actions,
-            baselineIndex = actions.indexOfFirst { it.command == baselineCommand },
         )
     }
 

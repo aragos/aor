@@ -30,6 +30,31 @@ class CardObservationEncoderTest {
     private val players = (1..4).map { Player(PlayerId("p$it"), "Player $it") }
 
     @Test
+    fun transientProjectionBindsAnyOfferedRecommendationWithoutChangingFacts() {
+        val state = fixture()
+        val offered = BotObservations.from(state, actor)
+        val projection = CardObservationEncoder.project(state.viewForPlayer(actor), actor, offered)
+        val encoded = projection.bindBaseline("play held")
+
+        assertThat(encoded.stateFeatures).isEqualTo(projection.stateFeatures)
+        assertThat(encoded.actions).isEqualTo(projection.actions)
+        assertThat(encoded.actions[encoded.baselineIndex].command).isEqualTo("play held")
+    }
+
+    @Test
+    fun transientProjectionRejectsAnUnavailableRecommendation() {
+        val state = fixture()
+        val projection =
+            CardObservationEncoder.project(
+                state.viewForPlayer(actor),
+                actor,
+                BotObservations.from(state, actor),
+            )
+
+        assertFailsWith<IllegalArgumentException> { projection.bindBaseline("play absent") }
+    }
+
+    @Test
     fun everyOfferedCommandSurvivesWithoutAuthoredScoresOrInventedPass() {
         val state = fixture()
         val view = state.viewForPlayer(actor)
