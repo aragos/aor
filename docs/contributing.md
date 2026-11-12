@@ -1610,3 +1610,29 @@ return is distinct from its first action under ordinary continuation; no per-hid
 plan is a policy target. A future experiment still requires frozen input/model snapshots, a
 reviewed runner/resource contract and source/evidence validation before games. Focused synthetic
 checks: `./gradlew :training:test --tests '*PurchaseSequence*Test'`.
+
+### Conditional Windmill value prerequisite
+
+`WindmillValueEncoder` encodes a real Windmill quote using the shared raw public/own state units,
+the complete own/public-unplayed card catalog, owner/victim resources and marker inventories.
+Its fixed273 columns exclude authored candidate utility, hidden hands, sampling cohort, incumbent
+action and post-root trade information. It selects no action and changes no runtime policy.
+
+`WindmillValueExport` is a standalone installed-classpath public-prefix entry point: pass a frozen
+manifest and a new JSONL path, or `--dictionary NEW_FILE` for zero-game schema export. It admits
+only original TRAIN/VALIDATION members before reading them, skips every continuation subtree,
+reconstructs the exact canonical prefix and requires original actor-view/observation equality.
+All header fields, including Renaissance activation, are preserved. Missing roots have no invented
+features. The separately admitted `windmill_value_data.detached_labels` binds four ordered paired
+terminal outcomes to each already-frozen public line; no TEST loader or automatic fitting exists.
+
+`windmill_value` fits one Float64 ridge with fixed penalty .1, including its explicit constant,
+equal captured-origin weights and TRAIN-only uncentered RMS scaling. The target is the mean four
+ATTEMPT-minus-PASS returns under unchanged continuation, not a hidden-world winning action.
+Validation fixes `prediction > 0` decisions before evaluating labels and reports MSE against zero
+and the TRAIN mean, plus paired gains against PASS and the recorded normal choice. Missing and
+sampling-cohort coverage remain descriptive; these conditional labels are not qualification.
+
+Focused synthetic checks: `:ai:jvmTest --tests '*WindmillValueEncoderTest'`,
+`:training:test --tests '*WindmillValueExportTest'` and `python -m unittest test_weighted_ridge
+test_windmill_value test_windmill_value_data` from `scripts` in the numerical environment.
