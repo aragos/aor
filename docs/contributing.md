@@ -924,6 +924,21 @@ rival-population qualification succeeds.
 
 ### Joint card and purchase learning
 
+The native arena can explicitly opt into `jointPolicy` with required `baseline`, `sharedBundle`,
+`candidateBundle` and `incumbentBundle` paths. The purchase baseline is separate from every seat's
+ordinary model; each bundle must bind its exact raw baseline hash. The shared bundle remains fixed
+for all rivals, while only the evaluated seat receives its declared side's bundle. A null card
+component uses that seat's ordinary HARD card choice exactly. A zero residual card actor still uses
+the existing seeded sampler and is therefore a different policy. Card and purchase actors retain
+`CardPolicy.choose` / `PurchasePolicy.choose`; this arena never substitutes greedy selection.
+Existing indexed token and expansion overlays compose after these two phase controllers.
+
+Joint roles are mutually exclusive with `frozenPurchase` and are supported only by complete arena
+and strategy replay. Source signatures, exact bundle/component snapshots and optional pair/replay
+metadata bind all roles; omitted sources preserve legacy metadata. Historical replay rejects missing
+or changed joint bindings before simulation. This native role seam does not qualify a bundle or
+activate a browser policy. Synthetic checks: `:training:test --tests '*ArenaJointPolicyTest'`.
+
 The experimental `joint-collect` mode records both typed actors from each complete game.
 Its [source contract](../training/src/main/kotlin/dev/aragos/aor/training/JointCollectionInput.kt)
 requires `schemaVersion: 1`, `kind: "joint-collect"`, `configuration`, `games`, `seed`,

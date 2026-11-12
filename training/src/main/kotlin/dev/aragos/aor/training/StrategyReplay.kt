@@ -63,6 +63,7 @@ data class StrategyReplay(
     val game: ArenaGame,
     val replayVerified: Boolean,
     val historicalPairVerified: Boolean,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
 )
 
 /**
@@ -80,6 +81,13 @@ class StrategyReplayPair private constructor(private val record: JsonNode) {
         }
         require(integer("seed") == lineup.seed && integer("seat") == lineup.seat) {
             "Recorded arena pair seed or controlled seat does not match the specification."
+        }
+        val expectedJoint =
+            specification.jointPolicy?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["jointPolicy"]?.takeUnless(JsonNode::isNull) == expectedJoint) {
+            "Recorded arena pair joint actor roles differ from the replay specification."
         }
         val opponents = record.required("opponentIndices")
         require(opponents.isArray && opponents.size() == lineup.configuration.playerCount) {
@@ -231,6 +239,7 @@ object StrategyReplays {
             game = terminal,
             replayVerified = true,
             historicalPairVerified = pair != null,
+            jointPolicy = specification.jointPolicy?.binding(),
         )
     }
 }
@@ -432,7 +441,9 @@ object StrategyReplayMain {
                     "startedAt" to Instant.now().toString(),
                     "workers" to 1,
                     "scoreMeaning" to
-                        if (specification.frozenPurchase == null) {
+                        if (specification.jointPolicy != null) {
+                            "Immediate seat-model scores; sampled joint card/purchase actors select independently, with separate token/expansion overlays."
+                        } else if (specification.frozenPurchase == null) {
                             "Immediate linear scores; HARD may choose a first move using bounded multi-action planning."
                         } else {
                             "Immediate seat-model linear scores; the frozen purchase actor selects independently, and HARD may use bounded multi-action planning elsewhere."

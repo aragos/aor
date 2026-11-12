@@ -118,6 +118,9 @@ data class StrategySearchSpecification(
     val explicitCandidates: List<BotModel>? = null,
 ) {
     init {
+        require(arena.jointPolicy == null) {
+            "Joint actor roles are supported only by complete arena and strategy replay."
+        }
         require(arena.experimentalRulesTransfer == null) {
             "Experimental rules transfer supports arena, token-order and purchase collection, not ordinary model search."
         }
