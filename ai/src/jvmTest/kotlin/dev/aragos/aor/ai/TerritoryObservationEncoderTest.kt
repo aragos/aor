@@ -169,6 +169,47 @@ class TerritoryObservationEncoderTest {
         assertThat(action.features).doesNotContainKey("poolAfter")
     }
 
+    @Test
+    fun unboundExpansionFactsExcludeRivalCardIdentityAndFutureDeckOrder() {
+        val state = fixture(Stage.EXPANSION)
+        val other = players[1].id
+        fun changed(card: String, deck: List<String>) =
+            state.copy(
+                deck = deck,
+                players =
+                    state.players +
+                        (other to
+                            state
+                                .playerState(other)
+                                .copy(hand = listOf(HandCard("private", CardData.definition(card))))),
+            )
+        val first = changed("stone-1", listOf("wine-3", "gold-3"))
+        val second = changed("gold-3", listOf("gold-3", "wine-3"))
+
+        assertThat(projectedExpansion(first)).isEqualTo(projectedExpansion(second))
+    }
+
+    @Test
+    fun unboundExpansionFactsKeepEveryActuallyOfferedCommand() {
+        val state = fixture(Stage.EXPANSION, AdvanceId.entries.toSet(), ShippingCapability.OCEAN_4)
+        val offered = BotObservations.from(state, own)
+
+        val projection = projectedExpansion(state)
+
+        assertThat(projection.encoderVersion).isEqualTo(TerritoryEncoder.EXPANSION_2.version)
+        assertThat(projection.actions.map(TerritoryAction::command))
+            .containsExactlyElementsIn(offered.candidates.map(BotCandidate::command).sorted())
+            .inOrder()
+    }
+
+    private fun projectedExpansion(state: GameState) =
+        ExpansionObservationEncoder.project(
+            state.viewForPlayer(own),
+            own,
+            BotObservations.from(state, own),
+            TerritoryEncoder.EXPANSION_2,
+        )
+
     private fun token(state: GameState) =
         TokenObservationEncoder.from(
             state.viewForPlayer(own),

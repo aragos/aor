@@ -250,7 +250,15 @@ object ExpansionObservationEncoder {
         observation: BotObservation,
         baselineCommand: String,
         encoder: TerritoryEncoder = TerritoryEncoder.EXPANSION_1,
-    ): TerritoryObservation {
+    ): TerritoryObservation = project(view, seat, observation, encoder).bindBaseline(baselineCommand)
+
+    /** Project the acting player's ordinary view without choosing or transporting a baseline. */
+    fun project(
+        view: GameView,
+        seat: PlayerId,
+        observation: BotObservation,
+        encoder: TerritoryEncoder = TerritoryEncoder.EXPANSION_1,
+    ): ExpansionProjection {
         require(encoder.phase == TerritoryPhase.EXPANSION) {
             "Expansion observations require an expansion encoder."
         }
@@ -383,11 +391,10 @@ object ExpansionObservationEncoder {
                         }
                 }
             } else raw
-        return TerritoryObservation(
+        return ExpansionProjection(
             encoder.version,
             state,
             actions,
-            actions.indexOfFirst { it.command == baselineCommand },
         )
     }
 }
