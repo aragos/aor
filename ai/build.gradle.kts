@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
 }
 
+tasks.withType<Test>().configureEach {
+    outputs.file(layout.buildDirectory.file("test-fixtures/cpe-browser-parity.json"))
+}
+
 kotlin {
     jvm()
     js {
