@@ -127,3 +127,10 @@ reference is `referenceIndex == sampledIndex`, separate from the observation's o
 `evaluate_validation(subjects, output, load_labels)` runs that barrier before its first
 `load_labels(iteration, Head, exact_seal_subject)` callback. It computes the declared paired
 world estimates and equal-phase mean/variance, without any model call or checkpoint selection.
+
+`cpe_paired_completed.verify(directory)` shares the intrinsic completion checks used during
+publication and returns checked artifact pins. Its stdlib-only `verify_effects(subjects, report,
+load_labels)` repeats the exact sealed paired arithmetic after the same two-bundle/two-seal
+barrier. It imports neither Torch nor NumPy. It verifies preserved value parameters numerically
+as Float64, so JSON spellings `0`, `0.0` and `-0.0` do not fabricate movement or a value change;
+raw model hashes and all metadata remain separately exact.
