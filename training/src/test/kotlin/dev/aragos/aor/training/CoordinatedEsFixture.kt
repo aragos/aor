@@ -61,7 +61,7 @@ internal class CoordinatedEsFixture : AutoCloseable {
                     },
             ),
         )
-        val path = files.directory.resolve("coordinated-bundle.json")
+        val path = files.directory.resolve("coordinated-bundle.json").toRealPath()
         original =
             CoordinatedEsBundle.read(
                 TokenPairedSubject(path, PurchaseJson.hash(path), path.toString()),

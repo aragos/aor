@@ -52,8 +52,11 @@ internal class CoordinatedEsPanel(val globalIndex: Int) {
     ) {
         require(head in HEADS) { "Only E/T have a signed-gap sensitivity panel." }
         val encoder =
-            if (head == CoordinatedEsHead.EXPANSION) TerritoryEncoder.EXPANSION_2
-            else TerritoryEncoder.TOKEN_2
+            if (head == CoordinatedEsHead.EXPANSION) {
+                TerritoryEncoder.EXPANSION_2
+            } else {
+                TerritoryEncoder.TOKEN_2
+            }
         require(observation.encoderVersion == encoder.version) {
             "A sensitivity state must use the complete dictionary for its declared head."
         }

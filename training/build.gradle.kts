@@ -129,6 +129,8 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     outputs.dir(layout.buildDirectory.dir("test-fixtures/cpe-wire"))
+    outputs.file(layout.buildDirectory.file("test-fixtures/coordinated-es-browser-parity.json"))
+    outputs.dir(layout.buildDirectory.dir("test-fixtures/coordinated-es-wire"))
 }
 
 tasks.register<JavaExec>("benchmark") {

@@ -221,9 +221,33 @@ object StrategyReplays {
         side: StrategyReplaySide,
         deadlineNanos: Long = Long.MAX_VALUE,
         pair: StrategyReplayPair? = null,
+    ): StrategyReplay = playRecorded(specification, specification, index, side, deadlineNanos, pair)
+
+    /**
+     * Historical zero-role proof preserves the original pair's opponents and validates its raw
+     * metadata.
+     */
+    internal fun coordinatedHistorical(
+        raw: ArenaSpecification,
+        policy: ArenaCoordinatedPolicy,
+        index: Int,
+        side: StrategyReplaySide,
+        deadlineNanos: Long,
+        pair: StrategyReplayPair,
+    ): StrategyReplay =
+        playRecorded(raw.copy(coordinatedEs = policy), raw, index, side, deadlineNanos, pair)
+
+    private fun playRecorded(
+        specification: ArenaSpecification,
+        recordedSpecification: ArenaSpecification,
+        index: Int,
+        side: StrategyReplaySide,
+        deadlineNanos: Long,
+        pair: StrategyReplayPair?,
     ): StrategyReplay {
         val lineup = StrategyArena.lineup(specification, index)
-        val opponentIndices = pair?.opponentIndices(specification, index) ?: lineup.opponentIndices
+        val opponentIndices =
+            pair?.opponentIndices(recordedSpecification, index) ?: lineup.opponentIndices
         val recording = StrategyRecording(lineup.seat, lineup.seed)
         val game =
             Simulation()

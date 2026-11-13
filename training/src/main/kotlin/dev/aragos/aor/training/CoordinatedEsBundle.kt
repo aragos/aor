@@ -71,7 +71,11 @@ private constructor(
                 )
         }
 
-    fun validateOriginal(arena: ArenaSpecification, baseline: PurchaseBaselineInput) {
+    fun validateOriginal(
+        arena: ArenaSpecification,
+        baseline: PurchaseBaselineInput,
+        controlledSides: Set<ArenaSide>? = null,
+    ) {
         val joint =
             PurchaseJson.mapper
                 .valueToTree<JsonNode>(arena.overlayMetadata())
@@ -79,13 +83,17 @@ private constructor(
         require(joint["baseline"]["sha256"]?.asText() == baseline.sha256) {
             "The complete coordinated reference requires its exact frozen F0 purchase prior."
         }
-        for (role in listOf("candidateBundle", "incumbentBundle", "sharedBundle")) {
+        val references =
+            controlledSides?.map {
+                if (it == ArenaSide.CANDIDATE) "candidateBundle" else "incumbentBundle"
+            } ?: listOf("candidateBundle", "incumbentBundle", "sharedBundle")
+        for (role in references) {
             require(
                 joint[role]["card"]["sha256"]?.asText() == subject(CoordinatedEsHead.CARD).sha256 &&
                     joint[role]["purchase"]["sha256"]?.asText() ==
                         subject(CoordinatedEsHead.PURCHASE).sha256
             ) {
-                "Every raw reference role must retain the exact original qualified G3 C/P heads."
+                "Every declared raw reference role must retain the exact original qualified G3 C/P heads."
             }
         }
         require(
@@ -160,13 +168,15 @@ private constructor(
                     TerritoryEncoder.TOKEN_2,
                 )
             return CoordinatedEsHead.entries.associateWith { head ->
-                if (head == CoordinatedEsHead.TOKEN)
+                if (head == CoordinatedEsHead.TOKEN) {
                     CpePairedDictionary(
                         TerritoryEncoder.TOKEN_2.version,
                         token.stateFeatureNames,
                         token.actionFeatureNames,
                     )
-                else requireNotNull(cpe[CpeHead.valueOf(head.name)]) { "Missing C/P/E dictionary." }
+                } else {
+                    requireNotNull(cpe[CpeHead.valueOf(head.name)]) { "Missing C/P/E dictionary." }
+                }
             }
         }
 
