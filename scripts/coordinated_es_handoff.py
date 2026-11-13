@@ -2,6 +2,9 @@
 import argparse
 import json
 import sys
+import signal
+import time
+from pathlib import Path
 
 import coordinated_es_plan as p
 import token_paired_handoff as shared
@@ -11,7 +14,7 @@ ADDRESS = shared.ADDRESS
 Clock = p.Clock
 STAGES = tuple(f'{phase}-{g}' for g in range(1,17) for phase in ('controls','population')) + ('screen',)
 MAXIMUM_PUBLICATION_BYTES = 1024**3
-STOP_REASONS = ('calibration-failed', 'zero-gradient', 'prefix-resource-gate')
+STOP_REASONS = ('calibration-failed', 'zero-gradient', 'nonfinite-arithmetic', 'prefix-resource-gate')
 
 
 class PeerStopped(Exception):
@@ -60,7 +63,34 @@ def notify_failure(root,name):return shared.notify_failure(root,name,contract=sy
 def stage(root,name):return shared.stage(root,name,contract=sys.modules[__name__])
 def reserve(root,name):return shared.reserve(root,name,contract=sys.modules[__name__])
 def accept(root,name):return shared.accept(root,name,contract=sys.modules[__name__])
-def serve(mode,root,name):return shared.serve(mode,root,name,contract=sys.modules[__name__])
+def receive_retention(root,name):
+    """Two finite accounting messages; no scientific shard, outcome or rescheduling API."""
+    import coordinated_es_storage as storage
+    p.require(isinstance(name,str) and len(name.encode())<=4096,
+        'A prefix resource census has a fixed compact message bound.')
+    row=json.loads(name);root=Path(root);number=row['generation']
+    p.require(number in (1,2) and health(root)['status']=='active',
+        'Only an active coordinator can accept its first two generation censuses.')
+    clock=p.read(root/'clock.json')
+    storage.prefix_retention(row,clock['protocolSha256'],'MAC',number)
+    p.require(all((root/'incoming'/tag(number,chunk,phase=phase)/'accepted.json').is_file()
+        for chunk in p.GENERATION_CHUNKS['MAC'] for phase in ('controls','population')),
+        'Mac resource measurement follows all of its original generation transfers.')
+    target=root/'peer-retention'/f'generation-{number}.json'
+    p.require(not target.exists(),'The prefix resource census has no repeated publication.')
+    return storage.publish_json(target,row)
+
+
+def serve(mode,root,name):
+    if mode!='retention':return shared.serve(mode,root,name,contract=sys.modules[__name__])
+    clock=p.read(Path(root)/'clock.json')
+    p.require(clock['kind']==PREFIX+'-clock-1','Resource handoff requires the shared original clock.')
+    seconds=min(60.,Clock(clock['startedEpoch'],clock['deadlineEpoch']).remaining(time.time()))
+    def expired(_number,_frame):raise TimeoutError('The bounded resource handoff expired.')
+    previous=signal.signal(signal.SIGALRM,expired);signal.setitimer(signal.ITIMER_REAL,seconds)
+    try:return receive_retention(root,name)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL,0);signal.signal(signal.SIGALRM,previous)
 def bundle(directory,name,files,identity):
     return shared.bundle(directory,name,files,identity,contract=sys.modules[__name__])
 
@@ -69,10 +99,16 @@ class Outbound(shared.Outbound):
     def __init__(self,profile,clock,local_root,**options):
         super().__init__(profile,clock,local_root,contract=sys.modules[__name__],**options)
 
+    def push_retention(self,record):
+        result=self.remote('retention',json.dumps(record,separators=(',',':')))
+        p.require(result['sha256']==__import__('hashlib').sha256(p.canonical(record)+b'\n').hexdigest(),
+            'The receiver must preserve exact measured resource bytes.')
+        return result
+
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode',choices=('probe','reserve','accept','health','fail'))
+    parser.add_argument('mode',choices=('probe','reserve','accept','health','fail','retention'))
     parser.add_argument('--root',required=True);parser.add_argument('--name',required=True)
     args=parser.parse_args()
     print(json.dumps(serve(args.mode,args.root,args.name)))

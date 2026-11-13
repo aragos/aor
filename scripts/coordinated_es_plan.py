@@ -50,6 +50,8 @@ PREFIX_GATE = dict(
     screenReserveBytes=2 * 1024**3, generationCost='MAXIMUM_INCLUSIVE_WALL_TIME',
     bytes='SHARED_BASE_ONCE_PLUS_16_MAX_GENERATION_DELTAS',
 )
+GAME_LIMITS = dict(maximumSeconds=300, maximumDecisions=12000,
+    invalidGame='ABORT_ATTEMPT', rewardImputation=False, refill=False)
 
 
 def host_limits(host):
@@ -119,12 +121,13 @@ class Plan:
 
     @classmethod
     def from_record(cls, record):
-        require(set(record) == {'kind', 'recipe', 'calibration', 'prefixGate', 'budget',
+        require(set(record) == {'kind', 'recipe', 'calibration', 'prefixGate', 'gameLimits', 'budget',
             'scienceSeconds', 'auditSeconds', 'hosts', 'original', 'projectionSeed',
             'generations', 'screenBank', 'screenGate', 'automaticRetry', 'automaticSuccessor'},
             'A coordinated ES protocol requires only its complete explicit scientific fields.')
         require(record['kind'] == KIND and record['recipe'] == RECIPE and
-            record['calibration'] == CALIBRATION and record['prefixGate'] == PREFIX_GATE,
+            record['calibration'] == CALIBRATION and record['prefixGate'] == PREFIX_GATE and
+            record['gameLimits'] == GAME_LIMITS,
             'Only the prescribed optimizer, one calibration and outcome-blind prefix are admitted.')
         require(record['budget'] == expected_budget() and
             record['scienceSeconds'] == SCIENCE_SECONDS and record['auditSeconds'] == AUDIT_SECONDS and
@@ -171,6 +174,34 @@ class Plan:
 
     def bank(self, number):
         return self.record['generations'][generation(number)-1]
+
+    def generation_source(self, number, chunk, phase, subjects):
+        """Native executable request; construction does not open models or fitness records."""
+        generation(number); owner(chunk)
+        require(phase in ('CONTROLS', 'POPULATION'), 'A fixed native stage is required.')
+        required = {'protocol', 'arena', 'originalBundle', 'projection', 'center',
+            'directions', 'population', 'calibration', 'previousUpdate', 'historical'}
+        require(set(subjects) == required, 'The native generation needs its exact subject closure.')
+        nullable = {'population', 'calibration', 'previousUpdate'}
+        for key, value in subjects.items():
+            if value is None:
+                require(key in nullable, 'A mandatory generation subject cannot be omitted.')
+            else:
+                require(isinstance(value, dict) and set(value) == {'path', 'sha256'},
+                    'Native subjects retain an explicit path and raw SHA256.')
+                require(isinstance(value['path'], str) and value['path'], 'A subject path is required.')
+                sha(value['sha256'])
+        require((subjects['population'] is None) == (phase == 'CONTROLS'),
+            'Only population stages admit a sealed executable population.')
+        require((subjects['calibration'] is None) == (number == 1 and phase == 'CONTROLS'),
+            'Only first-generation controls may precede the single calibration seal.')
+        require((subjects['previousUpdate'] is None) == (number == 1),
+            'Every later generation must bind its immediate preceding update.')
+        require(subjects['originalBundle']['sha256'] == self.record['original']['bundleSha256'] and
+            subjects['projection']['sha256'] == self.record['original']['projectionSha256'],
+            'The immutable original bundle and fixed projection cannot change.')
+        return dict(kind=PREFIX+'-generation-1', stage=phase, generation=number,
+            globalStart=chunk*32, count=32, bank=self.bank(number)['worldBank'], **subjects)
 
 
 @dataclass(frozen=True)

@@ -110,6 +110,10 @@ persisted terminal+900 and original science deadline+900. No retry, rescheduling
 deadline reset or shortened successful run exists. Any missing/invalid world or partial
 generation fails closed. Outcome-blind prefix resource projections must be fixed before
 scientific preparation; they may stop the run but cannot change its recipe/counts.
+Each original or reproduced game has at most300 wall seconds and12000 player commands,
+with its deadline clamped to the unchanged campaign deadline. Exhaustion aborts the
+attempt. Attempted and completed games remain separate; no fabricated terminal reward
+or replacement world repairs an invalid or unfinished game.
 
 Desktop uses10 native workers on16 logical CPUs and Mac6 on10. Concrete memory, disk,
 free-space and prefix-reserve limits are pinned in the later reviewed host profiles:
@@ -122,6 +126,11 @@ require `sharedBaseBytes + 16*max(generation1DeltaBytes,generation2DeltaBytes) +
 at most24GiB. Shared input/run overhead is counted once; each generation delta includes
 all retained actor, receipt, archive, transfer and numerical artifacts. Generated temporary
 copies still count while present. No scientific outcome changes these cost/storage gates.
+The immutable scientific package payload (models, projection/directions, dictionaries and
+historical subjects) is included in shared base bytes; installed runtime/JDK/environment
+closure is independently pinned. Duplicate generated copies each count. Mac sends exactly
+two compact resource censuses, after every shard transfer in generations1 and2; these
+contain only byte/file counts, include their own persisted bytes, and cannot carry outcomes.
 Native task ownership and publication
 identity are independent of host path and worker scheduling. Mac uses only the existing
 outbound SSH channel. Either peer's terminal state or the original deadline ends waiting.

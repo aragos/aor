@@ -8,6 +8,7 @@ import coordinated_es_plan as p
 import coordinated_es_handoff as h
 import token_paired_handoff as legacy
 import token_paired_storage as storage
+import coordinated_es_storage as es_storage
 
 
 class HandoffTest(unittest.TestCase):
@@ -84,6 +85,35 @@ class HandoffTest(unittest.TestCase):
             with patch.object(legacy.time,'time',return_value=86401.),patch.object(h,'accept') as accept:
                 with self.assertRaisesRegex(ValueError,'expired'):h.serve('accept',folder,'controls-1-chunk-5')
                 accept.assert_not_called()
+
+    def resource_fixture(self,root):
+        storage.publish_json(root/'clock.json',dict(protocolSha256='1'*64))
+        for phase in ('controls','population'):
+            for chunk in p.GENERATION_CHUNKS['MAC']:
+                storage.publish_json(root/'incoming'/h.tag(1,chunk,phase=phase)/'accepted.json',{})
+        return dict(kind=h.PREFIX+'-retention-1',host='MAC',generation=1,protocolSha256='1'*64,
+            sharedBaseBytes=7,generationBytes={str(g):9 if g==1 else 0 for g in range(1,17)},
+            totalBytes=16,regularFiles=2)
+
+    def test_prefix_bytes_require_all_mac_transfers(self):
+        with tempfile.TemporaryDirectory() as folder,patch.object(h,'health',return_value={'status':'active'}):
+            root=Path(folder);row=self.resource_fixture(root)
+            (root/'incoming/population-1-chunk-7/accepted.json').unlink()
+            with self.assertRaisesRegex(ValueError,'all of its original'):
+                h.receive_retention(root,__import__('json').dumps(row))
+
+    def test_prefix_bytes_are_published_once(self):
+        with tempfile.TemporaryDirectory() as folder,patch.object(h,'health',return_value={'status':'active'}):
+            root=Path(folder);row=self.resource_fixture(root);wire=__import__('json').dumps(row)
+            result=h.receive_retention(root,wire)
+            self.assertEqual(p.read(result['path']),row)
+            with self.assertRaisesRegex(ValueError,'repeated'):h.receive_retention(root,wire)
+
+    def test_resource_channel_rejects_outcome_fields(self):
+        with tempfile.TemporaryDirectory() as folder,patch.object(h,'health',return_value={'status':'active'}):
+            root=Path(folder);row=self.resource_fixture(root);row['reward']=.9
+            with self.assertRaisesRegex(ValueError,'original host'):
+                h.receive_retention(root,__import__('json').dumps(row))
 
 
 if __name__=='__main__':unittest.main()

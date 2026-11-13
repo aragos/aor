@@ -84,8 +84,10 @@ def learning_progress(receipt):
         receipt['actorAdamSteps']>receipt['previousActorAdamSteps'])
 
 
-def native_command(protocol, mode, source, output, extra=()):
-    seconds = max(1,min(7200,int(exp.remaining_seconds())))
+def native_command(protocol, mode, source, output, extra=(), *, maximum_seconds=7200):
+    require(type(maximum_seconds) is int and 1<=maximum_seconds<=86400,
+        'A native child needs an explicit finite stage ceiling of at most one day.')
+    seconds = max(1,min(maximum_seconds,int(exp.remaining_seconds())))
     return [protocol['java']['executable'], f'-Xmx{protocol["heapMiB"]}m',
         f'-XX:ActiveProcessorCount={protocol["machineCpus"]}', '-XX:ParallelGCThreads=1', '-XX:ConcGCThreads=1',
         '-cp',str(Path(protocol['runtime'])/'lib/*'),'dev.aragos.aor.training.TrainingMainKt',
