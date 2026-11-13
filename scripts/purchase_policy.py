@@ -805,7 +805,8 @@ class ActorAdamContinuation:
 
 
 def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
-                           precomputed_advantages=False, joint_actor_only=None, expansion_mc=None):
+                           precomputed_advantages=False, joint_actor_only=None, expansion_mc=None,
+                           expansion_baseline=None):
     config.validate_reference(policy.contract)
     probabilities, values = policy([row.get("_prepared", row["observation"]) for row in rows])
     chosen = torch.stack([logp[row["selectedIndex"]]
@@ -826,8 +827,14 @@ def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
                 and joint_actor_only is None and precomputed_advantages,
                 "Expansion MC requires its separate typed detached objective.")
         expansion_mc.validate(policy.contract, config)
+    if expansion_baseline is not None:
+        from expansion_previous_baseline import ExpansionBaselineObjective
+        require(type(expansion_baseline) is ExpansionBaselineObjective and not actor_only
+                and joint_actor_only is None and expansion_mc is None and precomputed_advantages,
+                "Previous-batch expansion baseline requires its separate typed detached objective.")
+        expansion_baseline.validate(policy.contract, config)
     if precomputed_advantages:
-        require(actor_only or joint_actor_only is not None or expansion_mc is not None,
+        require(actor_only or joint_actor_only is not None or expansion_mc is not None or expansion_baseline is not None,
                 "Explicit precomputed advantages require the actor-only objective.")
         advantages = torch.tensor([row["_actorOnlyAdvantage"] for row in rows], dtype=DTYPE)
     else:
@@ -851,7 +858,11 @@ def ordinary_loss_for_rows(policy, rows, config, *, actor_only=False,
 
 
 def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_reference=None,
-                  actor_only=False, precomputed_advantages=False, joint_actor_only=None, expansion_mc=None):
+                  actor_only=False, precomputed_advantages=False, joint_actor_only=None, expansion_mc=None,
+                  expansion_baseline=None):
+    require(expansion_baseline is None or (not actor_only and joint_actor_only is None and expansion_mc is None
+            and purchase_reference is None and offered_reference is None),
+            "Previous-batch expansion baseline cannot combine another objective.")
     require(expansion_mc is None or (not actor_only and joint_actor_only is None
             and purchase_reference is None and offered_reference is None),
             "Expansion MC cannot combine another objective.")
@@ -868,7 +879,8 @@ def loss_for_rows(policy, rows, config, *, purchase_reference=None, offered_refe
         purchase_reference.validate(policy.contract)
     ordinary = ordinary_loss_for_rows(policy, rows, config, actor_only=actor_only,
                                      precomputed_advantages=precomputed_advantages,
-                                     joint_actor_only=joint_actor_only, expansion_mc=expansion_mc)
+                                     joint_actor_only=joint_actor_only, expansion_mc=expansion_mc,
+                                     expansion_baseline=expansion_baseline)
     if purchase_reference is None and offered_reference is None:
         return ordinary
     # Match the reviewed LAB objective's separate forward and operation order exactly.
@@ -910,10 +922,15 @@ def epoch_batches(rows, config, epoch):
 
 def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_reference=None,
                   offered_reference=None, actor_only=False, precomputed_advantages=False,
-                  joint_actor_only=None, expansion_mc=None):
+                  joint_actor_only=None, expansion_mc=None, expansion_baseline=None):
     require(time.monotonic() < deadline, "Purchase update exceeded its elapsed-time budget.")
     optimizer.zero_grad(set_to_none=True)
-    if expansion_mc is not None:
+    if expansion_baseline is not None:
+        require(not actor_only and joint_actor_only is None and expansion_mc is None
+                and purchase_reference is None and offered_reference is None,
+                "Previous-batch baseline cannot add another objective.")
+        loss = loss_for_rows(policy, batch, config, expansion_baseline=expansion_baseline, precomputed_advantages=True)
+    elif expansion_mc is not None:
         require(not actor_only and joint_actor_only is None and purchase_reference is None
                 and offered_reference is None, "Expansion MC cannot add another objective.")
         loss = loss_for_rows(policy, batch, config, expansion_mc=expansion_mc, precomputed_advantages=True)
@@ -941,13 +958,17 @@ def fit_minibatch(policy, optimizer, batch, config, deadline, *, purchase_refere
 
 
 def fit_epoch(policy, optimizer, rows, config, epoch, deadline, *, actor_only=False,
-              precomputed_advantages=False, joint_actor_only=None, expansion_mc=None):
+              precomputed_advantages=False, joint_actor_only=None, expansion_mc=None, expansion_baseline=None):
+    require(expansion_baseline is None or (not actor_only and joint_actor_only is None and expansion_mc is None),
+            "A previous-batch baseline epoch cannot also select another objective.")
     require(joint_actor_only is None or not actor_only,
             "A joint epoch cannot also select the legacy purchase-only objective.")
     require(expansion_mc is None or (not actor_only and joint_actor_only is None),
             "An expansion MC epoch cannot also select another objective.")
     for batch in epoch_batches(rows, config, epoch):
-        if expansion_mc is not None:
+        if expansion_baseline is not None:
+            fit_minibatch(policy, optimizer, batch, config, deadline, expansion_baseline=expansion_baseline)
+        elif expansion_mc is not None:
             fit_minibatch(policy, optimizer, batch, config, deadline, expansion_mc=expansion_mc)
         elif joint_actor_only is not None:
             fit_minibatch(policy, optimizer, batch, config, deadline, joint_actor_only=joint_actor_only)
@@ -1312,7 +1333,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
            purchase_reference=None, collection_reader=None, offered_reference=None,
            actor_only=None, actor_optimizer_continuation=None,
            joint_actor_only=None, joint_optimizer_continuation=None,
-           expansion_mc=None, expansion_optimizer_continuation=None):
+           expansion_mc=None, expansion_optimizer_continuation=None,
+           expansion_baseline=None, expansion_baseline_continuation=None):
     """Fit one typed actor; optional readers own completed-data/likelihood validation.
 
     A custom reader has read_collection's signature and returns rows plus provenance containing
@@ -1364,6 +1386,23 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         require(isinstance(expansion_optimizer_continuation, ExpansionMcAdamContinuation)
                 and expansion_mc is not None and optimizer_from is not None and not resume,
                 "Expansion continuation requires its previous exact checkpoint and MC objective.")
+    if expansion_baseline is not None:
+        from expansion_previous_baseline import ExpansionBaselineObjective, ExpansionBaselineAdamContinuation
+        require(type(expansion_baseline) is ExpansionBaselineObjective and actor_only is None
+                and actor_optimizer_continuation is None and joint_actor_only is None
+                and joint_optimizer_continuation is None and expansion_mc is None
+                and expansion_optimizer_continuation is None and update_mode == LEGACY_UPDATE_MODE
+                and not resume and purchase_reference is None and offered_reference is None
+                and collection_reader == expansion_baseline.phase_reader
+                and (optimizer_from is None or type(expansion_baseline_continuation) is ExpansionBaselineAdamContinuation),
+                "Previous-batch expansion baseline requires its exact reader, epoch rollback and separate typed carry.")
+        expansion_baseline.validate(contract, config)
+        expansion_baseline.admit_optimizer(optimizer_from, config)
+    if expansion_baseline_continuation is not None:
+        from expansion_previous_baseline import ExpansionBaselineAdamContinuation
+        require(type(expansion_baseline_continuation) is ExpansionBaselineAdamContinuation
+                and expansion_baseline is not None and optimizer_from is not None and not resume,
+                "Previous-batch baseline carry requires its completed predecessor and typed objective.")
     validate_purchase_reference(purchase_reference, contract, update_mode)
     validate_offered_reference(offered_reference, contract, update_mode)
     require(purchase_reference is None or offered_reference is None,
@@ -1390,6 +1429,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
     expansion_identity = None
     if expansion_mc is not None:
         rows, expansion_identity = expansion_mc.bind(rows, provenance, file_digest(model_path))
+    baseline_identity = None
+    if expansion_baseline is not None:
+        rows, baseline_identity = expansion_baseline.bind(rows, provenance, file_digest(model_path))
     carry_identity = None
     if actor_optimizer_continuation is not None:
         carry_identity = actor_optimizer_continuation.validate(
@@ -1405,6 +1447,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         expansion_carry_identity = expansion_optimizer_continuation.validate(
             optimizer_from, expansion_identity, model, config)
         expansion_identity["optimizerInitialization"] = "matching-expansion-mc-adam"
+    baseline_carry_identity = None
+    if expansion_baseline_continuation is not None:
+        baseline_carry_identity = expansion_baseline_continuation.validate(
+            optimizer_from, baseline_identity, model, config)
+        baseline_identity["optimizerInitialization"] = "matching-expansion-previous-batch-adam"
     if reader_source is not None:
         require(file_digest(reader_source["path"]) == reader_source["sha256"]
                 and provenance.get("readerSha256") == reader_source["sha256"],
@@ -1442,6 +1489,11 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         identity["expansionMcOwnerSha256"] = file_digest(inspect.getsourcefile(type(expansion_mc)))
     if expansion_carry_identity is not None:
         identity["expansionMcOptimizerContinuation"] = expansion_carry_identity
+    if baseline_identity is not None:
+        identity["expansionBaselineObjective"] = baseline_identity
+        identity["expansionBaselineOwnerSha256"] = file_digest(inspect.getsourcefile(type(expansion_baseline)))
+    if baseline_carry_identity is not None:
+        identity["expansionBaselineOptimizerContinuation"] = baseline_carry_identity
     output = Path(output)
     checkpoint_path = output / "checkpoint.json"
     started_path = output / ("block-started.json" if update_mode == CHECKED_PREFIX_MODE
@@ -1483,10 +1535,10 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
                 "Existing epoch marker belongs to a different purchase update.")
     policy = ResidualPolicy(checkpoint["model"], contract)
     behavior = ResidualPolicy(model, contract)
-    if actor_only is not None or joint_actor_only is not None or expansion_mc is not None:
+    if actor_only is not None or joint_actor_only is not None or expansion_mc is not None or expansion_baseline is not None:
         policy.valueWeights.requires_grad_(False)
         policy.valueBias.requires_grad_(False)
-    parameters = (policy.parameters() if actor_only is None and joint_actor_only is None and expansion_mc is None else
+    parameters = (policy.parameters() if actor_only is None and joint_actor_only is None and expansion_mc is None and expansion_baseline is None else
                   [parameter for parameter in policy.parameters() if parameter.requires_grad])
     optimizer = torch.optim.Adam(parameters, lr=config.learningRate, foreach=False)
     if checkpoint["optimizer"] is not None:
@@ -1526,7 +1578,9 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         before = copy.deepcopy(policy.state_dict())
         old_optimizer = copy.deepcopy(optimizer.state_dict())
         try:
-            if expansion_mc is not None:
+            if expansion_baseline is not None:
+                fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline, expansion_baseline=expansion_baseline)
+            elif expansion_mc is not None:
                 fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline, expansion_mc=expansion_mc)
             elif joint_actor_only is not None:
                 fit_epoch(policy, optimizer, rows, config, checkpoint["epoch"], deadline,
@@ -1574,7 +1628,7 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
         report["purchaseReferenceObjective"] = asdict(purchase_reference)
     if offered_reference is not None:
         report["offeredReferenceObjective"] = asdict(offered_reference)
-    if actor_only_identity is not None or joint_identity is not None or expansion_identity is not None:
+    if actor_only_identity is not None or joint_identity is not None or expansion_identity is not None or baseline_identity is not None:
         require(policy.artifact()["valueWeights"] == model["valueWeights"]
                 and policy.artifact()["valueBias"] == model["valueBias"],
                 "Actor-only optimization must preserve both original value-head parameters.")
@@ -1587,6 +1641,8 @@ def update(model_path, collection_path, config, output, resume=False, optimizer_
             report["jointActorOnlyObjective"] = joint_identity
         if expansion_identity is not None:
             report["expansionMcObjective"] = expansion_identity
+        if baseline_identity is not None:
+            report["expansionBaselineObjective"] = baseline_identity
     atomic_json(output / "finished.json", report)
     return report
 
