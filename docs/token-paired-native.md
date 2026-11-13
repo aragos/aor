@@ -97,3 +97,25 @@ activated by exposing this evaluator.
 Only the final second-iteration actor is eligible for the separately frozen development screen.
 There is no validation-driven choice of epoch, iteration, settings or runner-up. This source
 prerequisite changes neither the closed studies nor any production default policy.
+
+## Final screen admission and replay
+
+The final screen has a separate typed source and admission. Before parsing either actor, it rehashes
+the two completed iteration transactions, their complete public corpora and validation probability
+seals, and requires the exact pi0-to-pi1-to-pi2 chain. Validation effects never select that chain.
+Portable admission subjects resolve relative to their owning receipt; original paths inside
+completed evidence remain provenance rather than a requirement to reopen another host's files.
+
+The three roles are FINAL, RAW_T and INITIAL. Optional token actors compose only around the
+controlled candidate or incumbent after the complete existing controller; omitted roles preserve
+legacy identities, metadata and behavior. Each world executes FINAL once, shared across both
+contrasts. Eight fixed128-world slices preserve global indices and a common full-bank identity.
+Only the owning slice executes the prescribed four global indices' three-role canonical replays.
+Two separately admitted historical raw-G3 replays precede any fresh screen world.
+
+The pure report consumes all1,024 compact world records and their original completed slice
+receipts, without parsing models. It verifies raw and semantic world bindings before computing
+paired-world intervals with the existing1.96 multiplier. The development gate requires positive
+lower95 bounds for FINAL-minus-RAW_T win and reward and FINAL-minus-INITIAL reward; it neither
+qualifies nor activates a model. Campaign-level validation diagnostics and the finite supervisor
+remain separate owners.
