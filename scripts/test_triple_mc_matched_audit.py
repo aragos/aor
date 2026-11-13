@@ -293,7 +293,7 @@ class ArchivedFixture:
                 for k in ('actorVersion','encoderVersion','stateFeatureNames','actionFeatureNames')}),
             controlledBehavior=behavior,snapshots=snapshots,replayIndices=[replay])
         loop.document(directory/'collection/collection.json',manifest)
-        loop.document(directory/'collection/started.json',dict(signature=signature,workers=10,
+        loop.document(directory/'collection/started.json',dict(signature=signature,workers=self.plan.workers,
             startedAt='2000-01-01T00:00:00Z',deadlineAt='2000-01-01T00:01:00Z'))
         hashes={};origins=[];reward=.3
         for i in range(256):

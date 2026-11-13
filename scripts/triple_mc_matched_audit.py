@@ -279,9 +279,9 @@ def verify_collection(index,meta,protocol,plan,arm,batch,pins,previous):
         and manifest['replayIndices']==[replay], 'Only complete original typed triple collections are admitted.')
     started=meta['collection/started.json']
     require(set(started)=={'signature','workers','startedAt','deadlineAt'} and started['signature']==manifest['signature']
-        and started['workers']==10 and 0<(datetime.fromisoformat(started['deadlineAt'].replace('Z','+00:00'))-
+        and started['workers']==plan.workers and 0<(datetime.fromisoformat(started['deadlineAt'].replace('Z','+00:00'))-
             datetime.fromisoformat(started['startedAt'].replace('Z','+00:00'))).total_seconds()<=7200,
-        'Native collection must retain its actual10-worker original bounded stage clock.')
+        'Native collection must retain its exact declared worker count and original bounded stage clock.')
     require(jm['games']==256 and jm['seed']==plan.offsets[batch-1]
         and jm['seeds']==[-1000000000+plan.offsets[batch-1]+i*8191 for i in range(256)]
         and jm['source']==str(root/'joint-source.json') and jm['sourceSha256']==index.files['joint-source.json']['sha256']
@@ -487,7 +487,7 @@ def terminal_contract(plan,finished,receipts,prefix):
     reached_prefix=len(receipts)>=8 and not (hit is not None and hit<=7)
     if reached_prefix and not (reason=='exception' and prefix is None and len(receipts)==8):
         require(prefix is not None and prefix['kind']=='triple-mc-operational-prefix-1'
-            and prefix['qualityInspected'] is False and finite(prefix['remainingSeconds'],0,21600),
+            and prefix['qualityInspected'] is False and finite(prefix['remainingSeconds'],0,plan.maximum_seconds),
             'Original paired-prefix measurements must precede every later batch.')
         require(prefix['passed'] is plan.prefix_passed(receipts[:8],prefix['remainingSeconds'],prefix['roundSeconds']),
             'Recorded prefix admission differs from the fixed measured-cost/exposure gate.')

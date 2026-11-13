@@ -1,6 +1,7 @@
 """Fixed 32-round matched terminal-MC study; source prerequisite, no embedded scientific inputs."""
 import argparse
 from dataclasses import dataclass
+from enum import Enum
 import gzip
 import json
 import math
@@ -24,6 +25,25 @@ LIMITS = dict(rounds=32,worldsPerBatch=256,prefixRounds=4,workers=10,machineCpus
     minimumFreeBytes=16*GIB,updateSeconds=900)
 
 
+class ResourceProfile(Enum):
+    DESKTOP = 'DESKTOP_16_WORKER_10_6H_1'
+    MAC = 'MAC_10_WORKER_6_8H_1'
+
+    @property
+    def limits(self):
+        return LIMITS if self is ResourceProfile.DESKTOP else dict(
+            LIMITS,workers=6,machineCpus=10,maximumSeconds=28800)
+
+
+def resource_profile(protocol):
+    name=protocol.get('resourceProfile',ResourceProfile.DESKTOP.value)
+    require(name in {p.value for p in ResourceProfile}, 'Use one explicit admitted resource profile.')
+    profile=ResourceProfile(name)
+    require(all(protocol[k]==v for k,v in profile.limits.items()),
+        'The matched study has one fixed recipe and exact resource profile; mixed host limits are invalid.')
+    return profile
+
+
 def subject(path):return dict(path=str(Path(path).resolve()),sha256=sha(path))
 
 
@@ -42,11 +62,19 @@ class LoopPlan:
     offsets: tuple
     shuffles: tuple
     workers: int
+    resource: ResourceProfile
+
+    @property
+    def maximum_seconds(self):return self.resource.limits['maximumSeconds']
+
+    @property
+    def machine_cpus(self):return self.resource.limits['machineCpus']
 
     @classmethod
     def read(cls, protocol):
+        profile=resource_profile(protocol)
         require(protocol['kind'] == VERSION and protocol['automaticRetry'] is False
-            and protocol['strengthScreens'] == [] and all(protocol[k] == v for k,v in LIMITS.items())
+            and protocol['strengthScreens'] == []
             and protocol['prefixGates'] == PREFIX, 'The matched study has one fixed recipe, gates and resource profile.')
         offsets, shuffles = tuple(protocol['offsets']), tuple(protocol['shuffleSeeds'])
         require(len(offsets) == len(shuffles) == 32
@@ -72,7 +100,7 @@ class LoopPlan:
             and template['bundle'] == protocol['fixedBundle']['path']
             and template['opponents'] == [protocol['fixedBundle']['path']],
             'Both arms must start from and face the same exact raw G3 C/P subjects.')
-        return cls(offsets,shuffles,protocol['workers'])
+        return cls(offsets,shuffles,protocol['workers'],profile)
 
     @staticmethod
     def order(index):
@@ -122,9 +150,11 @@ def batch_path(run, arm, index):
 
 
 def native_command(protocol, mode, source, output, extra=()):
+    profile=resource_profile(protocol)
     seconds = min(7200,int(exp.remaining_seconds()))
     require(seconds >= 1, 'The original deadline must permit the native child.')
-    return [protocol['java']['executable'], '-Xmx6144m', '-XX:ActiveProcessorCount=16',
+    return [protocol['java']['executable'], '-Xmx6144m',
+        '-XX:ActiveProcessorCount='+str(profile.limits['machineCpus']),
         '-XX:ParallelGCThreads=1','-XX:ConcGCThreads=1','-cp',str(Path(protocol['runtime'])/'lib/*'),
         'dev.aragos.aor.training.TrainingMainKt','--mode',mode,'--source',str(source),'--output',str(output),
         '--seconds',str(seconds),*extra]
@@ -256,8 +286,9 @@ def terminal(output, receipts, reason):
 
 def run(protocol, protocol_path, output):
     plan = LoopPlan.read(protocol);output = Path(output).resolve()
-    require(os.cpu_count() == 16 and os.environ.get('AOR_TRAINING_MACHINE_CPUS','16') == '16',
-        'The reviewed desktop16/worker10 declaration must match the actual host.')
+    require(os.cpu_count() == plan.machine_cpus and os.environ.get('AOR_TRAINING_MACHINE_CPUS',
+        str(plan.machine_cpus)) == str(plan.machine_cpus),
+        'The declared resource profile must match the actual host and native CPU budget.')
     require(not output.exists(), 'The matched study permits one new output, never resume or retry.')
     require(exp.remaining_seconds() <= protocol['maximumSeconds'],
         'The external controller cannot extend the original fixed study allowance.')
