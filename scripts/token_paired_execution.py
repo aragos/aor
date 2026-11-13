@@ -6,7 +6,9 @@ The reviewed package dispatcher owns controller/caffeinate/watcher cleanup; its 
 audit is capped by the earlier of terminal+900 seconds and the shared science deadline+900.
 """
 import argparse
+import importlib
 from pathlib import Path
+import sys
 import time
 
 import automata_campaign as controller
@@ -14,65 +16,76 @@ import token_paired_campaign as worker
 import token_paired_campaign_plan as p
 import token_paired_storage as storage
 
+PREFIX = 'token-paired'
+SCIENCE_SECONDS = 21600
+LABEL = 'TOKEN'
+EVIDENCE_MODULE = 'token_paired_campaign_audit'
 
-def specification(protocol_path, profile_path, clock_path):
+
+def contract_or_default(contract):
+    return sys.modules[__name__] if contract is None else contract
+
+
+def specification(protocol_path, profile_path, clock_path, *, contract=None):
     """Build one finite DAG stage without opening models or executing any work."""
+    c=contract_or_default(contract);p=c.p
     plan = p.Plan.from_record(p.read(protocol_path)); profile = p.read(profile_path)
     launch = p.read(clock_path); protocol_sha = p.file_sha(protocol_path)
-    p.require(profile['kind'] == 'token-paired-host-1' and profile['host'] in p.HOSTS and
-        profile['protocolSha256'] == protocol_sha and launch['kind'] == 'token-paired-clock-1' and
+    p.require(profile['kind'] == c.PREFIX+'-host-1' and profile['host'] in p.HOSTS and
+        profile['protocolSha256'] == protocol_sha and launch['kind'] == c.PREFIX+'-clock-1' and
         launch['protocolSha256'] == protocol_sha, 'Host and original clock must bind the shared protocol.')
     clock = p.Clock(launch['startedEpoch'], launch['deadlineEpoch'])
     limits = plan.record['hosts'][profile['host']]
     p.require(all(profile[name] == value for name, value in limits.items()),
         'The controller cannot override the fixed host resource profile.')
     inputs = dict(profile['files'])
-    for path in (protocol_path, profile_path, clock_path, __file__):
+    for path in (protocol_path, profile_path, clock_path, c.__file__):
         inputs[str(Path(path).resolve())] = p.file_sha(path)
     result = dict(schemaVersion=1, kind='automata-campaign', inputs=inputs,
-        limits=dict(maximumSeconds=21600, absoluteDeadlineEpoch=clock.deadline,
+        limits=dict(maximumSeconds=c.SCIENCE_SECONDS, absoluteDeadlineEpoch=clock.deadline,
             maximumDataBytes=limits['maximumDataBytes'], minimumFreeBytes=limits['minimumFreeBytes'],
             maximumRssBytes=limits['maximumRssBytes']),
-        stages=[dict(id='token-paired', maximumSeconds=21600, absoluteDeadlineEpoch=clock.deadline,
+        stages=[dict(id=c.PREFIX, maximumSeconds=c.SCIENCE_SECONDS, absoluteDeadlineEpoch=clock.deadline,
             maximumAttempts=1, result='stage-result.json', command=[profile['python']['executable'],
-                '-E', '-s', '-B', str(Path(__file__).resolve()), 'stage', '--protocol', str(Path(protocol_path).resolve()),
+                '-E', '-s', '-B', str(Path(c.__file__).resolve()), 'stage', '--protocol', str(Path(protocol_path).resolve()),
                 '--profile', str(Path(profile_path).resolve()), '--clock', str(Path(clock_path).resolve()),
                 '--output', '{output}'])])
     return result
 
 
-def host(protocol_path, profile_path, clock_path, output):
+def host(protocol_path, profile_path, clock_path, output, *, contract=None):
     """The sole host entrypoint; the established controller enforces resources and child cleanup."""
-    output = Path(output).resolve()
+    c=contract_or_default(contract);p=c.p;output = Path(output).resolve()
     p.require(not output.exists(), 'A host execution permits one new output and no resume.')
-    worker.check_profile(protocol_path, profile_path)
+    c.worker.check_profile(protocol_path, profile_path)
     launch = p.read(clock_path); clock = p.Clock(launch['startedEpoch'], launch['deadlineEpoch'])
     p.require(clock.start <= time.time(), 'The shared original attempt must have started before either host.')
     clock.remaining(time.time())
-    spec = specification(protocol_path, profile_path, clock_path)
+    spec = c.specification(protocol_path, profile_path, clock_path)
     controller.validate_spec(spec, output/'run')
     output.mkdir(parents=True)
     storage.publish_json(output/'campaign.json', spec)
     return controller.main(['--spec', str(output/'campaign.json'), '--output', str(output/'run')])
 
 
-def stage(protocol_path, profile_path, clock_path, output):
+def stage(protocol_path, profile_path, clock_path, output, *, contract=None):
     """Translate operational completion/stopping into the existing controller result contract."""
-    output = Path(output)
+    c=contract_or_default(contract);p=c.p;output = Path(output)
     p.require(output.is_dir() and not (output/'stage-result.json').exists(),
         'The existing controller owns this single original stage directory.')
-    result = worker.run(protocol_path, profile_path, clock_path, output/'study')
+    result = c.worker.run(protocol_path, profile_path, clock_path, output/'study')
     p.require(result['status'] in ('completed', 'stopped'), 'A failed worker cannot publish a passed stage.')
     receipt = dict(schemaVersion=1, status='passed' if result['status']=='completed' else 'rejected',
-        summary='Fixed TOKEN work '+result['status']+'; no successor or activation.',
+        summary='Fixed '+c.LABEL+' work '+result['status']+'; no successor or activation.',
         artifacts={'study/terminal.json':p.file_sha(output/'study/terminal.json')})
     storage.publish_json(output/'stage-result.json', receipt)
     return receipt
 
 
-def verify(protocol_path, output):
+def verify(protocol_path, output, *, contract=None):
     """Pure completed-evidence admission; outer watcher separately proves every owned group exited."""
-    import token_paired_campaign_audit as evidence
+    c=contract_or_default(contract);p=c.p
+    evidence=importlib.import_module(c.EVIDENCE_MODULE)
     output = Path(output).resolve(); run = output/'run'; study = run/'study'
     state = p.read(run/'campaign-state.json'); spec = p.read(output/'campaign.json')
     manifest = p.read(run/'campaign-manifest.json')
@@ -85,11 +98,11 @@ def verify(protocol_path, output):
     clock_wire = p.read(study/'clock.json')
     clock = p.Clock(clock_wire['startedEpoch'], clock_wire['deadlineEpoch'])
     p.require(clock_wire['protocolSha256'] == p.file_sha(protocol_path) and
-        state['status'] == 'completed' and set(state['stages']) == {'token-paired'} and
+        state['status'] == 'completed' and set(state['stages']) == {c.PREFIX} and
         state['deadlineEpoch'] == spec['limits']['absoluteDeadlineEpoch'] == clock.deadline and
         clock.start <= state['startedEpoch'] <= state['updatedEpoch'],
         'One completed controller must retain the shared original deadline and exact single stage.')
-    entry = state['stages']['token-paired']; terminal = p.read(study/'terminal.json')
+    entry = state['stages'][c.PREFIX]; terminal = p.read(study/'terminal.json')
     expected = 'passed' if terminal['status']=='completed' else 'rejected'
     p.require(entry['attempts'] == 1 and entry['status'] == expected and entry['exitCode'] == 0 and
         entry['deadlineEpoch'] == clock.deadline and entry['result'] == 'stage-result.json' and

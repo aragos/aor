@@ -55,10 +55,10 @@ def verify_historical(gate,protocol_sha,scope,ecology):
         'Fresh screens require both passing Desktop controls under the exact fixed scope.')
 
 
-def validate_world(plan,world,index,science):
-    p.require(world['kind']==KIND and world['scienceSha256']==science and set(world['roles'])==set(p.ROLES),
+def validate_world(plan,world,index,science,*,kind=KIND,roles=p.ROLES):
+    p.require(world['kind']==kind and world['scienceSha256']==science and set(world['roles'])==set(roles),
         'Each world requires all three exact frozen role results.')
-    for other in ('RAW_T','INITIAL'):
+    for other in roles[1:]:
         pair=dict(world,candidate=world['roles']['FINAL'],incumbent=world['roles'][other])
         arena_math.validate_pair(pair,index,plan.record['screenBank']['seeds'][index],1)
     for game in world['roles'].values():
@@ -181,13 +181,13 @@ def archived_chunk(plan,receipt_path,*,stream_archive=None):
     return receipt,metadata['finished.json'],[worlds[i] for i in p.indices(chunk,True)]
 
 
-def verify_report(worlds,report):
+def verify_report(worlds,report,*,kind='token-paired-screen-report-1',raw_role='RAW_T',raw_field='RawT'):
     p.require([row['index'] for row in worlds]==list(range(1024)) and
-        report['kind']=='token-paired-screen-report-1' and report['worlds']==1024 and
+        report['kind']==kind and report['worlds']==1024 and
         report['intervalMultiplier']==1.96,
         'Effects require the sole complete original screen, never a partial chunk.')
-    for field,first,second in (('finalMinusRawT','FINAL','RAW_T'),
-        ('finalMinusInitializer','FINAL','INITIAL'),('initializerMinusRawT','INITIAL','RAW_T')):
+    for field,first,second in (('finalMinus'+raw_field,'FINAL',raw_role),
+        ('finalMinusInitializer','FINAL','INITIAL'),('initializerMinus'+raw_field,'INITIAL',raw_role)):
         for metric in ('wins','rewards','ranks','chaos'):
             def value(world,role):
                 game=world['roles'][role];seat=world['seat']
@@ -195,7 +195,7 @@ def verify_report(worlds,report):
             expected=exp.interval([value(world,first)-value(world,second) for world in worlds])
             p.require(all(math.isclose(report[field][metric][name],number,rel_tol=1e-10,abs_tol=1e-12)
                 for name,number in expected.items()), 'Native whole-world interval differs from its original raw results.')
-    passed=(report['finalMinusRawT']['wins']['lower95']>0 and report['finalMinusRawT']['rewards']['lower95']>0
+    passed=(report['finalMinus'+raw_field]['wins']['lower95']>0 and report['finalMinus'+raw_field]['rewards']['lower95']>0
         and report['finalMinusInitializer']['rewards']['lower95']>0)
     p.require(report['developmentGatePassed']==passed and report['qualification'] is False and report['activated'] is False,
         'Screen gates must retain all three fixed tests without qualification or activation.')
