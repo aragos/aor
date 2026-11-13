@@ -19,7 +19,7 @@ def fixture():
         iterations=[dict(iteration=i,origins=[dict(gameSeed=next(cursor),
             proposalSeed=next(cursor),future=[next(cursor),next(cursor)]) for _ in range(640)],
             shuffleSeeds=[next(cursor) for _ in range(20)]) for i in (1,2)],
-        screenSeeds=[next(cursor) for _ in range(1024)],
+        screenBank=dict(nativeOffset=1000000,count=1024,seeds=[-999000000+i*8191 for i in range(1024)]),
         selection=dict(candidate='ITERATION_2_ONLY',validationRewardLower95Positive=True,
             finalMinusInitialRewardLower95Positive=True,finalMinusRawWinAndRewardLower95Positive=True))
 
@@ -40,7 +40,7 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(sum(v for k,v in p.expected_terminal_budget().items() if k!='maximum'),27414)
 
     def test_stream_collision_across_iterations_rejected(self):
-        value=fixture();value['iterations'][1]['origins'][0]['future'][0]=value['screenSeeds'][0]
+        value=fixture();value['iterations'][1]['origins'][0]['future'][0]=value['screenBank']['seeds'][0]
         with self.assertRaisesRegex(ValueError,'disjoint'):p.Plan.from_record(value)
 
     def test_recipe_tuning_rejected(self):

@@ -146,8 +146,13 @@ class Plan:
                 streams += [integer(value, -(2**63), 2**63-1, 'Proposal/future stream')
                     for value in [row['proposalSeed'], *row['future']]]
             streams += [integer(value, 0, 2**31-1, 'Epoch shuffle stream') for value in bank['shuffleSeeds']]
-        require(len(record['screenSeeds']) == 1024, 'The sole final screen requires1024 worlds.')
-        streams += [integer(value, -(2**31), 2**31-1, 'Screen world seed') for value in record['screenSeeds']]
+        screen=record['screenBank']
+        require(set(screen)=={'nativeOffset','count','seeds'} and screen['count']==1024,
+            'The sole final screen requires one exact native1024-world bank.')
+        offset=integer(screen['nativeOffset'],0,100000000,'Screen native offset')
+        require(screen['seeds']==[-1000000000+offset+i*8191 for i in range(1024)],
+            'Screen world identities must equal the authoritative native world formula.')
+        streams += screen['seeds']
         require(len(streams) == len(set(streams)),
             'Every backbone, proposal, future, shuffle and screen stream must be disjoint.')
         require(record['selection'] == dict(candidate='ITERATION_2_ONLY',

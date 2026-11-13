@@ -63,7 +63,8 @@ each represented nonempty world, then average worlds equally. Thus an iteration1
 already in its backbone is counted once. Iteration2's original backbone worlds and fresh root
 worlds remain distinct; their weights follow represented-world counts, not a fixed half/half mix.
 The reference is alwaysπ0. Mean `KL(pi_theta || pi0)` must stay≤0.02 and maximum individual-state
-KL≤0.10 after every epoch. Restore both actor and Adam on violation and end that fit without retry.
+KL≤0.10 after every epoch. Epoch0 is diagnostic only, including fresh iteration2 states; it adds
+no initial admission gate. Restore both actor and Adam on violation and end that fit without retry.
 
 Each iteration uses fresh Adam0.0003,20 epochs,64 prospective world slots per minibatch, Float64
 CPU1, gradient norm0.5 and no value update. Scale minibatch gain and anchor contributions to the

@@ -32,7 +32,8 @@ def collection(directory, chunk=1):
         arena=dict(sha256=arena_sha),currentActor=dict(sha256=actor_sha),originalActor=dict(sha256=actor_sha),
         dictionary=dict(path='dictionary.json',sha256=dictionary_sha),snapshots=snapshots,
         origins=value['iterations'][0]['origins'],requests=[p.request(i) for i in p.indices(chunk)],
-        replayIndices=list(p.COLLECTION_REPLAYS),ownedReplayIndices=list(p.replays(chunk)),policyBindings=bindings)
+        replayIndices=list(p.COLLECTION_REPLAYS),ownedReplayIndices=list(p.replays(chunk)),policyBindings=bindings,
+        ecologySha256=value['ecologySha256'])
     write('prepared.json',native)
     rows=[]
     for index in p.indices(chunk):
@@ -43,7 +44,7 @@ def collection(directory, chunk=1):
             public={},labels=dict(file=labels,sha256=p.file_sha(root/labels)),tailGames=0,anchorRows=0)
         payload=dict(kind='token-paired-public-1',signature=native['signature'],scopeSha256=native['scopeSha256'],scienceSha256=native['scienceSha256'],
             iteration=1,request=p.request(index),streams=value['iterations'][0]['origins'][index],
-            status='SINGLETON',originSha256=row['origin']['sha256'],missingReason=None,anchors=[],
+            status='SINGLETON',originSha256=row['origin']['sha256'],missingReason=None,observedWindows=1,anchors=[],
             publicRoot=dict(observation=dict(actions=[dict(command='PASS',features={})],baselineIndex=0),
                 referenceIndex=0,sampledCommandIndex=0,proposedIndices=[0],inclusionProbability=0.))
         row['public']=dict(file=public,sha256=write(public,payload));rows.append(row)

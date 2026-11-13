@@ -3,6 +3,7 @@
 Raw origins and label sidecars are hashed as bytes during collection admission. Only the public
 sidecar is decoded here. In particular an archive hash check is not semantic validation access.
 """
+import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import tarfile
@@ -59,7 +60,7 @@ def prepared(plan, native, source, source_sha, files, chunk, iteration, current_
     p.require(native['currentActor']['sha256'] == current_sha and
         native['originalActor']['sha256'] == plan.record['originalActorSha256'] and
         native['dictionary']['sha256'] == plan.record['dictionarySha256'] and
-        p.digest(portable(native['policyBindings'])) == plan.record['ecologySha256'],
+        native['ecologySha256'] == plan.record['ecologySha256'],
         'Prepared actor, dictionary or complete frozen ecology differs from the scientific protocol.')
     for key, field in (('arena','arena'),('currentActor','currentActor'),('originalActor','originalActor')):
         p.require(native[key]['sha256'] == source[field]['sha256'], 'Source and snapshot subject disagree.')
@@ -74,7 +75,7 @@ def prepared(plan, native, source, source_sha, files, chunk, iteration, current_
 
 def public_record(value, receipt, native, plan, index):
     p.require(set(value) == {'kind','signature','scopeSha256','scienceSha256','iteration','request','streams',
-        'status','originSha256','missingReason','publicRoot','anchors'},
+        'status','originSha256','missingReason','observedWindows','publicRoot','anchors'},
         'Public evidence must exclude authority, canonical history and all outcomes.')
     p.require(value['kind'] == 'token-paired-public-1' and
         value['signature'] == native['signature'] and value['scienceSha256'] == native['scienceSha256'] and
@@ -84,6 +85,8 @@ def public_record(value, receipt, native, plan, index):
         value['originSha256'] == receipt['origin']['sha256'] and value['status'] == receipt['status'],
         'Public evidence is not the exact original request and complete-origin subject.')
     status=value['status'];p.require(status in ('READY','SINGLETON','MISSING'), 'Unknown root status.')
+    p.require(type(value['observedWindows']) is int and value['observedWindows']>=0,
+        'Observed-window exposure is an original nonnegative descriptive count.')
     root=value['publicRoot']
     p.require((root is None) == (status == 'MISSING'), 'Only a missing root lacks public decision evidence.')
     if root is not None:
@@ -180,6 +183,15 @@ def verify_archive(archive, receipt):
     storage.verify_members(archive,receipt['files'],receipt['archiveSha256'])
 
 
+def member_json(source, member, receipt):
+    """Hash the very bytes passed to the semantic parser, not an earlier open of the archive."""
+    with source.extractfile(member) as stream:raw=stream.read()
+    expected=receipt['files'][member.name]
+    p.require(len(raw)==expected['size'] and hashlib.sha256(raw).hexdigest()==expected['sha256'],
+        'Archive member changed at its semantic read boundary.')
+    return json.loads(raw)
+
+
 def public_members(archive, receipt):
     """Read one public origin at a time; labels and opaque full worlds never enter the JSON parser."""
     verify_archive(archive,receipt)
@@ -188,7 +200,7 @@ def public_members(archive, receipt):
         for member in source:
             if member.name in allowed:
                 seen.add(member.name)
-                with source.extractfile(member) as stream:yield json.load(stream)
+                yield member_json(source,member,receipt)
     p.require(seen==allowed, 'Every admitted public sidecar must remain present.')
 
 
@@ -215,6 +227,7 @@ def iteration_corpus(plan, iteration, chunk_subjects):
     p.require(sum(row['historicalReproductions'] for row in rows)==4,
         'The four prescribed backbone reproductions must run exactly once globally.')
     return dict(kind='token-paired-corpus-1',iteration=iteration,protocolDigest=plan.sha256,
+        complete=True,origins=640,trainOrigins=512,validationOrigins=128,
         scopeSha256=rows[0]['scopeSha256'],scienceSha256=rows[0]['scienceSha256'],scienceIdentity=rows[0]['scienceIdentity'],
         chunks=chunk_subjects,currentActorSha256=rows[0]['currentActorSha256'],
         originalActorSha256=plan.record['originalActorSha256'],ready=counts,
