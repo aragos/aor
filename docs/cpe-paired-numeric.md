@@ -13,7 +13,9 @@ Each of two iterations has three independent 640-world cohorts, one per head, sp
 complete C/P/E bundle. Collection completes before any child update; no updated head changes
 another cohort's continuation. Original qualified G3 CARD and PURCHASE are nonzero actors,
 with their actual full offered probability distributions as fixed anchors. Original EXPANSION
-is one prospective warm G3 Purchase-derived actor with its explicit scoped reference prior.
+reuses the exact **untrained** family75 initializer
+`8268ba94536c5286ca7e7e9aedf148bffab2b8f5244e7a631594c5b4af8303fc`, with its scoped
+reference prior. No trained75/78 head or fresh initializer RNG is introduced.
 Raw T, other selectors and G3 rivals remain fixed.
 
 The observation's `baselineIndex` remains the head's original residual-prior reference:
