@@ -234,7 +234,9 @@ def game_reward(value,receipt,plan,index,expected_role,bundle_sha):
 def fitness(plan,protocol_sha,population_subject,calibration_subject,receipts):
     """The first semantic mutant-return boundary follows the one immutable calibration."""
     calibration=p.read(p.checked_subject(calibration_subject))
-    p.require(calibration['kind']==p.PREFIX+'-calibration-1' and calibration['passed'] is True and
+    calibration_kind=p.PREFIX+('-calibration-2' if plan.record['calibration']==p.CALIBRATION_V2
+        else '-calibration-1')
+    p.require(calibration['kind']==calibration_kind and calibration['passed'] is True and
         calibration['complete'] is True and calibration['protocolSha256']==protocol_sha and
         calibration['semanticFitnessDecoded'] is False and calibration['calibrationAttempts']==1,
         'Fitness is closed until the exact single public-only calibration is sealed.')

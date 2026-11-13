@@ -2,7 +2,7 @@
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import coordinated_es_storage as s
 import coordinated_es_plan as p
@@ -123,6 +123,57 @@ class PanelBoundaryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'Fitness is closed'):
                     s.fitness(self.plan,'a'*64,{'path':'/absent','sha256':'b'*64},p.subject(path),[])
                 semantic_read.assert_not_called()
+
+
+class CalibrationVersionBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name)
+
+    def plan(self,version):
+        value=protocol();value['calibration']=p.calibration_recipe(version)
+        return p.Plan.from_record(value)
+
+    def seal(self,version,**changes):
+        value=dict(kind=p.PREFIX+'-calibration-'+str(version),passed=True,complete=True,
+            protocolSha256='a'*64,semanticFitnessDecoded=False,calibrationAttempts=1)
+        value.update(changes)
+        path=self.root/'calibration.json';s.publish_json(path,value)
+        return p.subject(path)
+
+    def rejects_before_population(self,plan,subject,message='Fitness is closed'):
+        with patch.object(p,'checked_subject',wraps=p.checked_subject) as subjects:
+            with patch.object(s,'members') as members:
+                with self.assertRaisesRegex(ValueError,message):
+                    s.fitness(plan,'a'*64,{'path':'/absent-population','sha256':'b'*64},subject,[])
+                self.assertEqual(subjects.call_args_list,[call(subject)])
+                members.assert_not_called()
+
+    def test_v1_plan_rejects_complete_v2_seal_before_population(self):
+        self.rejects_before_population(self.plan(1),self.seal(2))
+
+    def test_v2_plan_rejects_complete_v1_seal_before_population(self):
+        self.rejects_before_population(self.plan(2),self.seal(1))
+
+    def test_v2_failed_calibration_cannot_open_population(self):
+        self.rejects_before_population(self.plan(2),self.seal(2,passed=False))
+
+    def test_v2_incomplete_calibration_cannot_open_population(self):
+        self.rejects_before_population(self.plan(2),self.seal(2,complete=False))
+
+    def test_v2_wrong_protocol_cannot_open_population(self):
+        self.rejects_before_population(self.plan(2),self.seal(2,protocolSha256='c'*64))
+
+    def test_v2_recalibration_cannot_open_population(self):
+        self.rejects_before_population(self.plan(2),self.seal(2,calibrationAttempts=2))
+
+    def test_v2_prior_fitness_decode_cannot_open_population(self):
+        self.rejects_before_population(self.plan(2),self.seal(2,semanticFitnessDecoded=True))
+
+    def test_changed_seal_bytes_cannot_open_population(self):
+        subject=self.seal(2)
+        Path(subject['path']).write_bytes(b'{}\n')
+        self.rejects_before_population(self.plan(2),subject,'Immutable subject bytes changed')
 
 
 class ReproductionInventoryTests(unittest.TestCase):
