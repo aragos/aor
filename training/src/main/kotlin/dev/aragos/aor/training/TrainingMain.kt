@@ -12,6 +12,12 @@ import kotlin.random.Random
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
     if (
+        arguments.toList().windowed(2).any { it[0] == "--mode" && it[1] in TokenPairedMain.modes }
+    ) {
+        TokenPairedMain.run(arguments.toList())
+        return
+    }
+    if (
         arguments.toList().windowed(2).any {
             it[0] == "--mode" && it[1] in ExpansionBaselineMain.modes
         }

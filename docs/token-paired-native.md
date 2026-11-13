@@ -32,7 +32,8 @@ VALIDATION. The requested seat is `i % 4`, epoch `1 + (i / 4) % 3`, and own toke
 `1 + (i / 12) % 4` within that epoch. All counts include ordinary singleton windows. Missing and
 singleton requested roots are retained without replacement or later-window substitution.
 
-A shard declares an explicit global start and count within those640 indices. Its source binds the
+A shard declares one of ten64-aligned global ranges. Desktop owns chunks0..4 and8; Mac owns5..7
+and9. Fixed global reproductions0,213,426,639 execute only in their owning shards. Each source binds the
 same complete immutable stream table and scientific subjects as the other shards; host, worker
 count and shard order cannot change the requested world, seat, root or streams. TRAIN/VALIDATION
 assignment always uses the global index. The source explicitly supplies each origin's game seed,
@@ -58,7 +59,8 @@ never enters observations, proposal selection or model inputs.
 Every origin retains its source/request/stream subjects, public root observation, selected original
 action indices, full pi_m/pi0 root probabilities, the canonical prefix, complete ordinary backbone
 receipt and each paired tail's terminal/canonical receipt. Actor input and semantic terminal labels
-are distinct trees so a typed streaming reader can keep VALIDATION labels closed. Source-level
+are distinct trees. Separate immutable public and label sidecars bind the complete origin's raw
+gzip hash, so VALIDATION public readers never need to decode its outcome tree. Source-level
 snapshots preserve exact model and ecology identities independently of original path provenance.
 Scientific labels are normalized controlled-seat terminal returns, never winner-selected actions.
 
@@ -69,6 +71,11 @@ the comparator stays the same pi0, not pi1. VALIDATION observations do not enter
 All anchor weights and objective normalization belong to the separately reviewed numeric owner.
 
 Worlds complete incrementally; workers return bounded completion receipts, not retained game trees.
+Each origin has separate `public-I.json` and `labels-I.json` sidecars bound to its original compressed
+evidence. The public sidecar contains no canonical or outcome tree; the label sidecar contains no
+actor inputs. Missing and singleton windows retain their complete original normal backbones.
+Host-independent ecology binds actual model/prior/dictionary/selector roles. Raw arena and joint
+bundle wrapper hashes remain separate provenance because their component paths may be relocated.
 Public metadata, canonical records and outcomes are hashed at completion. Every canonical suffix
 must replay against its exact prefix, source and chosen command. The campaign owns verified archive
 membership and original wall-clock/resource ceilings; the collector cannot resume or top up.

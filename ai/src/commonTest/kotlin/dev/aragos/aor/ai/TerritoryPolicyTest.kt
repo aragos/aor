@@ -9,6 +9,45 @@ import kotlin.test.assertNotEquals
 /** The same numerical and signed-seed fixtures execute on JVM and JavaScript. */
 class TerritoryPolicyTest {
     @Test
+    fun explicitTokenTwoPreservesTheSameNumericalAndSeedMath() {
+        val original = model(TerritoryPhase.TOKEN)
+        val state = observation(TerritoryPhase.TOKEN)
+        val current =
+            original.copy(schemaVersion = 3, encoderVersion = TerritoryEncoder.TOKEN_2.version)
+        val projected = state.copy(encoderVersion = TerritoryEncoder.TOKEN_2.version)
+        assertEquals(
+            TerritoryPolicy.evaluate(state, original),
+            TerritoryPolicy.evaluate(projected, current),
+        )
+        assertEquals(
+            TerritoryPolicy.choose(state, original, -179),
+            TerritoryPolicy.choose(projected, current, -179),
+        )
+    }
+
+    @Test
+    fun tokenTwoCannotUseSchemaOne() {
+        assertFailsWith<IllegalArgumentException> {
+            model(TerritoryPhase.TOKEN).copy(encoderVersion = TerritoryEncoder.TOKEN_2.version)
+        }
+    }
+
+    @Test
+    fun tokenTwoCannotUseSchemaTwo() {
+        assertFailsWith<IllegalArgumentException> {
+            model(TerritoryPhase.TOKEN)
+                .copy(schemaVersion = 2, encoderVersion = TerritoryEncoder.TOKEN_2.version)
+        }
+    }
+
+    @Test
+    fun schemaThreeCannotRelabelTokenOne() {
+        assertFailsWith<IllegalArgumentException> {
+            model(TerritoryPhase.TOKEN).copy(schemaVersion = 3)
+        }
+    }
+
+    @Test
     fun explicitExpansionTwoPreservesTheSameNumericalAndSeedMath() {
         val original = model(TerritoryPhase.EXPANSION)
         val state = observation(TerritoryPhase.EXPANSION)
