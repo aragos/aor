@@ -12,11 +12,10 @@ import dev.aragos.aor.ai.BotTokenValue
 /** Commands are fixed from the shared pre-reveal view before the session is forked. */
 internal class TokenValueFrozenRoot(
     session: ExperimentSession,
-    private val actor: PlayerId,
+    actor: PlayerId,
     commands: Map<PlayerId, String>,
 ) {
-    private val commands = commands.toMap()
-    private val snapshot: ExperimentSession
+    private val frozen: FrozenDecisionRoot
 
     init {
         require(
@@ -26,11 +25,11 @@ internal class TokenValueFrozenRoot(
         ) {
             "A token-value fork requires the complete sealed token-purchase batch."
         }
-        snapshot = session.fork()
+        frozen = FrozenDecisionRoot(session, actor, commands)
     }
 
     fun branch(command: String, seed: Long, deadlineNanos: Long): ExperimentSession =
-        snapshot.fork(seed).also { it.apply(commands + (actor to command), deadlineNanos) }
+        frozen.branch(command, seed, deadlineNanos)
 }
 
 /** Real full-game origin collection; authority worlds produce labels and never policy features. */

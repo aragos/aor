@@ -21,11 +21,22 @@ the selected root. `referenceIndex == sampledCommandIndex`; neither replaces the
 These are the existing encoder/controller owners. Original C/P actors keep their exact trained
 nonzero G3 weights and full probabilities. No original-policy sample is needed for `b`.
 
+The prospective E original is the exact original **untrained** family75 initializer
+`8268ba94536c5286ca7e7e9aedf148bffab2b8f5244e7a631594c5b4af8303fc`.
+No trained family75/78 head or new initializer stream is authorized. Its actual bytes remain
+unopened during this source prerequisite; preparation later proves the exact dictionary/factory.
+
 The explicit `cpe-paired-bundle-1` descriptor binds CARD, PURCHASE and EXPANSION component
 subjects and their complete dictionary identities. C/P policy JSON remains schema1; E remains
 schema2/EXPANSION_2. Original and current descriptors bind complete snapshots. The three updated
 heads must be published atomically after data from the same current bundle; a partial update is
 not a candidate. Iteration two consumes that exact atomic predecessor.
+
+`bundleScopeSha256` binds all three original component/dictionary identities and the fixed ecology.
+The head-specific `scopeSha256` additionally binds the cohort head; its `scienceSha256` binds the
+iteration, complete current bundle and that head's full 640-row stream table. The parent campaign
+binds all three tables together. Raw descriptors, paths and shard signatures remain separate
+provenance, while dictionary semantic hashes use sorted-key complete dictionary JSON.
 
 ## Root curriculum and interventions
 
