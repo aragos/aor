@@ -79,3 +79,24 @@ campaign owner supplies immutable generation/final admission, cross-host barrier
 population completeness and the sole final mean. Live E/T movement is diagnostic
 only. Tests prove selector/tie/zero parity, privacy and offset ownership, compact
 failure/count semantics and constructed JVM/production-JS equivalence.
+
+## Native boundaries
+
+`coordinated-es-scope` parses the original role/dictionary/ecology without policy calls,
+so projection preparation does not require a circular final-protocol subject. Fresh
+`coordinated-es-prepare`, `coordinated-es-controls` and `coordinated-es-population`
+require the real historical admission. A source carries the complete256-world bank,
+its fixed global32-world range, and named immutable protocol/arena/original/projection/
+center/directions/population/calibration/previous-update/historical subjects. Only
+G1 controls omit calibration; all controls omit population. Only G1 omits previous update.
+
+The historical source declares family60 homogeneous-heldout candidate indices0 and4095.
+The new zero role replaces only that recorded evaluated seat; original rival roles and
+recorded lineups remain intact. The fresh scope separately requires homogeneous raw G3.
+
+Final admission binds all16 compact update and output-center subjects, the final mean,
+its numerical materialization receipt, original bundle, calibration and historical gate.
+Only then may native code decode final tensors. The two-role screen reuses the existing
+compact screen executor with explicit2048-world counts, fixed replay indices and the
+new bounded-game hook. Old TOKEN/CPE screen defaults and receipts remain unchanged.
+No stage may resume an existing output directory or replace a failed world.

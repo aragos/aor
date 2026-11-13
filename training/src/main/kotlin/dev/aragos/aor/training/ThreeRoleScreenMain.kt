@@ -13,8 +13,14 @@ internal class ThreeRoleScreenMain(
     private val maximumSeconds: Int,
     private val readInput: (Path) -> ThreeRoleScreenInput,
     private val historical: (Path, Path, Long) -> Unit,
+    private val worldCount: Int = 1024,
+    private val replayIndices: List<Int> = listOf(0, 341, 682, 1023),
+    private val scienceDigest: (JsonNode) -> String = {
+        trainingSignature(PurchaseJson.mapper.writeValueAsString(it))
+    },
+    private val report: ((List<JsonNode>) -> Map<String, Any>)? = null,
+    private val requireExecutionCounts: Boolean = false,
 ) {
-    private val REPLAYS = listOf(0, 341, 682, 1023)
     val modes =
         setOf(
             "$prefix-screen-prepare",
@@ -86,64 +92,80 @@ internal class ThreeRoleScreenMain(
                 "maximumSeconds" to seconds,
             ),
         )
-        val indices =
-            Tournaments(workers, deadline).use { pool ->
-                pool.run(
-                    input.indices.map { index ->
-                        {
-                            val world =
-                                ThreeRoleScreen.play(input, index, deadline) { role, canonical ->
-                                    artifacts.write(canonicalName(index, role), canonical)
-                                }
-                            CardTrajectoryFiles.save(
-                                output.resolve(worldName(index)),
-                                ExpansionOnPolicyStore.wire(world),
-                            )
-                            index
+        try {
+            val indices =
+                Tournaments(workers, deadline).use { pool ->
+                    pool.run(
+                        input.indices.map { index ->
+                            {
+                                val world =
+                                    ThreeRoleScreen.play(input, index, deadline) { role, canonical
+                                        ->
+                                        artifacts.write(canonicalName(index, role), canonical)
+                                    }
+                                CardTrajectoryFiles.save(
+                                    output.resolve(worldName(index)),
+                                    ExpansionOnPolicyStore.wire(world),
+                                )
+                                index
+                            }
                         }
-                    }
-                )
-            }
-        require(indices.sorted() == input.indices.toList()) {
-            "Every screen index must complete exactly once in its owner shard."
-        }
-        for (index in input.ownedReplays) {
-            val world = readWorld(output, index)
-            for (role in roles) {
-                val replay =
-                    ThreeRoleScreen.reproduce(
-                        input,
-                        index,
-                        role,
-                        world,
-                        PurchaseJson.read(output.resolve(canonicalName(index, role))),
-                        deadline,
                     )
-                artifacts.write("replay-$index-${role}.json", replay)
+                }
+            require(indices.sorted() == input.indices.toList()) {
+                "Every screen index must complete exactly once in its owner shard."
             }
-        }
-        finish(
-            input,
-            output,
-            "chunk",
-            input.indices.map { index ->
+            for (index in input.ownedReplays) {
                 val world = readWorld(output, index)
-                ThreeRoleScreen.validateWorld(
-                    world,
-                    index,
-                    input.scienceSha256,
-                    StrategyArena.seed(input.raw.seed, index),
-                    input.kind,
-                    input.roles,
+                for (role in roles) {
+                    val replay =
+                        ThreeRoleScreen.reproduce(
+                            input,
+                            index,
+                            role,
+                            world,
+                            PurchaseJson.read(output.resolve(canonicalName(index, role))),
+                            deadline,
+                        )
+                    artifacts.write("replay-$index-${role}.json", replay)
+                }
+            }
+            finish(
+                input,
+                output,
+                "chunk",
+                input.indices.map { index ->
+                    val world = readWorld(output, index)
+                    ThreeRoleScreen.validateWorld(
+                        world,
+                        index,
+                        input.scienceSha256,
+                        StrategyArena.seed(input.raw.seed, index),
+                        input.kind,
+                        input.roles,
+                    )
+                    mapOf(
+                        "index" to index,
+                        "file" to worldName(index),
+                        "sha256" to PurchaseJson.hash(output.resolve(worldName(index))),
+                        "semanticSha256" to ThreeRoleScreen.semanticHash(world),
+                    )
+                },
+            )
+        } catch (failure: Exception) {
+            val counts = input.executionReceipt(null)
+            if (counts.isNotEmpty()) {
+                artifacts.write(
+                    "failed.json",
+                    counts +
+                        mapOf(
+                            "signature" to input.signature,
+                            "failure" to failure.toString(),
+                        ),
                 )
-                mapOf(
-                    "index" to index,
-                    "file" to worldName(index),
-                    "sha256" to PurchaseJson.hash(output.resolve(worldName(index))),
-                    "semanticSha256" to ThreeRoleScreen.semanticHash(world),
-                )
-            },
-        )
+            }
+            throw failure
+        }
     }
 
     private fun finish(
@@ -153,7 +175,7 @@ internal class ThreeRoleScreenMain(
         worlds: List<Map<String, Any>>,
     ) {
         input.verify()
-        val reproductions = if (stage == "chunk") input.ownedReplays.size * 3 else 0
+        val reproductions = if (stage == "chunk") input.ownedReplays.size * roles.size else 0
         TrainingArtifacts(output)
             .write(
                 "finished.json",
@@ -168,11 +190,11 @@ internal class ThreeRoleScreenMain(
                     "count" to worlds.size,
                     "worlds" to worlds,
                     "reproductions" to reproductions,
-                    "scientificTerminalExecutions" to worlds.size * 3 + reproductions,
+                    "scientificTerminalExecutions" to worlds.size * roles.size + reproductions,
                     "finalAdmissionSha256" to input.finalAdmissionSha256,
                     "historicalAdmissionSha256" to input.historicalAdmissionSha256,
                     "files" to ExpansionFinalMain.inventory(output),
-                ),
+                ) + input.executionReceipt(worlds.size * roles.size + reproductions),
             )
     }
 
@@ -188,17 +210,20 @@ internal class ThreeRoleScreenMain(
             PurchaseJson.array(compact["chunks"], "chunks").map {
                 TokenPairedSubject.read(it, source.parent)
             }
-        require(subjects.size == 8 && subjects.map { it.sha256 }.distinct().size == 8) {
-            "The complete screen requires eight distinct original chunk completions."
+        require(
+            subjects.size == worldCount / 128 &&
+                subjects.map { it.sha256 }.distinct().size == worldCount / 128
+        ) {
+            "The complete screen requires ${worldCount / 128} distinct original chunk completions."
         }
         val chunks = subjects.map { PurchaseJson.read(it.path) }
         val first = chunks.first()
         val science = first["scienceSha256"].asText()
         val identity = first.required("scienceIdentity")
         require(
-            science == trainingSignature(PurchaseJson.mapper.writeValueAsString(identity)) &&
-                identity["seeds"]?.size() == 1024 &&
-                identity["replayIndices"]?.map(JsonNode::intValue) == REPLAYS &&
+            science == scienceDigest(identity) &&
+                identity["seeds"]?.size() == worldCount &&
+                identity["replayIndices"]?.map(JsonNode::intValue) == replayIndices &&
                 identity["roles"]?.map(JsonNode::asText) == roles
         ) {
             "Compact completions must retain the same full bank, role identities and replay schedule."
@@ -206,7 +231,16 @@ internal class ThreeRoleScreenMain(
         chunks.forEachIndexed { ordinal, chunk ->
             val start = ordinal * 128
             val indices = start until start + 128
-            val reproductions = REPLAYS.count { it in indices } * 3
+            val reproductions = replayIndices.count { it in indices } * roles.size
+            if (requireExecutionCounts) {
+                val expected = 128 * roles.size + reproductions
+                require(
+                    chunk["attemptedGames"]?.asInt() == expected &&
+                        chunk["completedGames"]?.asInt() == expected
+                ) {
+                    "A bounded complete screen cannot contain failed or missing role executions."
+                }
+            }
             require(
                 chunk["kind"]?.asText() == "$prefix-screen-1" &&
                     chunk["complete"]?.booleanValue() == true &&
@@ -219,13 +253,14 @@ internal class ThreeRoleScreenMain(
                     chunk["historicalAdmissionSha256"] == first["historicalAdmissionSha256"] &&
                     chunk["worlds"]?.map { it["index"].intValue() } == indices.toList() &&
                     chunk["reproductions"]?.intValue() == reproductions &&
-                    chunk["scientificTerminalExecutions"]?.intValue() == 384 + reproductions
+                    chunk["scientificTerminalExecutions"]?.intValue() ==
+                        128 * roles.size + reproductions
             ) {
-                "Each of eight fixed chunks must complete its own 128 worlds and exact side replay count."
+                "Each fixed chunk must complete its own128 worlds and exact side replay count."
             }
         }
         val worlds = PurchaseJson.array(compact["worlds"], "worlds")
-        require(worlds.size == 1024) { "No partial-bank report is permitted." }
+        require(worlds.size == worldCount) { "No partial-bank report is permitted." }
         worlds.forEachIndexed { index, world ->
             val chunk = chunks[index / 128]
             val receipt = chunk["worlds"][index % 128]
@@ -251,7 +286,10 @@ internal class ThreeRoleScreenMain(
             "Compact screen inputs changed during pure reporting."
         }
         val artifacts = TrainingArtifacts(output)
-        artifacts.write("report.json", ThreeRoleScreen.report(worlds, prefix, rawRole, rawName))
+        artifacts.write(
+            "report.json",
+            report?.invoke(worlds) ?: ThreeRoleScreen.report(worlds, prefix, rawRole, rawName),
+        )
         artifacts.write(
             "inputs.json",
             mapOf(
@@ -267,7 +305,7 @@ internal class ThreeRoleScreenMain(
             mapOf(
                 "kind" to "$prefix-screen-report-complete-1",
                 "complete" to true,
-                "worlds" to 1024,
+                "worlds" to worldCount,
                 "newGames" to 0,
                 "newFits" to 0,
                 "files" to ExpansionFinalMain.inventory(output),

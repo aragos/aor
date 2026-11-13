@@ -13,6 +13,20 @@ import kotlin.random.Random
 fun main(arguments: Array<String>) {
     if (
         arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in CoordinatedEsScreenMain.modes
+        }
+    ) {
+        CoordinatedEsScreenMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any { it[0] == "--mode" && it[1] in CoordinatedEsMain.modes }
+    ) {
+        CoordinatedEsMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
             it[0] == "--mode" && it[1] in CpePairedScreenMain.modes
         }
     ) {

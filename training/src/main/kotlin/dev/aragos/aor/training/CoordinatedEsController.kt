@@ -38,8 +38,9 @@ internal class CoordinatedEsController(
         cardPurchase.controls(decision) || reference.controls(decision)
 
     override fun choose(decision: SimulationDecision): String? {
-        if (cardPurchase.controls(decision.observation.decision))
+        if (cardPurchase.controls(decision.observation.decision)) {
             return cardPurchase.choose(decision)
+        }
         val head = territoryHead(decision.observation.decision) ?: return reference.choose(decision)
         val recommended =
             requireNotNull(reference.choose(decision)) {

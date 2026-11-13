@@ -74,6 +74,7 @@ private constructor(
             PurchaseJson.fields(node.required("scales"), names)
             PurchaseJson.fields(node.required("heads"), names)
             val selectors = names.associate { name ->
+                CoordinatedEsCalibrationReceipt.validate(node, name, original)
                 val scale = node["scales"].required(name)
                 require(scale.isNumber) { "Calibration scales must be JSON numbers." }
                 CoordinatedEsHead.valueOf(name) to IncumbentResidualSelector(scale.doubleValue())
@@ -132,7 +133,7 @@ private constructor(
         ) {
             "Every coordinated role requires the full original dictionaries."
         }
-        original.validateOriginal(arena, baseline)
+        original.validateOriginal(arena, baseline, roles.keys)
     }
 
     internal fun controllers(

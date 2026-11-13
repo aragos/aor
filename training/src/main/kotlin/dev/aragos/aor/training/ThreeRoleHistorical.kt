@@ -28,34 +28,7 @@ internal object ThreeRoleHistorical {
                     it.commandValue == control["side"]?.asText()
                 } ?: error("Historical control requires its exact candidate/incumbent side.")
             val arena = ArenaSpecification.read(arenaSource.path)
-            require(
-                arena.coordinatedEs == null &&
-                    arena.cpeBundle == null &&
-                    arena.tokenActor == null &&
-                    arena.expansionActor == null &&
-                    arena.jointPolicy != null
-            ) {
-                "Historical controls must retain their unmodified raw-G3 factory."
-            }
-            val old = PurchaseJson.mapper.valueToTree<JsonNode>(arena.overlayMetadata())
-            val current = PurchaseJson.mapper.valueToTree<JsonNode>(raw.overlayMetadata())
-            val role =
-                if (side == StrategyReplaySide.CANDIDATE) "candidateBundle" else "incumbentBundle"
-            require(
-                listOf("card", "purchase").all {
-                    old["jointPolicy"][role][it]["sha256"] ==
-                        current["jointPolicy"]["sharedBundle"][it]["sha256"]
-                } &&
-                    old["jointPolicy"]["baseline"]["sha256"] ==
-                        current["jointPolicy"]["baseline"]["sha256"] &&
-                    old["expansionImitation"]["${side.commandValue}Model"]["sha256"] ==
-                        current["expansionImitation"]["candidateModel"]["sha256"] &&
-                    old["tokenOrder"]["${side.commandValue}Selector"] ==
-                        current["tokenOrder"]["candidateSelector"] &&
-                    side.model(arena) == raw.candidate
-            ) {
-                "Historical controlled models, F prior and E/T roles must match the raw study control."
-            }
+            validateReference(raw, arena, side)
             val replay =
                 StrategyReplays.play(
                     arena,
@@ -81,6 +54,42 @@ internal object ThreeRoleHistorical {
                 "replaySha256" to PurchaseJson.hash(output.resolve(name)),
                 "canonicalVerified" to true,
             )
+        }
+    }
+
+    /** Historical rival roles remain unchanged; only the recorded controlled role must match. */
+    fun validateReference(
+        raw: ArenaSpecification,
+        arena: ArenaSpecification,
+        side: StrategyReplaySide,
+    ) {
+        require(
+            arena.coordinatedEs == null &&
+                arena.cpeBundle == null &&
+                arena.tokenActor == null &&
+                arena.expansionActor == null &&
+                arena.jointPolicy != null
+        ) {
+            "Historical controls must retain their unmodified raw-G3 factory."
+        }
+        val old = PurchaseJson.mapper.valueToTree<JsonNode>(arena.overlayMetadata())
+        val current = PurchaseJson.mapper.valueToTree<JsonNode>(raw.overlayMetadata())
+        val role =
+            if (side == StrategyReplaySide.CANDIDATE) "candidateBundle" else "incumbentBundle"
+        require(
+            listOf("card", "purchase").all {
+                old["jointPolicy"][role][it]["sha256"] ==
+                    current["jointPolicy"]["sharedBundle"][it]["sha256"]
+            } &&
+                old["jointPolicy"]["baseline"]["sha256"] ==
+                    current["jointPolicy"]["baseline"]["sha256"] &&
+                old["expansionImitation"]["${side.commandValue}Model"]["sha256"] ==
+                    current["expansionImitation"]["candidateModel"]["sha256"] &&
+                old["tokenOrder"]["${side.commandValue}Selector"] ==
+                    current["tokenOrder"]["candidateSelector"] &&
+                side.model(arena) == raw.candidate
+        ) {
+            "Historical controlled models, F prior and E/T roles must match the raw study control."
         }
     }
 }

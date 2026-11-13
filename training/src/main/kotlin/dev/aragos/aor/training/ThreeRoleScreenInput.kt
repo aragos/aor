@@ -16,6 +16,14 @@ internal interface ThreeRoleScreenInput {
     val finalAdmissionSha256: String
     val historicalAdmissionSha256: String
 
+    /** Defaults preserve the original unwrapped TOKEN/CPE execution contract. */
+    fun executeGame(deadline: Long, operation: (Long) -> ArenaGame): ArenaGame = operation(deadline)
+
+    fun executeReplay(deadline: Long, operation: (Long) -> StrategyReplay): StrategyReplay =
+        operation(deadline)
+
+    fun executionReceipt(expected: Int?): Map<String, Int> = emptyMap()
+
     fun specification(role: String): ArenaSpecification
 
     fun side(role: String): ArenaSide

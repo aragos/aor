@@ -30,13 +30,16 @@ internal object ThreeRoleScreen {
             input.roles.associateWith { role ->
                 val trace =
                     if (index in input.replayIndices) PurchaseCanonicalTrace(lineup.seat) else null
-                StrategyArena.tracedGame(
-                        input.specification(role),
-                        index,
-                        input.side(role),
-                        deadline,
-                        trace,
-                    )
+                input
+                    .executeGame(deadline) { gameDeadline ->
+                        StrategyArena.tracedGame(
+                            input.specification(role),
+                            index,
+                            input.side(role),
+                            gameDeadline,
+                            trace,
+                        )
+                    }
                     .also {
                         trace?.let { canonical(role, it.result()) }
                     }
@@ -79,7 +82,10 @@ internal object ThreeRoleScreen {
         val side =
             if (input.side(role) == ArenaSide.CANDIDATE) StrategyReplaySide.CANDIDATE
             else StrategyReplaySide.INCUMBENT
-        val replay = StrategyReplays.play(input.specification(role), index, side, deadline)
+        val replay =
+            input.executeReplay(deadline) { gameDeadline ->
+                StrategyReplays.play(input.specification(role), index, side, gameDeadline)
+            }
         val actual = ExpansionOnPolicyStore.wire(replay)
         for (key in listOf("wins", "rewards", "ranks", "scores", "decisions")) {
             require(actual["game"][key] == world["roles"][role][key]) {
