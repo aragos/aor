@@ -191,9 +191,13 @@ class Plan:
             if value is None:
                 require(key in nullable, 'A mandatory generation subject cannot be omitted.')
             else:
-                require(isinstance(value, dict) and set(value) == {'path', 'sha256'},
+                require(isinstance(value, dict) and set(value) in
+                    ({'path', 'sha256'}, {'path', 'sha256', 'originalPath'}),
                     'Native subjects retain an explicit path and raw SHA256.')
                 require(isinstance(value['path'], str) and value['path'], 'A subject path is required.')
+                if 'originalPath' in value:
+                    require(isinstance(value['originalPath'], str) and Path(value['originalPath']).is_absolute(),
+                        'Optional original provenance remains an explicit absolute path.')
                 sha(value['sha256'])
         require((subjects['population'] is None) == (phase == 'CONTROLS'),
             'Only population stages admit a sealed executable population.')
