@@ -92,6 +92,7 @@ distributions {
                     "cpe_paired_screen.py",
                     "coordinated_es_math.py",
                     "coordinated_es_calibration.py",
+                    "coordinated_es_calibration_v2.py",
                     "coordinated_es_projection.py",
                     "coordinated_es_numeric.py",
                     "coordinated_es_plan.py",

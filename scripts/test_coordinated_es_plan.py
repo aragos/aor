@@ -37,6 +37,41 @@ def retention(base=100, delta=1000):
 
 
 class ProtocolTest(unittest.TestCase):
+    def test_legacy_protocol_keeps_exact_original_semantic_identity(self):
+        self.assertEqual(p.Plan.from_record(protocol()).sha256,
+            '2845a84477ea990651da13448588b6bbd6a41bc4d652b1b64c2aa1e43e621f3f')
+
+    def test_v2_recipe_is_explicit_and_changes_only_calibration(self):
+        original=protocol();value=copy.deepcopy(original)
+        value['calibration']=p.calibration_recipe(2)
+        accepted=p.Plan.from_record(value).record
+        self.assertEqual(accepted['calibration']['kind'],'coordinated-es-feasible-gap-calibration-2')
+        self.assertEqual({k:v for k,v in accepted.items() if k!='calibration'},
+            {k:v for k,v in original.items() if k!='calibration'})
+
+    def test_v2_cannot_reinterpret_a_legacy_kind(self):
+        value=protocol();value['calibration']=p.calibration_recipe(2)
+        value['calibration']['kind']=p.CALIBRATION['kind']
+        with self.assertRaisesRegex(ValueError,'prescribed optimizer'):p.Plan.from_record(value)
+
+    def test_v2_cannot_relax_existing_movement_or_eligibility_bounds(self):
+        for key,replacement in [('maximumMovement',.41),('minimumPositiveMass',.05),
+                ('minimumQuantile',0.),('requireStrictFloat64Interior',False)]:
+            with self.subTest(key=key):
+                value=protocol();value['calibration']=p.calibration_recipe(2)
+                value['calibration'][key]=replacement
+                with self.assertRaisesRegex(ValueError,'prescribed optimizer'):p.Plan.from_record(value)
+
+    def test_preparation_rejects_unknown_or_implicit_recipe_versions(self):
+        for version in (None,True,0,3,'2'):
+            with self.subTest(version=version):
+                with self.assertRaisesRegex(ValueError,'explicit supported version'):
+                    p.calibration_recipe(version)
+
+    def test_preparation_returns_an_independent_recipe(self):
+        chosen=p.calibration_recipe(2);chosen['heads'].append('CARD')
+        self.assertEqual(p.calibration_recipe(2)['heads'],['EXPANSION','TOKEN'])
+
     def test_exact_final_protocol_roundtrips_with_one_lf(self):
         plan=p.Plan.from_record(protocol())
         with tempfile.TemporaryDirectory() as folder:

@@ -8,6 +8,7 @@ import json
 import math
 from pathlib import Path
 
+from coordinated_es_calibration_v2 import PROTOCOL_RECIPE as CALIBRATION_V2
 from token_paired_campaign_plan import (
     canonical, checked_subject, digest, file_sha, integer, read, require, sha, subject,
 )
@@ -47,6 +48,15 @@ CALIBRATION = dict(
     meanProbe='ALTERNATING_SIGN_LINEAR_FITNESS', margin=1., scoreClamp=False,
     ties='REFERENCE_THEN_LOWEST_ORIGINAL_INDEX', recalibration=False,
 )
+
+
+def calibration_recipe(version):
+    """Select a prospective recipe explicitly; V1 remains the unchanged legacy default."""
+    require(type(version) is int and version in (1, 2),
+        'Calibration preparation requires explicit supported version1 or2.')
+    return json.loads(canonical(CALIBRATION if version == 1 else CALIBRATION_V2))
+
+
 PREFIX_GATE = dict(
     completedGenerations=2, remainingGenerations=14, finalReserveSeconds=7200,
     screenReserveBytes=2 * 1024**3, generationCost='MAXIMUM_INCLUSIVE_WALL_TIME',
@@ -128,7 +138,8 @@ class Plan:
             'generations', 'screenBank', 'screenGate', 'historicalControls', 'automaticRetry', 'automaticSuccessor'},
             'A coordinated ES protocol requires only its complete explicit scientific fields.')
         require(record['kind'] == KIND and record['recipe'] == RECIPE and
-            record['calibration'] == CALIBRATION and record['prefixGate'] == PREFIX_GATE and
+            record['calibration'] in (CALIBRATION, CALIBRATION_V2) and
+            record['prefixGate'] == PREFIX_GATE and
             record['gameLimits'] == GAME_LIMITS,
             'Only the prescribed optimizer, one calibration and outcome-blind prefix are admitted.')
         require(record['budget'] == expected_budget() and
