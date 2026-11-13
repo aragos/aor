@@ -2,8 +2,8 @@ package dev.aragos.aor.ai
 
 /**
  * Own/public expansion facts before the current E controller supplies its recommendation. The
- * complete offered commands retain canonical order. This transient work payload contains no
- * model, seed, game identity, authority state or placeholder baseline; it is never saved game state.
+ * complete offered commands retain canonical order. This transient work payload contains no model,
+ * seed, game identity, authority state or placeholder baseline; it is never saved game state.
  */
 data class ExpansionProjection(
     val encoderVersion: String,

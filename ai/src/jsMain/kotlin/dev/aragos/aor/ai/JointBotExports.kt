@@ -89,6 +89,18 @@ class JointBotSelector(
             "Joint actor facts must describe exactly the ordinary offered commands."
         }
     }
+
+    /** Additional E inference cannot be attached to a broken or differently supported bundle. */
+    internal fun acceptsExpansionReference(
+        observation: BotObservation,
+        ordinary: BotModel,
+        supportProfile: String?,
+    ): Boolean {
+        val selected = actor ?: return false
+        return selected.ordinaryBaseline == ordinary &&
+            readBotModel(baselineJson, observation) == ordinary &&
+            selected.support?.version == supportProfile
+    }
 }
 
 private data class QualifiedJointAsset(

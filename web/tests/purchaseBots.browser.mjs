@@ -212,7 +212,8 @@ try {
         assert(reply.command && !reply.error, JSON.stringify(reply));
         assert(input.observation.candidates.some(candidate => candidate.command === reply.command), 'Worker response must be an actual offered command.');
         assert.deepEqual(Object.keys(input).sort(), ['difficulty', 'id', 'observation', 'seed',
-            ...(input.purchase ? ['purchase'] : []), ...(input.card ? ['card'] : [])].sort());
+            ...(input.purchase ? ['purchase'] : []), ...(input.card ? ['card'] : []),
+            ...(input.expansion ? ['expansion'] : [])].sort());
         if (input.purchase) {
             assert.equal('baselineIndex' in input.purchase, false, 'Server never manufactures the actor recommendation.');
             assert.deepEqual(input.purchase.actions.map(action => action.command), input.observation.candidates.map(candidate => candidate.command).sort());
@@ -224,6 +225,15 @@ try {
             assert.deepEqual(input.card.actions.map(action => action.command), input.observation.candidates.map(candidate => candidate.command).sort());
             assert.equal(input.purchase, undefined, 'A card job contains no purchase projection.');
         }
+        if (input.expansion) {
+            assert.equal(input.difficulty, 'HARD');
+            assert.equal(input.observation.decision, 'expand');
+            assert.equal(input.expansion.encoderVersion, 'aor-expansion-observation-2');
+            assert.deepEqual(Object.keys(input.expansion).sort(), ['actions', 'encoderVersion', 'stateFeatures']);
+            assert.deepEqual(input.expansion.actions.map(action => action.command), input.observation.candidates.map(candidate => candidate.command).sort());
+            assert.equal(input.purchase, undefined);
+            assert.equal(input.card, undefined);
+        }
         const observation = JSON.stringify(input.observation);
         const purchase = input.purchase ? JSON.stringify(input.purchase) : null;
         const expected = jointSelector
@@ -232,6 +242,8 @@ try {
         assert.equal(reply.command, expected, 'Actual browser worker agrees with cached generated selector on the exact server input.');
         if (input.purchase && reply.command !== chooseBotMove(JSON.stringify(input.observation), baselineBytes, input.difficulty, input.seed)) nonbaseline++;
     }
+    const expansions = replies.filter(item => item.input.expansion);
+    assert(expansions.length > 0, 'Live HARD expansion offers must reach the unchanged production worker.');
     const advances = purchases.filter(item => item.input.observation.decision === 'purchase-advances');
     const refreshed = advances.filter((item, index) => index > 0 && advances[index - 1].reply.command.startsWith('buy-advance ')
         && advances[index - 1].input.observation.playerId === item.input.observation.playerId
@@ -250,7 +262,8 @@ try {
         jointSupportProfile: jointAsset?.supportProfile ?? null,
         webMode: process.env.AOR_BROWSER_PREVIEW === '1' ? 'built-production' : 'vite-development',
         baselineSha256: createHash('sha256').update(baselineBytes).digest('hex'), actorAssetSha256: createHash('sha256').update(actorBytes).digest('hex'),
-        replies: replies.length, purchaseReplies: purchases.length, learnedDeviations: nonbaseline,
+        replies: replies.length, purchaseReplies: purchases.length, expansionReplies: expansions.length,
+        expansionActorInstalled: false, learnedDeviations: nonbaseline,
         shippingReplies: purchases.filter(item => item.input.observation.decision === 'purchase-shipping').length,
         advanceReplies: advances.length, refreshedAdvanceQuotes: refreshed.length,
         pauseLateReplyBlocked: true, pausedReloadStayedPaused: true, undoLateReplyBlocked: true,

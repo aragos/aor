@@ -60,9 +60,10 @@ class ExpansionPolicyScopeTest {
 
     @Test
     fun easierDifficultiesRemainOutsideTheExpansionScope() {
-        val supported = listOf(BotDifficulty.EASY, BotDifficulty.NORMAL).map {
-            ExpansionPolicyScope.supports(observation(), it)
-        }
+        val supported =
+            listOf(BotDifficulty.EASY, BotDifficulty.NORMAL).map {
+                ExpansionPolicyScope.supports(observation(), it)
+            }
 
         assertThat(supported).doesNotContain(true)
     }

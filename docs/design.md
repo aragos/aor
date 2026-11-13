@@ -264,6 +264,13 @@ retain ordinary behavior. The decoded actor is cached for the worker's lifetime.
 ephemeral work, so commands, saved games, recorded history and stale-operation fencing retain their
 existing contracts.
 
+The inactive [expansion bridge](expansion-browser-bridge.md) follows the same creator-only input
+boundary with complete version-2 expansion offers. Its optional cached outer selector binds the
+actual composed E recommendation and exact browser constructor-input identities before using the
+shared schema-2 sampler. No expansion asset is installed; missing or incompatible assets preserve
+the current C/P, token, expansion and support behavior. This transient work projection changes no
+save, recorded command or lease-fencing contract.
+
 The experimental `pilot` mode uses the same engine through resumable, forkable in-memory sessions.
 Its commodity teacher samples explicit known-information curriculum fixtures and trains a compact
 four-choice selector, including retaining baseline behavior. Fresh held-out continuations must show

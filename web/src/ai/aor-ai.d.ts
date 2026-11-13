@@ -8,4 +8,8 @@ declare module 'aor-ai' {
         constructor(baselineModelJson: string, incumbentPurchaseModelJson: string, jointModelJson: string);
         choose(observationJson: string, purchaseJson: string | null, cardJson: string | null, difficulty: string, seed: number): string;
     }
+    export class ExpansionBotSelector {
+        constructor(incumbent: JointBotSelector, expansionModelJson: string);
+        choose(observationJson: string, purchaseJson: string | null, cardJson: string | null, expansionJson: string | null, difficulty: string, seed: number): string;
+    }
 }

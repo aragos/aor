@@ -40,7 +40,9 @@ class ExpansionProjectionTest {
     fun aProjectionCannotDuplicateAnAction() {
         val action = fixture().actions.first()
 
-        assertFailsWith<IllegalArgumentException> { fixture().copy(actions = listOf(action, action)) }
+        assertFailsWith<IllegalArgumentException> {
+            fixture().copy(actions = listOf(action, action))
+        }
     }
 
     @Test

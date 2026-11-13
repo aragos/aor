@@ -181,7 +181,9 @@ class TerritoryObservationEncoderTest {
                         (other to
                             state
                                 .playerState(other)
-                                .copy(hand = listOf(HandCard("private", CardData.definition(card))))),
+                                .copy(
+                                    hand = listOf(HandCard("private", CardData.definition(card)))
+                                )),
             )
         val first = changed("stone-1", listOf("wine-3", "gold-3"))
         val second = changed("gold-3", listOf("gold-3", "wine-3"))

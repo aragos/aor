@@ -40,6 +40,17 @@ identity. Raw G3 and G3+support1 are different behavior compositions: qualificat
 silently claimed for the other. The concrete asset/export admission is separate from this inactive
 source prerequisite and requires an actually qualified candidate.
 
+The optional `qualified-expansion-actor-1` asset has a `browser-policy-reference-1` reference. Its
+`ordinarySha256`, `purchaseSha256` and `jointSha256` hash UTF-8 of the exact `JSON.stringify` strings
+sent to the existing three constructors. These are browser-wire hashes, distinct from native file
+hashes. The worker checks all three once before wrapping its existing cached `JointBotSelector`.
+The reference also requires an explicit `supportProfile` (null for the original joint controller,
+or the known-own-Chaos version). The shared boundary requires a successfully parsed joint bundle,
+matching ordinary model and support profile in addition to exact scope and complete offers. Missing
+crypto, malformed assets or mismatched hashes preserve the existing selector. No hashing occurs when
+the optional asset is absent. A future qualified exporter must bind these exact browser strings;
+the bridge does not generate or install that asset.
+
 Absent, malformed, mismatched or unsupported expansion input/assets return the original composed
 choice. Card/purchase sampling, known-own-Chaos support, token ordering, ordinary E, other phases,
 difficulties and legacy-rules fallback are unchanged. No manual action preference, additional search,

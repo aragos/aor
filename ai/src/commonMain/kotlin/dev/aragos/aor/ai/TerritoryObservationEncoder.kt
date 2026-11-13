@@ -250,7 +250,8 @@ object ExpansionObservationEncoder {
         observation: BotObservation,
         baselineCommand: String,
         encoder: TerritoryEncoder = TerritoryEncoder.EXPANSION_1,
-    ): TerritoryObservation = project(view, seat, observation, encoder).bindBaseline(baselineCommand)
+    ): TerritoryObservation =
+        project(view, seat, observation, encoder).bindBaseline(baselineCommand)
 
     /** Project the acting player's ordinary view without choosing or transporting a baseline. */
     fun project(

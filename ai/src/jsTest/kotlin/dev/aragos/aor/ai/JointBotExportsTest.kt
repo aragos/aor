@@ -306,6 +306,117 @@ class JointBotExportsTest {
         )
     }
 
+    @Test
+    fun outerExpansionUsesActualReferenceAndOriginalTerritorySeed() {
+        val original = JointBotSelector(baseline(), incumbent(), asset())
+        val selector = ExpansionBotSelector(original, expansionAsset())
+        val input = observation("expand").replace("buy-advance A", "place 1 genoa")
+        val facts =
+            projection("card")
+                .replace("card-observation-1", "expansion-observation-2")
+                .replace("play card", "place 1 genoa")
+        val model = readExpansionModel(JSON.parse<dynamic>(expansionModel()))
+
+        for (seed in listOf(0, 17, -1, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            val reference = original.choose(input, null, null, "HARD", seed)
+            val expected =
+                TerritoryPolicy.choose(
+                    readExpansionProjection(facts).bindBaseline(reference),
+                    model,
+                    TerritoryPolicy.actorSeed(TerritoryPhase.EXPANSION, seed),
+                )
+            assertEquals(expected.command, selector.choose(input, null, null, facts, "HARD", seed))
+        }
+    }
+
+    @Test
+    fun malformedExpansionFactsRetainTheOriginalReference() {
+        val original = JointBotSelector(baseline(), incumbent(), asset())
+        val selector = ExpansionBotSelector(original, expansionAsset())
+        val input = observation("expand")
+
+        for (facts in listOf(null, "{}", projection("purchase"))) {
+            assertEquals(
+                original.choose(input, null, null, "HARD", 17),
+                selector.choose(input, null, null, facts, "HARD", 17),
+            )
+        }
+    }
+
+    @Test
+    fun outerExpansionPreservesSupportedCardBehaviorExactly() {
+        val original = JointBotSelector(baseline(), incumbent(), supportedAsset())
+        val selector = ExpansionBotSelector(original, expansionAsset(KnownOwnChaosSupport.VERSION))
+        val input = observation("play-cards")
+        val facts = JSON.parse<dynamic>(projection("card"))
+        facts.actions[1].features["effect.role.0.chaos"] = 1.0
+        val card = JSON.stringify(facts)
+
+        assertEquals(
+            original.choose(input, null, card, "HARD", 17),
+            selector.choose(input, null, card, "{}", "HARD", 17),
+        )
+    }
+
+    @Test
+    fun rawJointReferenceCannotBeSubstitutedForSupportedComposition() {
+        val original = JointBotSelector(baseline(), incumbent(), asset())
+        val selector = ExpansionBotSelector(original, expansionAsset(KnownOwnChaosSupport.VERSION))
+        val input = observation("expand").replace("buy-advance A", "place 1 genoa")
+        val facts =
+            projection("card")
+                .replace("card-observation-1", "expansion-observation-2")
+                .replace("play card", "place 1 genoa")
+
+        assertEquals(
+            original.choose(input, null, null, "HARD", 17),
+            selector.choose(input, null, null, facts, "HARD", 17),
+        )
+    }
+
+    @Test
+    fun invalidJointCannotInstallTheOptionalExpansionHead() {
+        val original = JointBotSelector(baseline(), incumbent(), "{}")
+        val selector = ExpansionBotSelector(original, expansionAsset())
+        val input = observation("expand").replace("buy-advance A", "place 1 genoa")
+        val facts =
+            projection("card")
+                .replace("card-observation-1", "expansion-observation-2")
+                .replace("play card", "place 1 genoa")
+
+        assertEquals(
+            original.choose(input, null, null, "HARD", 17),
+            selector.choose(input, null, null, facts, "HARD", 17),
+        )
+    }
+
+    private fun expansionModel(): String =
+        model("expansion", active = true)
+            .replace("\"schemaVersion\":1", "\"schemaVersion\":2")
+            .replace("expansion-observation-1", "expansion-observation-2")
+
+    private fun expansionAsset(support: String? = null): String {
+        val raw = js("({})")
+        raw.schemaVersion = 1
+        raw.kind = "qualified-expansion-actor-1"
+        raw.actorVersion = ExpansionPolicyScope.ACTOR_VERSION
+        raw.encoderVersion = TerritoryEncoder.EXPANSION_2.version
+        raw.rulesVersion = ExpansionPolicyScope.RULES_VERSION
+        raw.dataVersion = ExpansionPolicyScope.DATA_VERSION
+        raw.configuration = JSON.parse<dynamic>(configuration())
+        raw.ordinaryBaseline = JSON.parse<dynamic>(baseline())
+        raw.model = JSON.parse<dynamic>(expansionModel())
+        val reference = js("({})")
+        reference.kind = "browser-policy-reference-1"
+        // Transport hashing is exercised independently at the worker's binding boundary.
+        reference.ordinarySha256 = "0".repeat(64)
+        reference.purchaseSha256 = "0".repeat(64)
+        reference.jointSha256 = "0".repeat(64)
+        reference.supportProfile = support
+        raw.reference = reference
+        return JSON.stringify(raw)
+    }
+
     private fun supportedAsset(): String {
         val raw = JSON.parse<dynamic>(asset())
         raw.supportProfile = KnownOwnChaosSupport.VERSION
