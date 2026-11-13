@@ -14,17 +14,30 @@ internal enum class TokenPairedScreenRole {
  */
 internal class TokenPairedScreenInput
 private constructor(
-    val source: TokenPairedSubject,
+    override val source: TokenPairedSubject,
     val arenaSource: TokenPairedSubject,
-    val raw: ArenaSpecification,
+    override val raw: ArenaSpecification,
     val arena: ArenaSpecification,
     val admission: TokenPairedAdmission,
     val historical: TokenPairedSubject,
-    val globalStart: Int,
-) {
-    val indices = globalStart until globalStart + 128
-    val ownedReplays = REPLAYS.filter { it in indices }
-    val scienceIdentity: Map<String, Any> =
+    override val globalStart: Int,
+) : ThreeRoleScreenInput {
+    override val kind = VERSION
+    override val roles = TokenPairedScreenRole.entries.map { it.name }
+    override val replayIndices = REPLAYS
+    override val finalAdmissionSha256
+        get() = admission.source.sha256
+
+    override val historicalAdmissionSha256
+        get() = historical.sha256
+
+    override fun specification(role: String) = specification(TokenPairedScreenRole.valueOf(role))
+
+    override fun side(role: String) = side(TokenPairedScreenRole.valueOf(role))
+
+    override val indices = globalStart until globalStart + 128
+    override val ownedReplays = REPLAYS.filter { it in indices }
+    override val scienceIdentity: Map<String, Any> =
         mapOf(
             "kind" to VERSION,
             "scopeSha256" to admission.scopeSha256,
@@ -35,8 +48,9 @@ private constructor(
             "replayIndices" to REPLAYS,
             "roles" to TokenPairedScreenRole.entries.map { it.name },
         )
-    val scienceSha256 = trainingSignature(PurchaseJson.mapper.writeValueAsString(scienceIdentity))
-    val signature =
+    override val scienceSha256 =
+        trainingSignature(PurchaseJson.mapper.writeValueAsString(scienceIdentity))
+    override val signature =
         trainingSignature("$VERSION:${source.sha256}:${admission.source.sha256}:$scienceSha256")
 
     fun specification(role: TokenPairedScreenRole): ArenaSpecification =
@@ -45,14 +59,14 @@ private constructor(
     fun side(role: TokenPairedScreenRole): ArenaSide =
         if (role == TokenPairedScreenRole.FINAL) ArenaSide.CANDIDATE else ArenaSide.INCUMBENT
 
-    fun verify() {
+    override fun verify() {
         source.verify()
         arenaSource.verify()
         admission.verify()
         historical.verify()
     }
 
-    fun manifest(): Map<String, Any> =
+    override fun manifest(): Map<String, Any> =
         mapOf(
             "kind" to VERSION,
             "signature" to signature,
@@ -69,7 +83,7 @@ private constructor(
             "maximumTerminalExecutions" to 384 + ownedReplays.size * 3,
         )
 
-    fun snapshot(artifacts: TrainingArtifacts) {
+    override fun snapshot(artifacts: TrainingArtifacts) {
         verify()
         artifacts.ensureFileSnapshot(source.path, source.sha256, "study-source.json")
         artifacts.ensureFileSnapshot(arenaSource.path, arenaSource.sha256, "arena-source.json")

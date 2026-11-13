@@ -1,5 +1,7 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.aragos.aor.CardData
 import dev.aragos.aor.GameState
 import dev.aragos.aor.HandCard
@@ -7,13 +9,28 @@ import dev.aragos.aor.Stage
 import dev.aragos.aor.ai.BotObservations
 
 /** Invented public positions and locally constructed weights only; never a scientific input. */
-internal class CpePairedFixture : AutoCloseable {
+internal class CpePairedFixture(nonzeroCardPurchase: Boolean = false) : AutoCloseable {
     val prior = ExpansionOnPolicyFixture()
     val files = prior.files
     val source = files.directory.resolve("cpe-source.json")
     val bundle = files.directory.resolve("cpe-bundle.json")
 
     init {
+        if (nonzeroCardPurchase) {
+            for (name in listOf("card-policy.json", "purchase-policy.json")) {
+                val model = PurchaseJson.read(files.directory.resolve(name)) as ObjectNode
+                model.set<JsonNode>(
+                    "actorWeights",
+                    PurchaseJson.mapper.valueToTree(List(64) { .125 }),
+                )
+                model.set<JsonNode>(
+                    "stateBias",
+                    PurchaseJson.mapper.valueToTree(List(64) { .25 }),
+                )
+                files.write(name, model)
+            }
+            prior.prior.base.writeBundle("bundle.json")
+        }
         val dictionaries = CpePairedDictionary.forConfiguration(prior.prior.base.configuration)
         files.write(
             "cpe-bundle.json",

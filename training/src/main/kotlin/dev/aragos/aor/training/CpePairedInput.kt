@@ -33,7 +33,8 @@ private constructor(
             "proposalProfile" to "current-sample-uniform-eight-two-futures-1",
         )
     val bundleScopeSha256 = digest(bundleScopeIdentity)
-    val scopeSha256 = digest(mapOf("bundleScopeSha256" to bundleScopeSha256, "head" to head))
+    val scopeSha256 =
+        CpePairedDigest.json(mapOf("bundleScopeSha256" to bundleScopeSha256, "head" to head))
     val scienceIdentity =
         mapOf(
             "scopeSha256" to scopeSha256,
@@ -53,22 +54,8 @@ private constructor(
         ) {
             "C/P/E collection requires two fixed iterations starting from the exact original bundle."
         }
-        val joint = policyBindings.required("jointPolicy")
-        require(purchaseBaseline.sha256 == joint["baseline"]["sha256"]?.asText()) {
-            "The current purchase controller must retain the arena's exact frozen F0 prior."
-        }
-        for (role in listOf("candidateBundle", "incumbentBundle", "sharedBundle")) {
-            require(
-                joint[role]["card"]["sha256"]?.asText() == original.subject(CpeHead.CARD).sha256 &&
-                    joint[role]["purchase"]["sha256"]?.asText() ==
-                        original.subject(CpeHead.PURCHASE).sha256
-            ) {
-                "Every original C/P head must be the exact frozen qualified G3 component."
-            }
-        }
-        require(original.models.expansion.actorWeights.all { it == 0.0 }) {
-            "The original expansion actor must preserve its declared exact qualified-E prior."
-        }
+        original.validateOriginal(arena, purchaseBaseline)
+        current.models.validateFrozenValues(original.models)
     }
 
     fun request(index: Int) = CpePairedRequest(head, index)

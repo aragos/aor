@@ -60,4 +60,17 @@ internal data class CpePolicyHeads(
     val card: CardPolicyModel,
     val purchase: PurchasePolicyModel,
     val expansion: TerritoryPolicyModel,
-)
+) {
+    fun validateFrozenValues(original: CpePolicyHeads) {
+        require(
+            card.valueWeights == original.card.valueWeights &&
+                card.valueBias == original.card.valueBias &&
+                purchase.valueWeights == original.purchase.valueWeights &&
+                purchase.valueBias == original.purchase.valueBias &&
+                expansion.valueWeights == original.expansion.valueWeights &&
+                expansion.valueBias == original.expansion.valueBias
+        ) {
+            "Actor-only C/P/E publication must preserve every original value parameter."
+        }
+    }
+}
