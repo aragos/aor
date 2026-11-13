@@ -15,6 +15,7 @@ import token_paired_policy as policy
 import token_paired_data as data
 import token_paired_fit as fit
 import token_paired_validation as validation
+import token_paired_identity as identity_owner
 
 
 def model(nonzero=False):
@@ -363,6 +364,34 @@ class FitTests(unittest.TestCase):
             result=fit.fit(self.training,self.original,self.original,self.dictionary,self.output,self.config)
         self.assertEqual(result['acceptedEpochs'],20)
         self.assertFalse(result['operationalPassed'])
+
+    def test_numeric_spelling_does_not_claim_actor_parameter_movement(self):
+        value=model();value['stateBias'][0]=0;value['actorWeights'][0]=-.0
+        original=frozen(value);training,dictionary=corpus(original)
+        with patch.object(fit,'anchor_metrics',return_value=dict(mean=0.,maximum=0.)), \
+                patch.object(fit,'epoch',return_value=dict(accepted=True,anchor=dict(mean=0.,maximum=0.),
+                    attemptedAdamSteps=0)):
+            result=fit.fit(training,original,original,dictionary,self.output,self.config)
+        output=b.read_json(self.output/'policy.json')
+        self.assertNotEqual(b.digest(output),result['identity']['inputModelCanonicalSha256'])
+        self.assertFalse(result['actorChanged']);self.assertFalse(result['operationalPassed'])
+        self.assertEqual(result,fit.completed(self.output))
+
+
+class IdentityTests(unittest.TestCase):
+    def test_equal_json_number_spellings_have_one_actor_identity(self):
+        left={name:[0,1,-.0] for name in identity_owner.ACTOR_PARAMETERS}
+        right={name:[.0,1.,.0] for name in identity_owner.ACTOR_PARAMETERS}
+        self.assertEqual(identity_owner.actor_parameters_sha256(left),identity_owner.actor_parameters_sha256(right))
+
+    def test_real_parameter_change_changes_identity(self):
+        left={name:[.0]*64 for name in identity_owner.ACTOR_PARAMETERS};right=copy.deepcopy(left)
+        right['stateWeights'][0]=1e-12
+        self.assertNotEqual(identity_owner.actor_parameters_sha256(left),identity_owner.actor_parameters_sha256(right))
+
+    def test_nonfinite_parameter_identity_rejected(self):
+        value={name:[.0]*64 for name in identity_owner.ACTOR_PARAMETERS};value['actorWeights'][0]=float('nan')
+        with self.assertRaisesRegex(ValueError,'finite'):identity_owner.actor_parameters_sha256(value)
 
 
 if __name__ == '__main__':

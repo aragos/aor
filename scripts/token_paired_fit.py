@@ -10,6 +10,7 @@ import time
 import purchase_policy as b
 import token_paired_data as data
 import token_paired_policy as policy
+import token_paired_identity as identity_owner
 
 
 RECIPE = dict(version='token-paired-expected-improvement-1', epochs=20, batchWorlds=64,
@@ -217,7 +218,8 @@ def completed(directory):
             'Every recorded epoch must obey the exact fixed original-policy KL acceptance bounds.')
     b.require(checkpoint['kind'] == 'token-paired-adam-1' and checkpoint['model'] == model and
         checkpoint['acceptedEpochs'] == accepted and checkpoint['adamSteps'] == receipt['adamSteps'] and
-        receipt['actorChanged'] == (b.digest(model) != identity['inputModelCanonicalSha256']) and
+        receipt['actorChanged'] == (identity_owner.actor_parameters_sha256(model) !=
+            data.sha(identity['inputActorParametersSha256'], 'Input actor parameters')) and
         receipt['operationalPassed'] == (accepted > 0 and receipt['actorChanged']) and
         b.digest({key: value for key, value in model.items() if key not in b.PARAMETERS[:-2]}) ==
             identity['frozenModelFieldsSha256'],
@@ -265,6 +267,7 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         lr=RECIPE['learningRate'])
     identity = dict(kind='token-paired-fit-identity-1', recipe=RECIPE, context=asdict(training.context),
         inputModelCanonicalSha256=b.digest(current.model),
+        inputActorParametersSha256=identity_owner.actor_parameters_sha256(current.model),
         frozenModelFieldsSha256=b.digest({key: value for key, value in current.model.items()
             if key not in b.PARAMETERS[:-2]}),
         trainingSha256=training.sha256, anchorSha256=training.anchor_sha256, predecessor=predecessor,
@@ -272,7 +275,7 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
             validationReady=training.validation_ready_count),
         epochSeeds=list(config.epochSeeds), originalDeadline=config.deadline,
         sourceSha256={Path(path).name: b.file_digest(path) for path in
-            (__file__, data.__file__, policy.__file__, b.__file__)})
+            (__file__, data.__file__, policy.__file__, identity_owner.__file__, b.__file__)})
     b.atomic_json(output/'identity.json', identity)
     initial = anchor_metrics(actor, prepared)
     history = [dict(epoch=0, accepted=True, anchor=initial, actorSha256=b.digest(actor.artifact()))]
@@ -288,11 +291,11 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
     model = actor.artifact()
     b.require(all(model[name] == current.model[name] for name in b.PARAMETERS[-2:]),
         'Paired actor fitting must preserve both value parameter arrays exactly.')
-    changed = any(model[name] != current.model[name] for name in b.PARAMETERS[:-2])
+    changed = identity_owner.actor_parameters_sha256(model) != identity['inputActorParametersSha256']
     b.require(identity['trainingSha256'] == training.sha256,
         'Complete immutable TRAIN inputs must survive optimization unchanged.')
     b.require(all(b.file_digest(path) == identity['sourceSha256'][Path(path).name]
-        for path in (__file__, data.__file__, policy.__file__, b.__file__)),
+        for path in (__file__, data.__file__, policy.__file__, identity_owner.__file__, b.__file__)),
         'The original numerical source owners must remain unchanged until publication.')
     b.atomic_json(output/'policy.json', model)
     b.atomic_json(output/'checkpoint.json', dict(kind='token-paired-adam-1',
