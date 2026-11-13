@@ -130,9 +130,14 @@ model bytes and the canonical complete encoder/state/action dictionary digest. R
 dictionary JSON is separately pinned. New collection/public/labels/corpus/admission
 types bind head, iteration, cohort index, both complete bundle identities, semantic
 ecology/scope, source/range and all original streams. Stable scope identifies the
-original bundle/ecology/encoders; iteration science identity additionally binds the
-current complete bundle and the complete three-cohort stream table. Raw source hashes
+original bundle/ecology/encoders; each head's iteration science identity additionally
+binds the current complete bundle and that head's complete 640-origin stream table.
+The shared protocol binds all three independent cohort tables. Raw source hashes
 retain host-local paths/ranges as provenance without claiming cross-host byte equality.
+
+The protocol file is canonical UTF-8 JSON followed by exactly one LF. Its raw subject
+hash includes the LF; corpus `protocolDigest` hashes the exact JSON bytes before it.
+Native admission checks this byte framing without reserializing floating-point values.
 
 Reuse the existing numerical tensor kernel, bounded process execution, established
 campaign supervisor, immutable transfer/archive primitives and native arena/replay

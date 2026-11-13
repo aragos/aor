@@ -72,7 +72,7 @@ def bindings(plan, corpus, done, seal, directory, cohorts):
 
 
 def publish_iteration(protocol, original, corpus, directory, seal, portable):
-    plan=p.Plan.from_record(p.read(p.checked_subject(protocol)));corpus_value=p.read(p.checked_subject(corpus))
+    plan=p.Plan.from_file(p.checked_subject(protocol));corpus_value=p.read(p.checked_subject(corpus))
     directory=Path(directory);done=fit_receipt(directory);identity=done['identity'];iteration=identity['iteration']
     seal_value=p.read(p.checked_subject(seal))
     cohorts={head:(item,p.read(p.checked_subject(item))) for head,item in corpus_value['cohorts'].items()}
@@ -116,7 +116,7 @@ def verify_iteration(path):
     path=Path(path);value=p.read(path)
     p.require(value['kind']=='cpe-paired-iteration-admission-1' and value['allHeadsChanged'] is True,
         'Only the explicit changed complete three-head publication can be consumed.')
-    protocol=path.parents[2]/'protocol.json';plan=p.Plan.from_record(p.read(protocol))
+    protocol=path.parents[2]/'protocol.json';plan=p.Plan.from_file(protocol)
     p.require(p.file_sha(protocol)==value['protocolSha256'], 'Portable admission must retain its exact protocol bytes.')
     for name in ('currentBundle','outputBundle','originalBundle','corpus','fitCompletion','validationProbabilitySeal'):
         resolve(value[name],path)
@@ -163,7 +163,7 @@ def verify_iteration(path):
 
 
 def publish_final(portable):
-    portable=Path(portable);protocol=portable/'protocol.json';plan=p.Plan.from_record(p.read(protocol))
+    portable=Path(portable);protocol=portable/'protocol.json';plan=p.Plan.from_file(protocol)
     paths=[portable/'iterations'/f'iteration-{i}'/'admission.json' for i in (1,2)]
     rows=[verify_iteration(path) for path in paths];target=portable/'final-admission.json'
     p.require(all(row['protocolSha256']==p.file_sha(protocol) for row in rows),

@@ -31,7 +31,7 @@ def update(protocol_path,profile_path,corpus_path,original_corpus_path,current_p
     import cpe_paired_policy as policy
     import cpe_paired_fit as learner
     import cpe_paired_validation as validation
-    plan=p.Plan.from_record(p.read(protocol_path));profile=p.read(profile_path)
+    plan=p.Plan.from_file(protocol_path);profile=p.read(profile_path)
     p.require(profile['kind']=='cpe-paired-host-1' and profile['host']=='DESKTOP' and
         profile['protocolSha256']==p.file_sha(protocol_path), 'Only the frozen Desktop numerical owner may update bundles.')
     environment.verify(profile['numerical']);exp.remaining_seconds()
@@ -76,7 +76,7 @@ def effects(protocol_path,profile_path,iterations_root):
     import cpe_paired_fit as learner
     import cpe_paired_validation as validation
     from cpe_paired_corpus import Corpus
-    plan=p.Plan.from_record(p.read(protocol_path));profile=p.read(profile_path);root=Path(iterations_root)
+    plan=p.Plan.from_file(protocol_path);profile=p.read(profile_path);root=Path(iterations_root)
     p.require(profile['host']=='DESKTOP' and profile['protocolSha256']==p.file_sha(protocol_path),
         'Only the original Desktop learner opens the two completed validation endpoints.')
     subjects={i:p.subject(root/f'iteration-{i}'/'validation.json') for i in (1,2)}

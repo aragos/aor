@@ -16,6 +16,7 @@ controller=shared.controller
 
 
 def specification(protocol,profile,clock):
+    p.Plan.from_file(protocol)
     return shared.specification(protocol,profile,clock,contract=sys.modules[__name__])
 
 

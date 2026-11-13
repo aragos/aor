@@ -17,7 +17,7 @@ import cpe_paired_storage as storage
 
 
 def check_profile(protocol_path, profile_path):
-    protocol=p.read(protocol_path);plan=p.Plan.from_record(protocol);profile=p.read(profile_path)
+    plan=p.Plan.from_file(protocol_path);profile=p.read(profile_path)
     p.require(profile['kind']=='cpe-paired-host-1' and profile['host'] in p.HOSTS and
         profile['protocolSha256']==p.file_sha(protocol_path), 'Host package must bind the exact shared scientific protocol.')
     expected=plan.record['hosts'][profile['host']]

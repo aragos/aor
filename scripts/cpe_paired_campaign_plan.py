@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+from pathlib import Path
 
 from token_paired_campaign_plan import (HOSTS, COLLECTION_CHUNKS, SCREEN_CHUNKS,
     COLLECTION_REPLAYS, SCREEN_REPLAYS, canonical, digest, file_sha, sha, integer,
@@ -47,6 +48,19 @@ def head_record(values):
 @dataclass(frozen=True)
 class Plan:
     wire: bytes
+
+    @classmethod
+    def from_file(cls, path):
+        """The portable protocol is canonical UTF-8 JSON followed by exactly one LF.
+
+        Corpus protocolDigest hashes the JSON bytes without that framing LF; the raw
+        protocol subject hashes the whole file. Native admission can verify both without
+        reserializing floating-point numbers in another language.
+        """
+        plan=cls.from_record(read(path))
+        require(Path(path).read_bytes()==plan.wire+b'\n',
+            'The C/P/E protocol must retain canonical JSON bytes and exactly one framing LF.')
+        return plan
 
     @classmethod
     def from_record(cls, record):

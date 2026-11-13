@@ -34,6 +34,14 @@ def fixture():
 
 
 class PlanTests(unittest.TestCase):
+    def test_protocol_digest_uses_exact_framed_json_bytes_without_reserialization(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'protocol.json';plan=p.Plan.from_record(fixture())
+            path.write_bytes(plan.wire+b'\n')
+            self.assertEqual(p.Plan.from_file(path).sha256,plan.sha256)
+            path.write_bytes(plan.wire+b'\n\n')
+            with self.assertRaisesRegex(ValueError,'framing LF'):p.Plan.from_file(path)
+
     def test_each_head_has_exact_split_and_no_fixed_window_ordinal(self):
         for head in p.HEADS:
             values=[i for host in p.HOSTS for chunk in p.COLLECTION_CHUNKS[host] for i in p.indices(chunk)]
