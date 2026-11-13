@@ -32,6 +32,8 @@ The first four complete paired rounds are retained within the32. All256 original
 both first collections must match after excluding only their top-level source-derived signature;
 this includes actions, probabilities, values, canonical-command evidence and terminal fields.
 This equality is an integrity check, not an outcome comparison.
+Each canonical sidecar separately binds its own source-signed raw trajectory; its header and
+entries must match the other arm exactly. Sidecar trajectory hashes are not expected to match.
 
 Before round5, require all of the following, using exposure/progress/cost only:
 
@@ -71,6 +73,8 @@ checks all archive members, common-world schedules, both immediate-predecessor c
 control C/P subjects, phase identities/counters, whole original first-collection equality, prefix and
 stop gates, and both final32 receipts. It performs no inference, optimizer arithmetic or new games.
 Future independent whole-game comparison is outside this learning profile and requires review.
+Paired-round wall measurements include archive verification and duplicate/carry removal. The
+capsule's earlier batch receipt timing is retained separately and cannot replace that total cost.
 
 ## Source owners and checks
 
