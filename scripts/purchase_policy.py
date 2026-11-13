@@ -387,9 +387,9 @@ class ResidualPolicy(nn.Module):
         )
 
     def _batch_inputs(self, prepared):
-        state = torch.zeros((len(prepared), len(self.state_indices)), dtype=DTYPE)
-        action = torch.zeros((sum(item.action_count for item in prepared),
-                              len(self.action_indices)), dtype=DTYPE)
+        state = self._zeros((len(prepared), len(self.state_indices)))
+        action = self._zeros((sum(item.action_count for item in prepared),
+                              len(self.action_indices)))
         state_indices, action_indices, owners = [], [], []
         cursor = 0
         for row, item in enumerate(prepared):
@@ -401,7 +401,23 @@ class ResidualPolicy(nn.Module):
                                   torch.cat([item.state_values for item in prepared]))
         action.view(-1).index_copy_(0, torch.cat(action_indices),
                                    torch.cat([item.action_values for item in prepared]))
-        return state, action, torch.tensor(owners)
+        return state, action, self._owners(prepared, owners)
+
+    def _zeros(self, shape):
+        return torch.zeros(shape, dtype=DTYPE)
+
+    def _owners(self, prepared, owners):
+        return torch.tensor(owners)
+
+    def _prior(self, observation):
+        return torch.tensor(prior_probabilities(observation.action_count,
+                            observation.baseline_index), dtype=DTYPE).log()
+
+    def _exact_prior(self, log_probability, prior, residual):
+        if bool(torch.all(residual == residual[0])):
+            # Preserve the zero-head gradient while matching common exact-prior inference.
+            return log_probability + (prior - log_probability).detach()
+        return log_probability
 
     def forward(self, observations):
         require(1 <= len(observations) <= 256, "A numerical batch requires 1–256 decisions.")
@@ -420,12 +436,9 @@ class ResidualPolicy(nn.Module):
         for observation in prepared:
             size = observation.action_count
             residual = residuals[cursor:cursor + size]
-            prior = torch.tensor(prior_probabilities(size, observation.baseline_index),
-                                 dtype=DTYPE).log()
+            prior = self._prior(observation)
             log_probability = torch.log_softmax(prior + residual, dim=0)
-            if bool(torch.all(residual == residual[0])):
-                # Match the common exact-prior forward without destroying the zero-head gradient.
-                log_probability = log_probability + (prior - log_probability).detach()
+            log_probability = self._exact_prior(log_probability, prior, residual)
             log_probabilities.append(log_probability)
             cursor += size
         values = torch.sigmoid(hidden @ self.valueWeights + self.valueBias)

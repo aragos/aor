@@ -67,10 +67,14 @@ class SharedMathTests(unittest.TestCase):
         actor.forward=recording
         prepared_row=actor.prepare(view)
         old=b.reference_forward(artifact,view,contract=card_policy.CONTRACT)['probabilities']
-        prepared=SimpleNamespace(ready_count=17,roots=tuple([prepared_row]*17+[None]*495),
-            root_records=tuple([dict(currentProbabilities=old,proposedIndices=[0,1],inclusionProbability=1/1023)]*512),
-            training=SimpleNamespace(targets=tuple([SimpleNamespace(deltas=(0.,.2))]*512)),
-            anchor_count=1,anchor_rows=lambda slots:())
+        # A kernel-only cache uses the owning type's exact default loss/diagnostic methods.
+        prepared=shared.Prepared.__new__(shared.Prepared)
+        prepared.ready_count=17
+        prepared.roots=tuple([prepared_row]*17+[None]*495)
+        prepared.root_records=tuple([dict(currentProbabilities=old,proposedIndices=[0,1],inclusionProbability=1/1023)]*512)
+        prepared.training=SimpleNamespace(targets=tuple([SimpleNamespace(deltas=(0.,.2))]*512))
+        prepared.anchor_count=1
+        prepared.anchor_rows=lambda slots:()
         optimizer=b.torch.optim.Adam([getattr(actor,n) for n in b.PARAMETERS[:-2]],lr=.0003)
         result=shared.minibatch(actor,optimizer,prepared,list(range(64)))
         reference=b.ResidualPolicy(artifact,card_policy.CONTRACT)

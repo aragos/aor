@@ -24,6 +24,11 @@ def gain(probabilities, behavior, indices, deltas, inclusion):
     chosen = b.torch.tensor(indices[1:], dtype=b.torch.long)
     values = b.torch.tensor(deltas[1:], dtype=b.DTYPE)
     old = b.torch.tensor(behavior, dtype=b.DTYPE)
+    return gain_tensors(probabilities,old,chosen,values,inclusion)
+
+
+def gain_tensors(probabilities, old, chosen, values, inclusion):
+    """Already-admitted constants on the caller's explicit device; same arithmetic."""
     return ((probabilities[chosen]-old[chosen])*values/inclusion).sum()
 
 
@@ -32,6 +37,12 @@ def original_kl(log_probabilities, original):
     if len(original) == 1:
         return log_probabilities.sum()*0.
     reference = b.torch.tensor(original, dtype=b.DTYPE)
+    return original_kl_tensors(log_probabilities,reference)
+
+
+def original_kl_tensors(log_probabilities, reference):
+    if len(reference) == 1:
+        return log_probabilities.sum()*0.
     return (log_probabilities.exp()*(log_probabilities-reference.log())).sum()
 
 
@@ -75,6 +86,20 @@ class Prepared:
                 for observation, original in group:
                     yield observation, original, 1/len(group)
 
+    def gain_term(self, log, index):
+        root=self.root_records[index];target=self.training.targets[index]
+        return gain(log.exp(),root['currentProbabilities'],root['proposedIndices'],
+            target.deltas,root['inclusionProbability'])
+
+    def kl_term(self, log, original):
+        return original_kl(log,original)
+
+    def add_diagnostic(self, previous, value):
+        return previous+float(value.detach())
+
+    def finish_diagnostic(self, value):
+        return value
+
 
 def check_clock(config):
     b.require(time.time() < config.deadline, 'The original numerical deadline expired; no renewed clock.')
@@ -116,18 +141,17 @@ def minibatch(actor, optimizer, prepared, slots):
         logs, _ = actor([item[0] for item in chunk])
         contributions = []
         for (_, index), log in zip(chunk, logs):
-            root = prepared.root_records[index]; target = training.targets[index]
-            contributions.append(gain(log.exp(), root['currentProbabilities'],
-                root['proposedIndices'], target.deltas, root['inclusionProbability']))
+            contributions.append(prepared.gain_term(log,index))
         objective = b.torch.stack(contributions).sum()*512/(len(slots)*prepared.ready_count)
-        gain_value += float(objective.detach()); (-objective).backward()
+        gain_value = prepared.add_diagnostic(gain_value,objective); (-objective).backward()
     for chunk in batches(prepared.anchor_rows(slots)):
         logs, _ = actor([item[0] for item in chunk])
-        term = b.torch.stack([original_kl(log, item[1])*item[2]
+        term = b.torch.stack([prepared.kl_term(log, item[1])*item[2]
             for log, item in zip(logs, chunk)]).sum()*512/(len(slots)*prepared.anchor_count)
-        kl_value += float(term.detach())
+        kl_value = prepared.add_diagnostic(kl_value,term)
         (RECIPE['originalKlCoefficient']*term).backward()
     parameters = [getattr(actor, name) for name in b.PARAMETERS[:-2]]
+    gain_value=prepared.finish_diagnostic(gain_value);kl_value=prepared.finish_diagnostic(kl_value)
     if not any(parameter.grad is not None for parameter in parameters):
         return dict(gain=gain_value, kl=kl_value, stepped=False)
     norm = b.torch.nn.utils.clip_grad_norm_(parameters, RECIPE['gradientNorm'], error_if_nonfinite=True)
