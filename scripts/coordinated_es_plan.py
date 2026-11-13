@@ -22,6 +22,8 @@ MAXIMUM_TERMINALS = 139306
 GENERATION_CHUNKS = {'DESKTOP': tuple(range(5)), 'MAC': tuple(range(5, 8))}
 SCREEN_CHUNKS = {'DESKTOP': tuple(range(10)), 'MAC': tuple(range(10, 16))}
 SCREEN_REPLAYS = (0, 682, 1365, 2047)
+HISTORICAL_CONTROLS = [dict(family=60,bank='HOMOGENEOUS_HELDOUT',index=index,side='candidate')
+    for index in (0,4095)]
 ORIGINAL_ACTORS = dict(
     CARD='916de6e6ec41b3cc708f51155044956b1d3ebdb68e3a171f660a57123a8b00bf',
     PURCHASE='6613908b272cee6fb5789dc0ac8d8e6a14853d743ff6b9e08ba322a7d7a23f79',
@@ -123,7 +125,7 @@ class Plan:
     def from_record(cls, record):
         require(set(record) == {'kind', 'recipe', 'calibration', 'prefixGate', 'gameLimits', 'budget',
             'scienceSeconds', 'auditSeconds', 'hosts', 'original', 'projectionSeed',
-            'generations', 'screenBank', 'screenGate', 'automaticRetry', 'automaticSuccessor'},
+            'generations', 'screenBank', 'screenGate', 'historicalControls', 'automaticRetry', 'automaticSuccessor'},
             'A coordinated ES protocol requires only its complete explicit scientific fields.')
         require(record['kind'] == KIND and record['recipe'] == RECIPE and
             record['calibration'] == CALIBRATION and record['prefixGate'] == PREFIX_GATE and
@@ -133,6 +135,8 @@ class Plan:
             record['scienceSeconds'] == SCIENCE_SECONDS and record['auditSeconds'] == AUDIT_SECONDS and
             record['automaticRetry'] is False and record['automaticSuccessor'] is False,
             'Counts, original clocks and no-retry/no-successor policy cannot change.')
+        require(record['historicalControls']==HISTORICAL_CONTROLS,
+            'Only the two predetermined original qualified-G3 historical sides may execute.')
         require(record['hosts'] == {host: host_limits(host) for host in HOSTS},
             'Both exact native resource profiles must remain declared.')
         original = record['original']

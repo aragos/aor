@@ -68,8 +68,9 @@ def receive_retention(root,name):
     import coordinated_es_storage as storage
     p.require(isinstance(name,str) and len(name.encode())<=4096,
         'A prefix resource census has a fixed compact message bound.')
-    row=json.loads(name);root=Path(root);number=row['generation']
-    p.require(number in (1,2) and health(root)['status']=='active',
+    row=json.loads(name);root=Path(root);number=row['generation'];state=health(root)
+    if state['status']=='terminal':return state
+    p.require(number in (1,2) and state['status']=='active',
         'Only an active coordinator can accept its first two generation censuses.')
     clock=p.read(root/'clock.json')
     storage.prefix_retention(row,clock['protocolSha256'],'MAC',number)
@@ -101,6 +102,9 @@ class Outbound(shared.Outbound):
 
     def push_retention(self,record):
         result=self.remote('retention',json.dumps(record,separators=(',',':')))
+        if result.get('status')=='terminal':
+            if result['terminal'].get('status')=='stopped':raise PeerStopped(result)
+            raise ValueError('The original coordinator ended before prefix resource admission.')
         p.require(result['sha256']==__import__('hashlib').sha256(p.canonical(record)+b'\n').hexdigest(),
             'The receiver must preserve exact measured resource bytes.')
         return result

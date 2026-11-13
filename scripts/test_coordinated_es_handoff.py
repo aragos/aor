@@ -115,5 +115,17 @@ class HandoffTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'original host'):
                 h.receive_retention(root,__import__('json').dumps(row))
 
+    def test_late_resource_report_propagates_original_numerical_stop(self):
+        terminal=dict(kind=h.PREFIX+'-terminal-1',host='DESKTOP',status='stopped',
+            reason='zero-gradient',completedGenerations=0)
+        result=dict(status='terminal',terminal=terminal,terminalSubject={'path':'/original','sha256':'a'*64})
+        with tempfile.TemporaryDirectory() as folder,patch.object(h,'health',return_value=result):
+            root=Path(folder);row=self.resource_fixture(root)
+            self.assertEqual(h.receive_retention(root,__import__('json').dumps(row)),result)
+        client=h.Outbound(dict(address=h.ADDRESS,root='/constructed/root',python='/constructed/python',
+            script='/constructed/handoff'),p.Clock(0.,86400.),'/unused')
+        with patch.object(client,'remote',return_value=result),self.assertRaises(h.PeerStopped):
+            client.push_retention(row)
+
 
 if __name__=='__main__':unittest.main()

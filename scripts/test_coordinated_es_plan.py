@@ -18,6 +18,7 @@ def protocol():
     return dict(kind=p.KIND, recipe=copy.deepcopy(p.RECIPE),
         calibration=copy.deepcopy(p.CALIBRATION), prefixGate=copy.deepcopy(p.PREFIX_GATE),
         gameLimits=copy.deepcopy(p.GAME_LIMITS),
+        historicalControls=copy.deepcopy(p.HISTORICAL_CONTROLS),
         budget=p.expected_budget(), scienceSeconds=p.SCIENCE_SECONDS, auditSeconds=p.AUDIT_SECONDS,
         hosts={h:p.host_limits(h) for h in p.HOSTS}, original=dict(
             bundleSha256='1'*64, scopeSha256='2'*64, ecologySha256='3'*64,

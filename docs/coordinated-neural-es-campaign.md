@@ -88,7 +88,9 @@ Exactly two population reproductions belong to each generation: PLUS direction
 `generation-1` at world0, and MINUS of that direction at world255. Each runs only on the
 host owning that world. Their complete canonical evidence and ordinary factory identity
 are verified. Two predetermined historical zero-policy controls execute once globally
-on Desktop before fresh scientific games. Their portable admission gates both hosts.
+on Desktop before fresh scientific games: family60 homogeneous-heldout candidate-side
+global indices0 and4095, preserving their complete original source, lineup and canonical
+subjects as in the existing79/80 controls. Their portable admission gates both hosts.
 
 Only the mean after all 16 complete updates is eligible. It is frozen before the untouched
 2,048-world paired FINAL/RAW_G3 screen. Sixteen fixed 128-world screen shards are divided
