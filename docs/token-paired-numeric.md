@@ -50,7 +50,8 @@ beyond the campaign's20 declared epoch permutations per iteration.
 
 After each complete epoch, evaluate the entire retained TRAIN anchor: require mean KL≤.02
 and maximum individual-state KL≤.10. A violating epoch restores both actor and Adam and ends
-the fit, without retry. Nonfinite or identity failure aborts publication. Zero accepted actor
+the fit, without retry. Epoch0 is diagnostic only, including iteration2's fresh root states;
+it adds no pre-optimization gate. Nonfinite or identity failure aborts publication. Zero accepted actor
 change is an operational stop. The last accepted policy is the only result; no epoch or
 iteration is selected by outcomes. Iteration2 must consume the sole completed iteration1 actor
 and the exact original π0, scope, dictionaries and original anchor bank.
