@@ -9,10 +9,19 @@ import cpe_paired_campaign as campaign
 import cpe_paired_execution as execution
 import cpe_paired_campaign_plan as p
 import cpe_paired_storage as storage
+import cpe_paired_process as process
 from test_cpe_paired_campaign_plan import fixture
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_cpe_child_uses_explicit_cpe_lifecycle_without_changing_legacy_defaults(self):
+        with patch.object(process.shared,'live',side_effect=ValueError('closed')) as live,\
+             patch.object(process.shared.subprocess,'Popen') as spawn:
+            with self.assertRaisesRegex(ValueError,'closed'):
+                process.run_child({},['constructed-native'],'unused')
+            live.assert_called_once_with({},mailbox=process.handoff)
+            spawn.assert_not_called()
+
     def package(self, root, host):
         root.mkdir();protocol=root/'protocol.json';profile=root/'profile.json';clock=root/'clock.json'
         record=fixture();storage.publish_json(protocol,record)

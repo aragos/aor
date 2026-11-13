@@ -1,5 +1,6 @@
 """Bounded children remain in the original controller group; peer checks read lifecycle only."""
 from pathlib import Path
+from functools import partial
 import subprocess
 import time
 
@@ -22,7 +23,8 @@ def live(profile, *, mailbox=handoff):
 
 def run_child(profile, command, log, *, mailbox=handoff):
     """No new session/process group: the reviewed outer controller can always clean descendants."""
-    live(profile,mailbox=mailbox)
+    check=partial(live,profile) if mailbox is handoff else partial(live,profile,mailbox=mailbox)
+    check()
     with Path(log).open('ab') as stream:
         child=subprocess.Popen(command,stdout=stream,stderr=subprocess.STDOUT)
         try:
@@ -30,10 +32,10 @@ def run_child(profile, command, log, *, mailbox=handoff):
             while child.poll() is None:
                 profile['_clock'].remaining(time.time())
                 if time.monotonic()>=next_peer_check:
-                    live(profile,mailbox=mailbox);next_peer_check=time.monotonic()+30
+                    check();next_peer_check=time.monotonic()+30
                 time.sleep(min(1,profile['_clock'].remaining(time.time())))
             p.require(child.returncode==0,'Fixed child failed; retain evidence without retry.')
-            live(profile,mailbox=mailbox)
+            check()
         except BaseException:
             if child.poll() is None:
                 child.terminate()
