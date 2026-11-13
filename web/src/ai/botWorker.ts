@@ -3,7 +3,7 @@ import purchaseModel from './purchaseModel.json';
 import jointModel from './jointModel.json';
 import {createBotPolicyRunner} from './botPolicy';
 
-type Job = {id: string; observation: unknown; purchase?: unknown; card?: unknown; difficulty: 'EASY' | 'NORMAL' | 'HARD'; seed: number};
+type Job = {id: string; observation: unknown; purchase?: unknown; card?: unknown; expansion?: unknown; difficulty: 'EASY' | 'NORMAL' | 'HARD'; seed: number};
 const choose = createBotPolicyRunner(() => import('aor-ai'), model, purchaseModel, jointModel);
 
 // Authentication and game requests belong to the coordinator; the worker sees one bot's input.

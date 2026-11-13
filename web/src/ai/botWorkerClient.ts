@@ -39,7 +39,8 @@ export function createBotWorkerClient() {
             signal.addEventListener('abort', cancel, {once: true});
             current.postMessage({id, observation: job.observation, difficulty: job.difficulty, seed: job.seed,
                 ...(job.purchase == null ? {} : {purchase: job.purchase}),
-                ...(job.card == null ? {} : {card: job.card})});
+                ...(job.card == null ? {} : {card: job.card}),
+                ...(job.expansion == null ? {} : {expansion: job.expansion})});
         });
     }
     return {think, stop};

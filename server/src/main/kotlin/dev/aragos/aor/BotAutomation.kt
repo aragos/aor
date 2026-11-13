@@ -5,10 +5,14 @@ import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.CardObservationEncoder
 import dev.aragos.aor.ai.CardProjection
+import dev.aragos.aor.ai.ExpansionObservationEncoder
+import dev.aragos.aor.ai.ExpansionPolicyScope
+import dev.aragos.aor.ai.ExpansionProjection
 import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicyScope
 import dev.aragos.aor.ai.PurchaseProjection
+import dev.aragos.aor.ai.TerritoryEncoder
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -109,6 +113,8 @@ data class BotDecisionWork(
     val purchase: PurchaseProjection? = null,
     /** Optional actor-visible card facts; no authority state or embedded recommendation. */
     val card: CardProjection? = null,
+    /** Optional own/public full-offer expansion facts, without a model recommendation. */
+    val expansion: ExpansionProjection? = null,
 )
 
 /** Creator-only work; each observation belongs to exactly one automated seat. */
@@ -408,6 +414,17 @@ internal object BotAutomation {
                                         state.viewForPlayer(seat),
                                         seat,
                                         observation,
+                                    )
+                                } else {
+                                    null
+                                },
+                            expansion =
+                                if (ExpansionPolicyScope.supports(observation, bot.difficulty)) {
+                                    ExpansionObservationEncoder.project(
+                                        state.viewForPlayer(seat),
+                                        seat,
+                                        observation,
+                                        TerritoryEncoder.EXPANSION_2,
                                     )
                                 } else {
                                     null

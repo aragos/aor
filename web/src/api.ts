@@ -175,6 +175,8 @@ export interface BotJob {
     purchase?: unknown;
     /** Optional actor-visible card projection; authority and hidden opponent state are excluded. */
     card?: unknown;
+    /** Optional own/public expansion facts; the worker binds its exact E reference. */
+    expansion?: unknown;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;

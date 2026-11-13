@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.CardObservationEncoder
+import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.PurchaseObservationEncoder
+import dev.aragos.aor.ai.TerritoryEncoder
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -73,6 +75,70 @@ class BotAutomationTest(private val postgres: Boolean) {
 
             assertThat(job.difficulty).isEqualTo(BotDifficulty.NORMAL)
             assertThat(job.card).isNull()
+        }
+
+    @Test
+    fun hardExpansionWorkContainsCompleteUnboundOwnPublicFacts() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.prepareExpansion(PlayerId("p4"))
+            val state = fixture.service.store.read(fixture.game.gameId).state()
+
+            val job = fixture.claim().observations.single()
+
+            assertThat(job.expansion)
+                .isEqualTo(
+                    ExpansionObservationEncoder.project(
+                        state.viewForPlayer(job.seat),
+                        job.seat,
+                        job.observation,
+                        TerritoryEncoder.EXPANSION_2,
+                    )
+                )
+            val wire = json.readTree(json.writeValueAsString(job))["expansion"]
+            assertThat(wire.fieldNames().asSequence().toSet())
+                .containsExactly("encoderVersion", "stateFeatures", "actions")
+            assertThat(job.expansion?.actions?.map { it.command })
+                .containsExactlyElementsIn(job.observation.candidates.map { it.command }.sorted())
+                .inOrder()
+            assertThat(job.card).isNull()
+            assertThat(job.purchase).isNull()
+        }
+
+    @Test
+    fun legacyExpansionWorkKeepsTheOriginalControllerPayload() =
+        AutomationFixture(
+                postgres,
+                humans = 2,
+                bots = 2,
+                rules = qualifiedPurchaseRules,
+                rulesVersion = LEGACY_RULES_VERSION,
+            )
+            .use { fixture ->
+                fixture.prepareExpansion(PlayerId("p4"))
+
+                assertThat(fixture.claim().observations.single().expansion).isNull()
+            }
+
+    @Test
+    fun normalExpansionWorkDoesNotRequestLearnedActorFacts() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.prepareExpansion(PlayerId("p3"))
+
+            assertThat(fixture.claim().observations.single().expansion).isNull()
+        }
+
+    @Test
+    fun expansionActorFactsAreNotAddedToPublicSnapshots() =
+        AutomationFixture(postgres, humans = 2, bots = 2, rules = qualifiedPurchaseRules).use {
+            fixture ->
+            fixture.prepareExpansion(PlayerId("p4"))
+
+            val wire = json.writeValueAsString(fixture.snapshot(1))
+
+            assertThat(wire).doesNotContain("aor-expansion-observation")
+            assertThat(wire).doesNotContain("stateFeatures")
         }
 
     @Test
@@ -861,14 +927,16 @@ private class AutomationFixture(
         return "place $tokens $destination"
     }
 
-    fun prepareHumanExpansion() {
+    fun prepareHumanExpansion() = prepareExpansion(PlayerId("p1"))
+
+    fun prepareExpansion(actor: PlayerId) {
         prepareFirstTurn()
         service.store.update(game.gameId) { initial ->
             var current = initial
             repeat(100) {
                 val state = current.state()
                 val prompt = state.prompts().single() as Prompt.SinglePlayer
-                if (state.stage == Stage.EXPANSION && prompt.player == PlayerId("p1")) {
+                if (state.stage == Stage.EXPANSION && prompt.player == actor) {
                     return@update current
                 }
                 val choices = state.legalChoices(prompt.player).commands
@@ -880,7 +948,7 @@ private class AutomationFixture(
                     }
                 current = service.driver.submit(current, prompt.player, command)
             }
-            error("The fixture must reach the human's expansion activity.")
+            error("The fixture must reach the requested first-turn expansion activity.")
         }
     }
 

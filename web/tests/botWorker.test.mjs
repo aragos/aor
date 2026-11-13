@@ -84,3 +84,15 @@ test('canceling an actor decision creates a fresh worker for the next request', 
     assert.equal(workers[0].terminated, true);
     assert.equal(workers.length, 2);
 });
+
+test('worker receives optional expansion facts without controller metadata', async context => {
+    const {client, workers} = fixture(context);
+    const expansion = {encoderVersion: 'aor-expansion-observation-2', stateFeatures: {}, actions: []};
+    const result = client.think({...job, expansion}, new AbortController().signal);
+
+    assert.deepEqual(Object.keys(workers[0].message).sort(), ['difficulty', 'expansion', 'id', 'observation', 'seed']);
+    assert.deepEqual(workers[0].message.expansion, expansion);
+    workers[0].answer('pass');
+
+    assert.equal(await result, 'pass');
+});
