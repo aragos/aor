@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
+import coordinated_es_admission as admission
 import coordinated_es_calibration_v2 as v2
 import coordinated_es_campaign as campaign
 import coordinated_es_math as es
@@ -230,6 +231,97 @@ def verify_existing_consumption(root):
     return dict(kind='coordinated-es-constructed-consumption-proof-1', constructed=True, passed=True,
         completedProof=proof_subject, contexts=result, numericalChildren=0, forwards=0,
         scientificGames=0, scientificUpdates=0)
+
+
+def publication_shape(existing, output):
+    """Separate pure publisher shape: invented later populations/audits, no new forward.
+
+    Generation one is the actual joined transition. Later population bundle labels
+    are placeholders, never claims of executed mutant games. Sixteen real scalar
+    update calculations end at coordinates already materialized by G2 PLUS-00.
+    """
+    existing, output = Path(existing).absolute(), Path(output).absolute()
+    output.mkdir(parents=True, exist_ok=False)
+    proof_subject = plan_owner.subject(existing / 'joined-proof.json')
+    proof = plan_owner.read(proof_subject['path'])
+    es.require(proof['constructed'] is True and proof['version'] == 2 and proof['passed'] is True,
+        'Publisher shape reuses only the completed constructed V2 transition.')
+    protocol = proof['protocol']
+    value = plan_owner.read(plan_owner.checked_subject(protocol))
+    original_expectations = {es.Head(head): SimpleNamespace(sha256=row['actorSha256'])
+        for head, row in value['original']['heads'].items()}
+    plan = constructed_plan(value, original_expectations)
+    run = output / 'run'
+    stage.copy_tree(existing / 'generation-1/calibrate', run / 'generations/generation-1/calibrate')
+    put(run / 'historical/historical-admission.json', dict(constructed=True, actualGames=0))
+    center = plan_owner.subject(existing / 'center-0.json')
+    actual_population = plan_owner.read(proof['population']['path'])
+    wrapper_pins = {}
+    for number in range(1, 17):
+        directory = run / 'generations' / ('generation-' + str(number))
+        if number == 1:
+            population_subject = proof['population']
+            update = plan_owner.subject(existing / 'generation-1/update/update.json')
+            next_center = plan_owner.subject(existing / 'generation-1/update/center.json')
+        else:
+            current = es.Center.from_record(plan_owner.read(center['path']))
+            table = es.DirectionTable.from_record(plan_owner.read(existing / ('directions-' + str(number) + '.json')))
+            materialization = dict(kind='coordinated-es-materialization-1', scope=current.scope.record,
+                generation=number, centerSha256=center['sha256'], directionsSha256=es.digest(table.record),
+                worldBankSha256=es.digest(plan.bank(number)['worldBank']), worldIds=list(range(256)),
+                members=[dict(template, coordinatesSha256=es.digest(member['coordinates']))
+                    for template, member in zip(actual_population['members'], es.mutants(current, table))])
+            population = numeric.seal_population(materialization, protocol['sha256'], proof['calibration']['sha256'])
+            population_subject = put(directory / 'invented-population.json', population)
+            positive = number == 2 or number % 2 == 1
+            fitness = dict(kind='coordinated-es-fitness-1', populationSha256=population_subject['sha256'],
+                worldBankSha256=population['worldBankSha256'], worldIds=list(range(256)), members=[
+                    dict(direction=row['direction'], sign=row['sign'], bundleSha256=row['bundleSha256'],
+                        rewards=[1. if (row['sign'] == 1) == positive else 0.] * 256)
+                    for row in population['members']])
+            put(directory / 'invented-fitness.json', fitness)
+            result = es.update(current, table, population, fitness)
+            update = put(directory / 'update.json', result)
+            next_center = put(directory / 'center.json', result['center'])
+        receipt = put(directory / 'receipt.json', dict(kind='coordinated-es-generation-receipt-1',
+            constructed=True, complete=True, generation=number, protocolSha256=protocol['sha256'],
+            inputCenter=center, outputCenter=next_center, update=update, population=population_subject))
+        wrapper_pins[receipt['path']] = receipt['sha256']
+        center = next_center
+    final = output / 'final-materialization'
+    member = plan_owner.read(existing / 'generation-2/portable/population.json')['members'][0]
+    coordinates = plan_owner.read(center['path'])['coordinates']
+    es.require(es.digest(coordinates) == member['coordinatesSha256'],
+        'Final shape can reuse only an actual retained materialization of these exact coordinates.')
+    bundle = admission.copy_bundle(dict(path=str(existing / 'generation-2/portable' / member['path']),
+        sha256=member['bundleSha256']), final)
+    put(final / 'center-materialization.json', dict(kind='coordinated-es-center-materialization-1',
+        protocolSha256=protocol['sha256'], centerSha256=center['sha256'], generation=16,
+        projectionSha256=proof['projection']['sha256'], originalBundleSha256=proof['originalBundle']['sha256'],
+        calibrationSha256=proof['calibration']['sha256'], bundleSha256=bundle['sha256'], finalCandidate=True))
+    common = dict(constructed=True, passed=True, complete=True, completedGenerations=16,
+        protocolSha256=protocol['sha256'])
+    numerical_audit = put(output / 'invented-numerical-audit.json', dict(common,
+        kind='coordinated-es-numerical-audit-1', artifactPins=wrapper_pins, eligibleFinalCenter=center))
+    native_audit = put(output / 'invented-native-audit.json', dict(common,
+        kind='coordinated-es-training-audit-1', rawControls=4096, mutants=131072, reproductions=32))
+    profile = dict(originalBundle=proof['originalBundle'], projection=proof['projection'])
+    before = dict(plan_owner.ORIGINAL_ACTORS)
+    with patch.dict(plan_owner.ORIGINAL_ACTORS, {head.value: row.sha256 for head, row in original_expectations.items()}):
+        published = admission.publish(protocol, profile, run, final, numerical_audit, native_audit, output / 'portable')
+    es.require(before == plan_owner.ORIGINAL_ACTORS, 'Publisher test expectations must restore immediately.')
+    constructed_plan(value, original_expectations)  # Recheck ordinary rejection before/after the temporary allowance.
+    record = dict(kind='coordinated-es-constructed-publication-shape-1', constructed=True, passed=True,
+        joinedProof=proof_subject, finalAdmission=published, originalCenter=center,
+        coordinateMatchedActualMaterialization=dict(population=plan_owner.subject(existing / 'generation-2/portable/population.json'),
+            memberPath=member['path'], coordinatesSha256=member['coordinatesSha256'], bundleSha256=bundle['sha256']),
+        numericalAudit=numerical_audit, nativeAudit=native_audit, generationReceiptPins=wrapper_pins,
+        realJoinedGenerations=1, additionalPureScalarUpdates=15, inventedLaterPopulations=True,
+        inventedUpstreamAudits=True, inventedHistoricalEvidence=True, syntheticFinalMaterializationMetadata=True,
+        actualPublisherInvoked=True, nativeFinalAdmissionCovered=False, originalPinsRestored=True,
+        numericalChildren=0, forwards=0, scientificGames=0, scientificUpdates=0)
+    put(output / 'publication-shape.json', record)
+    return record
 
 
 def execute(root, version, environment):
