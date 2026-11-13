@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import java.nio.file.Path
 
 /**
  * Cross-host behavior identity. Raw arena/bundle JSON may contain relocated paths, so those wrapper
@@ -9,6 +10,24 @@ import com.fasterxml.jackson.databind.node.ObjectNode
  * version and explicit role remains in this identity.
  */
 internal object TokenPairedEcology {
+    fun ordinaryHash(arenaSource: Path): String {
+        val node = PurchaseJson.read(arenaSource)
+        val hashes =
+            (listOf(node.required("candidate"), node.required("incumbent")) +
+                    PurchaseJson.array(node["opponents"], "opponents"))
+                .map { value ->
+                    PurchaseJson.hash(
+                        arenaSource.parent
+                            .resolve(PurchaseJson.text(value, "ordinary model"))
+                            .toRealPath()
+                    )
+                }
+        require(hashes.distinct().size == 1) {
+            "Every ordinary role requires identical raw M8 bytes."
+        }
+        return hashes.first()
+    }
+
     fun identity(arena: ArenaSpecification, ordinarySha256: String): Map<String, Any> =
         mapOf(
             "configuration" to arena.configurations.single().id,

@@ -42,6 +42,7 @@ data class ArenaSpecification(
     private val initializationSource: ModelInitializationSource? = null,
     val jointPolicy: ArenaJointPolicy? = null,
     val expansionActor: ArenaExpansionActor? = null,
+    val tokenActor: ArenaTokenActor? = null,
 ) {
     init {
         require(
@@ -67,6 +68,7 @@ data class ArenaSpecification(
         tokenOrder?.validate(configurations, opponents.size)
         expansionImitation?.validate(candidate, incumbent, opponents)
         expansionActor?.validate(this)
+        tokenActor?.validate(this)
     }
 
     fun identity(): String =
@@ -85,6 +87,7 @@ data class ArenaSpecification(
                     tokenOrder?.identity(),
                     expansionImitation?.identity(),
                     expansionActor?.identity(),
+                    tokenActor?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
@@ -137,7 +140,8 @@ data class ArenaSpecification(
                         }
                     }
             }
-        return expansionActor?.controllers(composed, controlledSeat, side) ?: composed
+        val expanded = expansionActor?.controllers(composed, controlledSeat, side) ?: composed
+        return tokenActor?.controllers(expanded, controlledSeat, side) ?: expanded
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
@@ -147,6 +151,7 @@ data class ArenaSpecification(
             tokenOrder?.metadata().orEmpty() +
             expansionImitation?.metadata().orEmpty() +
             expansionActor?.metadata().orEmpty() +
+            tokenActor?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -189,6 +194,7 @@ data class ArenaSpecification(
         tokenOrder?.snapshot(artifacts)
         expansionImitation?.snapshot(artifacts)
         expansionActor?.snapshot(artifacts)
+        tokenActor?.snapshot(artifacts)
     }
 
     companion object {
@@ -279,6 +285,7 @@ data class ArenaSpecification(
                     experimentalRulesTransfer = transfer,
                     expansionActor =
                         node["expansionActor"]?.let { ArenaExpansionActor.read(source, it) },
+                    tokenActor = node["tokenActor"]?.let { ArenaTokenActor.read(source, it) },
                     ordinaryModelSources = modelSources,
                     initializationSource =
                         transfer?.let {
@@ -334,6 +341,7 @@ data class ArenaPair(
     val incumbent: ArenaGame,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val tokenActor: Map<String, Any>? = null,
 )
 
 object StrategyArena {
@@ -450,6 +458,7 @@ object StrategyArena {
             incumbent,
             specification.jointPolicy?.binding(),
             specification.expansionActor?.binding(),
+            specification.tokenActor?.binding(),
         )
     }
 
