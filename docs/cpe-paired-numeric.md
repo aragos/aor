@@ -104,3 +104,26 @@ The campaign separately owns resource feasibility, the 76,070-terminal/18-hour/4
 source/package admission, global clocks, exact full-bank final screen and later qualification.
 Only final iteration 2 can be eligible. The balanced reservoir curriculum is not deployment
 visitation and does not prove that unilateral action improvements solve all complementarity.
+# Numeric interface
+
+`cpe_paired_policy.Bundle` binds exact portable descriptor bytes plus three explicitly supplied
+immutable actors. Published paths are `heads/CARD/policy.json`, `heads/PURCHASE/policy.json`,
+and `heads/EXPANSION/policy.json`. Raw native dictionaries and their canonical complete semantic
+hashes remain separate. `Context` includes the common `bundle_scope_sha256`, head-specific scope,
+ecology, whole original/current bundle subjects, corpus receipt and request-bank subjects.
+
+`fit_bundle(trainings, original, current, dictionaries, output, configs, previous=...)` requires
+exact `Head` maps. It admits all three cohorts before the first update. Each child retains its
+policy, five-slot Adam checkpoint, identity, complete epoch history and completion receipt under
+`heads/HEAD/`. Only three successful children permit `bundle.json` and root `finished.json`.
+A stopped or failed transaction preserves diagnostics but has no consumable next bundle.
+
+`seal_validation(..., load_public)` invokes `load_public(Head)` for the128 original public VAL
+positions and publishes one all-head probability seal. CPE reservoir roots are only READY or
+MISSING; singleton backbone states remain valid zero-KL anchors. The immutable root delta
+reference is `referenceIndex == sampledIndex`, separate from the observation's original prior.
+
+`validate_seal_pair({1: subject, 2: subject})` is the intrinsic all-head/all-iteration barrier.
+`evaluate_validation(subjects, output, load_labels)` runs that barrier before its first
+`load_labels(iteration, Head, exact_seal_subject)` callback. It computes the declared paired
+world estimates and equal-phase mean/variance, without any model call or checkpoint selection.
