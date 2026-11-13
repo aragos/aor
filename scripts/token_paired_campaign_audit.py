@@ -707,6 +707,12 @@ def verify(protocol_subject, run):
     p.require(finite(terminal['updatedEpoch']) and terminal['updatedEpoch'] >= original.start,
         'The terminal cannot precede the original attempt.')
     pins.deadline = original.audit_deadline(terminal['updatedEpoch']); pins.check_clock()
+    owner = pins.read(run/'worker-owner.json')
+    p.require(set(owner) == {'kind','pid','processGroup'} and
+        owner['kind'] == 'token-paired-worker-owner-1' and
+        type(owner['pid']) is int and owner['pid'] > 1 and
+        type(owner['processGroup']) is int and owner['processGroup'] > 1,
+        'Terminal provenance requires the original typed worker PID and process group.')
     execution = dict(newGames=0,modelForwards=0,optimizerSteps=0)
     if terminal['status'] == 'failed':
         pins.unchanged()

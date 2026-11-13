@@ -153,6 +153,7 @@ def lifecycle(root,plan,host,status='stopped',reason='public-exposure-gate'):
     subject=write(root.parent/'protocol.json',plan.record)
     clock=dict(kind='token-paired-clock-1',protocolSha256=subject['sha256'],startedEpoch=1000.,deadlineEpoch=22600.)
     write(root/'clock.json',clock)
+    write(root/'worker-owner.json',dict(kind='token-paired-worker-owner-1',pid=101,processGroup=100))
     terminal=dict(kind='token-paired-terminal-1',host=host,status=status,reason=reason,
         completedIterations=0,updatedEpoch=1002.,clock=clock)
     write(root/'terminal.json',terminal)
@@ -361,6 +362,8 @@ class TerminalTests(unittest.TestCase):
             self.assertTrue(result['passed']);self.assertFalse(result['complete'])
             self.assertEqual(result['counts']['terminalExecutions'],644)
             self.assertEqual(result['counts']['pairedTails'],0);self.assertIsNone(result['nominee'])
+            owner=p.subject(root/'worker-owner.json')
+            self.assertEqual(result['artifactPins'][owner['path']],owner['sha256'])
 
     def test_mac_stop_preserves_own_archives_and_remote_acceptance_without_opening_remote_paths(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -379,6 +382,8 @@ class TerminalTests(unittest.TestCase):
             with patch.object(a.time,'time',return_value=1003.):result=a.verify(protocol,root)
             self.assertTrue(result['passed']);self.assertEqual(result['counts']['terminalExecutions'],258)
             self.assertFalse(result['counts']['fullTrainingRecomputed'])
+            owner=p.subject(root/'worker-owner.json')
+            self.assertEqual(result['artifactPins'][owner['path']],owner['sha256'])
 
     def test_peer_failure_cannot_be_relabelled_as_operational_stop(self):
         with tempfile.TemporaryDirectory() as directory:
