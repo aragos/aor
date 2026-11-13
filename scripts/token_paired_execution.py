@@ -35,7 +35,7 @@ def specification(protocol_path, profile_path, clock_path):
             maximumRssBytes=limits['maximumRssBytes']),
         stages=[dict(id='token-paired', maximumSeconds=21600, absoluteDeadlineEpoch=clock.deadline,
             maximumAttempts=1, result='stage-result.json', command=[profile['python']['executable'],
-                '-B', str(Path(__file__).resolve()), 'stage', '--protocol', str(Path(protocol_path).resolve()),
+                '-E', '-s', '-B', str(Path(__file__).resolve()), 'stage', '--protocol', str(Path(protocol_path).resolve()),
                 '--profile', str(Path(profile_path).resolve()), '--clock', str(Path(clock_path).resolve()),
                 '--output', '{output}'])])
     return result

@@ -34,6 +34,7 @@ class ExecutionTests(unittest.TestCase):
                 self.assertEqual(spec['stages'][0]['maximumAttempts'],1)
                 self.assertEqual(spec['stages'][0]['absoluteDeadlineEpoch'],21700.)
                 self.assertNotIn('--resume',spec['stages'][0]['command'])
+                self.assertEqual(spec['stages'][0]['command'][:4],['/constructed/python','-E','-s','-B'])
 
     def test_host_resource_override_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -12,6 +12,13 @@ from test_token_paired_campaign_plan import fixture
 
 
 class CampaignTests(unittest.TestCase):
+    def test_numeric_child_uses_existing_clean_venv_flags(self):
+        root=Path('/constructed')
+        command=campaign.numeric_command({'python':{'executable':'/constructed/venv/python'}},
+            root/'protocol',root/'profile',root/'iteration',root/'corpus',root/'original-corpus',
+            root/'actor',None)
+        self.assertEqual(command[:4],['/constructed/venv/python','-E','-s','-B'])
+
     def test_missing_mac_chunk_never_becomes_recomputed_work(self):
         with tempfile.TemporaryDirectory() as directory:
             now=[21599.]

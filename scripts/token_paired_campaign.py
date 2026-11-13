@@ -98,7 +98,7 @@ def publish_next(root,stage,portable,protocol,actor_sha,scope_sha):
 
 
 def numeric_command(profile,protocol,profile_path,iteration_root,corpus,original_corpus,current,previous):
-    command=[profile['python']['executable'],'-B',str(Path(__file__).with_name('token_paired_numeric_stage.py')),
+    command=[profile['python']['executable'],'-E','-s','-B',str(Path(__file__).with_name('token_paired_numeric_stage.py')),
         'update','--protocol',str(protocol),'--profile',str(profile_path),'--corpus',str(corpus),
         '--original-corpus',str(original_corpus),'--current',str(current),
         '--output',str(iteration_root/'fit'),'--seal',str(iteration_root/'validation.json')]
@@ -135,7 +135,7 @@ def desktop(plan,profile,protocol_path,profile_path,clock,root):
         if iteration==1:publish_next(root,'iteration-2',portable,protocol_path,current['sha256'],corpus['scopeSha256'])
     final=admission.publish_final(portable)
     # No validation direction can skip/choose a screen: both diagnostics and the sole final stage are fixed.
-    command=[profile['python']['executable'],'-B',str(Path(__file__).with_name('token_paired_numeric_stage.py')),
+    command=[profile['python']['executable'],'-E','-s','-B',str(Path(__file__).with_name('token_paired_numeric_stage.py')),
         'effects','--protocol',str(protocol_path),'--profile',str(profile_path),'--output',str(root/'iterations')]
     execution.run_child(profile,command,root/'validation-effects.log')
     historical=screen.historical(plan,profile,root,final)
