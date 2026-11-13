@@ -9,6 +9,7 @@ import purchase_policy as b
 import token_paired_data as data
 import token_paired_fit as fit
 import token_paired_validation as validation
+from token_paired_identity import actor_parameters_sha256
 from test_token_paired_fit import model, frozen, context, root_record, label
 
 
@@ -20,6 +21,7 @@ def completed_fixture(directory, original, current, iteration, previous=None, ch
         output['actorWeights'][0] += .01
     identity = dict(recipe=fit.RECIPE, context=asdict(ctx),
         inputModelCanonicalSha256=b.digest(current.model),
+        inputActorParametersSha256=actor_parameters_sha256(current.model),
         frozenModelFieldsSha256=b.digest({key:value for key,value in current.model.items()
             if key not in b.PARAMETERS[:-2]}), publicCoverage=dict(trainingReady=256,validationReady=64),
         anchorSha256='b'*64, epochSeeds=list(range(1000+iteration*100,1020+iteration*100)),
