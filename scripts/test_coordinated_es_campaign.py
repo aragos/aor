@@ -1,6 +1,8 @@
 """Finite original-worker transitions with constructed artifacts and no native/numeric execution."""
 from contextlib import ExitStack
+import copy
 from pathlib import Path
+import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -112,6 +114,73 @@ class SequenceTests(unittest.TestCase):
     def test_zero_live_movement_never_stops_the_fixed_sequence(self):
         result=self.execute();self.assertEqual(result['status'],'completed')
         self.assertEqual(sum(event[0]=='numeric' and event[2]=='diagnose' for event in self.events),16)
+
+
+class PreparationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.base=Path(self.tmp.name).resolve();self.plan=p.Plan.from_record(protocol())
+        self.root=self.base/'original/output'
+        request=s.publish_json(self.base/'original/request.json',dict(
+            projectionSeed=self.plan.record['projectionSeed'],
+            directionSeeds=[row['directionSeed'] for row in self.plan.record['generations']],
+            scopeSha256=self.plan.record['original']['scopeSha256'],
+            originalBundle=dict(sha256=self.plan.record['original']['bundleSha256'])))
+        projection=s.publish_json(self.root/'projection.json',dict(constructed='projection'))
+        center=s.publish_json(self.root/'initial-center.json',dict(constructed='center'))
+        directions=[]
+        for index in range(1,17):
+            directions.append(s.publish_json(self.root/f'directions/generation-{index:02d}.json',dict(generation=index)))
+            s.publish_json(self.root/f'directions/generation-{index:02d}-generation.json',dict(seed=101000+index))
+        s.publish_json(self.root/'started.json',dict(request=request))
+        finished=s.publish_json(self.root/'finished.json',dict(kind=p.PREFIX+'-numeric-complete-1',
+            complete=True,passed=True,verb='prepare',request=request,
+            artifacts={name:row['sha256'] for name,row in s.inventory(self.root).items()},
+            outputs=dict(projection='projection.json',center='initial-center.json')))
+        self.profile=dict(originalBundle=dict(sha256=self.plan.record['original']['bundleSha256']),
+            projection=projection,initialCenter=center,directions=directions,
+            numericalPreparation=dict(request=request,finished=finished))
+
+    def relocated(self):
+        source=self.base/'original';target=self.base/'other-host'
+        shutil.copytree(source,target)
+        def move(value):
+            if isinstance(value,list):return [move(item) for item in value]
+            if isinstance(value,dict):
+                if 'path' in value:
+                    return dict(value,path=str(target/Path(value['path']).relative_to(source)),originalPath=value['path'])
+                return {key:move(item) for key,item in value.items()}
+            return value
+        return move(self.profile)
+
+    def test_original_completed_preparation_passes_without_relocation(self):
+        c.check_preparation(self.plan,self.profile)
+
+    def test_exact_copied_preparation_passes_without_original_host_files(self):
+        profile=self.relocated();shutil.rmtree(self.base/'original')
+        c.check_preparation(self.plan,profile)
+
+    def test_relocated_request_requires_its_actual_original_path(self):
+        profile=self.relocated();profile['numericalPreparation']['request']['originalPath']='/wrong/request.json'
+        with self.assertRaisesRegex(ValueError,'reserved streams'):c.check_preparation(self.plan,profile)
+
+    def test_changed_request_bytes_cannot_use_original_completion(self):
+        profile=self.relocated();item=profile['numericalPreparation']['request'];path=Path(item['path'])
+        path.write_bytes(path.read_bytes()+b' ');item['sha256']=p.file_sha(path)
+        with self.assertRaisesRegex(ValueError,'reserved streams'):c.check_preparation(self.plan,profile)
+
+    def test_updated_profile_hash_cannot_replace_a_prepared_output(self):
+        profile=self.relocated();path=Path(profile['projection']['path']);path.write_bytes(b'{}')
+        profile['projection']['sha256']=p.file_sha(path)
+        with self.assertRaisesRegex(ValueError,'completed preparation output'):c.check_preparation(self.plan,profile)
+
+    def test_reordered_directions_are_rejected(self):
+        profile=copy.deepcopy(self.profile);profile['directions'][0:2]=reversed(profile['directions'][0:2])
+        with self.assertRaisesRegex(ValueError,'completed preparation output'):c.check_preparation(self.plan,profile)
+
+    def test_missing_preparation_generation_receipt_is_rejected(self):
+        (self.root/'directions/generation-16-generation.json').unlink()
+        with self.assertRaisesRegex(ValueError,'completed preparation output'):c.check_preparation(self.plan,self.profile)
 
 
 if __name__=='__main__':unittest.main()

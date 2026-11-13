@@ -35,20 +35,39 @@ def check_profile(protocol_path,profile_path):
         profile['projection']['sha256']==plan.record['original']['projectionSha256'] and
         len(profile['directions'])==16,'The one original scope and fixed projection/directions cannot change.')
     for item in profile['directions']:p.checked_subject(item)
-    preparation=profile['numericalPreparation'];request=p.read(p.checked_subject(preparation['request']))
-    finished=p.read(p.checked_subject(preparation['finished']))
-    p.require(finished['kind']==p.PREFIX+'-numeric-complete-1' and finished['verb']=='prepare' and
-        finished['complete'] is True and finished['passed'] is True and
-        finished['request']==preparation['request'] and request['projectionSeed']==plan.record['projectionSeed'] and
-        request['directionSeeds']==[row['directionSeed'] for row in plan.record['generations']] and
-        request['scopeSha256']==plan.record['original']['scopeSha256'] and
-        request['originalBundle']['sha256']==profile['originalBundle']['sha256'],
-        'The original zero-world preparation must use the exact prospectively reserved streams.')
+    check_preparation(plan,profile)
     roots=[Path(path).resolve() for path in profile['scientificInputDirectories']]
     p.require(roots and all(any(Path(item['path']).resolve().is_relative_to(root) for root in roots)
         for item in [profile['originalBundle'],profile['projection'],profile['initialCenter'],*profile['directions']]),
         'All immutable scientific model/projection inputs must count in shared base storage.')
     return plan,profile
+
+
+def check_preparation(plan,profile):
+    """Verify copied preparation bytes while retaining their original execution provenance."""
+    preparation=profile['numericalPreparation'];request_subject=preparation['request']
+    request=p.read(p.checked_subject(request_subject))
+    finished_path=p.checked_subject(preparation['finished']);finished=p.read(finished_path)
+    original_request=dict(path=request_subject.get('originalPath',request_subject['path']),
+        sha256=request_subject['sha256'])
+    p.require(finished['kind']==p.PREFIX+'-numeric-complete-1' and finished['verb']=='prepare' and
+        finished['complete'] is True and finished['passed'] is True and
+        finished['request']==original_request and request['projectionSeed']==plan.record['projectionSeed'] and
+        request['directionSeeds']==[row['directionSeed'] for row in plan.record['generations']] and
+        request['scopeSha256']==plan.record['original']['scopeSha256'] and
+        request['originalBundle']['sha256']==profile['originalBundle']['sha256'],
+        'The original zero-world preparation must use the exact prospectively reserved streams.')
+    outputs={'projection.json':profile['projection'],'initial-center.json':profile['initialCenter'],
+        **{f'directions/generation-{index:02d}.json':item for index,item in enumerate(profile['directions'],1)}}
+    expected=set(outputs)|{'started.json'}|{
+        f'directions/generation-{index:02d}-generation.json' for index in range(1,17)}
+    files=storage.inventory(finished_path.parent)
+    p.require(finished['outputs']==dict(projection='projection.json',center='initial-center.json') and
+        set(finished['artifacts'])==expected and set(files)==expected|{'finished.json'} and
+        all(files[name]['sha256']==digest for name,digest in finished['artifacts'].items()) and
+        all(p.checked_subject(item).resolve()==(finished_path.parent/name).resolve() and
+            item['sha256']==finished['artifacts'][name] for name,item in outputs.items()),
+        'Every executing projection, center and ordered direction must be an exact completed preparation output.')
 
 
 def native_run(profile,mode,source,output,log,extra=()):
