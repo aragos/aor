@@ -92,6 +92,42 @@ the reference wins a tie, then the lowest original offered index. Thus zero coor
 preserve raw reference behavior exactly. Actual live-mean E/T movement on the fixed panel
 is diagnostic only; it does not create an eligibility gate or alternate candidate.
 
+## Immutable numerical requests
+
+[`coordinated_es_numeric.py`](../scripts/coordinated_es_numeric.py) owns the exact
+request fields (`FIELDS`) and output receipts. Each invocation handles one explicit
+`prepare`, `materialize`, `calibrate`, `update`, `center` or `diagnose` request in a new
+directory. It checks the imported source owners, existing CPU1 numerical environment,
+raw input subjects and the caller's original absolute deadline. It never starts native
+work, chooses a successor, reads a live campaign directory or renews a clock.
+
+All subjects contain `path` and raw `sha256`. The original bundle retains its portable
+relative head paths and semantic complete dictionary hashes. Numerical artifacts,
+world banks and fitness use canonical JSON without LF; the final protocol subject hashes
+its complete original file, including LF. The factor map binds stable original scope,
+not the later protocol that contains that map. Centers and direction tables bind this
+same fixed map. No numerical object derives identity from a relocated host path.
+
+Preparation publishes the factor map, zero center and16 prospectively specified direction
+tables. Materialization publishes all32 members together; G1 also publishes the one
+prescribed mean probe. Before calibration it is explicitly a materialization, not an
+executable population. Calibration reads the strictly public256-world panel, computes
+unclipped residual gaps with the guarded CPU Float64 hidden owner, and seals both heads
+before publishing an executable population descriptor. It never opens terminal returns.
+The campaign assembles G1 by copying that exact descriptor beside the unchanged `members`
+tree; later materializations already contain their executable descriptor. The complete
+sealed calibration directory travels with the publication. Relative paths and hashes
+are never rewritten for another host.
+
+`finished.json` is written last and binds every input and output artifact. A declared
+operational stop retains `stopped.json` and returns a compact stopped status for the
+campaign to validate; deadline stops remain campaign failures. Other identity/schema
+failures retain diagnostics and propagate failure. A partial directory without a valid
+finished receipt cannot supply a next center, bundle or calibration. Live diagnostics
+use the original panel and sealed scale, retain zero movement, and publish no eligibility
+decision. The16th center is marked as the sole prospective final candidate; this marker
+does not replace the campaign's complete-cohort and final-screen admission.
+
 ## Verification
 
 Constructed tests cover exact-zero materialization/value freeze, all five actor blocks,
