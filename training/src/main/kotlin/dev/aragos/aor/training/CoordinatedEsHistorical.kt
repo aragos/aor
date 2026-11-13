@@ -1,6 +1,41 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.databind.JsonNode
 import java.nio.file.Path
+
+/** Global family60 identity and the index inside its unchanged recorded source chunk. */
+internal data class CoordinatedEsHistoricalPosition(val globalIndex: Int, val index: Int) {
+    companion object {
+        fun read(
+            control: JsonNode,
+            declaration: JsonNode,
+            raw: ArenaSpecification,
+            pair: StrategyReplayPair,
+        ): CoordinatedEsHistoricalPosition {
+            val position =
+                CoordinatedEsHistoricalPosition(
+                    PurchaseJson.integer(control["globalIndex"], "historical global index"),
+                    PurchaseJson.integer(control["index"], "historical source-local index"),
+                )
+            require(
+                control["globalIndex"] == declaration["index"] &&
+                    control["side"] == declaration["side"] &&
+                    position.globalIndex >= 0
+            ) {
+                "Historical global indices/sides must match the outcome-blind declarations."
+            }
+            require(
+                raw.configurations.size == 1 &&
+                    position.index == position.globalIndex % raw.pairsPerConfiguration
+            ) {
+                "The historical local index must preserve its original single-configuration chunk."
+            }
+            // The existing pair owner binds local range, seed, seat, roles and recorded rivals.
+            pair.opponentIndices(raw, position.index)
+            return position
+        }
+    }
+}
 
 /** Exactly the two declared historical games, evaluated through the new exact-zero role. */
 internal object CoordinatedEsHistorical {
@@ -43,18 +78,22 @@ internal object CoordinatedEsHistorical {
         artifacts.ensureFileSnapshot(source.path, source.sha256, "source.json")
         try {
             val records = controls.mapIndexed { ordinal, control ->
-                PurchaseJson.fields(control, setOf("source", "pair", "replay", "index", "side"))
-                val index = PurchaseJson.integer(control["index"], "historical index")
-                require(
-                    control["index"] == declarations[ordinal]["index"] &&
-                        control["side"] == declarations[ordinal]["side"]
-                ) {
-                    "Historical indices/sides must match the original outcome-blind declarations."
-                }
+                PurchaseJson.fields(
+                    control,
+                    setOf("source", "pair", "replay", "globalIndex", "index", "side"),
+                )
                 val originalSource = TokenPairedSubject.read(control["source"], source.path.parent)
                 val pair = TokenPairedSubject.read(control["pair"], source.path.parent)
                 val canonical = TokenPairedSubject.read(control["replay"], source.path.parent)
                 val raw = ArenaSpecification.read(originalSource.path)
+                val originalPair = StrategyReplayPair.read(pair.path)
+                val position =
+                    CoordinatedEsHistoricalPosition.read(
+                        control,
+                        declarations[ordinal],
+                        raw,
+                        originalPair,
+                    )
                 val side = StrategyReplaySide.CANDIDATE
                 ThreeRoleHistorical.validateReference(scope.arena, raw, side)
                 val zero =
@@ -63,10 +102,10 @@ internal object CoordinatedEsHistorical {
                     StrategyReplays.coordinatedHistorical(
                             raw,
                             zero,
-                            index,
+                            position.index,
                             side,
                             gameDeadline,
-                            StrategyReplayPair.read(pair.path),
+                            originalPair,
                         )
                         .also {
                             CoordinatedEsAttempts.terminal(it.game)
@@ -80,7 +119,8 @@ internal object CoordinatedEsHistorical {
                 val name = "historical-$ordinal.json"
                 artifacts.write(name, replay)
                 mapOf(
-                    "index" to index,
+                    "globalIndex" to position.globalIndex,
+                    "index" to position.index,
                     "side" to side.commandValue,
                     "originalSourceSha256" to originalSource.sha256,
                     "originalPairSha256" to pair.sha256,
