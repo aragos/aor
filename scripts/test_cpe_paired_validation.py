@@ -4,6 +4,8 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -128,6 +130,30 @@ class ValidationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'retains its original anchors'):
                 fit.fit_bundle(training,self.original,current,dictionaries,Path(temp)/'fit',configs,previous=self.fitdirs[1])
             child.assert_not_called()
+
+    def test_actual_complete_bundle_verifies_in_clean_process_without_numeric_imports(self):
+        code='''import sys
+import cpe_paired_completed as completed
+result=completed.verify(sys.argv[1])
+assert result['passed'] and result['modelForwards']==result['optimizerSteps']==0
+assert len(result['artifactPins'])==18
+assert not any(name=='torch' or name.startswith('torch.') or name=='numpy' or name.startswith('numpy.') for name in sys.modules)
+'''
+        result=subprocess.run([sys.executable,'-E','-s','-B','-c',code,str(self.fitdirs[2])],
+            cwd=Path(__file__).parent,capture_output=True,text=True,check=False)
+        self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_pure_auditor_recomputes_exact_sealed_paired_effects(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output=Path(temp)/'effects.json'
+            validation.evaluate_validation(self.seals,output,self.labels)
+            receipt=fit.completion_owner.verify_effects(self.seals,output,
+                lambda iteration,head,subject:self.labels(iteration,policy.Head(head),subject))
+            self.assertTrue(receipt['passed']);self.assertEqual(receipt['modelForwards'],0)
+            report=b.read_json(output);report['iterations']['2']['equalPhase']['mean']+=.01;b.atomic_json(output,report)
+            with self.assertRaisesRegex(ValueError,'VAL arithmetic changed'):
+                fit.completion_owner.verify_effects(self.seals,output,
+                    lambda iteration,head,subject:self.labels(iteration,policy.Head(head),subject))
 
 
 if __name__=='__main__':unittest.main()

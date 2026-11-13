@@ -2,25 +2,15 @@
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
-import time
-
-import card_policy
-import expansion_mc
 import purchase_policy as b
 import paired_policy_math as math_owner
 import token_paired_identity as actor_identity
-import token_paired_data as boundary_helpers
 import cpe_paired_data as data
 import cpe_paired_policy as policy
+import cpe_paired_completed as completion_owner
 
 
-RECIPE=dict(version='cpe-paired-expected-improvement-1',epochs=20,batchWorlds=64,
-    learningRate=.0003,gradientNorm=.5,originalKlCoefficient=.1,
-    maximumMeanOriginalKl=.02,maximumStateOriginalKl=.10,
-    gainWeighting='equal-ready-root-horvitz-thompson-sum',
-    anchorWeighting='equal-represented-world-equal-deduplicated-state',
-    klOrientation='current-to-original',optimizer='fresh-adam-per-head-per-iteration',
-    reference='actual-current-sampled-command',frozenParameters=['valueWeights','valueBias'])
+RECIPE=completion_owner.RECIPE
 
 
 @dataclass(frozen=True)
@@ -35,9 +25,10 @@ class Config:
         b.number(self.deadline,'Original absolute science deadline',1.)
 
 
-def source_hashes():
-    modules=(b,math_owner,actor_identity,boundary_helpers,data,policy,card_policy,expansion_mc)
-    return {Path(path).name:b.file_digest(path) for path in (__file__,*(module.__file__ for module in modules))}
+source_hashes=completion_owner.source_hashes
+validate_optimizer=completion_owner.validate_optimizer
+child_completed=completion_owner.child_completed
+completed=completion_owner.completed
 
 
 class Prepared(math_owner.Prepared):
@@ -56,77 +47,8 @@ def verify_original(prepared,original):
                     'Recorded original full probabilities must equal the exact original head actor.')
 
 
-def validate_optimizer(encoded, model, steps):
-    """Intrinsic five-slot metadata/shape check; it performs no update or optimizer restore."""
-    data.exact(encoded,('state','param_groups'),'Head Adam checkpoint')
-    groups=encoded['param_groups'];b.require(isinstance(groups,list) and len(groups)==1,
-        'Each head retains exactly one fresh actor-only Adam group.')
-    group=groups[0]
-    expected=dict(lr=.0003,betas=[.9,.999],eps=1e-8,weight_decay=0,amsgrad=False,maximize=False,
-        foreach=None,capturable=False,differentiable=False,fused=None,decoupled_weight_decay=False,params=list(range(5)))
-    b.require(group==expected,'Head Adam must retain the exact fixed fresh five-parameter recipe.')
-    state=encoded['state'];b.require(isinstance(state,dict) and set(state)==({str(i) for i in range(5)} if steps else set()),
-        'Only all five actor moment slots may exist after accepted steps; fresh zero-step state is empty.')
-    for index,name in enumerate(b.PARAMETERS[:-2]):
-        if not steps:break
-        slot=state[str(index)];data.exact(slot,('step','exp_avg','exp_avg_sq'),'Actor Adam slot')
-        step=slot['step'];data.exact(step,('tensor','dtype'),'Adam step')
-        b.require(step['dtype'] in ('torch.float32','torch.float64') and step['tensor']==steps,
-            'All actor Adam slots retain the exact accepted-epoch step count.')
-        width=(len(model['stateFeatureNames']) if name=='stateWeights' else
-            len(model['actionFeatureNames']) if name=='actionWeights' else None)
-        for key in ('exp_avg','exp_avg_sq'):
-            item=slot[key];data.exact(item,('tensor','dtype'),'Adam moment tensor')
-            values=item['tensor']
-            b.require(item['dtype']=='torch.float64' and isinstance(values,list) and len(values)==64 and
-                (all(isinstance(row,list) and len(row)==width for row in values) if width is not None else
-                 all(type(value) in (int,float) for value in values)),
-                'All five actor moments must preserve the exact Float64 parameter shapes.')
-            for value in (number for row in values for number in row) if width is not None else values:
-                b.number(value,'Finite actor moment',0. if key=='exp_avg_sq' else -float('inf'))
 
 
-def child_completed(directory):
-    directory=Path(directory);done=b.read_json(directory/'finished.json')
-    b.require(done['kind']=='cpe-paired-head-complete-1' and done['complete'] is True,
-        'Each head requires its explicit complete paired-fit receipt.')
-    b.require(set(done['artifacts'])=={'identity.json','policy.json','checkpoint.json','history.json'} and
-        all(b.file_digest(directory/name)==digest for name,digest in done['artifacts'].items()),
-        'Every child policy/Adam/history/identity subject must remain exact.')
-    identity=b.read_json(directory/'identity.json');context=data.Context.from_record(identity['context'])
-    b.require(identity==done['identity'] and identity['kind']=='cpe-paired-head-identity-1' and
-        identity['recipe']==RECIPE and identity['sourceSha256']==source_hashes(),
-        'CPE child identity, recipe and executing source closure must remain exact.')
-    model=policy.validate_model(b.read_json(directory/'policy.json'),context.head)
-    b.require(done['outputModelSha256']==b.file_digest(directory/'policy.json'),'Published head raw hash differs.')
-    history=b.read_json(directory/'history.json');checkpoint=b.read_json(directory/'checkpoint.json')
-    attempted=b.integer(done['attemptedEpochs'],'Attempted head epochs',1,20)
-    accepted=b.integer(done['acceptedEpochs'],'Accepted head epochs',0,attempted)
-    Config(tuple(identity['epochSeeds']),identity['originalDeadline'])
-    b.integer(identity['publicCoverage']['trainingReady'],'Admitted TRAIN roots',256,512)
-    b.integer(identity['publicCoverage']['validationReady'],'Admitted VAL roots',64,128)
-    b.require(len(history)==attempted+1 and [row['epoch'] for row in history]==list(range(attempted+1)) and
-        history[0]['accepted'] is True and all(row['accepted'] is True for row in history[1:accepted+1]) and
-        (accepted==attempted or (accepted==attempted-1 and history[-1]['accepted'] is False)) and
-        history[-1]['actorSha256']==b.digest(model),
-        'Child history must retain epoch0, all accepted epochs and at most one final rollback.')
-    b.require((accepted==attempted==20 and done['stopReason']=='epoch-limit') or
-        (accepted==attempted-1 and done['stopReason']=='original-kl-limit'),
-        'Each child ends at epoch20 or the first original-KL rejection.')
-    for row in history[1:]:
-        mean=b.number(row['anchor']['mean'],'Anchor mean KL');maximum=b.number(row['anchor']['maximum'],'Anchor maximum KL')
-        b.require(row['accepted']==(mean<=.02 and maximum<=.10),'Child KL admission must use the exact original limits.')
-        b.integer(row['attemptedAdamSteps'],'Attempted actor minibatches',1,8)
-    changed=actor_identity.actor_parameters_sha256(model)!=data.sha(identity['inputActorParametersSha256'],'Input head parameters')
-    steps=sum(row['attemptedAdamSteps'] for row in history[1:] if row['accepted'])
-    b.require(checkpoint['kind']=='cpe-paired-head-adam-1' and checkpoint['head']==context.head.value and
-        checkpoint['model']==model and checkpoint['acceptedEpochs']==accepted and
-        checkpoint['adamSteps']==done['adamSteps']==steps and done['actorChanged']==changed and
-        done['operationalPassed']==(accepted>0 and changed) and
-        b.digest({key:value for key,value in model.items() if key not in b.PARAMETERS[:-2]})==identity['frozenModelFieldsSha256'],
-        'Child policy, actor-only movement, preserved values and accepted Adam counters must agree.')
-    validate_optimizer(checkpoint['optimizer'],model,steps)
-    return done
 
 
 def _fit_head(training,original,current,output,config,predecessor):
@@ -139,7 +61,7 @@ def _fit_head(training,original,current,output,config,predecessor):
     optimizer=b.torch.optim.Adam([getattr(actor,name) for name in b.PARAMETERS[:-2]],lr=.0003)
     identity=dict(kind='cpe-paired-head-identity-1',recipe=RECIPE,context=asdict(training.context),
         inputActorParametersSha256=actor_identity.actor_parameters_sha256(current.model),
-        frozenModelFieldsSha256=b.digest({key:value for key,value in current.model.items() if key not in b.PARAMETERS[:-2]}),
+        frozenModelFieldsSha256=completion_owner.frozen_fields_sha256(current.model),
         trainingSha256=training.sha256,anchorSha256=training.anchor_sha256,predecessor=predecessor,
         publicCoverage=dict(trainingReady=training.ready_count,validationReady=training.validation_ready_count),
         epochSeeds=list(config.epochSeeds),originalDeadline=config.deadline,sourceSha256=source_hashes())
@@ -180,43 +102,6 @@ def load_completed_bundle(directory):
     return policy.Bundle(raw,b.file_digest(directory/'bundle.json'),tuple(actors))
 
 
-def completed(directory):
-    directory=Path(directory);done=b.read_json(directory/'finished.json');identity=b.read_json(directory/'identity.json')
-    b.require(done['kind']=='cpe-paired-bundle-complete-1' and done['complete'] is True and done['operationalPassed'] is True and
-        identity['kind']=='cpe-paired-bundle-identity-1' and identity==done['identity'] and identity['recipe']==RECIPE and
-        identity['sourceSha256']==source_hashes(), 'Only one complete successful three-head transaction is consumable.')
-    expected={'identity.json','bundle.json',*(f'heads/{head.value}/{name}' for head in policy.HEADS
-        for name in ('identity.json','policy.json','checkpoint.json','history.json','finished.json'))}
-    b.require(set(done['artifacts'])==expected and all(b.file_digest(directory/name)==digest for name,digest in done['artifacts'].items()),
-        'Atomic bundle completion must bind exactly all three full child transactions and descriptor.')
-    bundle=load_completed_bundle(directory)
-    b.require(done['outputBundleSha256']==bundle.sha256,'Atomic output bundle subject differs.')
-    b.require(all(set(identity[key])=={head.value for head in policy.HEADS} for key in
-        ('contexts','trainingSha256','epochSeeds','predecessors')),'Atomic identity requires all three explicit heads.')
-    seeds=[seed for values in identity['epochSeeds'].values() for seed in values]
-    b.require(len(seeds)==len(set(seeds))==60,'Atomic publication requires60 distinct head-specific epoch shuffles.')
-    b.require(identity['iteration'] in (1,2) and (identity['previousFinishedSha256'] is None)==(identity['iteration']==1),
-        'Atomic publication must retain its fixed iteration and predecessor presence.')
-    for head in policy.HEADS:
-        child=child_completed(directory/'heads'/head.value);context=child['identity']['context']
-        typed=data.Context.from_record(context)
-        b.require(child['operationalPassed'] is True and child['outputModelSha256']==bundle.actor(head).sha256 and
-            context==identity['contexts'][head.value] and child['identity']['trainingSha256']==identity['trainingSha256'][head.value] and
-            child['identity']['epochSeeds']==identity['epochSeeds'][head.value] and
-            child['identity']['predecessor']==identity['predecessors'][head.value],
-            'Every published head must belong to this exact same-bundle cohort and predecessor transaction.')
-        b.require(typed.head is head and typed.iteration==identity['iteration'] and
-            typed.bundle_scope_sha256==identity['bundleScopeSha256'] and typed.ecology_sha256==identity['ecologySha256'] and
-            typed.original_bundle_sha256==identity['originalBundleSha256'] and typed.current_bundle_sha256==identity['currentBundleSha256'] and
-            child['identity']['originalDeadline']==identity['originalDeadline'] and
-            (child['identity']['predecessor'] is None)==(typed.iteration==1),
-            'Every completed child must share its complete-bundle identity and original deadline.')
-        if typed.iteration==2:
-            predecessor=child['identity']['predecessor']
-            data.exact(predecessor,('bundleFinishedSha256','headFinishedSha256','modelSha256'),'Atomic child predecessor')
-            b.require(predecessor['bundleFinishedSha256']==identity['previousFinishedSha256'] and
-                predecessor['modelSha256']==typed.current_model_sha256,'A child cannot consume another bundle predecessor.')
-    return done
 
 
 def _admit(trainings,original,current,dictionaries,configs,previous):

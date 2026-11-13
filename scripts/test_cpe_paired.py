@@ -214,6 +214,13 @@ class MathTests(unittest.TestCase):
         self.assertAlmostEqual(result['mean'],.3)
         self.assertAlmostEqual(result['standardError']**2,(.2/64+.3/80+.4/128)/9)
 
+    def test_frozen_value_identity_ignores_only_numeric_zero_spelling(self):
+        first=self.original.actor(policy.Head.CARD).model;first['valueWeights']=[0]*64;first['valueBias']=-0.
+        second=copy.deepcopy(first);second['valueWeights']=[0.]*64;second['valueBias']=0
+        self.assertEqual(fit.completion_owner.frozen_fields_sha256(first),fit.completion_owner.frozen_fields_sha256(second))
+        second['valueBias']=.01
+        self.assertNotEqual(fit.completion_owner.frozen_fields_sha256(first),fit.completion_owner.frozen_fields_sha256(second))
+
 
 class TransactionTests(unittest.TestCase):
     @classmethod
