@@ -72,6 +72,11 @@ class PhaseTests(unittest.TestCase):
         value=audit.phase_metadata(**phase_fixture())
         self.assertEqual(4,value['actorAdamSteps']);self.assertTrue(value['actorChanged'])
 
+    def test_negative_float64_kl_roundoff_preserves_original_acceptance(self):
+        item=phase_fixture();item['checkpoint']['payload']['history'][0]['behaviorKl']=-1e-17
+        item['checkpoint']['sha256']=audit.digest(item['checkpoint']['payload'])
+        self.assertEqual(4,audit.phase_metadata(**item)['acceptedEpochs'])
+
     def test_initial_whole_epoch_rejection_keeps_fresh_empty_adam(self):
         value=audit.phase_metadata(**phase_fixture(accepted=0))
         self.assertEqual(0,value['actorAdamSteps']);self.assertFalse(value['actorChanged'])
