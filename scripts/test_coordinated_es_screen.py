@@ -56,6 +56,32 @@ class ScreenTests(unittest.TestCase):
             s.shared.validate_world(plan,value,0,'b'*64,kind=s.KIND,roles=s.ROLES)
 
 
+class HistoricalIndicesTests(unittest.TestCase):
+    def setUp(self):
+        self.plan=p.Plan.from_record(protocol());original=self.plan.record['original']
+        self.gate=dict(kind=p.PREFIX+'-historical-admission-1',complete=True,passed=True,
+            zeroFailures=True,protocolSha256='a'*64,scopeSha256=original['scopeSha256'],
+            ecologySha256=original['ecologySha256'],originalBundleSha256=original['bundleSha256'],
+            scientificTerminalExecutions=2,attemptedGames=2,completedGames=2,
+            controls=[dict(globalIndex=global_index,index=local_index,side='candidate',
+                canonicalVerified=True,execution='ZERO_REFERENCE') for global_index,local_index in ((0,0),(4095,511))])
+
+    def test_global4095_retains_original_chunk_local511(self):
+        s.verify_historical(self.gate,self.plan,'a'*64)
+
+    def test_global_identity_cannot_be_replaced_by_local_index(self):
+        self.gate['controls'][1]['globalIndex']=511
+        with self.assertRaisesRegex(ValueError,'historical sides'):s.verify_historical(self.gate,self.plan,'a'*64)
+
+    def test_global_index_cannot_be_used_as_native_execution_index(self):
+        self.gate['controls'][1]['index']=4095
+        with self.assertRaisesRegex(ValueError,'historical sides'):s.verify_historical(self.gate,self.plan,'a'*64)
+
+    def test_different_local_world_cannot_reuse_declared_global_identity(self):
+        self.gate['controls'][1]['index']=510
+        with self.assertRaisesRegex(ValueError,'historical sides'):s.verify_historical(self.gate,self.plan,'a'*64)
+
+
 class ShardIdentityTests(unittest.TestCase):
     def setUp(self):
         self.plan=p.Plan.from_record(protocol());self.worlds={index:world(self.plan,index) for index in range(128,256)}

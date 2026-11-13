@@ -90,7 +90,10 @@ host owning that world. Their complete canonical evidence and ordinary factory i
 are verified. Two predetermined historical zero-policy controls execute once globally
 on Desktop before fresh scientific games: family60 homogeneous-heldout candidate-side
 global indices0 and4095, preserving their complete original source, lineup and canonical
-subjects as in the existing79/80 controls. Their portable admission gates both hosts.
+subjects as in the existing79/80 controls. Historical subjects and receipts retain separate
+`globalIndex` and native `index`: global0 uses chunk00/local0, and global4095 uses
+chunk07/local511. The original512-world source and pair validate the native index before
+execution; neither source nor pair is rewritten. Their portable admission gates both hosts.
 
 Only the mean after all 16 complete updates is eligible. It is frozen before the untouched
 2,048-world paired FINAL/RAW_G3 screen. Sixteen fixed 128-world screen shards are divided

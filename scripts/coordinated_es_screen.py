@@ -16,6 +16,8 @@ from token_paired_campaign_audit import Pins,stream_archive
 
 KIND=p.PREFIX+'-screen-1'
 ROLES=('FINAL','RAW_G3')
+# Family60 used fixed512-world native chunks; global4095 is chunk07's local511.
+HISTORICAL_NATIVE_INDICES=(0,511)
 
 
 def verify_historical(gate,plan,protocol_sha):
@@ -26,8 +28,9 @@ def verify_historical(gate,plan,protocol_sha):
         gate['originalBundleSha256']==original['bundleSha256'] and
         gate['scientificTerminalExecutions']==gate['attemptedGames']==gate['completedGames']==2 and
         len(gate['controls'])==2,'Both exact original zero-role histories must pass before any fresh game.')
-    for expected,row in zip(plan.record['historicalControls'],gate['controls']):
-        p.require(row['index']==expected['index'] and row['side']==expected['side'] and
+    for expected,row,local_index in zip(plan.record['historicalControls'],gate['controls'],HISTORICAL_NATIVE_INDICES):
+        p.require(row['globalIndex']==expected['index'] and row['index']==local_index and
+            row['side']==expected['side'] and
             row['canonicalVerified'] is True and row['execution']=='ZERO_REFERENCE',
             'The two historical sides and exact-zero executable identity cannot change.')
 
@@ -37,8 +40,8 @@ def historical(plan,profile,protocol,root):
     p.require(profile['host']=='DESKTOP' and len(profile['historicalControls'])==2,
         'Desktop alone executes the two original historical controls once.')
     root=Path(root);source=root/'historical-source.json';output=root/'historical'
-    for expected,row in zip(plan.record['historicalControls'],profile['historicalControls']):
-        p.require(row['index']==expected['index'] and row['side']==expected['side'],
+    for expected,row,local_index in zip(plan.record['historicalControls'],profile['historicalControls'],HISTORICAL_NATIVE_INDICES):
+        p.require(row['globalIndex']==expected['index'] and row['index']==local_index and row['side']==expected['side'],
             'The host cannot substitute a historical control after preparation.')
     storage.publish_json(source,dict(kind=p.PREFIX+'-historical-source-1',protocol=p.subject(protocol),
         arena=profile['arena'],originalBundle=profile['originalBundle'],controls=profile['historicalControls']))
@@ -46,7 +49,8 @@ def historical(plan,profile,protocol,root):
     gate=p.read(output/'historical-admission.json');verify_historical(gate,plan,p.file_sha(protocol))
     p.require(gate['sourceSha256']==p.file_sha(source),'The historical admission must retain its exact raw source.')
     for expected,row in zip(profile['historicalControls'],gate['controls']):
-        p.require(all(row[field]==expected[key]['sha256'] for key,field in
+        p.require(all(row[key]==expected[key] for key in ('globalIndex','index','side')) and
+            all(row[field]==expected[key]['sha256'] for key,field in
             (('source','originalSourceSha256'),('pair','originalPairSha256'),('replay','originalReplaySha256'))) and
             p.file_sha(output/storage.safe(row['replayFile']))==row['replaySha256'],
             'Historical source, pair, canonical and actual replay bytes remain exact.')
@@ -61,6 +65,8 @@ def audit_historical(protocol,root,host,pins):
     if host=='DESKTOP':
         source=root/'historical-source.json';pins.pin(source,gate['sourceSha256']);request=pins.read(source)
         for original,row in zip(request['controls'],gate['controls']):
+            p.require(all(original[key]==row[key] for key in ('globalIndex','index','side')),
+                'Historical global identity and original chunk-local execution index remain distinct.')
             for key,field in (('source','originalSourceSha256'),('pair','originalPairSha256'),('replay','originalReplaySha256')):
                 p.require(original[key]['sha256']==row[field],'Original historical subject binding changed.')
                 pins.subject(original[key])
