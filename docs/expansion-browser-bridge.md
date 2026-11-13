@@ -70,6 +70,13 @@ response suppression and no extra credentials or authority fields. Production St
 checks must use live synthetic expansion offers, including legal submission and neighboring C/P/T
 and known-own-Chaos behavior. Existing QoL browser checks also apply to the refreshed base.
 
+`ExpansionBrowserParityTest` exports constructed native outputs as a declared JVM-test artifact.
+`expansionParity.test.mjs` and `expansionParity.browser.mjs` compare that artifact with the compiled
+production library in Node and isolated Chrome. These checks compare all probabilities, logits,
+value, log probability and exact selected index/command at the same native uniform. The common
+signed-seed tests and outer-selector tests separately cover the seed transformation. Browser parity
+serves only compiled inference modules from a temporary loopback test server; it installs no asset.
+
 During the two family-78 operational prefixes this task is read/edit only. After the explicit CPU
 release, serialize low-parallelism formatting/checks and focused JVM/JS/server tests, production JS
 and web builds, then the relevant browser suite. Source commits before that point are unverified

@@ -23,3 +23,8 @@ kotlin {
         }
     }
 }
+
+// This constructed JVM fixture is consumed by the production-JS and isolated browser checks.
+tasks.named<Test>("jvmTest") {
+    outputs.file(layout.buildDirectory.file("test-fixtures/expansion-browser-parity.json"))
+}
