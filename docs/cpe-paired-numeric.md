@@ -16,11 +16,13 @@ with their actual full offered probability distributions as fixed anchors. Origi
 is one prospective warm G3 Purchase-derived actor with its explicit scoped reference prior.
 Raw T, other selectors and G3 rivals remain fixed.
 
-The observation's `baselineIndex` remains the head's original residual-prior reference. The
+The observation's `baselineIndex` remains the head's original residual-prior reference:
+CARD ordinary M8 HARD, PURCHASE frozen F0 `PurchaseBaselineInput` HARD, EXPANSION qualified E.
+The
 counterfactual return reference `referenceIndex` is a separate recorded index and must never
-rewrite `baselineIndex`. The proposed outcome-blind reference is the actual current-bundle
-sampled action at the selected reservoir root; native/campaign must agree that rule before
-implementation. Reference plus up to eight uniform distinct nonreference actions use two
+rewrite `baselineIndex`. The fixed outcome-blind reference is the actual current-bundle
+sampled action at the selected reservoir root: `referenceIndex == sampledCommandIndex`.
+Reference plus up to eight uniform distinct nonreference actions use two
 paired future streams. The reference delta is zero; other deltas are action-minus-reference
 terminal returns, averaged over the two streams.
 
