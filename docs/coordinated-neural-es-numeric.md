@@ -15,8 +15,10 @@ implements simulation, policy selection from outcomes or a campaign loop.
 
 Head order is exactly CARD, PURCHASE, EXPANSION, TOKEN, with64 coordinates per head.
 C/P originals are the unchanged qualified nonzero G3 actors. The proposed E/T bases are
-the original untrained75 E and original untrained79 TOKEN2 initializer; parent/root must
-bind their exact subjects before preparation. No trained75/78/79 actor is a base.
+the original untrained75 E (`8268ba94536c5286ca7e7e9aedf148bffab2b8f5244e7a631594c5b4af8303fc`)
+and original untrained79 TOKEN2 initializer
+(`812a16f1b8d26911752db0720607d260f410b821922ba2f10f1e3254aa8c9ae6`).
+No trained75/78/79 actor is a base.
 Ordinary M8/F0/E/T references and their observation indices remain native-owned.
 
 The versioned projection binds all four original raw model hashes, complete semantic
@@ -37,7 +39,11 @@ These are prospective representation constants, not return-calibrated hyperparam
 Serialize and pin the complete factor map before scientific preparation. A prospective
 explicit NumPy PCG64 seed generates standard-normal factors in head order, then block
 order state-left/state-right/action-left/action-right/state-bias/action-bias/readout;
-normalization uses Float64. Actual seed allocation/use requires the later root review.
+normalization uses `row/sqrt(mean(row*row))` in Float64. A zero/nonfinite row or RMS
+stops; there is no redraw. The protocol supplies one `projectionSeed`, and one distinct
+`directionSeed` for each generation. Direction draws are raw standard-normal16-by256
+arrays, without RMS normalization; only projection factor rows are normalized.
+Actual seed allocation/use requires the later root review.
 Constructed tests may use literal toy factors and designated synthetic seeds.
 
 ## One normalized update
@@ -75,6 +81,10 @@ states; mutants receive equal probe weight. Integer weight units make the invers
 90th percentile boundary exact. Both mutant and mean populations require at least10%
 positive gap mass and q90>1e-8. Set `scale=(1+2^-20)/min(q_mut,q_mean)` once and require
 1/32<=scale<=32. With this same scale, both weighted movement rates must lie in[.05,.40].
+Retain each probe's compact `(D_reference, max_nonreference_D)` witness. Its finite
+subtraction must equal the recorded signed gap. Movement compares the actual Float64
+scores `scale*max_nonreference_D > 1+scale*D_reference`, with that parenthesization;
+the algebraically rearranged `scale*gap>1` can disagree near a tie or with common mode.
 Failure is an operational stop, never a scale search or panel replacement.
 
 E/T scores are `1[action==reference]+scale*(r_mut-r_original)`. Scores must be finite;
