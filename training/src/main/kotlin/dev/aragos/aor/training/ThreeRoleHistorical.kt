@@ -29,7 +29,8 @@ internal object ThreeRoleHistorical {
                 } ?: error("Historical control requires its exact candidate/incumbent side.")
             val arena = ArenaSpecification.read(arenaSource.path)
             require(
-                arena.cpeBundle == null &&
+                arena.coordinatedEs == null &&
+                    arena.cpeBundle == null &&
                     arena.tokenActor == null &&
                     arena.expansionActor == null &&
                     arena.jointPolicy != null

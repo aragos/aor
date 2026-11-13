@@ -44,6 +44,7 @@ data class ArenaSpecification(
     val expansionActor: ArenaExpansionActor? = null,
     val tokenActor: ArenaTokenActor? = null,
     val cpeBundle: ArenaCpeBundle? = null,
+    val coordinatedEs: ArenaCoordinatedPolicy? = null,
 ) {
     init {
         require(
@@ -71,6 +72,7 @@ data class ArenaSpecification(
         expansionActor?.validate(this)
         tokenActor?.validate(this)
         cpeBundle?.validate(this)
+        coordinatedEs?.validate(this)
     }
 
     fun identity(): String =
@@ -91,6 +93,7 @@ data class ArenaSpecification(
                     expansionActor?.identity(),
                     tokenActor?.identity(),
                     cpeBundle?.identity(),
+                    coordinatedEs?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
@@ -145,8 +148,9 @@ data class ArenaSpecification(
             }
         val expanded = expansionActor?.controllers(composed, controlledSeat, side) ?: composed
         val tokensApplied = tokenActor?.controllers(expanded, controlledSeat, side) ?: expanded
-        return cpeBundle?.controllers(tokensApplied, controlledSeat, side, ordinary)
-            ?: tokensApplied
+        val complete =
+            cpeBundle?.controllers(tokensApplied, controlledSeat, side, ordinary) ?: tokensApplied
+        return coordinatedEs?.controllers(complete, controlledSeat, side, ordinary) ?: complete
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
@@ -158,6 +162,7 @@ data class ArenaSpecification(
             expansionActor?.metadata().orEmpty() +
             tokenActor?.metadata().orEmpty() +
             cpeBundle?.metadata().orEmpty() +
+            coordinatedEs?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -202,6 +207,7 @@ data class ArenaSpecification(
         expansionActor?.snapshot(artifacts)
         tokenActor?.snapshot(artifacts)
         cpeBundle?.snapshot(artifacts)
+        coordinatedEs?.snapshot(artifacts)
     }
 
     companion object {
@@ -295,6 +301,10 @@ data class ArenaSpecification(
                     tokenActor = node["tokenActor"]?.let { ArenaTokenActor.read(source, it) },
                     cpeBundle =
                         node["cpeBundle"]?.let { ArenaCpeBundle.read(source, it, configurations) },
+                    coordinatedEs =
+                        node["coordinatedEs"]?.let {
+                            ArenaCoordinatedPolicy.read(source, it, configurations)
+                        },
                     ordinaryModelSources = modelSources,
                     initializationSource =
                         transfer?.let {
@@ -352,6 +362,7 @@ data class ArenaPair(
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val tokenActor: Map<String, Any>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val cpeBundle: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val coordinatedEs: Map<String, Any>? = null,
 )
 
 object StrategyArena {
@@ -470,6 +481,7 @@ object StrategyArena {
             specification.expansionActor?.binding(),
             specification.tokenActor?.binding(),
             specification.cpeBundle?.binding(),
+            specification.coordinatedEs?.binding(),
         )
     }
 
