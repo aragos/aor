@@ -21,7 +21,7 @@ internal data class CpePairedDictionary(
             "actionFeatureNames" to actionFeatureNames,
         )
 
-    fun sha256(): String = trainingSignature(PurchaseJson.mapper.writeValueAsString(wire()))
+    fun sha256(): String = CpePairedDigest.json(wire())
 
     companion object {
         fun forConfiguration(
@@ -64,6 +64,27 @@ private constructor(
     val dictionaries: Map<CpeHead, CpePairedDictionary>,
     val models: CpePolicyHeads,
 ) {
+    fun validateOriginal(arena: ArenaSpecification, baseline: PurchaseBaselineInput) {
+        val joint =
+            PurchaseJson.mapper
+                .valueToTree<JsonNode>(arena.overlayMetadata())
+                .required("jointPolicy")
+        require(baseline.sha256 == joint["baseline"]["sha256"]?.asText()) {
+            "The purchase controller must retain the arena's exact frozen F0 prior."
+        }
+        for (role in listOf("candidateBundle", "incumbentBundle", "sharedBundle")) {
+            require(
+                joint[role]["card"]["sha256"]?.asText() == subject(CpeHead.CARD).sha256 &&
+                    joint[role]["purchase"]["sha256"]?.asText() == subject(CpeHead.PURCHASE).sha256
+            ) {
+                "Every original C/P head must be the exact frozen qualified G3 component."
+            }
+        }
+        require(models.expansion.actorWeights.all { it == 0.0 }) {
+            "The original expansion actor must preserve its exact qualified-E prior."
+        }
+    }
+
     fun subject(head: CpeHead): TokenPairedSubject =
         requireNotNull(subjects[head]) { "A C/P/E bundle requires every component subject." }
 

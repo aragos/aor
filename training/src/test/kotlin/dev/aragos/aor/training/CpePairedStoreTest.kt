@@ -2,6 +2,12 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.ai.CardAction
+import dev.aragos.aor.ai.CardObservation
+import dev.aragos.aor.ai.CardPolicy
+import dev.aragos.aor.ai.PurchaseAction
+import dev.aragos.aor.ai.PurchaseObservation
+import dev.aragos.aor.ai.PurchasePolicy
 import dev.aragos.aor.ai.TerritoryAction
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
@@ -123,37 +129,71 @@ class CpePairedStoreTest {
         }
     }
 
-    private fun origin(input: CpePairedInput, index: Int, ready: Boolean): CpePairedOrigin {
+    internal fun origin(input: CpePairedInput, index: Int, ready: Boolean): CpePairedOrigin {
         val header = expansionPairedState().header
         val hash = CardAdvantageExecutor.hash(emptyList<String>())
         val backbone = TokenPairedCanonical(header, emptyList(), hash, 1, true)
         val observation =
-            CpePairedObservation.Expansion(
-                TerritoryObservation(
-                    TerritoryEncoder.EXPANSION_2.version,
-                    emptyMap(),
-                    listOf(
-                        TerritoryAction("expand-card", emptyMap()),
-                        TerritoryAction("pass", emptyMap()),
-                    ),
-                    0,
-                )
-            )
+            when (input.head) {
+                CpeHead.CARD ->
+                    CpePairedObservation.Card(
+                        CardObservation(
+                            stateFeatures = emptyMap(),
+                            actions =
+                                listOf(
+                                    CardAction("pass", emptyMap()),
+                                    CardAction("play held", emptyMap()),
+                                ),
+                            baselineIndex = 0,
+                        )
+                    )
+                CpeHead.PURCHASE ->
+                    CpePairedObservation.Purchase(
+                        PurchaseObservation(
+                            stateFeatures = emptyMap(),
+                            actions =
+                                listOf(
+                                    PurchaseAction("pass", emptyMap()),
+                                    PurchaseAction("shipping 1", emptyMap()),
+                                ),
+                            baselineIndex = 0,
+                        )
+                    )
+                CpeHead.EXPANSION ->
+                    CpePairedObservation.Expansion(
+                        TerritoryObservation(
+                            TerritoryEncoder.EXPANSION_2.version,
+                            emptyMap(),
+                            listOf(
+                                TerritoryAction("expand-card", emptyMap()),
+                                TerritoryAction("pass", emptyMap()),
+                            ),
+                            0,
+                        )
+                    )
+            }
         val botSeed =
             simulationPolicySeed(input.origins[index].gameSeed, 0, input.request(index).seat)
+        val actorSeed =
+            when (input.head) {
+                CpeHead.CARD -> CardPolicy.actorSeed(botSeed)
+                CpeHead.PURCHASE -> PurchasePolicy.actorSeed(botSeed)
+                CpeHead.EXPANSION -> TerritoryPolicy.actorSeed(TerritoryPhase.EXPANSION, botSeed)
+            }
+        val probabilities = observation.probabilities(input.current.models)
         val frame =
             CpePairedDecision(
-                CpeHead.EXPANSION,
+                input.head,
                 0,
                 0,
                 botSeed,
-                TerritoryPolicy.actorSeed(TerritoryPhase.EXPANSION, botSeed),
+                actorSeed,
                 observation,
                 0,
-                ln(.97),
+                ln(probabilities[0]),
                 .5,
-                listOf(.97, .03),
-                listOf(.97, .03),
+                probabilities,
+                observation.probabilities(input.original.models),
             )
         val public =
             if (ready) CpePairedPublicRoot.from(frame, input.origins[index].proposalSeed) else null
@@ -194,12 +234,12 @@ class CpePairedStoreTest {
                     listOf(
                         CpePairedAnchor(
                             1,
-                            CpeHead.EXPANSION,
+                            input.head,
                             index,
                             0,
                             0,
                             observation,
-                            listOf(.97, .03),
+                            probabilities,
                         )
                     )
                 else emptyList(),

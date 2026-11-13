@@ -43,6 +43,7 @@ data class ArenaSpecification(
     val jointPolicy: ArenaJointPolicy? = null,
     val expansionActor: ArenaExpansionActor? = null,
     val tokenActor: ArenaTokenActor? = null,
+    val cpeBundle: ArenaCpeBundle? = null,
 ) {
     init {
         require(
@@ -69,6 +70,7 @@ data class ArenaSpecification(
         expansionImitation?.validate(candidate, incumbent, opponents)
         expansionActor?.validate(this)
         tokenActor?.validate(this)
+        cpeBundle?.validate(this)
     }
 
     fun identity(): String =
@@ -88,6 +90,7 @@ data class ArenaSpecification(
                     expansionImitation?.identity(),
                     expansionActor?.identity(),
                     tokenActor?.identity(),
+                    cpeBundle?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
@@ -141,7 +144,9 @@ data class ArenaSpecification(
                     }
             }
         val expanded = expansionActor?.controllers(composed, controlledSeat, side) ?: composed
-        return tokenActor?.controllers(expanded, controlledSeat, side) ?: expanded
+        val tokensApplied = tokenActor?.controllers(expanded, controlledSeat, side) ?: expanded
+        return cpeBundle?.controllers(tokensApplied, controlledSeat, side, ordinary)
+            ?: tokensApplied
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
@@ -152,6 +157,7 @@ data class ArenaSpecification(
             expansionImitation?.metadata().orEmpty() +
             expansionActor?.metadata().orEmpty() +
             tokenActor?.metadata().orEmpty() +
+            cpeBundle?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -195,6 +201,7 @@ data class ArenaSpecification(
         expansionImitation?.snapshot(artifacts)
         expansionActor?.snapshot(artifacts)
         tokenActor?.snapshot(artifacts)
+        cpeBundle?.snapshot(artifacts)
     }
 
     companion object {
@@ -286,6 +293,8 @@ data class ArenaSpecification(
                     expansionActor =
                         node["expansionActor"]?.let { ArenaExpansionActor.read(source, it) },
                     tokenActor = node["tokenActor"]?.let { ArenaTokenActor.read(source, it) },
+                    cpeBundle =
+                        node["cpeBundle"]?.let { ArenaCpeBundle.read(source, it, configurations) },
                     ordinaryModelSources = modelSources,
                     initializationSource =
                         transfer?.let {
@@ -342,6 +351,7 @@ data class ArenaPair(
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val tokenActor: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val cpeBundle: Map<String, Any>? = null,
 )
 
 object StrategyArena {
@@ -459,6 +469,7 @@ object StrategyArena {
             specification.jointPolicy?.binding(),
             specification.expansionActor?.binding(),
             specification.tokenActor?.binding(),
+            specification.cpeBundle?.binding(),
         )
     }
 

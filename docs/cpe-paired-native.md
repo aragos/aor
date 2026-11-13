@@ -36,7 +36,10 @@ not a candidate. Iteration two consumes that exact atomic predecessor.
 The head-specific `scopeSha256` additionally binds the cohort head; its `scienceSha256` binds the
 iteration, complete current bundle and that head's full 640-row stream table. The parent campaign
 binds all three tables together. Raw descriptors, paths and shard signatures remain separate
-provenance, while dictionary semantic hashes use sorted-key complete dictionary JSON.
+provenance. Dictionary, request-table and head-scope semantic hashes are plain SHA-256 of
+sorted-key JSON; they never use the runtime-bound `trainingSignature`. The protocol is canonical
+Python JSON followed by one LF. Its raw subject includes that LF; its plan digest hashes the exact
+bytes before the LF, without any native numeric reserialization.
 
 ## Root curriculum and interventions
 
@@ -75,6 +78,15 @@ must not weaken old TOKEN, joint two-head or final64 admissions. Existing C/P/E 
 sampling math is reused unchanged. Constructed tests cover prior/reference separation,
 current-bundle routing, reservoir selection, complete offered support, privacy, seed/offset
 preservation, canonical evidence and native-to-production-JS probability/command parity.
+
+The final screen rehashes both atomic three-head publications and every child predecessor,
+component, cohort and complete validation probability seal before decoding actor models. It
+evaluates FINAL, RAW_G3 and INITIAL on one shared 1,024-world bank; only the evaluated seat receives
+the optional complete-bundle overlay after the unchanged G3/E/T composition. The historical,
+three-role execution, canonical replay and report mechanics are shared with family79. Omitting
+the new overlay preserves old arena identities and wire fields. The explicit JavaScript C/P/E
+evaluators use the same common forwards and per-head seed transforms; they add no worker routing,
+model asset or activation.
 
 The prospective campaign ceiling is 76,070 terminal executions: 3,840 complete backbones,
 up to 69,120 tails, 24 backbone reproductions, 3,072 final three-role screen worlds, 12 screen

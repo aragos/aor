@@ -110,6 +110,10 @@ dependencies {
     testImplementation(libs.truth)
 }
 
+tasks.withType<Test>().configureEach {
+    outputs.dir(layout.buildDirectory.dir("test-fixtures/cpe-wire"))
+}
+
 tasks.register<JavaExec>("benchmark") {
     group = "verification"
     description = "Measures fixed self-play games and optionally checks a prior report's outcomes."
