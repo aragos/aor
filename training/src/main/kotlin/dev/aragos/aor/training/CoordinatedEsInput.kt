@@ -194,9 +194,12 @@ internal object CoordinatedEsWire {
         val controls = PurchaseJson.array(node["controls"], "historical controls")
         require(
             controls.size == 2 &&
-                controls.map { it["index"]?.asInt() } == listOf(0, 4095) &&
+                controls.map { it["globalIndex"]?.asInt() } == listOf(0, 4095) &&
                 controls.all {
-                    it["side"]?.asText() == "candidate" &&
+                    it["index"]?.isIntegralNumber == true &&
+                        it["index"].canConvertToInt() &&
+                        it["index"].intValue() >= 0 &&
+                        it["side"]?.asText() == "candidate" &&
                         it["canonicalVerified"]?.booleanValue() == true
                 }
         ) {

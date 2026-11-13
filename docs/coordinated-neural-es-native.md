@@ -91,6 +91,9 @@ center/directions/population/calibration/previous-update/historical subjects. On
 G1 controls omit calibration; all controls omit population. Only G1 omits previous update.
 
 The historical source declares family60 homogeneous-heldout candidate indices0 and4095.
+Each control retains that `globalIndex` separately from its original source-local `index`
+(0 and511). The original single-configuration chunk size and recorded pair validate the local
+index, seed, seat and rivals before execution; both indices persist in the admission receipt.
 The new zero role replaces only that recorded evaluated seat; original rival roles and
 recorded lineups remain intact. The fresh scope separately requires homogeneous raw G3.
 
