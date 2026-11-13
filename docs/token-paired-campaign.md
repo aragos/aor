@@ -106,8 +106,11 @@ across chunks. Public/label exports remain separate and immutable.
 
 One Desktop coordinator owns the original21600-second science clock. A single bounded Mac shard
 worker executes only its declared iteration1 chunks, then waits for the exact sealedπ1 admission
-and immutable model before iteration2. Desktop executes its own chunks and is the sole numerical
-learner. Both hosts use the same model/component/dictionary/native/math bytes; host-local source
+and immutable model before iteration2. Mac uses the existing outbound SSH connection to upload
+completed immutable archives and poll Desktop's fixed stage manifests. No reverse SSH service,
+credential sharing, dynamic scheduling or scientific retries are introduced. Both workers stop on
+terminal status or the original deadline even if their peer disappears. Desktop executes its own
+chunks and is the sole numerical learner. Both hosts use the same model/component/dictionary/native/math bytes; host-local source
 paths and raw source signatures remain honest provenance. A shared scientific descriptor binds
 path-independent identity. No claim of cross-host numerical fitting equivalence is needed because
 all updates run on Desktop.
@@ -130,6 +133,13 @@ at most900 seconds of pure audit, tightened to `min(terminalTime+900, scienceDea
 Each native host uses6GiB heap /12GiB group RSS; the combined retained-data allowance is16GiB.
 Final preparation must freeze concrete per-host working/output/free-space guards and transfer
 accounting without expanding this science ceiling. No automatic successor is authorized.
+
+The final screen is also globally sharded: eight128-world chunks, Desktop0–4 and Mac5–7. Each
+world has all three roles on its single owning host. Global replay indices0,341,682,1023 are each
+reproduced for all three roles, only by the owning chunk. The two historical controls execute once
+on Desktop; no fresh screen opens on either host before their immutable passing admission. Mac
+downloads the exact final actor and this admission through its existing outbound connection.
+These are fixed slices of the same1024-world bank, not additional host-specific banks or controls.
 
 ## Source ownership and required proofs
 
