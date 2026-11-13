@@ -31,7 +31,7 @@ def require(condition, message):
 
 
 def canonical(value):
-    return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False,
+    return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=True,
         allow_nan=False).encode()
 
 
@@ -145,7 +145,7 @@ class Plan:
                 streams.append(integer(row['gameSeed'], -(2**31), 2**31-1, 'Native world seed'))
                 streams += [integer(value, -(2**63), 2**63-1, 'Proposal/future stream')
                     for value in [row['proposalSeed'], *row['future']]]
-            streams += [integer(value, 0, 2**31-1, 'Epoch shuffle stream') for value in bank['shuffleSeeds']]
+            streams += [integer(value, 1, 2**31-1, 'Epoch shuffle stream') for value in bank['shuffleSeeds']]
         screen=record['screenBank']
         require(set(screen)=={'nativeOffset','count','seeds'} and screen['count']==1024,
             'The sole final screen requires one exact native1024-world bank.')

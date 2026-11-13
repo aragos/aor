@@ -89,6 +89,8 @@ worlds and identical frozen rivals; retain each role once per world. Nomination 
 
 Onlyπ2 may be nominated. No earlier policy, raw control or alternate model is a fallback. This is
 development evidence; fresh99% qualification, runtime integration and activation are separate.
+Validation uses the numerical owner's two-sided normal95% interval with `NormalDist(.975)`;
+native screen intervals retain the existing1.96 multiplier. Both methods are reported explicitly.
 
 ## Fixed shards and finite ownership
 
@@ -98,9 +100,9 @@ Use ten64-origin chunks per iteration with one640-entry global stream table. Des
 host boundary. Source declares globalStart/count and may consume only its exact slice. No duplicate
 worlds, retry, top-up, adaptive redistribution or host-specific scientific recipe is permitted.
 
-Native source currently has no joint-role-compatible shard API: its old token collector also uses
-different request/proposal semantics. Add a typed owner over the existing frozen-root, sealed
-branch, simulation and complete arena-controller owners. Keep old readers and collectors strict.
+The new typed collector owns these request/proposal semantics over the existing frozen-root,
+sealed branch, simulation and complete arena-controller owners. Old readers and collectors remain
+strict and do not accept the new actor or paired corpus contracts.
 Each completed origin is written and verified as compressed evidence before its worker returns a
 small receipt. Archive and verify a complete chunk before the next; do not retain full world nodes
 across chunks. Public/label exports remain separate and immutable.
@@ -115,6 +117,14 @@ chunks and is the sole numerical learner. Both hosts use the same model/componen
 paths and raw source signatures remain honest provenance. A shared scientific descriptor binds
 path-independent identity. No claim of cross-host numerical fitting equivalence is needed because
 all updates run on Desktop.
+
+`token_paired_execution.py host` runs one stage under the existing `automata_campaign` resource
+and process-group owner. Both packages receive the same immutable original clock; launch Desktop
+first, then Mac, without renewing either deadline. The worker records its PID/process group before
+publishing an active clock. Read-only liveness checks reject a vanished or zombie worker even if
+its last clock file remains. Native and numerical children stay in that owned stage group. Final
+package dispatchers must bind this source, the shared clock and host profile, preserve startup
+failures, and prove controller/stage/watcher/caffeinate exit before terminal admission.
 
 Transfers contain only approved source, models and synthetic research evidence. Explicit member
 hashes, new-directory publication and exact actor/admission subjects precede every use. A network,

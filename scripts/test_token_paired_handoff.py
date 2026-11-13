@@ -1,7 +1,10 @@
 from pathlib import Path
+import os
 import subprocess
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 
 import token_paired_campaign_plan as p
 import token_paired_handoff as h
@@ -30,6 +33,15 @@ class HandoffTests(unittest.TestCase):
             now=lambda:21600.)
         with self.assertRaisesRegex(ValueError,'expired'):client.remote('probe','screen')
 
+    def test_unstarted_peer_is_waited_for_without_native_work(self):
+        now=[1.];responses=iter((b'{"status":"absent"}',
+            b'{"status":"active","protocolSha256":"expected","deadlineEpoch":21600}'))
+        client=h.Outbound(PROFILE,p.Clock(0.,21600.),'/unused',now=lambda:now[0],
+            sleep=lambda seconds:now.__setitem__(0,now[0]+seconds),
+            runner=lambda command,**kwargs:subprocess.CompletedProcess(command,0,next(responses),b''))
+        self.assertEqual(client.await_active('expected')['status'],'active')
+        self.assertEqual(now[0],11.)
+
     def test_absent_stage_wait_is_bounded_by_original_clock(self):
         now=[21595.];calls=[]
         def run(command,**kwargs):
@@ -41,7 +53,7 @@ class HandoffTests(unittest.TestCase):
 
     def test_peer_terminal_ends_worker_without_stage(self):
         client=h.Outbound(PROFILE,p.Clock(0.,21600.),'/unused',now=lambda:1.,
-            runner=lambda command,**kwargs:subprocess.CompletedProcess(command,0,b'{"status":"terminal"}',b''))
+            runner=lambda command,**kwargs:subprocess.CompletedProcess(command,0,b'{"status":"terminal","terminal":{"status":"failed"}}',b''))
         with self.assertRaisesRegex(ValueError,'Coordinator ended'):client.await_stage('screen')
 
     def test_only_explicit_research_endpoint_is_accepted(self):
@@ -57,8 +69,47 @@ class HandoffTests(unittest.TestCase):
 
     def test_reservation_is_once_only(self):
         with tempfile.TemporaryDirectory() as directory:
-            h.reserve(directory,'iteration-1-chunk-5')
-            with self.assertRaises(FileExistsError):h.reserve(directory,'iteration-1-chunk-5')
+            s.publish_json(Path(directory)/'worker-owner.json',dict(kind='token-paired-worker-owner-1',
+                pid=os.getpid(),processGroup=os.getpgrp()))
+            s.publish_json(Path(directory)/'clock.json',dict(kind='token-paired-clock-1',
+                protocolSha256='a'*64,deadlineEpoch=time.time()+21600))
+            with patch.object(h,'worker_alive',return_value=True):
+                h.reserve(directory,'iteration-1-chunk-5')
+                with self.assertRaises(FileExistsError):h.reserve(directory,'iteration-1-chunk-5')
+
+    def test_exited_worker_cannot_leave_an_active_clock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            s.publish_json(root/'clock.json',dict(kind='token-paired-clock-1',
+                protocolSha256='a'*64,deadlineEpoch=time.time()+21600))
+            s.publish_json(root/'worker-owner.json',dict(kind='token-paired-worker-owner-1',pid=10,processGroup=10))
+            with patch.object(h,'worker_alive',return_value=False):
+                self.assertEqual(h.health(root)['terminal']['reason'],'original-worker-exited')
+
+    def test_zombie_or_reused_worker_is_not_active(self):
+        owner=dict(kind='token-paired-worker-owner-1',pid=10,processGroup=10)
+        with patch.object(h.os,'getpgid',return_value=10),patch.object(h.subprocess,'run',
+             return_value=subprocess.CompletedProcess([],0,'Z\n','')):
+            self.assertFalse(h.worker_alive(owner))
+        with patch.object(h.os,'getpgid',return_value=11),patch.object(h.subprocess,'run') as ps:
+            self.assertFalse(h.worker_alive(owner));ps.assert_not_called()
+
+    def test_remote_member_verifier_is_bounded_by_original_clock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            s.publish_json(Path(directory)/'clock.json',dict(kind='token-paired-clock-1',
+                startedEpoch=0.,deadlineEpoch=21600.))
+            with patch.object(h.time,'time',return_value=21590.),patch.object(h.signal,'signal'), \
+                 patch.object(h.signal,'setitimer') as timer,patch.object(h,'accept',return_value={'ok':True}):
+                self.assertEqual(h.serve('accept',directory,'iteration-1-chunk-5'),{'ok':True})
+                self.assertEqual([call.args[1] for call in timer.call_args_list],[10.,0])
+
+    def test_expired_remote_clock_prevents_archive_admission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            s.publish_json(Path(directory)/'clock.json',dict(kind='token-paired-clock-1',
+                startedEpoch=0.,deadlineEpoch=21600.))
+            with patch.object(h.time,'time',return_value=21601.),patch.object(h,'accept') as accept:
+                with self.assertRaisesRegex(ValueError,'expired'):h.serve('accept',directory,'iteration-1-chunk-5')
+                accept.assert_not_called()
 
     def test_portable_publication_is_byte_exact_and_never_overwrites(self):
         with tempfile.TemporaryDirectory() as directory:

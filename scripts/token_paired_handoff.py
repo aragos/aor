@@ -5,8 +5,10 @@ are transferred; absence is polled, while a transport error or peer failure ends
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import shlex
+import signal
 import subprocess
 import tarfile
 import time
@@ -17,6 +19,17 @@ import purchase_storage as storage
 
 ADDRESS = 'aragos@192.168.86.44'
 STAGES = ('iteration-2', 'screen')
+
+
+class PeerStopped(Exception):
+    """The completed coordinator deliberately hit one of the frozen operational gates."""
+    def __init__(self, response):
+        value=response['terminal']
+        p.require(value['kind']=='token-paired-terminal-1' and value['host']=='DESKTOP' and
+            value['status']=='stopped' and value['reason'] in ('public-exposure-gate','no-accepted-actor-change')
+            and value['completedIterations'] in (0,1), 'Only the exact coordinator operational stop may propagate.')
+        self.response=response
+        super().__init__('Coordinator stopped at its fixed operational gate.')
 
 
 def tag(iteration, chunk, screen=False):
@@ -45,10 +58,50 @@ def terminal(root):
     return None
 
 
+def health(root):
+    ended=terminal(root)
+    if ended is not None:return dict(status='terminal',terminal=ended,terminalSubject=p.subject(Path(root)/'terminal.json'))
+    failure=Path(root)/'peer-failed.json'
+    if failure.exists():return dict(status='terminal',terminal=p.read(failure))
+    clock=Path(root)/'clock.json'
+    if not clock.exists():return dict(status='absent')
+    value=p.read(clock)
+    p.require(value['kind']=='token-paired-clock-1','The peer requires its original clock identity.')
+    owner=Path(root)/'worker-owner.json'
+    if not owner.exists() or not worker_alive(p.read(owner)):
+        return dict(status='terminal',terminal=dict(status='failed',reason='original-worker-exited'))
+    if time.time()>=value['deadlineEpoch']:
+        return dict(status='terminal',terminal=dict(status='failed',reason='original-deadline'))
+    return dict(status='active',protocolSha256=value['protocolSha256'],deadlineEpoch=value['deadlineEpoch'])
+
+
+def worker_alive(owner):
+    """Read only the recorded worker PID/PGID; a stale clock cannot keep a peer alive."""
+    p.require(owner['kind']=='token-paired-worker-owner-1' and
+        type(owner['pid']) is int and owner['pid']>1 and
+        type(owner['processGroup']) is int and owner['processGroup']>1,
+        'Worker ownership requires explicit positive original PID and process group.')
+    try:
+        if os.getpgid(owner['pid'])!=owner['processGroup']:return False
+    except ProcessLookupError:return False
+    result=subprocess.run(['/bin/ps','-p',str(owner['pid']),'-o','stat='],
+        capture_output=True,text=True,timeout=5,check=False)
+    return result.returncode==0 and bool(result.stdout.strip()) and not result.stdout.strip().startswith('Z')
+
+
+def notify_failure(root, name):
+    p.require(name=='MAC','Only the fixed outbound Mac worker can notify this peer slot.')
+    path=Path(root)/'peer-failed.json'
+    if path.exists():return p.read(path)
+    result=dict(kind='token-paired-peer-failure-1',host='MAC',status='failed',updatedEpoch=time.time())
+    s.publish_json(path,result)
+    return result
+
+
 def stage(root, name):
     p.require(name in STAGES, 'The Mac worker waits only for π1 or the final screen admission.')
-    ended=terminal(root)
-    if ended is not None:return dict(status='terminal',terminal=ended)
+    lifecycle=health(root)
+    if lifecycle['status']=='terminal':return lifecycle
     path=Path(root)/'publications'/name/'publication.json'
     if not path.exists():return dict(status='absent')
     value=p.read(path)
@@ -59,7 +112,7 @@ def stage(root, name):
 
 def reserve(root, name):
     allowed_tag(name)
-    p.require(terminal(root) is None, 'A completed or failed coordinator cannot accept new work.')
+    p.require(health(root)['status']=='active', 'A completed, expired or unstarted coordinator cannot accept new work.')
     directory=Path(root)/'incoming'/name
     directory.mkdir(parents=True,exist_ok=False)
     return dict(directory=str(directory.resolve()))
@@ -68,6 +121,7 @@ def reserve(root, name):
 def accept(root, name):
     """Receiver verifies original archive members before publishing a once-only completion marker."""
     allowed_tag(name);directory=Path(root)/'incoming'/name
+    p.require(health(root)['status']=='active','An ended coordinator cannot admit another transferred shard.')
     p.require({x.name for x in directory.iterdir()}=={'evidence.tar.gz','receipt.json'},
         'A fixed shard transfer must contain exactly its archive and immutable receipt.')
     record=p.read(directory/'receipt.json')
@@ -78,10 +132,29 @@ def accept(root, name):
     p.require(tag(None if screen else record['iteration'],record['chunk'],screen)==name and
         record['host']=='MAC', 'Remote receipt ownership does not match its fixed handoff slot.')
     s.verify_archive(directory/'evidence.tar.gz',record)
+    p.require(health(root)['status']=='active','The original worker must still be active after member verification.')
     result=dict(kind='token-paired-handoff-1',tag=name,receipt=p.subject(directory/'receipt.json'),
         archive=p.subject(directory/'evidence.tar.gz'))
     s.publish_json(directory/'accepted.json',result)
     return result
+
+
+def serve(mode,root,name):
+    """A remote helper cannot outlive its bounded SSH request or renew the scientific clock."""
+    seconds=60.
+    if mode in ('reserve','accept'):
+        clock=p.read(Path(root)/'clock.json')
+        p.require(clock['kind']=='token-paired-clock-1','A transfer requires the original clock.')
+        seconds=min(seconds,p.Clock(clock['startedEpoch'],clock['deadlineEpoch']).remaining(time.time()))
+    def expired(_number,_frame):raise TimeoutError('The bounded immutable handoff request expired.')
+    old=signal.signal(signal.SIGALRM,expired)
+    signal.setitimer(signal.ITIMER_REAL,seconds)
+    try:
+        return health(root) if mode=='health' else {
+            'probe':stage,'reserve':reserve,'accept':accept,'fail':notify_failure}[mode](root,name)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL,0)
+        signal.signal(signal.SIGALRM,old)
 
 
 def bundle(directory, name, files, identity):
@@ -153,13 +226,29 @@ class Outbound:
                 ADDRESS+':'+shlex.quote(target+'/'+destination)],timeout=600)
         return self.remote('accept',name)
 
+    def await_active(self,protocol_sha):
+        """A launched Desktop may still be hashing inputs; absence never starts a native game."""
+        while True:
+            result=self.remote('health','MAC')
+            if result['status']=='absent':
+                self.sleep(min(10,self.clock.remaining(self.now())))
+                continue
+            if result['status']=='terminal' and result['terminal'].get('status')=='stopped':
+                raise PeerStopped(result)
+            p.require(result['status']=='active' and result['protocolSha256']==protocol_sha and
+                result['deadlineEpoch']==self.clock.deadline,
+                'The original Desktop must be active on the same protocol and clock before Mac games.')
+            return result
+
     def await_stage(self, name):
         p.require(name in STAGES,'Only the fixed next actor/screen stages may be awaited.')
         while True:
             p.require(terminal(self.local) is None,'Local terminal state ends the Mac worker.')
             result=self.remote('probe',name)
             p.require(result['status'] in ('absent','ready','terminal'),'Unknown peer lifecycle status.')
-            if result['status']=='terminal':raise ValueError('Coordinator ended; no further Mac native stage is authorized.')
+            if result['status']=='terminal':
+                if result['terminal'].get('status')=='stopped':raise PeerStopped(result)
+                raise ValueError('Coordinator ended; no further Mac native stage is authorized.')
             if result['status']=='ready':return result
             self.sleep(min(10,self.clock.remaining(self.now())))
 
@@ -180,7 +269,8 @@ class Outbound:
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode',choices=('probe','reserve','accept'))
+    parser.add_argument('mode',choices=('probe','reserve','accept','health','fail'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--name',required=True)
     args=parser.parse_args()
-    print(json.dumps({'probe':stage,'reserve':reserve,'accept':accept}[args.mode](args.root,args.name)))
+    result=serve(args.mode,args.root,args.name)
+    print(json.dumps(result))
