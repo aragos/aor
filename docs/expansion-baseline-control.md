@@ -117,6 +117,12 @@ arm or checkpoint can be nominated. Qualification requires a separately reviewed
 this screen cannot activate anything. The test measures this previous-batch baseline recipe's
 effect on learning, not a claim that reduced prediction error proves playing strength.
 
+Combining results also requires identical fixed behavior and learning contracts across hosts:
+the complete C/P components and dictionaries, ordinary model, E/T/F0 roles, native JARs and
+numerical source owners. Original paths, source-bank wrappers and host resource identities remain
+separate provenance. Relocating a bundle cannot hide changed component bytes or turn a different
+ecology into a replication.
+
 Synthetic checks cover weighted ridge normalization/intercept, shared frozen hidden basis,
 action/future exclusion, previous-only target binding, first-batch exact equality, arm-local strict
 carry, whole-epoch rollback, paired finite gates, same-factory native composition, canonical roles,
