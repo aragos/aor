@@ -83,6 +83,7 @@ private constructor(
             CoordinatedEsWire.original(plan, scope, subject("projection"))
             CoordinatedEsWire.historical(subject("historical"), protocol, scope)
             val calibration = CoordinatedEsCalibration.read(subject("calibration"), scope.original)
+            calibration.version.validateProtocol(plan)
             require(
                 calibration.record["protocolSha256"]?.asText() == protocol.sha256 &&
                     calibration.record["projectionSha256"]?.asText() == subject("projection").sha256

@@ -418,6 +418,7 @@ internal constructor(
             val calibration =
                 subjects["calibration"]?.let { CoordinatedEsCalibration.read(it, scope.original) }
             calibration?.let {
+                it.version.validateProtocol(plan)
                 require(
                     it.record["protocolSha256"]?.asText() == protocol.sha256 &&
                         it.record["projectionSha256"]?.asText() == projection.sha256

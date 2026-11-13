@@ -20,7 +20,25 @@ internal object CoordinatedEsCalibrationReceipt {
             "maximumMovement" to .40,
         )
 
-    fun validate(node: JsonNode, name: String, original: CoordinatedEsBundle) {
+    val recipeV2: Map<String, Any> =
+        (recipe - setOf("kind", "marginExcess")) +
+            mapOf(
+                "kind" to CoordinatedEsCalibrationVersion.V2.recipeKind,
+                "minimumChangedNumerator" to 1,
+                "minimumChangedDenominator" to 20,
+                "maximumChangedNumerator" to 2,
+                "maximumChangedDenominator" to 5,
+                "intervalRule" to "OPEN_LOWER_CLOSED_UPPER_WEIGHTED_ATOMS",
+                "scaleSelection" to "SQRT_COMMON_INTERVAL_PRODUCT",
+                "requireStrictFloat64Interior" to true,
+            )
+
+    fun validate(
+        node: JsonNode,
+        name: String,
+        original: CoordinatedEsBundle,
+        version: CoordinatedEsCalibrationVersion,
+    ) {
         val head = node["heads"].required(name)
         PurchaseJson.fields(
             head,
@@ -40,13 +58,19 @@ internal object CoordinatedEsCalibrationReceipt {
                 "terminalLabelsRead",
                 "scaleAttempts",
                 "liveMovementIsGate",
-            ),
+            ) +
+                if (version == CoordinatedEsCalibrationVersion.V2) {
+                    setOf("intervals", "commonInterval")
+                } else emptySet(),
         )
         require(
-            head["kind"]?.asText() == "coordinated-es-signed-gap-calibration-1" &&
+            head["kind"]?.asText() == version.recipeKind &&
                 head["complete"]?.booleanValue() == true &&
                 head["head"]?.asText() == name &&
-                head["recipe"] == PurchaseJson.mapper.valueToTree<JsonNode>(recipe) &&
+                head["recipe"] ==
+                    PurchaseJson.mapper.valueToTree<JsonNode>(
+                        if (version == CoordinatedEsCalibrationVersion.V1) recipe else recipeV2
+                    ) &&
                 head["terminalLabelsRead"]?.isBoolean == true &&
                 !head["terminalLabelsRead"].booleanValue() &&
                 head["scaleAttempts"]?.asInt() == 1 &&
@@ -130,11 +154,28 @@ internal object CoordinatedEsCalibrationReceipt {
                 quantile
             }
         val scale = finite(head["scale"], "head scale")
+        val expectedScale =
+            when (version) {
+                CoordinatedEsCalibrationVersion.V1 -> (1.0 + 1.0 / 1048576) / quantiles.min()
+                CoordinatedEsCalibrationVersion.V2 -> {
+                    val intervals = head.required("intervals")
+                    PurchaseJson.fields(intervals, setOf("mutants", "prescribedMean"))
+                    CoordinatedEsCalibrationInterval.common(
+                            head.required("commonInterval"),
+                            listOf("mutants", "prescribedMean").map { role ->
+                                CoordinatedEsCalibrationInterval.read(
+                                    intervals.required(role),
+                                    head["distributions"].required(role),
+                                )
+                            },
+                        )
+                        .midpoint()
+                }
+            }
         require(
-            scale == finite(node["scales"][name], "executable scale") &&
-                scale == (1.0 + 1.0 / 1048576) / quantiles.min()
+            scale == finite(node["scales"][name], "executable scale") && scale == expectedScale
         ) {
-            "The executable head scale must equal its sole closed-form signed-gap calibration."
+            "The executable head scale must equal its sole versioned signed-gap calibration."
         }
     }
 

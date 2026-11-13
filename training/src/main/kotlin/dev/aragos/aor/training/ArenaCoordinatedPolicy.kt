@@ -16,6 +16,7 @@ private constructor(
     val source: TokenPairedSubject,
     val record: JsonNode,
     val selectors: Map<CoordinatedEsHead, IncumbentResidualSelector>,
+    val version: CoordinatedEsCalibrationVersion,
 ) {
     fun verify() = source.verify()
 
@@ -26,6 +27,7 @@ private constructor(
         ): CoordinatedEsCalibration {
             source.verify()
             val node = PurchaseJson.read(source.path)
+            val version = CoordinatedEsCalibrationVersion.read(node)
             PurchaseJson.fields(
                 node,
                 setOf(
@@ -46,8 +48,7 @@ private constructor(
                 ),
             )
             require(
-                node["kind"]?.asText() == "coordinated-es-calibration-1" &&
-                    node["passed"]?.booleanValue() == true &&
+                node["passed"]?.booleanValue() == true &&
                     node["complete"]?.booleanValue() == true &&
                     node["semanticFitnessDecoded"]?.isBoolean == true &&
                     !node["semanticFitnessDecoded"].booleanValue() &&
@@ -74,12 +75,12 @@ private constructor(
             PurchaseJson.fields(node.required("scales"), names)
             PurchaseJson.fields(node.required("heads"), names)
             val selectors = names.associate { name ->
-                CoordinatedEsCalibrationReceipt.validate(node, name, original)
+                CoordinatedEsCalibrationReceipt.validate(node, name, original, version)
                 val scale = node["scales"].required(name)
                 require(scale.isNumber) { "Calibration scales must be JSON numbers." }
                 CoordinatedEsHead.valueOf(name) to IncumbentResidualSelector(scale.doubleValue())
             }
-            return CoordinatedEsCalibration(source, node, selectors).also { it.verify() }
+            return CoordinatedEsCalibration(source, node, selectors, version).also { it.verify() }
         }
     }
 }
