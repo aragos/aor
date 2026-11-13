@@ -106,6 +106,12 @@ def final_bindings(plan,protocol_sha,final_subject,pins):
 
 def chunk_evidence(plan,chunk,files,manifest,finished,worlds,replays,canonicals,final_sha,historical_sha,identity_bindings):
     indices=list(p.indices(chunk,True));owned=p.screen_replays(chunk);expected=256+2*len(owned)
+    snapshots={'source':'study-source.json','arena':'arena-source.json','admission':'admission.json',
+        'historicalAdmission':'historical-admission.json'}
+    p.require({'manifest.json','started.json',*snapshots.values()}<=set(files) and
+        all(files[name]['sha256']==manifest[key]['sha256'] and manifest[key]['snapshot']==name
+            for key,name in snapshots.items()),
+        'Screen inventory must retain every native startup/manifest and exact source/admission snapshot.')
     p.require(manifest['kind']==finished['kind']==KIND and finished['complete'] is True and
         finished['stage']=='chunk' and finished['globalStart']==manifest['globalStart']==chunk*128 and
         finished['count']==manifest['count']==128 and finished['signature']==manifest['signature'] and
@@ -155,6 +161,8 @@ def collect(plan,profile,root,chunk,final,historical):
     for name in files:
         if name.startswith(('world-','replay-','canonical-')) or name in ('manifest.json','finished.json'):
             shared.parse_member(name,(output/name).read_bytes(),worlds,replays,canonicals,metadata)
+    p.require(metadata['manifest.json']['source']['sha256']==p.file_sha(source),
+        'The native screen manifest must bind its exact original execution request.')
     _,bindings=final_bindings(plan,profile['protocolSha256'],final,Pins(profile['_clock'].deadline))
     chunk_evidence(plan,chunk,files,metadata['manifest.json'],metadata['finished.json'],worlds,replays,canonicals,
         final['sha256'],historical['sha256'],bindings)

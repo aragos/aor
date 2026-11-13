@@ -125,4 +125,45 @@ class PanelBoundaryTests(unittest.TestCase):
                 semantic_read.assert_not_called()
 
 
+class ReproductionInventoryTests(unittest.TestCase):
+    def setUp(self):
+        value=protocol();dictionaries={head:{} for head in p.HEADS}
+        for head in p.HEADS:value['original']['heads'][head]['dictionarySha256']=p.digest({})
+        self.plan=p.Plan.from_record(value)
+        subjects={key:dict(path='/constructed/'+key,sha256='a'*64) for key in
+            ('protocol','arena','originalBundle','projection','center','directions','population','calibration','historical')}
+        subjects['previousUpdate']=None;subjects['originalBundle']['sha256']='1'*64;subjects['projection']['sha256']='4'*64
+        self.request=self.plan.generation_source(1,0,'POPULATION',subjects)
+        self.prepared=dict(kind=p.PREFIX+'-prepared-1',stage='POPULATION',generation=1,globalStart=0,count=32,
+            bank=self.plan.bank(1)['worldBank'],subjects={key:None if row is None else dict(row,originalPath=row['path'])
+                for key,row in subjects.items()},source={'sha256':'a'*64},scopeSha256='2'*64,ecologySha256='3'*64,
+            originalBundle={'sha256':'1'*64},arena={'sha256':'a'*64},dictionaries=dictionaries,
+            inputPins={row['path']:row['sha256'] for row in subjects.values() if row is not None},
+            signature='b'*64,scienceSha256='c'*64)
+        self.files={s.game_name(index,member):dict(sha256='a'*64,size=1) for index in range(32) for member in range(32)}
+        self.files.update({name:dict(sha256='a'*64,size=1) for name in ('source.json','arena.json','prepared.json')})
+        self.finished=dict(kind=p.PREFIX+'-complete-1',**{key:self.prepared[key] for key in
+            ('signature','scopeSha256','scienceSha256','stage','generation','globalStart','count')},
+            attemptedGames=1024,completedGames=1024,expectedGames=1024,canonicalGames=1,
+            files={name:row['sha256'] for name,row in self.files.items()})
+        directory='replay-PLUS-00-0';receipt=directory+'/'+directory+'.json';actual=directory+'/game-PLUS-00-0.json'
+        self.files.update({name:dict(sha256='a'*64,size=1) for name in ('finished.json',receipt,actual)})
+        game=dict(canonical=dict(replayVerified=True),terminal=dict(elapsedMillis=0))
+        self.values={'game-PLUS-00-0.json':game,actual:game,receipt:dict(kind=p.PREFIX+'-reproduction-1',
+            signature='b'*64,scienceSha256='c'*64,sourceSha256='a'*64,role='PLUS-00',globalIndex=0,
+            original={'sha256':'a'*64},actual={'file':'game-PLUS-00-0.json','sha256':'a'*64},
+            terminalEqual=True,canonicalEqual=True,replayVerified=True,scientificTerminalExecutions=1,
+            attemptedGames=1,completedGames=1)}
+
+    def check(self):
+        return s.generation_record(self.plan,self.request,'a'*64,self.prepared,self.finished,self.files,1,0,'population',self.values)
+
+    def test_actual_game_and_receipt_are_the_complete_reproduction(self):
+        self.assertEqual(self.check()['historicalReproductions'],1)
+
+    def test_extra_replay_output_cannot_hide_under_directory_prefix(self):
+        self.files['replay-PLUS-00-0/unexpected.json']=dict(sha256='a'*64,size=1)
+        with self.assertRaisesRegex(ValueError,'exactly its actual game'):self.check()
+
+
 if __name__=='__main__':unittest.main()

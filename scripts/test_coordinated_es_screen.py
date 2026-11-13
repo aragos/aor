@@ -65,8 +65,12 @@ class ShardIdentityTests(unittest.TestCase):
             originalBundleSha256='1'*64,**self.bindings)
         self.files={f'world-{index}.json.gz':dict(sha256='f'*64,size=1) for index in self.worlds}
         self.files['finished.json']=dict(sha256='f'*64,size=1)
+        self.files.update({name:dict(sha256='f'*64,size=1) for name in
+            ('manifest.json','started.json','study-source.json','arena-source.json','admission.json','historical-admission.json')})
         self.manifest=dict(kind=s.KIND,globalStart=128,count=128,signature='a'*64,scienceSha256='b'*64,
-            scienceIdentity=identity,admission={'sha256':'f'*64},historicalAdmission={'sha256':'f'*64},ownedReplayIndices=[])
+            scienceIdentity=identity,ownedReplayIndices=[],**{key:dict(sha256='f'*64,snapshot=name) for key,name in
+                (('source','study-source.json'),('arena','arena-source.json'),('admission','admission.json'),
+                 ('historicalAdmission','historical-admission.json'))})
         self.finished=dict(kind=s.KIND,complete=True,stage='chunk',globalStart=128,count=128,signature='a'*64,
             scienceSha256='b'*64,scienceIdentity=identity,finalAdmissionSha256='f'*64,historicalAdmissionSha256='f'*64,
             files={name:item['sha256'] for name,item in self.files.items() if name!='finished.json'},reproductions=0,
@@ -86,6 +90,14 @@ class ShardIdentityTests(unittest.TestCase):
     def test_attempted_game_failure_cannot_be_hidden_by_complete_counts(self):
         self.finished['attemptedGames']=257
         with self.assertRaisesRegex(ValueError,'original completed'):self.check()
+
+    def test_worlds_alone_cannot_replace_native_startup_and_subjects(self):
+        del self.files['started.json'];del self.finished['files']['started.json']
+        with self.assertRaisesRegex(ValueError,'startup/manifest'):self.check()
+
+    def test_snapshot_cannot_differ_from_declared_admission(self):
+        self.manifest['admission']['sha256']='0'*64
+        with self.assertRaisesRegex(ValueError,'snapshot'):self.check()
 
 
 class FinalIdentityTests(unittest.TestCase):

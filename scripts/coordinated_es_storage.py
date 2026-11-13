@@ -106,8 +106,11 @@ def generation_record(plan,request,source_sha,prepared,finished,files,number,chu
             original_game['canonical']['replayVerified'] is True and
             actual_game['canonical']['replayVerified'] is True and semantic(original_game)==semantic(actual_game),
             'Actual reproduction must preserve the complete original canonical and semantic game.')
+        actual_files={key for key in files if key.startswith(directory+'/')}
+        p.require(actual_files=={filename,actual_name},
+            'A prescribed reproduction retains exactly its actual game and equality receipt.')
         replay_receipts.append(dict(globalIndex=index,role=name,file=filename,sha256=files[filename]['sha256']))
-        replay_files|={key for key in files if key.startswith(directory+'/')}
+        replay_files|=actual_files
     p.require(set(files)==set(native_files)|{'finished.json'}|replay_files,
         'The completed shard inventory cannot omit generated evidence or unexpected files.')
     return dict(kind=p.PREFIX+'-chunk-receipt-1',phase=phase,generation=number,chunk=chunk,
