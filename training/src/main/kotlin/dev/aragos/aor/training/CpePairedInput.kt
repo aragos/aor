@@ -54,6 +54,9 @@ private constructor(
             "C/P/E collection requires two fixed iterations starting from the exact original bundle."
         }
         val joint = policyBindings.required("jointPolicy")
+        require(purchaseBaseline.sha256 == joint["baseline"]["sha256"]?.asText()) {
+            "The current purchase controller must retain the arena's exact frozen F0 prior."
+        }
         for (role in listOf("candidateBundle", "incumbentBundle", "sharedBundle")) {
             require(
                 joint[role]["card"]["sha256"]?.asText() == original.subject(CpeHead.CARD).sha256 &&
@@ -154,7 +157,7 @@ private constructor(
                 TokenPairedSubject.read(node.required("currentBundle"), actual.parent)
             val original = CpePairedBundle.read(originalSubject, dictionaries)
             val current =
-                if (currentSubject.sha256 == originalSubject.sha256) original
+                if (currentSubject == originalSubject) original
                 else CpePairedBundle.read(currentSubject, dictionaries)
             val baselinePath =
                 arenaSubject.path.parent
