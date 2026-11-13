@@ -13,7 +13,12 @@ all non-expansion decisions and rivals. The existing full-offer expansion collec
 policy remain the only behavior owners. No action masking, new reward, league change, actor basis
 change or original-E regularizer is introduced.
 
-Each arm collects eight batches of 256 complete worlds. Corresponding batches intentionally share
+There are two independently seeded replicas, PRIMARY_DESKTOP and MAC_REPLICATION. Both run the
+same algorithm and initialization; their training worlds, shuffle streams and development worlds
+are disjoint. The desktop is preselected as the only possible candidate source; the Mac is a
+replication diagnostic, never a runner-up. Host CPU/numerical environment identities are explicit.
+
+Within each replica, each arm collects eight batches of 256 complete worlds. Corresponding batches intentionally share
 the same world bank and four epoch shuffle streams. Arm execution order alternates by batch;
 neither arm reads the other arm's learned state. All worlds, including empty expansion histories,
 remain in evidence. One prescribed same-factory historical reproduction per arm and batch cycles
@@ -59,9 +64,10 @@ a family-75 checkpoint as treatment carry.
 
 ## Finite execution and evidence
 
-One original Mac attempt covers training, pure admission and the fixed final screen. The proposed
-ceiling is 3 hours plus 900 seconds of terminal-relative read-only audit, Mac 6 workers / 10 logical
-CPUs, numerical CPU 1, native heap 6 GiB, group RSS 12 GiB, data 8 GiB and free disk 16 GiB.
+One original attempt per replica covers training, pure admission and its fixed final screen.
+Each ceiling is 3 hours plus 900 seconds of terminal-relative read-only audit. PRIMARY_DESKTOP
+uses 10 workers / 16 logical CPUs; MAC_REPLICATION uses 6 workers / 10 logical CPUs. Both use
+numerical CPU 1, native heap 6 GiB, group RSS 12 GiB, data 8 GiB and free disk 16 GiB.
 Concrete cost/storage gates are frozen before any scientific work and may be refined only during
 preparation. There are no retries, top-ups, shortened candidates, intermediate strength looks,
 alternative baselines, fallback checkpoints or automatic successors.
@@ -75,11 +81,13 @@ the attempt. A stopped prefix is never eligible for the screen. Native workers r
 receipts; original trajectories and canonical histories are losslessly archived and member-verified
 before pruning. Keep only necessary actor records/prepared sparse inputs in the numerical process.
 
-The new learning audit admits only CONTROL8 and TREATMENT8 together. Its kind is
+Every protocol, arm receipt, objective/continuation lineage and native screen manifest carries
+the exact replica ID and protocol binding. The new learning audit admits only CONTROL8 and
+TREATMENT8 from the same replica together. Its kind is
 `expansion-baseline-learning-audit-1`, with `passed`, `complete`, `completedRounds=8`,
 `completedBatches={CONTROL:8,TREATMENT:8}`, `scientificWorlds=4096`,
 `historicalReproductions=16`, `firstBatchParityPassed`, `operationalPrefixPassed`,
-`eligibleFinalActors`, exact protocol/prepared hashes, every round/arm receipt hash, final per-arm
+`eligibleFinalActors`, `replica`, exact protocol/prepared hashes, every round/arm receipt hash, final per-arm
 policy/checkpoint/identity/receipt paths and hashes, and complete archived artifact pins.
 Final arm receipts use `expansion-baseline-batch-1`, explicit arm, batch 8 and complete status.
 The native screen checks these subjects before loading either final actor. It does not infer
@@ -87,18 +95,25 @@ completion from filenames or require the still-active overall controller to have
 
 ## Development screen and interpretation
 
-The screen uses one fresh 1,024-world bank and three roles: TREATMENT, CONTROL and RAW_G3. Each
+Each replica's screen uses its own fresh 1,024-world bank and three roles: TREATMENT, CONTROL and RAW_G3. Each
 role plays each world exactly once; corresponding contrasts share the same stored game. All
 non-expansion policies and rivals remain G3/M8/F0/E/T. Reuse the existing native arena, sampling
 and canonical replay owners through a new typed admission/input, preserving family-76's strict
 completed-64 admission. Twelve prescribed canonical role reproductions and two fixed historical
 raw-G3 compatibility controls precede/report alongside the fresh screen.
 
-Maximum terminal executions are 4,096 training + 16 historical training reproductions + 3,072
-development + 12 role reproductions + 2 historical controls = **7,198**. The primary result is
-TREATMENT minus CONTROL reward with a positive 95% lower bound. Nomination additionally requires
-TREATMENT minus RAW_G3 win and reward both to have positive 95% lower bounds. No other arm or
-checkpoint can be nominated. Qualification would require a separately reviewed fresh 99% study;
+Maximum terminal executions per replica are 4,096 training + 16 historical training reproductions
++ 3,072 development + 12 role reproductions + 2 historical controls = **7,198**, or **14,396**
+across both. Historical compatibility subjects are host-specific: frozen family-60 Linux controls
+on desktop and already admitted family-75 local raw-G3 references on Mac. Their proof scopes stay
+explicit; neither host creates additional reference games.
+
+Both replicas must finish and be audited before outcome interpretation. Each replica's primary
+mechanism gate is TREATMENT minus CONTROL reward with a positive 95% lower bound. Nomination is
+restricted to PRIMARY_DESKTOP TREATMENT8: both replica mechanism gates must pass, and desktop
+TREATMENT minus RAW_G3 win and reward must both have positive 95% lower bounds. This explicitly
+requires a positive replication effect; the Mac actor is never a replacement candidate. No other
+arm or checkpoint can be nominated. Qualification requires a separately reviewed fresh 99% study;
 this screen cannot activate anything. The test measures this previous-batch baseline recipe's
 effect on learning, not a claim that reduced prediction error proves playing strength.
 
