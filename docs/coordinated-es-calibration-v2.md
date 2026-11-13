@@ -13,7 +13,7 @@ This change replaces only the versioned public calibration rule and its admissio
 V1 protocol/receipts retain their exact interpretation; there is no fallback from V2
 to V1. The explicit protocol calibration kind selects the numerical and native receipt
 version. The outer V2 seal is `coordinated-es-calibration-2`; each head's recipe/receipt
-kind is `coordinated-es-signed-gap-calibration-2`. The gap-panel schema is unchanged.
+kind is `coordinated-es-feasible-gap-calibration-2`. The gap-panel schema is unchanged.
 
 ## Eligibility and strict movement intervals
 
