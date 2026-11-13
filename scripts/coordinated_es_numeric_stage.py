@@ -12,8 +12,10 @@ import coordinated_es_storage as storage
 import purchase_storage as atomic
 
 VERBS=('materialize','calibrate','update','center','diagnose')
-CALIBRATION_STOPS=('calibration-insufficient-worlds','calibration-positive-gap-mass',
+LEGACY_CALIBRATION_STOPS=('calibration-insufficient-worlds','calibration-positive-gap-mass',
     'calibration-small-signed-quantile','calibration-scale-bounds','calibration-movement-bounds')
+CALIBRATION_STOPS=LEGACY_CALIBRATION_STOPS+('calibration-empty-feasible-interval',
+    'calibration-no-interior-scale','calibration-nonfinite-movement')
 
 
 def same_subject(value,path):
@@ -72,15 +74,22 @@ def invoke(profile,verb,directory,fields):
 
 def verify_stop(root,request_path,verb):
     root=Path(root);row=p.read(root/'stopped.json');files=storage.inventory(root)
+    request_value=p.read(request_path)
+    allowed=LEGACY_CALIBRATION_STOPS
+    if verb=='calibrate':
+        configuration=p.read(p.checked_subject(request_value['protocol'])).get('calibration')
+        if configuration is not None and configuration.get('kind')!='coordinated-es-signed-gap-calibration-1':
+            import coordinated_es_calibration_v2 as v2
+            p.require(configuration==v2.PROTOCOL_RECIPE,'Operational stop receipt changed its fixed calibration version.')
+            allowed=v2.STOPS
     reason=row['reason']
-    admitted=(verb=='calibrate' and reason in CALIBRATION_STOPS) or (
+    admitted=(verb=='calibrate' and reason in allowed) or (
         verb=='update' and (reason=='zero-gradient' or reason.startswith('nonfinite-')))
     p.require(row['kind']==p.PREFIX+'-numeric-stop-1' and row['complete'] is False and
         row['passed'] is False and row['verb']==verb and same_subject(row['request'],request_path) and
         admitted and set(files)==set(row['artifacts'])|{'stopped.json'} and
         all(files[storage.safe(name)]['sha256']==digest for name,digest in row['artifacts'].items()),
         'Only a complete original calibration/arithmetic stop may end without another candidate.')
-    request_value=p.read(request_path)
     p.require(row['deadlineEpoch']==request_value['deadlineEpoch'] and
         row['stoppedEpoch']<=row['deadlineEpoch'] and row['inputPins'] and
         all(p.file_sha(path)==digest for path,digest in row['inputPins'].items()),

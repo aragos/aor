@@ -148,12 +148,27 @@ def protocol_sha(inputs,request):
     return request['protocol']['sha256']
 
 
+def calibration_owner(inputs,request):
+    """The explicit protocol selects V2; existing V1 request/owner requirements stay exact."""
+    configuration=inputs.json(request['protocol']).get('calibration')
+    if configuration is None or configuration.get('kind')==cal.VERSION:return cal
+    es.require(configuration.get('kind')=='coordinated-es-feasible-gap-calibration-2',
+        'An unknown calibration cannot select a legacy fallback.')
+    import coordinated_es_calibration_v2 as v2
+    es.require(configuration==v2.PROTOCOL_RECIPE,'The entire fixed V2 calibration recipe is required.')
+    path=str(Path(v2.__file__).absolute());digest=request.get('sourceOwners',{}).get(path)
+    es.require(digest is not None,'The actual selected V2 numerical owner must be pinned.')
+    inputs.raw(dict(path=path,sha256=digest))
+    return v2
+
+
 def checked_calibration(inputs,subject,request,value):
+    owner=calibration_owner(inputs,request)
     record=inputs.canonical(subject)
     es.exact(record,('kind','passed','complete','protocolSha256','originalBundleSha256','projectionSha256',
         'panelSha256','probePopulationSha256','directionsSha256','prescribedMeanSha256','scales','heads',
         'semanticFitnessDecoded','calibrationAttempts'),'Sealed E/T calibration')
-    es.require(record['kind']=='coordinated-es-calibration-1' and record['passed'] is True and
+    es.require(record['kind']==getattr(owner,'OUTER_VERSION','coordinated-es-calibration-1') and record['passed'] is True and
         record['complete'] is True and record['protocolSha256']==protocol_sha(inputs,request) and
         record['originalBundleSha256']==request['originalBundle']['sha256'] and
         record['projectionSha256']==value.sha256 and record['semanticFitnessDecoded'] is False and
@@ -164,7 +179,7 @@ def checked_calibration(inputs,subject,request,value):
     for head in ('EXPANSION','TOKEN'):
         receipt=record['heads'][head]
         panel=cal.GapPanel(inputs.raw(inputs.sibling(subject,f'gap-{head}.json',receipt['panelSha256'])))
-        es.require(panel.record['head']==head and cal.calibrate(panel)==receipt and
+        es.require(panel.record['head']==head and owner.calibrate(panel)==receipt and
             receipt['scale']==record['scales'][head] and
             all(receipt['subjects'][name]==record[name] for name in
                 ('protocolSha256','projectionSha256','directionsSha256','prescribedMeanSha256')) and
@@ -269,6 +284,7 @@ def differences(raw,reference):
 
 
 def calibrate(inputs,request,out,guard):
+    owner=calibration_owner(inputs,request)
     value=checked_projection(inputs,request);original=originals(inputs,request['originalBundle'])
     directions=checked_directions(inputs,request,value);probe=es.prescribed_mean_probe(directions)
     materialization=inputs.canonical(request['materialization'])
@@ -314,8 +330,8 @@ def calibrate(inputs,request,out,guard):
             projectionSha256=value.sha256,directionsSha256=es.digest(directions.record),
             prescribedMeanSha256=es.digest(probe),publicPanelSha256=request['publicPanel']['sha256'],worlds=worlds))
         out.raw(f'gap-{name}.json',panel.wire)
-        receipts[name]=cal.calibrate(panel);scales[name]=receipts[name]['scale']
-    record=dict(kind='coordinated-es-calibration-1',passed=True,complete=True,
+        receipts[name]=owner.calibrate(panel);scales[name]=receipts[name]['scale']
+    record=dict(kind=getattr(owner,'OUTER_VERSION','coordinated-es-calibration-1'),passed=True,complete=True,
         protocolSha256=protocol_sha(inputs,request),originalBundleSha256=request['originalBundle']['sha256'],
         projectionSha256=value.sha256,panelSha256=request['publicPanel']['sha256'],
         probePopulationSha256=request['materialization']['sha256'],directionsSha256=es.digest(directions.record),
@@ -348,6 +364,7 @@ def center(inputs,request,out,guard):
 
 
 def diagnose(inputs,request,out,guard):
+    owner=calibration_owner(inputs,request)
     value=checked_projection(inputs,request);current=checked_center(inputs,request,value)
     record,panels=checked_calibration(inputs,request['calibration'],request,value)
     es.require(record['panelSha256']==request['publicPanel']['sha256'],'Live movement uses only the original fixed panel.')
@@ -358,7 +375,7 @@ def diagnose(inputs,request,out,guard):
         raw=projection.raw_all(projection.RawPolicy(json.loads(actors[head]),head),prepared,guard)
         gaps=[dict(index=index,decisionNumber=state['number'],batchStartNumber=state['batchStartNumber'],
             witness=cal.witness(row,state['referenceIndex'])) for row,(index,state,_) in zip(differences(raw,reference),rows)]
-        heads[name]=cal.live_movement(panels[name],record['heads'][name],gaps)
+        heads[name]=owner.live_movement(panels[name],record['heads'][name],gaps)
     out.json('movement.json',dict(kind='coordinated-es-center-movement-1',generation=current.generation,
         protocolSha256=protocol_sha(inputs,request),centerSha256=es.digest(current.record),
         calibrationSha256=request['calibration']['sha256'],heads=heads,diagnosticOnly=True,eligibilityGate=False))

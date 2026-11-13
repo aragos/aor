@@ -30,6 +30,14 @@ def file_subject(pins,path):return dict(path=str(Path(path).absolute()),sha256=p
 def same(left,right):return left['sha256']==right['sha256']
 
 
+def calibration_owner(plan):
+    configuration=plan.record['calibration']
+    if configuration['kind']==cal.VERSION:return cal
+    import coordinated_es_calibration_v2 as v2
+    p.require(configuration==v2.PROTOCOL_RECIPE,'Pure audit requires the exact declared calibration version.')
+    return v2
+
+
 def numeric(pins,receipt_subject,verb,protocol,clock,*,stopped=False):
     """Verify the entire immutable transaction while treating actor files as opaque bytes."""
     receipt=subject(pins,receipt_subject,True);root=Path(receipt_subject['path']).parent
@@ -72,8 +80,9 @@ def numeric(pins,receipt_subject,verb,protocol,clock,*,stopped=False):
 
 
 def calibration(pins,value,protocol,plan):
+    owner=calibration_owner(plan)
     record=subject(pins,value,True);root=Path(value['path']).parent
-    p.require(record['kind']=='coordinated-es-calibration-1' and record['passed'] is True and
+    p.require(record['kind']==getattr(owner,'OUTER_VERSION','coordinated-es-calibration-1') and record['passed'] is True and
         record['complete'] is True and record['protocolSha256']==protocol['sha256'] and
         record['originalBundleSha256']==plan.record['original']['bundleSha256'] and
         record['projectionSha256']==plan.record['original']['projectionSha256'] and
@@ -83,7 +92,7 @@ def calibration(pins,value,protocol,plan):
     for head in ('EXPANSION','TOKEN'):
         receipt=record['heads'][head];path=root/f'gap-{head}.json'
         pins.pin(path,receipt['panelSha256']);panel=cal.GapPanel(path.read_bytes())
-        p.require(cal.calibrate(panel)==receipt and receipt['head']==head and
+        p.require(owner.calibrate(panel)==receipt and receipt['head']==head and
             receipt['scale']==record['scales'][head] and receipt['subjects']==dict(
                 protocolSha256=protocol['sha256'],originalModelSha256=plan.record['original']['heads'][head]['actorSha256'],
                 projectionSha256=record['projectionSha256'],directionsSha256=record['directionsSha256'],
@@ -217,7 +226,8 @@ def stopped(pins,terminal,root,protocol,plan,clock,previous):
     p.require(not (Path(record_subject['path']).parent/'center.json').exists(),
         'A stopped numerical operation cannot leave a consumable next center.')
     if verb=='calibrate':
-        p.require(number==1 and receipt['reason'] in CALIBRATION_STOPS,
+        owner=calibration_owner(plan)
+        p.require(number==1 and receipt['reason'] in getattr(owner,'STOPS',CALIBRATION_STOPS),
             'Only the original single calibration may stop before all fitness.')
         p.require(not (root/'generations/generation-1/fitness.json').exists() and
             not (root/'generations/generation-1/portable/population.json').exists(),
@@ -244,7 +254,7 @@ def stopped(pins,terminal,root,protocol,plan,clock,previous):
                 path=Path(record_subject['path']).parent/f'gap-{head}.json'
                 if not path.exists():continue
                 pins.pin(path);gap=cal.GapPanel(path.read_bytes())
-                try:cal.calibrate(gap)
+                try:owner.calibrate(gap)
                 except es.OperationalStop as failure:failures.append(failure.reason)
             p.require(failures==[receipt['reason']],'The retained scalar gap evidence must reproduce the declared stop.')
     else:
