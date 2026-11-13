@@ -69,6 +69,15 @@ class PlanTests(unittest.TestCase):
         self.protocol['fixedHeads']['card']=self.protocol['fixedHeads']['purchase']
         with self.assertRaisesRegex(ValueError,'same exact'):loop.LoopPlan.read(self.protocol)
 
+    def test_original_relative_bundle_components_resolve_without_rewriting_raw_subject(self):
+        path=Path(self.protocol['fixedBundle']['path']);value=loop.read(path)
+        for p in ('card','purchase'):value[p]['path']=p+'.json'
+        loop.document(path,value,immutable=False)
+        self.protocol['fixedBundle']=loop.subject(path);self.protocol['files'][str(path)]=loop.sha(path)
+        original=path.read_bytes()
+        loop.LoopPlan.read(self.protocol)
+        self.assertEqual(original,path.read_bytes())
+
     def test_prefix_admits_only_balanced_exposure_and_actual_progress(self):
         self.assertTrue(self.plan.prefix_passed(self.receipts,20000,[21]*4))
         self.receipts[0]['phases']['card']['branchingWorlds']=31

@@ -66,7 +66,9 @@ class LoopPlan:
             and protocol['files'].get(s['path']) == s['sha256'] == sha(s['path']) for s in subjects),
             'Every original model, bundle and template subject must be an explicit exact frozen pin.')
         bundle = read(protocol['fixedBundle']['path']);template = read(protocol['jointSourceTemplate']['path'])
-        require(all(bundle[p] == protocol['fixedHeads'][p] for p in ('card','purchase'))
+        bundle_parent = Path(protocol['fixedBundle']['path']).parent
+        require(all(dict(path=str((bundle_parent/bundle[p]['path']).resolve()),sha256=bundle[p]['sha256'])
+                == protocol['fixedHeads'][p] for p in ('card','purchase'))
             and template['bundle'] == protocol['fixedBundle']['path']
             and template['opponents'] == [protocol['fixedBundle']['path']],
             'Both arms must start from and face the same exact raw G3 C/P subjects.')
