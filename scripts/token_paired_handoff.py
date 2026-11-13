@@ -112,7 +112,7 @@ def notify_failure(root, name, *, contract=None):
 
 def stage(root, name, *, contract=None):
     contract=contract_or_default(contract)
-    p.require(name in STAGES, 'The Mac worker waits only for π1 or the final screen admission.')
+    p.require(name in contract.STAGES, 'The Mac worker waits only for its fixed published stages.')
     lifecycle=contract.health(root)
     if lifecycle['status']=='terminal':return lifecycle
     path=Path(root)/'publications'/name/'publication.json'
@@ -180,14 +180,16 @@ def serve(mode,root,name, *, contract=None):
 def bundle(directory, name, files, identity, *, contract=None):
     """Publish a small portable model/admission closure, preserving every source byte."""
     contract=contract_or_default(contract)
-    p.require(name in STAGES, 'Only the two declared actor/public admission stages are published.')
+    p.require(name in contract.STAGES, 'Only the declared actor/public admission stages are published.')
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=False)
     rows={}
     for member,source in files.items():
         s.safe(member);path=p.checked_subject(source)
         rows[member]=dict(sha256=source['sha256'],size=path.stat().st_size)
-    p.require(rows and sum(row['size'] for row in rows.values())<=256*1024**2,
-        'Model/admission publication is bounded to256MiB; raw corpus archives do not belong here.')
+    maximum=getattr(contract,'MAXIMUM_PUBLICATION_BYTES',256*1024**2)
+    p.require(type(maximum) is int and 0<maximum<=1024**3 and rows and
+        sum(row['size'] for row in rows.values())<=maximum,
+        'Model/admission publication exceeds its fixed byte bound; raw corpus archives do not belong here.')
     archive=directory/'publication.tar.gz'
     def write(stream):
         with tarfile.open(fileobj=stream,mode='w:gz',compresslevel=6) as out:
@@ -264,7 +266,7 @@ class Outbound:
             return result
 
     def await_stage(self, name):
-        p.require(name in STAGES,'Only the fixed next actor/screen stages may be awaited.')
+        p.require(name in self.contract.STAGES,'Only the fixed next actor/screen stages may be awaited.')
         while True:
             p.require(self.contract.terminal(self.local) is None,'Local terminal state ends the Mac worker.')
             result=self.remote('probe',name)
@@ -276,7 +278,7 @@ class Outbound:
             self.sleep(min(10,self.clock.remaining(self.now())))
 
     def fetch(self, name, ready, target):
-        p.require(name in STAGES and ready['status']=='ready' and
+        p.require(name in self.contract.STAGES and ready['status']=='ready' and
             ready['publication']['stage']==name, 'Download only the exact admitted stage publication.')
         record=ready['publication'];target=Path(target)
         p.require(not target.exists(),'A stage download cannot overwrite a previous attempted handoff.')

@@ -23,6 +23,12 @@ factor construction, ordering and scales before scientific inputs, and both host
 consume exactly the same materialized actor bytes. There is no output-only ridge,
 per-world winner label, critic fit, advantage estimate or alternate representation grid.
 
+The E/T parameter containers are the original untrained75 E0
+`8268ba94536c5286ca7e7e9aedf148bffab2b8f5244e7a631594c5b4af8303fc` and original
+untrained79 T0 `812a16f1b8d26911752db0720607d260f410b821922ba2f10f1e3254aa8c9ae6`.
+These are separate from the unchanged qualified raw E/T command references. Copying
+the containers requires later preparation authorization; there is no new initialization.
+
 For E/T, let b be the existing reference command at the original decision and let
 `D(z,s,a) = residual(theta(z),s,a) - residual(theta(0),s,a)`, excluding the .97 log prior.
 The new score is `1[a=b] + c_head * D(z,s,a)`. Apply the multiplier before adding the
@@ -106,8 +112,17 @@ generation fails closed. Outcome-blind prefix resource projections must be fixed
 scientific preparation; they may stop the run but cannot change its recipe/counts.
 
 Desktop uses10 native workers on16 logical CPUs and Mac6 on10. Concrete memory, disk,
-free-space and prefix-reserve limits are pinned in the later reviewed host profiles;
-no resource default silently overrides them. Native task ownership and publication
+free-space and prefix-reserve limits are pinned in the later reviewed host profiles:
+6GiB Java heap,12GiB process group,24GiB retained data and16GiB minimum free space per
+host. After two complete generations, require remaining seconds at least
+`14*max(generation1Seconds,generation2Seconds)+7200`. Each duration starts before that
+generation's first control and ends after both-host transfers, any calibration,
+population materialization, complete game receipts and atomic ES update. For each host,
+require `sharedBaseBytes + 16*max(generation1DeltaBytes,generation2DeltaBytes) + 2GiB`
+at most24GiB. Shared input/run overhead is counted once; each generation delta includes
+all retained actor, receipt, archive, transfer and numerical artifacts. Generated temporary
+copies still count while present. No scientific outcome changes these cost/storage gates.
+Native task ownership and publication
 identity are independent of host path and worker scheduling. Mac uses only the existing
 outbound SSH channel. Either peer's terminal state or the original deadline ends waiting.
 
