@@ -44,6 +44,7 @@ def construct_publication(root):
     for iteration in (1,2):
         location=root/f'iteration-{iteration}';location.mkdir();subjects={};rows={};configs={};training={}
         for head in policy.HEADS:
+            bank=plan.cohort(iteration,head.value)
             row=dict(kind='cpe-paired-corpus-1',head=head.value,iteration=iteration,complete=True,
                 exposurePassed=True,origins=640,trainOrigins=512,validationOrigins=128,protocolDigest=plan.sha256,
                 bundleScopeSha256='a'*64,scopeSha256=record['heads'][head.value]['scopeSha256'],
@@ -53,13 +54,14 @@ def construct_publication(root):
             subjects[head.value]=storage.publish_json(location/(head.value+'.json'),row);rows[head.value]=row
             old,dictionary=cohort(original,head,current,iteration)
             context=replace(old.context,source_sha256=subjects[head.value]['sha256'],
-                request_bank_sha256=p.digest(plan.cohort(iteration,head.value)['origins']))
-            roots=tuple(data.PublicRoot.from_record(root.record,context,current.actor(head).model,split='TRAIN')
-                for root in old.roots)
+                request_bank_sha256=p.digest(bank['origins']))
+            roots=tuple(data.PublicRoot.from_record(dict(root.record,
+                futureSeeds=bank['origins'][root.record['index']]['future']),
+                context,current.actor(head).model,split='TRAIN') for root in old.roots)
             targets=tuple(None if target is None else data.PairedTarget(root,target.rewards)
                 for root,target in zip(roots,old.targets))
             training[head]=replace(old,context=context,roots=roots,targets=targets)
-            configs[head]=fit.Config(tuple(plan.cohort(iteration,head.value)['shuffleSeeds']),deadline)
+            configs[head]=fit.Config(tuple(bank['shuffleSeeds']),deadline)
         aggregate=dict(kind='cpe-paired-iteration-corpus-1',iteration=iteration,protocolDigest=plan.sha256,
             complete=True,exposurePassed=True,independentOrigins=1920,cohorts=subjects,
             originalBundleSha256=original.sha256,currentBundleSha256=current.sha256,
@@ -68,9 +70,11 @@ def construct_publication(root):
         with patch('paired_policy_math.epoch',side_effect=synthetic_epoch):
             fit.fit_bundle(training,original,current,dictionaries,location/'fit',configs,previous=previous)
         def public(head):
-            context=training[head].context
-            return tuple(data.PublicRoot.from_record(public_record(context,original,current,index=index,
-                status='READY' if index<576 else 'MISSING'),context,current.actor(head).model,split='VALIDATION')
+            context=training[head].context;bank=plan.cohort(iteration,head.value)
+            return tuple(data.PublicRoot.from_record(dict(public_record(context,original,current,index=index,
+                status='READY' if index<576 else 'MISSING'),
+                futureSeeds=bank['origins'][index]['future']),
+                context,current.actor(head).model,split='VALIDATION')
                 for index in range(512,640))
         seal=validation.seal_validation(location/'fit',original,current,dictionaries,location/'validation.json',public)
         with patch.object(p.Plan,'from_record',side_effect=lambda value:p.Plan(p.canonical(value))):
@@ -134,6 +138,17 @@ class AdmissionTests(unittest.TestCase):
             with patch.object(admission,'fit_receipt',side_effect=changed):
                 with self.assertRaisesRegex(ValueError,'exact previous atomic child'):
                     admission.verify_iteration(self.portable/'iterations/iteration-2/admission.json')
+
+    def test_sealed_future_pair_must_equal_the_prospective_protocol(self):
+        path=self.portable/'iterations/iteration-2/admission.json';row=p.read(path)
+        directory=admission.resolve(row['fitCompletion'],path).parent
+        seal=p.read(admission.resolve(row['validationProbabilitySeal'],path))
+        seal['heads']['CARD']['rows'][0]['futureSeeds']=[-11025,-11026]
+        plan=p.Plan(p.canonical(p.read(self.portable/'protocol.json')))
+        cohorts={head:(subject,p.read(admission.resolve(subject,path))) for head,subject in row['cohorts'].items()}
+        with self.assertRaisesRegex(ValueError,'original128 positions'):
+            admission.bindings(plan,p.read(admission.resolve(row['corpus'],path)),
+                admission.fit_receipt(directory),seal,directory,cohorts)
 
 
 if __name__=='__main__':unittest.main()

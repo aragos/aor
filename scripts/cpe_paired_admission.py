@@ -46,6 +46,7 @@ def bindings(plan, corpus, done, seal, directory, cohorts):
         'The complete all-head probability seal must precede atomic publication.')
     p.head_record(cohorts);p.head_record(seal['heads'])
     for head,(subject,row) in cohorts.items():
+        bank=plan.cohort(iteration,head)
         context=identity['contexts'][head];child=p.read(directory/'heads'/head/'finished.json')
         p.require(row['kind']=='cpe-paired-corpus-1' and row['head']==head and row['iteration']==iteration and
             row['complete'] is True and row['exposurePassed'] is True and row['origins']==640 and
@@ -58,12 +59,14 @@ def bindings(plan, corpus, done, seal, directory, cohorts):
             context['dictionary_sha256']==plan.record['heads'][head]['dictionarySha256'] and
             context['dictionary_semantic_sha256']==plan.record['heads'][head]['semanticDictionarySha256'] and
             context['original_model_sha256']==plan.record['heads'][head]['originalActorSha256'] and
-            context['request_bank_sha256']==p.digest(plan.cohort(iteration,head)['origins']) and
-            identity['epochSeeds'][head]==plan.cohort(iteration,head)['shuffleSeeds'],
+            context['request_bank_sha256']==p.digest(bank['origins']) and
+            identity['epochSeeds'][head]==bank['shuffleSeeds'],
             'Every child must bind its exact head corpus, complete dictionary, original actor and prospective streams.')
         item=seal['heads'][head]
         p.require(item['context']==context and item['modelSha256']==child['outputModelSha256'] and
             len(item['rows'])==128 and [r['index'] for r in item['rows']]==list(range(512,640)) and
+            all(r['futureSeeds']==bank['origins'][r['index']]['future']
+                for r in item['rows']) and
             item['counts']==dict(READY=row['ready']['VALIDATION'],MISSING=128-row['ready']['VALIDATION']) and
             item['counts']=={status:sum(r['status']==status for r in item['rows']) for status in ('READY','MISSING')} and
             child['identity']['publicCoverage']==dict(trainingReady=row['ready']['TRAIN'],
