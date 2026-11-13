@@ -35,9 +35,9 @@ class TripleFixture(unittest.TestCase):
             encoderVersion=mc.CONTRACTS['expansion'].encoder,stateFeatureNames=['state'],
             actionFeatureNames=['choice']),37,contract=mc.CONTRACTS['expansion']))
 
-    def directory(self, name='triple', previous=None, singleton=False, empty_phase=None):
+    def directory(self, name='triple', previous=None, singleton=False, empty_phase=None, frozen_cp=False):
         directory = self.root/name; directory.mkdir()
-        bundle_path = self.root/'bundle.json' if previous is None else previous/'bundle.json'
+        bundle_path = self.root/'bundle.json' if previous is None or frozen_cp else previous/'bundle.json'
         e_path = self.expansion_path if previous is None else previous/'expansion/policy.json'
         cp, models = joint.load_bundle(bundle_path,joint.CONFIGURATION,joint.sha(self.root/'F.json'),{})
         models['expansion'] = joint.read(e_path)

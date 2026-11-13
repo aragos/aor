@@ -122,6 +122,15 @@ def completed_phase(directory, collection, phase, config, objective, carry, cont
         decisions=len(collection.rows[phase]), acceptedEpochs=report['acceptedEpochs'], stopReason=report['stopReason'])
 
 
+def update_phase(collection, phase, config, directory, typed, objective, carry, continuation):
+    """The shared numerical entrypoint; transaction owners prevalidate their complete active set."""
+    policy.update(collection.heads[phase]['path'], collection.directory, config, directory,
+        optimizer_from=carry, contract=mc.CONTRACTS[phase], entrypoint=__file__,
+        collection_reader=typed.phase_reader, triple_mc=typed,
+        triple_optimizer_continuation=mc.TripleMcAdamContinuation() if carry else None)
+    return completed_phase(directory, collection, phase, config, objective, carry, continuation)
+
+
 def update_triple(collection, configs, output, *, previous=None, guard=lambda:None):
     """One atomic publication; no resume, recollection, critic inference or phase substitution."""
     output = Path(output).resolve()
@@ -138,12 +147,8 @@ def update_triple(collection, configs, output, *, previous=None, guard=lambda:No
     for phase in mc.PHASES:
         guard(); joint.unchanged(pins)
         directory = output/phase
-        policy.update(collection.heads[phase]['path'], collection.directory, configs[phase], directory,
-            optimizer_from=carries[phase], contract=mc.CONTRACTS[phase], entrypoint=__file__,
-            collection_reader=objects[phase].phase_reader, triple_mc=objects[phase],
-            triple_optimizer_continuation=mc.TripleMcAdamContinuation() if carries[phase] else None)
-        reports[phase] = completed_phase(directory, collection, phase, configs[phase], objectives[phase],
-            carries[phase], continuations[phase])
+        reports[phase] = update_phase(collection, phase, configs[phase], directory, objects[phase],
+            objectives[phase], carries[phase], continuations[phase])
         for name in ('identity.json','finished.json','policy.json','checkpoint.json'):
             joint.pin(directory/name, outputs)
     guard(); joint.unchanged(pins); joint.unchanged(outputs)
