@@ -60,7 +60,7 @@ def host_limits(host):
     require(host in HOSTS, 'A declared Desktop or Mac host is required.')
     cpus, workers = (16, 10) if host == 'DESKTOP' else (10, 6)
     return dict(machineCpus=cpus, workers=workers, heapMiB=6144,
-        maximumRssBytes=12*1024**3, maximumDataBytes=24*1024**3,
+        maximumRssBytes=12*1024**3, maximumDataBytes=(64 if host=='DESKTOP' else 40)*1024**3,
         minimumFreeBytes=16*1024**3)
 
 
@@ -249,8 +249,9 @@ def prefix_gate(remaining_seconds, generation_seconds, retention):
         require(set(row) == {'sharedBaseBytes', 'generationDeltaBytes'} and
             len(row['generationDeltaBytes']) == 2,
             'Storage must separate shared base overhead from both complete generation deltas.')
-        base = integer(row['sharedBaseBytes'], 0, 24*1024**3, 'Shared retained base bytes')
-        deltas = [integer(v, 0, 24*1024**3, 'Inclusive generation retained bytes')
+        limit = host_limits(host)['maximumDataBytes']
+        base = integer(row['sharedBaseBytes'], 0, limit, 'Shared retained base bytes')
+        deltas = [integer(v, 0, limit, 'Inclusive generation retained bytes')
             for v in row['generationDeltaBytes']]
         projected[host] = base + 16*max(deltas) + PREFIX_GATE['screenReserveBytes']
     needed = 14*max(generation_seconds) + PREFIX_GATE['finalReserveSeconds']

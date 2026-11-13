@@ -357,9 +357,10 @@ def prefix_retention(record, protocol_sha, host, number):
     p.integer(record['regularFiles'],1,10**7,'Retained regular file count')
     p.require(set(record['generationBytes'])=={str(g) for g in range(1,17)},
         'All finite generation byte counters must be explicit.')
-    values=[p.integer(value,0,24*1024**3,'Retained generation bytes')
+    limit=p.host_limits(host)['maximumDataBytes']
+    values=[p.integer(value,0,limit,'Retained generation bytes')
         for value in record['generationBytes'].values()]
-    base=p.integer(record['sharedBaseBytes'],0,24*1024**3,'Shared scientific payload bytes')
+    base=p.integer(record['sharedBaseBytes'],0,limit,'Shared scientific payload bytes')
     p.require(record['totalBytes']==base+sum(values) and
         all(record['generationBytes'][str(g)]==0 for g in range(number+1,17)),
         'A prefix census cannot omit bytes or include unstarted future generation data.')

@@ -119,14 +119,15 @@ or replacement world repairs an invalid or unfinished game.
 
 Desktop uses10 native workers on16 logical CPUs and Mac6 on10. Concrete memory, disk,
 free-space and prefix-reserve limits are pinned in the later reviewed host profiles:
-6GiB Java heap,12GiB process group,24GiB retained data and16GiB minimum free space per
-host. After two complete generations, require remaining seconds at least
+6GiB Java heap,12GiB process group,64GiB retained data on Desktop/40GiB on Mac and16GiB
+minimum free space per host. After two complete generations, require remaining seconds at least
 `14*max(generation1Seconds,generation2Seconds)+7200`. Each duration starts before that
 generation's first control and ends after both-host transfers, any calibration,
 population materialization, complete game receipts and atomic ES update. For each host,
 require `sharedBaseBytes + 16*max(generation1DeltaBytes,generation2DeltaBytes) + 2GiB`
-at most24GiB. Shared input/run overhead is counted once; each generation delta includes
-all retained actor, receipt, archive, transfer and numerical artifacts. Generated temporary
+at most the declared host retained-data cap. Shared input/run overhead is counted once;
+each generation delta includes all retained actor, receipt, archive, transfer and numerical
+artifacts. Generated temporary
 copies still count while present. No scientific outcome changes these cost/storage gates.
 The immutable scientific package payload (models, projection/directions, dictionaries and
 historical subjects) is included in shared base bytes; installed runtime/JDK/environment

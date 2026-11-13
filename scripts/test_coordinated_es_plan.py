@@ -183,9 +183,20 @@ class ClockAndPrefixTest(unittest.TestCase):
         self.assertEqual(result['projectedRetainedBytes']['MAC'],123+16*17+2*1024**3)
 
     def test_one_host_over_budget_stops_both(self):
-        values=retention();values['MAC']['generationDeltaBytes']=[2*1024**3,1]
+        values=retention();values['MAC']['generationDeltaBytes']=[3*1024**3,1]
         result=p.prefix_gate(10000,[1,2],values)
         self.assertFalse(result['storagePassed']);self.assertFalse(result['passed'])
+
+    def test_fixed_host_caps_preserve_minimum_free_space(self):
+        self.assertEqual(p.host_limits('DESKTOP')['maximumDataBytes'],64*1024**3)
+        self.assertEqual(p.host_limits('MAC')['maximumDataBytes'],40*1024**3)
+        self.assertTrue(all(p.host_limits(host)['minimumFreeBytes']==16*1024**3 for host in p.HOSTS))
+
+    def test_same_projected_bytes_can_pass_desktop_but_stop_mac(self):
+        values=retention();values['DESKTOP']['generationDeltaBytes']=[3*1024**3,1]
+        self.assertTrue(p.prefix_gate(10000,[1,2],values)['storagePassed'])
+        values['MAC']['generationDeltaBytes']=[3*1024**3,1]
+        self.assertFalse(p.prefix_gate(10000,[1,2],values)['storagePassed'])
 
     def test_missing_peer_storage_is_not_assumed_zero(self):
         with self.assertRaisesRegex(ValueError,'both original hosts'):
