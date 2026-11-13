@@ -9,6 +9,7 @@ import time
 import coordinated_es_math as es
 import coordinated_es_calibration as cal
 import coordinated_es_plan as p
+from coordinated_es_storage import prefix_retention
 from token_paired_campaign_audit import Pins
 from token_paired_storage import safe
 
@@ -187,7 +188,7 @@ def generation(pins,protocol,plan,clock,row,number,previous,previous_finished,fi
         gradientRms=result['gradientRms'],centerRms=result['centerRms'],radiusDivisor=result['radiusDivisor'])
 
 
-def prefix(pins,path,rows,upper_epoch,clock):
+def prefix(pins,path,rows,upper_epoch,clock,protocol_sha):
     record=pins.read(path)
     keys=set(p.prefix_gate(1,[1,1],{host:dict(sharedBaseBytes=0,generationDeltaBytes=[0,0]) for host in p.HOSTS}))
     p.require(set(record)==keys|{'censusAdjustmentBytes','censuses'},'The operational prefix has exact original fields.')
@@ -196,7 +197,13 @@ def prefix(pins,path,rows,upper_epoch,clock):
         record['generationSeconds']==[row['elapsedSeconds'] for row in rows[:2]] and
         rows[1]['finishedEpoch']<=clock.deadline-record['remainingSeconds']<=upper_epoch,
         'The two-generation resource gate must reproduce from original inclusive costs and clock.')
-    for item in record['censuses'].values():pins.subject(item)
+    p.require(set(record['censuses'])==set(p.HOSTS),'Resource censuses must retain both exact named hosts.')
+    retention={host:prefix_retention(subject(pins,item),protocol_sha,host,2)
+        for host,item in record['censuses'].items()}
+    size=Path(path).stat().st_size
+    retention['DESKTOP']['generationDeltaBytes'][1]+=size
+    p.require(record['censusAdjustmentBytes']==size and record['retention']==retention,
+        'Projected retention must derive from both sealed censuses and the exact prefix receipt byte size.')
     return record
 
 
@@ -289,7 +296,7 @@ def verify_learning(protocol_subject,run,*,pins=None):
     pins.deadline=min(pins.deadline if pins.deadline is not None else float('inf'),clock.deadline)
     rows,raw_rows,previous=chain(pins,protocol_subject,plan,root,clock,16,16)
     p.require(raw_rows[-1]['finishedEpoch']<=now,'Future-dated numerical completion cannot admit final publication.')
-    p.require(prefix(pins,root/'generations/generation-2/operational-prefix.json',raw_rows,now,clock)['passed'],
+    p.require(prefix(pins,root/'generations/generation-2/operational-prefix.json',raw_rows,now,clock,protocol_subject['sha256'])['passed'],
         'Final publication requires the original successful resource gate.')
     return result(pins,protocol_subject,rows,'completed',previous)
 
@@ -312,7 +319,7 @@ def verify(protocol_subject,run,*,pins=None):
     expected=count+(1 if terminal['status']=='stopped' and terminal['reason']!='prefix-resource-gate' else 0)
     rows,raw_rows,previous=chain(pins,protocol_subject,plan,root,clock,count,expected)
     if count>=2:
-        gate=prefix(pins,root/'generations/generation-2/operational-prefix.json',raw_rows,terminal['updatedEpoch'],clock)
+        gate=prefix(pins,root/'generations/generation-2/operational-prefix.json',raw_rows,terminal['updatedEpoch'],clock,protocol_subject['sha256'])
         p.require(gate['passed'] is (terminal.get('reason')!='prefix-resource-gate'),
             'Only the exact resource gate may stop its two-generation prefix.')
     if terminal['status']=='stopped':

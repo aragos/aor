@@ -45,9 +45,20 @@ class Fixture:
         if count>=2:
             retention={host:dict(sharedBaseBytes=0,generationDeltaBytes=[100,100] if count==16 else [2*1024**3]*2)
                 for host in p.HOSTS}
-            row=p.prefix_gate(self.clock['deadlineEpoch']-(self.rows[1]['finishedEpoch']+1),[20.,20.],retention)
-            row.update(censusAdjustmentBytes=0,censuses={host:put(self.root/f'{host}-retention.json',dict(host=host)) for host in p.HOSTS})
-            put(self.run/'generations/generation-2/operational-prefix.json',row)
+            censuses={host:put(self.root/f'{host}-retention.json',dict(kind='coordinated-es-retention-1',host=host,
+                generation=2,protocolSha256=self.protocol['sha256'],sharedBaseBytes=0,
+                generationBytes={str(i):values['generationDeltaBytes'][i-1] if i<=2 else 0 for i in range(1,17)},
+                totalBytes=sum(values['generationDeltaBytes']),regularFiles=100)) for host,values in retention.items()}
+            base=retention['DESKTOP']['generationDeltaBytes'][1];size=0
+            for _ in range(8):
+                retention['DESKTOP']['generationDeltaBytes'][1]=base+size
+                row=p.prefix_gate(self.clock['deadlineEpoch']-(self.rows[1]['finishedEpoch']+1),[20.,20.],retention)
+                row.update(censusAdjustmentBytes=size,censuses=censuses)
+                new=len(es.canonical(row))+1
+                if new==size:break
+                size=new
+            else:raise AssertionError('Constructed prefix framing must stabilize.')
+            put(self.run/'generations/generation-2/operational-prefix.json',row,True)
 
     def numeric(self,number,verb,body,outputs):
         directory=self.run/'generations'/f'generation-{number}'/verb;directory.mkdir(exist_ok=True)
@@ -233,6 +244,18 @@ class GenerationAuditTests(unittest.TestCase):
         fixture=Fixture(self.root);path=fixture.run/'generations/generation-2/operational-prefix.json';row=p.read(path)
         row['passed']=True;put(path,row)
         with self.assertRaisesRegex(ValueError,'resource gate must reproduce'):audit.verify(fixture.protocol,fixture.run)
+
+    def test_retention_cannot_depart_from_the_original_host_censuses(self):
+        fixture=Fixture(self.root);path=fixture.run/'generations/generation-2/operational-prefix.json';row=p.read(path)
+        row['retention']['MAC']['sharedBaseBytes']=1
+        changed=p.prefix_gate(row['remainingSeconds'],row['generationSeconds'],row['retention'])
+        row.update(changed);put(path,row,True)
+        with self.assertRaisesRegex(ValueError,'both sealed censuses'):audit.verify(fixture.protocol,fixture.run)
+
+    def test_prefix_adjustment_must_equal_actual_retained_file_size(self):
+        fixture=Fixture(self.root);path=fixture.run/'generations/generation-2/operational-prefix.json';row=p.read(path)
+        row['censusAdjustmentBytes']+=1;put(path,row,True)
+        with self.assertRaisesRegex(ValueError,'exact prefix receipt byte size'):audit.verify(fixture.protocol,fixture.run)
 
     def test_unregistered_future_generation_is_rejected(self):
         fixture=Fixture(self.root);(fixture.run/'generations/generation-3').mkdir()
