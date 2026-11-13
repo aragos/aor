@@ -67,6 +67,7 @@ data class StrategyReplay(
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val tokenActor: Map<String, Any>? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL) val cpeBundle: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val coordinatedEs: Map<String, Any>? = null,
 )
 
 /**
@@ -112,6 +113,13 @@ class StrategyReplayPair private constructor(private val record: JsonNode) {
             }
         require(record["cpeBundle"]?.takeUnless(JsonNode::isNull) == expectedCpe) {
             "Recorded arena pair complete C/P/E roles differ from the replay specification."
+        }
+        val expectedCoordinated =
+            specification.coordinatedEs?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["coordinatedEs"]?.takeUnless(JsonNode::isNull) == expectedCoordinated) {
+            "Recorded arena pair coordinated roles differ from the replay specification."
         }
         val opponents = record.required("opponentIndices")
         require(opponents.isArray && opponents.size() == lineup.configuration.playerCount) {
@@ -267,6 +275,7 @@ object StrategyReplays {
             expansionActor = specification.expansionActor?.binding(),
             tokenActor = specification.tokenActor?.binding(),
             cpeBundle = specification.cpeBundle?.binding(),
+            coordinatedEs = specification.coordinatedEs?.binding(),
         )
     }
 }
