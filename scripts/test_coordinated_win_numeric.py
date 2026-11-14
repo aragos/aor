@@ -110,7 +110,7 @@ class NumericTests(unittest.TestCase):
     def prepared(self):
         result=self.execute('prepare',self.request,'prepared')
         common={key:self.request[key] for key in ('protocol','originalBundle','projection','warmStart')}
-        path=self.root/'prepared/inherited-calibration.json'
+        path=self.root/'prepared/calibration/inherited-calibration.json'
         common['inheritedCalibration']=dict(path=str(path),sha256=base.raw_sha(path.read_bytes()))
         center=put(self.root,'center0.json',json.loads((self.root/'prepared/initial-center.json').read_bytes()))
         return result,common,center
@@ -119,7 +119,7 @@ class NumericTests(unittest.TestCase):
         result,common,center=self.prepared()
         self.assertEqual(json.loads(Path(center['path']).read_bytes())['coordinates'],[.1]*256)
         self.assertEqual((self.root/'prepared/projection.json').read_bytes(),Path(self.request['projection']['path']).read_bytes())
-        self.assertEqual((self.root/'prepared/origin/calibration.json').read_bytes(),Path(self.request['calibration']['path']).read_bytes())
+        self.assertEqual((self.root/'prepared/calibration/origin/calibration.json').read_bytes(),Path(self.request['calibration']['path']).read_bytes())
         self.assertEqual(result['protocolSha256'],self.request['protocol']['sha256'])
         self.assertEqual(len(list((self.root/'prepared/directions').glob('*-generation.json'))),16)
         self.assertFalse((self.root/'prepared/prescribed-mean.json').exists())
@@ -181,7 +181,7 @@ class NumericTests(unittest.TestCase):
 
     def test_inherited_seal_cannot_be_relabelled_as_new_protocol(self):
         _,common,_=self.prepared();subject=common['inheritedCalibration']
-        path=self.root/'prepared/origin/calibration.json';record=json.loads(path.read_bytes())
+        path=self.root/'prepared/calibration/origin/calibration.json';record=json.loads(path.read_bytes())
         record['protocolSha256']=self.request['protocol']['sha256'];path.write_bytes(es.canonical(record))
         warm=c.WarmStart.from_record(json.loads(Path(self.request['warmStart']['path']).read_bytes()))
         with self.assertRaisesRegex(ValueError,'input bytes'):

@@ -5,6 +5,7 @@ only binds subjects, one original deadline, output closure and portable relative
 """
 from pathlib import Path
 import shutil
+import sys
 
 import coordinated_es_plan as p
 import coordinated_es_process as execution
@@ -12,6 +13,7 @@ import coordinated_es_storage as storage
 import purchase_storage as atomic
 
 VERBS=('materialize','calibrate','update','center','diagnose')
+NUMERIC_MODULE='coordinated_es_numeric.py'
 LEGACY_CALIBRATION_STOPS=('calibration-insufficient-worlds','calibration-positive-gap-mass',
     'calibration-small-signed-quantile','calibration-scale-bounds','calibration-movement-bounds')
 CALIBRATION_STOPS=LEGACY_CALIBRATION_STOPS+('calibration-empty-feasible-interval',
@@ -22,21 +24,21 @@ def same_subject(value,path):
     return p.checked_subject(value).resolve()==Path(path).resolve() and value['sha256']==p.file_sha(path)
 
 
-def request(profile,verb,fields):
-    p.require(verb in VERBS,'Only the fixed scientific numerical stages may execute here.')
+def request(profile,verb,fields,*,prefix=p.PREFIX,verbs=VERBS):
+    p.require(verb in verbs,'Only the fixed scientific numerical stages may execute here.')
     p.require(profile['numericalSourceOwners'] and all(p.file_sha(path)==digest
         for path,digest in profile['numericalSourceOwners'].items()),
         'Every executing numerical owner must match the frozen source closure.')
     p.checked_subject(profile['numerical'])
-    return dict(kind=p.PREFIX+'-'+verb+'-request-1',
+    return dict(kind=prefix+'-'+verb+'-request-1',
         sourceOwners=profile['numericalSourceOwners'],numerical=profile['numerical'],
         deadlineEpoch=profile['_clock'].deadline,**fields)
 
 
-def verify_complete(root,request_path,verb):
+def verify_complete(root,request_path,verb,*,prefix=p.PREFIX):
     root=Path(root);value=p.read(root/'finished.json');wire=p.read(request_path)
     files=storage.inventory(root)
-    p.require(value['kind']==p.PREFIX+'-numeric-complete-1' and value['passed'] is True and
+    p.require(value['kind']==prefix+'-numeric-complete-1' and value['passed'] is True and
         value['complete'] is True and value['verb']==verb and same_subject(value['request'],request_path) and
         value['protocolSha256']==wire['protocol']['sha256'] and
         value['sourceOwners']==wire['sourceOwners'],
@@ -51,28 +53,33 @@ def verify_complete(root,request_path,verb):
     return value
 
 
-def invoke(profile,verb,directory,fields):
+def invoke(profile,verb,directory,fields,*,contract=None):
+    """One existing process/receipt owner; explicit numerical method adapters retain their kinds."""
+    contract=sys.modules[__name__] if contract is None else contract
     directory=Path(directory)
     p.require(not directory.exists(),'Every prescribed numerical operation executes once with a fresh output.')
     directory.parent.mkdir(parents=True,exist_ok=True)
     path=directory.with_name(directory.name+'-request.json')
-    storage.publish_json(path,request(profile,verb,fields))
+    storage.publish_json(path,contract.request(profile,verb,fields))
     command=[profile['python']['executable'],'-E','-s','-B',
-        str(Path(__file__).with_name('coordinated_es_numeric.py')),verb,
+        str(Path(__file__).with_name(contract.NUMERIC_MODULE)),verb,
         '--request',str(path),'--output',str(directory)]
-    execution.run_child(profile,command,directory.with_name(directory.name+'.log'))
+    contract.run_child(profile,command,directory.with_name(directory.name+'.log'))
     p.require(not ((directory/'finished.json').exists() and (directory/'stopped.json').exists()),
         'A numerical operation cannot be both stopped and completed.')
     if (directory/'stopped.json').exists():
         p.require(verb in ('calibrate','update') and not (directory/'center.json').exists(),
             'Only the original calibration or zero-gradient boundary can stop without a successor.')
-        row=verify_stop(directory,path,verb)
+        row=contract.verify_stop(directory,path,verb)
         return dict(complete=False,directory=directory,receipt=p.subject(directory/'stopped.json'),reason=row['reason'])
-    verify_complete(directory,path,verb)
+    contract.verify_complete(directory,path,verb)
     return dict(complete=True,directory=directory,receipt=p.subject(directory/'finished.json'))
 
 
-def verify_stop(root,request_path,verb):
+def run_child(profile,command,log):return execution.run_child(profile,command,log)
+
+
+def verify_stop(root,request_path,verb,*,prefix=p.PREFIX):
     root=Path(root);row=p.read(root/'stopped.json');files=storage.inventory(root)
     request_value=p.read(request_path)
     allowed=LEGACY_CALIBRATION_STOPS
@@ -85,7 +92,7 @@ def verify_stop(root,request_path,verb):
     reason=row['reason']
     admitted=(verb=='calibrate' and reason in allowed) or (
         verb=='update' and (reason=='zero-gradient' or reason.startswith('nonfinite-')))
-    p.require(row['kind']==p.PREFIX+'-numeric-stop-1' and row['complete'] is False and
+    p.require(row['kind']==prefix+'-numeric-stop-1' and row['complete'] is False and
         row['passed'] is False and row['verb']==verb and same_subject(row['request'],request_path) and
         admitted and set(files)==set(row['artifacts'])|{'stopped.json'} and
         all(files[storage.safe(name)]['sha256']==digest for name,digest in row['artifacts'].items()),

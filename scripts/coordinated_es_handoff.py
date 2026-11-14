@@ -63,18 +63,19 @@ def notify_failure(root,name):return shared.notify_failure(root,name,contract=sy
 def stage(root,name):return shared.stage(root,name,contract=sys.modules[__name__])
 def reserve(root,name):return shared.reserve(root,name,contract=sys.modules[__name__])
 def accept(root,name):return shared.accept(root,name,contract=sys.modules[__name__])
-def receive_retention(root,name):
+def receive_retention(root,name,*,contract=None):
     """Two finite accounting messages; no scientific shard, outcome or rescheduling API."""
     import coordinated_es_storage as storage
+    contract=sys.modules[__name__] if contract is None else contract
     p.require(isinstance(name,str) and len(name.encode())<=4096,
         'A prefix resource census has a fixed compact message bound.')
-    row=json.loads(name);root=Path(root);number=row['generation'];state=health(root)
+    row=json.loads(name);root=Path(root);number=row['generation'];state=contract.health(root)
     if state['status']=='terminal':return state
     p.require(number in (1,2) and state['status']=='active',
         'Only an active coordinator can accept its first two generation censuses.')
     clock=p.read(root/'clock.json')
     storage.prefix_retention(row,clock['protocolSha256'],'MAC',number)
-    p.require(all((root/'incoming'/tag(number,chunk,phase=phase)/'accepted.json').is_file()
+    p.require(all((root/'incoming'/contract.tag(number,chunk,phase=phase)/'accepted.json').is_file()
         for chunk in p.GENERATION_CHUNKS['MAC'] for phase in ('controls','population')),
         'Mac resource measurement follows all of its original generation transfers.')
     target=root/'peer-retention'/f'generation-{number}.json'
@@ -82,14 +83,15 @@ def receive_retention(root,name):
     return storage.publish_json(target,row)
 
 
-def serve(mode,root,name):
-    if mode!='retention':return shared.serve(mode,root,name,contract=sys.modules[__name__])
+def serve(mode,root,name,*,contract=None):
+    contract=sys.modules[__name__] if contract is None else contract
+    if mode!='retention':return shared.serve(mode,root,name,contract=contract)
     clock=p.read(Path(root)/'clock.json')
-    p.require(clock['kind']==PREFIX+'-clock-1','Resource handoff requires the shared original clock.')
-    seconds=min(60.,Clock(clock['startedEpoch'],clock['deadlineEpoch']).remaining(time.time()))
+    p.require(clock['kind']==contract.PREFIX+'-clock-1','Resource handoff requires the shared original clock.')
+    seconds=min(60.,contract.Clock(clock['startedEpoch'],clock['deadlineEpoch']).remaining(time.time()))
     def expired(_number,_frame):raise TimeoutError('The bounded resource handoff expired.')
     previous=signal.signal(signal.SIGALRM,expired);signal.setitimer(signal.ITIMER_REAL,seconds)
-    try:return receive_retention(root,name)
+    try:return receive_retention(root,name,contract=contract)
     finally:
         signal.setitimer(signal.ITIMER_REAL,0);signal.signal(signal.SIGALRM,previous)
 def bundle(directory,name,files,identity):
@@ -97,13 +99,14 @@ def bundle(directory,name,files,identity):
 
 
 class Outbound(shared.Outbound):
-    def __init__(self,profile,clock,local_root,**options):
-        super().__init__(profile,clock,local_root,contract=sys.modules[__name__],**options)
+    def __init__(self,profile,clock,local_root,*,contract=None,**options):
+        super().__init__(profile,clock,local_root,
+            contract=sys.modules[__name__] if contract is None else contract,**options)
 
     def push_retention(self,record):
         result=self.remote('retention',json.dumps(record,separators=(',',':')))
         if result.get('status')=='terminal':
-            if result['terminal'].get('status')=='stopped':raise PeerStopped(result)
+            if result['terminal'].get('status')=='stopped':raise self.contract.PeerStopped(result)
             raise ValueError('The original coordinator ended before prefix resource admission.')
         p.require(result['sha256']==__import__('hashlib').sha256(p.canonical(record)+b'\n').hexdigest(),
             'The receiver must preserve exact measured resource bytes.')

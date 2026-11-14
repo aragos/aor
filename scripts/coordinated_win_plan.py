@@ -11,7 +11,7 @@ from pathlib import Path
 import coordinated_es_continuation as continuation
 import coordinated_es_math as es
 import coordinated_es_plan as base
-from token_paired_campaign_plan import canonical, digest, integer, read, require, sha
+from token_paired_campaign_plan import canonical, checked_subject, digest, file_sha, integer, read, require, sha, subject
 
 PREFIX = 'coordinated-win'
 KIND = PREFIX + '-continuation-1'
@@ -48,7 +48,7 @@ def exact(value, fields, label):
     require(type(value) is dict and set(value)==set(fields),label+' has missing or unexpected fields.')
 
 
-def subject(value):
+def native_subject(value):
     require(type(value) is dict and set(value) in ({'path','sha256'},{'path','sha256','originalPath'}),
         'An executable subject requires its path and exact raw SHA256.')
     require(type(value['path']) is str and bool(value['path']),'A readable subject path is required.')
@@ -177,7 +177,7 @@ class Plan:
             'directions','population','inheritedCalibration','previousUpdate','historical'), 'Native continuation subjects')
         for key,item in subjects.items():
             if item is None:require(key in ('population','previousUpdate'),'Every inherited source remains required from step1.')
-            else:subject(item)
+            else:native_subject(item)
         require((subjects['population'] is None)==(phase=='CONTROLS'),
             'Controls never receive mutants; every population must be sealed before execution.')
         require((subjects['previousUpdate'] is None)==(number==1),'Later steps require their immediate predecessor update.')

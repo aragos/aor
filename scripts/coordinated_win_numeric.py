@@ -160,14 +160,14 @@ def prepare(inputs,request,out,guard):
     out.json('initial-center.json',c.Center.initial(warm).record)
     reproduced=out.bundle('warm-bundle/',actual)
     es.require(reproduced==expected['bundleSha256'],'The portable warm bundle descriptor must also remain byte-exact.')
-    out.raw('origin/protocol.json',inputs.raw(request['calibrationProtocol']))
-    out.raw('origin/calibration.json',inputs.raw(request['calibration']))
-    for head,panel in panels.items():out.raw(f'origin/gap-{head}.json',panel.wire)
+    out.raw('calibration/origin/protocol.json',inputs.raw(request['calibrationProtocol']))
+    out.raw('calibration/origin/calibration.json',inputs.raw(request['calibration']))
+    for head,panel in panels.items():out.raw(f'calibration/origin/gap-{head}.json',panel.wire)
     inherited=dict(kind=INHERITED_KIND,protocolSha256=request['protocol']['sha256'],parameterSpace=value.scope.record,
         warmStartSha256=warm.sha256,originProtocol=dict(path='origin/protocol.json',sha256=request['calibrationProtocol']['sha256']),
         originCalibration=dict(path='origin/calibration.json',sha256=request['calibration']['sha256']),
         recipe=old['recipe'],scales=old['scales'],recalibrated=False)
-    out.json('inherited-calibration.json',inherited)
+    out.json('calibration/inherited-calibration.json',inherited)
     for row in value.record['generations']:
         guard();directions,receipt=projection.generate_directions(value.scope,row['generation'],row['directionSeed'])
         out.json(f"directions/generation-{row['generation']:02d}.json",directions.record)
@@ -179,7 +179,7 @@ def prepare(inputs,request,out,guard):
         calibrationRecomputedFromNewStates=False,initializationStreams=0,directionStreams=16,
         execution=dict(newGames=0,actualFits=0,optimizerSteps=0)))
     return dict(projection='projection.json',warmStart='warm-start.json',center='initial-center.json',
-        inheritedCalibration='inherited-calibration.json',proof='warm-start-proof.json')
+        inheritedCalibration='calibration/inherited-calibration.json',proof='warm-start-proof.json')
 
 
 def materialize(inputs,request,out,guard):
