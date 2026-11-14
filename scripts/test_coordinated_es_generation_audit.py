@@ -43,7 +43,7 @@ class Fixture:
         if count!=16:terminal['reason']='prefix-resource-gate'
         put(self.run/'terminal.json',terminal)
         if count>=2:
-            retention={host:dict(sharedBaseBytes=0,generationDeltaBytes=[100,100] if count==16 else [2*1024**3]*2)
+            retention={host:dict(sharedBaseBytes=0,generationDeltaBytes=[100,100] if count==16 else [8*1024**3]*2)
                 for host in p.HOSTS}
             censuses={host:put(self.root/f'{host}-retention.json',dict(kind='coordinated-es-retention-1',host=host,
                 generation=2,protocolSha256=self.protocol['sha256'],sharedBaseBytes=0,

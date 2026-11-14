@@ -6,6 +6,7 @@ by archiving or byte accounting.
 """
 from pathlib import Path
 import re
+import sys
 import tarfile
 
 import coordinated_es_plan as p
@@ -24,11 +25,32 @@ def game_name(index,mutant=None):
     return f'game-{role(mutant) if mutant is not None else "RAW_G3"}-{index}.json'
 
 
-def generation_record(plan,request,source_sha,prepared,finished,files,number,chunk,phase,replay_values):
+GENERATION_SUBJECTS=('protocol','arena','originalBundle','projection','center','directions',
+    'population','calibration','previousUpdate','historical')
+EXTRA_IDENTITIES=()
+
+
+def parameter_heads(plan):return plan.record['original']['heads']
+
+
+def prepared_identity(plan,prepared,source_sha):
+    original=plan.record['original']
+    p.require(prepared['source']['sha256']==source_sha and
+        prepared['scopeSha256']==original['scopeSha256'] and
+        prepared['ecologySha256']==original['ecologySha256'] and
+        prepared['originalBundle']['sha256']==original['bundleSha256'],
+        'Native preparation changed its raw source, original bundle or complete fixed ecology.')
+
+
+def panel_names(chunk,phase):
+    return [f'panel-{index}.json' for index in p.indices(chunk)] if phase=='controls' else []
+
+
+def generation_record(plan,request,source_sha,prepared,finished,files,number,chunk,phase,replay_values,*,contract=None):
     """Pure native metadata admission, shared before pruning and after lossless retention."""
+    current=sys.modules[__name__] if contract is None else contract;p=current.p
     p.require(phase in ('controls','population'),'Unknown original native execution phase.')
-    subjects={key:request[key] for key in ('protocol','arena','originalBundle','projection',
-        'center','directions','population','calibration','previousUpdate','historical')}
+    subjects={key:request[key] for key in current.GENERATION_SUBJECTS}
     p.require(request==plan.generation_source(number,chunk,phase.upper(),subjects),
         'Native collection must use the exact prescribed source, global bank and shard.')
     p.require(prepared['kind']==p.PREFIX+'-prepared-1' and
@@ -46,18 +68,13 @@ def generation_record(plan,request,source_sha,prepared,finished,files,number,chu
                 actual['originalPath']==declared.get('originalPath',declared['path']) and
                 prepared['inputPins'].get(actual['path'])==actual['sha256'],
                 'Native resolved subjects must preserve exact declared provenance and raw input bytes.')
-    original=plan.record['original']
-    p.require(prepared['source']['sha256']==source_sha and
-        prepared['scopeSha256']==original['scopeSha256'] and
-        prepared['ecologySha256']==original['ecologySha256'] and
-        prepared['originalBundle']['sha256']==original['bundleSha256'],
-        'Native preparation changed its raw source, original bundle or complete fixed ecology.')
+    current.prepared_identity(plan,prepared,source_sha)
     p.require(files['source.json']['sha256']==source_sha and
         files['arena.json']['sha256']==subjects['arena']['sha256'] and
         prepared['arena']['sha256']==subjects['arena']['sha256'],
         'Original raw source and arena snapshot bytes must remain explicitly bound.')
     p.require(set(prepared['dictionaries'])==set(p.HEADS) and all(
-        p.digest(prepared['dictionaries'][head])==original['heads'][head]['dictionarySha256']
+        p.digest(prepared['dictionaries'][head])==current.parameter_heads(plan)[head]['dictionarySha256']
         for head in p.HEADS),'Every full native head dictionary must preserve its canonical identity.')
     p.require(prepared['inputPins'] and all(isinstance(path,str) and Path(path).is_absolute() and p.sha(digest)
         for path,digest in prepared['inputPins'].items()),
@@ -67,16 +84,16 @@ def generation_record(plan,request,source_sha,prepared,finished,files,number,chu
     replays=[] if phase=='controls' else p.replays(number,chunk)
     p.require(finished['kind']==p.PREFIX+'-complete-1' and
         all(finished[key]==prepared[key] for key in
-            ('signature','scopeSha256','scienceSha256','stage','generation','globalStart','count')) and
+            ('signature','scopeSha256','scienceSha256','stage','generation','globalStart','count')+current.EXTRA_IDENTITIES) and
         finished['attemptedGames']==finished['completedGames']==finished['expectedGames']==expected and
         finished['canonicalGames']==len(replays),
         'Only the complete once-attempted fixed native shard can be admitted.')
     native_files=finished['files']
     p.require(native_files and all(safe(name) in files and files[name]['sha256']==digest
         for name,digest in native_files.items()),'Every original native completion file must match.')
-    games=[game_name(index,mutant) for index in p.indices(chunk)
+    games=[current.game_name(index,mutant) for index in p.indices(chunk)
         for mutant in ([None] if phase=='controls' else range(32))]
-    panels=[f'panel-{index}.json' for index in p.indices(chunk)] if phase=='controls' else []
+    panels=current.panel_names(chunk,phase)
     p.require(all(name in native_files for name in games+panels),
         'Every original world/member and required public panel must be present once.')
     p.require({name for name in native_files if name.startswith('game-')}==set(games) and
@@ -91,14 +108,14 @@ def generation_record(plan,request,source_sha,prepared,finished,files,number,chu
             value['signature']==prepared['signature'] and
             value['scienceSha256']==prepared['scienceSha256'] and
             value['sourceSha256']==source_sha and value['role']==name and value['globalIndex']==index and
-            value['original']['sha256']==files[game_name(index,item['mutant']['index'])]['sha256'] and
+            value['original']['sha256']==files[current.game_name(index,item['mutant']['index'])]['sha256'] and
             all(value[key] is True for key in ('terminalEqual','canonicalEqual','replayVerified')) and
             value['scientificTerminalExecutions']==value['attemptedGames']==value['completedGames']==1,
             'A prescribed reproduction must retain exact original game and full canonical equality.')
         actual_name=directory+'/'+safe(value['actual']['file'])
         p.require(files[actual_name]['sha256']==value['actual']['sha256'],
             'A reproduction must retain the exact actual compact game bytes it verified.')
-        original_game=replay_values[game_name(index,item['mutant']['index'])]
+        original_game=replay_values[current.game_name(index,item['mutant']['index'])]
         actual_game=replay_values[actual_name]
         def semantic(game):
             return dict(game,terminal={key:item for key,item in game['terminal'].items() if key!='elapsedMillis'})
@@ -120,11 +137,13 @@ def generation_record(plan,request,source_sha,prepared,finished,files,number,chu
         preparedSha256=files['prepared.json']['sha256'],finishedSha256=files['finished.json']['sha256'],
         inputPins=prepared['inputPins'],attemptedGames=expected,completedGames=expected,
         historicalReproductions=len(replays),scientificTerminalExecutions=expected+len(replays),
-        games=games,panels=panels,replays=replay_receipts,files=files,fitnessDecoded=False)
+        games=games,panels=panels,replays=replay_receipts,files=files,fitnessDecoded=False,
+        **{key:prepared[key] for key in current.EXTRA_IDENTITIES})
 
 
-def verify_generation(plan,root,source,number,chunk,phase):
+def verify_generation(plan,root,source,number,chunk,phase,*,contract=None):
     """Admit native bytes without decoding game outcomes or public observations."""
+    current=sys.modules[__name__] if contract is None else contract;p=current.p
     root=Path(root);files=inventory(root);prepared=p.read(root/'prepared.json')
     p.require(all(p.file_sha(path)==digest for path,digest in prepared['inputPins'].items()),
         'Every admitted native/model/reference input must still match its original bytes.')
@@ -133,12 +152,12 @@ def verify_generation(plan,root,source,number,chunk,phase):
         for item in p.replays(number,chunk):
             name=f'replay-{role(item["mutant"]["index"])}-{item["globalIndex"]}'
             values[name+'/'+name+'.json']=p.read(root/name/(name+'.json'))
-            original_name=game_name(item['globalIndex'],item['mutant']['index'])
+            original_name=current.game_name(item['globalIndex'],item['mutant']['index'])
             values[original_name]=p.read(root/original_name)
             actual_name=name+'/'+values[name+'/'+name+'.json']['actual']['file']
             values[actual_name]=p.read(root/actual_name)
     return generation_record(plan,p.read(source),p.file_sha(source),prepared,p.read(root/'finished.json'),
-        files,number,chunk,phase,values)
+        files,number,chunk,phase,values,contract=current)
 
 
 def members(receipt_subject,names):

@@ -4,11 +4,46 @@ The original calibration remains bound to its old protocol. Only the new envelop
 joins it to the supported continuation; no population/game is decoded before this gate.
 """
 from pathlib import Path
+import sys
 
 import coordinated_es_continuation as c
 import coordinated_es_math as es
 import coordinated_es_storage as storage
 import coordinated_win_plan as p
+
+GENERATION_SUBJECTS=('protocol','arena','originalBundle','projection','warmStart','originProof',
+    'numericalPreparation','center','directions','population','inheritedCalibration','previousUpdate','historical')
+EXTRA_IDENTITIES=('warmStartSha256','inheritedCalibrationSha256','ecologySha256')
+
+
+def game_name(index,mutant=None):
+    p.integer(index,0,255,'Global native world index')
+    return f'game-CONTROL-{index}.json' if mutant is None else storage.game_name(index,mutant)
+
+
+def panel_names(chunk,phase):return []
+
+
+def parameter_heads(plan):return plan.record['parameterSpace']['heads']
+
+
+def prepared_identity(plan,prepared,source_sha):
+    subjects=prepared['subjects'];record=plan.record
+    p.require(prepared['source']['sha256']==source_sha and prepared['scopeSha256']==plan.scope.scope_sha256 and
+        prepared['ecologySha256']==record['evaluation']['ecologySha256'] and
+        prepared['warmStartSha256']==record['warmStart']['identitySha256'] and
+        prepared['inheritedCalibrationSha256']==subjects['inheritedCalibration']['sha256'] and
+        prepared['originalBundle']['sha256']==plan.scope.original_bundle_sha256,
+        'Native continuation preparation binds the unchanged parameter origin and new supported execution identity.')
+
+
+def generation_record(plan,request,source_sha,prepared,finished,files,number,chunk,phase,replay_values):
+    return storage.generation_record(plan,request,source_sha,prepared,finished,files,number,chunk,phase,replay_values,
+        contract=sys.modules[__name__])
+
+
+def verify_generation(plan,root,source,number,chunk,phase):
+    return storage.verify_generation(plan,root,source,number,chunk,phase,contract=sys.modules[__name__])
 
 
 def canonical_subject(subject):

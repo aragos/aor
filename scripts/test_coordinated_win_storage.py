@@ -164,4 +164,91 @@ class TerminalTests(unittest.TestCase):
             s.game_win(game,self.receipt,self.plan,0,'PLUS-00','5'*64)
 
 
+class NativeGenerationTests(unittest.TestCase):
+    """Invented native DTOs exercise shared strict replay/inventory mechanics, not simulation."""
+    def build(self,phase='population'):
+        _,record=fixture()
+        for head in p.HEADS:record['parameterSpace']['heads'][head]['dictionarySha256']=p.digest({})
+        self.plan=p.Plan.from_record(record);self.phase=phase
+        subjects={key:dict(path='/constructed/'+key,sha256=p.digest(key)) for key in s.GENERATION_SUBJECTS}
+        subjects['previousUpdate']=None
+        if phase=='controls':subjects['population']=None
+        for key,digest in (('protocol',self.plan.file_sha256),('originalBundle',self.plan.scope.original_bundle_sha256),
+                ('projection',self.plan.scope.projection_sha256),('warmStart',record['warmStart']['identitySha256']),
+                ('originProof',record['warmStart']['proofSha256']['DESKTOP'])):subjects[key]['sha256']=digest
+        self.request=self.plan.generation_source(1,0,phase.upper(),subjects)
+        self.source_sha=p.digest(self.request)
+        self.prepared=dict(kind='coordinated-win-prepared-1',stage=phase.upper(),generation=1,globalStart=0,count=32,
+            bank=self.plan.bank(1)['worldBank'],subjects={key:None if item is None else dict(item,originalPath=item['path'])
+                for key,item in subjects.items()},source={'sha256':self.source_sha},scopeSha256=self.plan.scope.scope_sha256,
+            ecologySha256=record['evaluation']['ecologySha256'],warmStartSha256=record['warmStart']['identitySha256'],
+            inheritedCalibrationSha256=subjects['inheritedCalibration']['sha256'],originalBundle=subjects['originalBundle'],
+            arena=subjects['arena'],dictionaries={head:{} for head in p.HEADS},
+            inputPins={item['path']:item['sha256'] for item in subjects.values() if item is not None},
+            signature='b'*64,scienceSha256='c'*64)
+        self.files={s.game_name(index,member):dict(sha256='a'*64,size=1) for index in range(32)
+            for member in ([None] if phase=='controls' else range(32))}
+        self.files.update({name:dict(sha256=digest,size=1) for name,digest in
+            (('source.json',self.source_sha),('arena.json',subjects['arena']['sha256']),('prepared.json','a'*64))})
+        expected=32 if phase=='controls' else 1024
+        self.finished=dict(kind='coordinated-win-complete-1',**{key:self.prepared[key] for key in
+            ('signature','scopeSha256','scienceSha256','stage','generation','globalStart','count')+s.EXTRA_IDENTITIES},
+            attemptedGames=expected,completedGames=expected,expectedGames=expected,canonicalGames=0 if phase=='controls' else 1,
+            files={name:row['sha256'] for name,row in self.files.items()})
+        self.files['finished.json']=dict(sha256='a'*64,size=1);self.values={}
+        if phase=='population':
+            directory='replay-PLUS-00-0';receipt=directory+'/'+directory+'.json';actual=directory+'/game-PLUS-00-0.json'
+            self.files.update({name:dict(sha256='a'*64,size=1) for name in (receipt,actual)})
+            game=dict(canonical=dict(replayVerified=True),terminal=dict(elapsedMillis=0))
+            self.values={'game-PLUS-00-0.json':game,actual:game,receipt:dict(kind='coordinated-win-reproduction-1',
+                signature='b'*64,scienceSha256='c'*64,sourceSha256=self.source_sha,role='PLUS-00',globalIndex=0,
+                original={'sha256':'a'*64},actual={'file':'game-PLUS-00-0.json','sha256':'a'*64},
+                terminalEqual=True,canonicalEqual=True,replayVerified=True,scientificTerminalExecutions=1,
+                attemptedGames=1,completedGames=1)}
+
+    def check(self):
+        return s.generation_record(self.plan,self.request,self.source_sha,self.prepared,self.finished,self.files,
+            1,0,self.phase,self.values)
+
+    def test_supported_controls_have_exact_control_filenames_and_no_panels(self):
+        self.build('controls');row=self.check()
+        self.assertEqual(row['games'],[f'game-CONTROL-{i}.json' for i in range(32)])
+        self.assertEqual(row['panels'],[]);self.assertEqual(row['scientificTerminalExecutions'],32)
+
+    def test_complete_mutant_shard_reuses_actual_reproduction_inventory(self):
+        self.build();row=self.check()
+        self.assertEqual(row['scientificTerminalExecutions'],1025)
+        self.assertEqual(row['inheritedCalibrationSha256'],self.request['inheritedCalibration']['sha256'])
+        self.assertEqual(row['subjects']['numericalPreparation'],self.request['numericalPreparation'])
+
+    def test_new_control_cannot_emit_a_recalibration_panel(self):
+        self.build('controls');self.files['panel-0.json']=dict(sha256='a'*64,size=1)
+        self.finished['files']['panel-0.json']='a'*64
+        with self.assertRaisesRegex(ValueError,'extra or substituted'):self.check()
+
+    def test_old_raw_control_filename_cannot_replace_supported_control(self):
+        self.build('controls');self.files['game-RAW_G3-0.json']=self.files.pop('game-CONTROL-0.json')
+        with self.assertRaisesRegex(ValueError,'completion file must match'):self.check()
+
+    def test_completed_shard_cannot_replace_supported_ecology(self):
+        self.build();self.finished['ecologySha256']='d'*64
+        with self.assertRaisesRegex(ValueError,'complete once-attempted'):self.check()
+
+    def test_prepared_identity_cannot_replace_original_parameter_scope(self):
+        self.build();self.prepared['scopeSha256']=self.prepared['ecologySha256']
+        with self.assertRaisesRegex(ValueError,'unchanged parameter origin'):self.check()
+
+    def test_preparation_subject_cannot_be_dropped_from_native_source(self):
+        self.build();self.request.pop('numericalPreparation')
+        with self.assertRaises(KeyError):self.check()
+
+    def test_extra_actual_replay_file_is_rejected_by_shared_owner(self):
+        self.build();self.files['replay-PLUS-00-0/unexpected.json']=dict(sha256='a'*64,size=1)
+        with self.assertRaisesRegex(ValueError,'exactly its actual game'):self.check()
+
+    def test_forged_canonical_equality_flag_is_rejected(self):
+        self.build();self.values['replay-PLUS-00-0/replay-PLUS-00-0.json']['canonicalEqual']=False
+        with self.assertRaisesRegex(ValueError,'full canonical equality'):self.check()
+
+
 if __name__=='__main__':unittest.main()

@@ -160,6 +160,7 @@ def execute(root,*,numerical=None):
     arena=put(root/'invented-arena.json',dict(constructedArena=True));historical=put(root/'invented-historical.json',dict(constructedHistory=True))
     subjects={host:dict(protocol=request['protocol'],arena=arena,originalBundle=request['originalBundle'],
         projection=request['projection'],warmStart=request['warmStart'],originProof=proofs[host],center=first_center,
+        numericalPreparation=legacy_plan.subject(root/'prepared/finished.json'),
         directions=directions,population=population,inheritedCalibration=portable_calibration,
         previousUpdate=None,historical=historical) for host in p.HOSTS}
     receipts=archives(root/'archives',plan,request['protocol']['sha256'],population,portable_calibration,subjects=subjects)

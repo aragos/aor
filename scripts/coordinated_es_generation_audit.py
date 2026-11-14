@@ -38,18 +38,18 @@ def calibration_owner(plan):
     return v2
 
 
-def numeric(pins,receipt_subject,verb,protocol,clock,*,stopped=False):
+def numeric(pins,receipt_subject,verb,protocol,clock,*,stopped=False,prefix='coordinated-es'):
     """Verify the entire immutable transaction while treating actor files as opaque bytes."""
     receipt=subject(pins,receipt_subject,True);root=Path(receipt_subject['path']).parent
-    expected='coordinated-es-numeric-stop-1' if stopped else 'coordinated-es-numeric-complete-1'
+    expected=prefix+('-numeric-stop-1' if stopped else '-numeric-complete-1')
     p.require(receipt['kind']==expected and receipt['verb']==verb and receipt['complete'] is (not stopped) and
         receipt['passed'] is (not stopped) and receipt['execution']==ZERO_EXECUTION,
         'A numerical receipt must retain its exact operation and zero execution counters.')
     request=subject(pins,receipt['request'])
-    p.require(request['kind']==f'coordinated-es-{verb}-request-1' and same(request['protocol'],protocol) and
+    p.require(request['kind']==f'{prefix}-{verb}-request-1' and same(request['protocol'],protocol) and
         request['deadlineEpoch']==clock.deadline,'The request must retain the original raw protocol and clock.')
     started=pins.read(root/'started.json')
-    p.require(started['kind']=='coordinated-es-numeric-started-1' and started['verb']==verb and
+    p.require(started['kind']==prefix+'-numeric-started-1' and started['verb']==verb and
         started['request']==receipt['request'] and started['deadlineEpoch']==clock.deadline,
         'The original numerical startup evidence must remain bound.')
     completed=receipt['stoppedEpoch'] if stopped else receipt['completedEpoch']
@@ -197,11 +197,11 @@ def generation(pins,protocol,plan,clock,row,number,previous,previous_finished,fi
         gradientRms=result['gradientRms'],centerRms=result['centerRms'],radiusDivisor=result['radiusDivisor'])
 
 
-def prefix(pins,path,rows,upper_epoch,clock,protocol_sha):
+def prefix(pins,path,rows,upper_epoch,clock,protocol_sha,*,plan_owner=p):
     record=pins.read(path)
-    keys=set(p.prefix_gate(1,[1,1],{host:dict(sharedBaseBytes=0,generationDeltaBytes=[0,0]) for host in p.HOSTS}))
+    keys=set(plan_owner.prefix_gate(1,[1,1],{host:dict(sharedBaseBytes=0,generationDeltaBytes=[0,0]) for host in p.HOSTS}))
     p.require(set(record)==keys|{'censusAdjustmentBytes','censuses'},'The operational prefix has exact original fields.')
-    actual=p.prefix_gate(record['remainingSeconds'],record['generationSeconds'],record['retention'])
+    actual=plan_owner.prefix_gate(record['remainingSeconds'],record['generationSeconds'],record['retention'])
     p.require(all(record[key]==value for key,value in actual.items()) and
         record['generationSeconds']==[row['elapsedSeconds'] for row in rows[:2]] and
         rows[1]['finishedEpoch']<=clock.deadline-record['remainingSeconds']<=upper_epoch,
