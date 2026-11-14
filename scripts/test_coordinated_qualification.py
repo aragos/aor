@@ -186,6 +186,26 @@ class Fixture:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_visible_clock_always_has_worker_owner_before_peer_health(self):
+        class StopBeforeProfile(Exception): pass
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory); protocol = base/'protocol.json'
+            protocol.write_text('{}\n')
+            root = base/'study'; started = time.time(); observed = []
+            publish = q.storage.publish_json
+            def observe(path, value):
+                result = publish(path, value)
+                observed.append((Path(path).name, q.health(root)['status']))
+                if Path(path).name == 'clock.json': raise StopBeforeProfile()
+                return result
+            with patch.object(q.storage, 'publish_json', side_effect=observe), \
+                    patch.object(q, 'worker_alive', return_value=True), \
+                    patch.object(q, 'check_profile') as profile:
+                with self.assertRaises(StopBeforeProfile):
+                    q.worker(protocol, base/'unused-profile.json', root, started, started+p.SCIENCE_SECONDS)
+                profile.assert_not_called()
+            self.assertEqual(observed, [('worker-owner.json', 'absent'), ('clock.json', 'active')])
+
     def test_pure_import_closure_has_no_numerical_library(self):
         self.assertNotIn('torch', sys.modules); self.assertNotIn('numpy', sys.modules)
 
