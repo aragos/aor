@@ -55,12 +55,12 @@ def verify_historical(gate,protocol_sha,scope,ecology):
         'Fresh screens require both passing Desktop controls under the exact fixed scope.')
 
 
-def validate_world(plan,world,index,science,*,kind=KIND,roles=p.ROLES):
+def validate_world(plan,world,index,science,*,kind=KIND,roles=p.ROLES,opponent_count=1):
     p.require(world['kind']==kind and world['scienceSha256']==science and set(world['roles'])==set(roles),
         'Each world requires all three exact frozen role results.')
     for other in roles[1:]:
         pair=dict(world,candidate=world['roles']['FINAL'],incumbent=world['roles'][other])
-        arena_math.validate_pair(pair,index,plan.record['screenBank']['seeds'][index],1)
+        arena_math.validate_pair(pair,index,plan.record['screenBank']['seeds'][index],opponent_count)
     for game in world['roles'].values():
         p.require(all(0<=value<=1 for name in ('wins','rewards','ranks') for value in game[name]),
             'Every role metric must retain the original normalized terminal units.')

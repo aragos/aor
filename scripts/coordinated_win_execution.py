@@ -22,7 +22,28 @@ def specification(protocol,profile,clock):
 
 def host(protocol,profile,clock,output):return shared.host(protocol,profile,clock,output,contract=sys.modules[__name__])
 def stage(protocol,profile,clock,output):return shared.stage(protocol,profile,clock,output,contract=sys.modules[__name__])
-def verify(protocol,output):return shared.verify(protocol,output,contract=sys.modules[__name__])
+
+
+def verify_profile(protocol,output):
+    """The new profile-dependent numerical audit consumes the original controller input."""
+    output=Path(output);spec=p.read(output/'campaign.json')
+    p.require(len(spec['stages'])==1 and spec['stages'][0]['id']==PREFIX,
+        'Only the original single continuation stage may supply the audit profile.')
+    command=spec['stages'][0]['command']
+    p.require(command.count('--profile')==command.count('--protocol')==1,
+        'The original controller must declare exactly one profile and protocol.')
+    profile=p.subject(command[command.index('--profile')+1])
+    declared_protocol=p.subject(command[command.index('--protocol')+1])
+    owner=p.read(output/'run/study/worker-owner.json')
+    p.require(owner['kind']==PREFIX+'-worker-owner-1' and owner['profile']==profile and
+        declared_protocol==p.subject(protocol) and
+        all(spec['inputs'].get(item['path'])==item['sha256'] for item in (profile,declared_protocol)),
+        'The worker audit profile and protocol must equal the exact pinned controller arguments.')
+
+
+def verify(protocol,output):
+    verify_profile(protocol,output)
+    return shared.verify(protocol,output,contract=sys.modules[__name__])
 
 
 if __name__=='__main__':

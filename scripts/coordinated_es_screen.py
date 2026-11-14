@@ -1,6 +1,8 @@
 """Two original zero-policy controls and the sole final16 paired development screen."""
 import math
+import importlib
 from pathlib import Path
+import sys
 import tarfile
 
 import automata_experiments as intervals
@@ -18,6 +20,12 @@ KIND=p.PREFIX+'-screen-1'
 ROLES=('FINAL','RAW_G3')
 # Family60 used fixed512-world native chunks; global4095 is chunk07's local511.
 HISTORICAL_NATIVE_INDICES=(0,511)
+CAMPAIGN_MODULE='coordinated_es_campaign'
+SNAPSHOTS={'source':'study-source.json','arena':'arena-source.json','admission':'admission.json',
+    'historicalAdmission':'historical-admission.json'}
+
+
+def owner(contract):return sys.modules[__name__] if contract is None else contract
 
 
 def verify_historical(gate,plan,protocol_sha):
@@ -57,10 +65,11 @@ def historical(plan,profile,protocol,root):
     return p.subject(output/'historical-admission.json')
 
 
-def audit_historical(protocol,root,host,pins):
+def audit_historical(protocol,root,host,pins,*,contract=None):
+    current=owner(contract);p=current.p
     plan=p.Plan.from_file(pins.subject(protocol));root=Path(root)
     directory=root/'historical' if host=='DESKTOP' else root/'downloads/controls-1/content/historical'
-    gate=pins.read(directory/'historical-admission.json');verify_historical(gate,plan,protocol['sha256'])
+    gate=pins.read(directory/'historical-admission.json');current.verify_historical(gate,plan,protocol['sha256'])
     for row in gate['controls']:pins.pin(directory/storage.safe(row['replayFile']),row['replaySha256'])
     if host=='DESKTOP':
         source=root/'historical-source.json';pins.pin(source,gate['sourceSha256']);request=pins.read(source)
@@ -110,10 +119,27 @@ def final_bindings(plan,protocol_sha,final_subject,pins):
     return subjects,identity
 
 
-def chunk_evidence(plan,chunk,files,manifest,finished,worlds,replays,canonicals,final_sha,historical_sha,identity_bindings):
-    indices=list(p.indices(chunk,True));owned=p.screen_replays(chunk);expected=256+2*len(owned)
-    snapshots={'source':'study-source.json','arena':'arena-source.json','admission':'admission.json',
-        'historicalAdmission':'historical-admission.json'}
+def scope_identity(plan):
+    return {key:plan.record['original'][key] for key in ('scopeSha256','ecologySha256')}
+
+
+def original_bundle_sha(plan):return plan.record['original']['bundleSha256']
+
+
+def validate_world(plan,world,index,science):
+    return shared.validate_world(plan,world,index,science,kind=KIND,roles=ROLES)
+
+
+def replay_role(replay,role,bindings=None):return (replay.get('coordinatedEs') is None)==(role=='RAW_G3')
+
+
+def replay_bindings(plan,bindings):return bindings
+
+
+def chunk_evidence(plan,chunk,files,manifest,finished,worlds,replays,canonicals,final_sha,historical_sha,identity_bindings,*,contract=None):
+    current=owner(contract);p=current.p;KIND=current.KIND;ROLES=current.ROLES
+    indices=list(p.indices(chunk,True));owned=p.screen_replays(chunk);expected=(128+len(owned))*len(ROLES)
+    snapshots=current.SNAPSHOTS
     p.require({'manifest.json','started.json',*snapshots.values()}<=set(files) and
         all(files[name]['sha256']==manifest[key]['sha256'] and manifest[key]['snapshot']==name
             for key,name in snapshots.items()),
@@ -125,14 +151,14 @@ def chunk_evidence(plan,chunk,files,manifest,finished,worlds,replays,canonicals,
         finished['finalAdmissionSha256']==manifest['admission']['sha256']==final_sha and
         finished['historicalAdmissionSha256']==manifest['historicalAdmission']['sha256']==historical_sha and
         finished['files']=={name:row['sha256'] for name,row in files.items() if name!='finished.json'} and
-        finished['reproductions']==2*len(owned) and finished['scientificTerminalExecutions']==expected and
+        finished['reproductions']==len(ROLES)*len(owned) and finished['scientificTerminalExecutions']==expected and
         finished['attemptedGames']==finished['completedGames']==expected,
         'A screen shard requires exactly its original completed worlds/replays and entire raw inventory.')
-    identity=finished['scienceIdentity'];original=plan.record['original']
+    identity=finished['scienceIdentity']
     p.require(identity['seeds']==plan.record['screenBank']['seeds'] and identity['roles']==list(ROLES) and
         identity['replayIndices']==list(p.SCREEN_REPLAYS) and
-        all(identity[name]==original[name] for name in ('scopeSha256','ecologySha256')) and
-        identity['originalBundleSha256']==original['bundleSha256'] and
+        all(identity[name]==value for name,value in current.scope_identity(plan).items()) and
+        identity['originalBundleSha256']==current.original_bundle_sha(plan) and
         all(identity[name]==digest for name,digest in identity_bindings.items()),
         'Screen worlds retain one fixed role/ecology/bank across both hosts.')
     p.require(sorted(worlds)==indices and [row['index'] for row in finished['worlds']]==indices and
@@ -141,9 +167,10 @@ def chunk_evidence(plan,chunk,files,manifest,finished,worlds,replays,canonicals,
     for index,row in zip(indices,finished['worlds']):
         p.require(row['file']==f'world-{index}.json.gz' and files[row['file']]['sha256']==row['sha256'] and
             worlds[index]['signature']==manifest['signature'],'Native compact worlds must bind their original raw bytes.')
-        shared.validate_world(plan,worlds[index],index,manifest['scienceSha256'],kind=KIND,roles=ROLES)
+        current.validate_world(plan,worlds[index],index,manifest['scienceSha256'])
     p.require(set(replays)==set(canonicals)=={(index,role) for index in owned for role in ROLES} and
         manifest['ownedReplayIndices']==list(owned),'Only the prescribed global two-role reproductions may occur.')
+    role_bindings=current.replay_bindings(plan,identity_bindings)
     for (index,role),replay in replays.items():
         world=worlds[index]
         p.require(replay['replayVerified'] is True and replay['index']==index and replay['seed']==world['seed'] and
@@ -151,17 +178,27 @@ def chunk_evidence(plan,chunk,files,manifest,finished,worlds,replays,canonicals,
             replay['opponentIndices']==world['opponentIndices'] and replay['side']=='CANDIDATE' and
             arena_math.same_game(replay['game'],world['roles'][role]) and
             shared.canonical(replay)==canonicals[index,role] and
-            ((replay.get('coordinatedEs') is None) == (role=='RAW_G3')),
+            current.replay_role(replay,role,role_bindings),
             'Each actual role reproduction preserves the original world, full canonical and explicit role binding.')
 
 
-def collect(plan,profile,root,chunk,final,historical):
-    from coordinated_es_campaign import native_run
+def source(plan,profile,chunk,final,historical):
+    return dict(kind=KIND,arena=profile['arena'],admission=final,historical=historical,
+        globalStart=chunk*128,count=128,bank=plan.record['screenBank'])
+
+
+def publication_identity(plan,protocol_sha,final_sha):
+    return dict(protocolSha256=protocol_sha,finalAdmissionSha256=final_sha,
+        scopeSha256=plan.record['original']['scopeSha256'])
+
+
+def collect(plan,profile,root,chunk,final,historical,*,contract=None):
+    current=owner(contract);p=current.p;roles=current.ROLES
+    native_run=importlib.import_module(current.CAMPAIGN_MODULE).native_run
     p.require(p.owner(chunk,True)==profile['host'],'Final worlds cannot migrate between hosts.')
     directory=Path(root)/'screen/chunks'/f'chunk-{chunk}';directory.mkdir(parents=True,exist_ok=False)
     source=directory/'source.json';output=directory/'native'
-    storage.publish_json(source,dict(kind=KIND,arena=profile['arena'],admission=final,historical=historical,
-        globalStart=chunk*128,count=128,bank=plan.record['screenBank']))
+    storage.publish_json(source,current.source(plan,profile,chunk,final,historical))
     native_run(profile,p.PREFIX+'-screen-chunk',source,output,directory/'screen.log',('--workers',str(profile['workers'])))
     files=storage.inventory(output);worlds={};replays={};canonicals={};metadata={}
     for name in files:
@@ -169,29 +206,30 @@ def collect(plan,profile,root,chunk,final,historical):
             shared.parse_member(name,(output/name).read_bytes(),worlds,replays,canonicals,metadata)
     p.require(metadata['manifest.json']['source']['sha256']==p.file_sha(source),
         'The native screen manifest must bind its exact original execution request.')
-    _,bindings=final_bindings(plan,profile['protocolSha256'],final,Pins(profile['_clock'].deadline))
-    chunk_evidence(plan,chunk,files,metadata['manifest.json'],metadata['finished.json'],worlds,replays,canonicals,
+    _,bindings=current.final_bindings(plan,profile['protocolSha256'],final,Pins(profile['_clock'].deadline))
+    current.chunk_evidence(plan,chunk,files,metadata['manifest.json'],metadata['finished.json'],worlds,replays,canonicals,
         final['sha256'],historical['sha256'],bindings)
     receipt=dict(kind=p.PREFIX+'-screen-chunk-receipt-1',chunk=chunk,host=profile['host'],files=files,
         scienceSha256=metadata['manifest.json']['scienceSha256'],finalAdmissionSha256=final['sha256'],
-        historicalAdmissionSha256=historical['sha256'],worlds=128,games=256,reproductions=len(replays),
-        scientificTerminalExecutions=256+len(replays))
+        historicalAdmissionSha256=historical['sha256'],worlds=128,games=128*len(roles),reproductions=len(replays),
+        scientificTerminalExecutions=128*len(roles)+len(replays))
     archive=directory/'evidence.tar.gz';storage.archive_collection(output,archive,receipt)
     return p.subject(archive.with_name(archive.name+'.json'))
 
 
-def archived(plan,item,pins,identity_bindings):
+def archived(plan,item,pins,identity_bindings,*,contract=None):
+    current=owner(contract);p=current.p;roles=current.ROLES
     path=pins.subject(item);receipt=pins.read(path)
     names=[name for name in receipt['files'] if name.startswith(('world-','replay-','canonical-')) or
         name in ('manifest.json','finished.json')]
     values=stream_archive(path.with_name(receipt['archive']),receipt,pins,names)
     worlds={};replays={};canonicals={};metadata={}
     for name,value in values.items():shared.parse_value(name,value,worlds,replays,canonicals,metadata)
-    chunk_evidence(plan,receipt['chunk'],receipt['files'],metadata['manifest.json'],metadata['finished.json'],
+    current.chunk_evidence(plan,receipt['chunk'],receipt['files'],metadata['manifest.json'],metadata['finished.json'],
         worlds,replays,canonicals,receipt['finalAdmissionSha256'],receipt['historicalAdmissionSha256'],identity_bindings)
     p.require(receipt['kind']==p.PREFIX+'-screen-chunk-receipt-1' and receipt['host']==p.owner(receipt['chunk'],True) and
-        receipt['worlds']==128 and receipt['games']==256 and receipt['reproductions']==len(replays) and
-        receipt['scientificTerminalExecutions']==256+len(replays),'Screen receipt cannot alter actual original counts.')
+        receipt['worlds']==128 and receipt['games']==128*len(roles) and receipt['reproductions']==len(replays) and
+        receipt['scientificTerminalExecutions']==128*len(roles)+len(replays),'Screen receipt cannot alter actual original counts.')
     return receipt,metadata['finished.json'],[worlds[index] for index in p.indices(receipt['chunk'],True)]
 
 
@@ -213,14 +251,15 @@ def verify_report(worlds,report):
     return passed
 
 
-def complete(plan,profile,protocol,root,receipts,final,historical):
+def complete(plan,profile,protocol,root,receipts,final,historical,*,contract=None):
+    current=owner(contract);p=current.p;admission=current.admission;execution=current.execution
     root=Path(root);directory=root/'screen-report-input';directory.mkdir(parents=True,exist_ok=False)
     p.require(len(receipts)==16,'Every fixed Desktop/Mac final shard must complete before effects.')
     pins=Pins(profile['_clock'].deadline);worlds=[];chunks=[];sciences=set()
-    _,bindings=final_bindings(plan,p.file_sha(protocol),final,pins)
+    _,bindings=current.final_bindings(plan,p.file_sha(protocol),final,pins)
     ordered=sorted(receipts,key=lambda item:p.read(p.checked_subject(item))['chunk'])
     for ordinal,item in enumerate(ordered):
-        receipt,finished,rows=archived(plan,item,pins,bindings)
+        receipt,finished,rows=current.archived(plan,item,pins,bindings)
         p.require(receipt['chunk']==ordinal and receipt['finalAdmissionSha256']==final['sha256'] and
             receipt['historicalAdmissionSha256']==historical['sha256'],'Final and historical subjects are shared by every shard.')
         worlds.extend(rows);sciences.add(receipt['scienceSha256'])
@@ -237,10 +276,11 @@ def complete(plan,profile,protocol,root,receipts,final,historical):
         'dev.aragos.aor.training.TrainingMainKt','--mode',p.PREFIX+'-screen-report',
         '--worlds',compact['path'],'--output',str(root/'screen-report')]
     execution.run_child(profile,command,root/'screen-report.log')
-    report=p.read(root/'screen-report/report.json');passed=verify_report(worlds,report)
+    report=p.read(root/'screen-report/report.json');passed=current.verify_report(worlds,report)
     record=dict(kind=p.PREFIX+'-screen-complete-1',complete=True,protocolSha256=p.file_sha(protocol),chunks=ordered,
         compact=compact,report=p.subject(root/'screen-report/report.json'),reportFinished=p.subject(root/'screen-report/finished.json'),
-        finalAdmission=final,historicalAdmission=historical,worlds=2048,games=4096,reproductions=8,historicalControls=2,
+        finalAdmission=final,historicalAdmission=historical,worlds=2048,games=2048*len(current.ROLES),
+        reproductions=4*len(current.ROLES),historicalControls=2,
         developmentGatePassed=passed,qualification=False,activated=False,automaticSuccessor=False)
     return storage.publish_json(root/'screen-complete.json',record)
 
@@ -268,15 +308,15 @@ def finish(plan,profile,protocol,root,center,calibration,historical):
         finalAdmission=final,finalBundle=bundle,screenComplete=completion)
 
 
-def mac(plan,profile,protocol,root,folder,ready):
+def mac(plan,profile,protocol,root,folder,ready,*,contract=None):
+    current=owner(contract);p=current.p;admission=current.admission
     root=Path(root);folder=Path(folder);final=p.subject(folder/'final-admission.json');value=p.read(final['path'])
-    p.require(ready['publication']['identity']==dict(protocolSha256=p.file_sha(protocol),
-        finalAdmissionSha256=final['sha256'],scopeSha256=plan.record['original']['scopeSha256']),
+    p.require(ready['publication']['identity']==current.publication_identity(plan,p.file_sha(protocol),final['sha256']),
         'Mac may screen only the shared admitted final16 mean.')
     historical=p.subject(admission.resolve(value['historical'],final['path']))
     receipts=[]
     for chunk in p.SCREEN_CHUNKS['MAC']:
-        item=collect(plan,profile,root,chunk,final,historical);receipts.append(item)
+        item=current.collect(plan,profile,root,chunk,final,historical);receipts.append(item)
         path=Path(item['path']);row=p.read(path)
         accepted=profile['_peer'].push(path.with_name(row['archive']),path,None,chunk,True)
         storage.publish_json(path.parent/'handoff.json',accepted)
@@ -287,24 +327,25 @@ def mac(plan,profile,protocol,root,folder,ready):
         finalAdmission=final,finalBundle=bundle,screenComplete=completion)
 
 
-def audit_completed(protocol,root,host,pins):
+def audit_completed(protocol,root,host,pins,*,contract=None):
+    current=owner(contract);p=current.p
     root=Path(root);plan=p.Plan.from_file(pins.subject(protocol));completion=pins.read(root/'screen-complete.json')
     p.require(completion['complete'] is True and completion['protocolSha256']==protocol['sha256'],
         'Final screen completion must retain the original protocol.')
-    subjects,bindings=final_bindings(plan,protocol['sha256'],completion['finalAdmission'],pins)
+    subjects,bindings=current.final_bindings(plan,protocol['sha256'],completion['finalAdmission'],pins)
     terminal=pins.read(root/'terminal.json')
     p.require(terminal['finalAdmission']==completion['finalAdmission'] and
         terminal['screenComplete']==p.subject(root/'screen-complete.json') and
         terminal['finalBundle']==subjects['finalBundle'] and
         completion['historicalAdmission']['sha256']==subjects['historical']['sha256'],
         'Terminal eligibility must identify exactly the complete final bundle that was screened.')
-    verify_historical(
+    current.verify_historical(
         pins.read(pins.subject(completion['historicalAdmission'])),plan,protocol['sha256'])
     expected=list(range(16)) if host=='DESKTOP' else list(p.SCREEN_CHUNKS['MAC'])
     p.require(len(completion['chunks'])==len(expected),'Every host must retain its entire fixed final range.')
     worlds=[];reproductions=0;sciences=set()
     for ordinal,item in zip(expected,completion['chunks']):
-        receipt,finished,rows=archived(plan,item,pins,bindings)
+        receipt,finished,rows=current.archived(plan,item,pins,bindings)
         p.require(receipt['chunk']==ordinal and receipt['finalAdmissionSha256']==completion['finalAdmission']['sha256'] and
             receipt['historicalAdmissionSha256']==completion['historicalAdmission']['sha256'],
             'Final evidence must preserve the exact original completed shard order and actor.')
@@ -312,8 +353,8 @@ def audit_completed(protocol,root,host,pins):
     p.require(len(sciences)==1,'Every retained screen shard must preserve its one fixed science identity.')
     if host=='DESKTOP':
         p.require(completion['kind']==p.PREFIX+'-screen-complete-1' and
-            verify_report(worlds,pins.read(pins.subject(completion['report'])))==completion['developmentGatePassed'],
+            current.verify_report(worlds,pins.read(pins.subject(completion['report'])))==completion['developmentGatePassed'],
             'The complete final native report and prescribed gate must reproduce.')
         pins.subject(completion['compact']);pins.subject(completion['reportFinished'])
     else:p.require(completion['kind']==p.PREFIX+'-screen-host-complete-1','Mac cannot claim a global effect report.')
-    return dict(games=len(worlds)*2,reproductions=reproductions,historicalControls=2 if host=='DESKTOP' else 0)
+    return dict(games=len(worlds)*len(current.ROLES),reproductions=reproductions,historicalControls=2 if host=='DESKTOP' else 0)
