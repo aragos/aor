@@ -18,6 +18,17 @@ function failureCode(failure: unknown): string {
     return typeof failure === 'object' && failure !== null && 'code' in failure ? String(failure.code) : 'BOT_POLICY_FAILED';
 }
 
+function proposedCommand(job: BotJob): string | undefined {
+    const proposal = job.proposal;
+    if (proposal == null) return undefined;
+    if (proposal.profile !== 'aor-coordinated-83-support-1' || !/^[0-9a-f]{64}$/.test(proposal.assetSha256)
+        || typeof proposal.command !== 'string' || !proposal.command.trim() || proposal.command.length > 200
+        || /[\r\n]/.test(proposal.command)) {
+        throw new Error('BOT_POLICY_FAILED');
+    }
+    return proposal.command;
+}
+
 /** One lease and serial decision loop serve every automated seat. Stop fences all local callbacks. */
 export function startBotRunner(initialEpoch: number, dependencies: BotRunnerDependencies) {
     const controller = new AbortController();
@@ -69,7 +80,7 @@ export function startBotRunner(initialEpoch: number, dependencies: BotRunnerDepe
                 const job = work.observations[0];
                 if (!job) {status('waiting'); await wait(2000); continue;}
                 status('thinking');
-                const command = await dependencies.think(job, signal);
+                const command = proposedCommand(job) ?? await dependencies.think(job, signal);
                 if (signal.aborted) return;
                 // Human mutations can change decisions without advancing the public revision.
                 if (dependencies.suspended()) continue;

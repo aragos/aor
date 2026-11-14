@@ -52,6 +52,48 @@ test('one runner computes and submits multiple bot seats serially', async contex
     assert.deepEqual(submitted.map(entry => entry.command), ['answer p2', 'answer p3']);
 });
 
+test('an explicit server proposal bypasses worker inference', async context => {
+    const proposal = {profile: 'aor-coordinated-83-support-1', assetSha256: 'a'.repeat(64), command: 'buy-tokens 15'};
+    const decision = {...job('p2'), proposal};
+    let calls = 0;
+    const {submitted} = fixture(context, {
+        runner: async () => work([decision]),
+        think: async () => {calls++; return 'buy-tokens 16';},
+    });
+    await settle();
+
+    assert.equal(calls, 0);
+    assert.equal(submitted[0].command, proposal.command);
+});
+
+test('an unknown proposal profile stops without worker fallback or submission', async context => {
+    const decision = {...job('p2'), proposal: {profile: 'unknown', assetSha256: 'a'.repeat(64), command: 'pass'}};
+    let calls = 0;
+    const {submitted, states} = fixture(context, {
+        runner: async () => work([decision]),
+        think: async () => {calls++; return 'pass';},
+    });
+    await settle();
+
+    assert.equal(calls, 0);
+    assert.equal(submitted.length, 0);
+    assert.equal(states.at(-1), 'stopped');
+});
+
+test('a malformed proposal asset identity stops without worker fallback', async context => {
+    const decision = {...job('p2'), proposal: {profile: 'aor-coordinated-83-support-1', assetSha256: 'bad', command: 'pass'}};
+    let calls = 0;
+    const {submitted, states} = fixture(context, {
+        runner: async () => work([decision]),
+        think: async () => {calls++; return 'pass';},
+    });
+    await settle();
+
+    assert.equal(calls, 0);
+    assert.equal(submitted.length, 0);
+    assert.equal(states.at(-1), 'stopped');
+});
+
 test('a stopped StrictMode instance cannot publish or submit a late lease response', async context => {
     const pending = deferred();
     const {runner, states, submitted} = fixture(context, {runner: () => pending.promise});

@@ -175,6 +175,8 @@ export interface BotJob {
     purchase?: unknown;
     /** Optional actor-visible card projection; authority and hidden opponent state are excluded. */
     card?: unknown;
+    /** An exact server-profile proposal bypasses local worker inference for this decision. */
+    proposal?: {profile: 'aor-coordinated-83-support-1'; assetSha256: string; command: string} | null;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;
