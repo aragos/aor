@@ -385,36 +385,42 @@ def diagnose(inputs,request,out,guard):
 def execute(verb,request_path,output):
     """One guarded CPU1 operation. The caller owns the original deadline and stage launch."""
     es.require(verb in FIELDS,'Unknown numerical operation.')
+    return execute_request(verb,request_path,output,FIELDS[verb],'coordinated-es',
+        source_owners,globals()[verb],verb!='prepare')
+
+
+def execute_request(verb,request_path,output,fields,prefix,check_owners,operation,requires_protocol=True):
+    """Shared request/atomic evidence owner; typed adapters supply only their admitted operation."""
     inputs=Inputs();path=Path(request_path).absolute();request_subject=dict(path=str(path),sha256=raw_sha(path.read_bytes()))
     request=inputs.json(request_subject)
-    es.exact(request,COMMON+FIELDS[verb],'Numerical request')
-    es.require(request['kind']==f'coordinated-es-{verb}-request-1','Numerical request kind differs from its explicit verb.')
+    es.exact(request,COMMON+fields,'Numerical request')
+    es.require(request['kind']==f'{prefix}-{verb}-request-1','Numerical request kind differs from its explicit verb.')
     deadline=es.finite(request['deadlineEpoch'],'deadline')
     def guard():
         if time.time()>=deadline:raise es.OperationalStop('original-deadline')
-    guard();source_owners(inputs,request['sourceOwners'])
+    guard();check_owners(inputs,request['sourceOwners'])
     expected=inputs.json(request['numerical']);environment.verify(expected)
-    if verb!='prepare':protocol_sha(inputs,request)
+    if requires_protocol:protocol_sha(inputs,request)
     out=Output(output)
-    out.json('started.json',dict(kind='coordinated-es-numeric-started-1',verb=verb,request=request_subject,
+    out.json('started.json',dict(kind=prefix+'-numeric-started-1',verb=verb,request=request_subject,
         startedEpoch=time.time(),deadlineEpoch=deadline))
     try:
-        outputs=globals()[verb](inputs,request,out,guard)
+        outputs=operation(inputs,request,out,guard)
         guard();inputs.unchanged();guard()
-        receipt=dict(kind='coordinated-es-numeric-complete-1',passed=True,complete=True,verb=verb,
-            request=request_subject,protocolSha256=None if verb=='prepare' else request['protocol']['sha256'],
+        receipt=dict(kind=prefix+'-numeric-complete-1',passed=True,complete=True,verb=verb,
+            request=request_subject,protocolSha256=request['protocol']['sha256'] if requires_protocol else None,
             sourceOwners=request['sourceOwners'],inputPins=inputs.pins,artifacts=out.inventory(),outputs=outputs,
             completedEpoch=time.time(),execution=dict(newGames=0,actualFits=0,optimizerSteps=0))
         out.json('finished.json',receipt)
         return receipt
     except es.OperationalStop as failure:
-        out.json('stopped.json',dict(kind='coordinated-es-numeric-stop-1',complete=False,passed=False,verb=verb,
+        out.json('stopped.json',dict(kind=prefix+'-numeric-stop-1',complete=False,passed=False,verb=verb,
             request=request_subject,reason=failure.reason,diagnostics=failure.diagnostics,inputPins=inputs.pins,
             artifacts=out.inventory(),stoppedEpoch=time.time(),deadlineEpoch=deadline,
             execution=dict(newGames=0,actualFits=0,optimizerSteps=0)))
         raise
     except Exception as failure:
-        out.json('failed.json',dict(kind='coordinated-es-numeric-failure-1',complete=False,passed=False,verb=verb,
+        out.json('failed.json',dict(kind=prefix+'-numeric-failure-1',complete=False,passed=False,verb=verb,
             request=request_subject,errorType=type(failure).__name__,message=str(failure),inputPins=inputs.pins,
             artifacts=out.inventory(),failedEpoch=time.time(),execution=dict(newGames=0,actualFits=0,optimizerSteps=0)))
         raise

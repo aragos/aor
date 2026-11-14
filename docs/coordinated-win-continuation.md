@@ -105,6 +105,8 @@ Only all16 completed updates can reach the final screen.
 ## Counts, fixed ownership and final evidence
 
 Proposed total is141,358 terminal executions,2,052 above83 because the final screen adds START83.
+The reusable source and receipt wire calls this role `START`; this experiment's immutable origin
+subjects identify that role as the exact83 mean16. The role and comparisons below are unchanged.
 This count and the new development gate require prospective root approval before implementation.
 
 | Work | Count |
