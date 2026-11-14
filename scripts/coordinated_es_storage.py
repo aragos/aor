@@ -212,7 +212,6 @@ def public_panel(plan,protocol_sha,receipts):
 
 def game_reward(value,receipt,plan,index,expected_role,bundle_sha):
     """Authoritative score-derived normalized reward, never a substitute for unfinished play."""
-    import expansion_training_evidence as evidence
     number=receipt['generation'];p.generation(number)
     p.require(value['kind']==p.PREFIX+'-game-1' and value['generation']==number and
         value['globalIndex']==index and value['seed']==plan.bank(number)['worldBank']['seeds'][index] and
@@ -220,7 +219,15 @@ def game_reward(value,receipt,plan,index,expected_role,bundle_sha):
         value['originalBundleSha256']==plan.record['original']['bundleSha256'] and
         all(value[key]==receipt[key] for key in ('signature','scopeSha256','scienceSha256','sourceSha256')),
         'A fitness row must retain its exact original world, role, actor and executable factory binding.')
-    game=value['terminal'];seat=value['seat']
+    return terminal_metrics(value['terminal'])['rewards'][value['seat']]
+
+
+def terminal_metrics(game):
+    """Validate all recorded seat metrics against authoritative score/player identities.
+
+    Typed fitness owners select a field only after this unchanged complete-game check.
+    """
+    import expansion_training_evidence as evidence
     p.require(all(len(game[key])==4 for key in ('wins','rewards','ranks','scores')) and
         type(game['decisions']) is int and 0<game['decisions']<=12000,
         'Only an original complete bounded four-seat game supplies fitness.')
@@ -228,7 +235,7 @@ def game_reward(value,receipt,plan,index,expected_role,bundle_sha):
         evidence.terminal_reward(dict(controlledSeat=own,terminal=dict(scores=game['scores'],
             winShare=game['wins'][own],rankReward=game['ranks'][own],reward=game['rewards'][own],
             gameDecisions=game['decisions'])))
-    return game['rewards'][seat]
+    return {key:game[key] for key in ('wins','rewards','ranks')}
 
 
 def fitness(plan,protocol_sha,population_subject,calibration_subject,receipts):
@@ -248,30 +255,42 @@ def fitness(plan,protocol_sha,population_subject,calibration_subject,receipts):
         population['worldIds']==list(range(256)) and len(population['members'])==32 and
         p.digest(population)==population_subject['sha256'],
         'The complete executable population and native bank must share exact calibrated identity.')
-    p.require(len(receipts)==8,'A gradient requires both hosts and all eight immutable population shards.')
-    rows=[[None]*256 for _ in range(32)];seen=set();sciences=set()
-    for item in receipts:
-        receipt=p.read(p.checked_subject(item));chunk=receipt['chunk']
+    def admit(receipt):
         p.require(receipt['kind']==p.PREFIX+'-chunk-receipt-1' and receipt['phase']=='population' and
             receipt['generation']==number and receipt['protocolSha256']==protocol_sha and
             receipt['subjects']['population']['sha256']==population_subject['sha256'] and
-            receipt['subjects']['calibration']['sha256']==calibration_subject['sha256'] and chunk not in seen,
+            receipt['subjects']['calibration']['sha256']==calibration_subject['sha256'],
             'Every fitness shard must bind the same original calibrated population once.')
+    rows=return_matrix(receipts,admit,lambda value,receipt,index,member:
+        game_reward(value,receipt,plan,index,role(member),population['members'][member]['bundleSha256']))
+    return dict(kind=p.PREFIX+'-fitness-1',populationSha256=population_subject['sha256'],
+        worldBankSha256=population['worldBankSha256'],worldIds=list(range(256)),members=[
+            dict(direction=member//2,sign=1 if member%2==0 else -1,
+                bundleSha256=population['members'][member]['bundleSha256'],rewards=rows[member])
+            for member in range(32)])
+
+
+def return_matrix(receipts,admit_receipt,game_value):
+    """Read one complete32-by256 matrix using explicit typed receipt/game boundaries.
+
+    The callbacks own objective and scope admission. Archive integrity, ownership,
+    duplicate rejection and one-world-one-member accounting stay shared.
+    """
+    p.require(len(receipts)==8,'A gradient requires both hosts and all eight immutable population shards.')
+    rows=[[None]*256 for _ in range(32)];seen=set();sciences=set()
+    for item in receipts:
+        receipt=p.read(p.checked_subject(item));chunk=receipt['chunk'];admit_receipt(receipt)
+        p.require(chunk not in seen,'Every fitness shard must bind the same original calibrated population once.')
         seen.add(chunk);sciences.add(receipt['scienceSha256'])
         expected={game_name(index,member):(index,member) for index in p.indices(chunk) for member in range(32)}
         p.require(set(receipt['games'])==set(expected),'A shard must retain all32 mutants for each owned world.')
         for name,value in members(item,receipt['games']):
             index,member=expected[name]
             p.require(rows[member][index] is None,'A native mutant/world cannot contribute more than once.')
-            rows[member][index]=game_reward(value,receipt,plan,index,role(member),
-                population['members'][member]['bundleSha256'])
+            rows[member][index]=game_value(value,receipt,index,member)
     p.require(seen==set(range(8)) and len(sciences)==1 and all(value is not None for row in rows for value in row),
         'Incomplete or mixed-identity populations cannot produce a gradient or a replacement world.')
-    return dict(kind=p.PREFIX+'-fitness-1',populationSha256=population_subject['sha256'],
-        worldBankSha256=population['worldBankSha256'],worldIds=list(range(256)),members=[
-            dict(direction=member//2,sign=1 if member%2==0 else -1,
-                bundleSha256=population['members'][member]['bundleSha256'],rewards=rows[member])
-            for member in range(32)])
+    return rows
 
 
 def generation_path(name):
