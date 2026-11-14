@@ -40,8 +40,8 @@ future random consumption after policies diverge.
 
 For each of the four contexts, pair0..7 evaluates `CANDIDATE=pair` and `INCUMBENT=15-pair`.
 This executes each mask once per world/context without repeating mask0. Each of32 context/pair
-cases has eight64-world chunks. Desktop owns chunks0..4; Mac owns5..7. No migration or refill.
-This produces256 lossless chunk archives and16,384 paired world records.
+cases has one320-world Desktop range (indices0..319) and one192-world Mac range
+(indices320..511). No migration or refill. This produces64 lossless chunk archives and16,384 paired world records.
 
 Exactly one canonical reproduction per mask/context is executed at
 `[0,170,341,511][mask % 4]`. These indices cover controlled seats0,2,1,3 respectively; each seat
@@ -85,8 +85,8 @@ plus exactly one LF; execution subjects bind the raw file SHA including that LF.
 
 Source kind is `coordinated-diagnostic-input-1`, with exactly `kind`, `protocol`, `originArena`,
 `originAdmission`, `originProof`, `arena`, `host`, `ecology`, `support`, `pair`, `globalStart`,
-`count`. The six file subjects retain the existing `{path,sha256}` encoding. Count is64 and range
-belongs to its fixed host. Arena carries the explicit original/current complementary descriptors,
+`count`. The five file subjects retain the existing `{path,sha256}` encoding. Count is320 on Desktop and192 on Mac, with starts0 and320 respectively. Each case uses one
+native range call per host. Arena carries the explicit original/current complementary descriptors,
 all-seat support setting and unchanged raw reference factory. Native admission rehashes the
 original closure and every selected head before execution.
 
