@@ -78,57 +78,14 @@ internal object CoordinatedEsHistorical {
         artifacts.ensureFileSnapshot(source.path, source.sha256, "source.json")
         try {
             val records = controls.mapIndexed { ordinal, control ->
-                PurchaseJson.fields(
+                executeControl(
+                    source,
+                    output,
+                    scope,
+                    attempts,
+                    ordinal,
                     control,
-                    setOf("source", "pair", "replay", "globalIndex", "index", "side"),
-                )
-                val originalSource = TokenPairedSubject.read(control["source"], source.path.parent)
-                val pair = TokenPairedSubject.read(control["pair"], source.path.parent)
-                val canonical = TokenPairedSubject.read(control["replay"], source.path.parent)
-                val raw = ArenaSpecification.read(originalSource.path)
-                val originalPair = StrategyReplayPair.read(pair.path)
-                val position =
-                    CoordinatedEsHistoricalPosition.read(
-                        control,
-                        declarations[ordinal],
-                        raw,
-                        originalPair,
-                    )
-                val side = StrategyReplaySide.CANDIDATE
-                ThreeRoleHistorical.validateReference(scope.arena, raw, side)
-                val zero =
-                    ArenaCoordinatedPolicy.zero(scope.original, scope.baseline, side.arenaSide)
-                val replay = attempts.execute { gameDeadline ->
-                    StrategyReplays.coordinatedHistorical(
-                            raw,
-                            zero,
-                            position.index,
-                            side,
-                            gameDeadline,
-                            originalPair,
-                        )
-                        .also {
-                            CoordinatedEsAttempts.terminal(it.game)
-                            ExpansionFinalScreen.verifyHistorical(
-                                PurchaseJson.read(canonical.path),
-                                ExpansionOnPolicyStore.wire(it),
-                            )
-                        }
-                }
-                listOf(originalSource, pair, canonical).forEach(TokenPairedSubject::verify)
-                val name = "historical-$ordinal.json"
-                artifacts.write(name, replay)
-                mapOf(
-                    "globalIndex" to position.globalIndex,
-                    "index" to position.index,
-                    "side" to side.commandValue,
-                    "originalSourceSha256" to originalSource.sha256,
-                    "originalPairSha256" to pair.sha256,
-                    "originalReplaySha256" to canonical.sha256,
-                    "replayFile" to name,
-                    "replaySha256" to PurchaseJson.hash(output.resolve(name)),
-                    "canonicalVerified" to true,
-                    "execution" to "ZERO_REFERENCE",
+                    declarations[ordinal],
                 )
             }
             source.verify()
@@ -164,5 +121,68 @@ internal object CoordinatedEsHistorical {
             )
             throw failure
         }
+    }
+
+    internal fun executeControl(
+        source: TokenPairedSubject,
+        output: Path,
+        scope: CoordinatedEsScope,
+        attempts: CoordinatedEsAttempts,
+        ordinal: Int,
+        control: JsonNode,
+        declaration: JsonNode,
+    ): Map<String, Any> {
+        val artifacts = TrainingArtifacts(output)
+        PurchaseJson.fields(
+            control,
+            setOf("source", "pair", "replay", "globalIndex", "index", "side"),
+        )
+        val originalSource = TokenPairedSubject.read(control["source"], source.path.parent)
+        val pair = TokenPairedSubject.read(control["pair"], source.path.parent)
+        val canonical = TokenPairedSubject.read(control["replay"], source.path.parent)
+        val raw = ArenaSpecification.read(originalSource.path)
+        val originalPair = StrategyReplayPair.read(pair.path)
+        val position =
+            CoordinatedEsHistoricalPosition.read(
+                control,
+                declaration,
+                raw,
+                originalPair,
+            )
+        val side = StrategyReplaySide.CANDIDATE
+        ThreeRoleHistorical.validateReference(scope.arena, raw, side)
+        val zero = ArenaCoordinatedPolicy.zero(scope.original, scope.baseline, side.arenaSide)
+        val replay = attempts.execute { gameDeadline ->
+            StrategyReplays.coordinatedHistorical(
+                    raw,
+                    zero,
+                    position.index,
+                    side,
+                    gameDeadline,
+                    originalPair,
+                )
+                .also {
+                    CoordinatedEsAttempts.terminal(it.game)
+                    ExpansionFinalScreen.verifyHistorical(
+                        PurchaseJson.read(canonical.path),
+                        ExpansionOnPolicyStore.wire(it),
+                    )
+                }
+        }
+        listOf(originalSource, pair, canonical).forEach(TokenPairedSubject::verify)
+        val name = "historical-$ordinal.json"
+        artifacts.write(name, replay)
+        return mapOf(
+            "globalIndex" to position.globalIndex,
+            "index" to position.index,
+            "side" to side.commandValue,
+            "originalSourceSha256" to originalSource.sha256,
+            "originalPairSha256" to pair.sha256,
+            "originalReplaySha256" to canonical.sha256,
+            "replayFile" to name,
+            "replaySha256" to PurchaseJson.hash(output.resolve(name)),
+            "canonicalVerified" to true,
+            "execution" to "ZERO_REFERENCE",
+        )
     }
 }
