@@ -161,6 +161,8 @@ p { line-height: 1.55; } a { color: var(--link); text-underline-offset: 3px; } l
 .activity-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .activity-body > p { margin: .3rem 0; }
 .activity-content, .activity-group { display: grid; gap: .45rem; min-width: 0; }
+.competition-activity { padding: .5rem; border: 1px solid var(--result-success-border); border-radius: 4px; background: var(--result-success-fill); }
+.competition-activity.lost { border-color: var(--result-loss-border); background: var(--result-loss-fill); }
 .event-summary, .event-resolution, .event-player-effects { display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem .45rem; min-width: 0; }
 .event-consequences { display: grid; gap: .45rem; padding-left: .65rem; border-left: 2px solid #bdcbb2; }
 .activity-following { margin-left: .65rem; padding-left: .65rem; border-left: 2px solid #bdcbb2; }

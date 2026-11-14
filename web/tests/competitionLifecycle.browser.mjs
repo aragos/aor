@@ -68,6 +68,9 @@ export async function checkLiveCompetitionLifecycle(page, web) {
     const action = resolved.events.findLast(event => event.kind === 'ATTACK');
     assert.equal(await page.evaluate(`document.querySelector('[data-activity-member="${outcome.id}"]').closest('li').dataset.eventId`), action.id,
         'A live competition action and its recorded resolution share one activity row');
+    assert.equal(await page.evaluate(`document.querySelector('[data-event-id="${action.id}"] > .activity-group').className`),
+        `activity-group competition-activity ${outcome.competition.attackerWon ? 'won' : 'lost'}`,
+        'A live competition highlights the complete activity group from the submitting player’s perspective');
     for (const [width, height] of [[1280, 900], [390, 844]]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile: width < 700});
         await page.evaluate(`document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))`);
