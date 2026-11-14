@@ -1,7 +1,7 @@
 # Coordinated win-only continuation — prospective family86 plan
 
-Status: source plan for root review. No ES implementation, scientific input preparation,
-random-stream reservation, game, update, activation or qualification is authorized by this document.
+Status: approved source implementation. Scientific input preparation, random-stream reservation,
+games, updates, activation and qualification require the separate final source/preparation review.
 Family85's separate 16-mask diagnostic has priority for the next RNG reservation. Its outcomes do
 not choose this plan's warm start, heads, constants, scale, rivals or objective.
 
@@ -104,10 +104,10 @@ Only all16 completed updates can reach the final screen.
 
 ## Counts, fixed ownership and final evidence
 
-Proposed total is141,358 terminal executions,2,052 above83 because the final screen adds START83.
+The fixed total is141,358 terminal executions,2,052 above83 because the final screen adds START83.
 The reusable source and receipt wire calls this role `START`; this experiment's immutable origin
 subjects identify that role as the exact83 mean16. The role and comparisons below are unchanged.
-This count and the new development gate require prospective root approval before implementation.
+The count and development gate are fixed before implementation and scientific inputs.
 
 | Work | Count |
 | --- | ---: |
@@ -128,7 +128,7 @@ zero-reference factory only; they are not evidence for the supported learned com
 
 The final2048 mixed bank is untouched until completion of16 updates. Report paired FINAL-CONTROL,
 FINAL-START83 and START83-CONTROL win share, rank reward, old reward and Chaos with fixed multiplier1.96.
-Proposed learning gate: FINAL-START83 win95 lower>0. Proposed development nominee gate: that learning
+Learning gate: FINAL-START83 win95 lower>0. Development nominee gate: that learning
 gate AND FINAL-CONTROL win95 lower>0. Rank/reward/Chaos are descriptive, not gates or substitutes.
 All gates concern only the final complete mean. Failure does not nominate START83 or another mask.
 No qualification or activation is automatic; any future fresh99 qualification requires a separately

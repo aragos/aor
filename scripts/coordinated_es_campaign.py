@@ -5,8 +5,10 @@ controller owns all subprocesses and the original shared clock; this file owns o
 finite scientific transitions and immutable handoff subjects.
 """
 import argparse
+import importlib
 import os
 from pathlib import Path
+import sys
 import time
 
 import expansion_on_policy_loop as native
@@ -15,6 +17,11 @@ import coordinated_es_numeric_stage as numeric
 import coordinated_es_plan as p
 import coordinated_es_process as execution
 import coordinated_es_storage as storage
+
+SCREEN_MODULE='coordinated_es_screen'
+
+
+def owner(contract):return sys.modules[__name__] if contract is None else contract
 
 
 def check_profile(protocol_path,profile_path):
@@ -70,7 +77,8 @@ def check_preparation(plan,profile):
         'Every executing projection, center and ordered direction must be an exact completed preparation output.')
 
 
-def native_run(profile,mode,source,output,log,extra=()):
+def native_run(profile,mode,source,output,log,extra=(),*,contract=None):
+    current=owner(contract);p=current.p;execution=current.execution
     command=native.native_command(profile,mode,source,output,extra,maximum_seconds=p.SCIENCE_SECONDS)
     execution.run_child(profile,command,log)
 
@@ -130,26 +138,38 @@ def publish_context(root,directory,number,phase,protocol,plan):
             stage=name,generation=number,contextSha256=p.file_sha(Path(directory)/'stage.json')))
 
 
-def collect(plan,profile,root,number,chunk,phase,subjects):
+def verify_publication(ready,directory,number,phase,protocol,plan):
+    p.require(ready['publication']['identity']==dict(protocolSha256=p.file_sha(protocol),
+        scopeSha256=plan.record['original']['scopeSha256'],stage=f'{phase}-{number}',generation=number,
+        contextSha256=p.file_sha(Path(directory)/'stage.json')),'The portable publication scope cannot change.')
+
+
+def verify_generation(plan,output,source,number,chunk,phase):
+    return storage.verify_generation(plan,output,source,number,chunk,phase)
+
+
+def collect(plan,profile,root,number,chunk,phase,subjects,*,contract=None):
+    current=owner(contract);p=current.p
     p.require(p.owner(chunk)==profile['host'],'Only the original assigned host may execute a shard.')
     directory=Path(root)/'generations'/f'generation-{number}'/phase/f'chunk-{chunk}'
     p.require(not directory.exists(),'A native shard has one original attempt and no resume.')
     directory.mkdir(parents=True);source=directory/'source.json';output=directory/'native'
     storage.publish_json(source,plan.generation_source(number,chunk,phase.upper(),subjects))
-    native_run(profile,'coordinated-es-'+phase,source,output,directory/'native.log',
+    current.native_run(profile,p.PREFIX+'-'+phase,source,output,directory/'native.log',
         ('--workers',str(profile['workers'])))
     if phase=='population':
         for item in p.replays(number,chunk):
             name=f'replay-{storage.role(item["mutant"]["index"])}-{item["globalIndex"]}'
-            native_run(profile,'coordinated-es-reproduce',source,output/name,directory/(name+'.log'),
+            current.native_run(profile,p.PREFIX+'-reproduce',source,output/name,directory/(name+'.log'),
                 ('--original',str(output),'--index',str(item['globalIndex']),
                  '--role',storage.role(item['mutant']['index'])))
-    receipt=storage.verify_generation(plan,output,source,number,chunk,phase)
+    receipt=current.verify_generation(plan,output,source,number,chunk,phase)
     archive=directory/'evidence.tar.gz';storage.archive_collection(output,archive,receipt)
     return p.subject(archive.with_name(archive.name+'.json'))
 
 
-def wait_receipts(profile,root,number=None,phase=None,screen=False):
+def wait_receipts(profile,root,number=None,phase=None,screen=False,*,contract=None):
+    current=owner(contract);p=current.p;execution=current.execution;handoff=current.handoff
     root=Path(root);chunks=p.SCREEN_CHUNKS['MAC'] if screen else p.GENERATION_CHUNKS['MAC']
     while True:
         execution.live(profile)
@@ -176,7 +196,8 @@ def stop(result,completed):
     return dict(status='stopped',reason=kind,completedGenerations=completed,numericStop=result['receipt'])
 
 
-def prefix(profile,root,protocol,durations):
+def prefix(profile,root,protocol,durations,*,contract=None):
+    current=owner(contract);p=current.p;execution=current.execution
     root=Path(root);peer=root/'peer-retention/generation-2.json'
     while not peer.exists():
         execution.live(profile);time.sleep(min(10.,profile['_clock'].remaining(time.time())))
@@ -259,19 +280,18 @@ def desktop(plan,profile,protocol,root):
     return screen.finish(plan,profile,protocol,root,center,calibration,historical)
 
 
-def mac(plan,profile,protocol,root):
-    import coordinated_es_screen as screen
+def mac(plan,profile,protocol,root,*,contract=None):
+    current=owner(contract);p=current.p;handoff=current.handoff
+    screen=importlib.import_module(current.SCREEN_MODULE)
     root=Path(root);peer=profile['_peer'];peer.await_active(p.file_sha(protocol))
     for number in range(1,17):
         for phase in ('controls','population'):
             name=f'{phase}-{number}';ready=peer.await_stage(name)
             folder=peer.fetch(name,ready,root/'downloads'/name)
-            subjects=read_context(folder,plan,protocol,profile,number,phase)
-            p.require(ready['publication']['identity']==dict(protocolSha256=p.file_sha(protocol),
-                scopeSha256=plan.record['original']['scopeSha256'],stage=name,generation=number,
-                contextSha256=p.file_sha(folder/'stage.json')),'The portable publication scope cannot change.')
+            subjects=current.read_context(folder,plan,protocol,profile,number,phase)
+            current.verify_publication(ready,folder,number,phase,protocol,plan)
             for chunk in p.GENERATION_CHUNKS['MAC']:
-                receipt=collect(plan,profile,root,number,chunk,phase,subjects)
+                receipt=current.collect(plan,profile,root,number,chunk,phase,subjects)
                 path=Path(receipt['path']);value=p.read(path)
                 accepted=peer.push(path.with_name(value['archive']),path,number,chunk,phase=phase)
                 storage.publish_json(path.parent/'handoff.json',accepted)
@@ -282,7 +302,8 @@ def mac(plan,profile,protocol,root):
     return screen.mac(plan,profile,protocol,root,folder,ready)
 
 
-def failed(profile,root,launch,error):
+def failed(profile,root,launch,error,*,contract=None):
+    p=owner(contract).p
     storage.publish_json(Path(root)/'terminal.json',dict(kind=p.PREFIX+'-terminal-1',host=profile['host'],
         status='failed',failure=str(error),updatedEpoch=time.time(),clock=launch))
     if profile['host']=='MAC':
@@ -290,8 +311,13 @@ def failed(profile,root,launch,error):
         except Exception:pass  # The original shared deadline still bounds an unreachable peer.
 
 
-def run(protocol_path,profile_path,clock_path,root):
-    plan,profile=check_profile(protocol_path,profile_path);launch=p.read(clock_path)
+def worker_identity(profile_path):
+    return dict(kind=p.PREFIX+'-worker-owner-1',pid=os.getpid(),processGroup=os.getpgrp())
+
+
+def run(protocol_path,profile_path,clock_path,root,*,contract=None):
+    current=owner(contract);p=current.p;handoff=current.handoff
+    plan,profile=current.check_profile(protocol_path,profile_path);launch=p.read(clock_path)
     p.require(launch['kind']==p.PREFIX+'-clock-1' and launch['protocolSha256']==p.file_sha(protocol_path),
         'Both workers require the exact reviewed original clock bytes.')
     clock=p.Clock(launch['startedEpoch'],launch['deadlineEpoch']);clock.remaining(time.time())
@@ -300,10 +326,10 @@ def run(protocol_path,profile_path,clock_path,root):
         'The original controller clock cannot be extended by either host.')
     root=Path(root);p.require(not root.exists(),'This finite worker has one original attempt and no resume.')
     root.mkdir(parents=True)
-    storage.publish_json(root/'worker-owner.json',dict(kind=p.PREFIX+'-worker-owner-1',pid=os.getpid(),processGroup=os.getpgrp()))
+    storage.publish_json(root/'worker-owner.json',current.worker_identity(profile_path))
     storage.publish_json(root/'clock.json',launch);profile=dict(profile,_root=root,_clock=clock)
     if profile['host']=='MAC':profile['_peer']=handoff.Outbound(profile['peer'],clock,root)
-    try:result=(desktop if profile['host']=='DESKTOP' else mac)(plan,profile,protocol_path,root)
+    try:result=(current.desktop if profile['host']=='DESKTOP' else current.mac)(plan,profile,protocol_path,root)
     except handoff.PeerStopped as stopped:
         try:
             row=stopped.response['terminal'];original=stopped.response['terminalSubject']
@@ -312,8 +338,8 @@ def run(protocol_path,profile_path,clock_path,root):
             p.require(copied['sha256']==original['sha256'],'The peer stop must preserve exact original bytes.')
             result=dict(status='stopped',reason='coordinator-operational-stop',completedGenerations=row['completedGenerations'],
                 peerTerminal=copied,originalPeerSubject=original)
-        except BaseException as error:failed(profile,root,launch,error);raise
-    except BaseException as error:failed(profile,root,launch,error);raise
+        except BaseException as error:current.failed(profile,root,launch,error);raise
+    except BaseException as error:current.failed(profile,root,launch,error);raise
     storage.publish_json(root/'terminal.json',dict(kind=p.PREFIX+'-terminal-1',host=profile['host'],
         updatedEpoch=time.time(),clock=launch,**result))
     return result
