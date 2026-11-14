@@ -477,8 +477,8 @@ def worker(protocol, profile_path, output, started, deadline):
     root = Path(output); root.mkdir(parents=True, exist_ok=False)
     clock = p.Clock(started, deadline); clock.remaining(time.time())
     record = dict(kind=PREFIX+'-clock-1', protocolSha256=p.file_sha(protocol), startedEpoch=started, deadlineEpoch=deadline)
-    storage.publish_json(root/'clock.json', record)
     storage.publish_json(root/'worker-owner.json', dict(kind=PREFIX+'-worker-owner-1', pid=os.getpid(), processGroup=os.getpgrp()))
+    storage.publish_json(root/'clock.json', record)
     status = dict(kind=PREFIX+'-terminal-1', host=None, clock=record, completedBanks=0,
         qualified=False, qualification=None, banks={})
     profile = None
