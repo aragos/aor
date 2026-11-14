@@ -222,7 +222,7 @@ class CoordinatedPreviewPolicyTest {
 }
 
 /** Every tensor and every success claim here is invented; no scientific model or row is opened. */
-private class PreviewAssetFixture(val root: Path) {
+internal class PreviewAssetFixture(val root: Path) {
     private val mapper = ObjectMapper()
     private val profile = ServerBotProfile.COORDINATED_83_SUPPORT_1.version
     private val support = "known-own-chaos-support-1"
@@ -469,6 +469,53 @@ private class PreviewAssetFixture(val root: Path) {
         }
 
     fun changeManifest(transform: (ObjectNode) -> Unit) = change("manifest.json", transform)
+
+    /**
+     * Reuses only invented tensors; these success claims are transport fixtures, never evidence.
+     */
+    fun toWinQualified() {
+        val behavior = mapper.readTree(manifest.toFile()) as ObjectNode
+        behavior.put("kind", "coordinated-inference-asset-1")
+        behavior.put("profile", ServerBotProfile.COORDINATED_WIN_SUPPORT_1.version)
+        behavior.put("selectorVersion", "incumbent-residual-margin-1")
+        behavior.set<ObjectNode>("currentBundle", behavior.remove("candidateBundle"))
+        behavior.remove("qualification")
+        val asset = write("inference-asset.json", behavior)
+        change("qualification.json") { certificate ->
+            certificate.put("kind", "coordinated-win-qualification-1")
+            certificate.put("profile", ServerBotProfile.COORDINATED_WIN_SUPPORT_1.version)
+            certificate.put("inferenceAssetSha256", hash(asset))
+            certificate.put("nominationSha256", digest)
+            certificate.remove(
+                listOf(
+                    "candidateBundleSha256",
+                    "originalBundleSha256",
+                    "calibrationSha256",
+                    "references",
+                )
+            )
+            for (name in listOf("mixed", "homogeneous")) {
+                (certificate["banks"][name] as ObjectNode).remove("reward99Passed")
+            }
+        }
+        write(
+            "manifest.json",
+            mapOf(
+                "kind" to "coordinated-win-support-preview-1",
+                "schemaVersion" to 1,
+                "profile" to ServerBotProfile.COORDINATED_WIN_SUPPORT_1.version,
+                "inferenceAsset" to subject(asset),
+                "qualification" to subject(root.resolve("qualification.json")),
+            ),
+        )
+    }
+
+    fun changeInference(transform: (ObjectNode) -> Unit) {
+        change("inference-asset.json", transform)
+        val digest = hash(root.resolve("inference-asset.json"))
+        changeManifest { (it["inferenceAsset"] as ObjectNode).put("sha256", digest) }
+        changeQualification { it.put("inferenceAssetSha256", digest) }
+    }
 
     fun changeQualification(transform: (ObjectNode) -> Unit) {
         change("qualification.json", transform)

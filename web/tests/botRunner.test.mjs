@@ -66,6 +66,20 @@ test('an explicit server proposal bypasses worker inference', async context => {
     assert.equal(submitted[0].command, proposal.command);
 });
 
+test('a win-qualified server proposal bypasses worker inference', async context => {
+    const proposal = {profile: 'aor-coordinated-win-support-1', assetSha256: 'a'.repeat(64), command: 'buy-tokens 15'};
+    const decision = {...job('p2'), proposal};
+    let calls = 0;
+    const {submitted} = fixture(context, {
+        runner: async () => work([decision]),
+        think: async () => {calls++; return 'buy-tokens 16';},
+    });
+    await settle();
+
+    assert.equal(calls, 0);
+    assert.equal(submitted[0].command, proposal.command);
+});
+
 test('an unknown proposal profile stops without worker fallback or submission', async context => {
     const decision = {...job('p2'), proposal: {profile: 'unknown', assetSha256: 'a'.repeat(64), command: 'pass'}};
     let calls = 0;

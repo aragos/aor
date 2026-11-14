@@ -37,11 +37,10 @@ import java.security.MessageDigest
  */
 private class CachedCoordinatedPreviewPolicy(
     override val assetSha256: String,
+    override val profile: ServerBotProfile,
     private val reference: BotModel,
     private val selector: CoordinatedPolicySelector,
 ) : ServerBotPolicy {
-    override val profile = ServerBotProfile.COORDINATED_83_SUPPORT_1
-
     override fun choose(view: GameView, observation: BotObservation, seed: Int): String {
         require(profile.supports(observation, BotDifficulty.HARD)) {
             "The coordinated asset only supports its exact qualified current-rules setup."
@@ -84,6 +83,69 @@ private class CoordinatedAssetReader(path: Path) {
     fun read(): ServerBotPolicy {
         val manifest = document(manifestPath)
         val root = node(manifest)
+        val winOnly = text(root, "kind") == "coordinated-win-support-preview-1"
+        val selectedProfile =
+            if (winOnly) ServerBotProfile.COORDINATED_WIN_SUPPORT_1
+            else ServerBotProfile.COORDINATED_83_SUPPORT_1
+        val definition =
+            if (winOnly) inferenceAsset(manifest, root) else legacyAsset(manifest, root)
+        val behavior = node(definition)
+        profile(behavior, selectedProfile)
+        val current =
+            subject(definition, behavior[if (winOnly) "currentBundle" else "candidateBundle"])
+        val original = subject(definition, behavior["originalBundle"])
+        val calibrationFile = subject(definition, behavior["calibration"])
+        val references = behavior["references"]
+        fields(
+            references,
+            "qualifiedOrdinary",
+            "cardM8",
+            "purchaseF0",
+            "expansionE",
+            "tokenControlVersion",
+        )
+        require(text(references, "tokenControlVersion") == "FIXED_16_TO_15") {
+            "The qualified reference requires the exact offered 16-to-15 token control."
+        }
+        val referenceFiles =
+            listOf("qualifiedOrdinary", "cardM8", "purchaseF0", "expansionE").associateWith {
+                subject(definition, references[it])
+            }
+        val certificate = subject(manifest, root["qualification"])
+        if (winOnly) {
+            winQualification(certificate, definition)
+        } else {
+            qualification(certificate, current, original, calibrationFile, referenceFiles)
+        }
+        val currentModels = bundle(current)
+        val originalModels = bundle(original)
+        val scales = calibration(calibrationFile, original, originalModels)
+        fun referenceFile(name: String): Document =
+            requireNotNull(referenceFiles[name]) {
+                "The complete manifest must contain reference $name."
+            }
+        val packed = ordinary(referenceFile("qualifiedOrdinary"), scoped = true)
+        val card = ordinary(referenceFile("cardM8"), scoped = false)
+        val purchase = ordinary(referenceFile("purchaseF0"), scoped = false)
+        val expansion = ordinary(referenceFile("expansionE"), scoped = false)
+        referenceEquivalence(packed, card, expansion)
+        return CachedCoordinatedPreviewPolicy(
+            manifest.sha256,
+            selectedProfile,
+            packed,
+            CoordinatedPolicySelector(
+                ordinary = card,
+                purchaseBaseline = purchase,
+                current = currentModels,
+                original = originalModels,
+                expansionSelector = IncumbentResidualSelector(scales.first),
+                tokenSelector = IncumbentResidualSelector(scales.second),
+                support = JointSupportProfile.KNOWN_OWN_CHAOS_1,
+            ),
+        )
+    }
+
+    private fun legacyAsset(manifest: Document, root: JsonNode): Document {
         fields(
             root,
             "kind",
@@ -105,58 +167,93 @@ private class CoordinatedAssetReader(path: Path) {
         ) {
             "A coordinated preview requires its explicit version-one asset manifest."
         }
-        profile(root)
-        val current = subject(manifest, root["candidateBundle"])
-        val original = subject(manifest, root["originalBundle"])
-        val calibrationFile = subject(manifest, root["calibration"])
-        val references = root["references"]
+        return manifest
+    }
+
+    private fun inferenceAsset(manifest: Document, root: JsonNode): Document {
         fields(
-            references,
-            "qualifiedOrdinary",
-            "cardM8",
-            "purchaseF0",
-            "expansionE",
-            "tokenControlVersion",
+            root,
+            "kind",
+            "schemaVersion",
+            "profile",
+            "inferenceAsset",
+            "qualification",
         )
-        require(text(references, "tokenControlVersion") == "FIXED_16_TO_15") {
-            "The qualified reference requires the exact offered 16-to-15 token control."
+        require(
+            integer(root, "schemaVersion") == 1 &&
+                text(root, "profile") == ServerBotProfile.COORDINATED_WIN_SUPPORT_1.version
+        ) {
+            "A win-qualified manifest requires its explicit generic profile and version."
         }
-        val referenceFiles =
-            listOf("qualifiedOrdinary", "cardM8", "purchaseF0", "expansionE").associateWith {
-                subject(manifest, references[it])
-            }
-        qualification(
-            subject(manifest, root["qualification"]),
-            current,
-            original,
-            calibrationFile,
-            referenceFiles,
+        val asset = subject(manifest, root["inferenceAsset"])
+        val value = node(asset)
+        fields(
+            value,
+            "kind",
+            "schemaVersion",
+            "profile",
+            "supportProfile",
+            "selectorVersion",
+            "rulesVersion",
+            "dataVersion",
+            "configuration",
+            "currentBundle",
+            "originalBundle",
+            "references",
+            "calibration",
         )
-        val currentModels = bundle(current)
-        val originalModels = bundle(original)
-        val scales = calibration(calibrationFile, original, originalModels)
-        fun referenceFile(name: String): Document =
-            requireNotNull(referenceFiles[name]) {
-                "The complete manifest must contain reference $name."
-            }
-        val packed = ordinary(referenceFile("qualifiedOrdinary"), scoped = true)
-        val card = ordinary(referenceFile("cardM8"), scoped = false)
-        val purchase = ordinary(referenceFile("purchaseF0"), scoped = false)
-        val expansion = ordinary(referenceFile("expansionE"), scoped = false)
-        referenceEquivalence(packed, card, expansion)
-        return CachedCoordinatedPreviewPolicy(
-            manifest.sha256,
-            packed,
-            CoordinatedPolicySelector(
-                ordinary = card,
-                purchaseBaseline = purchase,
-                current = currentModels,
-                original = originalModels,
-                expansionSelector = IncumbentResidualSelector(scales.first),
-                tokenSelector = IncumbentResidualSelector(scales.second),
-                support = JointSupportProfile.KNOWN_OWN_CHAOS_1,
-            ),
+        require(
+            text(value, "kind") == "coordinated-inference-asset-1" &&
+                integer(value, "schemaVersion") == 1 &&
+                text(value, "selectorVersion") == "incumbent-residual-margin-1"
+        ) {
+            "A generic inference asset requires the unchanged incumbent residual selector."
+        }
+        return asset
+    }
+
+    private fun winQualification(document: Document, asset: Document) {
+        val value = node(document)
+        fields(
+            value,
+            "kind",
+            "schemaVersion",
+            "passed",
+            "complete",
+            "profile",
+            "supportProfile",
+            "rulesVersion",
+            "dataVersion",
+            "configuration",
+            "inferenceAssetSha256",
+            "nominationSha256",
+            "banks",
         )
+        require(
+            text(value, "kind") == "coordinated-win-qualification-1" &&
+                integer(value, "schemaVersion") == 1 &&
+                truth(value, "passed") &&
+                truth(value, "complete") &&
+                hash(value, "inferenceAssetSha256") == asset.sha256
+        ) {
+            "Win qualification must complete successfully for this exact inference asset."
+        }
+        profile(value, ServerBotProfile.COORDINATED_WIN_SUPPORT_1)
+        hash(value, "nominationSha256")
+        fields(value["banks"], "mixed", "homogeneous")
+        for (name in listOf("mixed", "homogeneous")) {
+            val bank = value["banks"][name]
+            fields(bank, "complete", "pairs", "win99Passed", "evidence", "report")
+            require(
+                truth(bank, "complete") &&
+                    integer(bank, "pairs") == 4096 &&
+                    truth(bank, "win99Passed")
+            ) {
+                "Both independent complete 4096-pair banks must pass their fixed 99% win gate."
+            }
+            subject(document, bank["evidence"])
+            subject(document, bank["report"])
+        }
     }
 
     private fun qualification(
@@ -233,9 +330,12 @@ private class CoordinatedAssetReader(path: Path) {
         }
     }
 
-    private fun profile(value: JsonNode) {
+    private fun profile(
+        value: JsonNode,
+        expected: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
+    ) {
         require(
-            text(value, "profile") == ServerBotProfile.COORDINATED_83_SUPPORT_1.version &&
+            text(value, "profile") == expected.version &&
                 text(value, "supportProfile") == "known-own-chaos-support-1" &&
                 text(value, "rulesVersion") == JointPolicyScope.RULES_VERSION &&
                 text(value, "dataVersion") == JointPolicyScope.DATA_VERSION

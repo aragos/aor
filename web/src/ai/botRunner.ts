@@ -21,7 +21,7 @@ function failureCode(failure: unknown): string {
 function proposedCommand(job: BotJob): string | undefined {
     const proposal = job.proposal;
     if (proposal == null) return undefined;
-    if (proposal.profile !== 'aor-coordinated-83-support-1' || !/^[0-9a-f]{64}$/.test(proposal.assetSha256)
+    if ((proposal.profile !== 'aor-coordinated-83-support-1' && proposal.profile !== 'aor-coordinated-win-support-1') || !/^[0-9a-f]{64}$/.test(proposal.assetSha256)
         || typeof proposal.command !== 'string' || !proposal.command.trim() || proposal.command.length > 200
         || /[\r\n]/.test(proposal.command)) {
         throw new Error('BOT_POLICY_FAILED');

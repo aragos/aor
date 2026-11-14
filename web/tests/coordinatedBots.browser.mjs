@@ -3,6 +3,8 @@ import {join} from 'node:path';
 import {open} from './browser-support.mjs';
 
 // The configured server loads only the explicitly constructed JVM asset fixture for this suite.
+const expectedProfile = process.env.AOR_TEST_COORDINATED_PROFILE ?? 'aor-coordinated-83-support-1';
+assert(['aor-coordinated-83-support-1', 'aor-coordinated-win-support-1'].includes(expectedProfile));
 const api = process.env.MAP_API_URL;
 const web = process.env.MAP_WEB_URL;
 const cdp = process.env.MAP_CDP_URL;
@@ -125,7 +127,7 @@ try {
     assert(decisions.every(decision => proof.jobs.some(job => job.observation.decision === decision)), 'Live server work covers C/P/E/T');
     assert.deepEqual(proof.workerJobs, [], 'All four phases use the cached shared server chooser');
     for (const job of [...initialProof.jobs, ...proof.jobs]) {
-        assert.equal(job.proposal.profile, 'aor-coordinated-83-support-1');
+        assert.equal(job.proposal.profile, expectedProfile);
         assert.match(job.proposal.assetSha256, /^[0-9a-f]{64}$/);
         assert(job.observation.candidates.some(candidate => candidate.command === job.proposal.command));
         assert.equal(job.card ?? null, null);

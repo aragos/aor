@@ -183,6 +183,47 @@ class ServerBotPolicyTest {
         }
 
     @Test
+    fun aGenericProfileRoundTripsAndContinuesWithItsExactAsset(): Unit =
+        ProfileFixture(policyProfile = ServerBotProfile.COORDINATED_WIN_SUPPORT_1).use { fixture ->
+            val original = fixture.service.store.read(fixture.game.gameId)
+            val restored = GameDocuments.read(fixture.game.gameId, GameDocuments.write(original))
+            fixture.service.store.update(fixture.game.gameId) { restored }
+            val work = fixture.claim()
+            val job = work.observations.single()
+            fixture.submit(
+                work,
+                job,
+                requireNotNull(job.proposal) { "The restored generic seat requires its proposal." }
+                    .command,
+            )
+
+            assertThat(restored.bots).isEqualTo(original.bots)
+            assertThat(job.proposal?.profile)
+                .isEqualTo(ServerBotProfile.COORDINATED_WIN_SUPPORT_1.version)
+            assertThat(job.proposal?.assetSha256).isEqualTo(fixture.policy.assetSha256)
+            assertThat(fixture.service.store.read(fixture.game.gameId).pendingBids.keys)
+                .containsExactly(job.seat)
+        }
+
+    @Test
+    fun aGenericProfileCannotSilentlyRebindToAnotherAsset(): Unit =
+        ProfileFixture(policyProfile = ServerBotProfile.COORDINATED_WIN_SUPPORT_1).use { fixture ->
+            val replacement =
+                OfferedProfile("b".repeat(64), ServerBotProfile.COORDINATED_WIN_SUPPORT_1)
+            val changedService =
+                GameService(
+                    fixture.service.store,
+                    fixture.service.driver,
+                    serverBotPolicy = replacement,
+                )
+
+            val failure = assertFailsWith<ServiceFailure> { fixture.claim(changedService) }
+
+            assertThat(failure.code).isEqualTo("BOT_POLICY_UNAVAILABLE")
+            assertThat(replacement.calls).isEmpty()
+        }
+
+    @Test
     fun aNonCreatorCannotObtainTheServerProposal(): Unit =
         ProfileFixture(humans = 2).use { fixture ->
             val second = GameAccess.SeatToken(fixture.game.links[1].path.substringAfter("token="))
@@ -210,8 +251,10 @@ private data class ProfileInput(val view: GameView, val observation: BotObservat
 /**
  * Records constructed policy inputs; this fixture never loads scientific models or plays a game.
  */
-private class OfferedProfile(override val assetSha256: String = "a".repeat(64)) : ServerBotPolicy {
-    override val profile = ServerBotProfile.COORDINATED_83_SUPPORT_1
+private class OfferedProfile(
+    override val assetSha256: String = "a".repeat(64),
+    override val profile: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
+) : ServerBotPolicy {
     val calls = mutableListOf<ProfileInput>()
 
     override fun choose(view: GameView, observation: BotObservation, seed: Int): String {
@@ -229,9 +272,10 @@ private class ProfileFixture(
             immediateMasterArtDiscard = true,
         ),
     humans: Int = 1,
+    policyProfile: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-server-profile-")
-    val policy = OfferedProfile()
+    val policy = OfferedProfile(profile = policyProfile)
     val service =
         GameService(FileGameStore(directory), GameDriver(FixedRandom()), serverBotPolicy = policy)
     val game =
