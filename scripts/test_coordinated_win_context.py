@@ -52,6 +52,7 @@ class ContextTests(unittest.TestCase):
             recipe=record['calibration']['recipe'],scales=record['calibration']['scales'],recalibrated=False))
         self.profile=dict(host='DESKTOP',arena=put(inputs/'arena.json',dict(constructedArena=True)),
             originalBundle=original,projection=projection,warmStart=warm,originProof=proofs['DESKTOP'],
+            numericalPreparation=dict(finished=put(inputs/'prepared/finished.json',dict(constructedPreparation=True))),
             initialCenter=initial,inheritedCalibration=inherited,directions=[
                 put(inputs/f'direction-{g}.json',es.DirectionTable(scope,g,((1.,)*256,)*16).record) for g in range(1,17)])
         self.mac=dict(self.profile,host='MAC',originProof=proofs['MAC'])

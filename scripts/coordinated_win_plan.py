@@ -173,7 +173,7 @@ class Plan:
     def generation_source(self,number,chunk,phase,subjects):
         generation(number);host=owner(chunk)
         require(phase in ('CONTROLS','POPULATION'),'A fixed native generation phase is required.')
-        exact(subjects,('protocol','arena','originalBundle','projection','warmStart','originProof','center',
+        exact(subjects,('protocol','arena','originalBundle','projection','warmStart','originProof','numericalPreparation','center',
             'directions','population','inheritedCalibration','previousUpdate','historical'), 'Native continuation subjects')
         for key,item in subjects.items():
             if item is None:require(key in ('population','previousUpdate'),'Every inherited source remains required from step1.')

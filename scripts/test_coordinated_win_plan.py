@@ -117,7 +117,7 @@ class SourceTests(unittest.TestCase):
     def setup_source(self,step=1,phase='CONTROLS',chunk=0):
         warm,record=fixture();plan=p.Plan.from_record(record)
         subjects={key:dict(path='/constructed/'+key,sha256='8'*64) for key in
-            ('protocol','arena','originalBundle','projection','warmStart','originProof','center','directions',
+            ('protocol','arena','originalBundle','projection','warmStart','originProof','numericalPreparation','center','directions',
              'population','inheritedCalibration','previousUpdate','historical')}
         subjects['originalBundle']['sha256']=warm.scope.original_bundle_sha256
         subjects['protocol']['sha256']=plan.file_sha256

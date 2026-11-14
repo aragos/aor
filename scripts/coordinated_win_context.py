@@ -73,6 +73,8 @@ def read(directory,plan,protocol,profile,number,phase):
     p.exact(row['subjects'],FIELDS,'Portable continuation subjects')
     subjects=dict(protocol=p.subject(protocol),**{key:profile[key] for key in
         ('arena','originalBundle','projection','warmStart','originProof')})
+    subjects['numericalPreparation']=profile['numericalPreparation']['finished']
+    p.checked_subject(subjects['numericalPreparation'])
     for key,item in row['subjects'].items():
         if item is None:subjects[key]=None;continue
         p.exact(item,('path','sha256'),'Portable stage member')

@@ -5,12 +5,22 @@ model inputs remain opaque hashes. The separate numerical owner recomputes ES ar
 neither auditor performs inference, RNG generation, fitting or process execution.
 """
 import hashlib
+import importlib
 from pathlib import Path
+import sys
 
 import coordinated_es_plan as p
 import coordinated_es_storage as storage
 import coordinated_es_generation_audit as numerical
 from token_paired_campaign_audit import Pins, stream_archive
+
+SCREEN_MODULE='coordinated_es_screen'
+CONTROL_FIELD='rawControls'
+METRIC_CHECK_FIELD='semanticGameRewardsChecked'
+STOP_REASONS=('calibration-failed','zero-gradient','nonfinite-arithmetic','prefix-resource-gate')
+
+
+def owner(contract):return sys.modules[__name__] if contract is None else contract
 
 
 def receipt_path(root,number,phase,chunk,host):
@@ -72,6 +82,17 @@ def bind_generation(pins,directory,number,completed,controls,populations,populat
             'A stopped update must consume the exact retained native population and fitness subjects.')
 
 
+def panel_digest(plan,protocol_sha,host,number):
+    return PublicPanelDigest(plan,protocol_sha) if host=='DESKTOP' and number==1 else None
+
+
+def verify_fitness(fitness,population,returns):
+    p.require(fitness['kind']==p.PREFIX+'-fitness-1' and
+        fitness['populationSha256']==p.digest(population) and
+        all(fitness['members'][member]['rewards'][index]==value for (index,member),value in returns.items()),
+        'Every numerical fitness value must equal its original authoritative native game return.')
+
+
 def chunk(plan,item,pins,*,population=None,decode_games=True):
     path=pins.subject(item);receipt=pins.read(path);phase=receipt['phase'];number=receipt['generation'];ordinal=receipt['chunk']
     p.require(receipt['kind']==p.PREFIX+'-chunk-receipt-1' and receipt['host']==p.owner(ordinal),
@@ -108,8 +129,9 @@ def chunk(plan,item,pins,*,population=None,decode_games=True):
     return receipt,rewards,panels
 
 
-def training(protocol_subject,root,*,host='DESKTOP',terminal=None,pins=None):
+def training(protocol_subject,root,*,host='DESKTOP',terminal=None,pins=None,contract=None):
     """Complete16 admission or exact honest native prefix; no final-screen effects here."""
+    current=owner(contract);p=current.p
     pins=pins if pins is not None else Pins();plan=p.Plan.from_file(pins.subject(protocol_subject));root=Path(root)
     p.require(host in p.HOSTS,'Only the two original hosts can own retained native evidence.')
     completed=16 if terminal is None else terminal['completedGenerations']
@@ -121,7 +143,7 @@ def training(protocol_subject,root,*,host='DESKTOP',terminal=None,pins=None):
             terminal['originalPeerSubject']['sha256']==terminal['peerTerminal']['sha256'] and
             peer['kind']==p.PREFIX+'-terminal-1' and peer['host']=='DESKTOP' and peer['status']=='stopped' and
             peer['clock']==terminal['clock'] and peer['completedGenerations']==completed and
-            reason in ('calibration-failed','zero-gradient','nonfinite-arithmetic','prefix-resource-gate'),
+            reason in current.STOP_REASONS,
             'An honest Mac stop must retain its exact original Desktop stop and shared clock.')
     count=completed+(1 if stopped and reason!='prefix-resource-gate' else 0)
     p.integer(count,1,16,'Retained native generation count')
@@ -133,7 +155,7 @@ def training(protocol_subject,root,*,host='DESKTOP',terminal=None,pins=None):
         has_population=not (stopped and reason=='calibration-failed' and number==1)
         population=None;fitness=None;population_subject=None;fitness_subject=None
         retained={phase:[] for phase in ('controls','population')}
-        panel_digest=PublicPanelDigest(plan,protocol_subject['sha256']) if host=='DESKTOP' and number==1 else None
+        panel=current.panel_digest(plan,protocol_subject['sha256'],host,number)
         if has_population:
             pop_path=(root/'generations'/f'generation-{number}'/'portable/population.json' if host=='DESKTOP'
                 else root/'downloads'/f'population-{number}'/'content/population.json')
@@ -145,22 +167,19 @@ def training(protocol_subject,root,*,host='DESKTOP',terminal=None,pins=None):
             for ordinal in chunks:
                 path=receipt_path(root,number,phase,ordinal,host)
                 item=file_subject(pins,path);retained[phase].append(item)
-                receipt,rewards,panels=chunk(plan,item,pins,population=population,decode_games=decode_games)
+                receipt,rewards,panels=current.chunk(plan,item,pins,population=population,decode_games=decode_games)
                 p.require(receipt['generation']==number and receipt['chunk']==ordinal and receipt['phase']==phase and
                     receipt['protocolSha256']==protocol_subject['sha256'],
                     'Native archives cannot replace a generation, stage or fixed world range.')
                 sciences.add(receipt['scienceSha256'])
                 row['controls' if phase=='controls' else 'mutants']+=receipt['completedGames']
                 row['reproductions']+=receipt['historicalReproductions']
-                if panel_digest is not None and phase=='controls':
-                    for world in panels:panel_digest.append(world)
+                if panel is not None and phase=='controls':
+                    for world in panels:panel.append(world)
                 if phase=='population' and fitness is not None:
-                    p.require(fitness['kind']==p.PREFIX+'-fitness-1' and
-                        fitness['populationSha256']==p.digest(population) and
-                        all(fitness['members'][member]['rewards'][index]==reward for (index,member),reward in rewards.items()),
-                        'Every numerical fitness value must equal its original authoritative native game return.')
+                    current.verify_fitness(fitness,population,rewards)
             p.require(len(sciences)==1,'Both hosts must share one path-independent stage science identity.')
-        if panel_digest is not None:bind_public_panel(pins,directory,retained['controls'],panel_digest)
+        if panel is not None:bind_public_panel(pins,directory,retained['controls'],panel)
         if host=='DESKTOP' and has_population:
             bind_generation(pins,directory,number,completed,retained['controls'],retained['population'],
                 population_subject,fitness_subject)
@@ -172,13 +191,17 @@ def training(protocol_subject,root,*,host='DESKTOP',terminal=None,pins=None):
     pins.unchanged()
     return dict(kind=p.PREFIX+'-training-audit-1',passed=True,complete=complete,host=host,
         protocolSha256=protocol_subject['sha256'],completedGenerations=completed,generations=rows,
-        rawControls=controls,mutants=mutants,reproductions=reproductions,
-        semanticGameRewardsChecked=decode_games,artifactPins=dict(pins.values))
+        mutants=mutants,reproductions=reproductions,artifactPins=dict(pins.values),
+        **{current.CONTROL_FIELD:controls,current.METRIC_CHECK_FIELD:decode_games})
 
 
-def verify(protocol_subject,root):
+def verify_numerical(protocol_subject,root,pins):
+    return numerical.verify(protocol_subject,root,pins=pins)
+
+
+def verify(protocol_subject,root,*,contract=None):
     """Original bounded host terminal audit; release of process groups belongs to its watcher."""
-    import coordinated_es_screen as screen
+    current=owner(contract);p=current.p;screen=importlib.import_module(current.SCREEN_MODULE)
     pins=Pins();root=Path(root);terminal=pins.read(root/'terminal.json');clock_wire=pins.read(root/'clock.json')
     p.require(terminal['kind']==p.PREFIX+'-terminal-1' and terminal['host'] in p.HOSTS and
         terminal['status'] in ('completed','stopped') and terminal['clock']==clock_wire and
@@ -187,8 +210,8 @@ def verify(protocol_subject,root):
     clock=p.Clock(clock_wire['startedEpoch'],clock_wire['deadlineEpoch'])
     pins.deadline=clock.audit_deadline(terminal['updatedEpoch']);pins.check_clock()
     p.require(clock.start<=terminal['updatedEpoch']<=clock.deadline,'The shared original science deadline cannot be renewed.')
-    numeric=numerical.verify(protocol_subject,root,pins=pins) if terminal['host']=='DESKTOP' else None
-    native=training(protocol_subject,root,host=terminal['host'],terminal=terminal,pins=pins)
+    numeric=current.verify_numerical(protocol_subject,root,pins) if terminal['host']=='DESKTOP' else None
+    native=current.training(protocol_subject,root,host=terminal['host'],terminal=terminal,pins=pins)
     screen.audit_historical(protocol_subject,root,terminal['host'],pins)
     if terminal['status']=='completed':
         result=screen.audit_completed(protocol_subject,root,terminal['host'],pins)
@@ -201,7 +224,7 @@ def verify(protocol_subject,root):
         p.require(not (root/'screen').exists() and not (root/'screen-complete.json').exists(),
             'An operational stop cannot retain a shortened or replacement final screen.')
         result=dict(games=0,reproductions=0,historicalControls=2 if terminal['host']=='DESKTOP' else 0)
-    total=native['rawControls']+native['mutants']+native['reproductions']+result['games']+result['reproductions']+result['historicalControls']
+    total=native[current.CONTROL_FIELD]+native['mutants']+native['reproductions']+result['games']+result['reproductions']+result['historicalControls']
     p.require(total<=p.MAXIMUM_TERMINALS,'Actual retained executions cannot exceed the single predeclared global cap.')
     if terminal['status']=='completed' and terminal['host']=='DESKTOP':
         p.require(total==p.MAXIMUM_TERMINALS,'Complete Desktop evidence includes the exact global count, not a sum of host subsets.')
@@ -210,6 +233,6 @@ def verify(protocol_subject,root):
         status=terminal['status'],host=terminal['host'],protocolSha256=protocol_subject['sha256'],
         completedGenerations=terminal['completedGenerations'],scientificTerminalExecutions=total,
         eligibleFinalBundle=terminal.get('finalBundle') if terminal['status']=='completed' else None,
-        nativeCounts={key:native[key] for key in ('rawControls','mutants','reproductions')},
+        nativeCounts={key:native[key] for key in (current.CONTROL_FIELD,'mutants','reproductions')},
         numericalRecomputed=numeric is not None,screenCounts=result,artifactPins=dict(pins.values),
         execution=dict(newGames=0,actualFits=0,optimizerSteps=0),interpretationAllowed=False)

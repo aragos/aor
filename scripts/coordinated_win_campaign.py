@@ -38,7 +38,7 @@ def check_profile(protocol_path,profile_path):
     p.require(profile['files'] and all(p.file_sha(path)==digest for path,digest in profile['files'].items()) and
         profile['files'].get('/bin/ps')==p.file_sha('/bin/ps'),
         'All executing source, runtime, model and liveness bytes remain exactly frozen.')
-    for key in ('arena','originProof','originalBundle','projection','warmStart','initialCenter',
+    for key in ('arena','originArena','originProof','originalBundle','projection','warmStart','initialCenter',
             'inheritedCalibration','numerical'):
         p.checked_subject(profile[key])
     p.require(profile['originProof']['sha256']==plan.record['warmStart']['proofSha256'][profile['host']],
@@ -48,7 +48,7 @@ def check_profile(protocol_path,profile_path):
     diagnostic=profile.get('diagnosticPanel')
     if diagnostic is not None:p.checked_subject(diagnostic)
     roots=[Path(path).resolve() for path in profile['scientificInputDirectories']]
-    subjects=[profile[key] for key in ('arena','originProof','originalBundle','projection','warmStart',
+    subjects=[profile[key] for key in ('arena','originArena','originProof','originalBundle','projection','warmStart',
         'initialCenter','inheritedCalibration')]+profile['directions']
     if diagnostic is not None:subjects.append(diagnostic)
     p.require(roots and all(any(Path(item['path']).resolve().is_relative_to(root) for root in roots)
