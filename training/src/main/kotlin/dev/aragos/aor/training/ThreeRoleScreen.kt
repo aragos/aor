@@ -75,6 +75,7 @@ internal object ThreeRoleScreen {
             StrategyArena.seed(input.raw.seed, index),
             input.kind,
             input.roles,
+            input.expectedOpponents(index),
         )
         require(world["signature"]?.asText() == input.signature) {
             "A reproduced world must bind its original source."
@@ -109,6 +110,7 @@ internal object ThreeRoleScreen {
         seed: Int,
         kind: String,
         roles: List<String>,
+        opponentIndices: List<Int> = List(4) { 0 },
     ) {
         require(
             world["kind"]?.asText() == kind &&
@@ -118,7 +120,7 @@ internal object ThreeRoleScreen {
                 world["seat"]?.intValue() == index % 4 &&
                 world["configuration"]?.asText() ==
                     "players-4/standard/no-crusades/deck-true/art-true" &&
-                world["opponentIndices"]?.map(JsonNode::intValue) == List(4) { 0 } &&
+                world["opponentIndices"]?.map(JsonNode::intValue) == opponentIndices &&
                 world["roles"]?.fieldNames()?.asSequence()?.toSet() == roles.toSet()
         ) {
             "Each compact screen world must retain all three roles and its original global lineup."

@@ -20,6 +20,7 @@ internal class ThreeRoleScreenMain(
     },
     private val report: ((List<JsonNode>) -> Map<String, Any>)? = null,
     private val requireExecutionCounts: Boolean = false,
+    private val expectedOpponents: (JsonNode, Int) -> List<Int> = { _, _ -> List(4) { 0 } },
 ) {
     val modes =
         setOf(
@@ -143,6 +144,7 @@ internal class ThreeRoleScreenMain(
                         StrategyArena.seed(input.raw.seed, index),
                         input.kind,
                         input.roles,
+                        input.expectedOpponents(index),
                     )
                     mapOf(
                         "index" to index,
@@ -271,6 +273,7 @@ internal class ThreeRoleScreenMain(
                 identity["seeds"][index].intValue(),
                 "$prefix-screen-1",
                 roles,
+                expectedOpponents(identity, index),
             )
             require(
                 world["signature"] == chunk["signature"] &&

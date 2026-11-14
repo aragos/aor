@@ -150,7 +150,14 @@ data class ArenaSpecification(
         val tokensApplied = tokenActor?.controllers(expanded, controlledSeat, side) ?: expanded
         val complete =
             cpeBundle?.controllers(tokensApplied, controlledSeat, side, ordinary) ?: tokensApplied
-        return coordinatedEs?.controllers(complete, controlledSeat, side, ordinary) ?: complete
+        return coordinatedEs?.controllers(
+            complete,
+            controlledSeat,
+            side,
+            ordinary,
+            opponentIndices,
+            opponents,
+        ) ?: complete
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =

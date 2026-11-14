@@ -3,6 +3,8 @@ package dev.aragos.aor.training
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.IncumbentResidualSelector
+import dev.aragos.aor.ai.JointPolicySelector
+import dev.aragos.aor.ai.JointSupportProfile
 import java.nio.file.Path
 
 internal enum class CoordinatedEsExecution {
@@ -93,6 +95,7 @@ private constructor(
     private val baseline: PurchaseBaselineInput,
     private val execution: CoordinatedEsExecution,
     private val calibration: CoordinatedEsCalibration?,
+    private val support: JointSupportProfile? = null,
 ) {
     private val selectors =
         calibration?.selectors
@@ -102,7 +105,7 @@ private constructor(
             )
 
     init {
-        require(roles.isNotEmpty()) {
+        require(roles.isNotEmpty() || support != null) {
             "A coordinated arena requires at least one explicit evaluated role."
         }
         require((execution == CoordinatedEsExecution.CALIBRATED) == (calibration != null)) {
@@ -134,7 +137,7 @@ private constructor(
         ) {
             "Every coordinated role requires the full original dictionaries."
         }
-        original.validateOriginal(arena, baseline, roles.keys)
+        original.validateOriginal(arena, baseline, if (support == null) roles.keys else null)
     }
 
     internal fun controllers(
@@ -142,12 +145,15 @@ private constructor(
         seat: Int,
         side: ArenaSide?,
         ordinary: BotModel,
+        opponentIndices: List<Int>? = null,
+        opponents: List<BotModel> = emptyList(),
     ): Map<Int, SimulationController> {
         require(side != null) { "A coordinated policy requires its explicit evaluated side." }
-        val bundle = roles[side] ?: return previous
+        val supported = supportedControllers(previous, seat, ordinary, opponentIndices, opponents)
+        val bundle = roles[side] ?: return supported
         val reference =
-            requireNotNull(previous[seat]) { "The full G3/E/T reference must be composed first." }
-        return previous +
+            requireNotNull(supported[seat]) { "The full G3/E/T reference must be composed first." }
+        return supported +
             (seat to
                 CoordinatedEsController(
                     reference,
@@ -156,17 +162,60 @@ private constructor(
                     bundle.models,
                     original.models,
                     selectors,
+                    support,
                 ))
     }
 
+    private fun supportedControllers(
+        previous: Map<Int, SimulationController>,
+        controlledSeat: Int,
+        ordinary: BotModel,
+        opponentIndices: List<Int>?,
+        opponents: List<BotModel>,
+    ): Map<Int, SimulationController> {
+        val profile = support ?: return previous
+        val indices =
+            requireNotNull(opponentIndices) {
+                "Supported rival C/P roles require the exact original opponent-index lineup."
+            }
+        require(
+            previous.keys == indices.indices.toSet() && indices.all { it in opponents.indices }
+        ) {
+            "Support must bind every original seat and its ordinary model."
+        }
+        return previous.mapValues { (seat, reference) ->
+            val selector =
+                JointPolicySelector(
+                    if (seat == controlledSeat) ordinary else opponents[indices[seat]],
+                    baseline.model,
+                    original.models.card,
+                    original.models.purchase,
+                    profile,
+                )
+            object : SimulationController {
+                override fun controls(decision: String): Boolean =
+                    selector.controls(decision) || reference.controls(decision)
+
+                override fun choose(decision: SimulationDecision): String? =
+                    if (selector.controls(decision.observation.decision)) {
+                        selector.choose(decision.view, decision.observation, decision.seed)
+                    } else reference.choose(decision)
+            }
+        }
+    }
+
+    private val version
+        get() = if (support == null) VERSION else SUPPORTED_VERSION
+
     internal fun identity(): String =
-        "$VERSION:$execution:${original.source.sha256}:${baseline.sha256}:" +
+        "$version:$execution:${original.source.sha256}:${baseline.sha256}:" +
             "${calibration?.source?.sha256}:" +
-            roles.entries.joinToString(":") { (side, bundle) -> "$side=${bundle.source.sha256}" }
+            roles.entries.joinToString(":") { (side, bundle) -> "$side=${bundle.source.sha256}" } +
+            (support?.let { ":all-seat-cp:${it.version}" } ?: "")
 
     internal fun binding(): Map<String, Any> =
         mapOf(
-            "version" to VERSION,
+            "version" to version,
             "execution" to execution,
             "reference" to "complete-joint-token-expansion-composition",
             "originalBundle" to
@@ -197,6 +246,9 @@ private constructor(
         ) +
             (calibration?.let {
                 mapOf("calibration" to it.source.metadata("coordinated-calibration.json"))
+            } ?: emptyMap()) +
+            (support?.let {
+                mapOf("supportProfile" to it.version, "supportRoles" to "ALL_SEATS_CP")
             } ?: emptyMap())
 
     internal fun metadata(): Map<String, Any> = mapOf("coordinatedEs" to binding())
@@ -218,6 +270,27 @@ private constructor(
 
     companion object {
         const val VERSION = "coordinated-es-arena-1"
+        const val SUPPORTED_VERSION = "coordinated-support-arena-1"
+
+        internal fun supported(
+            current: CoordinatedEsBundle?,
+            original: CoordinatedEsBundle,
+            baseline: PurchaseBaselineInput,
+            calibration: CoordinatedEsCalibration?,
+        ): ArenaCoordinatedPolicy {
+            require((current != null) == (calibration != null)) {
+                "Only a supported candidate carries its final bundle and sealed E/T calibration."
+            }
+            return ArenaCoordinatedPolicy(
+                current?.let { mapOf(ArenaSide.CANDIDATE to it) } ?: emptyMap(),
+                original,
+                baseline,
+                if (current == null) CoordinatedEsExecution.ZERO_REFERENCE
+                else CoordinatedEsExecution.CALIBRATED,
+                calibration,
+                JointSupportProfile.KNOWN_OWN_CHAOS_1,
+            )
+        }
 
         internal fun zero(
             original: CoordinatedEsBundle,
@@ -254,10 +327,23 @@ private constructor(
             PurchaseJson.fields(
                 node,
                 setOf("version", "execution", "originalBundle", "baseline", "calibration"),
-                setOf("candidate", "incumbent"),
+                setOf("candidate", "incumbent", "supportProfile"),
             )
-            require(node["version"]?.asText() == VERSION && configurations.size == 1) {
-                "Declare the exact single-configuration coordinated role."
+            val support =
+                node["supportProfile"]?.let {
+                    require(
+                        it.isTextual && it.asText() == JointSupportProfile.KNOWN_OWN_CHAOS_1.version
+                    ) {
+                        "Only the explicit known-own Chaos support profile is admitted."
+                    }
+                    JointSupportProfile.KNOWN_OWN_CHAOS_1
+                }
+            require(
+                node["version"]?.asText() ==
+                    (if (support == null) VERSION else SUPPORTED_VERSION) &&
+                    configurations.size == 1
+            ) {
+                "Declare the exact single-configuration coordinated role and support version."
             }
             val dictionaries = CoordinatedEsBundle.dictionaries(configurations.single())
             val original =
@@ -294,7 +380,14 @@ private constructor(
                     )
                 }
             baselineSubject.verify()
-            return ArenaCoordinatedPolicy(roles, original, baseline, execution, calibration)
+            return ArenaCoordinatedPolicy(
+                roles,
+                original,
+                baseline,
+                execution,
+                calibration,
+                support,
+            )
         }
     }
 }

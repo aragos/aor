@@ -22,6 +22,10 @@ There is no training, storage, transport, or privileged state dependency in this
 ## Separate origin and evaluation identities
 
 The original family83 final admission is verified against its original arena and remains unchanged.
+The protocol records `originArenaSha256:{DESKTOP,MAC}` and every source has an explicit `host`.
+Each selected raw original arena and the common portable admission are hash-checked before tensor
+access; the frozen original runtime proves their admitted scope/ecology and final bundle, and
+the new runtime consumes its separately pinned zero-game proof.
 A new `coordinated-qualification-input-1` binds that admission and original arena separately from
 its evaluation arena, protocol, support profile, and bank. It must not reinterpret the original
 homogeneous ecology as a mixed or supported ecology. Old coordinated/three-role contracts retain
@@ -66,7 +70,11 @@ clock and900-second pure audit reserve, no automatic retry. Each game retains th
 A complete successful final receipt has kind `coordinated-support-qualification-1`, schemaVersion1,
 passed/complete true, profile `aor-coordinated-83-support-1`, supportProfile
 `known-own-chaos-support-1`, and exact candidateBundleSha256, originalBundleSha256,
-calibrationSha256 and rulesVersion/dataVersion/configuration fields. `references` binds
+calibrationSha256 and rulesVersion/dataVersion/configuration fields. The native protocol uses the
+canonical configuration ID string; the final application receipt explicitly maps it to the exact
+BotConfiguration object: playerCount4, mapSTANDARD, initialCardNO_CRUSADES, deckModificationtrue,
+immediateMasterArtDiscardtrue and drawThreeKeepTwofalse. No optional/default configuration fields
+are inferred at export. `references` binds
 qualifiedOrdinarySha256, cardM8Sha256, purchaseF0Sha256, expansionESha256 and tokenControlVersion.
 The qualification input separately binds raw M8/E/T arena subjects; qualifiedOrdinarySha256 is the
 future application's byte-exact combined transport model, whose equivalence to those references
@@ -78,4 +86,24 @@ normalized owner-relative `path` and raw `sha256`. This receipt is a qualified-u
 Source validation uses constructed models/observations only, including legacy/null support parity,
 known-own Chaos exclusions and all-unsafe fallback, exact prior/seed/full-offer behavior, and the
 joined versioned admission/execution/report path. No actual candidate/model reads, fresh reservations,
-scientific games or forwards are authorized by this source prerequisite.
+scientific games or forwards are authorized by this source prerequisite. The separately authorized
+actual83 zero-game origin proof only parses and rehashes the retained admitted subjects; it does not
+select actions or create a qualification result.
+
+### Frozen origin validation across runtimes
+
+The original83 ecology identity includes its executing JARs. Qualification therefore does not run
+that historical admission through the new84 runtime or relabel the old ecology. Preparation runs
+`scripts/QualificationOriginProof.java` under the exact frozen83 nine-JAR classpath. Its explicit
+request binds the host, raw admission, raw arena and all nine runtime subjects. The helper invokes
+the unchanged83 admission reader, rehashes its full closure and records zero games, policy calls and
+fits. No simulation or action selection occurs.
+
+The shared qualification protocol preregisters `originProofSha256` for DESKTOP and MAC. Each host
+source supplies its exact `originProof` subject; the manifest and `origin-proof.json` snapshot retain
+it. The new qualification origin type rehashes all retained local closure paths before decoding any
+model. It joins the unchanged raw admission subjects, original policy/configuration scope, final
+bundle and calibration, preserving the original runtime ecology separately from the new execution
+identity. Proofs are generated at final retained local paths; there is no relocation fallback.
+Constructed admission-shape tests explicitly label their invented origin attestation; only the
+separate frozen-runtime actual proof establishes scientific83 provenance.

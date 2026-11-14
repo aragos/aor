@@ -2,9 +2,11 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ai.BotModel
+import dev.aragos.aor.ai.CoordinatedPolicyModels
+import dev.aragos.aor.ai.CoordinatedPolicySelector
 import dev.aragos.aor.ai.ExpansionObservationEncoder
-import dev.aragos.aor.ai.IncumbentResidualPolicy
 import dev.aragos.aor.ai.IncumbentResidualSelector
+import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TerritoryPhase
@@ -17,7 +19,8 @@ internal class CoordinatedEsController(
     purchaseBaseline: BotModel,
     private val current: CoordinatedEsModels,
     private val original: CoordinatedEsModels,
-    private val selectors: Map<CoordinatedEsHead, IncumbentResidualSelector>,
+    selectors: Map<CoordinatedEsHead, IncumbentResidualSelector>,
+    support: JointSupportProfile? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -26,34 +29,31 @@ internal class CoordinatedEsController(
         }
     }
 
-    private val cardPurchase =
-        CardActorController(
+    private val selector =
+        CoordinatedPolicySelector(
             ordinary,
-            current.card,
-            current.purchase,
-            purchaseBaseline = purchaseBaseline,
+            purchaseBaseline,
+            current.common(),
+            original.common(),
+            requireNotNull(selectors[CoordinatedEsHead.EXPANSION]) {
+                "The expansion head requires its sealed selector."
+            },
+            requireNotNull(selectors[CoordinatedEsHead.TOKEN]) {
+                "The token head requires its sealed selector."
+            },
+            support,
         )
 
     override fun controls(decision: String): Boolean =
-        cardPurchase.controls(decision) || reference.controls(decision)
+        selector.controls(decision) || reference.controls(decision)
 
     override fun choose(decision: SimulationDecision): String? {
-        if (cardPurchase.controls(decision.observation.decision)) {
-            return cardPurchase.choose(decision)
-        }
-        val head = territoryHead(decision.observation.decision) ?: return reference.choose(decision)
-        val recommended =
+        if (!selector.controls(decision.observation.decision)) return reference.choose(decision)
+        return selector.choose(decision.view, decision.observation, decision.seed) {
             requireNotNull(reference.choose(decision)) {
                 "The complete qualified G3/E/T reference must supply its offered command."
             }
-        val observation = observation(decision, recommended)
-        return IncumbentResidualPolicy.choose(
-                observation,
-                current.territory(head),
-                original.territory(head),
-                requireNotNull(selectors[head]) { "The active head requires its sealed selector." },
-            )
-            .command
+        }
     }
 
     companion object {
@@ -88,3 +88,7 @@ internal class CoordinatedEsController(
         }
     }
 }
+
+/** No wire conversion or parameter rewriting occurs between native and application inference. */
+internal fun CoordinatedEsModels.common(): CoordinatedPolicyModels =
+    CoordinatedPolicyModels(card, purchase, expansion, token)

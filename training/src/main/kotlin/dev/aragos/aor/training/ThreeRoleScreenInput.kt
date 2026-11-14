@@ -24,6 +24,9 @@ internal interface ThreeRoleScreenInput {
 
     fun executionReceipt(expected: Int?): Map<String, Int> = emptyMap()
 
+    /** Legacy screens retain homogeneous index0; explicit mixed contracts own their lineup. */
+    fun expectedOpponents(index: Int): List<Int> = List(4) { 0 }
+
     fun specification(role: String): ArenaSpecification
 
     fun side(role: String): ArenaSide
