@@ -38,32 +38,8 @@ internal object ResidualPolicyMath {
         baselineIndex: Int,
         network: ResidualPolicyWeights,
     ): ResidualPolicyEvaluation {
-        val state = indexed(stateFeatures, network.stateIndices, network.kind)
-        val hidden =
-            List(network.hiddenSize) { row ->
-                tanh(
-                    network.stateBias[row] +
-                        dot(network.stateWeights, row, network.stateColumns, state)
-                )
-            }
-        val residuals = actionFeatures.map { action ->
-            val features = indexed(action, network.actionIndices, network.kind)
-            network.actorWeights.indices
-                .sumOf { row ->
-                    network.actorWeights[row] *
-                        tanh(
-                            hidden[row] +
-                                network.actionBias[row] +
-                                dot(
-                                    network.actionWeights,
-                                    row,
-                                    network.actionColumns,
-                                    features,
-                                )
-                        )
-                }
-                .coerceIn(-20.0, 20.0)
-        }
+        val hidden = hidden(stateFeatures, network)
+        val residuals = residuals(hidden, actionFeatures, network).map { it.coerceIn(-20.0, 20.0) }
         val prior =
             List(actionFeatures.size) { index ->
                 when {
@@ -90,6 +66,41 @@ internal object ResidualPolicyMath {
                 exponential / (1.0 + exponential)
             }
         return ResidualPolicyEvaluation(logits, probabilities, value)
+    }
+
+    /** Raw shared network arithmetic, excluding both legacy residual clipping and action priors. */
+    fun rawResiduals(
+        stateFeatures: Map<String, Double>,
+        actionFeatures: List<Map<String, Double>>,
+        network: ResidualPolicyWeights,
+    ): List<Double> = residuals(hidden(stateFeatures, network), actionFeatures, network)
+
+    private fun hidden(
+        stateFeatures: Map<String, Double>,
+        network: ResidualPolicyWeights,
+    ): List<Double> {
+        val state = indexed(stateFeatures, network.stateIndices, network.kind)
+        return List(network.hiddenSize) { row ->
+            tanh(
+                network.stateBias[row] + dot(network.stateWeights, row, network.stateColumns, state)
+            )
+        }
+    }
+
+    private fun residuals(
+        hidden: List<Double>,
+        actionFeatures: List<Map<String, Double>>,
+        network: ResidualPolicyWeights,
+    ): List<Double> = actionFeatures.map { action ->
+        val features = indexed(action, network.actionIndices, network.kind)
+        network.actorWeights.indices.sumOf { row ->
+            network.actorWeights[row] *
+                tanh(
+                    hidden[row] +
+                        network.actionBias[row] +
+                        dot(network.actionWeights, row, network.actionColumns, features)
+                )
+        }
     }
 
     fun select(probabilities: List<Double>, uniform: Double): Int {

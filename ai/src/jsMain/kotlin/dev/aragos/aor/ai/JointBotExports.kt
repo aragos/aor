@@ -101,17 +101,11 @@ private data class QualifiedJointAsset(
 )
 
 /** Optional inference identity, separate from the immutable trained actor qualification. */
-private enum class JointSupportProfile(val version: String) {
-    KNOWN_OWN_CHAOS_1(KnownOwnChaosSupport.VERSION);
-
-    companion object {
-        fun read(raw: dynamic): JointSupportProfile? {
-            if (jsTypeOf(raw) == "undefined") return null
-            val version = purchaseString(raw)
-            return requireNotNull(entries.singleOrNull { it.version == version }) {
-                "Unknown joint actor support profile."
-            }
-        }
+private fun readJointSupportProfile(raw: dynamic): JointSupportProfile? {
+    if (jsTypeOf(raw) == "undefined") return null
+    val version = purchaseString(raw)
+    return requireNotNull(JointSupportProfile.entries.singleOrNull { it.version == version }) {
+        "Unknown joint actor support profile."
     }
 }
 
@@ -138,7 +132,7 @@ private fun readQualifiedJointAsset(json: String): QualifiedJointAsset? =
             purchaseBaseline = readPurchaseBaseline(raw.purchaseBaseline),
             card = readCardModel(raw.cardModel),
             purchase = readPurchaseModel(raw.purchaseModel),
-            support = JointSupportProfile.read(raw.supportProfile),
+            support = readJointSupportProfile(raw.supportProfile),
         )
     } catch (_: Throwable) {
         null

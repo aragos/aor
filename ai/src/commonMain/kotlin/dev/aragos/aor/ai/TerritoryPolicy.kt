@@ -26,7 +26,7 @@ enum class TerritoryPhase(
     }
 }
 
-/** Input versions are independent of phase and network architecture. PPO remains on version 1. */
+/** Explicit actor opt-ins: schema 2 samples expansion-v2; schema 3 samples token-v2. */
 enum class TerritoryEncoder(val version: String, val phase: TerritoryPhase) {
     TOKEN_1(TerritoryPhase.TOKEN.encoderVersion, TerritoryPhase.TOKEN),
     TOKEN_2("aor-token-observation-2", TerritoryPhase.TOKEN),
@@ -135,12 +135,15 @@ data class TerritoryPolicyModel(
 ) {
     init {
         require(
-            schemaVersion == 1 && TerritoryPhase.entries.any { it.encoderVersion == encoderVersion }
+            schemaVersion == 1 &&
+                TerritoryPhase.entries.any { it.encoderVersion == encoderVersion } ||
+                schemaVersion == 2 && encoderVersion == TerritoryEncoder.EXPANSION_2.version ||
+                schemaVersion == 3 && encoderVersion == TerritoryEncoder.TOKEN_2.version
         ) {
             "Unsupported territory policy schema or encoder."
         }
         require(hiddenSize == 64 && baselineProbability == 0.97) {
-            "Territory policy version 1 requires 64 hidden units and a .97 baseline prior."
+            "Territory policies require 64 hidden units and a .97 baseline prior."
         }
         requireNames(stateFeatureNames, 8192)
         requireNames(actionFeatureNames, 512)
