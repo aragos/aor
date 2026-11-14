@@ -108,6 +108,7 @@ def generation_record(plan,request,source_sha,prepared,finished,files,number,chu
             value['signature']==prepared['signature'] and
             value['scienceSha256']==prepared['scienceSha256'] and
             value['sourceSha256']==source_sha and value['role']==name and value['globalIndex']==index and
+            all(value[key]==prepared[key] for key in current.EXTRA_IDENTITIES) and
             value['original']['sha256']==files[current.game_name(index,item['mutant']['index'])]['sha256'] and
             all(value[key] is True for key in ('terminalEqual','canonicalEqual','replayVerified')) and
             value['scientificTerminalExecutions']==value['attemptedGames']==value['completedGames']==1,

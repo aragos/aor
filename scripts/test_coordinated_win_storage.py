@@ -204,7 +204,7 @@ class NativeGenerationTests(unittest.TestCase):
                 signature='b'*64,scienceSha256='c'*64,sourceSha256=self.source_sha,role='PLUS-00',globalIndex=0,
                 original={'sha256':'a'*64},actual={'file':'game-PLUS-00-0.json','sha256':'a'*64},
                 terminalEqual=True,canonicalEqual=True,replayVerified=True,scientificTerminalExecutions=1,
-                attemptedGames=1,completedGames=1)}
+                attemptedGames=1,completedGames=1,**{key:self.prepared[key] for key in s.EXTRA_IDENTITIES})}
 
     def check(self):
         return s.generation_record(self.plan,self.request,self.source_sha,self.prepared,self.finished,self.files,
@@ -248,6 +248,10 @@ class NativeGenerationTests(unittest.TestCase):
 
     def test_forged_canonical_equality_flag_is_rejected(self):
         self.build();self.values['replay-PLUS-00-0/replay-PLUS-00-0.json']['canonicalEqual']=False
+        with self.assertRaisesRegex(ValueError,'full canonical equality'):self.check()
+
+    def test_reproduction_cannot_relabel_its_inherited_selector(self):
+        self.build();self.values['replay-PLUS-00-0/replay-PLUS-00-0.json']['inheritedCalibrationSha256']='9'*64
         with self.assertRaisesRegex(ValueError,'full canonical equality'):self.check()
 
 
