@@ -118,7 +118,7 @@ internal class ThreeRoleScreenMain(
             }
             for (index in input.ownedReplays) {
                 val world = readWorld(output, index)
-                for (role in roles) {
+                for (role in input.replayRoles(index)) {
                     val replay =
                         ThreeRoleScreen.reproduce(
                             input,
@@ -177,7 +177,8 @@ internal class ThreeRoleScreenMain(
         worlds: List<Map<String, Any>>,
     ) {
         input.verify()
-        val reproductions = if (stage == "chunk") input.ownedReplays.size * roles.size else 0
+        val reproductions =
+            if (stage == "chunk") input.ownedReplays.sumOf { input.replayRoles(it).size } else 0
         TrainingArtifacts(output)
             .write(
                 "finished.json",

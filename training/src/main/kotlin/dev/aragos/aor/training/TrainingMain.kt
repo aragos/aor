@@ -13,6 +13,14 @@ import kotlin.random.Random
 fun main(arguments: Array<String>) {
     if (
         arguments.toList().chunked(2).any {
+            it.size == 2 && it[0] == "--mode" && it[1] in CoordinatedDiagnosticMain.modes
+        }
+    ) {
+        CoordinatedDiagnosticMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().chunked(2).any {
             it.size == 2 && it[0] == "--mode" && it[1] in CoordinatedQualificationMain.modes
         }
     ) {

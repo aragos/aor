@@ -29,7 +29,8 @@ internal object ThreeRoleScreen {
         val roles =
             input.roles.associateWith { role ->
                 val trace =
-                    if (index in input.replayIndices) PurchaseCanonicalTrace(lineup.seat) else null
+                    if (role in input.replayRoles(index)) PurchaseCanonicalTrace(lineup.seat)
+                    else null
                 input
                     .executeGame(deadline) { gameDeadline ->
                         StrategyArena.tracedGame(
@@ -65,7 +66,7 @@ internal object ThreeRoleScreen {
         canonical: JsonNode,
         deadline: Long,
     ): StrategyReplay {
-        require(index in input.ownedReplays) {
+        require(index in input.ownedReplays && role in input.replayRoles(index)) {
             "Only the owner shard may execute a fixed side reproduction."
         }
         validateWorld(

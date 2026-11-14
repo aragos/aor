@@ -24,6 +24,11 @@ internal interface ThreeRoleScreenInput {
 
     fun executionReceipt(expected: Int?): Map<String, Int> = emptyMap()
 
+    /**
+     * Existing screens reproduce every role; fixed factorial pairs prescribe one role per index.
+     */
+    fun replayRoles(index: Int): List<String> = if (index in replayIndices) roles else emptyList()
+
     /** Legacy screens retain homogeneous index0; explicit mixed contracts own their lineup. */
     fun expectedOpponents(index: Int): List<Int> = List(4) { 0 }
 

@@ -216,7 +216,7 @@ class CoordinatedQualificationJoinedTest {
         }
     }
 
-    private fun scenario(block: (Fixture) -> Unit) {
+    internal fun scenario(block: (Fixture) -> Unit) {
         val root = Files.createTempDirectory("coordinated-qualification-joined-shape")
         CoordinatedEsFixture().use { toy ->
             @Suppress("UNCHECKED_CAST")
@@ -284,7 +284,7 @@ class CoordinatedQualificationJoinedTest {
         }
     }
 
-    private class Fixture(
+    internal class Fixture(
         val root: Path,
         val toy: CoordinatedEsFixture,
         val originArena: TokenPairedSubject,
