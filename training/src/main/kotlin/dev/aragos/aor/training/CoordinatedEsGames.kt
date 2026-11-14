@@ -53,14 +53,14 @@ internal data class CoordinatedEsGameReceipt(
     val files: Map<String, String>,
 )
 
-internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Path) {
+internal class CoordinatedEsGames(val input: CoordinatedGenerationInput, val output: Path) {
     private val artifacts = TrainingArtifacts(output)
 
     fun prepare() {
         artifacts.ensureFileSnapshot(input.source.path, input.source.sha256, "source.json")
         artifacts.ensureFileSnapshot(
-            input.scope.arenaSource.path,
-            input.scope.arenaSource.sha256,
+            input.arenaSource.path,
+            input.arenaSource.sha256,
             "arena.json",
         )
         artifacts.write("prepared.json", input.metadata())
@@ -84,7 +84,7 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
             }
         val lineup = StrategyArena.lineup(specification, index)
         val panel =
-            if (input.stage == CoordinatedEsStage.CONTROLS && input.generation == 1) {
+            if (input.panelFiles && input.generation == 1) {
                 CoordinatedEsPanel(index)
             } else {
                 null
@@ -129,23 +129,23 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
             name,
             identity +
                 mapOf(
-                    "kind" to "coordinated-es-game-1",
+                    "kind" to "${input.prefix}-game-1",
                     "configuration" to lineup.configuration.id,
                     "opponentIndices" to lineup.opponentIndices,
-                    "bundleSha256" to input.population?.members?.let { it[role] }?.source?.sha256,
+                    "bundleSha256" to input.bundleSha256(role),
                     "terminal" to game,
                     "canonical" to canonical,
                 ),
         )
         val files = linkedMapOf(name to PurchaseJson.hash(output.resolve(name)))
-        if (input.stage == CoordinatedEsStage.CONTROLS) {
+        if (input.panelFiles) {
             val public = panel ?: CoordinatedEsPanel(index)
             val panelName = "panel-$index.json"
             artifacts.write(
                 panelName,
                 identity.filterKeys { it != "role" } +
                     mapOf(
-                        "kind" to "coordinated-es-panel-1",
+                        "kind" to "${input.prefix}-panel-1",
                         "assignedEpoch" to public.assignedEpoch,
                         "heads" to public.heads(),
                         "windows" to public.windows(),
@@ -160,16 +160,16 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
     private fun identity(index: Int, role: String): Map<String, Any> =
         mapOf(
             "signature" to input.signature,
-            "scopeSha256" to input.scope.sha256,
+            "scopeSha256" to input.scopeSha256,
             "scienceSha256" to input.scienceSha256,
             "sourceSha256" to input.source.sha256,
-            "originalBundleSha256" to input.scope.original.source.sha256,
+            "originalBundleSha256" to input.originalBundleSha256,
             "generation" to input.generation,
             "globalIndex" to index,
             "seed" to input.bank.seeds[index],
             "seat" to index % 4,
             "role" to role,
-        )
+        ) + input.additionalIdentity
 
     fun finish(receipts: List<CoordinatedEsGameReceipt>, attempts: CoordinatedEsAttempts) {
         require(
@@ -206,10 +206,10 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
         artifacts.write(
             "finished.json",
             mapOf(
-                "kind" to "coordinated-es-complete-1",
+                "kind" to "${input.prefix}-complete-1",
                 "signature" to input.signature,
                 "scienceSha256" to input.scienceSha256,
-                "scopeSha256" to input.scope.sha256,
+                "scopeSha256" to input.scopeSha256,
                 "stage" to input.stage,
                 "generation" to input.generation,
                 "globalStart" to input.globalStart,
@@ -219,7 +219,7 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
                 "expectedGames" to expected.size,
                 "canonicalGames" to expected.count { input.canonical(it.second, it.first) },
                 "files" to files.toSortedMap(),
-            ),
+            ) + input.additionalIdentity,
         )
     }
 
@@ -227,7 +227,7 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
         setOf("source.json", "arena.json", "prepared.json", "started.json") +
             input.indices.flatMap { index ->
                 input.roles.map { gameName(it, index) } +
-                    if (input.stage == CoordinatedEsStage.CONTROLS) {
+                    if (input.panelFiles) {
                         listOf("panel-$index.json")
                     } else {
                         emptyList()
@@ -240,7 +240,7 @@ internal class CoordinatedEsGames(val input: CoordinatedEsInput, val output: Pat
         }
         val finished = PurchaseJson.read(output.resolve("finished.json"))
         require(
-            finished["kind"]?.asText() == "coordinated-es-complete-1" &&
+            finished["kind"]?.asText() == "${input.prefix}-complete-1" &&
                 finished["signature"]?.asText() == input.signature &&
                 finished["scienceSha256"]?.asText() == input.scienceSha256 &&
                 finished["completedGames"]?.asInt() == input.count * input.roles.size &&

@@ -156,7 +156,7 @@ internal object CoordinatedEsWire {
     }
 
     /** Scaled compensated summation preserves the numeric owner's projected-radius boundary. */
-    private fun rootMeanSquare(values: List<Double>): Double {
+    internal fun rootMeanSquare(values: List<Double>): Double {
         val scale = values.maxOf(::abs)
         if (scale == 0.0) return 0.0
         var sum = 0.0
@@ -218,17 +218,32 @@ internal enum class CoordinatedEsStage {
  */
 internal class CoordinatedEsInput
 internal constructor(
-    val source: TokenPairedSubject,
+    override val source: TokenPairedSubject,
     val subjects: Map<String, TokenPairedSubject?>,
     val scope: CoordinatedEsScope,
-    val stage: CoordinatedEsStage,
-    val generation: Int,
-    val globalStart: Int,
-    val count: Int,
-    val bank: CoordinatedEsBank,
+    override val stage: CoordinatedEsStage,
+    override val generation: Int,
+    override val globalStart: Int,
+    override val count: Int,
+    override val bank: CoordinatedEsBank,
     val calibration: CoordinatedEsCalibration?,
     val population: CoordinatedEsPopulation?,
-) {
+) : CoordinatedGenerationInput {
+    override val prefix = "coordinated-es"
+    override val arenaSource
+        get() = scope.arenaSource
+
+    override val scopeSha256
+        get() = scope.sha256
+
+    override val originalBundleSha256
+        get() = scope.original.source.sha256
+
+    override val panelFiles
+        get() = stage == CoordinatedEsStage.CONTROLS
+
+    override fun bundleSha256(role: String) = population?.members?.let { it[role] }?.source?.sha256
+
     init {
         require(
             generation in 1..16 &&
@@ -247,10 +262,11 @@ internal constructor(
         }
     }
 
-    val indices = globalStart until globalStart + count
+    override val indices = globalStart until globalStart + count
     val protocol = required("protocol")
-    val arena = scope.arena.copy(pairsPerConfiguration = bank.count, seed = bank.nativeOffset)
-    val roles = population?.members?.keys?.toList() ?: listOf("RAW_G3")
+    override val arena =
+        scope.arena.copy(pairsPerConfiguration = bank.count, seed = bank.nativeOffset)
+    override val roles = population?.members?.keys?.toList() ?: listOf("RAW_G3")
     val scienceIdentity =
         mapOf(
             "kind" to VERSION,
@@ -261,9 +277,9 @@ internal constructor(
             "bank" to bank,
             "subjects" to subjects.filterKeys { it != "arena" }.mapValues { it.value?.sha256 },
         )
-    val scienceSha256 = CpePairedDigest.json(scienceIdentity)
-    val signature = trainingSignature("$VERSION:${source.sha256}:${scienceSha256}")
-    val specifications: Map<String, ArenaSpecification> =
+    override val scienceSha256 = CpePairedDigest.json(scienceIdentity)
+    override val signature = trainingSignature("$VERSION:${source.sha256}:${scienceSha256}")
+    override val specifications: Map<String, ArenaSpecification> =
         population?.members?.mapValues { (_, bundle) ->
             arena.copy(
                 coordinatedEs =
@@ -279,12 +295,12 @@ internal constructor(
     fun required(name: String): TokenPairedSubject =
         requireNotNull(subjects[name]) { "$name subject is required." }
 
-    fun canonical(role: String, index: Int): Boolean =
+    override fun canonical(role: String, index: Int): Boolean =
         stage == CoordinatedEsStage.POPULATION &&
             (index == 0 && role == "PLUS-${(generation - 1).toString().padStart(2, '0')}" ||
                 index == 255 && role == "MINUS-${(generation - 1).toString().padStart(2, '0')}")
 
-    fun inputPins(): Map<String, String> = buildMap {
+    override fun inputPins(): Map<String, String> = buildMap {
         putAll(scope.inputPins())
         put(source.path.toString(), source.sha256)
         subjects.values.filterNotNull().forEach {
@@ -298,7 +314,7 @@ internal constructor(
         }
     }
 
-    fun metadata(): Map<String, Any?> =
+    override fun metadata(): Map<String, Any?> =
         mapOf(
             "kind" to "coordinated-es-prepared-1",
             "signature" to signature,

@@ -80,24 +80,36 @@ object CoordinatedEsMain {
             return
         }
         val input = CoordinatedEsInput.read(source.path)
+        execute(input, mode, fields, output, seconds, deadline)
+    }
+
+    internal fun execute(
+        input: CoordinatedGenerationInput,
+        mode: String,
+        fields: Map<String, String>,
+        output: Path,
+        seconds: Int,
+        deadline: Long,
+    ) {
+        val artifacts = TrainingArtifacts(output)
         val store = CoordinatedEsGames(input, output)
-        if (mode == "coordinated-es-reproduce") {
+        if (mode == "${input.prefix}-reproduce") {
             reproduce(input, store, fields, output, deadline)
             return
         }
         require(
-            mode == "coordinated-es-prepare" ||
+            mode == "${input.prefix}-prepare" ||
                 mode ==
                     if (input.stage == CoordinatedEsStage.CONTROLS) {
-                        "coordinated-es-controls"
+                        "${input.prefix}-controls"
                     } else {
-                        "coordinated-es-population"
+                        "${input.prefix}-population"
                     }
         ) {
             "The command mode must match the exact frozen source stage."
         }
         store.prepare()
-        if (mode == "coordinated-es-prepare") return
+        if (mode == "${input.prefix}-prepare") return
         val workers =
             requireNotNull(fields["--workers"]?.toIntOrNull()) { "Workers must be integral." }
         require(workers in 1..10) { "The original host profile permits at most ten workers." }
@@ -143,7 +155,7 @@ object CoordinatedEsMain {
     }
 
     private fun reproduce(
-        input: CoordinatedEsInput,
+        input: CoordinatedGenerationInput,
         store: CoordinatedEsGames,
         fields: Map<String, String>,
         output: Path,
@@ -165,10 +177,10 @@ object CoordinatedEsMain {
             .write(
                 "replay-$role-$index.json",
                 mapOf(
-                    "kind" to "coordinated-es-reproduction-1",
+                    "kind" to "${input.prefix}-reproduction-1",
                     "signature" to input.signature,
                     "scienceSha256" to input.scienceSha256,
-                    "scopeSha256" to input.scope.sha256,
+                    "scopeSha256" to input.scopeSha256,
                     "sourceSha256" to input.source.sha256,
                     "generation" to input.generation,
                     "role" to role,
@@ -181,7 +193,7 @@ object CoordinatedEsMain {
                     "scientificTerminalExecutions" to 1,
                     "attemptedGames" to attempts.attemptedGames,
                     "completedGames" to attempts.completedGames,
-                ),
+                ) + input.additionalIdentity,
             )
     }
 }

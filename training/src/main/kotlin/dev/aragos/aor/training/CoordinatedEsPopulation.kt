@@ -73,6 +73,18 @@ private constructor(
                     "The first executable population must be the sole original calibration probe."
                 }
             }
+            return CoordinatedEsPopulation(
+                source,
+                readMembers(source, node, scope.original, scope.dictionaries),
+            )
+        }
+
+        internal fun readMembers(
+            source: TokenPairedSubject,
+            node: JsonNode,
+            original: CoordinatedEsBundle,
+            dictionaries: Map<CoordinatedEsHead, CpePairedDictionary>,
+        ): Map<String, CoordinatedEsBundle> {
             val records = PurchaseJson.array(node["members"], "population members")
             require(records.size == 32) {
                 "An executable population requires all32 original signed mutants."
@@ -110,12 +122,12 @@ private constructor(
             }
             val members = subjects.associate { (role, subject) ->
                 role to
-                    CoordinatedEsBundle.read(subject, scope.dictionaries).also {
-                        it.models.validateFrozenValues(scope.original.models)
+                    CoordinatedEsBundle.read(subject, dictionaries).also {
+                        it.models.validateFrozenValues(original.models)
                     }
             }
             source.verify()
-            return CoordinatedEsPopulation(source, members)
+            return members
         }
 
         fun role(index: Int): String {
