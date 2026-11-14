@@ -64,14 +64,16 @@ clock and900-second pure audit reserve, no automatic retry. Each game retains th
 ## Qualified-unit receipt
 
 A complete successful final receipt has kind `coordinated-support-qualification-1`, schemaVersion1,
-passed/complete true, profile `coordinated-83-support-1`, supportProfile
+passed/complete true, profile `aor-coordinated-83-support-1`, supportProfile
 `known-own-chaos-support-1`, and exact candidateBundleSha256, originalBundleSha256,
 calibrationSha256 and rulesVersion/dataVersion/configuration fields. `references` binds
 qualifiedOrdinarySha256, cardM8Sha256, purchaseF0Sha256, expansionESha256 and tokenControlVersion.
 The qualification input separately binds raw M8/E/T arena subjects; qualifiedOrdinarySha256 is the
 future application's byte-exact combined transport model, whose equivalence to those references
 must be proved before preparation. `banks` binds the complete mixed and homogeneous evidence/report
-subjects and both99 gates. This receipt is a qualified-unit identity, not an activation instruction.
+subjects and both99 gates. Each `banks.mixed` / `banks.homogeneous` object has `complete:true`,
+`pairs:4096`, `win99Passed:true`, `reward99Passed:true`, and `evidence`/`report` subjects with
+normalized owner-relative `path` and raw `sha256`. This receipt is a qualified-unit identity, not an activation instruction.
 
 Source validation uses constructed models/observations only, including legacy/null support parity,
 known-own Chaos exclusions and all-unsafe fallback, exact prior/seed/full-offer behavior, and the
