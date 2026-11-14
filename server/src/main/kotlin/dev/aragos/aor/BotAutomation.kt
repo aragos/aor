@@ -26,10 +26,17 @@ data class AutomatedPlayer(
     val difficulty: BotDifficulty,
     val policyVersion: String,
     val seed: Int,
+    val policyAssetSha256: String? = null,
 ) {
     init {
         require(policyVersion.matches(Regex("[a-z0-9-]{1,80}"))) {
             "An automated-player policy requires a canonical version identifier."
+        }
+        require(
+            if (ServerBotProfile.fromVersion(policyVersion) == null) policyAssetSha256 == null
+            else policyAssetSha256?.matches(Regex("[0-9a-f]{64}")) == true
+        ) {
+            "A server-profile seat requires its exact asset hash; legacy seats retain no asset binding."
         }
     }
 }
@@ -109,6 +116,8 @@ data class BotDecisionWork(
     val purchase: PurchaseProjection? = null,
     /** Optional actor-visible card facts; no authority state or embedded recommendation. */
     val card: CardProjection? = null,
+    /** Present only for the explicitly stored server profile; the browser must not replace it. */
+    val proposal: BotPolicyProposal? = null,
 )
 
 /** Creator-only work; each observation belongs to exactly one automated seat. */
@@ -251,7 +260,7 @@ internal object BotAutomation {
                     else -> throw ServiceFailure(400, "INVALID_REQUEST")
                 }
             }
-        return work(stored, now)
+        return work(service, stored, now)
     }
 
     fun read(
@@ -268,7 +277,7 @@ internal object BotAutomation {
         val runner = requireRunner(game)
         if (runner.epoch != epoch) throw ServiceFailure(409, "BOT_STALE_EPOCH")
         if (!runner.paused && active(game)) requireLease(game, runnerId, epoch, now)
-        return work(game, now)
+        return work(service, game, now)
     }
 
     fun submit(
@@ -326,6 +335,14 @@ internal object BotAutomation {
                 }
                 val command = TextCodec.parseCommand(commandText)
                 if (command.toText() != commandText) throw ServiceFailure(400, "INVALID_COMMAND")
+                val bot =
+                    checkNotNull(current.bots[seat]) {
+                        "A ready automated seat requires its stored controller."
+                    }
+                val proposal = serverProposal(service, current, seat, bot)
+                if (proposal != null && proposal.command != commandText) {
+                    throw ServiceFailure(409, "BOT_POLICY_COMMAND_MISMATCH")
+                }
                 val next =
                     try {
                         service.driver.submit(current, seat, command)
@@ -358,10 +375,10 @@ internal object BotAutomation {
                     )
                 if (active(saved)) saved else pause(saved)
             }
-        return work(stored, now)
+        return work(service, stored, now)
     }
 
-    private fun work(game: StoredGame, now: Long): BotWork {
+    private fun work(service: GameService, game: StoredGame, now: Long): BotWork {
         val runner = requireRunner(game)
         val paused = runner.paused || !active(game)
         val seats = if (!paused && runner.leaseUntil > now) readySeats(game) else emptyList()
@@ -382,6 +399,7 @@ internal object BotAutomation {
                         val decision = decisionId(game, seat)
                         val state = game.state()
                         val observation = BotObservations.from(state, seat)
+                        val proposal = serverProposal(service, game, seat, bot, observation)
                         BotDecisionWork(
                             seat = seat,
                             difficulty = bot.difficulty,
@@ -390,7 +408,10 @@ internal object BotAutomation {
                             submissionVersion = game.submissionVersions[seat],
                             observation = observation,
                             purchase =
-                                if (PurchasePolicyScope.supports(observation, bot.difficulty)) {
+                                if (
+                                    proposal == null &&
+                                        PurchasePolicyScope.supports(observation, bot.difficulty)
+                                ) {
                                     PurchaseObservationEncoder.project(
                                         state.viewForPlayer(seat),
                                         seat,
@@ -401,7 +422,8 @@ internal object BotAutomation {
                                 },
                             card =
                                 if (
-                                    observation.decision == "play-cards" &&
+                                    proposal == null &&
+                                        observation.decision == "play-cards" &&
                                         JointPolicyScope.supports(observation, bot.difficulty)
                                 ) {
                                     CardObservationEncoder.project(
@@ -412,10 +434,43 @@ internal object BotAutomation {
                                 } else {
                                     null
                                 },
+                            proposal = proposal,
                         )
                     },
             operationReceipts = runner.receipts.map(BotOperationReceipt::operationId),
         )
+    }
+
+    private fun serverProposal(
+        service: GameService,
+        game: StoredGame,
+        seat: PlayerId,
+        bot: AutomatedPlayer,
+        observation: BotObservation? = null,
+    ): BotPolicyProposal? {
+        val profile = ServerBotProfile.fromVersion(bot.policyVersion) ?: return null
+        val policy = service.serverBotPolicy
+        if (
+            policy == null ||
+                policy.profile != profile ||
+                policy.assetSha256 != bot.policyAssetSha256
+        ) {
+            throw ServiceFailure(503, "BOT_POLICY_UNAVAILABLE")
+        }
+        val actual = observation ?: BotObservations.from(game.state(), seat)
+        if (!profile.supports(actual, bot.difficulty)) {
+            throw ServiceFailure(409, "BOT_POLICY_SCOPE_CHANGED")
+        }
+        val command =
+            policy.choose(
+                game.state().viewForPlayer(seat),
+                actual,
+                bot.seed xor decisionId(game, seat).hashCode(),
+            )
+        if (actual.candidates.none { it.command == command }) {
+            throw ServiceFailure(503, "BOT_POLICY_FAILED")
+        }
+        return BotPolicyProposal(profile.version, policy.assetSha256, command)
     }
 
     private fun readySeats(game: StoredGame): List<PlayerId> =

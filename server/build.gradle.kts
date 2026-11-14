@@ -24,6 +24,10 @@ tasks.register<Test>("fastTest") {
     shouldRunAfter(tasks.test)
 }
 
+tasks.withType<Test>().configureEach {
+    outputs.dir(layout.buildDirectory.dir("test-fixtures/coordinated-preview"))
+}
+
 tasks.register<JavaExec>("verifyGameLogs") {
     group = "verification"
     description =

@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import dev.aragos.aor.ai.BOT_POLICY_VERSION
+import dev.aragos.aor.ai.BotDifficulty
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -75,11 +76,12 @@ class GameService(
     internal val store: GameStore,
     internal val driver: GameDriver = GameDriver(),
     private val accounts: AccountStore? = null,
+    internal val serverBotPolicy: ServerBotPolicy? = null,
 ) {
     private val credentialsRandom = SecureRandom()
 
     internal fun forAccounts(accounts: AccountStore): GameService =
-        GameService(store, driver, accounts)
+        GameService(store, driver, accounts, serverBotPolicy)
 
     fun create(
         names: List<String>,
@@ -127,7 +129,14 @@ class GameService(
                 )
                 .copy(
                     name = name,
-                    bots = botSeats(players.drop(names.size), bots),
+                    bots =
+                        botSeats(
+                            players.drop(names.size),
+                            bots,
+                            players.size,
+                            rules,
+                            serverBotPolicy,
+                        ),
                     botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
                 )
         )
@@ -187,7 +196,13 @@ class GameService(
                 .copy(
                     name = name,
                     memberships = seats.associate { (seat, account) -> seat to account.id.value },
-                    bots = botSeats(header.players.drop(players.size), bots),
+                    bots =
+                        botSeats(
+                            header.players.drop(players.size),
+                            bots,
+                            header.players.size,
+                            rules,
+                        ),
                     botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
                 )
         )
@@ -805,10 +820,21 @@ class GameService(
     private fun botSeats(
         players: List<Player>,
         requests: List<AutomatedPlayerRequest>,
+        playerCount: Int,
+        rules: RuleOptions,
+        policy: ServerBotPolicy? = null,
     ): Map<PlayerId, AutomatedPlayer> =
         players.zip(requests).associate { (player, request) ->
+            val selected = policy?.takeIf {
+                request.difficulty == BotDifficulty.HARD && it.profile.supports(playerCount, rules)
+            }
             player.id to
-                AutomatedPlayer(request.difficulty, BOT_POLICY_VERSION, credentialsRandom.nextInt())
+                AutomatedPlayer(
+                    request.difficulty,
+                    selected?.profile?.version ?: BOT_POLICY_VERSION,
+                    credentialsRandom.nextInt(),
+                    selected?.assetSha256,
+                )
         }
 
     private fun authenticateSeat(stored: StoredGame, token: String): PlayerId {

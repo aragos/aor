@@ -158,6 +158,10 @@ internal object GameDocuments {
                                     BotDifficulty.valueOf(bot.field("difficulty").string()),
                                 policyVersion = bot.field("policyVersion").string(),
                                 seed = bot.field("seed").integer(),
+                                policyAssetSha256 =
+                                    bot["policyAssetSha256"]
+                                        ?.takeUnless(JsonNode::isNull)
+                                        ?.string(),
                             )
                     }
                     .orEmpty(),

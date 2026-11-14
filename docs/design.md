@@ -120,6 +120,10 @@ Archives/checkpoints preserve controllers and pending decisions.
 The [browser runner](../web/src/ai/botRunner.ts) sends one seat-safe observation at a time to one local
 worker. [Policies](engine.md#opponent-policies) return canonical commands; the server validates,
 persists and supplies actual randomness. Reads never execute bots; search never calls the server.
+An explicitly configured local [coordinated profile](coordinated-preview.md) instead computes a
+seat-safe, immutable-model proposal on the server. Its stored identity opts in only new compatible
+HARD seats; legacy seats keep the worker path. The browser submits the proposal without replacing it,
+and the server rechecks it before the ordinary command driver. Proposal reads do not execute actions.
 Writes atomically check lease epoch, revision, decision and private-submission version; UUID/hash
 receipts prevent duplicate uncertain decisions. Sealed amounts stay private until ordinary reveal.
 Public snapshots exclude runner identity, deadlines, seeds, hands and receipts.

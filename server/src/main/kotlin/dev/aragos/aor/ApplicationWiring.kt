@@ -32,7 +32,18 @@ fun createConfiguredGameService(environment: Map<String, String> = System.getenv
     LinearGameMigration.run(store).forEach { id ->
         LoggerFactory.getLogger("LinearGameMigration").info("Upgraded Linear game {}", id)
     }
-    return GameService(store)
+    val serverBotPolicy =
+        environment["AOR_COORDINATED_BOT_ASSET"]?.let { configured ->
+            require((environment["AOR_AUTH_MODE"] ?: "local") == "local") {
+                "The explicitly configured coordinated profile is available only in local mode."
+            }
+            val path = Path.of(configured)
+            require(path.isAbsolute) {
+                "AOR_COORDINATED_BOT_ASSET requires an absolute immutable asset path."
+            }
+            CoordinatedPreviewPolicy.read(path)
+        }
+    return GameService(store, serverBotPolicy = serverBotPolicy)
 }
 
 /** Local private-link mode is only for loopback development and deterministic engine checks. */

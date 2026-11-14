@@ -17,8 +17,8 @@ residuals, the frozen calibrated scales, margin1 and reference-first ties. The o
 decoder is not used.
 
 Only newly created HARD seats in the exact current-rules four-player qualified configuration receive
-the new stored profile identity. Existing seats, other setups and difficulties retain their browser
-policy path. Startup configuration is opt-in and local-only; a configured invalid asset fails startup.
+the new stored profile identity and immutable asset SHA. Existing seats, other setups and difficulties
+retain their browser policy path. Startup configuration is opt-in and local-only; a configured invalid asset fails startup.
 A saved seat requiring the new profile cannot silently fall back when its asset is unavailable.
 
 Creator-authorized bot work may contain a typed proposal with profile, asset identity and canonical
