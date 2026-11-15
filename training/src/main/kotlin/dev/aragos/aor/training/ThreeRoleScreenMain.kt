@@ -20,6 +20,8 @@ internal class ThreeRoleScreenMain(
     },
     private val report: ((List<JsonNode>) -> Map<String, Any>)? = null,
     private val requireExecutionCounts: Boolean = false,
+    private val admissionKeys: List<String> =
+        listOf("finalAdmissionSha256", "historicalAdmissionSha256"),
     private val expectedOpponents: (JsonNode, Int) -> List<Int> = { _, _ -> List(4) { 0 } },
 ) {
     val modes =
@@ -193,10 +195,10 @@ internal class ThreeRoleScreenMain(
                     "worlds" to worlds,
                     "reproductions" to reproductions,
                     "scientificTerminalExecutions" to worlds.size * roles.size + reproductions,
-                    "finalAdmissionSha256" to input.finalAdmissionSha256,
-                    "historicalAdmissionSha256" to input.historicalAdmissionSha256,
-                    "files" to ExpansionFinalMain.inventory(output),
-                ) + input.executionReceipt(worlds.size * roles.size + reproductions),
+                ) +
+                    input.admissionBindings +
+                    mapOf("files" to ExpansionFinalMain.inventory(output)) +
+                    input.executionReceipt(worlds.size * roles.size + reproductions),
             )
     }
 
@@ -251,8 +253,7 @@ internal class ThreeRoleScreenMain(
                     chunk["count"]?.intValue() == 128 &&
                     chunk["scienceSha256"]?.asText() == science &&
                     chunk["scienceIdentity"] == identity &&
-                    chunk["finalAdmissionSha256"] == first["finalAdmissionSha256"] &&
-                    chunk["historicalAdmissionSha256"] == first["historicalAdmissionSha256"] &&
+                    admissionKeys.all { chunk[it]?.isTextual == true && chunk[it] == first[it] } &&
                     chunk["worlds"]?.map { it["index"].intValue() } == indices.toList() &&
                     chunk["reproductions"]?.intValue() == reproductions &&
                     chunk["scientificTerminalExecutions"]?.intValue() ==
@@ -299,9 +300,7 @@ internal class ThreeRoleScreenMain(
                 "sourceSha256" to sourceHash,
                 "chunks" to compact["chunks"],
                 "scienceSha256" to science,
-                "finalAdmissionSha256" to first["finalAdmissionSha256"],
-                "historicalAdmissionSha256" to first["historicalAdmissionSha256"],
-            ),
+            ) + admissionKeys.associateWith { first.required(it) },
         )
         artifacts.write(
             "finished.json",

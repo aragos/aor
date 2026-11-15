@@ -13,8 +13,7 @@ internal interface ThreeRoleScreenInput {
     val signature: String
     val scienceSha256: String
     val scienceIdentity: Map<String, Any>
-    val finalAdmissionSha256: String
-    val historicalAdmissionSha256: String
+    val admissionBindings: Map<String, String>
 
     /** Defaults preserve the original unwrapped TOKEN/CPE execution contract. */
     fun executeGame(deadline: Long, operation: (Long) -> ArenaGame): ArenaGame = operation(deadline)

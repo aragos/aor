@@ -21,7 +21,7 @@ drawThreeKeepTwo false. Rules/data retain the existing native versions.
 Bundles retain `coordinated-es-bundle-1` and all four complete head/dictionary identities. Original
 C/P are the qualified reference; original E/T are the zero-readout parameter anchors, distinct from
 the current bundle. Current value arrays must equal original values. Calibration is the exact
-completed versioned raw seal, and supplies the sole E/T scales. References are subjects
+completed V2 raw seal, and supplies the sole E/T scales. References are subjects
 `qualifiedOrdinary`, `cardM8`, `purchaseF0`, `expansionE`, plus `tokenControlVersion:FIXED_16_TO_15`.
 The packed ordinary preview reference must equal the separate native M8/E/token composition.
 The existing shared chooser owns sampling, Support1, margin1, raw residual subtraction and ties.
@@ -84,9 +84,8 @@ protocolSha256, candidateBundleSha256, inferenceAssetSha256, nominationSha256, r
 All raw report/evidence joins and counts remain mandatory.
 
 Final certificate `coordinated-win-qualification-1` has exactly kind, schemaVersion1, passed,
-complete, profile, supportProfile, inferenceAssetSha256, nominationSha256, candidateBundleSha256,
-originalBundleSha256, calibrationSha256, rulesVersion, dataVersion, configuration (structured
-application configuration), references and banks. Each bank has complete, pairs4096,
+complete, profile, supportProfile, inferenceAssetSha256, nominationSha256, rulesVersion, dataVersion, configuration (structured
+application configuration) and banks. Each bank has complete, pairs4096,
 win99Passed, evidence and report; no reward gate. The cached-server outer manifest
 `coordinated-win-support-preview-1` has kind, schemaVersion1, profile, inferenceAsset and
 qualification. Preview activation is a later action after actual qualification.

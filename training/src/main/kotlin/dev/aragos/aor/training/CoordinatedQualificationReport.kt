@@ -5,6 +5,18 @@ import com.fasterxml.jackson.databind.JsonNode
 /** Complete-bank paired99 inference, preserving the existing independent-world interval owner. */
 internal object CoordinatedQualificationReport {
     const val VERSION = "coordinated-qualification-screen-report-1"
+    private val owner = PairedQualificationReport(VERSION, listOf("wins", "rewards"))
+
+    fun report(worlds: List<JsonNode>): Map<String, Any> = owner.report(worlds)
+
+    fun requirePassed(report: JsonNode) = owner.requirePassed(report)
+}
+
+/** Shared fixed-bank interval arithmetic; an explicit version owns the required metrics. */
+internal class PairedQualificationReport(
+    private val version: String,
+    private val requiredMetrics: List<String>,
+) {
 
     fun report(worlds: List<JsonNode>): Map<String, Any> {
         require(worlds.map { it["index"]?.intValue() } == (0..4095).toList()) {
@@ -45,17 +57,14 @@ internal object CoordinatedQualificationReport {
                 }
                 .toDouble() > 0.0
         return mapOf(
-            "kind" to VERSION,
+            "kind" to version,
             "worlds" to 4096,
             "confidence" to .99,
             "intervalMultiplier" to CoordinatedQualificationProtocol.MULTIPLIER,
             "candidateMinusControl" to contrasts,
             "gates" to
-                mapOf(
-                    "wins" to passes("wins"),
-                    "rewards" to passes("rewards"),
-                    "passed" to (passes("wins") && passes("rewards")),
-                ),
+                (requiredMetrics.associateWith(::passes) +
+                    ("passed" to requiredMetrics.all(::passes))),
             "qualification" to false,
             "activated" to false,
         )
@@ -63,7 +72,7 @@ internal object CoordinatedQualificationReport {
 
     fun requirePassed(report: JsonNode) {
         require(
-            report["kind"]?.asText() == VERSION &&
+            report["kind"]?.asText() == version &&
                 report["worlds"]?.asInt() == 4096 &&
                 report["confidence"]?.doubleValue() == .99 &&
                 report["intervalMultiplier"]?.doubleValue() ==
@@ -75,7 +84,7 @@ internal object CoordinatedQualificationReport {
         ) {
             "A complete mixed99 report is required before independent homogeneous evaluation."
         }
-        for (metric in listOf("wins", "rewards")) {
+        for (metric in requiredMetrics) {
             val interval = report["candidateMinusControl"]?.let { it[metric] }
             require(
                 interval != null &&
@@ -101,7 +110,7 @@ internal object CoordinatedQualificationReport {
                     report["gates"]?.let { it[metric] }?.booleanValue() == true &&
                     report["gates"]?.let { it["passed"] }?.booleanValue() == true
             ) {
-                "Both declared99 gates must be strictly positive and agree with their interval evidence."
+                "All required99 gates must be strictly positive and agree with their interval evidence."
             }
         }
     }

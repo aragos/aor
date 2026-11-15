@@ -42,11 +42,12 @@ private constructor(
                     admission.calibration,
                 )
         )
-    override val finalAdmissionSha256
-        get() = admission.source.sha256
-
-    override val historicalAdmissionSha256
-        get() = admission.historical.sha256
+    override val admissionBindings
+        get() =
+            mapOf(
+                "finalAdmissionSha256" to admission.source.sha256,
+                "historicalAdmissionSha256" to admission.historical.sha256,
+            )
 
     private val attempts = CoordinatedEsAttempts(Long.MAX_VALUE)
     private val gatePins = protocol.confirmation(confirmation, bankName)

@@ -36,11 +36,12 @@ private constructor(
                         )
                 )
             }
-    override val finalAdmissionSha256
-        get() = admission.source.sha256
-
-    override val historicalAdmissionSha256
-        get() = historical.sha256
+    override val admissionBindings
+        get() =
+            mapOf(
+                "finalAdmissionSha256" to admission.source.sha256,
+                "historicalAdmissionSha256" to historical.sha256,
+            )
 
     override val scienceIdentity: Map<String, Any> =
         mapOf(
