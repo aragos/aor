@@ -1,11 +1,16 @@
 """Pure two-bank terminal audit: one archive pass, no inference, simulation or process control."""
 import argparse
 import math
+import sys
 from pathlib import Path
 
 import coordinated_qualification_plan as p
 import coordinated_qualification as q
 from token_paired_campaign_audit import Pins
+
+
+def contract():
+    return sys.modules[__name__]
 
 
 def children(path):
@@ -18,7 +23,8 @@ def children(path):
     return result
 
 
-def handoff(root, bank, chunk, item, pins):
+def handoff(root, bank, chunk, item, pins, *, owner=None):
+    current = owner or contract(); p = current.p; q = current.q
     directory = Path(root)/'incoming'/q.tag(bank, chunk)
     accepted = pins.read(directory/'accepted.json')
     receipt = pins.subject(accepted['receipt']); archive = Path(accepted['archive']['path'])
@@ -29,17 +35,18 @@ def handoff(root, bank, chunk, item, pins):
         'Received shards must retain their exact once-only mailbox acceptance and original bytes.')
 
 
-def bank(plan, root, name, item, pins, gate_sha):
+def bank(plan, root, name, item, pins, gate_sha, *, owner=None):
+    current = owner or contract(); p = current.p; q = current.q
     owner = pins.subject(item); record = pins.read(owner)
     p.require(owner.resolve() == (Path(root)/'banks'/name/'complete.json').resolve() and
         record['kind'] == p.PREFIX+'-bank-evidence-1' and record['complete'] is True and record['bank'] == name and
-        record['protocolSha256'] == plan.sha256 and record['candidateBundleSha256'] == p.CANDIDATE and
+        record['protocolSha256'] == plan.sha256 and all(record[key] == value for key, value in q.identity(plan).items()) and
         record['worlds'] == 4096 and record['games'] == 8192 and record['reproductions'] == 8 and
         record['scientificTerminalExecutions'] == 8200 and len(record['chunks']) == 32,
         'A completed Desktop bank contains all32 original shards and exactly8200 executions.')
     worlds = []; native_completions = []; sciences = set()
     for chunk, subject in enumerate(record['chunks']):
-        if p.owner(chunk) == 'MAC': handoff(root, name, chunk, subject, pins)
+        if p.owner(chunk) == 'MAC': current.handoff(root, name, chunk, subject, pins)
         else:
             expected = Path(root)/'banks'/name/'chunks'/f'chunk-{chunk}'/'evidence.tar.gz.json'
             p.require(Path(subject['path']).resolve() == expected.resolve(), 'Local shards retain their declared path.')
@@ -71,8 +78,7 @@ def bank(plan, root, name, item, pins, gate_sha):
         completed['files'] == {'report.json': p.file_sha(report_path), 'inputs.json': p.file_sha(inputs_path)} and
         inputs['sourceSha256'] == p.file_sha(compact_path) and inputs['chunks'] == compact['chunks'] and
         inputs['scienceSha256'] == record['scienceSha256'] and
-        inputs['finalAdmissionSha256'] == plan.record['originAdmissionSha256'] and
-        inputs['historicalAdmissionSha256'] == native_completions[0][1]['historicalAdmissionSha256'],
+        all(inputs[key] == value for key, value in q.report_bindings(plan, native_completions[0][1]).items()),
         'The completed native report must bind the exact original compact evidence and zero new execution.')
     passed = q.verify_report(worlds, pins.read(report_path))
     p.require(record['gatePassed'] is passed, 'Persisted gate status must equal independently recomputed99 statistics.')
@@ -80,7 +86,8 @@ def bank(plan, root, name, item, pins, gate_sha):
         terminalExecutions=8200, report=p.subject(report_path), evidence=p.subject(owner))
 
 
-def local_bank(plan, root, name, pins, gate_sha):
+def local_bank(plan, root, name, pins, gate_sha, *, owner=None):
+    current = owner or contract(); p = current.p; q = current.q
     directory = Path(root)/'banks'/name/'chunks'
     p.require(children(directory) == {f'chunk-{chunk}' for chunk in p.CHUNKS['MAC']},
         'The Mac worker retains exactly its12 original shards in each attempted bank.')
@@ -107,7 +114,8 @@ def local_bank(plan, root, name, pins, gate_sha):
     return counts
 
 
-def qualified(plan, root, terminal, banks, pins):
+def qualified(plan, root, terminal, banks, pins, *, owner=None):
+    current = owner or contract(); p = current.p; q = current.q
     expected = all(row['gatePassed'] for row in banks)
     p.require(terminal['qualified'] is expected and (terminal['qualification'] is not None) == expected,
         'Only both fixed complete paired99 banks may qualify the sole candidate.')
@@ -117,26 +125,24 @@ def qualified(plan, root, terminal, banks, pins):
         return None
     p.require(pins.subject(terminal['qualification']).resolve() == path.resolve(),
         'The qualified unit must be this exact final publication.')
-    value = pins.read(path); protocol = plan.record
-    expected_fields = dict(kind='coordinated-support-qualification-1', schemaVersion=1,
-        passed=True, complete=True, profile=p.PROFILE, supportProfile=p.SUPPORT,
-        **{key: protocol[key] for key in ('candidateBundleSha256', 'originalBundleSha256', 'calibrationSha256',
-            'rulesVersion', 'dataVersion', 'references')}, configuration=p.APPLICATION_CONFIGURATION)
+    value = pins.read(path)
+    expected_fields = q.certificate_fields(plan)
     p.require(set(value) == {*expected_fields, 'banks'} and
         all(value[key] == item for key, item in expected_fields.items()) and set(value['banks']) == set(p.BANKS),
         'Application qualification has one explicit configuration mapping and complete immutable policy identity.')
     for row in banks:
         item = value['banks'][row['bank']]
-        p.require(set(item) == {'complete', 'pairs', 'win99Passed', 'reward99Passed', 'evidence', 'report'} and
+        p.require(set(item) == {'complete', 'pairs', *q.CERTIFICATE_BANK_GATES, 'evidence', 'report'} and
             item['complete'] is True and item['pairs'] == 4096 and
-            item['win99Passed'] is True and item['reward99Passed'] is True and
+            all(item[key] is True for key in q.CERTIFICATE_BANK_GATES) and
             p.file_sha(q.resolve(item['evidence'], path, pins)) == row['evidence']['sha256'] and
             p.file_sha(q.resolve(item['report'], path, pins)) == row['report']['sha256'],
             'The application receipt must bind these exact independently audited bank effects and evidence.')
     return terminal['qualification']
 
 
-def verify(protocol_subject, run):
+def verify(protocol_subject, run, *, owner=None):
+    current = owner or contract(); p = current.p; q = current.q
     root = Path(run); pins = Pins()
     protocol = pins.subject(protocol_subject); plan = p.Plan.from_file(protocol)
     ended = pins.read(root/'terminal.json'); clock = pins.read(root/'clock.json')
@@ -166,12 +172,9 @@ def verify(protocol_subject, run):
     profile = pins.read(pins.subject(inputs['profile']))
     p.require(inputs['protocol']['sha256'] == plan.sha256 and profile['kind'] == p.PREFIX+'-host-1' and
         profile['host'] == ended['host'] and profile['protocolSha256'] == plan.sha256 and
-        profile['originProof']['sha256'] == plan.record['originProofSha256'][ended['host']] and
         all(profile[key] == value for key, value in p.host_limits(ended['host']).items()),
         'Terminal inputs and fixed host resources must bind the exact executing profile.')
-    proof = pins.read(pins.subject(profile['originProof'])); q.origin_proof(plan, ended['host'], proof)
-    p.require(all(profile['files'].get(path) == digest for path, digest in proof['inputPins'].items()),
-        'The host audit must rehash the complete original83 proof closure, not only a proof label.')
+    q.audit_profile_admission(plan, profile, pins)
     for path, digest in profile['files'].items(): pins.pin(path, digest)
     names = p.BANKS[:ended['completedBanks']]
     p.require(children(root/'banks') == set(names), 'Only the prospectively opened banks may have any native work.')
@@ -187,7 +190,7 @@ def verify(protocol_subject, run):
                 gate_sha = gate_subject['sha256']
             p.require(children(root/'banks'/name/'chunks') == {f'chunk-{i}' for i in p.CHUNKS['DESKTOP']},
                 'Desktop local collection has exactly its20 fixed shard directories.')
-            rows.append(bank(plan, root, name, ended['banks'][name], pins, gate_sha))
+            rows.append(current.bank(plan, root, name, ended['banks'][name], pins, gate_sha))
         if ended['status'] == 'stopped':
             p.require(rows[0]['gatePassed'] is False and ended['qualified'] is False and ended['qualification'] is None and
                 not (root/'confirmation').exists() and not (root/'publications/homogeneous').exists() and
@@ -195,7 +198,7 @@ def verify(protocol_subject, run):
             eligible = None
         else:
             p.require(rows[0]['gatePassed'] is True, 'A completed homogeneous bank requires a passing original mixed gate.')
-            eligible = qualified(plan, root, ended, rows, pins)
+            eligible = current.qualified(plan, root, ended, rows, pins)
         expected_incoming = {q.tag(name, chunk) for name in names for chunk in p.CHUNKS['MAC']}
         p.require(children(root/'incoming') == expected_incoming, 'No undeclared remote shard may enter the completed attempt.')
     else:
@@ -212,14 +215,14 @@ def verify(protocol_subject, run):
                 publication = pins.read(directory/'publication.json')
                 gate_subject = p.subject(directory/'content/gate.json'); q.confirmation(plan, gate_subject, pins)
                 p.require(publication['kind'] == p.PREFIX+'-publication-1' and publication['stage'] == 'homogeneous' and
-                    publication['identity'] == dict(protocolSha256=plan.sha256, candidateBundleSha256=p.CANDIDATE,
+                    publication['identity'] == dict(protocolSha256=plan.sha256, **q.identity(plan),
                         confirmationSha256=gate_subject['sha256']), 'Mac must retain the exact original mixed-gate publication.')
                 # This archive contains only three compact gate files, not another world archive.
                 from token_paired_campaign_audit import stream_archive
                 stream_archive(directory/publication['archive'], publication, pins, ())
                 for member, value in publication['files'].items(): pins.pin(directory/'content'/member, value['sha256'])
                 gate_sha = gate_subject['sha256']
-            rows.append(local_bank(plan, root, name, pins, gate_sha))
+            rows.append(current.local_bank(plan, root, name, pins, gate_sha))
         eligible = None
     counts = {key: sum(row[key] for row in rows) for key in ('worlds', 'games', 'reproductions', 'terminalExecutions')}
     p.require(counts['terminalExecutions'] <= p.MAXIMUM_TERMINALS, 'The original total execution ceiling is immutable.')

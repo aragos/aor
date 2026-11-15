@@ -29,6 +29,7 @@ MAXIMUM_TERMINALS = 16400
 MULTIPLIER = 2.5758293035489004
 INTERVAL = dict(confidence=.99, multiplier=MULTIPLIER,
     requiredMetrics=['wins', 'rewards'], lowerBoundStrictlyPositive=True)
+INPUT_BINDINGS = ('originArena', 'originAdmission', 'originProof')
 REFERENCE_FIELDS = ('qualifiedOrdinarySha256', 'cardM8Sha256', 'purchaseF0Sha256',
     'expansionESha256', 'tokenControlVersion')
 
@@ -126,17 +127,7 @@ class Plan:
             'All exact M8/F0/E/packed-reference identities and the fixed token control are required.')
         for name in REFERENCE_FIELDS[:-1]:
             sha(value['references'][name])
-        require(set(value['banks']) == set(BANKS), 'Both independent banks must be prospectively frozen.')
-        all_seeds = []
-        for bank in BANKS:
-            record = value['banks'][bank]
-            require(set(record) == {'nativeOffset', 'count', 'seeds'} and record['count'] == 4096,
-                'Each bank retains all4096 native global worlds.')
-            offset = integer(record['nativeOffset'], 0, 100000000, 'Native bank offset')
-            expected = [-1000000000+offset+index*8191 for index in range(4096)]
-            require(record['seeds'] == expected, 'Native world identities retain the exact global-index formula.')
-            all_seeds.extend(expected)
-        require(len(set(all_seeds)) == 8192, 'The confirmation and heldout bank values must be disjoint.')
+        validate_banks(value['banks'])
 
     def source(self, bank, chunk, subjects):
         bank_name(bank)
@@ -159,3 +150,17 @@ class Plan:
             'The raw protocol and original83 admission/arena cannot be rebound to evaluation ecology.')
         return dict(kind=PREFIX+'-input-1', host=owner(chunk), **subjects, bankName=bank,
             globalStart=chunk*128, count=128)
+
+
+def validate_banks(banks):
+    require(set(banks) == set(BANKS), 'Both independent banks must be prospectively frozen.')
+    all_seeds = []
+    for bank in BANKS:
+        record = banks[bank]
+        require(set(record) == {'nativeOffset', 'count', 'seeds'} and record['count'] == 4096,
+            'Each bank retains all4096 native global worlds.')
+        offset = integer(record['nativeOffset'], 0, 100000000, 'Native bank offset')
+        expected = [-1000000000+offset+index*8191 for index in range(4096)]
+        require(record['seeds'] == expected, 'Native world identities retain the exact global-index formula.')
+        all_seeds.extend(expected)
+    require(len(set(all_seeds)) == 8192, 'The confirmation and heldout bank values must be disjoint.')
