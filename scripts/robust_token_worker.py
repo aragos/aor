@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import signal
@@ -17,6 +18,18 @@ from robust_token_campaign import read, require, sha, write
 
 def census(root):
     return sum(path.stat().st_size for path in Path(root).rglob('*') if path.is_file())
+
+
+def java_options(profile):
+    """Frozen optional performance settings; default commands retain the earlier experiment."""
+    options=profile.get('jvmOptions',[
+        '-XX:ActiveProcessorCount=1','-XX:ParallelGCThreads=1','-XX:ConcGCThreads=1'])
+    patterns=(r'-XX:(ActiveProcessorCount|ParallelGCThreads|ConcGCThreads|CICompilerCount)=\d+',
+        r'-XX:\+(UseG1GC|UseParallelGC|UseSerialGC)',r'-Xms\d+[mMgG]',r'-XX:-StackTraceInThrowable')
+    require(isinstance(options,list) and all(isinstance(value,str) and
+        any(re.fullmatch(pattern,value) for pattern in patterns) for value in options),
+        'Only explicit CPU, collector, initial-heap and diagnostic-stack performance options are admitted.')
+    return options
 
 
 def group_rss(group):
@@ -101,8 +114,7 @@ def execute(profile_path, request, now=time.time):
             require(sha(item['path']) == item['sha256'], 'An explicitly declared native input changed.')
     output = directory/'native'
     remaining = max(1, int(deadline-now()))
-    command = [profile['java'], '-Xmx'+str(profile['heapMiB'])+'m', '-XX:ActiveProcessorCount=1',
-        '-XX:ParallelGCThreads=1', '-XX:ConcGCThreads=1', '-cp', profile['classpath'],
+    command = [profile['java'], '-Xmx'+str(profile['heapMiB'])+'m', *java_options(profile), '-cp', profile['classpath'],
         'dev.aragos.aor.training.TrainingMainKt', '--mode', 'robust-token-screen-chunk',
         '--source', str(source), '--output', str(output), '--seconds', str(remaining),
         '--workers', str(profile['workers'])]
