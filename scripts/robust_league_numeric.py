@@ -1,4 +1,4 @@
-"""Fresh eight-generation ES around a qualified four-head origin; Desktop Float64 only.
+"""Fresh six-generation ES around a qualified four-head origin; Desktop Float64 only.
 
 The numerical origin is distinct from the frozen selector subtraction reference. This adapter
 reuses the old factor map and ascent arithmetic only, never its old experiment admission rules.
@@ -19,10 +19,12 @@ import coordinated_es_math as es
 import coordinated_es_projection as projection
 
 
-RECIPE = dict(kind='robust-league-normalized-antithetic-es-1', dimensions=256,
-    coordinatesPerHead=64, generations=8, directions=16, mutants=32, worlds=128,
+GENERATIONS = 6
+MAXIMUM_TERMINAL_EXECUTIONS = 36920
+RECIPE = dict(kind='robust-league-normalized-antithetic-es-2', dimensions=256,
+    coordinatesPerHead=64, generations=GENERATIONS, directions=16, mutants=32, worlds=128,
     sigma=1., stepRms=1., centerRmsLimit=4., minimumGradientRms=1e-12,
-    objective='WIN_SHARE_ONLY', candidate='FINAL_MEAN_8_ONLY', mutantProjection=False,
+    objective='WIN_SHARE_ONLY', candidate='FINAL_MEAN_6_ONLY', mutantProjection=False,
     valueUpdates=False, ranking=False, eliteSelection=False, dtype='float64', threads=1,
     projectionRecipe=projection.RECIPE)
 ACTOR_BLOCKS = ('stateWeights', 'stateBias', 'actionWeights', 'actionBias', 'actorWeights')
@@ -150,7 +152,7 @@ def load_bundle(inputs, item):
 def read_receipt(inputs, item, kind):
     value = inputs.json(item)
     require(value['kind'] == kind and value['complete'] is True and value['recipe'] == RECIPE,
-        'The numerical predecessor must be complete and use this exact eight-generation recipe.')
+        'The numerical predecessor must be complete and use this exact six-generation recipe.')
     owner = Path(item['path']).absolute()
     for name, digest in value['files'].items():
         inputs.raw(inputs.portable(owner, dict(path=name, sha256=digest)))
@@ -167,6 +169,12 @@ def prepared(inputs, item):
         origin_item['sha256'] == value['numericalOriginBundleSha256'],
         'The fresh factor map must use the exact qualified numerical origin.')
     schedule = inputs.json(inputs.portable(owner, value['seedSchedule']))
+    require(value['activeGenerations'] == GENERATIONS and len(value['directions']) == GENERATIONS and
+        value['completeSeedScheduleSha256'] == value['seedSchedule']['sha256'] and
+        value['usedDirectionSeeds'] == schedule['directionSeeds'][:GENERATIONS] and
+        value['heldDirectionSeeds'] == schedule['directionSeeds'][GENERATIONS:] and
+        value['heldGenerationBanks'] == ['generation-7', 'generation-8'],
+        'The complete reservation stays frozen while only six explicit direction streams may execute.')
     return value, owner, actors, factor, schedule
 
 
@@ -175,7 +183,7 @@ def read_center(inputs, item, scope, expected=None):
     exact(center, ('kind', 'scopeSha256', 'generation', 'coordinates'),
         'A robust center requires explicit scope, generation and coordinates.')
     require(center['kind'] == 'robust-league-center-1' and center['scopeSha256'] == scope and
-        type(center['generation']) is int and 0 <= center['generation'] <= 8 and
+        type(center['generation']) is int and 0 <= center['generation'] <= GENERATIONS and
         (expected is None or center['generation'] == expected),
         'The center must be the exact immediate same-scope predecessor.')
     coordinates = es.vector(center['coordinates'], 256, 'robust-center')
@@ -216,21 +224,24 @@ def prepare(inputs, request, out):
         type(schedule['directionSeeds']) is list and len(schedule['directionSeeds']) == 8 and
         len({schedule['projectionSeed'], *schedule['directionSeeds']}) == 9,
         'Exactly one projection and eight distinct prospectively reserved direction integers are required.')
-    for generation in range(1, 9):
+    for generation in range(1, GENERATIONS + 1):
         bank = schedule['banks']['generation-' + str(generation)]
         require(bank['count'] == 128 and bank['seeds'] ==
             [-1000000000 + bank['nativeOffset'] + index * 8191 for index in range(128)],
             'Every training generation retains its128 original ordered native world declarations.')
-    scope = es.digest(dict(kind='robust-league-origin-scope-1',
+    used_direction_seeds = schedule['directionSeeds'][:GENERATIONS]
+    held_direction_seeds = schedule['directionSeeds'][GENERATIONS:]
+    scope = es.digest(dict(kind='robust-league-origin-scope-2',
         protocolSha256=request['protocol']['sha256'], assetSha256=request['baseInferenceAsset']['sha256'],
+        seedScheduleSha256=request['seedSchedule']['sha256'],
         numericalOriginBundleSha256=origin_item['sha256'],
         selectorOriginalBundleSha256=asset['originalBundle']['sha256'], recipe=RECIPE,
-        projectionSeed=schedule['projectionSeed'], directionSeeds=schedule['directionSeeds']))
+        projectionSeed=schedule['projectionSeed'], usedDirectionSeeds=used_direction_seeds))
     factor = projection.generate(actors, scope, origin_item['sha256'], schedule['projectionSeed'])
     factor_item = out.raw('projection.json', factor.wire)
     initial = out.json('center.json', center_record(scope, 0, [0.] * 256))
     directions = []
-    for generation, seed in enumerate(schedule['directionSeeds'], 1):
+    for generation, seed in enumerate(used_direction_seeds, 1):
         table, generation_receipt = projection.generate_directions(factor.scope, generation, seed)
         directions.append(out.json('directions/generation-' + str(generation) + '.json', table.record))
         out.json('directions/generation-' + str(generation) + '-draw.json', generation_receipt)
@@ -249,14 +260,19 @@ def prepare(inputs, request, out):
         selectorOriginalBundleSha256=asset['originalBundle']['sha256'],
         selectorCalibrationSha256=asset['calibration']['sha256'], projection=factor_item,
         center=initial, originBundle=zero_item, protocol=protocol_item, seedSchedule=schedule_item,
-        directions=directions, zeroHeadsCopiedByteExact=True), inputs)
+        directions=directions, activeGenerations=GENERATIONS,
+        completeSeedScheduleSha256=request['seedSchedule']['sha256'],
+        usedDirectionSeeds=used_direction_seeds, heldDirectionSeeds=held_direction_seeds,
+        heldGenerationBanks=['generation-7', 'generation-8'],
+        zeroHeadsCopiedByteExact=True), inputs)
 
 
 def population(inputs, request, out):
     exact(request, ('kind', 'preparation', 'center', 'generation'),
         'Population materialization requires its exact preparation, center and generation.')
     generation = request['generation']
-    require(type(generation) is int and 1 <= generation <= 8, 'Generations are exactly1 through8.')
+    require(type(generation) is int and 1 <= generation <= GENERATIONS,
+        'Generations are exactly1 through6; reserved7 and8 remain held unused.')
     prep, owner, actors, factor, schedule = prepared(inputs, request['preparation'])
     center = read_center(inputs, request['center'], prep['scopeSha256'], generation - 1)
     direction_item = inputs.portable(owner, prep['directions'][generation - 1])
@@ -296,7 +312,8 @@ def update(inputs, request, out):
     pop_item = inputs.portable(pop_owner, pop_receipt['population'])
     pop = inputs.json(pop_item)
     generation = pop['generation']
-    require(type(generation) is int and 1 <= generation <= 8, 'Only the fixed eight generations may update.')
+    require(type(generation) is int and 1 <= generation <= GENERATIONS,
+        'Only the fixed six generations may update.')
     center = read_center(inputs, inputs.portable(pop_owner,
         dict(path='center.json', sha256=pop['centerSha256'])), prep['scopeSha256'], generation - 1)
     table = es.DirectionTable.from_record(inputs.json(inputs.portable(owner,
@@ -338,14 +355,14 @@ def update(inputs, request, out):
 
 def final(inputs, request, out):
     exact(request, ('kind', 'preparation', 'center'),
-        'The sole final candidate requires the frozen preparation and exact mean8.')
+        'The sole final candidate requires the frozen preparation and exact mean6.')
     prep, owner, actors, factor, schedule = prepared(inputs, request['preparation'])
-    center = read_center(inputs, request['center'], prep['scopeSha256'], 8)
+    center = read_center(inputs, request['center'], prep['scopeSha256'], GENERATIONS)
     materialized = projection.materialize(factor, actors, center['coordinates'])
     unchanged_actor_metadata(actors, materialized)
     bundle = out.bundle('', materialized)
     return out.finish('robust-league-final-mean-1', dict(scopeSha256=prep['scopeSha256'],
-        generation=8, centerSha256=request['center']['sha256'], candidate='FINAL_MEAN_8_ONLY',
+        generation=GENERATIONS, centerSha256=request['center']['sha256'], candidate='FINAL_MEAN_6_ONLY',
         bundle=bundle, numericalOriginBundleSha256=prep['numericalOriginBundleSha256'],
         selectorOriginalBundleSha256=prep['selectorOriginalBundleSha256'],
         selectorCalibrationSha256=prep['selectorCalibrationSha256']), inputs)

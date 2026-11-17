@@ -189,17 +189,18 @@ class RobustNumericTests(unittest.TestCase):
             self.update(outcomes)
         self.assertFalse((self.case / 'result/center.json').exists())
 
-    def test_only_mean8_can_be_the_final_candidate(self):
-        center = write(self.case / 'center7.json', numeric.center_record(read(self.prep)['scopeSha256'], 7, [.1] * 256))
+    def test_only_mean6_can_be_the_final_candidate(self):
+        center = write(self.case / 'center5.json', numeric.center_record(read(self.prep)['scopeSha256'], 5, [.1] * 256))
         with self.assertRaisesRegex(ValueError, 'immediate same-scope'):
             self.execute('final', dict(kind='robust-league-numeric-final-1',
                 preparation=self.prep, center=center))
 
-    def test_final_mean8_keeps_original_selector_reference_and_value_arrays(self):
-        center = write(self.case / 'center8.json', numeric.center_record(read(self.prep)['scopeSha256'], 8, [.1] * 256))
+    def test_final_mean6_keeps_original_selector_reference_and_value_arrays(self):
+        center = write(self.case / 'center6.json', numeric.center_record(read(self.prep)['scopeSha256'], 6, [.1] * 256))
         self.execute('final', dict(kind='robust-league-numeric-final-1', preparation=self.prep, center=center))
         receipt = json.loads((self.case / 'result/receipt.json').read_bytes())
-        self.assertEqual(receipt['candidate'], 'FINAL_MEAN_8_ONLY')
+        self.assertEqual(receipt['candidate'], 'FINAL_MEAN_6_ONLY')
+        self.assertEqual(receipt['generation'], 6)
         self.assertEqual(receipt['selectorOriginalBundleSha256'], 'e' * 64)
         item = absolute(self.case / 'result/receipt.json', receipt['bundle'])
         bundle = read(item)
@@ -208,6 +209,34 @@ class RobustNumericTests(unittest.TestCase):
                 for key in ('path', 'sha256')}))
             self.assertEqual(model['valueWeights'], self.actors[head].model['valueWeights'])
             self.assertEqual(model['valueBias'], self.actors[head].model['valueBias'])
+
+    def test_held_direction_streams7_and8_are_never_drawn(self):
+        with patch.object(numeric.projection, 'generate_directions',
+                wraps=numeric.projection.generate_directions) as draw:
+            self.execute('prepare', self.prepare_record)
+        self.assertEqual([(call.args[1], call.args[2]) for call in draw.call_args_list],
+            list(enumerate(self.schedule_record['directionSeeds'][:6], 1)))
+        receipt = json.loads((self.case / 'result/receipt.json').read_bytes())
+        self.assertEqual(receipt['activeGenerations'], 6)
+        self.assertEqual(receipt['heldDirectionSeeds'], self.schedule_record['directionSeeds'][6:])
+        self.assertEqual(receipt['heldGenerationBanks'], ['generation-7', 'generation-8'])
+        self.assertEqual(receipt['completeSeedScheduleSha256'], self.schedule['sha256'])
+        self.assertEqual(len(receipt['directions']), 6)
+
+    def test_scope_binds_complete_schedule_including_held_metadata(self):
+        schedule = copy.deepcopy(self.schedule_record)
+        schedule['directionSeeds'][7] = 211
+        record = dict(self.prepare_record,
+            seedSchedule=write(self.case / 'different-held-metadata.json', schedule))
+        self.execute('prepare', record)
+        receipt = json.loads((self.case / 'result/receipt.json').read_bytes())
+        self.assertNotEqual(receipt['scopeSha256'], read(self.prep)['scopeSha256'])
+        self.assertEqual(receipt['usedDirectionSeeds'], self.schedule_record['directionSeeds'][:6])
+
+    def test_reserved_generation7_cannot_materialize(self):
+        with self.assertRaisesRegex(ValueError, 'reserved7 and8 remain held'):
+            self.execute('population', dict(kind='robust-league-numeric-population-1',
+                preparation=self.prep, center=self.center0, generation=7))
 
     def test_default_cli_owner_rejects_arm_mac_before_drawing(self):
         request = write(self.case / 'request.json', self.prepare_record)
