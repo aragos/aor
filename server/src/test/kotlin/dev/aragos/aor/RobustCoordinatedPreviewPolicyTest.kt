@@ -37,6 +37,54 @@ class RobustCoordinatedPreviewPolicyTest {
     }
 
     @Test
+    fun denialQualificationRequiresItsOriginalDataMode() =
+        withFixture(RobustQualificationVersion.DENIAL_FULL) { fixture ->
+            fixture.changeResearchProtocol { it.put("dataMode", "SMALL") }
+
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.manifest)
+            }
+        }
+
+    @Test
+    fun denialQualificationRequiresItsApprovedMethodBytes() =
+        withFixture(RobustQualificationVersion.DENIAL_FULL) { fixture ->
+            fixture.changeResearchProtocol { it.put("methodSha256", "0".repeat(64)) }
+
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.manifest)
+            }
+        }
+
+    @Test
+    fun denialQualificationCountsOriginalSeedArraysRatherThanAnInventedCount() =
+        withFixture(RobustQualificationVersion.DENIAL_FULL) { fixture ->
+            fixture.changeResearchProtocol {
+                (it["banks"]["mixed"] as ObjectNode).apply {
+                    remove("seeds")
+                    put("count", 2048)
+                }
+            }
+
+            val failure =
+                assertFailsWith<IllegalArgumentException> {
+                    CoordinatedPreviewPolicy.read(fixture.manifest)
+                }
+
+            assertThat(failure).hasMessageThat().contains("registered mixed world prefix")
+        }
+
+    @Test
+    fun denialQualificationCannotWeakenTheOriginalConfidenceRule() =
+        withFixture(RobustQualificationVersion.DENIAL_SMALL) { fixture ->
+            fixture.changeResearchProtocol { it.put("confidenceMultiplier", 1.96) }
+
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.manifest)
+            }
+        }
+
+    @Test
     fun aSmallCertificateCannotReuseFullProtocolEvidence() = withFixture { fixture ->
         fixture.changeQualification { it.put("evaluationVersion", "study90-SMALL1") }
 
@@ -142,7 +190,11 @@ class RobustCoordinatedPreviewPolicyTest {
                 "expansionDenial",
                 ObjectMapper()
                     .valueToTree(
-                        mapOf("kind" to "always-attack", "beta" to 1.0, "minWinProbability" to 0.5)
+                        mapOf(
+                            "kind" to "always-attack",
+                            "beta" to 1.0,
+                            "minimumWinProbability" to 0.5,
+                        )
                     ),
             )
         }
@@ -198,7 +250,7 @@ class RobustCoordinatedPreviewPolicyTest {
                 mapOf(
                     "kind" to "public-leader-attack-bonus-1",
                     "beta" to 2.0,
-                    "minWinProbability" to 0.5,
+                    "minimumWinProbability" to 0.5,
                 ),
         ) { fixture ->
             val policy = CoordinatedPreviewPolicy.read(fixture.manifest)

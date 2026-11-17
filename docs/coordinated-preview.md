@@ -69,6 +69,10 @@ Each bank must be complete and pass its 99% win gate. The registered sizes must 
 protocol's counts and budget. Study 89 additionally requires its six-generation final-mean recipe.
 No development winner, partial run or arbitrary smaller bank can authorize a preview.
 
+Study 90 retains the `leader-denial-campaign-1` protocol, explicit `FULL` or `SMALL` data mode,
+approved method hash and original confidence multiplier. Admission counts its actual seed arrays,
+including the development prefix; a separately invented count cannot replace those declarations.
+
 Source verification uses explicitly invented tensor/certificate fixtures only. Such fixtures are
 transport tests, never research evidence or playable scientific assets. An actual package and new
 isolated preview require the completed scientific evidence and their separate review.

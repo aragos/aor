@@ -306,13 +306,13 @@ private class CoordinatedAssetReader(path: Path) {
 
     private fun expansionDenial(value: JsonNode): PublicLeaderAttackConfig? {
         if (value.isNull) return null
-        fields(value, "kind", "beta", "minWinProbability")
+        fields(value, "kind", "beta", "minimumWinProbability")
         require(text(value, "kind") == PublicLeaderAttackConfig.VERSION) {
             "Only the shared public-leader attack adjustment is supported."
         }
         return PublicLeaderAttackConfig(
             beta = number(value["beta"], "leader-denial beta"),
-            minimumWinProbability = number(value["minWinProbability"], "attack probability"),
+            minimumWinProbability = number(value["minimumWinProbability"], "attack probability"),
         )
     }
 
@@ -376,29 +376,58 @@ private class CoordinatedAssetReader(path: Path) {
             }
             RobustQualificationVersion.DENIAL_FULL,
             RobustQualificationVersion.DENIAL_SMALL -> {
-                require(text(protocol, "kind") == "robust-token-campaign-1") {
-                    "Study90 qualification requires its original approved campaign protocol."
+                val full = version == RobustQualificationVersion.DENIAL_FULL
+                val mode = if (full) "FULL" else "SMALL"
+                require(
+                    text(protocol, "kind") == "leader-denial-campaign-1" &&
+                        text(protocol, "dataMode") == mode
+                ) {
+                    "Study90 qualification requires its original approved campaign and data mode."
                 }
+                require(
+                    hash(protocol, "methodSha256") ==
+                        "79a06fe8b7760b8ba7b35a8aebce6f9e3fe5e952f156b0cb1b9795e51d60e468" &&
+                        number(protocol["confidenceMultiplier"], "confidence multiplier") ==
+                            2.5758293035489004 &&
+                        number(protocol["minimumDevelopmentDelta"], "development threshold") == 0.0
+                ) {
+                    "Study90 qualification must retain the original approved method and 99% win rule."
+                }
+                protocolSeedCount(protocol, "development", if (full) 512 else 256)
             }
         }
         fields(value["banks"], "mixed", "homogeneous")
         for (name in listOf("mixed", "homogeneous")) {
             val bank = value["banks"][name]
-            val protocolBank =
-                requireNotNull(protocol["banks"]?.get(name)) {
-                    "The approved protocol must retain each independent qualification bank."
-                }
             fields(bank, "complete", "pairs", "win99Passed", "evidence", "report")
+            if (version == RobustQualificationVersion.LEAGUE_SIX) {
+                require(integer(protocolBank(protocol, name), "count") == version.pairs) {
+                    "Study89 qualification must retain its registered independent bank counts."
+                }
+            } else {
+                protocolSeedCount(protocol, name, version.pairs)
+            }
             require(
                 truth(bank, "complete") &&
                     integer(bank, "pairs") == version.pairs &&
-                    integer(protocolBank, "count") == version.pairs &&
                     truth(bank, "win99Passed")
             ) {
                 "Both independent complete banks must pass the registered 99% win gate and pair count."
             }
             subject(certificate, bank["evidence"])
             subject(certificate, bank["report"])
+        }
+    }
+
+    private fun protocolBank(protocol: JsonNode, name: String): JsonNode =
+        requireNotNull(protocol["banks"]?.let { it[name] }) {
+            "The approved protocol must retain each original world bank."
+        }
+
+    private fun protocolSeedCount(protocol: JsonNode, name: String, expected: Int) {
+        val seeds = protocolBank(protocol, name)["seeds"]
+        require(seeds != null && seeds.isArray && seeds.size() == expected) {
+            "Study90 qualification must retain the registered $name world prefix."
         }
     }
 

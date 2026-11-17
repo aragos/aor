@@ -545,7 +545,13 @@ internal class PreviewAssetFixture(val root: Path) {
                     "kind" to
                         if (version == RobustQualificationVersion.LEAGUE_SIX)
                             "robust-league-campaign-1"
-                        else "robust-token-campaign-1",
+                        else "leader-denial-campaign-1",
+                    "dataMode" to
+                        if (version == RobustQualificationVersion.DENIAL_FULL) "FULL" else "SMALL",
+                    "methodSha256" to
+                        "79a06fe8b7760b8ba7b35a8aebce6f9e3fe5e952f156b0cb1b9795e51d60e468",
+                    "confidenceMultiplier" to 2.5758293035489004,
+                    "minimumDevelopmentDelta" to 0,
                     "activeGenerations" to 6,
                     "numericRecipe" to
                         mapOf(
@@ -555,8 +561,14 @@ internal class PreviewAssetFixture(val root: Path) {
                         ),
                     "maximumTerminalExecutions" to version.maximumTerminalExecutions,
                     "banks" to
-                        listOf("mixed", "homogeneous").associateWith {
-                            mapOf("count" to version.pairs)
+                        listOf("development", "mixed", "homogeneous").associateWith { name ->
+                            if (version == RobustQualificationVersion.LEAGUE_SIX) {
+                                mapOf("count" to version.pairs)
+                            } else {
+                                val count =
+                                    if (name == "development") version.pairs / 4 else version.pairs
+                                mapOf("seeds" to List(count) { it })
+                            }
                         },
                 ),
             )
