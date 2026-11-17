@@ -58,6 +58,25 @@ class RobustTokenInputTest {
     }
 
     @Test
+    fun candidateOnlyCollectionHasOneRoleAndAnExactReducedExecutionBound() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val input = RobustTokenInput.read(source(fixture, mapOf("candidateOnly" to true)).path)
+            assertThat(input.roles).containsExactly("CANDIDATE")
+            assertThat(input.prepared()["maximumTerminalExecutions"]).isEqualTo(3)
+            assertThat(input.prepared()["qualificationClaimed"]).isEqualTo(false)
+        }
+    }
+
+    @Test
+    fun candidateOnlyFlagCannotBeAnAmbiguousString() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            assertFailsWith<IllegalArgumentException> {
+                RobustTokenInput.read(source(fixture, mapOf("candidateOnly" to "true")).path)
+            }
+        }
+    }
+
+    @Test
     fun shardBoundariesDoNotChangeScientificIdentity() {
         CoordinatedWinQualificationFixture().use { fixture ->
             val first = RobustTokenInput.read(source(fixture, mapOf("count" to 1)).path)

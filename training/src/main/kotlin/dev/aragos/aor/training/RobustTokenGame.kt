@@ -157,7 +157,7 @@ internal object RobustTokenGame {
         role: String,
         deadline: Long,
     ): RobustTokenGameResult {
-        require(index in input.indices && role in setOf("CANDIDATE", "CONTROL")) {
+        require(index in input.indices && role in input.roles) {
             "A robust game requires its original shard index and explicit paired role."
         }
         val arena = input.arena

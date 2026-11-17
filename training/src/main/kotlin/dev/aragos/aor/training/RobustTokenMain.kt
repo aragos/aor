@@ -100,7 +100,7 @@ object RobustTokenMain {
                     }
                 }
             input.verify()
-            val total = input.count * 2 + input.ownedReplays.size * 2
+            val total = input.maximumTerminalExecutions
             check(attempts.attemptedGames == total && attempts.completedGames == total) {
                 "Every prescribed original game and reproduction must complete exactly once."
             }
@@ -118,8 +118,10 @@ object RobustTokenMain {
                     "globalStart" to input.start,
                     "count" to input.count,
                     "worlds" to input.count,
-                    "games" to input.count * 2,
-                    "reproductions" to input.ownedReplays.size * 2,
+                    "games" to input.count * input.roles.size,
+                    "reproductions" to input.ownedReplays.size * input.roles.size,
+                    "roles" to input.roles,
+                    "candidateOnly" to input.candidateOnly,
                     "scientificTerminalExecutions" to total,
                     "attemptedGames" to attempts.attemptedGames,
                     "completedGames" to attempts.completedGames,
@@ -161,7 +163,7 @@ object RobustTokenMain {
         attempts: CoordinatedEsAttempts,
         deadline: Long,
     ): RobustWorld {
-        val roles = listOf("CANDIDATE", "CONTROL")
+        val roles = input.roles
         fun play(role: String) =
             attempts.execute(deadline) { gameDeadline ->
                 RobustTokenGame.play(input, index, role, gameDeadline)

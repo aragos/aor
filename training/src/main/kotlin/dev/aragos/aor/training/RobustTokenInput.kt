@@ -32,10 +32,14 @@ private constructor(
     val start: Int,
     val count: Int,
     val replayIndices: List<Int>,
+    /** Experimental population collection only; paired qualification sources omit this flag. */
+    val candidateOnly: Boolean,
     val pins: Map<String, String>,
 ) {
     val indices = start until start + count
     val ownedReplays = replayIndices.filter { it in indices }
+    val roles = if (candidateOnly) listOf("CANDIDATE") else listOf("CANDIDATE", "CONTROL")
+    val maximumTerminalExecutions = (count + ownedReplays.size) * roles.size
     val selectorIdentity: Map<String, Any>? = sampler?.let {
         mapOf(
             "kind" to NearOptimalTokenSampler.VERSION,
@@ -60,7 +64,7 @@ private constructor(
             "styleRotation" to "index-div4-plus-seat-mod4-1",
             "seeds" to seeds,
             "replayIndices" to replayIndices,
-            "roles" to listOf("CANDIDATE", "CONTROL"),
+            "roles" to roles,
         )
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -83,7 +87,9 @@ private constructor(
             "globalStart" to start,
             "count" to count,
             "ownedReplayIndices" to ownedReplays,
-            "maximumTerminalExecutions" to count * 2 + ownedReplays.size * 2,
+            "maximumTerminalExecutions" to maximumTerminalExecutions,
+            "roles" to roles,
+            "candidateOnly" to candidateOnly,
             "newGames" to 0,
             "modelForwards" to 0,
             "experimentalCandidateOverride" to
@@ -126,7 +132,7 @@ private constructor(
                     "count",
                     "replayIndices",
                 ),
-                setOf("candidateBundle"),
+                setOf("candidateBundle", "candidateOnly"),
             )
             require(node["kind"]?.asText() == "robust-token-chunk-1") {
                 "Use the bounded robust-token paired source contract."
@@ -193,6 +199,13 @@ private constructor(
                 ) {
                     "Declare one typed robust opponent ecology."
                 }
+            val candidateOnly =
+                node["candidateOnly"]?.let {
+                    require(it.isBoolean) {
+                        "Candidate-only collection requires an explicit JSON boolean."
+                    }
+                    it.booleanValue()
+                } ?: false
             val pins =
                 asset.pins +
                     nominationPins +
@@ -215,6 +228,7 @@ private constructor(
                     start,
                     count,
                     replays,
+                    candidateOnly,
                     pins,
                 )
                 .also(RobustTokenInput::verify)
