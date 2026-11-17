@@ -26,6 +26,7 @@ tasks.register<Test>("fastTest") {
 
 tasks.withType<Test>().configureEach {
     outputs.dir(layout.buildDirectory.dir("test-fixtures/coordinated-preview"))
+    outputs.dir(layout.buildDirectory.dir("test-fixtures/robust-coordinated-preview"))
 }
 
 tasks.register<JavaExec>("verifyGameLogs") {

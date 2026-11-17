@@ -4,7 +4,7 @@ import {open} from './browser-support.mjs';
 
 // The configured server loads only the explicitly constructed JVM asset fixture for this suite.
 const expectedProfile = process.env.AOR_TEST_COORDINATED_PROFILE ?? 'aor-coordinated-83-support-1';
-assert(['aor-coordinated-83-support-1', 'aor-coordinated-win-support-1'].includes(expectedProfile));
+assert(['aor-coordinated-83-support-1', 'aor-coordinated-win-support-1', 'aor-coordinated-robust-support-1'].includes(expectedProfile));
 const api = process.env.MAP_API_URL;
 const web = process.env.MAP_WEB_URL;
 const cdp = process.env.MAP_CDP_URL;

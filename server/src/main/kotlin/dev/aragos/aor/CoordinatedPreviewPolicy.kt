@@ -19,6 +19,8 @@ import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
 import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.NearOptimalTokenSampler
+import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicyModel
 import dev.aragos.aor.ai.PurchasePolicyScope
@@ -67,6 +69,19 @@ private enum class PreviewHead {
     TOKEN,
 }
 
+/**
+ * Exact prospectively approved evaluation sizes; a certificate cannot choose its own sample size.
+ */
+internal enum class RobustQualificationVersion(
+    val wireValue: String,
+    val pairs: Int,
+    val maximumTerminalExecutions: Int,
+) {
+    LEAGUE_SIX("study89-SIX1", 2048, 36920),
+    DENIAL_FULL("study90-FULL1", 2048, 16464),
+    DENIAL_SMALL("study90-SMALL1", 1024, 8272),
+}
+
 private class CoordinatedAssetReader(path: Path) {
     private val declaredManifestPath = path.toAbsolutePath().normalize()
     private val directory = declaredManifestPath.parent.toRealPath()
@@ -83,16 +98,35 @@ private class CoordinatedAssetReader(path: Path) {
     fun read(): ServerBotPolicy {
         val manifest = document(manifestPath)
         val root = node(manifest)
+        val robust = text(root, "kind") == "coordinated-robust-support-preview-1"
         val winOnly = text(root, "kind") == "coordinated-win-support-preview-1"
         val selectedProfile =
-            if (winOnly) ServerBotProfile.COORDINATED_WIN_SUPPORT_1
-            else ServerBotProfile.COORDINATED_83_SUPPORT_1
+            when {
+                robust -> ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1
+                winOnly -> ServerBotProfile.COORDINATED_WIN_SUPPORT_1
+                else -> ServerBotProfile.COORDINATED_83_SUPPORT_1
+            }
+        val robustDefinition = if (robust) robustAsset(manifest, root) else null
         val definition =
-            if (winOnly) inferenceAsset(manifest, root) else legacyAsset(manifest, root)
+            when {
+                robustDefinition != null ->
+                    subject(robustDefinition, node(robustDefinition)["baseInferenceAsset"]).also {
+                        validateInferenceAsset(it)
+                    }
+                winOnly -> inferenceAsset(manifest, root)
+                else -> legacyAsset(manifest, root)
+            }
         val behavior = node(definition)
-        profile(behavior, selectedProfile)
+        profile(
+            behavior,
+            if (robust) ServerBotProfile.COORDINATED_WIN_SUPPORT_1 else selectedProfile,
+        )
         val current =
-            subject(definition, behavior[if (winOnly) "currentBundle" else "candidateBundle"])
+            if (robustDefinition != null) {
+                subject(robustDefinition, node(robustDefinition)["currentBundle"])
+            } else {
+                subject(definition, behavior[if (winOnly) "currentBundle" else "candidateBundle"])
+            }
         val original = subject(definition, behavior["originalBundle"])
         val calibrationFile = subject(definition, behavior["calibration"])
         val references = behavior["references"]
@@ -112,7 +146,9 @@ private class CoordinatedAssetReader(path: Path) {
                 subject(definition, references[it])
             }
         val certificate = subject(manifest, root["qualification"])
-        if (winOnly) {
+        if (robustDefinition != null) {
+            robustQualification(certificate, robustDefinition)
+        } else if (winOnly) {
             winQualification(certificate, definition)
         } else {
             qualification(certificate, current, original, calibrationFile, referenceFiles)
@@ -141,6 +177,9 @@ private class CoordinatedAssetReader(path: Path) {
                 expansionSelector = IncumbentResidualSelector(scales.first),
                 tokenSelector = IncumbentResidualSelector(scales.second),
                 support = JointSupportProfile.KNOWN_OWN_CHAOS_1,
+                tokenSampler = robustDefinition?.let { tokenSampler(node(it)["tokenSelector"]) },
+                expansionDenial =
+                    robustDefinition?.let { expansionDenial(node(it)["expansionDenial"]) },
             ),
         )
     }
@@ -186,6 +225,11 @@ private class CoordinatedAssetReader(path: Path) {
             "A win-qualified manifest requires its explicit generic profile and version."
         }
         val asset = subject(manifest, root["inferenceAsset"])
+        validateInferenceAsset(asset)
+        return asset
+    }
+
+    private fun validateInferenceAsset(asset: Document) {
         val value = node(asset)
         fields(
             value,
@@ -209,7 +253,153 @@ private class CoordinatedAssetReader(path: Path) {
         ) {
             "A generic inference asset requires the unchanged incumbent residual selector."
         }
+    }
+
+    private fun robustAsset(manifest: Document, root: JsonNode): Document {
+        fields(root, "kind", "schemaVersion", "profile", "inferenceAsset", "qualification")
+        require(
+            integer(root, "schemaVersion") == 1 &&
+                text(root, "profile") == ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1.version
+        ) {
+            "A robust preview requires its explicit stored profile and version."
+        }
+        val asset = subject(manifest, root["inferenceAsset"])
+        val value = node(asset)
+        fields(
+            value,
+            "kind",
+            "schemaVersion",
+            "profile",
+            "supportProfile",
+            "rulesVersion",
+            "dataVersion",
+            "configuration",
+            "baseInferenceAsset",
+            "currentBundle",
+            "tokenSelector",
+            "expansionDenial",
+        )
+        require(
+            text(value, "kind") == "coordinated-robust-inference-asset-1" &&
+                integer(value, "schemaVersion") == 1
+        ) {
+            "A robust inference descriptor must explicitly bind the complete policy."
+        }
+        profile(value, ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
+        tokenSampler(value["tokenSelector"])
+        expansionDenial(value["expansionDenial"])
         return asset
+    }
+
+    private fun tokenSampler(value: JsonNode): NearOptimalTokenSampler? {
+        if (value.isNull) return null
+        fields(value, "kind", "temperature", "maxScoreGap", "neighborRadius")
+        require(text(value, "kind") == NearOptimalTokenSampler.VERSION) {
+            "Only the shared near-optimal token sampler is supported."
+        }
+        return NearOptimalTokenSampler(
+            temperature = number(value["temperature"], "token temperature"),
+            maxScoreGap = number(value["maxScoreGap"], "token score gap"),
+            neighborRadius = integer(value, "neighborRadius"),
+        )
+    }
+
+    private fun expansionDenial(value: JsonNode): PublicLeaderAttackConfig? {
+        if (value.isNull) return null
+        fields(value, "kind", "beta", "minWinProbability")
+        require(text(value, "kind") == PublicLeaderAttackConfig.VERSION) {
+            "Only the shared public-leader attack adjustment is supported."
+        }
+        return PublicLeaderAttackConfig(
+            beta = number(value["beta"], "leader-denial beta"),
+            minimumWinProbability = number(value["minWinProbability"], "attack probability"),
+        )
+    }
+
+    private fun robustQualification(certificate: Document, asset: Document) {
+        val value = node(certificate)
+        fields(
+            value,
+            "kind",
+            "schemaVersion",
+            "passed",
+            "complete",
+            "profile",
+            "supportProfile",
+            "rulesVersion",
+            "dataVersion",
+            "configuration",
+            "inferenceAssetSha256",
+            "evaluationVersion",
+            "protocol",
+            "banks",
+        )
+        require(
+            text(value, "kind") == "coordinated-robust-win-qualification-1" &&
+                integer(value, "schemaVersion") == 1 &&
+                truth(value, "passed") &&
+                truth(value, "complete") &&
+                hash(value, "inferenceAssetSha256") == asset.sha256
+        ) {
+            "Robust qualification must bind this exact complete model, sampler and denial policy."
+        }
+        profile(value, ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
+        val version =
+            requireNotNull(
+                RobustQualificationVersion.entries.singleOrNull {
+                    it.wireValue == text(value, "evaluationVersion")
+                }
+            ) {
+                "A robust certificate requires an explicitly registered evaluation version."
+            }
+        val protocol = node(subject(certificate, value["protocol"]))
+        require(
+            integer(protocol, "maximumTerminalExecutions") == version.maximumTerminalExecutions
+        ) {
+            "Qualification must retain its original approved execution budget."
+        }
+        when (version) {
+            RobustQualificationVersion.LEAGUE_SIX -> {
+                val recipe =
+                    requireNotNull(protocol["numericRecipe"]) {
+                        "Study89 qualification requires its original numeric recipe."
+                    }
+                require(
+                    text(protocol, "kind") == "robust-league-campaign-1" &&
+                        integer(protocol, "activeGenerations") == 6 &&
+                        text(recipe, "kind") == "robust-league-normalized-antithetic-es-2" &&
+                        integer(recipe, "generations") == 6 &&
+                        text(recipe, "candidate") == "FINAL_MEAN_6_ONLY"
+                ) {
+                    "Study89 qualification requires the prospectively fixed six-generation final mean."
+                }
+            }
+            RobustQualificationVersion.DENIAL_FULL,
+            RobustQualificationVersion.DENIAL_SMALL -> {
+                require(text(protocol, "kind") == "robust-token-campaign-1") {
+                    "Study90 qualification requires its original approved campaign protocol."
+                }
+            }
+        }
+        fields(value["banks"], "mixed", "homogeneous")
+        for (name in listOf("mixed", "homogeneous")) {
+            val bank = value["banks"][name]
+            val protocolBank =
+                requireNotNull(protocol["banks"]?.get(name)) {
+                    "The approved protocol must retain each independent qualification bank."
+                }
+            fields(bank, "complete", "pairs", "win99Passed", "evidence", "report")
+            require(
+                truth(bank, "complete") &&
+                    integer(bank, "pairs") == version.pairs &&
+                    integer(protocolBank, "count") == version.pairs &&
+                    truth(bank, "win99Passed")
+            ) {
+                "Both independent complete banks must pass the registered 99% win gate and pair count."
+            }
+            subject(certificate, bank["evidence"])
+            subject(certificate, bank["report"])
+        }
     }
 
     private fun winQualification(document: Document, asset: Document) {

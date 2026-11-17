@@ -40,3 +40,35 @@ Source verification uses constructed fixtures only: common/native selector parit
 cached asset identity and malformed-input rejection, server proposal scope/privacy/command equality,
 legacy saves and bot lifecycle, and browser worker bypass with pause/reload/stale/uncertain writes.
 Actual model packaging, fresh qualification streams/games and activation need their separate review.
+
+## Qualified robust profiles
+
+`aor-coordinated-robust-support-1` is a separate opt-in stored identity. Its immutable inference
+descriptor binds the base reference/calibration asset, complete current four-head bundle, optional
+`near-optimal-token-softmax-1` configuration and optional `public-leader-attack-bonus-1`
+configuration. The native researcher and cached server call those same common policy implementations.
+The original decision seed owns token sampling, so polling and proposal rechecks preserve a choice.
+Null options retain the deterministic base chooser.
+
+The new `coordinated-robust-support-preview-1` manifest points to this full descriptor and its
+`coordinated-robust-win-qualification-1` certificate. Changing weights, selector parameters or denial
+parameters changes the descriptor hash and requires qualification for that complete policy. Stored
+seats retain the final outer manifest hash. Existing 83/87 profiles and their 4096-pair admission
+contracts remain unchanged.
+
+Qualification retains the raw original approved protocol and both independent bank evidence/report
+subjects. Only these registered evaluation versions are accepted:
+
+| Evaluation | Pairs in each bank | Maximum terminal executions |
+| --- | ---: | ---: |
+| `study89-SIX1` | 2048 | 36920 |
+| `study90-FULL1` | 2048 | 16464 |
+| `study90-SMALL1` | 1024 | 8272 |
+
+Each bank must be complete and pass its 99% win gate. The registered sizes must equal the original
+protocol's counts and budget. Study 89 additionally requires its six-generation final-mean recipe.
+No development winner, partial run or arbitrary smaller bank can authorize a preview.
+
+Source verification uses explicitly invented tensor/certificate fixtures only. Such fixtures are
+transport tests, never research evidence or playable scientific assets. An actual package and new
+isolated preview require the completed scientific evidence and their separate review.

@@ -8,7 +8,8 @@ import dev.aragos.aor.ai.JointPolicyScope
 /** An explicit stored controller identity, separate from the legacy browser policy version. */
 enum class ServerBotProfile(val version: String) {
     COORDINATED_83_SUPPORT_1("aor-coordinated-83-support-1"),
-    COORDINATED_WIN_SUPPORT_1("aor-coordinated-win-support-1");
+    COORDINATED_WIN_SUPPORT_1("aor-coordinated-win-support-1"),
+    COORDINATED_ROBUST_SUPPORT_1("aor-coordinated-robust-support-1");
 
     fun supports(playerCount: Int, rules: RuleOptions): Boolean =
         BotConfiguration(

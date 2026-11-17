@@ -510,6 +510,96 @@ internal class PreviewAssetFixture(val root: Path) {
         )
     }
 
+    /** Invented transport fixture only; no real model, research outcome or certificate is used. */
+    fun toRobustQualified(
+        version: RobustQualificationVersion = RobustQualificationVersion.LEAGUE_SIX,
+        sampler: Map<String, Any>? =
+            mapOf(
+                "kind" to "near-optimal-token-softmax-1",
+                "temperature" to 0.7,
+                "maxScoreGap" to 3.0,
+                "neighborRadius" to 4,
+            ),
+        denial: Map<String, Any>? = null,
+    ) {
+        toWinQualified()
+        val robustProfile = ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1.version
+        val asset =
+            write(
+                "robust-inference-asset.json",
+                scope +
+                    mapOf(
+                        "kind" to "coordinated-robust-inference-asset-1",
+                        "schemaVersion" to 1,
+                        "profile" to robustProfile,
+                        "baseInferenceAsset" to subject(root.resolve("inference-asset.json")),
+                        "currentBundle" to subject(root.resolve("candidate/bundle.json")),
+                        "tokenSelector" to sampler,
+                        "expansionDenial" to denial,
+                    ),
+            )
+        val protocol =
+            write(
+                "research-protocol.json",
+                mapOf(
+                    "kind" to
+                        if (version == RobustQualificationVersion.LEAGUE_SIX)
+                            "robust-league-campaign-1"
+                        else "robust-token-campaign-1",
+                    "activeGenerations" to 6,
+                    "numericRecipe" to
+                        mapOf(
+                            "kind" to "robust-league-normalized-antithetic-es-2",
+                            "generations" to 6,
+                            "candidate" to "FINAL_MEAN_6_ONLY",
+                        ),
+                    "maximumTerminalExecutions" to version.maximumTerminalExecutions,
+                    "banks" to
+                        listOf("mixed", "homogeneous").associateWith {
+                            mapOf("count" to version.pairs)
+                        },
+                ),
+            )
+        change("qualification.json") { certificate ->
+            certificate.put("kind", "coordinated-robust-win-qualification-1")
+            certificate.put("profile", robustProfile)
+            certificate.put("inferenceAssetSha256", hash(asset))
+            certificate.put("evaluationVersion", version.wireValue)
+            certificate.set<ObjectNode>("protocol", mapper.valueToTree(subject(protocol)))
+            certificate.remove("nominationSha256")
+            for (name in listOf("mixed", "homogeneous")) {
+                (certificate["banks"][name] as ObjectNode).put("pairs", version.pairs)
+            }
+        }
+        write(
+            "manifest.json",
+            mapOf(
+                "kind" to "coordinated-robust-support-preview-1",
+                "schemaVersion" to 1,
+                "profile" to robustProfile,
+                "inferenceAsset" to subject(asset),
+                "qualification" to subject(root.resolve("qualification.json")),
+            ),
+        )
+    }
+
+    fun changeRobustInference(transform: (ObjectNode) -> Unit) {
+        change("robust-inference-asset.json", transform)
+        val digest = hash(root.resolve("robust-inference-asset.json"))
+        changeManifest { (it["inferenceAsset"] as ObjectNode).put("sha256", digest) }
+        changeQualification { it.put("inferenceAssetSha256", digest) }
+    }
+
+    fun changeResearchProtocol(transform: (ObjectNode) -> Unit) {
+        change("research-protocol.json", transform)
+        changeQualification {
+            (it["protocol"] as ObjectNode).put(
+                "sha256",
+                hash(root.resolve("research-protocol.json")),
+            )
+        }
+    }
+
     fun changeInference(transform: (ObjectNode) -> Unit) {
         change("inference-asset.json", transform)
         val digest = hash(root.resolve("inference-asset.json"))
