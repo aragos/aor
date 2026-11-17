@@ -7,6 +7,26 @@ import kotlin.test.assertFailsWith
 
 /** Invented complete model subjects; no game, neural forward or fresh scientific stream. */
 class RobustTokenInputTest {
+    private val denial =
+        mapOf(
+            "kind" to "public-leader-attack-bonus-1",
+            "beta" to 1.0,
+            "minimumWinProbability" to .5,
+        )
+
+    private fun alternateActor(fixture: CoordinatedWinQualificationFixture): TokenPairedSubject {
+        val token =
+            PurchaseJson.read(fixture.toy.original.subject(CoordinatedEsHead.TOKEN).path)
+                as ObjectNode
+        token.putArray("actorWeights").apply { repeat(64) { add(if (it == 0) .1 else 0.0) } }
+        val changed = fixture.save("alternate-token.json", token)
+        val bundle = PurchaseJson.read(fixture.toy.original.source.path) as ObjectNode
+        (bundle["heads"]["TOKEN"] as ObjectNode)
+            .put("path", "alternate-token.json")
+            .put("sha256", changed.sha256)
+        return fixture.save("alternate-control.json", bundle)
+    }
+
     private fun source(
         fixture: CoordinatedWinQualificationFixture,
         extra: Map<String, Any?> = emptyMap(),
@@ -73,6 +93,82 @@ class RobustTokenInputTest {
             assertFailsWith<IllegalArgumentException> {
                 RobustTokenInput.read(source(fixture, mapOf("candidateOnly" to "true")).path)
             }
+        }
+    }
+
+    @Test
+    fun leaderDenialRequiresMatchedTokenPolicies() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            assertFailsWith<IllegalArgumentException> {
+                RobustTokenInput.read(source(fixture, mapOf("expansionDenial" to denial)).path)
+            }
+        }
+    }
+
+    @Test
+    fun leaderDenialCanUseAMatchedExperimentalControlBundle() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val model = alternateActor(fixture)
+            val input =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "candidateBundle" to fixture.ref(model),
+                                "controlBundle" to fixture.ref(model),
+                                "selector" to null,
+                                "controlSelector" to null,
+                                "expansionDenial" to denial,
+                            ),
+                        )
+                        .path
+                )
+            assertThat(input.control.source.sha256).isEqualTo(model.sha256)
+            assertThat(input.candidate.source.sha256).isEqualTo(model.sha256)
+            assertThat(input.scienceIdentity["controlAndRivalsBundleSha256"])
+                .isEqualTo(model.sha256)
+            assertThat(input.prepared()["qualificationClaimed"]).isEqualTo(false)
+        }
+    }
+
+    @Test
+    fun leaderDenialCannotConfoundDifferentCandidateAndControlModels() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val model = alternateActor(fixture)
+            assertFailsWith<IllegalArgumentException> {
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "candidateBundle" to fixture.ref(model),
+                                "selector" to null,
+                                "expansionDenial" to denial,
+                            ),
+                        )
+                        .path
+                )
+            }
+        }
+    }
+
+    @Test
+    fun neutralOptionalSettingsPreserveThePreviousCompleteScientificIdentity() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val original = RobustTokenInput.read(source(fixture).path)
+            val explicit =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "controlBundle" to fixture.ref(fixture.toy.original.source),
+                                "controlSelector" to null,
+                                "expansionDenial" to null,
+                            ),
+                        )
+                        .path
+                )
+            assertThat(original.scienceIdentity).isEqualTo(explicit.scienceIdentity)
+            assertThat(original.scienceSha256).isEqualTo(explicit.scienceSha256)
         }
     }
 

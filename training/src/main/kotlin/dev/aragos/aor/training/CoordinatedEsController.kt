@@ -8,6 +8,7 @@ import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
 import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.NearOptimalTokenSampler
+import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TerritoryPhase
@@ -23,6 +24,7 @@ internal class CoordinatedEsController(
     selectors: Map<CoordinatedEsHead, IncumbentResidualSelector>,
     support: JointSupportProfile? = null,
     tokenSampler: NearOptimalTokenSampler? = null,
+    expansionDenial: PublicLeaderAttackConfig? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -45,6 +47,7 @@ internal class CoordinatedEsController(
             },
             support,
             tokenSampler,
+            expansionDenial,
         )
 
     override fun controls(decision: String): Boolean =

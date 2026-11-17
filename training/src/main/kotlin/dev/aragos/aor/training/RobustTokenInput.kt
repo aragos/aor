@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.NearOptimalTokenSampler
+import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import java.nio.file.Path
 
 /** Public-state opponent interventions around each rival's actual qualified token command. */
@@ -27,6 +28,9 @@ private constructor(
     val arena: ArenaSpecification,
     val candidate: CoordinatedEsBundle,
     val sampler: NearOptimalTokenSampler?,
+    val control: CoordinatedEsBundle,
+    val controlSampler: NearOptimalTokenSampler?,
+    val expansionDenial: PublicLeaderAttackConfig?,
     val opponentStyle: RobustOpponentStyle,
     val seeds: List<Int>,
     val start: Int,
@@ -40,14 +44,7 @@ private constructor(
     val ownedReplays = replayIndices.filter { it in indices }
     val roles = if (candidateOnly) listOf("CANDIDATE") else listOf("CANDIDATE", "CONTROL")
     val maximumTerminalExecutions = (count + ownedReplays.size) * roles.size
-    val selectorIdentity: Map<String, Any>? = sampler?.let {
-        mapOf(
-            "kind" to NearOptimalTokenSampler.VERSION,
-            "temperature" to it.temperature,
-            "maxScoreGap" to it.maxScoreGap,
-            "neighborRadius" to it.neighborRadius,
-        )
-    }
+    val selectorIdentity = samplerIdentity(sampler)
     val scienceIdentity: Map<String, Any?> =
         mapOf(
             "kind" to "robust-token-science-1",
@@ -55,7 +52,7 @@ private constructor(
             "inferenceAssetSha256" to asset.source.sha256,
             "nominationSha256" to nomination.sha256,
             "candidateBundleSha256" to candidate.source.sha256,
-            "controlAndRivalsBundleSha256" to asset.current.source.sha256,
+            "controlAndRivalsBundleSha256" to control.source.sha256,
             "originalBundleSha256" to asset.original.source.sha256,
             "calibrationSha256" to asset.calibration.source.sha256,
             "configuration" to arena.configurations.single().id,
@@ -65,7 +62,19 @@ private constructor(
             "seeds" to seeds,
             "replayIndices" to replayIndices,
             "roles" to roles,
-        )
+        ) +
+            (controlSampler?.let { mapOf("controlSelector" to samplerIdentity(it)) }
+                ?: emptyMap()) +
+            (expansionDenial?.let {
+                mapOf(
+                    "expansionDenial" to
+                        mapOf(
+                            "kind" to PublicLeaderAttackConfig.VERSION,
+                            "beta" to it.beta,
+                            "minimumWinProbability" to it.minimumWinProbability,
+                        )
+                )
+            } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
     fun verify() {
@@ -98,6 +107,32 @@ private constructor(
         )
 
     companion object {
+        private fun samplerIdentity(value: NearOptimalTokenSampler?): Map<String, Any>? =
+            value?.let {
+                mapOf(
+                    "kind" to NearOptimalTokenSampler.VERSION,
+                    "temperature" to it.temperature,
+                    "maxScoreGap" to it.maxScoreGap,
+                    "neighborRadius" to it.neighborRadius,
+                )
+            }
+
+        private fun denial(node: JsonNode): PublicLeaderAttackConfig? {
+            if (node.isNull) return null
+            PurchaseJson.fields(node, setOf("kind", "beta", "minimumWinProbability"))
+            require(
+                node["kind"]?.asText() == PublicLeaderAttackConfig.VERSION &&
+                    node["beta"].isNumber &&
+                    node["minimumWinProbability"].isNumber
+            ) {
+                "Declare the typed public-leader bonus and its numeric probability threshold."
+            }
+            return PublicLeaderAttackConfig(
+                node["beta"].doubleValue(),
+                node["minimumWinProbability"].doubleValue(),
+            )
+        }
+
         fun sampler(node: JsonNode): NearOptimalTokenSampler? {
             if (node.isNull) return null
             PurchaseJson.fields(node, setOf("kind", "temperature", "maxScoreGap", "neighborRadius"))
@@ -132,7 +167,13 @@ private constructor(
                     "count",
                     "replayIndices",
                 ),
-                setOf("candidateBundle", "candidateOnly"),
+                setOf(
+                    "candidateBundle",
+                    "candidateOnly",
+                    "controlBundle",
+                    "controlSelector",
+                    "expansionDenial",
+                ),
             )
             require(node["kind"]?.asText() == "robust-token-chunk-1") {
                 "Use the bounded robust-token paired source contract."
@@ -173,6 +214,17 @@ private constructor(
                     )
                 } ?: asset.current
             candidate.models.validateFrozenValues(asset.original.models)
+            val control =
+                node["controlBundle"]?.let {
+                    CoordinatedEsBundle.read(
+                        TokenPairedSubject.read(it, source.path.parent),
+                        CoordinatedEsBundle.dictionaries(arena.configurations.single()),
+                    )
+                } ?: asset.current
+            control.models.validateFrozenValues(asset.original.models)
+            val candidateSampler = sampler(node.required("selector"))
+            val controlSampler = node["controlSelector"]?.let(::sampler)
+            val expansionDenial = node["expansionDenial"]?.let(::denial)
             val seeds = node.required("seeds").map { PurchaseJson.integer(it, "world seed") }
             require(seeds.size in 1..16384 && seeds.distinct().size == seeds.size) {
                 "A robust bank requires 1–16384 distinct prospectively fixed world seeds."
@@ -206,11 +258,22 @@ private constructor(
                     }
                     it.booleanValue()
                 } ?: false
+            require(
+                expansionDenial == null ||
+                    !candidateOnly &&
+                        candidate.source.sha256 == control.source.sha256 &&
+                        candidateSampler == controlSampler
+            ) {
+                "The leader-denial mechanism requires paired identical model and token policies; only expansion may differ."
+            }
             val pins =
                 asset.pins +
                     nominationPins +
                     CoordinatedWinEcology.pins(arenaSource, arena) +
                     (listOf(candidate.source) + candidate.subjects.values).associate {
+                        it.path.toString() to it.sha256
+                    } +
+                    (listOf(control.source) + control.subjects.values).associate {
                         it.path.toString() to it.sha256
                     } +
                     mapOf(source.path.toString() to source.sha256)
@@ -222,7 +285,10 @@ private constructor(
                     arenaSource,
                     arena,
                     candidate,
-                    sampler(node.required("selector")),
+                    candidateSampler,
+                    control,
+                    controlSampler,
+                    expansionDenial,
                     style,
                     seeds,
                     start,

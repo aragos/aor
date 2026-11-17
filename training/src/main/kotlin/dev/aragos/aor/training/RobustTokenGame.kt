@@ -174,11 +174,12 @@ internal object RobustTokenGame {
                     reference,
                     ordinary,
                     input.asset.baseline.model,
-                    if (candidate) input.candidate.models else input.asset.current.models,
+                    if (candidate) input.candidate.models else input.control.models,
                     input.asset.original.models,
                     input.asset.calibration.selectors,
                     JointSupportProfile.KNOWN_OWN_CHAOS_1,
-                    if (candidate) input.sampler else null,
+                    if (candidate) input.sampler else input.controlSampler,
+                    if (candidate) input.expansionDenial else null,
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {
