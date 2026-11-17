@@ -10,14 +10,15 @@ import time
 import robust_token_campaign as c
 
 
-def install(root, host, python, java):
+def install(root, host, python, java, *, contract=None):
+    contract = contract or c.TokenExperiment()
     root=Path(root).resolve();python=Path(python);java=Path(java)
     c.require(host in c.HOSTS and os.cpu_count()==(16 if host=='DESKTOP' else 10),
         'The payload must be finalized on its declared physical host capacity.')
     c.require(not (root/'tasks').exists() and not (root/'clock.json').exists() and
         not (root/'profile.json').exists(), 'Host admission is new-only and cannot reopen a scientific attempt.')
     c.require(shutil.disk_usage(root).free>=16*1024**3,'Host admission must retain16GiB free.')
-    protocol=root/'protocol.json';plan=c.validate(c.read(protocol))
+    protocol=root/'protocol.json';plan=contract.validate(c.read(protocol))
     asset=root/'inputs/inference/inference-asset.json';nomination=root/'inputs/nomination/nomination.json'
     arena=root/'inputs/homogeneous-arena.json'
     c.require(c.sha(asset)==plan['inferenceAssetSha256'] and c.sha(nomination)==plan['nominationSha256'] and
@@ -26,11 +27,10 @@ def install(root, host, python, java):
     for filename,item in c.read(root/'payload-manifest.json')['files'].items():
         c.require(c.sha(root/filename)==item,'The copied payload changed before actual host admission.')
     subject=lambda path:dict(path=str(path),sha256=c.sha(path))
-    source=dict(kind='robust-token-chunk-1',protocolSha256=c.sha(protocol),
-        inferenceAsset=subject(asset),nomination=subject(nomination),arena=subject(arena),
-        selector=plan['caseConfigs'][0]['selector'],opponentStyle='BALANCED',
-        seeds=plan['banks']['development']['seeds'],globalStart=0,count=64,
-        replayIndices=plan['banks']['development']['replayIndices'])
+    inputs=dict(host=host,inferenceAsset=subject(asset),nomination=subject(nomination),arena=subject(arena))
+    extra=contract.extra_profile(root, plan)
+    inputs.update(extra)
+    source=contract.native_source(plan,inputs,'development',plan['caseConfigs'][0],0,c.sha(protocol))
     source_path=root/'preflight-source.json';c.write(source_path,source)
     command=[str(java),'-Xmx6144m','-XX:ActiveProcessorCount=1','-XX:ParallelGCThreads=1',
         '-XX:ConcGCThreads=1','-cp',str(root/'runtime/lib/*'),
@@ -38,7 +38,7 @@ def install(root, host, python, java):
         '--source',str(source_path),'--output',str(root/'host-preflight')]
     with (root/'host-preflight.log').open('xb') as log:
         subprocess.run(command,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,
-            timeout=120,check=True)
+            timeout=120,check=True,env=contract.native_environment())
     prepared=c.read(root/'host-preflight/prepared.json')
     c.require(prepared['passed'] is True and prepared['newGames']==prepared['modelForwards']==0 and
         prepared['sourceSha256']==c.sha(source_path),
@@ -48,18 +48,19 @@ def install(root, host, python, java):
     for path in (python,java,java.resolve().parent.parent/'lib/server/libjvm.dylib',
             java.resolve().parent.parent/'lib/server/libjvm.so'):
         if path.is_file():pins[str(path)]=c.sha(path)
-    profile=dict(kind='robust-token-host-1',host=host,root=str(root),python=str(python),java=str(java),
-        classpath=str(root/'runtime/lib/*'),machineCpus=os.cpu_count(),workers=14 if host=='DESKTOP' else 8,
+    profile=dict(kind=contract.profile_kind,host=host,root=str(root),python=str(python),java=str(java),
+        classpath=str(root/'runtime/lib/*'),machineCpus=os.cpu_count(),workers=contract.workers[host],
         heapMiB=6144,minimumFreeBytes=16*1024**3,maximumDataBytes=(64 if host=='DESKTOP' else 4)*1024**3,
-        maximumRssBytes=12*1024**3,workerScript=str(root/'runtime/bin/robust_token_worker.py'),
+        maximumRssBytes=12*1024**3,workerScript=str(root/'runtime/bin'/contract.worker_script),
         actualProfile=str(root/'profile.json'),inferenceAsset=subject(asset),nomination=subject(nomination),
         arena=subject(arena),nativeJar=subject(root/'runtime/lib/training.jar'),pins=pins)
+    profile.update(extra)
     if host=='DESKTOP':profile['sshTarget']='aragos@192.168.86.44'
     c.write(root/'profile.json',profile)
-    manifest=dict(kind='robust-token-actual-host-manifest-1',host=host,
+    manifest=dict(kind=contract.prefix+'-actual-host-manifest-1',host=host,
         files={**pins,str(root/'profile.json'):c.sha(root/'profile.json')})
     c.write(root/'package-manifest.json',manifest)
-    ready=dict(kind='robust-token-actual-host-preflight-1',passed=True,host=host,actualRoot=str(root),
+    ready=dict(kind=contract.prefix+'-actual-host-preflight-1',passed=True,host=host,actualRoot=str(root),
         profile=subject(root/'profile.json'),manifest=subject(root/'package-manifest.json'),
         prepared=subject(root/'host-preflight/prepared.json'),scienceSha256=prepared['scienceSha256'],
         scienceIdentity=prepared['scienceIdentity'],source=subject(source_path),

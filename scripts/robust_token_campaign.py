@@ -158,10 +158,62 @@ def aggregate(rows, bank):
     return result
 
 
+def science_clock(plan, started, protocol_sha, prefix='robust-token'):
+    deadline = min(started+plan['maximumScienceSeconds'], plan['globalDeadlineEpoch'])
+    require(deadline > started, 'The original user science window has elapsed.')
+    return dict(kind=prefix+'-clock-1', startedEpoch=started, deadlineEpoch=deadline,
+        auditDeadlineEpoch=min(deadline+plan['auditSeconds'], plan['globalDeadlineEpoch']+plan['auditSeconds']),
+        protocolSha256=protocol_sha)
+
+
+class TokenExperiment:
+    """Explicit reusable execution contract; subclasses own their prospective method."""
+    prefix = 'robust-token'
+    profile_kind = 'robust-token-host-1'
+    worker_script = 'robust_token_worker.py'
+    workers = {'DESKTOP': 14, 'MAC': 8}
+    validate = staticmethod(validate)
+
+    def task_owner(self, plan, bank_name, case, chunk):
+        return owner(chunk)
+
+    def extra_profile(self, root, plan):
+        return {}
+
+    def native_environment(self):
+        return None
+
+    def native_source(self, plan, profile, bank_name, case, chunk, protocol_sha):
+        bank = plan['banks'][bank_name]
+        source = dict(kind='robust-token-chunk-1', protocolSha256=protocol_sha,
+            inferenceAsset=profile['inferenceAsset'], nomination=profile['nomination'],
+            arena=profile['arena'], selector=case['selector'], opponentStyle=bank['opponentStyle'],
+            seeds=bank['seeds'], globalStart=chunk*64, count=64,
+            replayIndices=bank['replayIndices'])
+        if 'candidateBundle' in case:
+            source['candidateBundle'] = case['candidateBundle'][profile['host']]
+        return source
+
+    def check_source(self, plan, source, bank_name, case, chunk, protocol_sha):
+        bank = plan['banks'][bank_name]
+        require(source['protocolSha256'] == protocol_sha and
+            source['selector'] == case['selector'] and source['seeds'] == bank['seeds'] and
+            source['opponentStyle'] == bank['opponentStyle'] and source['globalStart'] == chunk*64 and
+            source['count'] == 64 and source['replayIndices'] == bank['replayIndices'],
+            'Original native requests must retain the exact prospective case and whole-bank stream.')
+
+    def audit(self, protocol, output, terminal):
+        import robust_token_audit
+        return robust_token_audit.verify(protocol, output, terminal, contract=self)
+
+
 class Campaign:
-    def __init__(self, protocol, profiles, approval, approval_sha, output):
+    contract = TokenExperiment()
+
+    def __init__(self, protocol, profiles, approval, approval_sha, output, *, contract=None):
+        if contract is not None: self.contract = contract
         self.protocol_path = Path(protocol).resolve()
-        self.plan = validate(read(protocol))
+        self.plan = self.contract.validate(read(protocol))
         self.protocol_sha = sha(protocol)
         self.profile_paths = {name: Path(path).resolve() for name, path in profiles.items()}
         require(set(profiles) == set(HOSTS), 'Both frozen host profiles are required.')
@@ -176,13 +228,9 @@ class Campaign:
         require(not self.output.exists(), 'A campaign output is new-only; attempts cannot resume or overwrite.')
         self.output.mkdir(parents=True)
         self.started = time.time()
-        deadline = min(self.started+self.plan['maximumScienceSeconds'], self.plan['globalDeadlineEpoch'])
-        require(deadline > self.started, 'The original user science window has elapsed.')
-        self.clock = dict(kind='robust-token-clock-1', startedEpoch=self.started,
-            deadlineEpoch=deadline, auditDeadlineEpoch=min(deadline+600, self.plan['globalDeadlineEpoch']+600),
-            protocolSha256=self.protocol_sha)
+        self.clock = science_clock(self.plan, self.started, self.protocol_sha, self.contract.prefix)
         write(self.output/'clock.json', self.clock)
-        write(self.output/'launch.json', dict(kind='robust-token-launch-1',
+        write(self.output/'launch.json', dict(kind=self.contract.prefix+'-launch-1',
             pid=os.getpid(), processGroup=os.getpgrp(), protocolSha256=self.protocol_sha,
             profileSha256={name: sha(path) for name, path in self.profile_paths.items()},
             approvalSha256=approval_sha, automaticRetry=False, maximumAttempts=1))
@@ -195,7 +243,7 @@ class Campaign:
         self.original_handlers = {}
 
     def status(self, **fields):
-        replace_status(self.output/'status.json', dict(kind='robust-token-status-1',
+        replace_status(self.output/'status.json', dict(kind=self.contract.prefix+'-status-1',
             updatedEpoch=time.time(), protocolSha256=self.protocol_sha,
             terminalExecutions=self.executions, **fields))
 
@@ -233,15 +281,9 @@ class Campaign:
             require(sum(path.stat().st_size for path in self.output.rglob('*') if path.is_file()) < 4*1024**3,
                 'The local compact campaign must remain below4GiB.')
             self.reserved_executions += executed
-            require(self.reserved_executions <= MAXIMUM_EXECUTIONS,
+            require(self.reserved_executions <= self.plan['maximumTerminalExecutions'],
                 'Actual started tasks cannot exceed the fixed scientific execution allowance.')
-        source = dict(kind='robust-token-chunk-1', protocolSha256=self.protocol_sha,
-            inferenceAsset=profile['inferenceAsset'], nomination=profile['nomination'],
-            arena=profile['arena'], selector=case['selector'], opponentStyle=bank['opponentStyle'],
-            seeds=bank['seeds'], globalStart=chunk*64, count=64,
-            replayIndices=bank['replayIndices'])
-        if 'candidateBundle' in case:
-            source['candidateBundle'] = case['candidateBundle'][host]
+        source = self.contract.native_source(self.plan, profile, bank_name, case, chunk, self.protocol_sha)
         task_id = f'{bank_name}/{case["id"]}/chunk-{chunk}'
         request = dict(kind='robust-token-worker-task-1', taskId=task_id,
             clock=self.clock, source=source, profileSha256=sha(self.profile_paths[host]))
@@ -286,31 +328,16 @@ class Campaign:
             target = directory/'native'/path
             target.parent.mkdir(parents=True, exist_ok=True)
             with target.open('xb') as stream: stream.write(raw)
-        finished = read(directory/'native/finished.json')
-        require(finished['sourceSha256'] == hashlib.sha256(canonical(source)).hexdigest(),
-            'The native completion must bind the exact original canonical source bytes.')
-        for name, digest in finished['files'].items():
-            require(sha(directory/'native'/name) == digest,
-                'The native completion must hash each original outcome and reproduction file.')
-        rows = [json.loads(line) for line in (directory/'native/worlds.jsonl').read_text().splitlines()]
-        validate_chunk_indices(rows, chunk*64, 64)
-        require(finished['complete'] is True and finished['worlds'] == 64 and
-            finished['games'] == 128 and finished['reproductions'] == expected_replays and
-            finished['scientificTerminalExecutions'] == executed and
-            finished['attemptedGames'] == executed and finished['completedGames'] == executed,
-            'Native execution accounting must match the fixed paired worlds and actual reproductions.')
-        prepared = read(directory/'native/prepared.json')
-        require(prepared['passed'] is True and prepared['newGames'] == prepared['modelForwards'] == 0 and
-            prepared['scienceSha256'] == finished['scienceSha256'] and
-            prepared['sourceSha256'] == finished['sourceSha256'] and
-            all(row['scienceSha256'] == prepared['scienceSha256'] for row in rows),
-            'Every original outcome and completed task must retain the admitted native scientific identity.')
+        import robust_token_audit
+        rows, counts, _ = robust_token_audit.native_chunk(source, directory/'native')
+        require(counts['terminalExecutions'] == executed,
+            'The admitted native executions must equal this original reserved task.')
         write(directory/'receipt.json', dict(kind='robust-token-chunk-receipt-1', complete=True,
             host=host, taskId=task_id, finishedSha256=sha(directory/'native/finished.json'),
             rowsSha256=sha(directory/'native/worlds.jsonl'), terminalExecutions=executed))
         with self.lock:
             self.executions += executed
-            require(self.executions <= MAXIMUM_EXECUTIONS,
+            require(self.executions <= self.plan['maximumTerminalExecutions'],
                 'The fixed total scientific execution allowance cannot be exceeded.')
             self.status(status='running', stage=bank_name, case=case['id'], lastTask=task_id)
         return rows
@@ -319,7 +346,7 @@ class Campaign:
         result = {case['id']: [] for case in cases}
         for case in cases:
             for chunk in range(len(self.plan['banks'][name]['seeds'])//64):
-                if owner(chunk) == host:
+                if self.contract.task_owner(self.plan, name, case, chunk) == host:
                     result[case['id']].extend(self.task(host, name, case, chunk))
         return result
 
@@ -339,7 +366,7 @@ class Campaign:
                 for case in cases]
             require(all(control == controls[0] for control in controls[1:]),
                 'Repeated original CONTROL worlds must be identical across all selector configurations.')
-        write(self.output/'reports'/f'{name}.json', dict(kind='robust-token-bank-report-1',
+        write(self.output/'reports'/f'{name}.json', dict(kind=self.contract.prefix+'-bank-report-1',
             complete=True, bank=name, protocolSha256=self.protocol_sha, cases=result,
             qualification=False, activated=False))
         return result
@@ -351,7 +378,7 @@ class Campaign:
         try:
             development = self.bank('development', self.plan['caseConfigs'])
             selected = chosen_case(development, self.plan['caseConfigs'])
-            write(self.output/'selection.json', dict(kind='robust-token-selection-1',
+            write(self.output/'selection.json', dict(kind=self.contract.prefix+'-selection-1',
                 complete=True, case=selected, rule='highest-development-mean-win;stable-case-order-ties;positive-only',
                 protocolSha256=self.protocol_sha))
             qualified = False
@@ -363,14 +390,13 @@ class Campaign:
                     homogeneous = self.bank('homogeneous', [selected])[selected['id']]
                     qualified = homogeneous['wins']['lower99'] > 0
                     reason = 'both-independent-win99-passed' if qualified else 'homogeneous-win99-refused'
-            terminal = dict(kind='robust-token-terminal-1', status='completed', complete=True,
+            terminal = dict(kind=self.contract.prefix+'-terminal-1', status='completed', complete=True,
                 qualified=qualified, selectedCase=selected, reason=reason,
                 protocolSha256=self.protocol_sha, terminalExecutions=self.executions,
                 knownCompletedTerminalExecutions=self.executions,
                 reservedTerminalUpperBound=self.reserved_executions,
                 finishedEpoch=time.time(), newFits=0, activated=False)
-            import robust_token_audit
-            audit = robust_token_audit.verify(self.protocol_path, self.output, terminal)
+            audit = self.contract.audit(self.protocol_path, self.output, terminal)
             write(self.output/'completion-audit.json', audit)
             terminal['completionAuditSha256'] = sha(self.output/'completion-audit.json')
             write(self.output/'terminal.json', terminal)
@@ -378,7 +404,7 @@ class Campaign:
             return terminal
         except BaseException as error:
             self.stop()
-            terminal = dict(kind='robust-token-terminal-1', status='interrupted' if self.interrupted else 'failed',
+            terminal = dict(kind=self.contract.prefix+'-terminal-1', status='interrupted' if self.interrupted else 'failed',
                 complete=False, qualified=False, protocolSha256=self.protocol_sha,
                 reason=type(error).__name__+': '+str(error), terminalExecutions=self.executions,
                 knownCompletedTerminalExecutions=self.executions,

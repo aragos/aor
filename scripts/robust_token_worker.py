@@ -68,14 +68,16 @@ def inspect(profile_path):
         newGames=0,newFits=0,modelForwards=0,effectReads=0)
 
 
-def execute(profile_path, request, now=time.time):
+def execute(profile_path, request, now=time.time, *, profile_kind='robust-token-host-1',
+        source_validator=None, native_environment=None):
     profile_path = Path(profile_path)
     require(sha(profile_path) == request['profileSha256'], 'The actual executing host profile changed.')
     profile = read(profile_path)
-    require(profile['kind'] == 'robust-token-host-1' and profile['host'] in ('DESKTOP', 'MAC') and
+    require(profile['kind'] == profile_kind and profile['host'] in ('DESKTOP', 'MAC') and
         profile['workers'] in range(1, os.cpu_count()+1), 'Native worker and host capacity must be explicit.')
     require(profile['pins'] and all(sha(path) == digest for path, digest in profile['pins'].items()),
         'Every executing runtime/model/source input must retain its original pinned bytes.')
+    if source_validator is not None: source_validator(profile, request)
     deadline = request['clock']['deadlineEpoch']
     require(deadline > now(), 'No native task may start after the original science deadline.')
     task_id = PurePosixPath(request['taskId'])
@@ -95,7 +97,7 @@ def execute(profile_path, request, now=time.time):
     directory.mkdir(parents=True)
     source = directory/'source.json'
     write(source, request['source'])
-    for key in ('inferenceAsset', 'nomination', 'arena', 'candidateBundle'):
+    for key in ('inferenceAsset', 'nomination', 'arena', 'candidateBundle', 'controlBundle'):
         item = request['source'].get(key)
         if item is not None:
             require(sha(item['path']) == item['sha256'], 'An explicitly declared native input changed.')
@@ -121,7 +123,8 @@ def execute(profile_path, request, now=time.time):
     try:
         with (directory/'native.log').open('xb') as log:
             process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log,
-                stderr=subprocess.STDOUT, start_new_session=True, close_fds=True)
+                stderr=subprocess.STDOUT, start_new_session=True, close_fds=True,
+                env=native_environment() if native_environment is not None else None)
             write(directory/'owner.json', dict(kind='robust-token-native-owner-1',
                 workerPid=os.getpid(), nativePid=process.pid, nativeProcessGroup=process.pid,
                 taskId=request['taskId'], deadlineEpoch=deadline, sourceSha256=sha(source)))

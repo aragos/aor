@@ -1,0 +1,215 @@
+{
+  "activationAuthorized": false,
+  "allowedDataModes": {
+    "FULL": {
+      "activeUniqueWorlds": 4608,
+      "developmentReplays": [
+        0,
+        170,
+        341,
+        511
+      ],
+      "developmentWorlds": 512,
+      "homogeneousWorlds": 2048,
+      "maximumTerminalExecutions": 16464,
+      "mixedWorlds": 2048,
+      "qualificationReplays": [
+        0,
+        682,
+        1365,
+        2047
+      ]
+    },
+    "SMALL": {
+      "activeUniqueWorlds": 2304,
+      "developmentReplays": [
+        0,
+        85,
+        170,
+        255
+      ],
+      "developmentWorlds": 256,
+      "homogeneousWorlds": 1024,
+      "maximumTerminalExecutions": 8272,
+      "mixedWorlds": 1024,
+      "qualificationReplays": [
+        0,
+        341,
+        682,
+        1023
+      ]
+    }
+  },
+  "auditSeconds": 600,
+  "automaticRetry": false,
+  "automaticSuccessor": false,
+  "bankTemplateNote": "Existingbanks/budget describeSMALLtemplate. ActualprotocolmustuseexactselectedallowedDataModes entry, withfixedprefixesoftheoriginalfull4608reserved schedule; allunusedsuffixesheld.",
+  "banks": {
+    "development": {
+      "commonAcrossCases": true,
+      "opponentStyle": "BALANCED",
+      "replayIndices": [
+        0,
+        85,
+        170,
+        255
+      ],
+      "worlds": 256
+    },
+    "homogeneous": {
+      "opponentStyle": "QUALIFIED",
+      "replayIndices": [
+        0,
+        341,
+        682,
+        1023
+      ],
+      "worlds": 1024
+    },
+    "mixed": {
+      "opponentStyle": "BALANCED",
+      "replayIndices": [
+        0,
+        341,
+        682,
+        1023
+      ],
+      "worlds": 1024
+    }
+  },
+  "budget": {
+    "activeUniqueWorlds": 2304,
+    "developmentGames": 4096,
+    "developmentReproductions": 64,
+    "maximumTerminalExecutions": 8272,
+    "qualificationGames": 4096,
+    "qualificationReproductions": 16,
+    "reservedWorlds": 4608
+  },
+  "caseConfigs": [
+    {
+      "expansionDenial": {
+        "beta": 0.25,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.5
+      },
+      "id": "d00"
+    },
+    {
+      "expansionDenial": {
+        "beta": 0.25,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.8
+      },
+      "id": "d01"
+    },
+    {
+      "expansionDenial": {
+        "beta": 0.5,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.5
+      },
+      "id": "d02"
+    },
+    {
+      "expansionDenial": {
+        "beta": 0.5,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.8
+      },
+      "id": "d03"
+    },
+    {
+      "expansionDenial": {
+        "beta": 1.0,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.5
+      },
+      "id": "d04"
+    },
+    {
+      "expansionDenial": {
+        "beta": 1.0,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.8
+      },
+      "id": "d05"
+    },
+    {
+      "expansionDenial": {
+        "beta": 2.0,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.5
+      },
+      "id": "d06"
+    },
+    {
+      "expansionDenial": {
+        "beta": 2.0,
+        "kind": "public-leader-attack-bonus-1",
+        "minimumWinProbability": 0.8
+      },
+      "id": "d07"
+    }
+  ],
+  "confidenceMultiplier": 2.5758293035489004,
+  "controlRule": "Before90games choose sole89finalmean if89qualified; else sole88bselector if88bqualified; else qualified87. No other checkpoint or development candidate may become CONTROL.",
+  "dataModeSelection": "Before any90prep/game/effect read, after comparatorfreeze: FULL if remaining originaluserwindow>=9000seconds; else SMALL if>=4500seconds; otherwiseDEFER. Freezeexactselectedmode andprotocolbeforelaunch; neverresizeortopupafterany90data.",
+  "diagnosticOnly": [
+    "attack targets and missed legal opportunities",
+    "pool loss",
+    "Chaos",
+    "cash",
+    "rank",
+    "reward",
+    "third-party winners"
+  ],
+  "globalDeadlineUtc": "2026-11-18T02:28:29+00:00",
+  "hostOwnership": {
+    "development": "MAC iffchunk%4==3; otherwiseDESKTOP; identical across allcases",
+    "qualification": "MAC iffchunk%4==3; otherwiseDESKTOP"
+  },
+  "intervention": "EXPANSION only: own current public total strictly below the global maximum; add beta*quoted competition win probability to existing calibrated scores for exact legal canonical ATTACK commands targeting pieces of max-score rivals, provided quoted probability>=threshold. Full action set and reference-first ties preserved.",
+  "isolation": "Candidate and CONTROL use identical four-head bundle, frozen subtraction reference/calibration and TOKEN sampler. All rivals use CONTROL bundle/sampler, with only prospectively fixed bid-style overrides. Candidate differs only by declared leader-denial bonus.",
+  "kind": "root-leader-denial-prospective-method-1",
+  "launchMechanism": "OwnedTerminal.command executes exact root-approved argv with sanitizedJava environment; captureactualcontrollerPID/clock/children and protectidle sleep. No IDE-launched maincontroller.",
+  "maximumScienceSeconds": 7200,
+  "maximumTerminalExecutions": 16464,
+  "previousProspectiveMethodSha256": "b9a030f00fe987c8df206f10230143aa521060c29067a4782957f4db1d7b6398",
+  "privacy": "Fresh simulated games only; human saves remain local diagnostics, never exported or fit.",
+  "purpose": "Counterfactual test whether selective leading-rival attacks improve own winning chances; public-score leader is an explicit imperfect proxy, not a proven error label.",
+  "qualification": "Sole selected case: fresh1024mixed pairs strict win lower99>0, then independently1024homogeneous pairs strict win lower99>0. No alternate case, retry, fallback, or top-up.",
+  "quoteScope": "Authoritative primary ATTACK offer for the exact command/destination with no blockers and finite known probability. PLACE/partial placements, Cathedral, missing/mismatched probabilities receive no bonus.",
+  "recordedAt": "2026-11-17T19:53:53.134256+00:00",
+  "requires": [
+    "Reviewed native and corrected runner source",
+    "Fresh4608world declarations after88b/89protection",
+    "Frozen selected comparator, both-host preflight and root launch approval",
+    "Do not start if original nine-hour science deadline has elapsed"
+  ],
+  "reservedStreamUse": "Take fixed first256 development seeds, first1024 mixed seeds, first1024 homogeneous seeds from original untouched schedule12c96d27. Remaining2304reservedworlds stay protected and unused.",
+  "resourceRevision": "Before any89scientificdraws/games, identical8thread5secCbenchmark reached794.556%CPU throughownedTerminal.command vs~2CPU underIDE. Launch wholecoordinator throughTerminal; retain6gens/finalmean6 andoriginalglobaldeadline. Usefull16D/10Mcapacitywith75D/25Mownership.",
+  "resources": {
+    "heapMiB": 6144,
+    "maximumRssGiB": 12,
+    "minimumFreeGiB": 16,
+    "workers": {
+      "DESKTOP": 16,
+      "MAC": 10
+    }
+  },
+  "rivalStyles": [
+    "QUALIFIED",
+    "UNDERCUT",
+    "OVERBID",
+    "MIXED"
+  ],
+  "rotation": {
+    "seat": "index%4",
+    "style": "(index//4+seat)%4"
+  },
+  "scientificGamesAuthorized": false,
+  "selection": "Sole best complete development mean paired win delta, stable case-order ties; proceed only if mean>0. No behavior-based selection.",
+  "sourcePreparationAuthorized": true,
+  "wireClarification": "The executable typed field is minimumWinProbability; this replaces the earlier shorthand minWinProbability without changing any numeric threshold or scientific method, before any90games."
+}
