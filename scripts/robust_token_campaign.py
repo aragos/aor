@@ -120,6 +120,12 @@ def chosen_case(reports, ordered_cases):
     return best if reports[best['id']]['wins']['mean'] > 0 else None
 
 
+def validate_chunk_indices(rows, start, count):
+    """Concurrent native writers retain completion order; world IDs own statistical order."""
+    require(len(rows) == count and sorted(row['index'] for row in rows) == list(range(start, start+count)),
+        'Every transported chunk must retain its exact original global index set.')
+
+
 def metric(world, role, name):
     game = world['roles'][role]
     seat = world['seat']
@@ -287,8 +293,7 @@ class Campaign:
             require(sha(directory/'native'/name) == digest,
                 'The native completion must hash each original outcome and reproduction file.')
         rows = [json.loads(line) for line in (directory/'native/worlds.jsonl').read_text().splitlines()]
-        require(len(rows) == 64 and [row['index'] for row in rows] == list(range(chunk*64, (chunk+1)*64)),
-            'Every transported chunk must retain its exact original global index range.')
+        validate_chunk_indices(rows, chunk*64, 64)
         require(finished['complete'] is True and finished['worlds'] == 64 and
             finished['games'] == 128 and finished['reproductions'] == expected_replays and
             finished['scientificTerminalExecutions'] == executed and

@@ -41,6 +41,13 @@ def worlds(count=16):
 
 
 class StatisticsTest(unittest.TestCase):
+    def test_concurrent_native_completion_order_does_not_change_world_membership(self):
+        campaign.validate_chunk_indices([{'index':3},{'index':1},{'index':2},{'index':0}],0,4)
+
+    def test_duplicate_world_cannot_replace_another_original_world(self):
+        with self.assertRaisesRegex(ValueError,'exact original global index set'):
+            campaign.validate_chunk_indices([{'index':0},{'index':1},{'index':1},{'index':3}],0,4)
+
     def test_native_failure_retains_failure_and_partial_execution_bounds(self):
         with tempfile.TemporaryDirectory() as directory:
             instance=object.__new__(campaign.Campaign)

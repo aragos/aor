@@ -58,8 +58,7 @@ def verify(protocol, output, terminal):
                     c.require(c.sha(path)==digest,'An original native output changed after completion.')
                     pins[str(path)]=digest
                 original=[json.loads(line) for line in (native/'worlds.jsonl').read_text().splitlines()]
-                c.require(len(original)==64 and [row['index'] for row in original]==list(range(chunk*64,(chunk+1)*64)),
-                    'Each compact task retains its64 original global outcomes.')
+                c.validate_chunk_indices(original,chunk*64,64)
                 rows.extend(original)
                 owned=[index for index in bank['replayIndices'] if chunk*64<=index<(chunk+1)*64]
                 reproduction_path=native/'reproductions.jsonl'
