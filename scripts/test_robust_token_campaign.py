@@ -41,6 +41,25 @@ def worlds(count=16):
 
 
 class StatisticsTest(unittest.TestCase):
+    def test_native_failure_retains_failure_and_partial_execution_bounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance=object.__new__(campaign.Campaign)
+            instance.output=Path(directory);instance.plan={'caseConfigs':[]}
+            instance.protocol_sha='constructed-protocol'
+            instance.cancel=threading.Event();instance.interrupted=False
+            instance.lock=threading.Lock();instance.active={};instance.original_handlers={}
+            instance.executions=128;instance.reserved_executions=258
+            def fail(*_):
+                instance.stop()
+                raise RuntimeError('constructed native failure')
+            instance.bank=fail
+            with self.assertRaisesRegex(RuntimeError,'constructed native failure'):instance.run()
+            terminal=campaign.read(instance.output/'terminal.json')
+            self.assertEqual(terminal['status'],'failed')
+            self.assertEqual(terminal['knownCompletedTerminalExecutions'],128)
+            self.assertEqual(terminal['reservedTerminalUpperBound'],258)
+            self.assertIn('constructed native failure',terminal['reason'])
+
     def test_internal_abort_does_not_become_a_user_interruption(self):
         instance=object.__new__(campaign.Campaign)
         instance.cancel=threading.Event();instance.interrupted=False
