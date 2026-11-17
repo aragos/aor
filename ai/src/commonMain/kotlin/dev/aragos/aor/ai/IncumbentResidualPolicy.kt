@@ -76,15 +76,28 @@ object IncumbentResidualPolicy {
         differences: List<Double>,
         selector: IncumbentResidualSelector,
     ): IncumbentResidualChoice {
-        require(differences.size == observation.actions.size && differences.all(Double::isFinite)) {
-            "Residual selection requires one finite difference per original offered action."
-        }
         val scores = differences.mapIndexed { index, difference ->
             (if (index == observation.baselineIndex) selector.margin else 0.0) +
                 selector.scale * difference
         }
-        require(scores.all(Double::isFinite)) {
-            "Incumbent-relative scores must be finite without clipping."
+        return selectScores(observation, differences, scores)
+    }
+
+    /**
+     * Explicit score adjustments retain the complete offer order and exact reference-first ties.
+     */
+    fun selectScores(
+        observation: TerritoryObservation,
+        differences: List<Double>,
+        scores: List<Double>,
+    ): IncumbentResidualChoice {
+        require(
+            differences.size == observation.actions.size &&
+                scores.size == observation.actions.size &&
+                differences.all(Double::isFinite) &&
+                scores.all(Double::isFinite)
+        ) {
+            "Residual selection requires one finite difference and score per original offered action."
         }
         val maximum = scores.max()
         val index =
