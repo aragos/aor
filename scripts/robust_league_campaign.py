@@ -50,13 +50,13 @@ def validate(plan):
 
 
 def owner(member,chunk,generation):
-    """Four balanced signed-member chunks per generation use the slower Mac."""
-    assigned=(member+2*(generation-1))%16 in (0,15) and chunk==(generation-1)%2
+    """Sixteen balanced signed-member chunks per generation use the Terminal-launched Mac."""
+    assigned=(member+2*(generation-1))%4 in (0,3) and chunk==(generation-1)%2
     return 'MAC' if assigned else 'DESKTOP'
 
 
 def test_owner(chunk):
-    return 'MAC' if chunk%16==15 else 'DESKTOP'
+    return 'MAC' if chunk%4==3 else 'DESKTOP'
 
 
 def replay_indices(bank,member=None):

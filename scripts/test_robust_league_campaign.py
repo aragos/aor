@@ -63,12 +63,12 @@ class ExperimentalRulesTest(unittest.TestCase):
         for generation in range(1,7):
             assignments=[(member,chunk) for member in range(32) for chunk in range(2)
                 if league.owner(member,chunk,generation)=='MAC']
-            self.assertEqual(len(assignments),4)
-            self.assertEqual(sum(member%2==0 for member,_ in assignments),2)
+            self.assertEqual(len(assignments),16)
+            self.assertEqual(sum(member%2==0 for member,_ in assignments),8)
             self.assertEqual({chunk for _,chunk in assignments},{(generation-1)%2})
 
     def test_test_banks_have_fixed_small_mac_share(self):
-        self.assertEqual([chunk for chunk in range(32) if league.test_owner(chunk)=='MAC'],[15,31])
+        self.assertEqual([chunk for chunk in range(32) if league.test_owner(chunk)=='MAC'],[3,7,11,15,19,23,27,31])
 
     def test_six_generation_execution_budget_counts_actual_reproductions(self):
         training=6*32*128+sum(len(league.replay_indices('generation-1',member)) for member in range(32))*6

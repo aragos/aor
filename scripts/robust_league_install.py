@@ -57,7 +57,7 @@ def install(root,host,python,java,numeric_python=None,jvm_options=None):
             java.resolve().parent.parent/'lib/server/libjvm.so'):
         if path.is_file():pins[str(path)]=c.sha(path)
     profile=dict(kind='robust-token-host-1',host=host,root=str(root),python=str(python),java=str(java),
-        classpath=str(root/'runtime/lib/*'),machineCpus=os.cpu_count(),workers=16 if host=='DESKTOP' else 2,
+        classpath=str(root/'runtime/lib/*'),machineCpus=os.cpu_count(),workers=16 if host=='DESKTOP' else 10,
         heapMiB=6144,minimumFreeBytes=16*1024**3,maximumDataBytes=(64 if host=='DESKTOP' else 4)*1024**3,
         maximumRssBytes=12*1024**3,workerScript=str(root/'runtime/bin/robust_league_remote.py'),
         actualProfile=str(root/'profile.json'),inferenceAsset=subject(asset),nomination=subject(nomination),
