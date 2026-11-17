@@ -7,6 +7,7 @@ import dev.aragos.aor.ai.CoordinatedPolicySelector
 import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TerritoryPhase
@@ -21,6 +22,7 @@ internal class CoordinatedEsController(
     private val original: CoordinatedEsModels,
     selectors: Map<CoordinatedEsHead, IncumbentResidualSelector>,
     support: JointSupportProfile? = null,
+    tokenSampler: NearOptimalTokenSampler? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -42,6 +44,7 @@ internal class CoordinatedEsController(
                 "The token head requires its sealed selector."
             },
             support,
+            tokenSampler,
         )
 
     override fun controls(decision: String): Boolean =

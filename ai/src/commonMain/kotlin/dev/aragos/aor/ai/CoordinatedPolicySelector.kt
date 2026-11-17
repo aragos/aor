@@ -36,6 +36,7 @@ class CoordinatedPolicySelector(
     private val expansionSelector: IncumbentResidualSelector,
     private val tokenSelector: IncumbentResidualSelector,
     support: JointSupportProfile? = null,
+    private val tokenSampler: NearOptimalTokenSampler? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
@@ -109,12 +110,15 @@ class CoordinatedPolicySelector(
                 recommended,
                 TerritoryEncoder.TOKEN_2,
             )
-        return IncumbentResidualPolicy.choose(
+        val deterministic =
+            IncumbentResidualPolicy.choose(
                 encoded,
                 current.token,
                 original.token,
                 tokenSelector,
             )
-            .command
+        return tokenSampler?.let {
+            NearOptimalTokenPolicy.choose(encoded, deterministic, it, seed).command
+        } ?: deterministic.command
     }
 }
