@@ -239,6 +239,48 @@ class RevealedTokenCounterTest {
     }
 
     @Test
+    fun forkedTailsLearnIndependentlyFromTheSamePublicPrefix() {
+        val prefix = league(RevealedTokenCounterConfig(2, 2, 1))
+        prefix.observe(view(Stage.PLAY_CARDS, 1))
+        prefix.observe(view(Stage.PLAY_CARDS, 2))
+        val left = prefix.fork()
+        val right = prefix.fork()
+        left.observe(view(Stage.PLAY_CARDS, 3).copy(revealedTokenPurchases = mapOf(target to 10)))
+        right.observe(view(Stage.PLAY_CARDS, 3).copy(revealedTokenPurchases = mapOf(target to 30)))
+        fun command(league: RevealedTokenCounterLeague): String? =
+            league
+                .wrap(rival, RobustOpponentStyle.REVEALED_UNDERCUT, tokenOnly())
+                .choose(decision(rival, view(Stage.TOKEN_PURCHASE, 4)))
+
+        assertThat(command(left)).isEqualTo("buy-tokens 9")
+        assertThat(command(right)).isEqualTo("buy-tokens 29")
+        assertThat(command(prefix)).isEqualTo("buy-tokens 20")
+    }
+
+    @Test
+    fun aForkAfterSealedRootCommandsRetainsTheRivalsTieIntent() {
+        val prefix = league()
+        prefix.observe(view(Stage.PLAY_CARDS, 1))
+        prefix.observe(view(Stage.PLAY_CARDS, 2))
+        prefix
+            .wrap(rival, RobustOpponentStyle.REVEALED_TIE_UNDERCUT, tokenOnly())
+            .choose(decision(rival, view(Stage.TOKEN_PURCHASE, 3)))
+        val tail = prefix.fork().wrap(rival, RobustOpponentStyle.REVEALED_TIE_UNDERCUT, tokenOnly())
+
+        val command =
+            tail.choose(
+                decision(
+                    rival,
+                    view(Stage.TURN_ORDER_TIE, 3).copy(provisionalTieOrder = listOf(target)),
+                    "choose-turn-position",
+                    tieOffers,
+                )
+            )
+
+        assertThat(command).isEqualTo("choose-turn-position 1")
+    }
+
+    @Test
     fun controlledSeatCurrentCommandsCannotTeachTheCounterInsideTheSealedBatch() {
         assertThat(counterAfterCurrentTargetCommand("buy-tokens 17"))
             .isEqualTo(counterAfterCurrentTargetCommand("buy-tokens 35"))
@@ -253,6 +295,53 @@ class RevealedTokenCounterTest {
         val value = counter.diagnostics()["publicTokenCounter"] as Map<*, *>
         assertThat(value["bidDecisions"]).isEqualTo(100)
         assertThat(value["decisionProofs"] as List<*>).hasSize(RevealedTokenCounter.PROOF_LIMIT)
+    }
+
+    @Test
+    fun publicOrderOutcomesJoinForecastsToActualPrintedBoxesOnlyOnce() {
+        val counter = learned()
+        bid(counter)
+        val revealed =
+            view(Stage.DRAW_CARD, 3)
+                .copy(
+                    revealedTokenPurchases = mapOf(target to 21, rival to 20),
+                    orderBoxes = mapOf(target to 3, rival to 1),
+                )
+        counter.order(revealed, rival)
+        counter.order(revealed, rival)
+
+        val value = counter.diagnostics()["publicTokenCounter"] as Map<*, *>
+        assertThat(value["resolvedOrderOutcomes"]).isEqualTo(1)
+        assertThat(value["rivalBeforeTargetCount"]).isEqualTo(1)
+        assertThat(value["predictionHits"]).isEqualTo(1)
+        val proofs = value["decisionProofs"] as List<*>
+        assertThat(proofs.last() as Map<*, *>).containsEntry("rivalOrderBox", 1)
+    }
+
+    @Test
+    fun incompleteOrderResolutionDoesNotInventAnAdvantage() {
+        val counter = learned()
+        bid(counter)
+
+        counter.order(view(Stage.TURN_ORDER_TIE, 3), rival)
+
+        val value = counter.diagnostics()["publicTokenCounter"] as Map<*, *>
+        assertThat(value["resolvedOrderOutcomes"]).isEqualTo(0)
+    }
+
+    @Test
+    fun expansionActivityCountsActualAttacksCardsAndUnspentTokens() {
+        val counter = counter()
+        counter.expansion(rival, "attack basel", 8)
+        counter.expansion(rival, "buy-expansion-card", 6)
+        counter.expansion(rival, "pass", 3)
+
+        val value = counter.diagnostics()["publicTokenCounter"] as Map<*, *>
+        val rivals = value["rivalExpansionActivity"] as Map<*, *>
+        val actor = rivals[rival.value] as Map<*, *>
+        assertThat(actor["attacks"]).isEqualTo(1)
+        assertThat(actor["expansionCards"]).isEqualTo(1)
+        assertThat(actor["discardedPoolAtPass"]).isEqualTo(3L)
     }
 
     private fun counterAfterCurrentTargetCommand(command: String): String? {
@@ -279,8 +368,12 @@ class RevealedTokenCounterTest {
         object : SimulationController {
             override fun controls(decision: String): Boolean = decision == "buy-tokens"
 
-            override fun choose(decision: SimulationDecision): String? =
-                if (decision.observation.decision == "buy-tokens") "buy-tokens 8" else null
+            override fun choose(decision: SimulationDecision): String {
+                check(controls(decision.observation.decision)) {
+                    "The synthetic baseline must never receive an unsupported tie decision."
+                }
+                return "buy-tokens 8"
+            }
         }
 
     private fun decision(

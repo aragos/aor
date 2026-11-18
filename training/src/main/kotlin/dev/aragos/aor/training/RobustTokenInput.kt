@@ -7,7 +7,7 @@ import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import java.nio.file.Path
 
-/** Public-state opponent interventions around each rival's actual qualified token command. */
+/** Own-baseline interventions and explicit learning from another seat's public revealed bids. */
 internal enum class RobustOpponentStyle {
     QUALIFIED,
     UNDERCUT,
@@ -17,17 +17,19 @@ internal enum class RobustOpponentStyle {
     REVEALED_UNDERCUT,
     REVEALED_OVERBID,
     REVEALED_TIE_UNDERCUT,
-    REVEALED_TIE_OVERBID;
+    REVEALED_TIE_OVERBID,
+    REVEALED_BALANCED;
 
     val isRevealedCounter: Boolean
         get() =
-            this in
-                setOf(
-                    REVEALED_UNDERCUT,
-                    REVEALED_OVERBID,
-                    REVEALED_TIE_UNDERCUT,
-                    REVEALED_TIE_OVERBID,
-                )
+            when (this) {
+                REVEALED_UNDERCUT,
+                REVEALED_OVERBID,
+                REVEALED_TIE_UNDERCUT,
+                REVEALED_TIE_OVERBID,
+                REVEALED_BALANCED -> true
+                else -> false
+            }
 
     val isTieAware: Boolean
         get() = this == REVEALED_TIE_UNDERCUT || this == REVEALED_TIE_OVERBID
@@ -36,7 +38,17 @@ internal enum class RobustOpponentStyle {
         get() = this == REVEALED_UNDERCUT || this == REVEALED_TIE_UNDERCUT
 
     fun at(index: Int, seat: Int): RobustOpponentStyle =
-        if (this == BALANCED) entries[(index / 4 + seat) % 4] else this
+        when (this) {
+            BALANCED -> entries[(index / 4 + seat) % 4]
+            REVEALED_BALANCED ->
+                listOf(
+                    REVEALED_UNDERCUT,
+                    REVEALED_OVERBID,
+                    REVEALED_TIE_UNDERCUT,
+                    REVEALED_TIE_OVERBID,
+                )[(index / 4 + seat) % 4]
+            else -> this
+        }
 }
 
 /** A bounded paired shard; the source owns all streams and immutable inference subjects. */
