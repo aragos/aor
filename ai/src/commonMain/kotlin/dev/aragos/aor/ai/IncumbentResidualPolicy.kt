@@ -29,19 +29,12 @@ object IncumbentResidualPolicy {
         original: TerritoryPolicyModel,
     ): List<Double> {
         validate(observation, current, original)
-        val actions = observation.actions.map(TerritoryAction::features)
-        val residuals =
-            ResidualPolicyMath.rawResiduals(observation.stateFeatures, actions, current.network)
-        val baseline =
-            if (current === original) residuals
-            else
-                ResidualPolicyMath.rawResiduals(
-                    observation.stateFeatures,
-                    actions,
-                    original.network,
-                )
-        return residuals
-            .zip(baseline) { value, prior -> value - prior }
+        return ResidualPolicyMath.differences(
+                observation.stateFeatures,
+                observation.actions.map(TerritoryAction::features),
+                current.network,
+                original.network,
+            )
             .also { values ->
                 require(values.all(Double::isFinite)) {
                     "Every raw residual difference must be finite."
