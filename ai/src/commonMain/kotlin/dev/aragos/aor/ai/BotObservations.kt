@@ -20,6 +20,7 @@ import dev.aragos.aor.Prompt
 import dev.aragos.aor.ProvinceDefinition
 import dev.aragos.aor.ProvinceId
 import dev.aragos.aor.RULES_VERSION
+import dev.aragos.aor.TokenPurchaseOfferView
 import kotlin.math.abs
 
 /**
@@ -28,6 +29,38 @@ import kotlin.math.abs
  * evaluation, variation, and bounded planning run in the client.
  */
 object BotObservations {
+    /**
+     * Retain an already-authorized exact quote for tracing an opt-in unoffered purchase. This
+     * projection is created after baseline inference and never changes its scored candidates.
+     */
+    fun withQuotedTokenPurchase(
+        view: GameView,
+        observation: BotObservation,
+        quote: TokenPurchaseOfferView,
+    ): Pair<GameView, BotObservation> {
+        require(observation.decision == "buy-tokens") {
+            "Only a token observation may retain an accepted purchase quote."
+        }
+        require(
+            observation.candidates.none { it.command == "buy-tokens ${quote.amount}" } &&
+                view.tokenPurchaseOffers.none { it.amount == quote.amount }
+        ) {
+            "Only a previously unoffered exact token quote may augment the accepted trace."
+        }
+        val quotedView = view.copy(tokenPurchaseOffers = view.tokenPurchaseOffers + quote)
+        val projected =
+            ObservationProjection(
+                    quotedView,
+                    LegalChoices(),
+                    PlayerId(observation.playerId),
+                    "buy-tokens",
+                    observation.rulesVersion,
+                )
+                .build()
+        val candidate = projected.candidates.single { it.command == "buy-tokens ${quote.amount}" }
+        return quotedView to observation.copy(candidates = observation.candidates + candidate)
+    }
+
     fun from(state: GameState, seat: PlayerId): BotObservation {
         val prompt = state.prompts().singleOrNull()
         val decision =

@@ -38,6 +38,7 @@ class CoordinatedPolicySelector(
     support: JointSupportProfile? = null,
     private val tokenSampler: NearOptimalTokenSampler? = null,
     private val expansionDenial: PublicLeaderAttackConfig? = null,
+    private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
@@ -79,6 +80,14 @@ class CoordinatedPolicySelector(
         observation: BotObservation,
         seed: Int,
         referenceCommand: () -> String,
+    ): String = choose(view, observation, seed, referenceCommand, null)
+
+    fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        referenceCommand: () -> String,
+        tokenQuote: TokenNeighborQuote?,
     ): String {
         require(controls(observation.decision)) {
             "The coordinated selector controls only C/P/E/T."
@@ -121,6 +130,19 @@ class CoordinatedPolicySelector(
                 original.token,
                 tokenSelector,
             )
+        if (tokenNeighborMixture != null && tokenNeighborMixture.departureProbability > 0.0) {
+            val probabilities =
+                tokenSampler?.let {
+                    NearOptimalTokenPolicy.select(encoded, deterministic, it, 0.0).probabilities
+                } ?: encoded.actions.indices.map { if (it == deterministic.index) 1.0 else 0.0 }
+            return LocalTokenNeighborPolicy.distribution(
+                    observation,
+                    probabilities,
+                    tokenNeighborMixture,
+                    tokenQuote,
+                )
+                .command(ResidualPolicyMath.uniform(seed))
+        }
         return tokenSampler?.let {
             NearOptimalTokenPolicy.choose(encoded, deterministic, it, seed).command
         } ?: deterministic.command
