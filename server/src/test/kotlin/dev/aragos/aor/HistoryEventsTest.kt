@@ -93,11 +93,20 @@ class HistoryEventsTest {
     }
 
     @Test
-    fun discardedCardRemainsPrivate() {
-        val event = project(Entry.Action(owner, TurnCommand.DiscardCard(card.reference)), observer)
+    fun masterArtDiscardRevealsItsCatalogIdentityToEveryAudience() {
+        val events =
+            listOf(owner, observer, null).map { viewer ->
+                project(Entry.Action(owner, TurnCommand.DiscardCard(card.reference)), viewer)
+            }
 
-        assertThat(event?.card).isNull()
-        assertThat(event?.kind).isEqualTo(HistoryEventKind.DISCARD_CARD)
+        assertThat(events.map { it?.card }).containsExactly("stone-1", "stone-1", "stone-1")
+        assertThat(events.map { it?.kind })
+            .containsExactly(
+                HistoryEventKind.DISCARD_CARD,
+                HistoryEventKind.DISCARD_CARD,
+                HistoryEventKind.DISCARD_CARD,
+            )
+        assertThat(json.writeValueAsString(events)).doesNotContain(card.reference)
     }
 
     @Test
@@ -1150,9 +1159,10 @@ class HistoryEventsTest {
         )
     }
 
-    private fun project(entry: Entry, viewer: PlayerId): HistoryEventView? = before.let { initial ->
-        val state =
-            if (entry is GameOutcome.Draw) initial.copy(stage = Stage.INITIAL_DRAW) else initial
-        HistoryEvents.project("2:0", state, state, entry, viewer)
-    }
+    private fun project(entry: Entry, viewer: PlayerId?): HistoryEventView? =
+        before.let { initial ->
+            val state =
+                if (entry is GameOutcome.Draw) initial.copy(stage = Stage.INITIAL_DRAW) else initial
+            HistoryEvents.project("2:0", state, state, entry, viewer)
+        }
 }

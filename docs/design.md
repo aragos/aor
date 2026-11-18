@@ -42,8 +42,10 @@ Static shipping adjacency is keyed by exact map/count; advances, ownership and c
 Hosted Firebase UIDs map to game-local seat IDs through memberships; creator/admin roles are explicit.
 Current handles may change, but recorded names/capital symbols retain entry-time identity. Admins do
 not impersonate seats. Spectators receive public projections without hands, choices or edit access.
-Apply audiences to outcomes, diagnostics, plans and historical reads too. Only administrative exports
-include complete hidden outcomes; public ETags exclude other players' private writes.
+Master Art discards reveal the card identity to all players and spectators, including when replaying
+existing histories; automatic hand losses remain private. Apply audiences to outcomes, diagnostics,
+plans and historical reads too. Only administrative exports include complete hidden outcomes; public
+ETags exclude other players' private writes.
 
 Simultaneous bids/purchases persist outside the log until all seats submit; validate and append the
 whole batch atomically in stable player order. Pending values have no game effect and may be replaced

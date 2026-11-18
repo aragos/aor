@@ -63,6 +63,65 @@ class CardAvailabilityTest {
     }
 
     @Test
+    fun masterArtDiscardsRemoveCardsFromEveryViewersListWithoutApplyingEffects() {
+        val initial =
+            state("stone-1", "armor").copy(stage = Stage.BUY_CARD).let { state ->
+                state.replacePlayer(
+                    state
+                        .playerState(p1)
+                        .copy(
+                            advances =
+                                PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.MASTER_ART, 1)))
+                        )
+                )
+            }
+
+        val discarded = TurnCommand.DiscardCard("armor").applyTo(initial, p1)
+
+        for (view in
+            listOf(
+                discarded.publicView(),
+                discarded.viewForPlayer(p1),
+                discarded.viewForPlayer(p2),
+            )) {
+            assertThat(view.unplayedCards.map(CardDefinition::id))
+                .containsExactlyElementsIn(CardData.epochOne.map(CardDefinition::id) - "armor")
+        }
+        assertThat(discarded.effects).isEqualTo(initial.effects)
+        assertThat(discarded.playerState(p1).hand.map { it.definition.id })
+            .containsExactly("stone-1")
+    }
+
+    @Test
+    fun epochShuffleRestoresMasterArtRecurringDiscardsAndKeepsSquaresExcluded() {
+        val initial =
+            state("stone-1", "armor").copy(stage = Stage.BUY_CARD).let { state ->
+                state.replacePlayer(
+                    state
+                        .playerState(p1)
+                        .copy(
+                            advances =
+                                PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.MASTER_ART, 1)))
+                        )
+                )
+            }
+        val recurring = TurnCommand.DiscardCard("stone-1").applyTo(initial, p1)
+        val nextOpportunity =
+            recurring.copy(flow = recurring.flow.copy(discardedCards = emptySet()))
+        val discarded = TurnCommand.DiscardCard("armor").applyTo(nextOpportunity, p1)
+        val exhausted = discarded.copy(deck = emptyList()).queueDraw(p1)
+        val request =
+            requireNotNull(exhausted.pendingShuffle()) { "An exhausted deck must shuffle." }
+
+        val shuffled = exhausted.step(Entry.Shuffle(request.cards))
+
+        assertThat(shuffled.publicView().unplayedCards.map(CardDefinition::id))
+            .containsExactlyElementsIn(
+                (CardData.epochOne + CardData.epochTwo).map(CardDefinition::id) - "armor"
+            )
+    }
+
+    @Test
     fun nextEpochRestoresRecurringCardsAndKeepsPlayedSquaresExcluded() {
         val initial = state("stone-1", "enlightened-ruler", "armor", "charlemagne")
         val played =

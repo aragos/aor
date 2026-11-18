@@ -49,7 +49,7 @@ class OpeningSelectionTest {
         assertThat(returned.playerState(p1).hand).hasSize(2)
         assertThat(returned.deckHistory.discarded).isEmpty()
         assertThat(returned.deckHistory.removed).isEmpty()
-        assertThat(returned.playedCards).isEmpty()
+        assertThat(returned.publiclyDiscardedCards).isEmpty()
         val failure =
             assertFailsWith<RuleViolation> {
                 returned.step(Entry.Shuffle(request.cards.drop(1)))
