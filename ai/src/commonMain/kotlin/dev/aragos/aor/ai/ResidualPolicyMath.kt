@@ -5,7 +5,7 @@ import kotlin.math.ln
 import kotlin.math.tanh
 
 /** Immutable validated model references; phase-specific types retain their own wire invariants. */
-internal data class ResidualPolicyWeights(
+internal class ResidualPolicyWeights(
     val kind: String,
     val hiddenSize: Int,
     val baselineProbability: Double,
@@ -13,14 +13,21 @@ internal data class ResidualPolicyWeights(
     val actionColumns: Int,
     val stateIndices: Map<String, Int>,
     val actionIndices: Map<String, Int>,
-    val stateWeights: List<Double>,
-    val stateBias: List<Double>,
-    val actionWeights: List<Double>,
-    val actionBias: List<Double>,
-    val actorWeights: List<Double>,
-    val valueWeights: List<Double>,
+    stateWeights: List<Double>,
+    stateBias: List<Double>,
+    actionWeights: List<Double>,
+    actionBias: List<Double>,
+    actorWeights: List<Double>,
+    valueWeights: List<Double>,
     val valueBias: Double,
-)
+) {
+    val stateWeights = stateWeights.toDoubleArray()
+    val stateBias = stateBias.toDoubleArray()
+    val actionWeights = actionWeights.toDoubleArray()
+    val actionBias = actionBias.toDoubleArray()
+    val actorWeights = actorWeights.toDoubleArray()
+    val valueWeights = valueWeights.toDoubleArray()
+}
 
 internal data class ResidualPolicyEvaluation(
     val logits: List<Double>,
@@ -38,8 +45,14 @@ internal object ResidualPolicyMath {
         baselineIndex: Int,
         network: ResidualPolicyWeights,
     ): ResidualPolicyEvaluation {
-        val hidden = hidden(stateFeatures, network)
-        val residuals = residuals(hidden, actionFeatures, network).map { it.coerceIn(-20.0, 20.0) }
+        val hidden = hidden(indexed(stateFeatures, network.stateIndices, network.kind), network)
+        val residuals =
+            residuals(
+                    hidden,
+                    actionFeatures.map { indexed(it, network.actionIndices, network.kind) },
+                    network,
+                )
+                .map { it.coerceIn(-20.0, 20.0) }
         val prior =
             List(actionFeatures.size) { index ->
                 when {
@@ -73,26 +86,40 @@ internal object ResidualPolicyMath {
         stateFeatures: Map<String, Double>,
         actionFeatures: List<Map<String, Double>>,
         network: ResidualPolicyWeights,
-    ): List<Double> = residuals(hidden(stateFeatures, network), actionFeatures, network)
+    ): List<Double> =
+        residuals(
+            hidden(indexed(stateFeatures, network.stateIndices, network.kind), network),
+            actionFeatures.map { indexed(it, network.actionIndices, network.kind) },
+            network,
+        )
 
-    private fun hidden(
+    /** Both models use the same validated dictionary, so sparse indices need only one sort. */
+    fun differences(
         stateFeatures: Map<String, Double>,
-        network: ResidualPolicyWeights,
+        actionFeatures: List<Map<String, Double>>,
+        current: ResidualPolicyWeights,
+        original: ResidualPolicyWeights,
     ): List<Double> {
-        val state = indexed(stateFeatures, network.stateIndices, network.kind)
-        return List(network.hiddenSize) { row ->
+        val state = indexed(stateFeatures, current.stateIndices, current.kind)
+        val actions = actionFeatures.map { indexed(it, current.actionIndices, current.kind) }
+        if (current === original) return List(actionFeatures.size) { 0.0 }
+        val currentScores = residuals(hidden(state, current), actions, current)
+        val originalScores = residuals(hidden(state, original), actions, original)
+        return currentScores.zip(originalScores, Double::minus)
+    }
+
+    private fun hidden(state: Sparse, network: ResidualPolicyWeights): DoubleArray =
+        DoubleArray(network.hiddenSize) { row ->
             tanh(
                 network.stateBias[row] + dot(network.stateWeights, row, network.stateColumns, state)
             )
         }
-    }
 
     private fun residuals(
-        hidden: List<Double>,
-        actionFeatures: List<Map<String, Double>>,
+        hidden: DoubleArray,
+        actionFeatures: List<Sparse>,
         network: ResidualPolicyWeights,
-    ): List<Double> = actionFeatures.map { action ->
-        val features = indexed(action, network.actionIndices, network.kind)
+    ): List<Double> = actionFeatures.map { features ->
         network.actorWeights.indices.sumOf { row ->
             network.actorWeights[row] *
                 tanh(
@@ -121,21 +148,36 @@ internal object ResidualPolicyMath {
         return (mixed.toLong() and 0xffffffffL).toDouble() / 4294967296.0
     }
 
+    private class Sparse(val columns: IntArray, val values: DoubleArray)
+
     private fun indexed(
         features: Map<String, Double>,
         indices: Map<String, Int>,
         kind: String,
-    ): List<Pair<Int, Double>> =
-        features
-            .map { (name, value) ->
-                checkNotNull(indices[name]) { "Unknown $kind feature: $name." } to value
-            }
-            .sortedBy { it.first }
+    ): Sparse {
+        val ordered =
+            features
+                .map { (name, value) ->
+                    checkNotNull(indices[name]) { "Unknown $kind feature: $name." } to value
+                }
+                .sortedBy { it.first }
+        return Sparse(
+            IntArray(ordered.size) { ordered[it].first },
+            DoubleArray(ordered.size) { ordered[it].second },
+        )
+    }
 
     private fun dot(
-        weights: List<Double>,
+        weights: DoubleArray,
         row: Int,
         columns: Int,
-        features: List<Pair<Int, Double>>,
-    ): Double = features.sumOf { (column, value) -> weights[row * columns + column] * value }
+        features: Sparse,
+    ): Double {
+        val offset = row * columns
+        var sum = 0.0
+        for (index in features.columns.indices) {
+            sum += weights[offset + features.columns[index]] * features.values[index]
+        }
+        return sum
+    }
 }
