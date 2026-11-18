@@ -56,7 +56,7 @@ parameters changes the descriptor hash and requires qualification for that compl
 seats retain the final outer manifest hash. Existing 83/87 profiles and their 4096-pair admission
 contracts remain unchanged.
 
-Qualification retains the raw original approved protocol and both independent bank evidence/report
+Qualification retains the raw original approved protocol and all independent bank evidence/report
 subjects. Only these registered evaluation versions are accepted:
 
 | Evaluation | Pairs in each bank | Maximum terminal executions |
@@ -65,6 +65,8 @@ subjects. Only these registered evaluation versions are accepted:
 | `study90-FULL1` | 2048 | 16464 |
 | `study90-SMALL1` | 1024 | 8272 |
 | `study91-QUAL1` | 2048 | 8208 |
+| `study92-BID1` | 512 (mixed, homogeneous and reference) | 5208 |
+| `study93-LEADER1` | 256 | 2128 |
 
 Each bank must be complete and pass its 99% win gate. The registered sizes must equal the original
 protocol's counts and budget. Study 89 additionally requires its six-generation final-mean recipe.
@@ -83,6 +85,27 @@ final-mean receipt and complete development report. Archived absolute research p
 as provenance; the server opens only the separate confined portable copies. The original source
 must retain its final-six recipe. This qualification claims no new fitting and no completed
 qualification from the earlier interrupted trial.
+
+Study 92 retains the `learned-bid-search-1` protocol, its eight frozen token samplers and complete
+128-world development panel. Both learned-base confirmation banks must pass the observed 80%
+positive-bid concentration threshold as well as the 99% win gate; a separate regression bank against
+qualified study 87 with 512 worlds must also pass its 99% win gate. The reader derives concentration
+from the original bid histograms and reproduces the sole eligible development nomination. This measure
+does not establish conditional unpredictability.
+
+Study 93 retains the `mac-leader-search-1` protocol, its eight frozen leader bonuses and complete
+64-world development panel. Its full model and token sampler must equal the root-frozen qualified
+anchor, using qualified study 92, otherwise qualified study 91, otherwise verified study 87. The
+selected expansion bonus alone changes. Both fresh banks with 256 worlds must pass their 99% win
+gates; concentration is diagnostic.
+
+These search certificates carry portable `searchEvidence` copies of the original profile, source
+readiness, selection, development report, sealed audit and physical closure. Study 93 additionally
+carries the frozen anchor, preceding study 92 terminal/closure, study 91 closure and anchor qualification
+with its source protocol where applicable. Raw protocol and archived paths remain unchanged. The
+reader checks hashes against the original profile/audit records and opens only confined portable
+copies. Counts come from the actual prepared `worlds` and `seeds` fields; another count field or
+partial bank cannot substitute for the registered method.
 
 Source verification uses explicitly invented tensor/certificate fixtures only. Such fixtures are
 transport tests, never research evidence or playable scientific assets. An actual package and new
