@@ -1,0 +1,134 @@
+{
+  "kind": "mac-leader-search-prospective-method-1",
+  "study": 93,
+  "localOnly": true,
+  "remoteUseAuthorized": false,
+  "globalDeadlineEpoch": 1795020399,
+  "userWindowEndUtc": "2026-11-18T16:46:39+00:00",
+  "nativeJarSha256": "14245cba2d1dbd4e62780371efd84d4416bd91592ceca876449d7f417756463f",
+  "anchorRule": "Before actual preparation freeze complete qualified92 after all three fresh banks and closure; else complete qualified91 after both fresh banks and closure; else qualified87. Never use incomplete or development-only results as a qualified anchor.",
+  "caseConfigs": [
+    {
+      "id": "l00",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 0.25,
+        "minimumWinProbability": 0.5
+      }
+    },
+    {
+      "id": "l01",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 0.25,
+        "minimumWinProbability": 0.8
+      }
+    },
+    {
+      "id": "l02",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 0.5,
+        "minimumWinProbability": 0.5
+      }
+    },
+    {
+      "id": "l03",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 0.5,
+        "minimumWinProbability": 0.8
+      }
+    },
+    {
+      "id": "l04",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 1,
+        "minimumWinProbability": 0.5
+      }
+    },
+    {
+      "id": "l05",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 1,
+        "minimumWinProbability": 0.8
+      }
+    },
+    {
+      "id": "l06",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 2,
+        "minimumWinProbability": 0.5
+      }
+    },
+    {
+      "id": "l07",
+      "expansionDenial": {
+        "kind": "public-leader-attack-bonus-1",
+        "beta": 2,
+        "minimumWinProbability": 0.8
+      }
+    }
+  ],
+  "banks": [
+    {
+      "name": "development",
+      "worlds": 64,
+      "opponentStyle": "BALANCED",
+      "replayIndices": [
+        0,
+        21,
+        42,
+        63
+      ]
+    },
+    {
+      "name": "mixed",
+      "worlds": 256,
+      "opponentStyle": "BALANCED",
+      "replayIndices": [
+        0,
+        85,
+        170,
+        255
+      ]
+    },
+    {
+      "name": "homogeneous",
+      "worlds": 256,
+      "opponentStyle": "QUALIFIED",
+      "replayIndices": [
+        0,
+        85,
+        170,
+        255
+      ]
+    }
+  ],
+  "roles": "Candidate, control and rivals have identical frozen qualified anchor weights and sampler; only candidate expansionDenial varies. Native90 original references and calibration unchanged.",
+  "candidateSelection": "Sole highest strictly positive complete development paired win mean, stable case-order ties. No positive mean stops without a nominee.",
+  "qualification": "Mixed lower99>0, then homogeneous lower99>0, using fresh complete prescribed pairs. No alternative nominee, topup or resizing.",
+  "confidenceMultiplier": 2.5758293035489004,
+  "concentration": "Diagnostic only; report inherited bidding weakness.",
+  "maximumTerminalExecutions": 2128,
+  "maximumScienceSeconds": 7200,
+  "minimumRemainingSecondsAtPreparation": 5400,
+  "auditSeconds": 600,
+  "workers": 10,
+  "heapMiB": 6144,
+  "maximumRssBytes": 12884901888,
+  "minimumFreeBytes": 17179869184,
+  "maximumDataBytes": 805306368,
+  "chunkSize": 256,
+  "noRetry": true,
+  "noResume": true,
+  "noTopUp": true,
+  "noAutomaticSuccessor": true,
+  "noNewFits": true,
+  "weightsImmutable": true,
+  "launchViaOwnedTerminal": true,
+  "prerequisite": "Study92 terminal and all owned processes gone; at least5400seconds remain in original12hwindow. Otherwise DEFER without actual preparation/science."
+}

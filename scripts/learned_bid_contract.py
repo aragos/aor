@@ -154,7 +154,7 @@ def check_inputs(prepared, source):
                 'Every explicitly declared native model/reference subject must remain physically pinned.')
 
 
-def bid_summary(rows, role):
+def bid_summary(rows, role, *, require_positive=True):
     """Observed positive bid concentration across a complete case; not conditional entropy."""
     counts = Counter()
     for row in rows:
@@ -169,8 +169,13 @@ def bid_summary(rows, role):
             counts[amount] += count
     positive = {amount:count for amount,count in sorted(counts.items()) if amount > 0}
     total = sum(positive.values())
-    c.require(total > 0,
+    c.require(total > 0 or not require_positive,
         'Missing or empty positive controlled bid counts refuse admission; they cannot imply unpredictability.')
+    if total == 0:
+        return dict(counts={str(amount):count for amount,count in sorted(counts.items())},
+            positiveCount=0,maximumSinglePositiveAmountCount=0,maximumSinglePositiveAmountShare=None,
+            mostFrequentPositiveAmount=None,positiveBidEntropyNats=None,positiveBid21Share=None,
+            observedConcentrationPassed=False,conditionalUnpredictabilityClaimed=False)
     maximum = max(positive.values())
     return dict(counts={str(amount):count for amount,count in sorted(counts.items())},
         positiveCount=total, maximumSinglePositiveAmountCount=maximum,
