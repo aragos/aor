@@ -38,9 +38,7 @@ internal data class TokenAnchoredProposals(
             }
             val amounts = commands.map(LocalTokenNeighborPolicy::amount)
             val maximum = currentProbabilities.max()
-            val current =
-                if (currentProbabilities[anchorReference] == maximum) anchorReference
-                else currentProbabilities.indexOfFirst { it == maximum }
+            val current = currentProbabilities.indexOfFirst { it == maximum }
             val center = amounts[current].toLong()
             val mandatory =
                 (listOf(rawReference, anchorReference, sampledIndex) +

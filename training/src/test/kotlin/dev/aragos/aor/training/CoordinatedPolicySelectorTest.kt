@@ -22,6 +22,7 @@ import dev.aragos.aor.ai.TokenAnchorDistribution
 import dev.aragos.aor.ai.TokenAnchoredPolicy
 import dev.aragos.aor.ai.TokenAnchoredResidual
 import dev.aragos.aor.ai.TokenNeighborAdmission
+import dev.aragos.aor.ai.TokenNeighborQuote
 import dev.aragos.aor.ai.TokenObservationEncoder
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -66,10 +67,21 @@ class CoordinatedPolicySelectorTest {
             var referenceCalls = 0
             for (seed in 0..31) {
                 val actual =
-                    selector.choose(decision.view, decision.observation, seed) {
-                        referenceCalls++
-                        "buy-tokens 10"
-                    }
+                    selector.choose(
+                        decision.view,
+                        decision.observation,
+                        seed,
+                        referenceCommand = {
+                            referenceCalls++
+                            "buy-tokens 10"
+                        },
+                        tokenQuote =
+                            TokenNeighborQuote {
+                                error(
+                                    "An offered-only anchored policy cannot request another authority quote."
+                                )
+                            },
+                    )
                 assertThat(actual)
                     .isEqualTo(TokenAnchoredPolicy.choose(encoded, expected, seed).command)
             }

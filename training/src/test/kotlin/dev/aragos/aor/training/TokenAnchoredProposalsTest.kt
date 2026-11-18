@@ -57,6 +57,23 @@ class TokenAnchoredProposalsTest {
         assertThat(result.inclusionProbabilities.sum()).isWithin(1e-12).of(9.0)
     }
 
+    @Test
+    fun currentPolicyTiesUseFirstCanonicalActionWithoutAnotherSamplingDraw() {
+        val result =
+            TokenAnchoredProposals.sample(
+                commands,
+                commands.indexOf("buy-tokens 15"),
+                commands.indexOf("buy-tokens 21"),
+                List(commands.size) { 1.0 / commands.size },
+                commands.indexOf("buy-tokens 0"),
+                budget = 12,
+                seed = 17,
+            )
+
+        assertThat(result.mandatoryIndices.map(commands::get))
+            .containsAtLeastElementsIn((-3..1).map { "buy-tokens $it" })
+    }
+
     private fun sample(
         current: Int,
         raw: Int,

@@ -69,7 +69,7 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                 "snapshots" to snapshots,
                 "maximumTerminalGames" to input.range.count * (1 + 2 * input.proposalBudget),
                 "fits" to 0,
-            ),
+            ) + anchoredMetadata(),
         )
     }
 
@@ -148,9 +148,21 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                 "capturedRoots" to receipts.count { it.status != TokenPairedStatus.MISSING },
                 "tailGames" to receipts.sumOf { it.tailGames },
                 "scientificTerminalGames" to receipts.sumOf { 1 + it.tailGames },
-            ),
+            ) + anchoredMetadata(),
         )
     }
+
+    private fun anchoredMetadata(): Map<String, Any> =
+        input.anchor?.let {
+            mapOf(
+                "anchor" to it.source.metadata("anchor.json"),
+                "anchorIdentity" to it.identity,
+                "trainCount" to input.layout.trainCount,
+                "originCount" to input.layout.originCount,
+                "proposalBudget" to input.proposalBudget,
+                "sourceSha256" to input.source.sha256,
+            )
+        } ?: emptyMap()
 
     fun readCompleted(index: Int): Pair<JsonNode, TokenPairedFile> {
         require(index in input.ownedReplayIndices) {
@@ -355,6 +367,14 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
             "The exact encoded94 anchor probabilities must retain their complete original offers."
         }
         val anchorIndex = reference ?: values.indexOfFirst { it == values.max() }
+        if (reference != null) {
+            val raw = root["rawReferenceIndex"].intValue()
+            val expectedReference =
+                if (values[raw] == values.max()) raw else values.indexOfFirst { it == values.max() }
+            require(reference == expectedReference) {
+                "The frozen94 paired reference retains its exact raw-reference-first tie rule."
+            }
+        }
         val expected =
             dev.aragos.aor.ai.TokenAnchoredPolicy.probabilities(
                 values,

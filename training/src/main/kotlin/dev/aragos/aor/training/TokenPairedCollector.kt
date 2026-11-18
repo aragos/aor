@@ -102,6 +102,8 @@ internal data class TokenPairedOrigin(
     val backbone: TokenPairedCanonical,
     val backboneTerminal: TokenValueOutcome,
     val arms: List<TokenPairedArm>,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val backbonePublicCounterDiagnostics: Map<String, Any>? = null,
 )
 
 /**
@@ -117,6 +119,7 @@ internal class TokenPairedCollector(
         val frozen: TokenValueFrozenRoot,
         val prefix: TokenPairedCanonical,
         val public: TokenPairedPublicRoot,
+        val league: RevealedTokenCounterLeague?,
     )
 
     fun collect(globalIndex: Int): TokenPairedOrigin = run(globalIndex, includeTails = true)
@@ -134,23 +137,28 @@ internal class TokenPairedCollector(
         val actor = session.state.playerIds[request.seat]
         val window = TokenPairedWindow(request)
         val anchors = mutableListOf<TokenPairedAnchor>()
+        val league = input.counterLeague(globalIndex)
         var frame: TokenPairedDecision? = null
         val normal =
-            continuation(globalIndex) { decision ->
-                frame = decision
-                if (input.iteration == 1 && request.split == TokenPairedSplit.TRAIN) {
-                    anchors +=
-                        TokenPairedAnchor(
-                            input.iteration,
-                            globalIndex,
-                            decision.number,
-                            decision.batchStartNumber,
-                            decision.observation,
-                            decision.originalProbabilities,
-                            decision.anchor94Probabilities,
-                        )
-                }
-            }
+            continuation(
+                globalIndex,
+                league = league,
+                record = { decision ->
+                    frame = decision
+                    if (input.iteration == 1 && request.split == TokenPairedSplit.TRAIN) {
+                        anchors +=
+                            TokenPairedAnchor(
+                                input.iteration,
+                                globalIndex,
+                                decision.number,
+                                decision.batchStartNumber,
+                                decision.observation,
+                                decision.originalProbabilities,
+                                decision.anchor94Probabilities,
+                            )
+                    }
+                },
+            )
         var root: Root? = null
         while (session.state.stage != Stage.FINISHED) {
             normal.check(session)
@@ -161,7 +169,8 @@ internal class TokenPairedCollector(
             val own = observations[actor]
             if (own != null && window.observe(session.state.currentEpoch.number, own.decision)) {
                 val selected = requireNotNull(frame) { "The current actor must record the root." }
-                val fresh = continuation(globalIndex, offset = session.decisions)
+                val fresh =
+                    continuation(globalIndex, offset = session.decisions, league = league?.fork())
                 val prototype = ExperimentSession(session.state, streams.future.first())
                 check(fresh.commands(prototype, observations) == commands) {
                     "Fresh complete controllers must reproduce every sealed command at its absolute offset."
@@ -179,6 +188,7 @@ internal class TokenPairedCollector(
                         TokenValueFrozenRoot(session, actor, commands),
                         canonical(session),
                         public,
+                        league?.fork(),
                     )
             }
             session.apply(commands, deadlineNanos)
@@ -216,6 +226,7 @@ internal class TokenPairedCollector(
             backbone = backbone,
             backboneTerminal = terminal,
             arms = arms,
+            backbonePublicCounterDiagnostics = league?.diagnostics(),
         )
     }
 
@@ -272,7 +283,7 @@ internal class TokenPairedCollector(
                     // This fork already retains the original absolute PLAYER count and prefix.
                     val branch = root.frozen.branch(command, chance, deadlineNanos)
                     val terminal =
-                        continuation(globalIndex)
+                        continuation(globalIndex, league = root.league?.fork())
                             .finish(
                                 branch,
                                 request.seat,
@@ -303,10 +314,11 @@ internal class TokenPairedCollector(
         globalIndex: Int,
         offset: Int = 0,
         record: ((TokenPairedDecision) -> Unit)? = null,
+        league: RevealedTokenCounterLeague? = input.counterLeague(globalIndex),
     ) =
         FrozenPolicyContinuation(
             List(4) { input.arena.candidate },
-            input.controllers(globalIndex, record),
+            input.controllers(globalIndex, record, league),
             input.origins[globalIndex].gameSeed,
             deadlineNanos,
             decisionOffset = offset,

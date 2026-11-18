@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import dev.aragos.aor.PlayerId
 import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryPolicyModel
@@ -68,6 +69,8 @@ private constructor(
     val anchor: TokenFrozenAnchor? = null,
     val layout: TokenPairedLayout = TokenPairedLayout(),
     val proposalBudget: Int = 9,
+    val opponentStyle: RobustOpponentStyle = RobustOpponentStyle.QUALIFIED,
+    val adaptiveOpponent: RevealedTokenCounterConfig? = null,
 ) {
     val version = if (anchor == null) VERSION else ANCHORED_VERSION
     val roundField = if (anchor == null) "iteration" else "round"
@@ -80,7 +83,10 @@ private constructor(
     val policyBindings: JsonNode = PurchaseJson.mapper.valueToTree(arena.overlayMetadata())
     val ecologyIdentity =
         TokenPairedEcology.identity(arena, ordinarySha256) +
-            (anchor?.let { mapOf("frozenAnchor" to it.identity) } ?: emptyMap())
+            (anchor?.let {
+                mapOf("frozenAnchor" to it.identity, "opponentStyle" to opponentStyle.name)
+            } ?: emptyMap()) +
+            (adaptiveOpponent?.let { mapOf("adaptiveOpponent" to it.identity) } ?: emptyMap())
     val ecologySha256 = TokenPairedEcology.hash(ecologyIdentity)
     val scopeIdentity: Map<String, Any> =
         mapOf(
@@ -119,6 +125,16 @@ private constructor(
     init {
         require(if (anchor == null) proposalBudget == 9 else proposalBudget in 9..16) {
             "The token proposal budget must match its fixed legacy or declared anchored family."
+        }
+        require(
+            if (anchor == null)
+                opponentStyle == RobustOpponentStyle.QUALIFIED && adaptiveOpponent == null
+            else
+                (opponentStyle == RobustOpponentStyle.QUALIFIED ||
+                    opponentStyle.isRevealedCounter) &&
+                    opponentStyle.isRevealedCounter == (adaptiveOpponent != null)
+        ) {
+            "Anchored adaptive rivals require their explicit public-history config; legacy ecology is fixed."
         }
         require(if (anchor == null) iteration in 1..2 else iteration in 1..16) {
             "Token collection requires its fixed legacy iteration or a declared bounded anchored round."
@@ -192,6 +208,7 @@ private constructor(
     fun controllers(
         globalIndex: Int,
         record: ((TokenPairedDecision) -> Unit)? = null,
+        league: RevealedTokenCounterLeague? = counterLeague(globalIndex),
     ): Map<Int, SimulationController> {
         val seat = request(globalIndex).seat
         val normal = arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
@@ -201,11 +218,22 @@ private constructor(
             anchor
                 ?: return normal +
                     (seat to TokenPairedController(reference, current, original, record))
-        return normal.mapValues { (player, raw) ->
+        val complete = normal.mapValues { (player, raw) ->
             val qualified = frozen.qualified(raw, arena.candidate)
             if (player == seat) TokenAnchoredController(raw, qualified, frozen, current, record)
             else qualified
         }
+        val style = opponentStyle.at(globalIndex, seat)
+        return if (league == null) complete
+        else
+            complete.mapValues { (player, base) ->
+                league.wrap(PlayerId("p${player + 1}"), style, base)
+            }
+    }
+
+    fun counterLeague(globalIndex: Int): RevealedTokenCounterLeague? = adaptiveOpponent?.let {
+        val players = List(4) { seat -> PlayerId("p${seat + 1}") }
+        RevealedTokenCounterLeague(players[request(globalIndex).seat], players, it)
     }
 
     fun snapshot(artifacts: TrainingArtifacts) {
@@ -260,7 +288,16 @@ private constructor(
                     "originalActor",
                     "origins",
                     "replayIndices",
-                ) + if (anchored) setOf("anchor", "trainCount", "proposalBudget") else emptySet(),
+                ) +
+                    if (anchored)
+                        setOf(
+                            "anchor",
+                            "trainCount",
+                            "proposalBudget",
+                            "opponentStyle",
+                            "adaptiveOpponent",
+                        )
+                    else emptySet(),
             )
             require(node["kind"]?.asText() in setOf(VERSION, ANCHORED_VERSION)) {
                 "Use an explicit legacy or anchored token paired source."
@@ -378,6 +415,20 @@ private constructor(
                     layout,
                     if (anchored) PurchaseJson.integer(node["proposalBudget"], "proposal budget")
                     else 9,
+                    if (anchored)
+                        requireNotNull(
+                            RobustOpponentStyle.entries.singleOrNull {
+                                it.name == node["opponentStyle"].asText()
+                            }
+                        ) {
+                            "Declare an explicit anchored rival style."
+                        }
+                    else RobustOpponentStyle.QUALIFIED,
+                    if (anchored)
+                        node["adaptiveOpponent"]
+                            .takeUnless(JsonNode::isNull)
+                            ?.let(RevealedTokenCounterConfig::read)
+                    else null,
                 )
                 .also {
                     listOf(source, arenaSubject, currentSubject, originalSubject)
