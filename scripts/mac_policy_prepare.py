@@ -105,6 +105,7 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
         minimumFreeBytes=plan['minimumFreeBytes'],maximumDataBytes=plan['maximumDataBytes'],
         inferenceAsset=old['inferenceAsset'],nomination=old['nomination'],arena=old['arena'],
         candidateBundle=declaration(candidate),nativeJar=declaration(library/'training.jar'),pins={})
+    if hasattr(contract,'profile_fields'):profile.update(contract.profile_fields(plan,old))
     pins={str(path):c.sha(path) for path in [*library.glob('*.jar'),*scripts.glob('*.py'),
         root/'protocol.json',Path(python),Path(old['java']),Path(method),Path(schedule),Path(seed_audit),
         Path(root_proof),Path(parent_terminal),Path(parent_closure),Path(native_readiness),Path(source_readiness)]}
@@ -149,7 +150,7 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
-        'local_bid_mixture_contract','token_focus_contract'),required=True)
+        'local_bid_mixture_contract','token_focus_contract','token_focus_second_contract'),required=True)
     for name in ('method','schedule','seed-audit','root-proof','parent-terminal','parent-closure',
                  'old-profile','native-readiness','source-readiness','candidate','root','python'):
         parser.add_argument('--'+name,type=Path,required=True)

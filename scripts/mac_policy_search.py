@@ -49,7 +49,8 @@ def verify_profile(path, plan):
         'The local search profile must retain its exact native source and fixed Mac resource allowance.')
     for owner,digest in profile['pins'].items():
         c.require(c.sha(owner)==digest,'An original pinned local search input changed: '+owner)
-    for name in ('candidateBundle','inferenceAsset','nomination','arena','nativeJar'):
+    names=('candidateBundle','inferenceAsset','nomination','arena','nativeJar')
+    for name in (*names,*(['controlBundle'] if 'controlBundle' in profile else [])):
         item=profile[name]
         c.require(profile['pins'].get(item['path'])==item['sha256'] and c.sha(item['path'])==item['sha256'],
             'The local executable and policy subjects must all belong to the physically pinned closure.')
@@ -256,7 +257,7 @@ def launch(args, contract, *, entrypoint=None):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
-        'local_bid_mixture_contract','token_focus_contract'),required=True)
+        'local_bid_mixture_contract','token_focus_contract','token_focus_second_contract'),required=True)
     for name in ('protocol','profile','approval','output'):
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--approval-sha256',required=True)

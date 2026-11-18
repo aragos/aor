@@ -34,13 +34,14 @@ def bundle(owner,token):
     path=owner/'bundle.json';c.write(path,dict(heads=heads));return subject(path)
 
 
-def fixture(root):
+def fixture(root,*,study=96,separate_control=False):
     profile_path=root/'profile.json';protocol=root/'protocol.json';output=root/'run';output.mkdir()
     origin=bundle(root/'origin','original TOKEN')
+    control=bundle(root/'control','fixed94 TOKEN') if separate_control else origin
     assets={name:root/(name+'.json') for name in ('inferenceAsset','nomination','arena')}
     for path in assets.values():path.write_text('{}')
     jar=root/'runtime/lib/training.jar';jar.parent.mkdir(parents=True);jar.write_text('invented jar')
-    plan=dict(kind='constructed-token-research-1',study=96,maximumScienceSeconds=7200,auditSeconds=600,
+    plan=dict(kind='constructed-token-research-1',study=study,maximumScienceSeconds=7200,auditSeconds=600,
         globalDeadlineEpoch=1795020399.,minimumRemainingSecondsAtPreparation=7800,preparedEpoch=1795011399.,
         workers=10,heapMiB=6144,maximumRssBytes=12*1024**3,minimumFreeBytes=16*1024**3,
         maximumDataBytes=1024**3,nativeJarSha256=c.sha(jar),baseSelector=policy.mixture.CONTROL_SELECTOR,
@@ -49,12 +50,18 @@ def fixture(root):
             holdout=dict(nativeOffset=2,count=128,seeds=list(range(100,228)))))
     schedule=root/'schedule.json';c.write(schedule,dict(kind='invented',banks=plan['banks']))
     plan['seedSchedule']=subject(schedule);c.write(protocol,plan)
-    profile=dict(kind='mac-policy-search-host-1',study=96,root=str(root),classpath=str(jar.parent/'*'),
+    if study!=96:
+        plan['numericStageSpec']=dict(study=study,constructed=True);protocol.write_bytes(c.canonical(plan))
+    profile=dict(kind='mac-policy-search-host-1',study=study,root=str(root),classpath=str(jar.parent/'*'),
         **{key:plan[key] for key in ('workers','heapMiB','maximumRssBytes','minimumFreeBytes','maximumDataBytes')},
         candidateBundle=origin,nativeJar=subject(jar),**{name:subject(path) for name,path in assets.items()})
+    if separate_control:profile['controlBundle']=control
     profile['pins']={item['path']:item['sha256'] for key,item in profile.items()
         if key in ('candidateBundle','nativeJar',*assets)};c.write(profile_path,profile)
-    clock=c.science_clock(plan,plan['globalDeadlineEpoch']-8000,c.sha(protocol),policy.PREFIX)
+    if separate_control:
+        profile['pins'][control['path']]=control['sha256'];profile_path.write_bytes(c.canonical(profile))
+    prefix=policy.PREFIX if study==96 else 'token-focus-second'
+    clock=c.science_clock(plan,plan['globalDeadlineEpoch']-8000,c.sha(protocol),prefix)
     c.write(output/'clock.json',clock);c.write(output/'launch.json',dict(constructed=True))
     (output/'protocol-copy.json').write_bytes(protocol.read_bytes())
     def numeric(mode,body,files,**fields):
@@ -65,7 +72,8 @@ def fixture(root):
         raw_files={str(path.relative_to(artifact)):c.sha(path) for path in artifact.rglob('*') if path.is_file()}
         c.write(artifact/'receipt.json',dict(kind=learner.KINDS[mode],complete=True,
             recipe=plan['numericRecipe'],scopeSha256='a'*64,
-            inputPins={str(folder/'request.json'):c.sha(folder/'request.json')},files=raw_files,**fields))
+            inputPins={str(folder/'request.json'):c.sha(folder/'request.json')},files=raw_files,
+            **(dict(stageSpec=plan['numericStageSpec']) if study!=96 else {}),**fields))
         return subject(artifact/'receipt.json')
     vectors=[[0.]*192+[1.]*64 for _ in range(16)]
     prep=numeric('prepare',dict(protocol=subject(protocol),seedSchedule=subject(schedule),
@@ -97,12 +105,13 @@ def fixture(root):
     c.write(pop_root/'receipt.json',dict(kind=learner.KINDS['population'],complete=True,
         recipe=plan['numericRecipe'],scopeSha256='a'*64,
         inputPins={str(pop_request):c.sha(pop_request)},files=pop_files,preparation=prep,
-        population=dict(path='population.json',sha256=c.sha(pop_root/'population.json'))))
+        population=dict(path='population.json',sha256=c.sha(pop_root/'population.json')),
+        **(dict(stageSpec=plan['numericStageSpec']) if study!=96 else {})))
     pop=subject(pop_root/'receipt.json')
     def source_value(value,actual,bank,case,chunk,protocol_sha):
         return dict(kind='robust-token-chunk-1',protocolSha256=protocol_sha,
             **{name:actual[name] for name in assets},candidateBundle=case.get('bundle',origin),
-            controlBundle=origin,selector=plan['baseSelector'],controlSelector=plan['baseSelector'],
+            controlBundle=control,selector=plan['baseSelector'],controlSelector=plan['baseSelector'],
             seeds=plan['banks'][bank]['seeds'],globalStart=0,count=plan['banks'][bank]['count'],opponentStyle='BALANCED',
             replayIndices=([0,15] if case['id'] in ('PLUS_00','MINUS_00') else []) if bank=='training' else [0,42,85,127])
     def cohort(bank,cases):
@@ -131,12 +140,13 @@ def fixture(root):
         inputPins={str(final_request):c.sha(final_request)},
         files={str(path.relative_to(final_root)):c.sha(path) for path in final_root.rglob('*') if path.is_file()},
         preparation=prep,update=update,center=subject(Path(update['path']).parent/'center.json'),
-        bundle=dict(path='model/bundle.json',sha256=final_bundle['sha256'])))
+        bundle=dict(path='model/bundle.json',sha256=final_bundle['sha256']),
+        **(dict(stageSpec=plan['numericStageSpec']) if study!=96 else {})))
     hold=cohort('holdout',[dict(id='START',bundle=origin),dict(id='FINAL',bundle=final_bundle)])
     report=learner.holdout(*hold);c.write(output/'holdout.json',report)
     terminal=dict(complete=True,status='completed',qualified=False,researchSignal=True,
         candidateBundle=final_bundle,protocolSha256=c.sha(protocol),knownCompletedTerminalExecutions=1560,reservedTerminalUpperBound=1560)
-    injected=SimpleNamespace(PREFIX=policy.PREFIX,validate=lambda value:value,native_source=source_value,
+    injected=SimpleNamespace(PREFIX=prefix,validate=lambda value:value,native_source=source_value,
         native_chunk=lambda source,path,bank,**kw:native.native_chunk(source,path,**kw))
     return protocol,profile_path,output,terminal,injected,clock
 

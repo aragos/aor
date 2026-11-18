@@ -1,6 +1,7 @@
 """A single local TOKEN learning step, with no model-selection or qualification capability."""
 import argparse
 import hashlib
+import importlib
 import json
 import math
 from pathlib import Path
@@ -33,10 +34,14 @@ def portable(owner,item):
 def numerical_receipt(output,mode):
     folder=Path(output)/'numeric'/mode;owner=folder/'artifacts';path=owner/'receipt.json'
     value=c.read(path)
+    plan=c.read(Path(output)/'protocol-copy.json')
     c.require(value['kind']==KINDS[mode] and value['complete'] is True and
-        value['recipe']==c.read(Path(output)/'protocol-copy.json')['numericRecipe'] and
+        value['recipe']==plan['numericRecipe'] and
         value['inputPins'].get(str(folder/'request.json'))==c.sha(folder/'request.json'),
         'Every numerical phase must retain the original exact request and complete typed receipt.')
+    c.require((plan['study']==96 and 'stageSpec' not in value) or
+        (plan['study']==97 and value.get('stageSpec')==plan['numericStageSpec']),
+        'Every numerical receipt must retain its exact source-registered stage identity.')
     for name,digest in value['inputPins'].items():
         c.require(c.sha(name)==digest,'An original numerical input changed.')
     for name,digest in value['files'].items():portable(owner,dict(path=name,sha256=digest))
@@ -226,6 +231,7 @@ class Campaign(search.Campaign):
         source=search.subject(self.plan['numericSourceReadiness'])
         command=[source['python']['path'],'-E','-s','-B',str(Path(source['sourceRoot'])/'token_focus_numeric.py'),
             '--mode',mode,'--request',str(request),'--output',str(folder/'artifacts')]
+        if self.plan['study']!=96:command.extend(['--stage',str(self.plan['study'])])
         local.bounded_process(command,folder,self.profile,self.clock,self.cancelled,
             lambda process:setattr(self,'process',process))
         return numerical_receipt(self.output,mode)[0]
@@ -259,7 +265,7 @@ class Campaign(search.Campaign):
         final=dict(id='FINAL',bundle=numerical_artifact(self.output,'final','bundle'));immutable_heads(self.profile,[final])
         rows=self.cohort('holdout',[dict(id='START',bundle=self.profile['candidateBundle']),final])
         report=holdout(*rows);c.write(self.output/'holdout.json',report)
-        return dict(kind=contract.PREFIX+'-terminal-1',study=96,complete=True,status='completed',qualified=False,
+        return dict(kind=self.contract.PREFIX+'-terminal-1',study=self.plan['study'],complete=True,status='completed',qualified=False,
             researchSignal=report['researchSignal'],candidateBundle=final['bundle'],originPolicy=self.plan['originPolicy'],
             protocolSha256=c.sha(self.protocol),knownCompletedTerminalExecutions=self.known,
             reservedTerminalUpperBound=self.reserved,finishedEpoch=time.time(),activated=False)
@@ -267,12 +273,12 @@ class Campaign(search.Campaign):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--contract',choices=('token_focus_contract',),required=True)
+    parser.add_argument('--contract',choices=('token_focus_contract','token_focus_second_contract'),required=True)
     for name in ('protocol','profile','approval','output'):parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--approval-sha256',required=True);parser.add_argument('--launch',action='store_true')
-    parser.add_argument('--owner-record',type=Path);args=parser.parse_args()
-    if args.launch:return search.launch(args,contract,entrypoint=Path(__file__))
-    result=Campaign(args.protocol,args.profile,args.approval,args.approval_sha256,args.output,contract).run(auditor=audit)
+    parser.add_argument('--owner-record',type=Path);args=parser.parse_args();policy=importlib.import_module(args.contract)
+    if args.launch:return search.launch(args,policy,entrypoint=Path(__file__))
+    result=Campaign(args.protocol,args.profile,args.approval,args.approval_sha256,args.output,policy).run(auditor=audit)
     print(json.dumps(result,sort_keys=True))
 
 
