@@ -122,6 +122,19 @@ def verify(audit_path, expected_sha):
     assert banks == audit['seedBanks'] == checked(audit['streamBanks'])
     values = [value for bank in banks.values() for value in bank['seeds']]
     assert len(values) == len(set(values)) == 1664 and not prior.intersection(values)
+    parent_values = declared(parent)
+    parent_offsets = [bank['nativeOffset'] for bank in parent['seedBanks'].values()]
+    accepted_offsets = [bank['nativeOffset'] for bank in banks.values()]
+    parent_against_expanded = sum(any((value+1000000000-offset) % 8191 == 0 and
+        0 <= (value+1000000000-offset)//8191 < 10000 for offset in accepted_offsets)
+        for value in parent_values)
+    accepted_against_parent = sum(any((value+1000000000-offset) % 8191 == 0 and
+        0 <= (value+1000000000-offset)//8191 < 10000 for offset in parent_offsets)
+        for value in values)
+    progression_overlaps = sum(max(0,
+        (min(old+9999*8191, new+9999*8191)-max(old, new))//8191+1)
+        for old in parent_offsets for new in accepted_offsets if (old-new) % 8191 == 0)
+    assert parent_against_expanded == accepted_against_parent == progression_overlaps == 0
     assert checked(audit['schedule']) == dict(kind='learned-bid-search-schedule-1', banks=banks)
     assert checked(audit['rngStreams']) == {} and audit['numericalReservationProbes'] == []
     assert audit['declaredNumericalStreams'] == 0 and audit['maximumTerminalExecutions'] == 5208
@@ -134,6 +147,11 @@ def verify(audit_path, expected_sha):
         declaredNewWorlds=1664, numericalStreams=0, rejectedPrefixes=len(probes)-1,
         nativeOffsets=[bank['nativeOffset'] for bank in banks.values()],
         explicitAncestryDeclarationsWitnessed=witnessed, gamesRun=0, numericDraws=0,
+        symmetricParentFreshness=dict(parentAuditSha256=PARENT_SHA,
+            parentActualAgainstAcceptedExpanded=parent_against_expanded,
+            acceptedActualAgainstParentExpanded=accepted_against_parent,
+            acceptedProgressionIntersection=progression_overlaps,
+            parentBytesUnchanged=True, circularAncestryIntroduced=False),
         scientificStreamUseAuthorized=False)
 
 
