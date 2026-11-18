@@ -26,9 +26,17 @@ def build_protocol(contract, method, schedule, seed_audit, root_proof, parent_te
         c.sha(root_proof)==contract.ROOT_RNG_PROOF_SHA,
         'Only the independently approved complete RNG metadata subjects may prepare this study.')
     proof=c.read(root_proof)
-    c.require(proof['passed'] is True and proof['scheduleSha256']==c.sha(schedule) and
-        proof['auditSha256']==c.sha(seed_audit),
+    c.require(proof['kind']=='mac-search-resource-refinement-proof-1' and
+        proof['passed'] is True and proof['methodSha256']==contract.METHOD_SHA and
+        proof['scheduleSha256']==c.sha(schedule) and proof['auditSha256']==c.sha(seed_audit) and
+        proof['allUnusedSuffixesProtected'] is True and proof['exactOriginalPrefixesOnly'] is True and
+        proof['maximumTerminalExecutions']==method['maximumTerminalExecutions'],
         'The independent root freshness proof must bind this exact schedule and original seed audit.')
+    for name in ('method','originalAudit','originalSchedule','originalFullRootProof','originalMethod',
+                 'compatibility94Audit','compatibility94RootProof','verifier'):
+        item=proof[name]
+        c.require(c.sha(item['path'])==item['sha256'],
+            'An exact original/refined method, full reservation or94 compatibility proof changed.')
     seed_record=c.read(seed_audit)
     for item in [*seed_record['verifiedAncestors'],seed_record['carriedForwardAudit']]:
         c.require(c.sha(item['path'])==item['sha256'],
@@ -39,7 +47,7 @@ def build_protocol(contract, method, schedule, seed_audit, root_proof, parent_te
         rootSeedProof=declaration(root_proof),parentTerminal=declaration(parent_terminal),
         parentClosure=declaration(parent_closure),inferenceAssetSha256=contract.ASSET_SHA,
         nominationSha256=contract.NOMINATION_SHA,arenaSha256=arena_sha,
-        banks={bank['name']:dict(bank,seeds=reserved['banks'][bank['name']]['seeds'])
+        banks={bank['name']:dict(bank,seeds=reserved['banks'][bank['name']]['seeds'][:bank['worlds']])
             for bank in method['banks']})
     if extra:plan.update(extra)
     contract.validate(plan);search.prerequisite(plan,contract)

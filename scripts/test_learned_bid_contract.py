@@ -12,14 +12,14 @@ def plan():
     start = 1
     reserved = dict(kind='learned-bid-search-schedule-1',banks={})
     for bank in policy.BANKS:
-        count = bank['worlds']
+        count = policy.FULL_BANK_COUNTS[bank['name']]
         reserved['banks'][bank['name']] = dict(nativeOffset=start,count=count,
             seeds=list(range(start,start+count)))
         start += count
     return dict(copy.deepcopy(policy.FIXED), kind=policy.KIND, methodSha256=policy.METHOD_SHA,
         preparedEpoch=policy.GLOBAL_DEADLINE-20000, reservedSchedule=reserved,
         scheduleSha256=hashlib.sha256(c.canonical(reserved)).hexdigest(),
-        banks={bank['name']:dict(copy.deepcopy(bank),seeds=reserved['banks'][bank['name']]['seeds'])
+        banks={bank['name']:dict(copy.deepcopy(bank),seeds=reserved['banks'][bank['name']]['seeds'][:bank['worlds']])
             for bank in policy.BANKS}, inferenceAssetSha256=policy.ASSET_SHA,
         nominationSha256=policy.NOMINATION_SHA, arenaSha256='a'*64)
 
@@ -45,13 +45,13 @@ class MethodTest(unittest.TestCase):
     def test_exact_root_method_is_retained_without_changing_its_bytes(self):
         path=Path(__file__).parent/'testdata/learned-bid-method.json'
         method=policy.read_method(path)
-        self.assertEqual(method['maximumTerminalExecutions'],5208)
+        self.assertEqual(method['maximumTerminalExecutions'],2648)
         self.assertEqual(method['caseConfigs'],policy.CASES)
 
     def test_four_banks_have_the_prospectively_complete_counts(self):
         value=policy.validate(plan())
         self.assertEqual([len(bank['seeds']) for bank in value['banks'].values()],
-            [128,512,512,512])
+            [64,256,256,256])
 
     def test_preparation_requires_three_original_hours(self):
         value=plan();value['preparedEpoch']=policy.GLOBAL_DEADLINE-10799
@@ -60,7 +60,7 @@ class MethodTest(unittest.TestCase):
 
     def test_reserved_worlds_cannot_be_replaced_or_topped_up(self):
         value=plan();value['banks']['reference']['seeds'][-1]+=1
-        with self.assertRaisesRegex(ValueError,'complete newly reserved'):
+        with self.assertRaisesRegex(ValueError,'fixed original prefix'):
             policy.validate(value)
 
     def test_case_order_and_wider_support_cannot_change_after_review(self):
@@ -68,12 +68,26 @@ class MethodTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'prospective method parameter'):
             policy.validate(value)
 
+    def test_all_original_suffixes_remain_protected_after_resource_refinement(self):
+        value=policy.validate(plan())
+        self.assertEqual(sum(len(bank['seeds']) for bank in value['reservedSchedule']['banks'].values()),1664)
+        self.assertEqual(sum(len(bank['seeds']) for bank in value['banks'].values()),832)
+        self.assertEqual(value['unusedReservedWorlds'],832)
+
+    def test_held_suffix_cannot_replace_one_of_the_fixed_active_worlds(self):
+        value=plan();value['banks']['development']['seeds'][-1]=value['reservedSchedule']['banks']['development']['seeds'][64]
+        with self.assertRaisesRegex(ValueError,'fixed original prefix'):policy.validate(value)
+
+    def test_protected_full_schedule_cannot_be_truncated_to_only_the_active_prefix(self):
+        value=plan();value['reservedSchedule']['banks']['mixed']['seeds']=value['reservedSchedule']['banks']['mixed']['seeds'][:256]
+        with self.assertRaisesRegex(ValueError,'complete newly reserved'):policy.validate(value)
+
     def test_accounting_includes_all_three_separate_confirmations_and_replays(self):
         total=0
         for bank in policy.BANKS:
             cases=8 if bank['name']=='development' else 1
             total+=cases*2*(bank['worlds']+len(bank['replayIndices']))
-        self.assertEqual(total,5208)
+        self.assertEqual(total,2648)
 
 
 class RoleSourceTest(unittest.TestCase):
@@ -104,12 +118,12 @@ class RoleSourceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'exact learned'):
             policy.check_prepared(prepared,'homogeneous')
 
-    def test_development_is_one128_world_chunk_and_confirmation_two256_chunks(self):
+    def test_development_is_one64_world_chunk_and_confirmation_one256_chunk(self):
         value=plan();actual=profile()
         development=policy.native_source(value,actual,'development',policy.CASES[0],0,'b'*64)
-        last=policy.native_source(value,actual,'mixed',policy.CASES[0],1,'b'*64)
-        self.assertEqual((development['globalStart'],development['count']),(0,128))
-        self.assertEqual((last['globalStart'],last['count']),(256,256))
+        last=policy.native_source(value,actual,'mixed',policy.CASES[0],0,'b'*64)
+        self.assertEqual((development['globalStart'],development['count']),(0,64))
+        self.assertEqual((last['globalStart'],last['count']),(0,256))
 
     def test_new_hidden_override_cannot_enter_a_reviewed_native_request(self):
         value=plan();actual=profile()

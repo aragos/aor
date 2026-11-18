@@ -10,12 +10,12 @@ import robust_token_campaign as c
 KIND = 'learned-bid-search-1'
 PREFIX = 'learned-bid-search'
 STUDY = 92
-PARENT_TERMINAL_KIND = 'mac-qualification-terminal-1'
+PARENT_TERMINAL_KIND = 'fixed-policy-qualification-terminal-1'
 PARENT_CLOSURE_KIND = 'mac-qualification-physical-closure-1'
-METHOD_SHA = '82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36'
+METHOD_SHA = '193edfd32bad8c1143350ed51831a6b229f731cc2cfeb25ec13c791994d822f9'
 SCHEDULE_SHA = 'a49c271f9a1c1ecf69ce02345713b777209dbd1a5b6657bdefe8880e8616c987'
 RNG_AUDIT_SHA = '7df8f7ab2ddce6807731f55218b4646d2ffed6da2b644b7df74fb51bd576b3f4'
-ROOT_RNG_PROOF_SHA = '66fa3c163699a2ac1e062a271f29af132eef81a76eeccb7b066e5c8600ef4a07'
+ROOT_RNG_PROOF_SHA = '9db035c846d6f147a2d96f5c8eba197830c4ff5fa36b48ae09b9b8138fc9cd4d'
 NATIVE_SHA = '14245cba2d1dbd4e62780371efd84d4416bd91592ceca876449d7f417756463f'
 CANDIDATE_SHA = 'fca8593a5d43026d1c7146a9bb76cbce5bfd1a725de28ba18382d537710ff63e'
 OLD_CONTROL_SHA = 'e62d749f4d9125cc86107cc2c37d77cb2f23af65c3648105a5fd2636f1ee27f1'
@@ -29,28 +29,31 @@ CASES = [dict(id=f's{index:02d}', selector=dict(kind='near-optimal-token-softmax
     for index, (gap, radius, temperature) in enumerate((gap, radius, temperature)
         for gap, radius in ((6, 4), (16, 8)) for temperature in (.7, 1.5, 3, 8))]
 BANKS = (
-    dict(name='development', worlds=128, opponentStyle='BALANCED', control='LEARNED',
-        replayIndices=[0, 42, 85, 127]),
-    dict(name='mixed', worlds=512, opponentStyle='BALANCED', control='LEARNED',
-        replayIndices=[0, 170, 341, 511]),
-    dict(name='homogeneous', worlds=512, opponentStyle='QUALIFIED', control='LEARNED',
-        replayIndices=[0, 170, 341, 511]),
-    dict(name='reference', worlds=512, opponentStyle='QUALIFIED', control='OLD87',
-        replayIndices=[0, 170, 341, 511]),
+    dict(name='development', worlds=64, opponentStyle='BALANCED', control='LEARNED',
+        replayIndices=[0, 21, 42, 63]),
+    dict(name='mixed', worlds=256, opponentStyle='BALANCED', control='LEARNED',
+        replayIndices=[0, 85, 170, 255]),
+    dict(name='homogeneous', worlds=256, opponentStyle='QUALIFIED', control='LEARNED',
+        replayIndices=[0, 85, 170, 255]),
+    dict(name='reference', worlds=256, opponentStyle='QUALIFIED', control='OLD87',
+        replayIndices=[0, 85, 170, 255]),
 )
+FULL_BANK_COUNTS = dict(development=128,mixed=512,homogeneous=512,reference=512)
 BANK_ORDER = tuple(bank['name'] for bank in BANKS)
 FIXED = dict(study=STUDY, globalDeadlineEpoch=GLOBAL_DEADLINE, nativeJarSha256=NATIVE_SHA,
     candidateBundleSha256=CANDIDATE_SHA, learnedControlBundleSha256=CANDIDATE_SHA,
     learnedControlSelector=CONTROL_SELECTOR, oldControlBundleSha256=OLD_CONTROL_SHA,
     oldControlSelector=None, caseConfigs=CASES, confidenceMultiplier=c.MULTIPLIER,
-    maximumTerminalExecutions=5208, maximumScienceSeconds=16200,
+    maximumTerminalExecutions=2648, maximumScienceSeconds=16200,
     minimumRemainingSecondsAtPreparation=10800, auditSeconds=600,
     positiveBidConcentrationMaximum=.8, workers=10, heapMiB=6144,
     maximumRssBytes=12*1024**3, minimumFreeBytes=16*1024**3,
     maximumDataBytes=768*1024**2, chunkSize=256,
     localOnly=True, remoteUseAuthorized=False, noRetry=True, noResume=True, noTopUp=True,
     noAutomaticSuccessor=True, noNewFits=True, weightsImmutable=True,
-    launchViaOwnedTerminal=True)
+    launchViaOwnedTerminal=True,activeReservedWorlds=832,fullReservedWorlds=1664,
+    unusedReservedWorlds=832,
+    parentTrialProtocolSha256='140427b0db6635b7842b1b51213a5db174382e8088a0d43fc2917aa7a1c37e5e')
 
 
 def read_method(path):
@@ -82,13 +85,15 @@ def validate(plan):
     seeds = []
     for bank in BANKS:
         name = bank['name']; actual = plan['banks'][name]; original = reserved['banks'][name]
-        c.require(actual == dict(bank, seeds=original['seeds']) and
-            original['count'] == bank['worlds'] and len(original['seeds']) == bank['worlds'] and
+        c.require(actual == dict(bank, seeds=original['seeds'][:bank['worlds']]) and
+            original['count'] == len(original['seeds']) == FULL_BANK_COUNTS[name] and
             all(type(seed) is int and -(2**31) <= seed < 2**31 for seed in original['seeds']),
-            'Each study92 bank must consume exactly its original complete bounded native seed list.')
-        seeds.extend(original['seeds'])
-    c.require(len(seeds) == len(set(seeds)) == 1664,
-        'The four original study92 banks must contain 1664 mutually disjoint worlds.')
+            'Each study92 bank must consume only its fixed original prefix, with every suffix still held.')
+        seeds.extend(actual['seeds'])
+    reserved_seeds=[seed for bank in reserved['banks'].values() for seed in bank['seeds']]
+    c.require(len(seeds) == len(set(seeds)) == 832 and
+        len(reserved_seeds) == len(set(reserved_seeds)) == 1664,
+        'All1664 original worlds remain protected; exactly832 fixed prefixes may be consumed.')
     c.require(plan['inferenceAssetSha256'] == ASSET_SHA and plan['nominationSha256'] == NOMINATION_SHA,
         'The unchanged87 numerical references and calibration foundation must remain exact.')
     return plan

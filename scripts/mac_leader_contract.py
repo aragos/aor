@@ -14,10 +14,10 @@ PREFIX='mac-leader-search'
 STUDY=93
 PARENT_TERMINAL_KIND='learned-bid-search-terminal-1'
 PARENT_CLOSURE_KIND='learned-bid-search-physical-closure-1'
-METHOD_SHA='20a3a84a7c03a601fffffe20fe08c691ff22e691b87b992b22a1d5fb17ee79fa'
+METHOD_SHA='0ee2ed67c272bc5e9035d7ad77ba8204b6a53d81a3eb9cefc78fcebe09c4aef2'
 SCHEDULE_SHA='e72aac1b0fae40b0cbc92b452888f7152378ea812e1b3b6d9ecbcb18b4a72a35'
 RNG_AUDIT_SHA='78c59913811288b71a8c1bfa08848f8a82b592061066a819d7801bb5dda442cb'
-ROOT_RNG_PROOF_SHA='c5350c2234637651c01437fbb0e9501edec83b10cb7bfaa894a267c8d975a974'
+ROOT_RNG_PROOF_SHA='a530abde347e132f61123432c344b80aeb065f5d67261a2708edb6805ce1abab'
 NATIVE_SHA=bids.NATIVE_SHA
 ASSET_SHA=bids.ASSET_SHA
 NOMINATION_SHA=bids.NOMINATION_SHA
@@ -31,7 +31,7 @@ BANKS=(dict(name='development',worlds=64,opponentStyle='BALANCED',replayIndices=
 BANK_ORDER=tuple(bank['name'] for bank in BANKS)
 FIXED=dict(study=STUDY,globalDeadlineEpoch=bids.GLOBAL_DEADLINE,nativeJarSha256=NATIVE_SHA,
     caseConfigs=CASES,confidenceMultiplier=c.MULTIPLIER,maximumTerminalExecutions=2128,
-    maximumScienceSeconds=7200,minimumRemainingSecondsAtPreparation=5400,auditSeconds=600,
+    maximumScienceSeconds=10800,minimumRemainingSecondsAtPreparation=9000,auditSeconds=600,
     workers=10,heapMiB=6144,maximumRssBytes=12*1024**3,minimumFreeBytes=16*1024**3,
     maximumDataBytes=768*1024**2,chunkSize=256,localOnly=True,remoteUseAuthorized=False,
     noRetry=True,noResume=True,noTopUp=True,noAutomaticSuccessor=True,noNewFits=True,
@@ -61,17 +61,29 @@ def validate_anchor(plan):
         parent['allOwnedProcessesExited'] is True and prior91['kind']=='mac-qualification-physical-closure-1' and
         prior91['passed'] is True and prior91['allOwnedProcessesExited'] is True,
         'Anchor priority requires the original physically closed92 and91 qualification records.')
-    expected='92' if parent['qualified'] else '91' if prior91['qualified'] else '87'
+    prior94=None if parent['qualified'] else search.subject(frozen['study94Closure'])
+    if prior94 is not None:
+        c.require(prior94['kind']=='mac-qualification-physical-closure-1' and prior94['passed'] is True and
+            prior94['allOwnedProcessesExited'] is True and
+            prior94['protocolSha256']==bids.FIXED['parentTrialProtocolSha256'],
+            'Anchor priority requires the exact original closed94 trial, without91 metric reuse.')
+    expected='92' if parent['qualified'] else '94' if prior94['qualified'] else '91' if prior91['qualified'] else '87'
     anchor=plan['anchor']
-    c.require(anchor['origin']==expected,'The qualified anchor priority is92, then91, then87; no skipped winner.')
+    c.require(anchor['origin']==expected,'The qualified anchor priority is92, then94, then91, then87; no skipped winner.')
     if expected=='92':
         c.require(parent['scienceComplete'] is True and terminal['complete'] is True and
-            parent['actualCompletedLowerBound']==5208 and
+            parent['actualCompletedLowerBound']==2648 and
             anchor['bundleSha256']==bids.CANDIDATE_SHA and
             anchor['selector']==terminal['selectedCase']['selector'] and
             any(case['selector']==anchor['selector'] for case in bids.CASES) and
             anchor['qualificationSha256']==terminal['completionAuditSha256'],
             'A92 anchor requires all three complete fresh banks, its exact winning sampler and sealed audit.')
+    elif expected=='94':
+        c.require(prior94['scienceComplete'] is True and prior94['actualCompletedLowerBound']==2064 and
+            anchor['bundleSha256']==bids.CANDIDATE_SHA and anchor['selector']==bids.CONTROL_SELECTOR and
+            any(path.endswith('/completion-audit.json') and digest==anchor['qualificationSha256']
+                for path,digest in prior94['artifactPins'].items()),
+            'A94 anchor requires both complete fresh512-world banks and the exact final+c05 policy.')
     elif expected=='91':
         c.require(prior91['scienceComplete'] is True and prior91['actualCompletedLowerBound']==8208 and
             anchor['bundleSha256']==bids.CANDIDATE_SHA and anchor['selector']==bids.CONTROL_SELECTOR and
@@ -87,7 +99,7 @@ def validate_anchor(plan):
             frozen['old87Lineage']==dict(qualified=True,bundleSha256=bids.OLD_CONTROL_SHA,
                 inferenceAssetSha256=ASSET_SHA,nominationSha256=NOMINATION_SHA),
             'The qualified87 fallback requires its exact sealed certificate and verified asset/nomination lineage.')
-    for closed in (parent,prior91):
+    for closed in (parent,prior91,*([prior94] if prior94 is not None else [])):
         for path,digest in closed['artifactPins'].items():
             c.require(c.sha(path)==digest,'An original qualified-ancestor artifact changed before anchor freeze.')
 
@@ -98,8 +110,8 @@ def validate(plan):
         'The finite leader protocol must preserve every prospectively fixed parameter.')
     prepared=plan['preparedEpoch']
     c.require(type(prepared) in (int,float) and math.isfinite(prepared) and
-        bids.GLOBAL_DEADLINE-prepared>=5400,
-        'The optional leader search must defer before preparation with fewer than90 original minutes left.')
+        bids.GLOBAL_DEADLINE-prepared>=9000,
+        'The optional leader search must defer before preparation with fewer than150 original minutes left.')
     reserved=plan['reservedSchedule']
     c.require(reserved['kind']=='mac-leader-search-schedule-1' and
         hashlib.sha256(c.canonical(reserved)).hexdigest()==plan['scheduleSha256'] and

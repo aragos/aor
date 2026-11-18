@@ -95,50 +95,50 @@
   "banks": [
     {
       "name": "development",
-      "worlds": 128,
+      "worlds": 64,
       "opponentStyle": "BALANCED",
       "control": "LEARNED",
       "replayIndices": [
         0,
+        21,
         42,
-        85,
-        127
+        63
       ]
     },
     {
       "name": "mixed",
-      "worlds": 512,
+      "worlds": 256,
       "opponentStyle": "BALANCED",
       "control": "LEARNED",
       "replayIndices": [
         0,
+        85,
         170,
-        341,
-        511
+        255
       ]
     },
     {
       "name": "homogeneous",
-      "worlds": 512,
+      "worlds": 256,
       "opponentStyle": "QUALIFIED",
       "control": "LEARNED",
       "replayIndices": [
         0,
+        85,
         170,
-        341,
-        511
+        255
       ]
     },
     {
       "name": "reference",
-      "worlds": 512,
+      "worlds": 256,
       "opponentStyle": "QUALIFIED",
       "control": "OLD87",
       "replayIndices": [
         0,
+        85,
         170,
-        341,
-        511
+        255
       ]
     }
   ],
@@ -147,7 +147,7 @@
   "concentrationDefinition": "For controlledBidCounts across each complete bank/case, retain integer keys>0; max count divided by sum counts; missing/empty counts refuse admission. Aggregate observed concentration is only a diagnostic proxy and does not prove conditional unpredictability.",
   "qualification": "After nomination, require mixed99 lower>0 AND concentration<=.80; then homogeneous99 lower>0 AND concentration<=.80; then reference99 lower>0. No reselection, topup, resize or reusing failed banks.",
   "confidenceMultiplier": 2.5758293035489004,
-  "maximumTerminalExecutions": 5208,
+  "maximumTerminalExecutions": 2648,
   "maximumScienceSeconds": 16200,
   "minimumRemainingSecondsAtPreparation": 10800,
   "auditSeconds": 600,
@@ -164,6 +164,18 @@
   "noAutomaticSuccessor": true,
   "noNewFits": true,
   "weightsImmutable": true,
-  "prerequisite": "Study91 has terminal status and all its owned processes have exited. Study92 does not reinterpret or replace any incomplete91 qualification.",
-  "preview": "A91 qualified policy remains separate; a92 qualification needs all three complete independent banks and source/policy identity checks before serving."
+  "prerequisite": "Study94 has terminal status and physical closure proving all owned processes exited; at least10800seconds remain before original16:46:39UTC. Old91 remains closed/unqualified. No parallel science.",
+  "preview": "A91 qualified policy remains separate; a92 qualification needs all three complete independent banks and source/policy identity checks before serving.",
+  "activeReservedWorlds": 832,
+  "fullReservedWorlds": 1664,
+  "unusedReservedWorlds": 832,
+  "resourceRefinement": {
+    "originalMethod": {
+      "path": "/Users/aragos/Projects/aor/.aor-training/automata-learned-bid-search-20261118/prospective-method.json",
+      "sha256": "82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36"
+    },
+    "beforeAnyStudy92Data": true,
+    "reason": "Measured sustainedlocalserviceabout3cores; fixedsmallerfreshprefixes before any92games, same8configs/strict99winand80%concentrationgates. Alloriginalunusedsuffixes remain protected."
+  },
+  "parentTrialProtocolSha256": "140427b0db6635b7842b1b51213a5db174382e8088a0d43fc2917aa7a1c37e5e"
 }

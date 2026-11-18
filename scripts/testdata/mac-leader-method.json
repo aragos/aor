@@ -6,7 +6,7 @@
   "globalDeadlineEpoch": 1795020399,
   "userWindowEndUtc": "2026-11-18T16:46:39+00:00",
   "nativeJarSha256": "14245cba2d1dbd4e62780371efd84d4416bd91592ceca876449d7f417756463f",
-  "anchorRule": "Before actual preparation freeze complete qualified92 after all three fresh banks and closure; else complete qualified91 after both fresh banks and closure; else qualified87. Never use incomplete or development-only results as a qualified anchor.",
+  "anchorRule": "Beforeactualpreparation freezequalified92BID2(all3freshbanks+closure); elsequalified94(2064completeexecutions+closure); elsequalified91(8208completeexecutions+closure); elsequalified87. No incomplete or development-only anchor.",
   "caseConfigs": [
     {
       "id": "l00",
@@ -114,8 +114,8 @@
   "confidenceMultiplier": 2.5758293035489004,
   "concentration": "Diagnostic only; report inherited bidding weakness.",
   "maximumTerminalExecutions": 2128,
-  "maximumScienceSeconds": 7200,
-  "minimumRemainingSecondsAtPreparation": 5400,
+  "maximumScienceSeconds": 10800,
+  "minimumRemainingSecondsAtPreparation": 9000,
   "auditSeconds": 600,
   "workers": 10,
   "heapMiB": 6144,
@@ -130,5 +130,14 @@
   "noNewFits": true,
   "weightsImmutable": true,
   "launchViaOwnedTerminal": true,
-  "prerequisite": "Study92 terminal and all owned processes gone; at least5400seconds remain in original12hwindow. Otherwise DEFER without actual preparation/science."
+  "prerequisite": "Study92terminal+allownedprocessesgone; at least9000seconds remain in original12hwindow, elseDEFER.",
+  "resourceRefinement": {
+    "originalMethod": {
+      "path": "/Users/aragos/Projects/aor/.aor-training/automata-mac-leader-search-20261118/prospective-method.json",
+      "sha256": "20a3a84a7c03a601fffffe20fe08c691ff22e691b87b992b22a1d5fb17ee79fa"
+    },
+    "beforeAnyStudy93Data": true,
+    "reservedWorldsUnchanged": 576,
+    "reason": "Use newly qualifiedsamefca+c05 policy from94 as eligibleanchor and allow3h for measuredlocalthroughput; same8leadercases/worlds/repro/99gates."
+  }
 }

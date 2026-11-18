@@ -29,6 +29,9 @@ def prerequisite(plan, contract, *, processes=metadata.processes):
         terminal['protocolSha256']==closed['protocolSha256'] and
         closed['originalClocksRenewed'] is False and closed['auditReruns']==0,
         'The preceding study must have its original terminal and physical closure before preparation.')
+    if 'parentTrialProtocolSha256' in plan:
+        c.require(terminal['protocolSha256']==plan['parentTrialProtocolSha256'],
+            'Only the exact prospectively declared prior trial can open this independent search.')
     pids,groups=set(closed['ownedPids']),set(closed['ownedGroups'])
     c.require(not [row for row in processes() if int(row[0]) in pids or int(row[1]) in groups],
         'All preceding study owners must remain exited before the next independent experiment.')
@@ -119,12 +122,15 @@ def audit(protocol, profile_path, output, terminal, contract, *, now=time.time):
     for path in (Path(protocol),Path(profile_path),output/'clock.json',output/'launch.json',
                  output/'selection.json',*list((output/'reports').glob('*.json'))):
         pins[str(path)]=c.sha(path)
+    reservation=(dict(fullReservedWorlds=plan['fullReservedWorlds'],activeReservedWorlds=plan['activeReservedWorlds'],
+        unusedReservedWorlds=plan['unusedReservedWorlds'],fullScheduleSha256=plan['scheduleSha256'])
+        if 'fullReservedWorlds' in plan else None)
     return dict(kind=contract.PREFIX+'-original-audit-1',passed=True,complete=True,qualified=qualified,
         study=plan['study'],protocolSha256=c.sha(protocol),profileSha256=c.sha(profile_path),
         clockSha256=c.sha(output/'clock.json'),terminalExecutions=executions,selectedCase=selected,
         artifactPins=pins,allWin99StatisticsRecomputed=True,originalReproductionsVerified=True,
         allObservedConcentrationStatisticsRecomputed=True,newGames=0,newFits=0,modelForwards=0,
-        completedEpoch=now())
+        completedEpoch=now(),protectedReservation=reservation)
 
 
 class Campaign:

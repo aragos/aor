@@ -69,9 +69,10 @@ def fixture(root):
         banks[bank['name']]=dict(bank,seeds=list(range(start,start+bank['worlds'])))
         start+=bank['worlds']
     plan=dict(kind='constructed-policy-search-fixture-1',study=92,banks=banks,caseConfigs=policy.CASES,
-        chunkSize=256,maximumTerminalExecutions=5208,maximumScienceSeconds=16200,auditSeconds=600,
+        chunkSize=256,maximumTerminalExecutions=2648,maximumScienceSeconds=16200,auditSeconds=600,
         minimumRemainingSecondsAtPreparation=10800,globalDeadlineEpoch=policy.GLOBAL_DEADLINE,
         preparedEpoch=policy.GLOBAL_DEADLINE-20000,workers=10,heapMiB=6144,
+        fullReservedWorlds=1664,activeReservedWorlds=832,unusedReservedWorlds=832,scheduleSha256='f'*64,
         maximumRssBytes=12*1024**3,minimumFreeBytes=16*1024**3,maximumDataBytes=768*1024**2)
     protocol=root/'protocol.json';profile_path=root/'profile.json';output=root/'run';output.mkdir()
     runtime=root/'runtime/lib';runtime.mkdir(parents=True)
@@ -120,13 +121,15 @@ def fixture(root):
 
 
 class SearchEvidenceTest(unittest.TestCase):
-    def test_complete5208_record_search_reaggregates_selection_and_all_three_gates(self):
+    def test_complete2648_record_search_reaggregates_selection_and_all_three_gates(self):
         with tempfile.TemporaryDirectory() as temporary:
             protocol,profile,output,terminal,contract,clock=fixture(Path(temporary))
             result=search.audit(protocol,profile,output,terminal,contract,now=lambda:clock['deadlineEpoch']+1)
-            self.assertTrue(result['qualified']);self.assertEqual(result['terminalExecutions'],5208)
+            self.assertTrue(result['qualified']);self.assertEqual(result['terminalExecutions'],2648)
             self.assertEqual(result['selectedCase']['id'],'s01')
             self.assertEqual(result['newGames'],0)
+            self.assertEqual(result['protectedReservation'],dict(fullReservedWorlds=1664,
+                activeReservedWorlds=832,unusedReservedWorlds=832,fullScheduleSha256='f'*64))
 
     def test_extra_unreported_attempted_bank_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -192,6 +195,12 @@ class PrerequisiteTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);value=self.records(root);(root/'input.txt').write_text('changed\n')
             with self.assertRaisesRegex(ValueError,'closed-study artifact changed'):
+                search.prerequisite(value,policy,processes=lambda:[])
+
+    def test_another_closed_trial_cannot_replace_the_declared94_prerequisite(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            value=self.records(Path(temporary));value['parentTrialProtocolSha256']=policy.FIXED['parentTrialProtocolSha256']
+            with self.assertRaisesRegex(ValueError,'exact prospectively declared prior trial'):
                 search.prerequisite(value,policy,processes=lambda:[])
 
     def test_source_closure_recurses_local_imports_without_copying_unrelated_pipeline(self):
