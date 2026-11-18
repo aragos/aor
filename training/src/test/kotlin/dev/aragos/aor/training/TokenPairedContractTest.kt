@@ -20,6 +20,17 @@ class TokenPairedContractTest {
     }
 
     @Test
+    fun bothProbeSplitsCoverAllOrdinals() {
+        val layout = TokenPairedLayout(originCount = 48, trainCount = 32, anchored = true)
+        val requests = (0 until layout.originCount).map { TokenPairedRequest(it, layout) }
+
+        for (split in TokenPairedSplit.entries) {
+            val ordinals = requests.filter { it.split == split }.map(TokenPairedRequest::ordinal)
+            assertThat(ordinals.toSet()).containsExactly(1, 2, 3, 4)
+        }
+    }
+
+    @Test
     fun anchoredLayoutCannotRelaxLegacyRequestAndRangeInvariants() {
         assertFailsWith<IllegalArgumentException> { TokenPairedLayout(24, 16) }
         assertFailsWith<IllegalArgumentException> { TokenPairedRange(16, 8) }
@@ -30,11 +41,11 @@ class TokenPairedContractTest {
     fun layoutParametersNeverBecomePublicObservationOrRequestFeatures() {
         val legacy =
             PurchaseJson.mapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(
-                TokenPairedRequest(15)
+                TokenPairedRequest(3)
             )
         val anchored =
             PurchaseJson.mapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(
-                TokenPairedRequest(15, TokenPairedLayout(24, 16, anchored = true))
+                TokenPairedRequest(3, TokenPairedLayout(24, 16, anchored = true))
             )
 
         assertThat(legacy).isEqualTo(anchored)

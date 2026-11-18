@@ -96,7 +96,7 @@ private constructor(
             "dictionary" to dictionary,
             "requestProfile" to
                 if (anchor == null) "global-640-seat-epoch-ordinal-1"
-                else "declared-seat-epoch-ordinal-1",
+                else "declared-rotating-seat-epoch-ordinal-2",
             "proposalProfile" to
                 if (anchor == null) "uniform-eight-reference-two-futures-1"
                 else TokenAnchoredProposals.VERSION,

@@ -25,7 +25,7 @@ SELECTION = dict(candidate='SOLE_LAST_ROUND', ordinaryWinLower99GreaterThan=-.03
 def request(index, train_count):
     shared.integer(index, 0, 8191, 'Declared global origin')
     return dict(globalIndex=index, seat=index % 4, epoch=1+(index//4) % 3,
-        ordinal=1+(index//12) % 4, split='TRAIN' if index < train_count else 'VALIDATION')
+        ordinal=1+(index//4) % 4, split='TRAIN' if index < train_count else 'VALIDATION')
 
 
 def indices(total, chunk_size, chunk):

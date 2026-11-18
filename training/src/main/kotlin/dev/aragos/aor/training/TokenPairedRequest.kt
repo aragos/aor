@@ -42,7 +42,7 @@ internal data class TokenPairedRequest(
         get() = 1 + (globalIndex / 4) % 3
 
     val ordinal: Int
-        get() = 1 + (globalIndex / 12) % 4
+        get() = if (layout.anchored) 1 + (globalIndex / 4) % 4 else 1 + (globalIndex / 12) % 4
 
     val split: TokenPairedSplit
         get() =
