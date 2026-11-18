@@ -82,7 +82,8 @@ def inspect(profile_path):
 
 
 def execute(profile_path, request, now=time.time, *, profile_kind='robust-token-host-1',
-        source_validator=None, native_environment=None):
+        source_validator=None, native_environment=None, command_factory=None,
+        completion_name='finished.json', completion_validator=None):
     profile_path = Path(profile_path)
     require(sha(profile_path) == request['profileSha256'], 'The actual executing host profile changed.')
     profile = read(profile_path)
@@ -121,6 +122,8 @@ def execute(profile_path, request, now=time.time, *, profile_kind='robust-token-
         'dev.aragos.aor.training.TrainingMainKt', '--mode', 'robust-token-screen-chunk',
         '--source', str(source), '--output', str(output), '--seconds', str(remaining),
         '--workers', str(profile['workers'])]
+    if command_factory is not None:
+        command = command_factory(profile, request, source, output, remaining)
     process = None
     interrupted = threading.Event()
     previous = {}
@@ -156,8 +159,11 @@ def execute(profile_path, request, now=time.time, *, profile_kind='robust-token-
                 time.sleep(min(1, max(.01, deadline-now())))
         require(stopped_reason is None and process.returncode == 0,
             'The original native task did not complete: '+str(stopped_reason or process.returncode))
-        finished = read(output/'finished.json')
-        require(finished['complete'] is True, 'An incomplete original native collection cannot be transported.')
+        finished = read(output/completion_name)
+        if completion_validator is None:
+            require(finished['complete'] is True, 'An incomplete original native collection cannot be transported.')
+        else:
+            completion_validator(finished, request)
         files = {}; size = 0
         for path in sorted(output.rglob('*')):
             require(not path.is_symlink(), 'Native output cannot introduce symlinks.')
@@ -168,8 +174,10 @@ def execute(profile_path, request, now=time.time, *, profile_kind='robust-token-
                 base64=base64.b64encode(raw).decode('ascii'))
         result = dict(kind='robust-token-worker-result-1', complete=True,
             taskId=request['taskId'], profileSha256=request['profileSha256'], files=files)
+        completion_pin = (dict(finishedSha256=sha(output/'finished.json')) if completion_name == 'finished.json'
+            else dict(completionFile=completion_name, completionSha256=sha(output/completion_name)))
         write(directory/'transport.json', dict(kind='robust-token-transport-receipt-1',
-            complete=True, taskId=request['taskId'], finishedSha256=sha(output/'finished.json'),
+            complete=True, taskId=request['taskId'], **completion_pin,
             files={key:value['sha256'] for key,value in files.items()}, bytes=size,
             completedEpoch=now(), originalDeadlineEpoch=deadline))
         return result

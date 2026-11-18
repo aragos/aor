@@ -4,7 +4,6 @@ Worlds, configurations, host ownership and the selection rule are fixed before l
 Each native chunk is attempted once. Closed or interrupted runs cannot resume.
 """
 import argparse
-import base64
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
@@ -268,6 +267,15 @@ class Campaign:
                     # Each remote task independently owns the original deadline and cleanup.
                     pass
 
+    def register_task(self, host, process):
+        with self.lock:
+            require(host not in self.active, 'Only one original native transport may own each host.')
+            self.active[host] = process
+
+    def release_task(self, host):
+        with self.lock:
+            self.active.pop(host, None)
+
     def task(self, host, bank_name, case, chunk):
         require(not self.cancel.is_set() and time.time() < self.clock['deadlineEpoch'],
             'No new task may start after cancellation or the original science deadline.')
@@ -290,44 +298,9 @@ class Campaign:
         directory = self.output/'chunks'/task_id
         directory.mkdir(parents=True)
         write(directory/'request.json', request)
-        worker = [profile['python'], '-B', profile['workerScript'], '--profile', profile['actualProfile']]
-        command = worker if host == 'MAC' else ['ssh', '-o', 'BatchMode=yes', '-o',
-            'ConnectTimeout=8', profile['sshTarget'], *worker]
-        process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=False, start_new_session=True)
-        with self.lock:
-            self.active[host] = process
-        allowance = max(.1, self.clock['deadlineEpoch']-time.time()+15)
-        try:
-            stdout, stderr = process.communicate(json.dumps(request, allow_nan=False).encode(), timeout=allowance)
-        except BaseException:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill(); process.wait(timeout=5)
-            raise
-        finally:
-            with self.lock:
-                self.active.pop(host, None)
-        (directory/'worker-stderr.log').write_bytes(stderr)
-        require(process.returncode == 0, f'{host} native task failed; no retry is allowed: {task_id}.')
-        require(len(stdout) <= 96*1024**2, 'A native chunk transport exceeded its compact output allowance.')
-        response = json.loads(stdout)
-        require(response['kind'] == 'robust-token-worker-result-1' and response['complete'] is True and
-            response['taskId'] == task_id and response['profileSha256'] == request['profileSha256'],
-            'The completed transport must identify this exact original task and frozen host.')
-        for name, item in response['files'].items():
-            path = Path(name)
-            require(not path.is_absolute() and all(part not in ('.', '..') for part in path.parts),
-                'Transported native members must remain inside their original chunk.')
-            raw = base64.b64decode(item['base64'], validate=True)
-            require(hashlib.sha256(raw).hexdigest() == item['sha256'],
-                'A transported original native output changed in transit.')
-            target = directory/'native'/path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with target.open('xb') as stream: stream.write(raw)
+        import automata_native_transport
+        automata_native_transport.invoke(profile, request['profileSha256'], request, directory,
+            register=self.register_task, release=self.release_task)
         import robust_token_audit
         rows, counts, _ = robust_token_audit.native_chunk(source, directory/'native')
         require(counts['terminalExecutions'] == executed,
@@ -371,36 +344,40 @@ class Campaign:
             qualification=False, activated=False))
         return result
 
+    def run_work(self):
+        development = self.bank('development', self.plan['caseConfigs'])
+        selected = chosen_case(development, self.plan['caseConfigs'])
+        write(self.output/'selection.json', dict(kind=self.contract.prefix+'-selection-1',
+            complete=True, case=selected, rule='highest-development-mean-win;stable-case-order-ties;positive-only',
+            protocolSha256=self.protocol_sha))
+        qualified = False
+        reason = 'no-positive-development-candidate'
+        if selected is not None:
+            mixed = self.bank('mixed', [selected])[selected['id']]
+            reason = 'mixed-win99-refused'
+            if mixed['wins']['lower99'] > 0:
+                homogeneous = self.bank('homogeneous', [selected])[selected['id']]
+                qualified = homogeneous['wins']['lower99'] > 0
+                reason = 'both-independent-win99-passed' if qualified else 'homogeneous-win99-refused'
+        return dict(qualified=qualified, selectedCase=selected, reason=reason, newFits=0)
+
     def run(self):
         for event in (signal.SIGTERM, signal.SIGINT):
             self.original_handlers[event] = signal.signal(event, self.stop)
         self.status(status='running', stage='development')
         try:
-            development = self.bank('development', self.plan['caseConfigs'])
-            selected = chosen_case(development, self.plan['caseConfigs'])
-            write(self.output/'selection.json', dict(kind=self.contract.prefix+'-selection-1',
-                complete=True, case=selected, rule='highest-development-mean-win;stable-case-order-ties;positive-only',
-                protocolSha256=self.protocol_sha))
-            qualified = False
-            reason = 'no-positive-development-candidate'
-            if selected is not None:
-                mixed = self.bank('mixed', [selected])[selected['id']]
-                reason = 'mixed-win99-refused'
-                if mixed['wins']['lower99'] > 0:
-                    homogeneous = self.bank('homogeneous', [selected])[selected['id']]
-                    qualified = homogeneous['wins']['lower99'] > 0
-                    reason = 'both-independent-win99-passed' if qualified else 'homogeneous-win99-refused'
+            result = self.run_work()
             terminal = dict(kind=self.contract.prefix+'-terminal-1', status='completed', complete=True,
-                qualified=qualified, selectedCase=selected, reason=reason,
+                **result,
                 protocolSha256=self.protocol_sha, terminalExecutions=self.executions,
                 knownCompletedTerminalExecutions=self.executions,
                 reservedTerminalUpperBound=self.reserved_executions,
-                finishedEpoch=time.time(), newFits=0, activated=False)
+                finishedEpoch=time.time(), activated=False)
             audit = self.contract.audit(self.protocol_path, self.output, terminal)
             write(self.output/'completion-audit.json', audit)
             terminal['completionAuditSha256'] = sha(self.output/'completion-audit.json')
             write(self.output/'terminal.json', terminal)
-            self.status(status='completed', qualified=qualified, reason=reason)
+            self.status(status='completed', qualified=terminal['qualified'], reason=terminal['reason'])
             return terminal
         except BaseException as error:
             self.stop()

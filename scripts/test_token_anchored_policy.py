@@ -134,6 +134,16 @@ class DataAndFitTests(unittest.TestCase):
         self.assertEqual(root['referenceIndex'], 1)
         self.assertEqual(training.targets[0].deltas, (0., 1., 0.))
 
+    def test_tied94_anchor_preserves_raw_reference_before_canonical_first(self):
+        training, actor, _ = fixture(); record = training.roots[0].record
+        record['observation']['baselineIndex'] = 1; record['rawReferenceIndex'] = 1
+        record['anchor94Probabilities'] = [.5, .5, 0.]
+        record['originalProbabilities'] = record['currentProbabilities'] = distribution.prior([.5, .5, 0.])
+        data.PublicRoot(record, training.context, actor.model, split='TRAIN')
+        record['referenceIndex'] = 0; record['proposedIndices'] = [0, 1, 2]
+        with self.assertRaisesRegex(ValueError, 'raw-reference-first'):
+            data.PublicRoot(record, training.context, actor.model, split='TRAIN')
+
     def test_mandatory_and_random_inclusion_estimator_is_unbiased_in_value_and_gradient(self):
         def calculate(indices, inclusion):
             logits = b.torch.tensor([.5, -.3, .7, .1, -.2, .3], dtype=b.DTYPE, requires_grad=True)

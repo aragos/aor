@@ -123,3 +123,55 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         artifacts={name: b.file_digest(output/name) for name in ARTIFACTS},
         qualificationClaimed=False, activated=False))
     return completed(output)
+
+
+def main():
+    """One fit-only CLI stage. Complete native corpus admission precedes every TRAIN label read."""
+    import argparse
+    import time
+    import token_anchored_plan as plan_owner
+    import token_anchored_corpus as corpus_owner
+    import token_paired_data as frozen_owner
+    from token_paired_campaign_plan import subject, read, file_sha
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('protocol', 'corpus', 'original-corpus', 'original-actor', 'current-actor', 'dictionary', 'output'):
+        parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument('--deadline-epoch', type=float, required=True)
+    parser.add_argument('--previous', type=Path)
+    args = parser.parse_args()
+    b.number(args.deadline_epoch, 'Original absolute deadline', 1.)
+    b.require(time.time() < args.deadline_epoch, 'Original warm deadline expired before any corpus is opened.')
+    plan = plan_owner.Plan.from_record(read(args.protocol), raw_sha256=file_sha(args.protocol))
+    corpus = corpus_owner.Corpus(plan, subject(args.corpus))
+    anchor = corpus_owner.Corpus(plan, subject(args.original_corpus))
+    original = frozen_owner.FrozenActor(args.original_actor.read_bytes(), file_sha(args.original_actor))
+    current = frozen_owner.FrozenActor(args.current_actor.read_bytes(), file_sha(args.current_actor))
+    context = corpus.context(args.dictionary, original, current)
+    b.require(context.original_model_sha256 == plan.record['originalActorSha256'] and
+        context.current_model_sha256 == corpus.record['currentActorSha256'] and
+        context.dictionary_sha256 == plan.record['dictionarySha256'],
+        'The numerical stage must retain the exact original/current residual and native dictionary subjects.')
+    training = corpus.training(context, current.model, original.model, anchor)
+    config = legacy.Config(tuple(plan.record['rounds'][context.round-1]['shuffleSeeds']),
+        min(args.deadline_epoch, plan.record['globalDeadlineEpoch']))
+    pins = {str(path): file_sha(path) for path in (args.protocol, args.corpus, args.original_corpus,
+        args.original_actor, args.current_actor, args.dictionary)}
+    for population in (corpus, anchor):
+        for item, chunk in zip(population.record['chunks'], population.chunks):
+            pins[item['path']] = item['sha256']; pins[chunk['source']['path']] = chunk['source']['sha256']
+            for name, value in chunk['files'].items():
+                pins[str(Path(chunk['native'])/name)] = value['sha256']
+            for reproduction in chunk['reproductions']:
+                pins[reproduction['subject']['path']] = reproduction['subject']['sha256']
+    done = fit(training, original, current, args.dictionary.read_bytes(), args.output, config, previous=args.previous)
+    b.require(all(file_sha(path) == expected for path, expected in pins.items()),
+        'Every actual original warm corpus/model input must remain unchanged until numerical publication.')
+    b.atomic_json(args.output/'numeric-complete.json', dict(kind='token-anchored-numeric-stage-complete-1',
+        complete=True, round=context.round, protocolSha256=file_sha(args.protocol),
+        fitCompletion=subject(args.output/'finished.json'), inputPins=pins,
+        operationalPassed=done['operationalPassed'], semanticValidationLabelsDecoded=False,
+        qualificationClaimed=False, activated=False))
+
+
+if __name__ == '__main__':
+    main()

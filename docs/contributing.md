@@ -1355,6 +1355,26 @@ determinism; it supplies no new independent worlds or policy qualification. The 
 validates this explicit protocol and includes its metadata validator hash in new-protocol provenance;
 legacy input and provenance behavior remain unchanged.
 
+### Warm frozen-anchor TOKEN numerical foundation
+
+The separate [warm fitter](../scripts/token_anchored_fit.py) consumes a versioned, completely
+admitted warm corpus. Its zero-output residual starts from the frozen anchor's TOKEN2 embeddings.
+For every original offered action, `p0 = .8 * p94 + .2 / N`; the learned policy is
+`softmax(log(p0) + rawResidual)`. This reader has no residual clamp or hard support gate, and the
+frozen anchor, residual, dictionary and probability law have separate immutable identities.
+
+The [corpus owner](../scripts/token_anchored_corpus.py) derives pure paired winner shares, keeps
+diagnostic labels sealed, and checks mandatory-neighbor versus uniformly sampled action inclusion
+probabilities separately. The shared optimizer retains exact original-policy KL rollback; the warm
+recipe explicitly uses mean KL `.25`, maximum state KL `.75`, 20 epochs and 32 worlds per batch.
+Legacy numerical contracts retain their original distributions and limits.
+
+Run `python scripts/token_anchored_fit.py --help` with the numerical environment's Python for the
+fit-only CLI. The [finite plan](../scripts/token_anchored_plan.py) and
+[bounded worker](../scripts/token_anchored_worker.py) are source foundations: an unattended warm
+campaign launcher and accepted final evaluation protocol are still required before starting a run.
+No numerical completion activates an opponent or establishes human-play strength.
+
 
 The native `expansion-opportunity-collect` diagnostic uses an arena-shaped `SCREENING` source
 with `diagnosticRoots` (1–128, default 128), exactly two `continuationReplicates`, identical ordinary

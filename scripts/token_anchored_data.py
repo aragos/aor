@@ -31,9 +31,11 @@ class Context:
     probability_contract_sha256: str
 
     def __post_init__(self):
-        b.integer(self.round, 'Declared warm-anchor round', 1, 32)
-        b.integer(self.train_count, 'Declared TRAIN origins', 1, 4096)
-        b.integer(self.validation_count, 'Declared public diagnostic origins', 0, 4096)
+        b.integer(self.round, 'Declared warm-anchor round', 1, 16)
+        b.integer(self.train_count, 'Declared TRAIN origins', 1, 4095)
+        b.integer(self.validation_count, 'Declared public diagnostic origins', 1, 4095)
+        b.require(self.train_count+self.validation_count <= 4096,
+            'The declared warm family retains at most4096 total original origins per round.')
         for key in self.__dataclass_fields__:
             if key not in ('round', 'train_count', 'validation_count'):
                 legacy.sha(getattr(self, key), key)
@@ -141,9 +143,10 @@ class PublicRoot(legacy.PublicRoot):
             frozen = check_anchor(record, model); count = len(frozen)
             b.require((count > 1) == (record['status'] == 'READY'),
                 'Warm status must match its original full offered support.')
-            b.require(record['rawReferenceIndex'] == record['observation']['baselineIndex'] and
-                record['referenceIndex'] == max(range(count), key=lambda index: frozen[index]),
-                'Raw G3 reference and stable frozen94 argmax must remain separate correct indices.')
+            raw_reference = record['observation']['baselineIndex']; maximum = max(frozen)
+            reference = raw_reference if frozen[raw_reference] == maximum else frozen.index(maximum)
+            b.require(record['rawReferenceIndex'] == raw_reference and record['referenceIndex'] == reference,
+                'Raw G3 reference and frozen94 argmax with raw-reference-first ties must remain correct separate indices.')
             b.integer(record['sampledIndex'], 'Actual sampled warm action', 0, count-1)
             legacy.probabilities(record['currentProbabilities'], count, 'Warm behavior probabilities')
             check_proposals(record)
