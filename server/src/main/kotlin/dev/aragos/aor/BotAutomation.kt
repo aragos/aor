@@ -340,7 +340,7 @@ internal object BotAutomation {
                         "A ready automated seat requires its stored controller."
                     }
                 val proposal = serverProposal(service, current, seat, bot)
-                if (proposal != null && proposal.command != commandText) {
+                if (proposal != null && proposal.proposal.command != commandText) {
                     throw ServiceFailure(409, "BOT_POLICY_COMMAND_MISMATCH")
                 }
                 val next =
@@ -399,14 +399,15 @@ internal object BotAutomation {
                         val decision = decisionId(game, seat)
                         val state = game.state()
                         val observation = BotObservations.from(state, seat)
-                        val proposal = serverProposal(service, game, seat, bot, observation)
+                        val serverDecision = serverProposal(service, game, seat, bot, observation)
+                        val proposal = serverDecision?.proposal
                         BotDecisionWork(
                             seat = seat,
                             difficulty = bot.difficulty,
                             seed = bot.seed xor decision.hashCode(),
                             decisionId = decision,
                             submissionVersion = game.submissionVersions[seat],
-                            observation = observation,
+                            observation = serverDecision?.observation ?: observation,
                             purchase =
                                 if (
                                     proposal == null &&
@@ -447,7 +448,7 @@ internal object BotAutomation {
         seat: PlayerId,
         bot: AutomatedPlayer,
         observation: BotObservation? = null,
-    ): BotPolicyProposal? {
+    ): ServerPolicyDecision? {
         val profile = ServerBotProfile.fromVersion(bot.policyVersion) ?: return null
         val policy = service.serverBotPolicy
         if (
@@ -461,17 +462,30 @@ internal object BotAutomation {
         if (!profile.supports(actual, bot.difficulty)) {
             throw ServiceFailure(409, "BOT_POLICY_SCOPE_CHANGED")
         }
+        val state = game.state()
+        val view = state.viewForPlayer(seat)
+        val tokenQuotes =
+            ServerTokenNeighborQuotes(state, seat, actual, policy.tokenNeighborMixture)
         val command =
             policy.choose(
-                game.state().viewForPlayer(seat),
+                view,
                 actual,
                 bot.seed xor decisionId(game, seat).hashCode(),
+                tokenQuotes,
             )
-        if (actual.candidates.none { it.command == command }) {
+        if (actual.candidates.none { it.command == command } && !tokenQuotes.accepts(command)) {
             throw ServiceFailure(503, "BOT_POLICY_FAILED")
         }
-        return BotPolicyProposal(profile.version, policy.assetSha256, command)
+        return ServerPolicyDecision(
+            BotPolicyProposal(profile.version, policy.assetSha256, command),
+            tokenQuotes.acceptedObservation(view, command),
+        )
     }
+
+    private data class ServerPolicyDecision(
+        val proposal: BotPolicyProposal,
+        val observation: BotObservation,
+    )
 
     private fun readySeats(game: StoredGame): List<PlayerId> =
         when (val prompt = game.state().prompts().singleOrNull()) {

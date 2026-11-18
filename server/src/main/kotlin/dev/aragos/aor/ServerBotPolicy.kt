@@ -4,6 +4,8 @@ import dev.aragos.aor.ai.BotConfiguration
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.JointPolicyScope
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
+import dev.aragos.aor.ai.TokenNeighborQuote
 
 /** An explicit stored controller identity, separate from the legacy browser policy version. */
 enum class ServerBotProfile(val version: String) {
@@ -40,8 +42,20 @@ enum class ServerBotProfile(val version: String) {
 interface ServerBotPolicy {
     val profile: ServerBotProfile
     val assetSha256: String
+    val tokenNeighborMixture: LocalTokenNeighborMixture?
+        get() = null
 
     fun choose(view: GameView, observation: BotObservation, seed: Int): String
+
+    /**
+     * Authority-owned quoting is optional; existing profiles keep their original inference path.
+     */
+    fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        tokenQuote: TokenNeighborQuote,
+    ): String = choose(view, observation, seed)
 }
 
 /** Creator-only proposal; submission still uses the ordinary fenced authoritative command path. */

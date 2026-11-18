@@ -4,12 +4,34 @@ import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
+import dev.aragos.aor.ai.TokenNeighborAdmission
+import dev.aragos.aor.ai.TokenNeighborQuote
 import java.nio.file.Files
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class ServerBotPolicyTest {
+    @Test
+    fun anExplicitQuotedProposalRetainsItsAuthorityQuoteThroughPrivateSubmission(): Unit =
+        ProfileFixture(
+                policyProfile = ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1,
+                quotedTokenAmount = 37,
+            )
+            .use { fixture ->
+                fixture.prepareTokenWindow()
+                val work = fixture.claim()
+                val job = work.observations.single()
+
+                fixture.submit(work, job, "buy-tokens 37")
+
+                assertThat(job.observation.candidates.map { it.command }).contains("buy-tokens 37")
+                assertThat(job.proposal?.command).isEqualTo("buy-tokens 37")
+                assertThat(fixture.service.store.read(fixture.game.gameId).pendingBids.keys)
+                    .containsExactly(job.seat)
+            }
+
     @Test
     fun onlyNewCompatibleHardSeatsReceiveTheExplicitProfile(): Unit =
         ProfileFixture().use { fixture ->
@@ -254,12 +276,28 @@ private data class ProfileInput(val view: GameView, val observation: BotObservat
 private class OfferedProfile(
     override val assetSha256: String = "a".repeat(64),
     override val profile: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
+    private val quotedTokenAmount: Int? = null,
 ) : ServerBotPolicy {
     val calls = mutableListOf<ProfileInput>()
+    override val tokenNeighborMixture: LocalTokenNeighborMixture?
+        get() = quotedTokenAmount?.let {
+            LocalTokenNeighborMixture(.25, 1, TokenNeighborAdmission.QUOTED_LEGAL_NEIGHBORS)
+        }
 
     override fun choose(view: GameView, observation: BotObservation, seed: Int): String {
         calls += ProfileInput(view, observation, seed)
         return observation.candidates.first().command
+    }
+
+    override fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        tokenQuote: TokenNeighborQuote,
+    ): String {
+        val original = choose(view, observation, seed)
+        if (observation.decision != "buy-tokens" || quotedTokenAmount == null) return original
+        return Command.BuyTokens(tokenQuote.quote(quotedTokenAmount).amount).toText()
     }
 }
 
@@ -273,9 +311,10 @@ private class ProfileFixture(
         ),
     humans: Int = 1,
     policyProfile: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
+    quotedTokenAmount: Int? = null,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-server-profile-")
-    val policy = OfferedProfile(profile = policyProfile)
+    val policy = OfferedProfile(profile = policyProfile, quotedTokenAmount = quotedTokenAmount)
     val service =
         GameService(FileGameStore(directory), GameDriver(FixedRandom()), serverBotPolicy = policy)
     val game =
@@ -286,6 +325,32 @@ private class ProfileFixture(
         )
     val runnerId = UUID.randomUUID().toString()
     private val access = GameAccess.SeatToken(game.links.first().path.substringAfter("token="))
+
+    /** Complete only constructed setup decisions; no research policy or game world is evaluated. */
+    fun prepareTokenWindow() {
+        repeat(40) {
+            if (service.store.read(game.gameId).state().stage == Stage.TOKEN_PURCHASE) return
+            service.store.update(game.gameId) { current ->
+                val state = current.state()
+                val prompt =
+                    requireNotNull(state.prompts().singleOrNull()) {
+                        "Constructed setup must retain its next player decision."
+                    }
+                val actor =
+                    when (prompt) {
+                        is Prompt.SinglePlayer -> prompt.player
+                        is Prompt.MultiPlayer -> prompt.players.first { it !in current.pendingBids }
+                        else -> error("The fixture driver must resolve setup chance requests.")
+                    }
+                val command =
+                    if (state.stage == Stage.BIDDING) {
+                        "bid-capital 0"
+                    } else state.legalChoices(actor).commands.first()
+                service.driver.submit(current, actor, TextCodec.parseCommand(command))
+            }
+        }
+        error("Constructed setup must reach its token window within40 decisions.")
+    }
 
     fun claim(owner: GameService = service): BotWork =
         BotAutomation.control(owner, game.gameId, access, "claim", runnerId, 0, now = 1000)
