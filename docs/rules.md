@@ -234,7 +234,8 @@ Recorded cash at the end of each turn is public.
 ### 5.3 Buy Card
 
 - **Urban Ascendancy.** In turn order, each owner may buy one extra card for $10.
-- **Master Art.** Each owner may then discard one card from hand with no effect, whether or not they bought one.
+- **Master Art.** Each owner may then publicly discard one card from hand with no effect, whether or not
+  they bought one.
 
 ### 5.4 Play Cards
 

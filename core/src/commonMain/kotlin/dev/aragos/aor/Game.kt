@@ -96,8 +96,11 @@ data class GameState(
             player.id to PlayerState(player = player)
         },
     val effects: CardTurnEffects = CardTurnEffects(),
-    /** Public physical plays; recycled cards reset at each epoch shuffle. Rebuilt by replay. */
-    val playedCards: Set<String> = emptySet(),
+    /**
+     * Physical card IDs revealed by play or Master Art discard, rebuilt by replay. Recurring cards
+     * reset at each epoch shuffle; square cards remain excluded from public availability.
+     */
+    val publiclyDiscardedCards: Set<String> = emptySet(),
     val activeWar: WarState? = null,
     val voids: CardVoids = CardVoids(),
     val board: BoardState =

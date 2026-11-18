@@ -31,9 +31,18 @@ data class DeckHistory(
     }
 }
 
-/** A physical discard is distinct from a transfer or a setup return. */
-internal fun GameState.discardCards(cards: List<HandCard>): GameState =
+/**
+ * A physical discard is distinct from a transfer or a setup return. [publicly] reveals card
+ * identities for plays and Master Art; automatic hand losses remain private.
+ */
+internal fun GameState.discardCards(cards: List<HandCard>, publicly: Boolean = false): GameState =
     copy(
+        publiclyDiscardedCards =
+            if (publicly) {
+                publiclyDiscardedCards + cards.map { it.definition.id }
+            } else {
+                publiclyDiscardedCards
+            },
         deckHistory =
             deckHistory.copy(
                 discarded =
@@ -46,7 +55,7 @@ internal fun GameState.discardCards(cards: List<HandCard>): GameState =
                         cards
                             .filterNot { card -> card.definition.shape.recycledOnEpochChange }
                             .map { card -> card.definition.id },
-            )
+            ),
     )
 
 /** Exact eligible cards remain authoritative hidden state, never a public game-view field. */
@@ -88,8 +97,8 @@ internal fun GameState.applyShuffle(cards: List<String>): GameState {
                     },
                 deck = cards.toList(),
                 deckHistory = history.copy(discarded = emptyList()),
-                playedCards =
-                    playedCards
+                publiclyDiscardedCards =
+                    publiclyDiscardedCards
                         .filterNot { CardData.definition(it).shape.recycledOnEpochChange }
                         .toSet(),
             )

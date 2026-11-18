@@ -81,7 +81,9 @@ data class GameView(
     val catalog: PublicCatalog? = null,
     val activity: ActivityView? = null,
     val deckRemaining: Int = 0,
-    /** Introduced cards not publicly played in this epoch, including hands and private discards. */
+    /**
+     * Introduced cards not publicly played or discarded this epoch, including hidden hand losses.
+     */
     val unplayedCards: List<CardDefinition> = emptyList(),
     val endingTriggered: Boolean = false,
     val scores: List<ScoreView> = emptyList(),

@@ -536,12 +536,7 @@ internal object HistoryEvents {
                     )
             is TurnCommand.DiscardCard ->
                 event(HistoryEventKind.DISCARD_CARD)
-                    .copy(
-                        card =
-                            if (entry.actor == viewer)
-                                cardId(before, entry.actor, command.reference)
-                            else null
-                    )
+                    .copy(card = cardId(before, entry.actor, command.reference))
             is TurnCommand.CancelAdjustment ->
                 event(HistoryEventKind.CANCEL_ADJUSTMENT)
                     .copy(

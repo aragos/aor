@@ -10,7 +10,7 @@ export async function checkSpectator(page, web, baseline) {
     await page.wait(`typeof window.setMapSnapshot === 'function'`, 'spectator table harness');
     const publicSnapshot = {...baseline, revision: 41000, viewerId: null, accountId: null,
         pendingBid: null, submitted: [], submissionReceipts: [], submissionVersion: null, history: [],
-        events: baseline.events.map(event => ['DRAW_CARD', 'DISCARD_CARD', 'TRADE_CARD'].includes(event.kind)
+        events: baseline.events.map(event => ['DRAW_CARD', 'TRADE_CARD'].includes(event.kind)
             ? {...event, card: null} : event),
         legalChoices: {commands: [], bidMin: null, bidMax: null},
         undo: {...baseline.undo, available: false, fromEntry: null, actions: []},

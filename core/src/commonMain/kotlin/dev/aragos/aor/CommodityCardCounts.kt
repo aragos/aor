@@ -2,8 +2,8 @@ package dev.aragos.aor
 
 /**
  * Public commodity counts. [epochs] lists newly introduced cards in epochs 1–3, including shared
- * choices. [unplayed] counts introduced physical cards not publicly played since the last epoch
- * shuffle, including held cards and private discards. Null means no live game context.
+ * choices. [unplayed] counts introduced physical cards not publicly played or discarded since the
+ * last epoch shuffle, including held cards and private discards. Null means no live game context.
  *
  * Neither hidden locations nor the selected commodity of a shared card affect these counts.
  */
@@ -22,7 +22,9 @@ data class CommodityCardCountView(
                 CommodityCardCountView(
                     commodity = commodity.id,
                     epochs = epochs,
-                    unplayed = introduced - commodity.cardIds().count(state.playedCards::contains),
+                    unplayed =
+                        introduced -
+                            commodity.cardIds().count(state.publiclyDiscardedCards::contains),
                 )
             }
     }
