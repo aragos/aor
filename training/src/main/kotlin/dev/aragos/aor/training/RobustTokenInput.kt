@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
@@ -84,6 +85,7 @@ private constructor(
     val opponentStyle: RobustOpponentStyle,
     val adaptiveOpponent: RevealedTokenCounterConfig?,
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
+    val initiative: InitiativePolicyConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -153,6 +155,12 @@ private constructor(
             } ?: emptyMap()) +
             (candidateTokenAnchoredPolicy?.let {
                 mapOf("candidateTokenAnchoredPolicy" to it.identity)
+            } ?: emptyMap()) +
+            (initiative?.let {
+                mapOf(
+                    "initiative" to
+                        mapOf("kind" to InitiativePolicyConfig.VERSION, "configuration" to it)
+                )
             } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -252,6 +260,34 @@ private constructor(
             )
         }
 
+        private fun initiative(node: JsonNode): InitiativePolicyConfig {
+            PurchaseJson.fields(
+                node,
+                setOf(
+                    "kind",
+                    "maximumTokenLoss",
+                    "tokenPenalty",
+                    "participation",
+                    "requireAffordableContest",
+                    "attackBonus",
+                ),
+            )
+            require(
+                node["kind"]?.asText() == InitiativePolicyConfig.VERSION &&
+                    node["requireAffordableContest"].isBoolean
+            ) {
+                "Supply a versioned public initiative policy and a boolean contest condition."
+            }
+            return InitiativePolicyConfig(
+                maximumTokenLoss =
+                    PurchaseJson.integer(node["maximumTokenLoss"], "maximum token loss"),
+                tokenPenalty = PurchaseJson.number(node["tokenPenalty"], "token penalty"),
+                participation = PurchaseJson.number(node["participation"], "participation"),
+                requireAffordableContest = node["requireAffordableContest"].booleanValue(),
+                attackBonus = PurchaseJson.number(node["attackBonus"], "attack bonus"),
+            )
+        }
+
         fun read(path: Path): RobustTokenInput {
             val source = CoordinatedEsWire.source(path)
             val node = PurchaseJson.read(source.path)
@@ -278,6 +314,7 @@ private constructor(
                     "controlBundle",
                     "controlSelector",
                     "expansionDenial",
+                    "initiative",
                     "tokenNeighborMixture",
                 ),
             )
@@ -383,6 +420,15 @@ private constructor(
             require(tokenNeighborMixture == null || !candidateOnly && expansionDenial == null) {
                 "Local token neighbor experiments require paired roles and no expansion intervention."
             }
+            val initiative = node["initiative"]?.let(::initiative)
+            require(
+                initiative == null ||
+                    expansionDenial == null &&
+                        tokenNeighborMixture == null &&
+                        !node.has("candidateTokenAnchoredPolicy")
+            ) {
+                "Initiative is a standalone intervention over the declared normal policies."
+            }
             val anchoredNode = node["candidateTokenAnchoredPolicy"]?.takeUnless(JsonNode::isNull)
             val anchored = anchoredNode?.let {
                 val c05 = NearOptimalTokenSampler(.35, 3.0, 4)
@@ -437,6 +483,7 @@ private constructor(
                     style,
                     adaptiveOpponent,
                     anchored,
+                    initiative,
                     seeds,
                     start,
                     count,

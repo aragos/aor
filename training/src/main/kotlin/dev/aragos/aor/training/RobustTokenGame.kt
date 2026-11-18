@@ -238,6 +238,7 @@ internal object RobustTokenGame {
                     if (candidate) input.expansionDenial else null,
                     if (candidate) input.tokenNeighborMixture else null,
                     if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
+                    if (candidate) input.initiative else null,
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {

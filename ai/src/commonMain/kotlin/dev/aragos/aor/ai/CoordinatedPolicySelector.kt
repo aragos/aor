@@ -41,11 +41,20 @@ class CoordinatedPolicySelector(
     private val expansionDenial: PublicLeaderAttackConfig? = null,
     private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
     private val tokenAnchoredResidual: TokenAnchoredResidual? = null,
+    private val initiative: InitiativePolicyConfig? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
 
     init {
+        require(
+            initiative == null ||
+                tokenAnchoredResidual == null &&
+                    tokenNeighborMixture == null &&
+                    expansionDenial == null
+        ) {
+            "Initiative requires the regular frozen token and expansion selectors."
+        }
         require(tokenAnchoredResidual == null || tokenNeighborMixture == null) {
             "The offered-only anchored actor cannot also admit a token-neighbor mixture."
         }
@@ -124,6 +133,9 @@ class CoordinatedPolicySelector(
                     original.expansion,
                     expansionSelector,
                 )
+            initiative?.let {
+                return InitiativePolicy.expansion(view, player, encoded, deterministic, it).command
+            }
             return expansionDenial?.let {
                 PublicLeaderAttackPolicy.choose(view, player, encoded, deterministic, it).command
             } ?: deterministic.command
@@ -192,8 +204,10 @@ class CoordinatedPolicySelector(
                 )
                 .command(ResidualPolicyMath.uniform(seed))
         }
-        return tokenSampler?.let {
-            NearOptimalTokenPolicy.choose(encoded, deterministic, it, seed).command
-        } ?: deterministic.command
+        val normal =
+            tokenSampler?.let {
+                NearOptimalTokenPolicy.choose(encoded, deterministic, it, seed).command
+            } ?: deterministic.command
+        return initiative?.let { InitiativePolicy.bid(view, player, normal, seed, it) } ?: normal
     }
 }
