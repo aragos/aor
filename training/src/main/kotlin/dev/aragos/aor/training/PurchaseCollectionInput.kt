@@ -50,8 +50,15 @@ internal data class PurchaseCollectionInput(
     val opponentPurchasePolicy: PurchaseActorInput? = null,
     val sharedPurchaseBaseline: PurchaseBaselineInput? = null,
     val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
+    val ecology: PurchaseEcology? = null,
 ) {
     init {
+        require(
+            ecology == null ||
+                policy != null && opponentPurchasePolicy != null && sharedPurchaseBaseline != null
+        ) {
+            "Purchase ecology requires a sampled learner, frozen rival purchase actor and explicit shared prior."
+        }
         require(
             listOfNotNull(policy, opponentPurchasePolicy?.model).all {
                 it.stateFeatureNames == dictionary.stateFeatureNames &&
@@ -110,6 +117,7 @@ internal data class PurchaseCollectionInput(
                         },
                         sharedPurchaseBaseline?.let { "shared-purchase-baseline:${it.sha256}" },
                         experimentalRulesTransfer?.metadata(),
+                        ecology?.identity(),
                     )
                 )
                 .joinToString("\n")
@@ -128,6 +136,10 @@ internal data class PurchaseCollectionInput(
                     "opponentPurchasePolicy",
                     "sharedPurchaseBaseline",
                     "experimentalRulesTransfer",
+                    "continuationProtocol",
+                    "expansionImitation",
+                    "tokenOrder",
+                    "replayIndices",
                 ),
             )
             val transfer = ExperimentalRulesTransfer.read(node["experimentalRulesTransfer"])
@@ -204,6 +216,7 @@ internal data class PurchaseCollectionInput(
                 opponentPolicy,
                 sharedBaseline,
                 transfer,
+                PurchaseEcology.read(realSource, node, configuration, incumbent, opponents, games),
             )
         }
     }

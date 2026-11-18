@@ -1,12 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
-import dev.aragos.aor.ai.BotDifficulty
-import dev.aragos.aor.ai.BotModel
-import dev.aragos.aor.ai.BotObservation
-import dev.aragos.aor.ai.BotPolicy
 import dev.aragos.aor.ai.BotTokenValue
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
@@ -14,19 +9,54 @@ import dev.aragos.aor.ai.TokenObservationEncoder
 import dev.aragos.aor.ai.TokenOrderPolicy
 import java.nio.file.Path
 
+/** Explicit continuation semantics; omission retains the historical purchase-only collector. */
+internal enum class TokenOrderContinuationProtocol {
+    ARENA_OVERLAYS_1
+}
+
 /** Fresh, precommitted origin banks; validation is model selection, never final confirmation. */
 internal data class TokenOrderSpecification(
     val arena: ArenaSpecification,
     val trainingRoots: Int = 96,
     val validationRoots: Int = 32,
     val continuationReplicates: Int = 2,
+    val continuationProtocol: TokenOrderContinuationProtocol? = null,
+    /** At most eight complete origins, fixed before collection, may be reproduced for auditing. */
+    val replayOrigins: List<Int> = emptyList(),
 ) {
     init {
         require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
             "Token-order collection requires one SCREENING configuration."
         }
-        require(arena.candidate == arena.incumbent && arena.tokenOrder == null) {
-            "Token-order roots require identical ordinary baselines without a learned token overlay."
+        require(arena.candidate == arena.incumbent) {
+            "Token-order roots require identical ordinary candidate and incumbent baselines."
+        }
+        require(arena.jointPolicy == null) {
+            "Joint actor roles are supported only by complete arena and strategy replay."
+        }
+        if (continuationProtocol == null) {
+            require(arena.tokenOrder == null && arena.expansionImitation == null) {
+                "Legacy token-order roots require ordinary baselines without a learned token overlay or expansion imitation."
+            }
+            require(replayOrigins.isEmpty()) {
+                "Origin reproduction requires the explicit arena continuation protocol."
+            }
+        } else {
+            arena.tokenOrder?.validateCollectionContinuation()
+            requireNotNull(arena.expansionImitation) {
+                    "Arena token continuation requires an explicit expansion model."
+                }
+                .validateCollectionContinuation()
+            require(arena.candidate.weights["planning.tokenOrderControl.fixed16To15"] != 1.0) {
+                "Token collection must retain its ordinary head without the fixed token gate."
+            }
+            require(
+                replayOrigins.size in 1..8 &&
+                    replayOrigins.distinct() == replayOrigins &&
+                    replayOrigins.all { it in 0 until origins }
+            ) {
+                "Arena token continuation requires one through eight distinct prospective replay origins."
+            }
         }
         val purchase =
             requireNotNull(arena.frozenPurchase) {
@@ -70,7 +100,7 @@ internal data class TokenOrderSpecification(
         )
 
     fun identity(): String =
-        listOf(
+        (listOf(
                 arena.identity(),
                 trainingRoots,
                 validationRoots,
@@ -78,12 +108,38 @@ internal data class TokenOrderSpecification(
                 TerritoryEncoder.TOKEN_2.version,
                 TokenOrderPolicy.PROPOSAL_VERSION,
                 TokenValueSelectionProtocol.PRECOMMITTED_ORDINAL_V1,
-            )
+            ) + listOfNotNull(continuationProtocol?.let { "$it:$replayOrigins" }))
             .joinToString("\n")
+
+    /** The same phase-disjoint controllers are reused for the origin prefix and every tail. */
+    fun controllers(lineup: StrategyArena.Lineup): Map<Int, SimulationController> {
+        if (continuationProtocol == null) {
+            return requireNotNull(arena.frozenPurchase) {
+                    "A validated token collector retains its shared purchase environment."
+                }
+                .controllers(lineup.configuration.playerCount, lineup.seat, side = null)
+        }
+        return arena
+            .controllers(
+                playerCount = lineup.configuration.playerCount,
+                controlledSeat = lineup.seat,
+                side = ArenaSide.CANDIDATE,
+                ordinary = arena.candidate,
+                opponentIndices = lineup.opponentIndices,
+            )
+            .also { controllers ->
+                check(controllers[lineup.seat]?.controls("buy-tokens") != true) {
+                    "The controlled token reference must remain the actual ordinary head."
+                }
+            }
+    }
 
     companion object {
         fun read(source: Path): TokenOrderSpecification {
             val node = PurchaseJson.read(source)
+            require(node.has("continuationProtocol") || !node.has("replayOrigins")) {
+                "Declared replay origins require the explicit arena continuation protocol."
+            }
             fun count(name: String, default: Int): Int =
                 node[name]?.let { PurchaseJson.integer(it, name) } ?: default
             return TokenOrderSpecification(
@@ -91,6 +147,19 @@ internal data class TokenOrderSpecification(
                 count("trainingRoots", 96),
                 count("validationRoots", 32),
                 count("continuationReplicates", 2),
+                node["continuationProtocol"]?.let { value ->
+                    val name = PurchaseJson.text(value, "continuationProtocol")
+                    requireNotNull(
+                        TokenOrderContinuationProtocol.entries.find { it.name == name }
+                    ) {
+                        "Unknown token continuation protocol: $name."
+                    }
+                },
+                node["replayOrigins"]?.let { values ->
+                    PurchaseJson.array(values, "replayOrigins").map {
+                        PurchaseJson.integer(it, "replay origin")
+                    }
+                } ?: emptyList(),
             )
         }
     }
@@ -127,82 +196,6 @@ internal data class TokenOrderOrigin(
     val alternatives: List<TokenOrderAlternative>? = null,
 )
 
-/** Shared controller routing for every prefix/tail; sealed choices use one untouched state. */
-internal class TokenOrderContinuation(
-    private val models: List<BotModel>,
-    private val purchase: Map<Int, SimulationController>,
-    private val seed: Int,
-    private val deadlineNanos: Long,
-) {
-    fun check(session: ExperimentSession) {
-        checkTokenValueDeadline(deadlineNanos)
-        check(session.decisions < 12000) { "A token-order continuation exceeded 12000 decisions." }
-    }
-
-    fun commands(
-        session: ExperimentSession,
-        observations: Map<PlayerId, BotObservation>,
-    ): Map<PlayerId, String> =
-        observations.entries
-            .mapIndexed { actorIndex, (actor, observation) ->
-                val seat = session.state.playerIds.indexOf(actor)
-                val policySeed = seed xor (session.decisions * 65537 + seat * 8191)
-                val controller = purchase[seat]?.takeIf { it.controls(observation.decision) }
-                val command =
-                    controller?.choose(
-                        SimulationDecision(
-                            number = session.decisions + actorIndex,
-                            seat = seat,
-                            seed = policySeed,
-                            view = session.state.viewForPlayer(actor),
-                            observation = observation,
-                            batchStartNumber = session.decisions,
-                        )
-                    ) ?: BotPolicy.choose(observation, BotDifficulty.HARD, policySeed, models[seat])
-                actor to command
-            }
-            .toMap()
-
-    fun finish(
-        session: ExperimentSession,
-        seat: Int,
-        configuration: String,
-        chanceSeed: Long,
-    ): TokenValueOutcome {
-        while (session.state.stage != Stage.FINISHED) {
-            check(session)
-            session.apply(
-                commands(session, session.actors().associateWith(session::observation)),
-                deadlineNanos,
-            )
-        }
-        val game =
-            SimulatedGame(
-                configuration,
-                seed,
-                session.decisions,
-                session.state.publicView().scores,
-                GameCoverage(
-                    emptyMap(),
-                    emptyMap(),
-                    emptySet(),
-                    emptySet(),
-                    emptySet(),
-                    emptySet(),
-                ),
-                0,
-            )
-        return TokenValueOutcome(
-            game.reward(seat),
-            game.winShare(seat),
-            game.rankReward(seat),
-            game.scores.map(PilotReplayScore::from),
-            game.steps,
-            chanceSeed,
-        )
-    }
-}
-
 /** One prospective root per fresh game, followed by paired complete-game continuations. */
 internal class TokenOrderCollector(
     private val specification: TokenOrderSpecification,
@@ -217,12 +210,13 @@ internal class TokenOrderCollector(
                 if (seat == lineup.seat) specification.arena.candidate
                 else specification.arena.opponents[opponent]
             }
-        val purchase =
-            requireNotNull(specification.arena.frozenPurchase) {
-                    "A validated token-order specification retains its frozen Purchase environment."
-                }
-                .controllers(models.size, lineup.seat, side = null)
-        val continuation = TokenOrderContinuation(models, purchase, lineup.seed, deadlineNanos)
+        val continuation =
+            FrozenPolicyContinuation(
+                models,
+                specification.controllers(lineup),
+                lineup.seed,
+                deadlineNanos,
+            )
         val session = ExperimentSession.start(lineup.configuration, lineup.seed.toLong())
         val actor = session.state.playerIds[lineup.seat]
         fun provenance(status: TokenValueOriginStatus, skip: TokenValueSkipReason? = null) =

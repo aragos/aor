@@ -53,7 +53,7 @@ class TokenOrderCollectionTest {
                     weights = BotModels.default.weights + ("tokenPreference" to 80.0)
                 )
             val continuation =
-                TokenOrderContinuation(
+                FrozenPolicyContinuation(
                     List(4) { model },
                     fixture.frozen.controllers(4, 0, null),
                     seed,
@@ -103,7 +103,7 @@ class TokenOrderCollectionTest {
             val expected = PurchaseActorController(prior, policy).choose(decision)
             val forcePass = prior.copy(weights = prior.weights + ("action.pass" to 1.0e6))
             val continuation =
-                TokenOrderContinuation(
+                FrozenPolicyContinuation(
                     List(4) { forcePass },
                     fixture.frozen.controllers(4, 0, null),
                     71,

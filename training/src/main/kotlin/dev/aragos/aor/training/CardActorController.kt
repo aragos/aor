@@ -13,7 +13,9 @@ import dev.aragos.aor.ai.PurchasePolicyModel
  * Repeated card decisions use only the ordinary actor view; nested choices retain the simulator's
  * HARD baseline. Every purchase uses the independently frozen purchase actor and its original
  * sampler, including rival purchases. Only the controlled seat supplies [record] or a purchase
- * recorder. The card recorder stays last so existing trailing-lambda callers retain their meaning.
+ * recorder. [purchaseBaseline] permits an explicit ordinary/card model distinct from the frozen
+ * purchase prior. The card recorder stays last so existing trailing-lambda callers retain their
+ * meaning.
  */
 internal class CardActorController(
     private val baseline: BotModel,
@@ -21,9 +23,11 @@ internal class CardActorController(
     frozenPurchasePolicy: PurchasePolicyModel,
     private val audit: ((CardPurchaseAudit) -> Unit)? = null,
     purchaseRecord: ((PurchaseDecisionRecord) -> Unit)? = null,
+    purchaseBaseline: BotModel = baseline,
     private val record: ((CardDecisionRecord) -> Unit)? = null,
 ) : SimulationController {
-    private val purchase = PurchaseActorController(baseline, frozenPurchasePolicy, purchaseRecord)
+    private val purchase =
+        PurchaseActorController(purchaseBaseline, frozenPurchasePolicy, purchaseRecord)
 
     override fun controls(decision: String): Boolean =
         decision == "play-cards" || purchase.controls(decision)

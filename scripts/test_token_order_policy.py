@@ -9,6 +9,7 @@ import unittest
 import purchase_policy as b
 import territory_value as q
 import token_order_policy as learner
+from test_token_order_metadata import add_overlay_metadata
 
 
 def schema():
@@ -81,6 +82,21 @@ def collection_fixture(root):
 def finish_collection(root):
     b.atomic_json(root / "finished.json", {"kind": learner.KIND, "signature": "fixed",
                   "originSha256": [learner.sha(root / f"origin-{index}.json") for index in range(4)]})
+
+
+def overlay_collection_fixture(root):
+    collection_fixture(root)
+    add_overlay_metadata(root)
+    manifest = learner.read(root / "run.json")
+    for request in manifest["rootRequests"]:
+        request["opponentIndices"] = list(range(4))
+        path = root / f"origin-{request['index']}.json"
+        row = learner.read(path)
+        row["opponentIndices"] = request["opponentIndices"]
+        b.atomic_json(path, row)
+    b.atomic_json(root / "run.json", manifest)
+    b.atomic_json(root / "dataset.json", dict(manifest, complete=True, counts={"COLLECTED": 4}))
+    finish_collection(root)
 
 
 class TokenOrderPolicyTest(unittest.TestCase):
@@ -222,6 +238,31 @@ class TokenOrderPolicyTest(unittest.TestCase):
     def test_undeclared_transfer_cannot_silently_change_the_fitting_environment(self):
         with self.assertRaisesRegex(ValueError, "undeclared rules transfer"):
             learner.transfer_metadata({}, {"experimentalRulesTransfer": learner.RULES_TRANSFER}, {})
+
+
+class ArenaContinuationParityTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        overlay_collection_fixture(self.root)
+
+    def test_opt_in_keeps_training_rows_and_initialized_model_equal_to_legacy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legacy = Path(directory)
+            collection_fixture(legacy)
+            expected_model, expected_rows, legacy_provenance = learner.collection(legacy, 137)
+
+        actual_model, actual_rows, provenance = learner.collection(self.root, 137)
+
+        self.assertEqual(expected_model, actual_model)
+        self.assertEqual(expected_rows, actual_rows)
+        self.assertNotIn("metadataValidatorSha256", legacy_provenance)
+        self.assertEqual(learner.sha(learner.metadata.__file__), provenance["metadataValidatorSha256"])
+        self.assertNotIn("expansion-imitation-candidate.json", legacy_provenance["files"])
+        self.assertIn("expansion-imitation-candidate.json", provenance["files"])
+        self.assertIn("expansion-imitation-opponent-3.json", provenance["files"])
+        self.assertNotIn("expansion-imitation-opponent-0.json", provenance["files"])
 
 
 if __name__ == "__main__":

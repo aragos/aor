@@ -65,7 +65,7 @@ internal class PurchaseCollectionStore(
             startedAt = Instant.now()
             progress("initialized", 0)
         }
-        immutableJson("collection.json", manifest())
+        immutableJson("collection.json", manifest(input, signature))
         snapshot("source.json", input.source, input.sourceSha256)
         snapshot("baseline.json", input.baseline.path, input.baseline.sha256)
         input.sharedPurchaseBaseline?.let {
@@ -86,6 +86,7 @@ internal class PurchaseCollectionStore(
         input.opponentPurchasePolicy?.let {
             snapshot("opponent-purchase-policy.json", it.path, it.sha256)
         }
+        input.ecology?.snapshot(artifacts)
         Files.list(directory).use { paths ->
             paths
                 .filter { it.fileName.toString().startsWith("game-") }
@@ -118,10 +119,34 @@ internal class PurchaseCollectionStore(
             ) {
                 "Completed purchase game bytes must match their immutable completion manifest."
             }
+            input.ecology?.let { ecology ->
+                require(
+                    finished["replaySha256"] ==
+                        PurchaseJson.mapper.valueToTree<JsonNode>(
+                            ecology.replayIndices.associate { index ->
+                                "replay-$index.json" to
+                                    PurchaseJson.hash(directory.resolve("replay-$index.json"))
+                            }
+                        )
+                ) {
+                    "Completed purchase canonical histories must retain their recorded hashes."
+                }
+            }
         }
         return input.seeds.indices.filterTo(mutableSetOf()) { index ->
             val record = readIfPresent("game-$index.json") ?: return@filterTo false
             validation.validate(record, index)
+            if (index in input.ecology?.replayIndices.orEmpty()) {
+                val replay =
+                    requireNotNull(readIfPresent("replay-$index.json")) {
+                        "A declared purchase game requires its complete canonical history sidecar."
+                    }
+                validateReplayBinding(
+                    replay,
+                    index,
+                    PurchaseJson.hash(directory.resolve("game-$index.json")),
+                )
+            }
             true
         }
     }
@@ -129,7 +154,22 @@ internal class PurchaseCollectionStore(
     fun save(game: PurchaseGameTrajectory) {
         val document = PurchaseJson.mapper.valueToTree<JsonNode>(game)
         validation.validate(document, game.index)
+        val expected = game.index in input.ecology?.replayIndices.orEmpty()
+        require(expected == (game.canonicalReplay != null)) {
+            "Canonical purchase histories must match exactly the predeclared replay indices."
+        }
         immutableJson("game-${game.index}.json", document)
+        game.canonicalReplay?.let { replay ->
+            immutableJson(
+                "replay-${game.index}.json",
+                replayDocument(
+                    signature,
+                    game.index,
+                    PurchaseJson.hash(directory.resolve("game-${game.index}.json")),
+                    replay,
+                ),
+            )
+        }
     }
 
     fun progress(phase: String, completed: Int) {
@@ -175,59 +215,105 @@ internal class PurchaseCollectionStore(
         )
         immutableJson(
             "finished.json",
-            identity + mapOf("games" to totals.size, "gameSha256" to hashes),
+            identity +
+                mapOf("games" to totals.size, "gameSha256" to hashes) +
+                (input.ecology?.let { ecology ->
+                    mapOf(
+                        "replaySha256" to
+                            ecology.replayIndices.associate { index ->
+                                "replay-$index.json" to
+                                    PurchaseJson.hash(directory.resolve("replay-$index.json"))
+                            }
+                    )
+                } ?: emptyMap()),
         )
         progress("complete", totals.size)
     }
 
-    private fun manifest(): Map<String, Any?> =
-        identity +
-            input.initializationMetadata() +
-            mapOf(
-                "schemaVersion" to 1,
-                "mode" to input.mode,
-                "rulesVersion" to RULES_VERSION,
-                "dataVersion" to DATA_VERSION,
-                "encoderVersion" to PurchaseObservationEncoder.ENCODER_VERSION,
-                "actorVersion" to PurchasePolicy.ACTOR_VERSION,
-                "source" to input.source.toString(),
-                "sourceSha256" to input.sourceSha256,
-                "configuration" to input.configuration.id,
-                "games" to input.seeds.size,
-                "seed" to input.seed,
-                "seeds" to input.seeds,
-                "baseline" to
-                    mapOf(
-                        "path" to input.baseline.path.toString(),
-                        "sha256" to input.baseline.sha256,
-                    ),
-                "opponents" to
-                    input.opponents.map {
-                        mapOf("path" to it.path.toString(), "sha256" to it.sha256)
-                    },
-                "policy" to input.policyPath?.toString(),
-                "modelSha256" to input.modelSha256,
-                "stateFeatureNames" to input.dictionary.stateFeatureNames,
-                "actionFeatureNames" to input.dictionary.actionFeatureNames,
-                "controlledSeat" to "index % playerCount",
-                "opponentRotation" to "(index / playerCount + seat) % opponentCount",
-                "reward" to ".8 * winShare + .2 * rankReward",
-            ) +
-            (input.opponentPurchasePolicy?.let {
+    companion object {
+        internal fun manifest(
+            input: PurchaseCollectionInput,
+            signature: String,
+        ): Map<String, Any?> =
+            mapOf("kind" to "purchase-collect", "signature" to signature) +
+                input.initializationMetadata() +
                 mapOf(
-                    "opponentPurchasePolicy" to
+                    "schemaVersion" to 1,
+                    "mode" to input.mode,
+                    "rulesVersion" to RULES_VERSION,
+                    "dataVersion" to DATA_VERSION,
+                    "encoderVersion" to PurchaseObservationEncoder.ENCODER_VERSION,
+                    "actorVersion" to PurchasePolicy.ACTOR_VERSION,
+                    "source" to input.source.toString(),
+                    "sourceSha256" to input.sourceSha256,
+                    "configuration" to input.configuration.id,
+                    "games" to input.seeds.size,
+                    "seed" to input.seed,
+                    "seeds" to input.seeds,
+                    "baseline" to
                         mapOf(
-                            "path" to it.path.toString(),
-                            "sha256" to it.sha256,
-                        )
-                )
-            } ?: emptyMap()) +
-            (input.sharedPurchaseBaseline?.let {
-                mapOf(
-                    "sharedPurchaseBaseline" to
-                        mapOf("path" to it.path.toString(), "sha256" to it.sha256)
-                )
-            } ?: emptyMap())
+                            "path" to input.baseline.path.toString(),
+                            "sha256" to input.baseline.sha256,
+                        ),
+                    "opponents" to
+                        input.opponents.map {
+                            mapOf("path" to it.path.toString(), "sha256" to it.sha256)
+                        },
+                    "policy" to input.policyPath?.toString(),
+                    "modelSha256" to input.modelSha256,
+                    "stateFeatureNames" to input.dictionary.stateFeatureNames,
+                    "actionFeatureNames" to input.dictionary.actionFeatureNames,
+                    "controlledSeat" to "index % playerCount",
+                    "opponentRotation" to "(index / playerCount + seat) % opponentCount",
+                    "reward" to ".8 * winShare + .2 * rankReward",
+                ) +
+                (input.opponentPurchasePolicy?.let {
+                    mapOf(
+                        "opponentPurchasePolicy" to
+                            mapOf(
+                                "path" to it.path.toString(),
+                                "sha256" to it.sha256,
+                            )
+                    )
+                } ?: emptyMap()) +
+                (input.sharedPurchaseBaseline?.let {
+                    mapOf(
+                        "sharedPurchaseBaseline" to
+                            mapOf("path" to it.path.toString(), "sha256" to it.sha256)
+                    )
+                } ?: emptyMap()) +
+                input.ecology?.metadata().orEmpty()
+
+        internal fun replayDocument(
+            signature: String,
+            index: Int,
+            trajectorySha256: String,
+            replay: PurchaseCanonicalReplay,
+        ): Map<String, Any> =
+            mapOf(
+                "kind" to "purchase-canonical-replay-1",
+                "signature" to signature,
+                "index" to index,
+                "trajectorySha256" to trajectorySha256,
+                "header" to replay.header,
+                "entries" to replay.entries,
+                "replayVerified" to true,
+            )
+    }
+
+    private fun validateReplayBinding(replay: JsonNode, index: Int, trajectorySha256: String) {
+        require(
+            replay["kind"]?.asText() == "purchase-canonical-replay-1" &&
+                replay["signature"]?.asText() == signature &&
+                replay["index"]?.intValue() == index &&
+                replay["trajectorySha256"]?.asText() == trajectorySha256 &&
+                replay["replayVerified"]?.booleanValue() == true &&
+                replay["header"]?.isObject == true &&
+                replay["entries"]?.isArray == true
+        ) {
+            "A purchase history sidecar must bind its exact original trajectory."
+        }
+    }
 
     private fun immutableJson(name: String, value: Any) {
         val expected = PurchaseJson.mapper.valueToTree<JsonNode>(value)

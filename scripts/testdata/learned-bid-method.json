@@ -1,0 +1,181 @@
+{
+  "kind": "learned-bid-search-prospective-method-1",
+  "study": 92,
+  "localOnly": true,
+  "remoteUseAuthorized": false,
+  "createdUtc": "2026-11-18T04:52:58.492606+00:00",
+  "userWindowStartUtc": "2026-11-18T04:46:39+00:00",
+  "userWindowEndUtc": "2026-11-18T16:46:39+00:00",
+  "globalDeadlineEpoch": 1795020399.0,
+  "nativeJarSha256": "14245cba2d1dbd4e62780371efd84d4416bd91592ceca876449d7f417756463f",
+  "candidateBundleSha256": "fca8593a5d43026d1c7146a9bb76cbce5bfd1a725de28ba18382d537710ff63e",
+  "learnedControlBundleSha256": "fca8593a5d43026d1c7146a9bb76cbce5bfd1a725de28ba18382d537710ff63e",
+  "learnedControlSelector": {
+    "kind": "near-optimal-token-softmax-1",
+    "temperature": 0.35,
+    "maxScoreGap": 3,
+    "neighborRadius": 4
+  },
+  "oldControlBundleSha256": "e62d749f4d9125cc86107cc2c37d77cb2f23af65c3648105a5fd2636f1ee27f1",
+  "oldControlSelector": null,
+  "caseConfigs": [
+    {
+      "id": "s00",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 0.7,
+        "maxScoreGap": 6,
+        "neighborRadius": 4
+      }
+    },
+    {
+      "id": "s01",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 1.5,
+        "maxScoreGap": 6,
+        "neighborRadius": 4
+      }
+    },
+    {
+      "id": "s02",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 3,
+        "maxScoreGap": 6,
+        "neighborRadius": 4
+      }
+    },
+    {
+      "id": "s03",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 8,
+        "maxScoreGap": 6,
+        "neighborRadius": 4
+      }
+    },
+    {
+      "id": "s04",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 0.7,
+        "maxScoreGap": 16,
+        "neighborRadius": 8
+      }
+    },
+    {
+      "id": "s05",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 1.5,
+        "maxScoreGap": 16,
+        "neighborRadius": 8
+      }
+    },
+    {
+      "id": "s06",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 3,
+        "maxScoreGap": 16,
+        "neighborRadius": 8
+      }
+    },
+    {
+      "id": "s07",
+      "selector": {
+        "kind": "near-optimal-token-softmax-1",
+        "temperature": 8,
+        "maxScoreGap": 16,
+        "neighborRadius": 8
+      }
+    }
+  ],
+  "banks": [
+    {
+      "name": "development",
+      "worlds": 64,
+      "opponentStyle": "BALANCED",
+      "control": "LEARNED",
+      "replayIndices": [
+        0,
+        21,
+        42,
+        63
+      ]
+    },
+    {
+      "name": "mixed",
+      "worlds": 256,
+      "opponentStyle": "BALANCED",
+      "control": "LEARNED",
+      "replayIndices": [
+        0,
+        85,
+        170,
+        255
+      ]
+    },
+    {
+      "name": "homogeneous",
+      "worlds": 256,
+      "opponentStyle": "QUALIFIED",
+      "control": "LEARNED",
+      "replayIndices": [
+        0,
+        85,
+        170,
+        255
+      ]
+    },
+    {
+      "name": "reference",
+      "worlds": 256,
+      "opponentStyle": "QUALIFIED",
+      "control": "OLD87",
+      "replayIndices": [
+        0,
+        85,
+        170,
+        255
+      ]
+    }
+  ],
+  "candidateSelection": "Among complete-development candidates with paired win mean>0 and positive-bid max-single-amount share<=0.80, select the sole largest paired win mean, stable case-order ties. No eligible candidate means stop with no nominee.",
+  "positiveBidConcentrationMaximum": 0.8,
+  "concentrationDefinition": "For controlledBidCounts across each complete bank/case, retain integer keys>0; max count divided by sum counts; missing/empty counts refuse admission. Aggregate observed concentration is only a diagnostic proxy and does not prove conditional unpredictability.",
+  "qualification": "After nomination, require mixed99 lower>0 AND concentration<=.80; then homogeneous99 lower>0 AND concentration<=.80; then reference99 lower>0. No reselection, topup, resize or reusing failed banks.",
+  "confidenceMultiplier": 2.5758293035489004,
+  "maximumTerminalExecutions": 2648,
+  "maximumScienceSeconds": 16200,
+  "minimumRemainingSecondsAtPreparation": 10800,
+  "auditSeconds": 600,
+  "workers": 10,
+  "heapMiB": 6144,
+  "maximumRssBytes": 12884901888,
+  "minimumFreeBytes": 17179869184,
+  "maximumDataBytes": 805306368,
+  "chunkSize": 256,
+  "launchViaOwnedTerminal": true,
+  "noRetry": true,
+  "noResume": true,
+  "noTopUp": true,
+  "noAutomaticSuccessor": true,
+  "noNewFits": true,
+  "weightsImmutable": true,
+  "prerequisite": "Study94 has terminal status and physical closure proving all owned processes exited; at least10800seconds remain before original16:46:39UTC. Old91 remains closed/unqualified. No parallel science.",
+  "preview": "A91 qualified policy remains separate; a92 qualification needs all three complete independent banks and source/policy identity checks before serving.",
+  "activeReservedWorlds": 832,
+  "fullReservedWorlds": 1664,
+  "unusedReservedWorlds": 832,
+  "resourceRefinement": {
+    "originalMethod": {
+      "path": "/Users/aragos/Projects/aor/.aor-training/automata-learned-bid-search-20261118/prospective-method.json",
+      "sha256": "82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36"
+    },
+    "beforeAnyStudy92Data": true,
+    "reason": "Measured sustainedlocalserviceabout3cores; fixedsmallerfreshprefixes before any92games, same8configs/strict99winand80%concentrationgates. Alloriginalunusedsuffixes remain protected."
+  },
+  "parentTrialProtocolSha256": "140427b0db6635b7842b1b51213a5db174382e8088a0d43fc2917aa7a1c37e5e"
+}

@@ -63,6 +63,11 @@ data class StrategyReplay(
     val game: ArenaGame,
     val replayVerified: Boolean,
     val historicalPairVerified: Boolean,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val tokenActor: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val cpeBundle: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val coordinatedEs: Map<String, Any>? = null,
 )
 
 /**
@@ -80,6 +85,41 @@ class StrategyReplayPair private constructor(private val record: JsonNode) {
         }
         require(integer("seed") == lineup.seed && integer("seat") == lineup.seat) {
             "Recorded arena pair seed or controlled seat does not match the specification."
+        }
+        val expectedJoint =
+            specification.jointPolicy?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["jointPolicy"]?.takeUnless(JsonNode::isNull) == expectedJoint) {
+            "Recorded arena pair joint actor roles differ from the replay specification."
+        }
+        val expectedExpansion =
+            specification.expansionActor?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["expansionActor"]?.takeUnless(JsonNode::isNull) == expectedExpansion) {
+            "Recorded arena pair expansion actor roles differ from the replay specification."
+        }
+        val expectedToken =
+            specification.tokenActor?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["tokenActor"]?.takeUnless(JsonNode::isNull) == expectedToken) {
+            "Recorded arena pair token actor roles differ from the replay specification."
+        }
+        val expectedCpe =
+            specification.cpeBundle?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["cpeBundle"]?.takeUnless(JsonNode::isNull) == expectedCpe) {
+            "Recorded arena pair complete C/P/E roles differ from the replay specification."
+        }
+        val expectedCoordinated =
+            specification.coordinatedEs?.binding()?.let {
+                PurchaseJson.mapper.valueToTree<JsonNode>(it)
+            }
+        require(record["coordinatedEs"]?.takeUnless(JsonNode::isNull) == expectedCoordinated) {
+            "Recorded arena pair coordinated roles differ from the replay specification."
         }
         val opponents = record.required("opponentIndices")
         require(opponents.isArray && opponents.size() == lineup.configuration.playerCount) {
@@ -181,9 +221,33 @@ object StrategyReplays {
         side: StrategyReplaySide,
         deadlineNanos: Long = Long.MAX_VALUE,
         pair: StrategyReplayPair? = null,
+    ): StrategyReplay = playRecorded(specification, specification, index, side, deadlineNanos, pair)
+
+    /**
+     * Historical zero-role proof preserves the original pair's opponents and validates its raw
+     * metadata.
+     */
+    internal fun coordinatedHistorical(
+        raw: ArenaSpecification,
+        policy: ArenaCoordinatedPolicy,
+        index: Int,
+        side: StrategyReplaySide,
+        deadlineNanos: Long,
+        pair: StrategyReplayPair,
+    ): StrategyReplay =
+        playRecorded(raw.copy(coordinatedEs = policy), raw, index, side, deadlineNanos, pair)
+
+    private fun playRecorded(
+        specification: ArenaSpecification,
+        recordedSpecification: ArenaSpecification,
+        index: Int,
+        side: StrategyReplaySide,
+        deadlineNanos: Long,
+        pair: StrategyReplayPair?,
     ): StrategyReplay {
         val lineup = StrategyArena.lineup(specification, index)
-        val opponentIndices = pair?.opponentIndices(specification, index) ?: lineup.opponentIndices
+        val opponentIndices =
+            pair?.opponentIndices(recordedSpecification, index) ?: lineup.opponentIndices
         val recording = StrategyRecording(lineup.seat, lineup.seed)
         val game =
             Simulation()
@@ -210,6 +274,7 @@ object StrategyReplays {
                             lineup.seat,
                             side.arenaSide,
                             side.model(specification),
+                            opponentIndices,
                         ),
                 )
         val terminal = ArenaGame.from(game)
@@ -230,6 +295,11 @@ object StrategyReplays {
             game = terminal,
             replayVerified = true,
             historicalPairVerified = pair != null,
+            jointPolicy = specification.jointPolicy?.binding(),
+            expansionActor = specification.expansionActor?.binding(),
+            tokenActor = specification.tokenActor?.binding(),
+            cpeBundle = specification.cpeBundle?.binding(),
+            coordinatedEs = specification.coordinatedEs?.binding(),
         )
     }
 }
@@ -431,7 +501,9 @@ object StrategyReplayMain {
                     "startedAt" to Instant.now().toString(),
                     "workers" to 1,
                     "scoreMeaning" to
-                        if (specification.frozenPurchase == null) {
+                        if (specification.jointPolicy != null) {
+                            "Immediate seat-model scores; sampled joint card/purchase actors select independently, with separate token/expansion overlays."
+                        } else if (specification.frozenPurchase == null) {
                             "Immediate linear scores; HARD may choose a first move using bounded multi-action planning."
                         } else {
                             "Immediate seat-model linear scores; the frozen purchase actor selects independently, and HARD may use bounded multi-action planning elsewhere."

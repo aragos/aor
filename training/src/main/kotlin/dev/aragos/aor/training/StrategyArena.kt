@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.DATA_VERSION
 import dev.aragos.aor.RULES_VERSION
@@ -35,9 +36,15 @@ data class ArenaSpecification(
     val seed: Int,
     val frozenPurchase: ArenaPurchasePolicy? = null,
     val tokenOrder: ArenaTokenOrderPolicy? = null,
+    val expansionImitation: ArenaExpansionImitation? = null,
     val experimentalRulesTransfer: ExperimentalRulesTransfer? = null,
     private val ordinaryModelSources: Map<String, ModelInitializationSource> = emptyMap(),
     private val initializationSource: ModelInitializationSource? = null,
+    val jointPolicy: ArenaJointPolicy? = null,
+    val expansionActor: ArenaExpansionActor? = null,
+    val tokenActor: ArenaTokenActor? = null,
+    val cpeBundle: ArenaCpeBundle? = null,
+    val coordinatedEs: ArenaCoordinatedPolicy? = null,
 ) {
     init {
         require(
@@ -55,8 +62,17 @@ data class ArenaSpecification(
             "An arena requires 1–10000 pairs per configuration and at most 100000 pairs overall."
         }
         require(seed in 0..100_000_000) { "Arena seed must be between zero and 100000000." }
+        require(frozenPurchase == null || jointPolicy == null) {
+            "Frozen purchase and joint actor roles are mutually exclusive."
+        }
         frozenPurchase?.validate(configurations)
-        tokenOrder?.validate(configurations)
+        jointPolicy?.validate(configurations)
+        tokenOrder?.validate(configurations, opponents.size)
+        expansionImitation?.validate(candidate, incumbent, opponents)
+        expansionActor?.validate(this)
+        tokenActor?.validate(this)
+        cpeBundle?.validate(this)
+        coordinatedEs?.validate(this)
     }
 
     fun identity(): String =
@@ -71,39 +87,89 @@ data class ArenaSpecification(
             ) +
                 listOfNotNull(
                     frozenPurchase?.identity(),
+                    jointPolicy?.identity(),
                     tokenOrder?.identity(),
+                    expansionImitation?.identity(),
+                    expansionActor?.identity(),
+                    tokenActor?.identity(),
+                    cpeBundle?.identity(),
+                    coordinatedEs?.identity(),
                     experimentalRulesTransfer?.metadata(),
                     initializationSource?.sha256,
                     ordinaryModelSources.takeIf { it.isNotEmpty() }?.mapValues { it.value.sha256 },
                 ))
             .joinToString("\n")
 
-    /** Phase-disjoint overlays retain their own priors and never replace a rival's token policy. */
+    /**
+     * Phase-disjoint overlays retain each seat's actual ordinary token baseline and Purchase prior.
+     */
     internal fun controllers(
         playerCount: Int,
         controlledSeat: Int,
         side: ArenaSide?,
         ordinary: BotModel,
+        opponentIndices: List<Int>? = null,
     ): Map<Int, SimulationController> {
-        val purchase = frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
-        val token = tokenOrder?.controller(side, ordinary) ?: return purchase
-        val previous = purchase[controlledSeat]
-        val combined =
-            object : SimulationController {
-                override fun controls(decision: String): Boolean =
-                    token.controls(decision) || previous?.controls(decision) == true
+        val purchase =
+            jointPolicy?.controllers(
+                playerCount,
+                controlledSeat,
+                side,
+                ordinary,
+                opponentIndices,
+                opponents,
+            ) ?: frozenPurchase?.controllers(playerCount, controlledSeat, side).orEmpty()
+        val policy = tokenOrder
+        val evaluated = policy?.controller(side, ordinary)
+        val tokens =
+            policy
+                ?.opponentControllers(playerCount, controlledSeat, opponentIndices, opponents)
+                .orEmpty() + listOfNotNull(evaluated?.let { controlledSeat to it }).toMap()
+        val expansion =
+            expansionImitation
+                ?.controllers(playerCount, controlledSeat, side, opponentIndices)
+                .orEmpty()
+        val composed =
+            listOf(tokens, expansion).fold(purchase) { existing, overlay ->
+                existing +
+                    overlay.mapValues { (seat, controller) ->
+                        val previous = existing[seat]
+                        object : SimulationController {
+                            override fun controls(decision: String): Boolean =
+                                controller.controls(decision) ||
+                                    previous?.controls(decision) == true
 
-                override fun choose(decision: SimulationDecision): String? =
-                    if (token.controls(decision.observation.decision)) token.choose(decision)
-                    else previous?.choose(decision)
+                            override fun choose(decision: SimulationDecision): String? =
+                                if (controller.controls(decision.observation.decision))
+                                    controller.choose(decision)
+                                else previous?.choose(decision)
+                        }
+                    }
             }
-        return purchase + (controlledSeat to combined)
+        val expanded = expansionActor?.controllers(composed, controlledSeat, side) ?: composed
+        val tokensApplied = tokenActor?.controllers(expanded, controlledSeat, side) ?: expanded
+        val complete =
+            cpeBundle?.controllers(tokensApplied, controlledSeat, side, ordinary) ?: tokensApplied
+        return coordinatedEs?.controllers(
+            complete,
+            controlledSeat,
+            side,
+            ordinary,
+            opponentIndices,
+            opponents,
+        ) ?: complete
     }
 
     internal fun overlayMetadata(candidateSnapshot: String = "candidate.json"): Map<String, Any> =
         mapOf("rulesVersion" to RULES_VERSION, "dataVersion" to DATA_VERSION) +
             frozenPurchase?.metadata().orEmpty() +
+            jointPolicy?.metadata().orEmpty() +
             tokenOrder?.metadata().orEmpty() +
+            expansionImitation?.metadata().orEmpty() +
+            expansionActor?.metadata().orEmpty() +
+            tokenActor?.metadata().orEmpty() +
+            cpeBundle?.metadata().orEmpty() +
+            coordinatedEs?.metadata().orEmpty() +
             experimentalRulesTransfer?.metadata().orEmpty() +
             (experimentalRulesTransfer?.let {
                 mapOf(
@@ -142,7 +208,13 @@ data class ArenaSpecification(
 
     internal fun snapshotOverlays(artifacts: TrainingArtifacts) {
         frozenPurchase?.snapshot(artifacts)
+        jointPolicy?.snapshot(artifacts)
         tokenOrder?.snapshot(artifacts)
+        expansionImitation?.snapshot(artifacts)
+        expansionActor?.snapshot(artifacts)
+        tokenActor?.snapshot(artifacts)
+        cpeBundle?.snapshot(artifacts)
+        coordinatedEs?.snapshot(artifacts)
     }
 
     companion object {
@@ -221,8 +293,25 @@ data class ArenaSpecification(
                         node["frozenPurchase"]?.let {
                             ArenaPurchasePolicy.read(source, it, transfer)
                         },
+                    jointPolicy =
+                        node["jointPolicy"]?.let {
+                            ArenaJointPolicy.read(source, it, configurations, transfer)
+                        },
                     tokenOrder = node["tokenOrder"]?.let { ArenaTokenOrderPolicy.read(source, it) },
+                    expansionImitation =
+                        node["expansionImitation"]?.let {
+                            ArenaExpansionImitation.read(source, it)
+                        },
                     experimentalRulesTransfer = transfer,
+                    expansionActor =
+                        node["expansionActor"]?.let { ArenaExpansionActor.read(source, it) },
+                    tokenActor = node["tokenActor"]?.let { ArenaTokenActor.read(source, it) },
+                    cpeBundle =
+                        node["cpeBundle"]?.let { ArenaCpeBundle.read(source, it, configurations) },
+                    coordinatedEs =
+                        node["coordinatedEs"]?.let {
+                            ArenaCoordinatedPolicy.read(source, it, configurations)
+                        },
                     ordinaryModelSources = modelSources,
                     initializationSource =
                         transfer?.let {
@@ -276,6 +365,11 @@ data class ArenaPair(
     val opponentIndices: List<Int>,
     val candidate: ArenaGame,
     val incumbent: ArenaGame,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val jointPolicy: Map<String, Any?>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val expansionActor: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val tokenActor: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val cpeBundle: Map<String, Any>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val coordinatedEs: Map<String, Any>? = null,
 )
 
 object StrategyArena {
@@ -306,6 +400,15 @@ object StrategyArena {
         index: Int,
         side: ArenaSide,
         deadlineNanos: Long,
+    ): ArenaGame = tracedGame(specification, index, side, deadlineNanos, null)
+
+    /** Optional canonical recording shares the exact existing explicit-side game factory. */
+    internal fun tracedGame(
+        specification: ArenaSpecification,
+        index: Int,
+        side: ArenaSide,
+        deadlineNanos: Long,
+        trace: SimulationTrace?,
     ): ArenaGame =
         game(
             specification,
@@ -316,6 +419,7 @@ object StrategyArena {
             },
             deadlineNanos,
             side,
+            trace,
         )
 
     /**
@@ -334,6 +438,7 @@ object StrategyArena {
         model: BotModel,
         deadlineNanos: Long,
         side: ArenaSide?,
+        trace: SimulationTrace? = null,
     ): ArenaGame {
         val lineup = lineup(specification, index)
         return ArenaGame.from(
@@ -350,12 +455,14 @@ object StrategyArena {
                             )
                         },
                     deadlineNanos = deadlineNanos,
+                    trace = trace,
                     controllers =
                         specification.controllers(
                             lineup.configuration.playerCount,
                             lineup.seat,
                             side,
                             model,
+                            lineup.opponentIndices,
                         ),
                 )
         )
@@ -377,6 +484,11 @@ object StrategyArena {
             lineup.opponentIndices,
             candidate,
             incumbent,
+            specification.jointPolicy?.binding(),
+            specification.expansionActor?.binding(),
+            specification.tokenActor?.binding(),
+            specification.cpeBundle?.binding(),
+            specification.coordinatedEs?.binding(),
         )
     }
 

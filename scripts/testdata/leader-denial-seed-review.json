@@ -1,0 +1,14 @@
+{
+  "kind": "root-leader-denial-seed-review-1",
+  "passed": true,
+  "recordedAt": "2026-11-17T19:05:01.792241+00:00",
+  "auditSha256": "3193943dee4dddd649d17e88e09dac29591b2f9a89b50eab3e9c50b3dd7c97a2",
+  "scheduleSha256": "12c96d27c5b75a0b33c9c125fff58b452a1b175c2355440f1a53343566d65953",
+  "rootProofSha256": "5b1197c4d3e929cd8e995274f7dce4cd0f1d67663b0083e4ecc463578b4439b6",
+  "ancestryPinsRehashed": 71,
+  "freshWorlds": 4608,
+  "numericalStreams": 0,
+  "rngDeclarationsApproved": true,
+  "scientificGamesAuthorized": false,
+  "wireMethodClarificationOnly": "minimumWinProbability field name; numerical thresholds/counts unchanged vs original reservation."
+}

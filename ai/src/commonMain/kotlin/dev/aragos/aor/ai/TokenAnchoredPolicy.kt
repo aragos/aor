@@ -60,7 +60,25 @@ data class TokenAnchoredEvaluation(
     val logits: List<Double>,
     val probabilities: List<Double>,
     val anchorIndex: Int,
-)
+) {
+    init {
+        require(
+            probabilities.size in 1..TerritoryPhase.TOKEN.maxActions &&
+                listOf(anchorProbabilities, initialProbabilities, residuals, logits).all {
+                    it.size == probabilities.size && it.all(Double::isFinite)
+                } &&
+                anchorIndex in probabilities.indices &&
+                anchorProbabilities.all { it >= 0.0 } &&
+                abs(anchorProbabilities.sum() - 1.0) <= 1e-12 &&
+                anchorProbabilities[anchorIndex] == anchorProbabilities.max() &&
+                listOf(initialProbabilities, probabilities).all { values ->
+                    values.all { it > 0.0 && it <= 1.0 } && abs(values.sum() - 1.0) <= 1e-12
+                }
+        ) {
+            "An anchored evaluation must retain complete finite vectors, full support and unit mass."
+        }
+    }
+}
 
 /**
  * Shared collection/application contract: p0=(1-epsilon)*p94+epsilon/N;
@@ -142,12 +160,6 @@ object TokenAnchoredPolicy {
                 val total = weights.sum()
                 weights.map { it / total }
             }
-        require(
-            probabilities.all { it.isFinite() && it > 0.0 && it <= 1.0 } &&
-                abs(probabilities.sum() - 1.0) <= 1e-12
-        ) {
-            "An anchored actor must retain numerical full support and unit probability mass."
-        }
         return TokenAnchoredEvaluation(
             anchorProbabilities,
             initial,

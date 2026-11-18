@@ -11,6 +11,8 @@ import tempfile
 import time
 import unittest
 
+import automata_campaign as controller
+
 
 CONTROLLER = Path(__file__).with_name("automata_campaign.py").resolve()
 WORKLOAD = '''import hashlib, json, os, pathlib, signal, subprocess, sys, time
@@ -117,6 +119,52 @@ class AutomataCampaignTest(unittest.TestCase):
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertTrue(not result.stdout.strip() or result.stdout.strip().startswith("Z"),
                         f"Process {pid} is still running: {result.stdout}")
+
+    def test_absolute_campaign_deadline_caps_the_initialized_clock(self):
+        self.stage("done")
+        absolute = time.time() + 10
+        self.spec["limits"]["absoluteDeadlineEpoch"] = absolute
+        result = self.run_campaign()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(absolute, self.read()["deadlineEpoch"])
+
+    def test_past_absolute_campaign_deadline_opens_no_stage(self):
+        self.stage("unopened")
+        absolute = time.time() - 1
+        self.spec["limits"]["absoluteDeadlineEpoch"] = absolute
+        self.assertNotEqual(0, self.run_campaign().returncode)
+        self.assertEqual(absolute, self.read()["deadlineEpoch"])
+        self.assertEqual(0, self.read()["stages"]["unopened"]["attempts"])
+        self.assertFalse((self.output / "trace.txt").exists())
+
+    def test_past_absolute_stage_deadline_starts_no_process(self):
+        self.stage("unopened")
+        absolute = time.time() - 1
+        self.spec["stages"][0]["absoluteDeadlineEpoch"] = absolute
+        self.assertNotEqual(0, self.run_campaign().returncode)
+        self.assertEqual(absolute, self.read()["stages"]["unopened"]["deadlineEpoch"])
+        self.assertEqual(0, self.read()["stages"]["unopened"]["attempts"])
+        self.assertFalse((self.output / "trace.txt").exists())
+
+    def test_later_absolute_stage_deadline_preserves_earlier_duration_and_resume_clock(self):
+        self.stage("retry", "retry", attempts=2, seconds=5)
+        self.spec["stages"][0]["absoluteDeadlineEpoch"] = time.time() + 20
+        self.assertNotEqual(0, self.run_campaign().returncode)
+        original = self.read()["stages"]["retry"]
+        self.assertEqual(original["startedEpoch"] + 5, original["deadlineEpoch"])
+        resumed = self.run_campaign(resume=True)
+        self.assertEqual(0, resumed.returncode, resumed.stderr)
+        self.assertEqual(original["deadlineEpoch"], self.read()["stages"]["retry"]["deadlineEpoch"])
+
+    def test_absolute_deadlines_require_finite_numeric_unix_seconds(self):
+        self.stage("done")
+        for owner in (self.spec["limits"], self.spec["stages"][0]):
+            for invalid in (True, "123", None, float('inf'), float('-inf'), float('nan')):
+                with self.subTest(value=invalid):
+                    owner["absoluteDeadlineEpoch"] = invalid
+                    with self.assertRaisesRegex(ValueError, "finite Unix seconds"):
+                        controller.validate_spec(self.spec, self.output)
+            owner.pop("absoluteDeadlineEpoch")
 
     def test_rejection_skips_dependents_and_continues_independent_work(self):
         self.stage("diagnostic", "reject")

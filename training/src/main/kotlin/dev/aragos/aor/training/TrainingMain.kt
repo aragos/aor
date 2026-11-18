@@ -11,8 +11,158 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (
+        arguments.toList().chunked(2).any {
+            it.size == 2 && it[0] == "--mode" && it[1] in RobustTokenMain.modes
+        }
+    ) {
+        RobustTokenMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().chunked(2).any {
+            it.size == 2 && it[0] == "--mode" && it[1] in CoordinatedWinScreenMain.modes
+        }
+    ) {
+        CoordinatedWinScreenMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().chunked(2).any {
+            it.size == 2 && it[0] == "--mode" && it[1] in CoordinatedWinMain.modes
+        }
+    ) {
+        CoordinatedWinMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().chunked(2).any {
+            it.size == 2 && it[0] == "--mode" && it[1] in CoordinatedWinQualificationMain.modes
+        }
+    ) {
+        CoordinatedWinQualificationMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().chunked(2).any {
+            it.size == 2 && it[0] == "--mode" && it[1] in CoordinatedQualificationMain.modes
+        }
+    ) {
+        CoordinatedQualificationMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in CoordinatedEsScreenMain.modes
+        }
+    ) {
+        CoordinatedEsScreenMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any { it[0] == "--mode" && it[1] in CoordinatedEsMain.modes }
+    ) {
+        CoordinatedEsMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in CpePairedScreenMain.modes
+        }
+    ) {
+        CpePairedScreenMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it[0] == "--mode" && it[1] in CpePairedMain.modes }) {
+        CpePairedMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in TokenPairedScreenMain.modes
+        }
+    ) {
+        TokenPairedScreenMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any { it[0] == "--mode" && it[1] in TokenPairedMain.modes }
+    ) {
+        TokenPairedMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in ExpansionBaselineMain.modes
+        }
+    ) {
+        ExpansionBaselineMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in ExpansionFinalMain.modes
+        }
+    ) {
+        ExpansionFinalMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" &&
+                it[1] in
+                    setOf(
+                        "expansion-on-policy-prepare",
+                        "expansion-on-policy-collect",
+                        "expansion-on-policy-reproduce",
+                    )
+        }
+    ) {
+        ExpansionOnPolicyMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in setOf("purchase-plan-public", "purchase-plan-tails")
+        }
+    ) {
+        PurchasePlanMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it[0] == "--mode" && it[1] in setOf("afterstate-collect", "afterstate-replay")
+        }
+    ) {
+        AfterstateMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "joint-replay") }) {
+        JointReproduction.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "joint-state-schema") }) {
+        JointStateSchema.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "expansion-imitation-fit") }) {
+        ExpansionImitationMain.run(arguments.toList())
+        return
+    }
+    if (
+        arguments.toList().windowed(2).any {
+            it == listOf("--mode", "expansion-opportunity-collect")
+        }
+    ) {
+        ExpansionOpportunityMain.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-order-collect") }) {
         TokenOrderCollectionMain.run(arguments.toList())
+        return
+    }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-order-replay") }) {
+        TokenOrderReproduction.run(arguments.toList())
         return
     }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "territory-value-schema") }) {
@@ -52,6 +202,10 @@ fun main(arguments: Array<String>) {
         PurchaseCollectionMain.run(arguments.toList())
         return
     }
+    if (arguments.toList().windowed(2).any { it == listOf("--mode", "purchase-replay") }) {
+        PurchaseReproduction.run(arguments.toList())
+        return
+    }
     if (arguments.toList().windowed(2).any { it == listOf("--mode", "token-value-pilot") }) {
         TokenValuePilotMain.run(arguments.toList())
         return
@@ -87,10 +241,14 @@ fun main(arguments: Array<String>) {
             --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
             --mode pilot-diagnose --source PATH --output PATH --samples N --seed N
             --mode arena --source COMPARISON_JSON --output PATH --hours HOURS --workers N
+            --mode expansion-imitation-fit --source IMITATION_JSON --output NEW_PATH
             --mode strategy-search --source SEARCH_JSON --output PATH --hours HOURS --workers N
             --mode token-value-pilot --source PILOT_JSON --output PATH --hours HOURS --workers N
+            --mode expansion-opportunity-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode token-order-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
+            --mode token-order-replay --source COMPLETED_COLLECTION --output NEW_PATH --hours HOURS
             --mode purchase-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
+            --mode purchase-replay --source COMPLETED_COLLECTION --output NEW_PATH --hours HOURS
             --mode card-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode joint-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N
             --mode territory-collect --source COLLECTION_JSON --output PATH --hours HOURS --workers N

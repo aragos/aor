@@ -13,6 +13,7 @@ import sys
 import card_policy as card
 import purchase_policy as backend
 from joint_economy import terminal_metrics
+from joint_current_ecology import CurrentJointEvidence, JointEcology
 
 require, read, sha = backend.require, backend.read_json, backend.file_digest
 PHASES = ('card', 'purchase')
@@ -76,7 +77,9 @@ def load_bundle(path, configuration, baseline_sha, pins, controlled=True):
 
 class JointCollection:
     """Hash-bound complete batch, read once before either typed fitter receives a row."""
-    def __init__(self, directory, bundle_path):
+    def __init__(self, directory, bundle_path, *, ecology=None):
+        require(ecology is None or ecology is JointEcology.CURRENT,
+                'Choose an explicit typed joint ecology; omission preserves the legacy reader.')
         self.directory = Path(directory).resolve(strict=True)
         self.pins = {}
         root = self.directory
@@ -113,9 +116,12 @@ class JointCollection:
         require(manifest['baseline'] == dict(path=str(baseline), sha256=sha(baseline)),
                 'Joint F prior differs from its manifest.')
         self._snapshot(baseline, 'baseline.json')
+        evidence = (CurrentJointEvidence(root, source_path, snapshot, manifest, done, self.pins, pin)
+                    if ecology is JointEcology.CURRENT else None)
+        purchase_prior = evidence.prior if evidence else baseline
         own = resolved(snapshot['bundle'], source_path.parent)
         require(own == Path(bundle_path).resolve(strict=True), 'Train only the exact collecting joint bundle.')
-        self.bundle, self.models = load_bundle(own, snapshot['configuration'], sha(baseline), self.pins)
+        self.bundle, self.models = load_bundle(own, snapshot['configuration'], sha(purchase_prior), self.pins)
         require(manifest['bundle'] == self.bundle, 'Joint phase versions, dictionaries or model identities changed.')
         self._bundle_snapshots(self.bundle, 'bundle.json', '')
         opponents = []
@@ -123,10 +129,12 @@ class JointCollection:
                 'A joint collection requires a bounded frozen rival pool.')
         for index, value in enumerate(snapshot['opponents']):
             opponent, _ = load_bundle(resolved(value, source_path.parent), snapshot['configuration'],
-                                      sha(baseline), self.pins, controlled=False)
+                                      sha(purchase_prior), self.pins, controlled=False)
             opponents.append(opponent)
             self._bundle_snapshots(opponent, f'opponent-{index}-bundle.json', f'opponent-{index}-')
         require(manifest['opponents'] == opponents, 'Joint rival bundles changed.')
+        if evidence:
+            evidence.validate_heads([self.bundle, *opponents])
         paths = [root/f'game-{index}.json.gz' for index in range(count)]
         hashes = [sha(pin(path, self.pins)) for path in paths]
         require(done['gameSha256'] == hashes and set(root.glob('game-*')) == set(paths),
@@ -143,6 +151,8 @@ class JointCollection:
                 purchaseModelSha256=self.bundle['purchase']['sha256'])
             require(all(game.get(key) == value for key, value in expected.items()),
                     'Joint game origins and both behavior model identities must match their manifest.')
+            if evidence:
+                evidence.validate_game(game, index, hashes[index])
             reward = terminal_metrics(game)['reward']
             rewards.append(reward)
             occupied, counts, turns = set(), {}, []
@@ -183,7 +193,10 @@ class JointCollection:
             completionSha256=sha(root/'finished.json'), gameHashes=hashes, games=count,
             gameMeanReward=math.fsum(rewards)/count, bundleSha256=self.bundle['sha256'],
             originCoverage=self.origins, readerSha256=sha(__file__))
-        self.configuration, self.baseline_sha = manifest['configuration'], sha(baseline)
+        if evidence:
+            evidence.finish()
+            self.common['jointEcology'] = evidence.provenance
+        self.configuration, self.baseline_sha = manifest['configuration'], sha(purchase_prior)
         unchanged(self.pins)
 
     def _snapshot(self, original, name):

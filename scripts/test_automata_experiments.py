@@ -16,6 +16,23 @@ import automata_experiments as experiment
 
 
 class ExperimentTest(unittest.TestCase):
+    def test_four_hour_parent_caps_only_strategy_replay_at_one_hour(self):
+        with mock.patch.object(experiment, "remaining_seconds", return_value=14400):
+            with mock.patch.object(subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+                experiment.native(self.protocol, "strategy-replay", self.baseline, self.output / "replay")
+                command = run.call_args.args[0]
+                self.assertEqual(command[command.index("--hours") + 1], "1.0")
+                experiment.native(self.protocol, "arena", self.baseline, self.output / "arena")
+                command = run.call_args.args[0]
+                self.assertEqual(command[command.index("--hours") + 1], "4.0")
+
+    def test_strategy_replay_retains_shorter_remaining_deadline(self):
+        with mock.patch.object(experiment, "remaining_seconds", return_value=900):
+            with mock.patch.object(subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+                experiment.native(self.protocol, "strategy-replay", self.baseline, self.output / "replay")
+                command = run.call_args.args[0]
+                self.assertEqual(command[command.index("--hours") + 1], "0.25")
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

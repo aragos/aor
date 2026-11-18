@@ -118,11 +118,14 @@ data class StrategySearchSpecification(
     val explicitCandidates: List<BotModel>? = null,
 ) {
     init {
+        require(arena.jointPolicy == null) {
+            "Joint actor roles are supported only by complete arena and strategy replay."
+        }
         require(arena.experimentalRulesTransfer == null) {
             "Experimental rules transfer supports arena, token-order and purchase collection, not ordinary model search."
         }
-        require(arena.tokenOrder == null) {
-            "Ordinary model search cannot assign token-order actor roles."
+        require(arena.tokenOrder == null && arena.expansionImitation == null) {
+            "Ordinary model search cannot assign token-order or expansion-imitation actor roles."
         }
         require(arena.purpose == ArenaPurpose.SCREENING) {
             "Parameter search is selection data and requires SCREENING purpose."

@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.PurchaseObservation
 import dev.aragos.aor.ai.PurchaseObservationEncoder
@@ -41,6 +42,8 @@ internal data class PurchaseGameTrajectory(
     val opponentIndices: List<Int>,
     val decisions: List<PurchaseDecisionRecord>,
     val terminal: PurchaseTerminal,
+    /** Separate audit sidecar, never serialized into the learning trajectory. */
+    @get:JsonIgnore val canonicalReplay: PurchaseCanonicalReplay? = null,
 )
 
 /** Collects whole games using the same shared inference/sampler that evaluates the actor. */
@@ -79,6 +82,10 @@ internal class PurchaseCollector(
             } else {
                 emptyMap()
             }
+        val purchaseControllers = opponentControllers + (seat to controller)
+        val trace =
+            if (index in input.ecology?.replayIndices.orEmpty()) PurchaseCanonicalTrace(seat)
+            else null
         val game =
             Simulation()
                 .play(
@@ -93,7 +100,10 @@ internal class PurchaseCollector(
                             )
                         },
                     deadlineNanos = deadlineNanos,
-                    controllers = opponentControllers + (seat to controller),
+                    controllers =
+                        input.ecology?.controllers(input, index, purchaseControllers)
+                            ?: purchaseControllers,
+                    trace = trace,
                 )
         return PurchaseGameTrajectory(
             signature = signature,
@@ -113,6 +123,7 @@ internal class PurchaseCollector(
                     game.scores.map(PilotReplayScore::from),
                     game.steps,
                 ),
+            canonicalReplay = trace?.result(),
         )
     }
 }

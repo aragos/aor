@@ -14,12 +14,15 @@ import dev.aragos.aor.ScoreView
 import dev.aragos.aor.Stage
 import dev.aragos.aor.SystemNeed
 import dev.aragos.aor.TextCodec
+import dev.aragos.aor.TokenPurchaseOfferView
 import dev.aragos.aor.ai.BotCandidate
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.BotPolicy
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
+import dev.aragos.aor.ai.TokenNeighborQuote
 import java.util.concurrent.CancellationException
 import kotlin.random.Random
 
@@ -45,6 +48,8 @@ constructor(
     val view: GameView,
     val observation: BotObservation,
     val batchStartNumber: Int = number,
+    /** Explicit actor-only quote capability; absent from every ordinary controller input. */
+    val tokenQuote: TokenNeighborQuote? = null,
 )
 
 /** Explicit experiment-only policy extension; null retains the ordinary baseline command. */
@@ -52,8 +57,23 @@ fun interface SimulationController {
     /** Avoid projecting a full owner view for decisions this controller leaves to the baseline. */
     fun controls(decision: String): Boolean = true
 
+    fun tokenNeighborMixture(): LocalTokenNeighborMixture? = null
+
+    /** Observation-only receipt, delivered after authority admission and never used to select. */
+    fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) = Unit
+
     fun choose(decision: SimulationDecision): String?
 }
+
+/** The original input and the exact augmented owner projection retained for decision tracing. */
+data class SimulationTokenQuoteAdmission(
+    val command: String,
+    val quote: TokenPurchaseOfferView,
+    val original: BotObservation,
+    val acceptedView: GameView,
+    val accepted: BotObservation,
+    val candidate: BotCandidate,
+)
 
 /**
  * Optional inspection sink, never a policy input. [seat] is the zero-based registration index.
@@ -78,6 +98,17 @@ interface SimulationTrace {
     )
 
     fun verified(header: GameHeader, entries: List<String>)
+}
+
+/**
+ * Native research inspection only, separate from every policy/controller input. Implementations
+ * must publish only the selected seat's public/own projection. Called after choice and before
+ * applying that exact action; it may neither select commands nor advance the authority.
+ */
+interface SimulationStateObserver {
+    val seat: Int
+
+    fun chosen(state: GameState, number: Int, observation: BotObservation, command: String)
 }
 
 /** Public coverage facts; no actual hidden hand or deck order is retained in training reports. */
@@ -132,6 +163,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
         verifyReplay: Boolean = false,
         trace: SimulationTrace? = null,
         controllers: Map<Int, SimulationController> = emptyMap(),
+        stateObserver: SimulationStateObserver? = null,
     ): SimulatedGame {
         require(competitors.size == configuration.playerCount) {
             "Every simulated seat requires one competitor."
@@ -141,6 +173,9 @@ class Simulation(private val maxDecisions: Int = 12000) {
         }
         require(controllers.keys.all { it in competitors.indices }) {
             "A simulation controller requires a registered seat."
+        }
+        require(stateObserver == null || stateObserver.seat in competitors.indices) {
+            "A simulation state observer requires a registered seat."
         }
         val controlled = controllers.toMap()
         checkDeadline(deadlineNanos)
@@ -194,6 +229,14 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 val policySeed = simulationPolicySeed(seed, step, seat)
                 val controller = controlled[seat]?.takeIf { it.controls(observation.decision) }
                 val view = if (controller != null) state.viewForPlayer(actor) else null
+                val tokenQuotes =
+                    SimulationTokenQuotes.create(
+                        state,
+                        actor,
+                        view,
+                        observation,
+                        controller?.tokenNeighborMixture(),
+                    )
                 val command =
                     controller?.choose(
                         SimulationDecision(
@@ -206,8 +249,17 @@ class Simulation(private val maxDecisions: Int = 12000) {
                                 },
                             observation = observation,
                             batchStartNumber = step,
+                            tokenQuote = tokenQuotes?.capability,
                         )
                     )
+                val accepted =
+                    if (command != null && observation.candidates.none { it.command == command }) {
+                        requireNotNull(tokenQuotes) {
+                                "An experiment controller must select one of its ordinary offered commands."
+                            }
+                            .admit(command)
+                    } else null
+                val acceptedObservation = accepted?.accepted ?: observation
                 val candidate =
                     if (command == null) {
                         BotPolicy.chooseCandidate(
@@ -218,7 +270,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                         )
                     } else {
                         requireNotNull(
-                            observation.candidates.singleOrNull { it.command == command }
+                            acceptedObservation.candidates.singleOrNull { it.command == command }
                         ) {
                             "An experiment controller must select one of its ordinary offered commands."
                         }
@@ -233,15 +285,24 @@ class Simulation(private val maxDecisions: Int = 12000) {
                         number = step + actorIndex,
                         snapshotEntryCount = snapshotEntryCount,
                         commandEntryIndex = snapshotEntryCount + actorIndex,
-                        view = state.viewForDecision(actor),
-                        observation = observation,
+                        view = accepted?.acceptedView ?: state.viewForDecision(actor),
+                        observation = acceptedObservation,
                         chosen = candidate,
                         model = competitor.model,
                     )
                 }
+                if (accepted != null) controller?.acceptedTokenQuote(accepted)
                 decisions[observation.decision] = (decisions[observation.decision] ?: 0) + 1
                 families[candidate.family] = (families[candidate.family] ?: 0) + 1
                 val action = TextCodec.parseAction(candidate.command, state, actor = actor)
+                if (stateObserver?.seat == seat) {
+                    stateObserver.chosen(
+                        state,
+                        step + actorIndex,
+                        acceptedObservation,
+                        candidate.command,
+                    )
+                }
                 if (candidate.command.startsWith("play ")) {
                     val reference = candidate.command.split(' ').getOrNull(1)
                     state

@@ -1,0 +1,93 @@
+"""Pure host-local joins for the retained zero-game continuation preparation.
+
+Copied request provenance remains original. Physical model/runtime/environment paths belong to
+the actual host profile; this owner binds every executing center/direction/seal to prepared bytes.
+"""
+from pathlib import Path
+
+import coordinated_es_continuation as c
+import coordinated_es_math as es
+import coordinated_win_plan as p
+import token_paired_storage as storage
+
+
+def verify(plan,profile):
+    preparation=profile['numericalPreparation'];request_subject=preparation['request']
+    request=p.read(p.checked_subject(request_subject))
+    finished_path=p.checked_subject(preparation['finished']);finished=p.read(finished_path)
+    original_request=dict(path=request_subject.get('originalPath',request_subject['path']),sha256=request_subject['sha256'])
+    expected_protocol=plan.file_sha256
+    p.require(profile['protocolSha256']==expected_protocol and
+        finished['kind']=='coordinated-win-numeric-complete-1' and finished['verb']=='prepare' and
+        finished['passed'] is True and finished['complete'] is True and finished['request']==original_request and
+        finished['protocolSha256']==expected_protocol and request['protocol']['sha256']==expected_protocol and
+        request['kind']=='coordinated-win-prepare-request-1' and finished['sourceOwners']==request['sourceOwners'] and
+        finished['execution']==dict(newGames=0,actualFits=0,optimizerSteps=0),
+        'The copied preparation must retain its exact original request, new protocol and zero-game identity.')
+    for key,expected in (('originalBundle',plan.scope.original_bundle_sha256),('projection',plan.scope.projection_sha256),
+            ('warmStart',plan.record['warmStart']['identitySha256'])):
+        p.require(request[key]['sha256']==profile[key]['sha256']==expected,
+            'Every executing original/projection/warm-start subject must match the completed preparation.')
+        p.checked_subject(profile[key])
+    p.require(type(profile['directions']) is list and len(profile['directions'])==16,
+        'All16 prepared direction tables are required in original generation order.')
+    outputs={'projection.json':profile['projection'],'warm-start.json':profile['warmStart'],
+        'initial-center.json':profile['initialCenter'],'calibration/inherited-calibration.json':profile['inheritedCalibration'],
+        **{f'directions/generation-{number:02d}.json':item for number,item in enumerate(profile['directions'],1)}}
+    expected=set(outputs)|{'started.json','warm-start-proof.json','warm-bundle/bundle.json',
+        *(f'warm-bundle/heads/{head}/policy.json' for head in p.HEADS),
+        'calibration/origin/calibration.json','calibration/origin/protocol.json',
+        'calibration/origin/gap-EXPANSION.json','calibration/origin/gap-TOKEN.json',
+        *(f'directions/generation-{number:02d}-generation.json' for number in range(1,17))}
+    inventory=storage.inventory(finished_path.parent)
+    p.require(finished['outputs']==dict(projection='projection.json',warmStart='warm-start.json',center='initial-center.json',
+        inheritedCalibration='calibration/inherited-calibration.json',proof='warm-start-proof.json') and
+        set(finished['artifacts'])==expected and set(inventory)==expected|{'finished.json'} and
+        all(inventory[name]['sha256']==digest for name,digest in finished['artifacts'].items()) and
+        all(p.checked_subject(item).resolve()==(finished_path.parent/name).resolve() and
+            item['sha256']==finished['artifacts'][name] for name,item in outputs.items()),
+        'The entire executing preparation closure must be byte-exact, complete and in its original portable layout.')
+    warm=c.WarmStart.from_record(p.read(p.checked_subject(profile['warmStart'])));plan.verify_warm_start(warm)
+    initial=c.Center.from_record(p.read(p.checked_subject(profile['initialCenter'])),warm)
+    p.require(initial.step==0 and initial.coordinates==warm.coordinates,
+        'The new local origin is precisely the parent final center, without resetting its coordinate space.')
+    for number,item in enumerate(profile['directions'],1):
+        direction=es.DirectionTable.from_record(p.read(p.checked_subject(item)))
+        generated=p.read(finished_path.parent/f'directions/generation-{number:02d}-generation.json')
+        p.require(direction.scope==plan.scope and direction.generation==number and
+            generated['kind']=='coordinated-es-direction-generation-1' and generated['generation']==number and
+            generated['seed']==plan.bank(number)['directionSeed'] and generated['generator']=='numpy-PCG64' and
+            generated['distribution']=='independent-standard-normal' and generated['shape']==[16,256] and
+            generated['renormalized'] is False and generated['directionsSha256']==item['sha256'],
+            'Every executing direction must retain its prospective fresh generation stream and exact generated bytes.')
+    proof=p.read(finished_path.parent/'warm-start-proof.json')
+    p.require(proof==dict(kind='coordinated-es-warm-start-proof-1',complete=True,
+        protocolSha256=expected_protocol,warmStartSha256=warm.sha256,originCenterSha256=warm.origin_center_sha256,
+        originBundleSha256=warm.origin_bundle_sha256,allFourHeadBytesExact=True,descriptorBytesExact=True,
+        projectionRegenerated=False,calibrationRecomputedFromNewStates=False,initializationStreams=0,directionStreams=16,
+        execution=dict(newGames=0,actualFits=0,optimizerSteps=0)),
+        'The inherited center must have a complete exact four-head materialization proof without reinitialization/recalibration.')
+    bundle=p.read(finished_path.parent/'warm-bundle/bundle.json')
+    p.require(inventory['warm-bundle/bundle.json']['sha256']==warm.origin_bundle_sha256 and
+        bundle['kind']=='coordinated-es-bundle-1' and set(bundle['heads'])==set(p.HEADS),
+        'The prepared parent descriptor must remain its exact admitted whole four-head bundle.')
+    for head,row in bundle['heads'].items():
+        p.require(set(row)=={'path','sha256','dictionarySha256'} and row['path']==f'heads/{head}/policy.json' and
+            inventory['warm-bundle/'+row['path']]['sha256']==row['sha256'] and
+            row['dictionarySha256']==plan.record['parameterSpace']['heads'][head]['dictionarySha256'],
+            'Every prepared warm head and complete dictionary must remain in its exact admitted bundle.')
+    inherited=p.read(p.checked_subject(profile['inheritedCalibration']))
+    expected_calibration=plan.record['calibration']
+    p.require(inherited==dict(kind='coordinated-es-inherited-calibration-1',protocolSha256=expected_protocol,
+        parameterSpace=plan.scope.record,warmStartSha256=warm.sha256,
+        originProtocol=dict(path='origin/protocol.json',sha256=expected_calibration['originProtocolSha256']),
+        originCalibration=dict(path='origin/calibration.json',sha256=expected_calibration['originCalibrationSha256']),
+        recipe=expected_calibration['recipe'],scales=expected_calibration['scales'],recalibrated=False),
+        'The executing selector envelope must retain its exact original seal, protocol, recipe and scales.')
+    for name,key in (('protocol','originProtocolSha256'),('calibration','originCalibrationSha256')):
+        p.require(inventory[f'calibration/origin/{name}.json']['sha256']==expected_calibration[key],
+            'The inherited old protocol/seal raw bytes cannot be rewritten during relocation.')
+    return dict(kind='coordinated-win-preparation-join-1',passed=True,
+        protocolSha256=expected_protocol,finishedSha256=preparation['finished']['sha256'],
+        warmStartSha256=warm.sha256,inheritedCalibrationSha256=profile['inheritedCalibration']['sha256'],
+        directionTables=16,preparationFiles=len(inventory))
