@@ -15,15 +15,21 @@ import token_anchor_distribution as distribution
 import token_anchored_data as data
 import token_anchored_policy as policy
 import token_anchored_fit as fit
-from token_anchored_recipe import PROXIMAL_RECIPE
+from token_anchored_recipe import FIT_CASES, PROXIMAL_RECIPE, RECIPE
 import token_paired_data as legacy
 import token_paired_fit as old_fit
 import token_paired_objective as objective
-from test_token_paired_fit import model, view, frozen
+from test_token_paired_fit import model, view
 
 
-def fixture(count=16):
-    original = frozen(policy.initialize(model(True)))
+def fixture(count=16, *, history=False):
+    anchor_model = model(True)
+    history_dictionary = dict(encoderVersion=policy.HISTORY_CONTRACT.encoder,
+        stateFeatureNames=sorted(anchor_model['stateFeatureNames'] + list(policy.HISTORY_STATE)),
+        actionFeatureNames=sorted(anchor_model['actionFeatureNames'] + list(policy.HISTORY_ACTION)))
+    initialized = policy.initialize(anchor_model, dictionary=history_dictionary if history else None)
+    raw = b.canonical(initialized)
+    original = data.FrozenActor(raw, hashlib.sha256(raw).hexdigest())
     dictionary = b.canonical({key: original.model[key] for key in
         ('encoderVersion', 'stateFeatureNames', 'actionFeatureNames')})
     context = data.Context(1, count, 4, '1'*64, '2'*64, '3'*64,
@@ -32,6 +38,10 @@ def fixture(count=16):
     roots = []; targets = []; anchors = []
     for index in range(count):
         offered = view(); p94 = [0., 1., 0.]; p0 = distribution.prior(p94)
+        if history:
+            offered['encoderVersion'] = policy.HISTORY_CONTRACT.encoder
+            offered['stateFeatures']['bidHistory.sampleShare'] = (index+1)/count
+            offered['actions'][0]['features']['bidOrder.bestBox'] = 1/6
         record = dict(index=index, split='TRAIN', status='READY',
             requestSha256=hashlib.sha256(f'INVENTED-{index}'.encode()).hexdigest(),
             decisionNumber=8, batchStartNumber=7, observation=offered,
@@ -231,6 +241,41 @@ class DataAndFitTests(unittest.TestCase):
             self.assertEqual(history[-1]['collection']['states'], training.ready_count)
             self.assertGreater(history[-1]['collection']['mean'], 0.)
             self.assertEqual(done, fit.completed(output))
+
+    def test_shared_history_corpus_seals_each_fit_and_exports_a_masked_runtime(self):
+        training, original, dictionary = fixture(history=True)
+        config = old_fit.Config(tuple(range(1, 21)), time.time()+90)
+        observation = training.roots[-1].record
+        with tempfile.TemporaryDirectory() as temporary:
+            for case, recipe in zip(FIT_CASES, (RECIPE, PROXIMAL_RECIPE, PROXIMAL_RECIPE)):
+                with self.subTest(case=case['id']):
+                    output = Path(temporary)/case['id']
+                    done = fit.fit(training, original, original, dictionary, output, config,
+                        recipe=recipe, fit_case=case)
+                    self.assertEqual(done['identity']['fitCase'], case)
+                    self.assertEqual(done['identity']['recipe'], recipe)
+                    self.assertEqual(done['identity']['trainingSha256'], training.sha256)
+                    self.assertTrue(done['actorChanged'])
+                    result = b.read_json(output/'policy.json')
+                    if case['historyEnabled']:
+                        with self.assertRaisesRegex(ValueError, 'masked history'):
+                            policy.require_zero_history_weights(result)
+                    else:
+                        policy.require_zero_history_weights(result)
+                        masked = policy.TokenAnchoredPolicy(result, history_enabled=False)
+                        runtime = policy.TokenAnchoredPolicy(result)
+                        self.assertTrue(b.torch.equal(masked([masked.prepare_record(observation)])[0][0],
+                            runtime([runtime.prepare_record(observation)])[0][0]))
+
+    def test_history_case_cannot_be_fit_under_a_different_penalty(self):
+        training, original, dictionary = fixture(history=True)
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)/'never'
+            with self.assertRaisesRegex(ValueError, 'fixed recipe and feature mask'):
+                fit.fit(training, original, original, dictionary, output,
+                    old_fit.Config(tuple(range(1, 21)), time.time()+30),
+                    recipe=RECIPE, fit_case=FIT_CASES[-1])
+            self.assertFalse(output.exists())
 
     def test_expired_fit_creates_no_output(self):
         training, original, dictionary = fixture()

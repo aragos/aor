@@ -11,7 +11,7 @@ import hashlib
 
 import token_paired_campaign_plan as shared
 import token_anchor_distribution as distribution
-from token_anchored_recipe import PROXIMAL_RECIPE, RECIPE
+from token_anchored_recipe import FIT_CASES, PROXIMAL_RECIPE, RECIPE, validate_fit_case
 
 
 KIND = 'token-anchored-campaign-1'
@@ -74,6 +74,13 @@ class Plan:
         if 'comparisonNumericalRecipe' in record:
             shared.require(len(rounds) == 1 and record['comparisonNumericalRecipe'] == PROXIMAL_RECIPE,
                 'Only the fixed proximal comparison may share a prospectively declared one-round corpus.')
+        if 'fitCases' in record:
+            shared.require(record.get('comparisonNumericalRecipe') == PROXIMAL_RECIPE and
+                record['fitCases'] == FIT_CASES,
+                'The shared history corpus requires all three fixed fit cases.')
+            for case in record['fitCases']:
+                recipe = RECIPE if case['recipeVersion'] == RECIPE['version'] else PROXIMAL_RECIPE
+                validate_fit_case(case, recipe)
         streams = []
         ecology = None
         for row in rounds:
@@ -158,6 +165,16 @@ class Plan:
         shared.require(comparison is not None and version == comparison['version'],
             'Every fitted recipe must be declared in the original campaign protocol.')
         return comparison
+
+    def fit_case(self, identifier=None):
+        cases = self.record.get('fitCases')
+        if cases is None:
+            shared.require(identifier is None, 'This protocol does not declare explicit fit cases.')
+            return None
+        for case in cases:
+            if case['id'] == identifier:
+                return case
+        raise ValueError('Choose one explicit fit case from the original protocol.')
 
     def collection_source(self, round_number, chunk, profile, current):
         record = self.record; row = record['rounds'][round_number-1]
