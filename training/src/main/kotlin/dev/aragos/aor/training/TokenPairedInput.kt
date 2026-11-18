@@ -190,21 +190,26 @@ private constructor(
                 "externalImmutable" to true,
             )
 
-    /** Internal legacy data classes do not determine the versioned anchored transport contract. */
+    /**
+     * Encode and parse the origin at the JSON boundary. Integer seeds fit in different JVM node
+     * widths depending on their source type, but the persisted evidence has one JSON
+     * representation.
+     */
     fun originWire(origin: TokenPairedOrigin): ObjectNode =
-        PurchaseJson.mapper.valueToTree<ObjectNode>(origin).also { wire ->
-            if (anchor != null) {
-                wire.put("kind", kind("origin"))
-                wire.set<JsonNode>("round", wire.remove("iteration"))
-                wire["publicRoot"].takeUnless(JsonNode::isNull)?.let { root ->
-                    (root as ObjectNode).remove("inclusionProbability")
-                }
-                wire["anchors"].forEach { row ->
-                    row as ObjectNode
-                    row.set<JsonNode>("round", row.remove("iteration"))
+        (PurchaseJson.mapper.readTree(PurchaseJson.mapper.writeValueAsBytes(origin)) as ObjectNode)
+            .also { wire ->
+                if (anchor != null) {
+                    wire.put("kind", kind("origin"))
+                    wire.set<JsonNode>("round", wire.remove("iteration"))
+                    wire["publicRoot"].takeUnless(JsonNode::isNull)?.let { root ->
+                        (root as ObjectNode).remove("inclusionProbability")
+                    }
+                    wire["anchors"].forEach { row ->
+                        row as ObjectNode
+                        row.set<JsonNode>("round", row.remove("iteration"))
+                    }
                 }
             }
-        }
 
     fun controllers(
         globalIndex: Int,
