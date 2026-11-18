@@ -42,24 +42,24 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
         artifacts.write(
             "prepared.json",
             mapOf(
-                "kind" to TokenPairedInput.VERSION,
+                "kind" to input.version,
                 "signature" to input.signature,
                 "scopeSha256" to input.scopeSha256,
                 "scienceSha256" to input.scienceSha256,
                 "scienceIdentity" to input.scienceIdentity,
                 "ecologySha256" to input.ecologySha256,
                 "ecologyIdentity" to input.ecologyIdentity,
-                "iteration" to input.iteration,
+                input.roundField to input.iteration,
                 "range" to input.range,
-                "requests" to input.range.indices.map(::TokenPairedRequest),
+                "requests" to input.range.indices.map(input::request),
                 "origins" to input.origins,
                 "replayIndices" to input.replayIndices,
                 "ownedReplayIndices" to input.ownedReplayIndices,
                 "configuration" to input.configuration.id,
                 "source" to input.source.metadata("source.json"),
                 "arena" to input.arenaSource.metadata("arena.json"),
-                "currentActor" to input.currentActor.metadata("current-actor.json"),
-                "originalActor" to input.originalActor.metadata("original-actor.json"),
+                "currentActor" to input.actorMetadata(input.currentActor, "current-actor.json"),
+                "originalActor" to input.actorMetadata(input.originalActor, "original-actor.json"),
                 "policyBindings" to input.policyBindings,
                 "dictionary" to
                     mapOf(
@@ -67,7 +67,7 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                         "sha256" to PurchaseJson.hash(directory.resolve("dictionary.json")),
                     ),
                 "snapshots" to snapshots,
-                "maximumTerminalGames" to input.range.count * 19,
+                "maximumTerminalGames" to input.range.count * (1 + 2 * input.proposalBudget),
                 "fits" to 0,
             ),
         )
@@ -75,7 +75,7 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
 
     fun save(origin: TokenPairedOrigin): TokenPairedReceipt {
         val index = origin.request.globalIndex
-        val wire = PurchaseJson.mapper.readTree(PurchaseJson.mapper.writeValueAsBytes(origin))
+        val wire = input.originWire(origin)
         validate(wire, index)
         val name = "origin-$index.json.gz"
         require(!Files.exists(directory.resolve(name))) { "Token origins cannot be overwritten." }
@@ -133,12 +133,12 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
         artifacts.write(
             "finished.json",
             mapOf(
-                "kind" to "token-paired-finished-1",
+                "kind" to input.kind("finished"),
                 "signature" to input.signature,
                 "scopeSha256" to input.scopeSha256,
                 "scienceSha256" to input.scienceSha256,
                 "complete" to true,
-                "iteration" to input.iteration,
+                input.roundField to input.iteration,
                 "range" to input.range,
                 "origins" to receipts.sortedBy { it.globalIndex },
                 "backboneGames" to receipts.size,
@@ -186,12 +186,12 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
     internal fun validate(origin: JsonNode, index: Int) {
         require(index in input.range.indices) { "An origin index must belong to its source shard." }
         require(
-            origin["kind"]?.asText() == "token-paired-origin-1" &&
+            origin["kind"]?.asText() == input.kind("origin") &&
                 origin["signature"]?.asText() == input.signature &&
                 origin["scopeSha256"]?.asText() == input.scopeSha256 &&
                 origin["scienceSha256"]?.asText() == input.scienceSha256 &&
-                origin["iteration"]?.intValue() == input.iteration &&
-                origin["request"] == wire(TokenPairedRequest(index)) &&
+                origin[input.roundField]?.intValue() == input.iteration &&
+                origin["request"] == wire(input.request(index)) &&
                 origin["streams"] == wire(input.origins[index])
         ) {
             "Origin source, global request and exact streams must match their immutable input."
@@ -218,7 +218,7 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
             "Every origin retains one complete current-policy backbone and its exact prefix."
         }
         val anchors = origin.required("anchors")
-        require(input.iteration == 1 && index < 512 || anchors.isEmpty) {
+        require(input.iteration == 1 && index < input.layout.trainCount || anchors.isEmpty) {
             "Only original iteration-one TRAIN backbone states belong in the fixed anchor."
         }
         require(anchors.map { it["number"].intValue() }.let { it == it.sorted().distinct() }) {
@@ -226,12 +226,13 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
         }
         anchors.forEach { anchor ->
             require(
-                anchor["iteration"].intValue() == input.iteration &&
+                anchor[input.roundField].intValue() == input.iteration &&
                     anchor["globalIndex"].intValue() == index
             ) {
                 "An anchor must retain its original independent world identity."
             }
             probabilities(anchor["originalProbabilities"], anchor["observation"]["actions"].size())
+            validateAnchorProbabilities(anchor, reference = null)
         }
         val root = origin.required("publicRoot")
         val arms = origin.required("arms")
@@ -256,16 +257,43 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
         }
         val actions = root["observation"]["actions"]
         val reference = root["referenceIndex"].intValue()
+        val focused =
+            if (input.anchor == null) null
+            else
+                TokenAnchoredProposals.sample(
+                    actions.map { it["command"].asText() },
+                    root["rawReferenceIndex"].intValue(),
+                    reference,
+                    root["currentProbabilities"].map(JsonNode::doubleValue),
+                    root["sampledCommandIndex"].intValue(),
+                    input.proposalBudget,
+                    input.origins[index].proposalSeed,
+                )
         val proposals =
-            TokenPairedProposals.sample(
-                actions.size(),
-                reference,
-                input.origins[index].proposalSeed,
-            )
+            if (focused != null) null
+            else
+                TokenPairedProposals.sample(
+                    actions.size(),
+                    reference,
+                    input.origins[index].proposalSeed,
+                )
         require(
-            root["observation"]["baselineIndex"].intValue() == reference &&
-                root["proposedIndices"].map(JsonNode::intValue) == proposals.indices &&
-                root["inclusionProbability"].doubleValue() == proposals.inclusionProbability &&
+            root["observation"]["baselineIndex"].intValue() ==
+                (if (input.anchor == null) reference else root["rawReferenceIndex"].intValue()) &&
+                root["proposedIndices"].map(JsonNode::intValue) ==
+                    (focused?.indices
+                        ?: requireNotNull(proposals) { "Legacy proposals are required." }
+                            .indices) &&
+                (if (focused == null)
+                    root["inclusionProbability"].doubleValue() ==
+                        requireNotNull(proposals) { "Legacy proposals are required." }
+                            .inclusionProbability
+                else
+                    !root.has("inclusionProbability") &&
+                        root["mandatoryIndices"].map(JsonNode::intValue) ==
+                            focused.mandatoryIndices &&
+                        root["inclusionProbabilities"].map(JsonNode::doubleValue) ==
+                            focused.inclusionProbabilities) &&
                 root["sampledCommandIndex"].intValue() in 0 until actions.size() &&
                 root["number"].intValue() >= root["batchStartNumber"].intValue()
         ) {
@@ -273,6 +301,7 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
         }
         probabilities(root["currentProbabilities"], actions.size())
         probabilities(root["originalProbabilities"], actions.size())
+        validateAnchorProbabilities(root, reference)
         if (status == TokenPairedStatus.SINGLETON.name) {
             require(actions.size() == 1 && arms.isEmpty) {
                 "Singleton windows have no paired action deltas."
@@ -280,7 +309,10 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
             return
         }
         require(
-            actions.size() > 1 && arms.map { it["actionIndex"].intValue() } == proposals.indices
+            actions.size() > 1 &&
+                arms.map { it["actionIndex"].intValue() } ==
+                    (focused?.indices
+                        ?: requireNotNull(proposals) { "Legacy proposals are required." }.indices)
         ) {
             "Ready origins require every predeclared reference/proposal arm exactly once."
         }
@@ -290,7 +322,11 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                 arm["command"] == actions[actionIndex]["command"] &&
                     arm["outcomes"].size() == 2 &&
                     arm["inclusionProbability"].doubleValue() ==
-                        if (actionIndex == reference) 1.0 else proposals.inclusionProbability
+                        (focused?.inclusionProbabilities?.getOrNull(actionIndex)
+                            ?: if (actionIndex == reference) 1.0
+                            else
+                                requireNotNull(proposals) { "Legacy proposals are required." }
+                                    .inclusionProbability)
             ) {
                 "Each arm binds its original offered index, command, inclusion probability and two streams."
             }
@@ -308,6 +344,28 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                     "Every paired terminal requires its shared future stream and verified canonical suffix."
                 }
             }
+        }
+    }
+
+    private fun validateAnchorProbabilities(root: JsonNode, reference: Int?) {
+        val anchor = input.anchor ?: return
+        val values = root.required("anchor94Probabilities").map(JsonNode::doubleValue)
+        val count = root["observation"]["actions"].size()
+        require(values.size == count && values.all { it.isFinite() && it >= 0.0 }) {
+            "The exact encoded94 anchor probabilities must retain their complete original offers."
+        }
+        val anchorIndex = reference ?: values.indexOfFirst { it == values.max() }
+        val expected =
+            dev.aragos.aor.ai.TokenAnchoredPolicy.probabilities(
+                values,
+                List(count) { 0.0 },
+                anchor.distribution,
+                anchorIndex,
+            )
+        require(
+            root["originalProbabilities"].map(JsonNode::doubleValue) == expected.probabilities
+        ) {
+            "The recorded initial policy must be exactly the declared smoothed94 anchor."
         }
     }
 
@@ -334,7 +392,8 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                         "signature",
                         "scopeSha256",
                         "scienceSha256",
-                        "iteration",
+                        if (origin["kind"].asText() == "token-anchored-paired-origin-1") "round"
+                        else "iteration",
                         "request",
                         "streams",
                         "status",
@@ -343,14 +402,14 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
             }
 
         internal fun publicSidecar(origin: JsonNode, hash: String): ObjectNode =
-            common(origin, hash, "token-paired-public-1").also { result ->
+            common(origin, hash, familyKind(origin, "public")).also { result ->
                 listOf("missingReason", "observedWindows", "publicRoot", "anchors").forEach { key ->
                     result.set<JsonNode>(key, origin.required(key))
                 }
             }
 
         internal fun labelSidecar(origin: JsonNode, hash: String): ObjectNode =
-            common(origin, hash, "token-paired-labels-1").also { result ->
+            common(origin, hash, familyKind(origin, "labels")).also { result ->
                 result.set<JsonNode>(
                     "arms",
                     wire(
@@ -373,5 +432,10 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
                     ),
                 )
             }
+
+        private fun familyKind(origin: JsonNode, stage: String) =
+            if (origin["kind"].asText() == "token-anchored-paired-origin-1")
+                "token-anchored-paired-$stage-1"
+            else "token-paired-$stage-1"
     }
 }

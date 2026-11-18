@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameState
@@ -40,6 +41,10 @@ internal data class TokenPairedPublicRoot(
     val originalProbabilities: List<Double>,
     val proposedIndices: List<Int>,
     val inclusionProbability: Double,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val anchor94Probabilities: List<Double>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val rawReferenceIndex: Int? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val mandatoryIndices: List<Int>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val inclusionProbabilities: List<Double>? = null,
 )
 
 /**
@@ -52,6 +57,7 @@ internal data class TokenPairedAnchor(
     val batchStartNumber: Int,
     val observation: TerritoryObservation,
     val originalProbabilities: List<Double>,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL) val anchor94Probabilities: List<Double>? = null,
 )
 
 internal data class TokenPairedCanonical(
@@ -122,7 +128,7 @@ internal class TokenPairedCollector(
         require(globalIndex in input.range.indices) {
             "The origin must belong to this global shard."
         }
-        val request = TokenPairedRequest(globalIndex)
+        val request = input.request(globalIndex)
         val streams = input.origins[globalIndex]
         val session = ExperimentSession.start(input.configuration, streams.gameSeed.toLong(), true)
         val actor = session.state.playerIds[request.seat]
@@ -141,6 +147,7 @@ internal class TokenPairedCollector(
                             decision.batchStartNumber,
                             decision.observation,
                             decision.originalProbabilities,
+                            decision.anchor94Probabilities,
                         )
                 }
             }
@@ -213,31 +220,50 @@ internal class TokenPairedCollector(
     }
 
     private fun publicRoot(frame: TokenPairedDecision, seed: Long): TokenPairedPublicRoot {
+        val focused =
+            frame.anchorIndex?.let {
+                TokenAnchoredProposals.sample(
+                    frame.observation.actions.map { action -> action.command },
+                    frame.observation.baselineIndex,
+                    it,
+                    frame.currentProbabilities,
+                    frame.sampled.index,
+                    input.proposalBudget,
+                    seed,
+                )
+            }
         val proposal =
-            TokenPairedProposals.sample(
-                frame.observation.actions.size,
-                frame.observation.baselineIndex,
-                seed,
-            )
+            if (focused != null) null
+            else
+                TokenPairedProposals.sample(
+                    frame.observation.actions.size,
+                    frame.anchorIndex ?: frame.observation.baselineIndex,
+                    seed,
+                )
         return TokenPairedPublicRoot(
             frame.number,
             frame.batchStartNumber,
             frame.botSeed,
             frame.actorSeed,
             frame.observation,
-            frame.observation.baselineIndex,
+            frame.anchorIndex ?: frame.observation.baselineIndex,
             frame.sampled.index,
             frame.sampled.logProbability,
             frame.sampled.value,
             frame.currentProbabilities,
             frame.originalProbabilities,
-            proposal.indices,
-            proposal.inclusionProbability,
+            focused?.indices
+                ?: requireNotNull(proposal) { "Legacy proposals are required." }.indices,
+            proposal?.inclusionProbability ?: 0.0,
+            frame.anchor94Probabilities,
+            frame.anchor94Probabilities?.let { frame.observation.baselineIndex },
+            focused?.mandatoryIndices,
+            focused?.inclusionProbabilities,
         )
     }
 
     private fun tails(globalIndex: Int, root: Root): List<TokenPairedArm> {
-        val request = TokenPairedRequest(globalIndex)
+        val request = input.request(globalIndex)
         val streams = input.origins[globalIndex]
         return root.public.proposedIndices.map { actionIndex ->
             val command = root.public.observation.actions[actionIndex].command
@@ -265,8 +291,9 @@ internal class TokenPairedCollector(
             TokenPairedArm(
                 actionIndex,
                 command,
-                if (actionIndex == root.public.referenceIndex) 1.0
-                else root.public.inclusionProbability,
+                root.public.inclusionProbabilities?.getOrNull(actionIndex)
+                    ?: if (actionIndex == root.public.referenceIndex) 1.0
+                    else root.public.inclusionProbability,
                 outcomes,
             )
         }

@@ -19,6 +19,8 @@ internal data class TokenPairedDecision(
     val currentProbabilities: List<Double>,
     val originalProbabilities: List<Double>,
     val sampled: TerritoryPolicyChoice,
+    val anchor94Probabilities: List<Double>? = null,
+    val anchorIndex: Int? = null,
 )
 
 /** Outermost TOKEN_2 actor; the complete G3/E/T reference is called exactly once per decision. */

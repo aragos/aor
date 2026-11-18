@@ -18,6 +18,9 @@ import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicy
 import dev.aragos.aor.ai.TerritoryEncoder
+import dev.aragos.aor.ai.TokenAnchorDistribution
+import dev.aragos.aor.ai.TokenAnchoredPolicy
+import dev.aragos.aor.ai.TokenAnchoredResidual
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import dev.aragos.aor.ai.TokenObservationEncoder
 import kotlin.test.Test
@@ -25,6 +28,57 @@ import kotlin.test.assertFailsWith
 
 /** Constructed full dictionaries and own/public positions; no game or scientific model is read. */
 class CoordinatedPolicySelectorTest {
+    @Test
+    fun anchoredPolicyAlignsCompleteLexicalOffersAndUsesExactlyOneActorUniform() {
+        CoordinatedEsFixture().use { fixture ->
+            val sampler = NearOptimalTokenSampler(.35, 3.0, 4)
+            val model = fixture.original.models.token
+            val residual =
+                TokenAnchoredResidual(
+                    model.copy(
+                        actorWeights = List(64) { 0.0 },
+                        valueWeights = List(64) { 0.0 },
+                        valueBias = 0.0,
+                    ),
+                    TokenAnchorDistribution(.2, 1.0),
+                )
+            val selector = selector(fixture, tokenSampler = sampler, anchored = residual)
+            val decision = fixture.decision(CoordinatedEsHead.TOKEN)
+            val encoded =
+                TokenObservationEncoder.from(
+                    decision.view,
+                    PlayerId(decision.observation.playerId),
+                    decision.observation,
+                    "buy-tokens 10",
+                    TerritoryEncoder.TOKEN_2,
+                )
+            assertThat(encoded.actions.map { it.command })
+                .isNotEqualTo(decision.observation.candidates.map { it.command })
+            val expected =
+                TokenAnchoredPolicy.evaluate(
+                    encoded,
+                    model,
+                    model,
+                    IncumbentResidualSelector(1.0),
+                    sampler,
+                    residual,
+                )
+            var referenceCalls = 0
+            for (seed in 0..31) {
+                val actual =
+                    selector.choose(decision.view, decision.observation, seed) {
+                        referenceCalls++
+                        "buy-tokens 10"
+                    }
+                assertThat(actual)
+                    .isEqualTo(TokenAnchoredPolicy.choose(encoded, expected, seed).command)
+            }
+            assertThat(referenceCalls).isEqualTo(32)
+            assertThat(expected.probabilities.all { it > 0.0 }).isTrue()
+            assertThat(encoded.actions[encoded.baselineIndex].command).isEqualTo("buy-tokens 10")
+        }
+    }
+
     @Test
     fun mixtureAlignsLexicalEncodedProbabilitiesWithTheirExactNumericOfferedCommands() {
         CoordinatedEsFixture().use { fixture ->
@@ -232,6 +286,7 @@ class CoordinatedPolicySelectorTest {
         support: JointSupportProfile? = null,
         tokenSampler: NearOptimalTokenSampler? = null,
         mixture: LocalTokenNeighborMixture? = null,
+        anchored: TokenAnchoredResidual? = null,
     ): CoordinatedPolicySelector =
         CoordinatedPolicySelector(
             fixture.input.arena.candidate,
@@ -243,5 +298,6 @@ class CoordinatedPolicySelectorTest {
             support,
             tokenSampler = tokenSampler,
             tokenNeighborMixture = mixture,
+            tokenAnchoredResidual = anchored,
         )
 }
