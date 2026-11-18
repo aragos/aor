@@ -70,6 +70,7 @@ subjects. Only these registered evaluation versions are accepted:
 | `study92-BID2` | 256 (mixed, homogeneous and reference) | 2648 |
 | `study93-LEADER2` | 256 | 2128 |
 | `study94-QUAL1` | 512 | 2064 |
+| `study95-LOCAL1` | 256 (mixed, homogeneous and reference) | 2648 |
 
 Each bank must be complete and pass its 99% win gate. The registered sizes must equal the original
 protocol's counts and budget. Study 89 additionally requires its six-generation final-mean recipe.
@@ -94,6 +95,21 @@ registered `fixed-policy-qualification-campaign-1` contract `final6-c05-small-51
 512-world banks, original study 91 protocol link and required prior physical closure are explicit;
 the original study 91 registration still requires 2048 worlds per bank. Neither old outcomes nor
 a smaller prefix of that earlier qualification can authorize the new trial.
+
+Study 95 uses a version-two robust inference descriptor with an explicit
+`local-token-neighbor-mixture-1` configuration. The qualified94 base models and token sampler
+retain their original inference offers. The common chooser applies the registered departure
+kernel to that unchanged distribution using the existing actor uniform. Only the explicit quoted
+admission mode receives an authority-owned, revision-bound token quote capability. A new command
+must have its exact authoritative quote and is retained in the accepted owner-visible observation;
+the fenced private submission and deterministic proposal recheck remain unchanged.
+
+Its certificate retains the eight fixed configurations, complete 64-world development panel and
+three independent 256-world confirmation banks. Both learned-base banks require the observed 80%
+concentration gate; all three require the 99% win gate. Portable evidence binds the original
+qualified94 policy, preceding93 physical closure, native source and complete original audit.
+Earlier evaluation versions cannot authorize the new mixture, and version-one descriptors retain
+their existing strict fields. This registration installs no model or preview.
 
 Study 92 retains the `learned-bid-search-1` protocol, its eight frozen token samplers and complete
 128-world development panel. Both learned-base confirmation banks must pass the observed 80%

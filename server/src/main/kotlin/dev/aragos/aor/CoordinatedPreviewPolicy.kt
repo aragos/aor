@@ -19,6 +19,7 @@ import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
 import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.PurchaseObservationEncoder
@@ -26,11 +27,17 @@ import dev.aragos.aor.ai.PurchasePolicyModel
 import dev.aragos.aor.ai.PurchasePolicyScope
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryPolicyModel
+import dev.aragos.aor.ai.TokenNeighborAdmission
+import dev.aragos.aor.ai.TokenNeighborQuote
 import dev.aragos.aor.ai.TokenObservationEncoder
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.security.MessageDigest
+
+/** The source-frozen study95 executable; another native build needs separate qualification. */
+internal const val LOCAL_BID_MIXTURE_NATIVE_JAR_SHA256 =
+    "6d7a056095ad5f886171823a29b23e466f4f89ad948bfc2f8e6999a71c4a6097"
 
 /**
  * Immutable local asset. All portable subjects are verified and decoded once at startup. The
@@ -42,15 +49,31 @@ private class CachedCoordinatedPreviewPolicy(
     override val profile: ServerBotProfile,
     private val reference: BotModel,
     private val selector: CoordinatedPolicySelector,
+    override val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
 ) : ServerBotPolicy {
-    override fun choose(view: GameView, observation: BotObservation, seed: Int): String {
+    override fun choose(view: GameView, observation: BotObservation, seed: Int): String =
+        chooseQuoted(view, observation, seed, null)
+
+    override fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        tokenQuote: TokenNeighborQuote,
+    ): String = chooseQuoted(view, observation, seed, tokenQuote)
+
+    private fun chooseQuoted(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        tokenQuote: TokenNeighborQuote?,
+    ): String {
         require(profile.supports(observation, BotDifficulty.HARD)) {
             "The coordinated asset only supports its exact qualified current-rules setup."
         }
         fun referenceCommand(): String =
             BotPolicy.choose(observation, BotDifficulty.HARD, seed, reference)
         return if (selector.controls(observation.decision)) {
-            selector.choose(view, observation, seed, ::referenceCommand)
+            selector.choose(view, observation, seed, ::referenceCommand, tokenQuote)
         } else {
             referenceCommand()
         }
@@ -85,7 +108,8 @@ internal enum class RobustQualificationVersion(
     LEARNED_BID_SEARCH("study92-BID1", 512, 5208),
     LEADER_SEARCH("study93-LEADER1", 256, 2128),
     LEARNED_BID_SEARCH_REFINED("study92-BID2", 256, 2648),
-    LEADER_SEARCH_REFINED("study93-LEADER2", 256, 2128);
+    LEADER_SEARCH_REFINED("study93-LEADER2", 256, 2128),
+    LOCAL_BID_MIXTURE("study95-LOCAL1", 256, 2648);
 
     val isBidSearch: Boolean
         get() = this == LEARNED_BID_SEARCH || this == LEARNED_BID_SEARCH_REFINED
@@ -101,7 +125,8 @@ internal enum class RobustQualificationVersion(
 
     val banks: List<String>
         get() =
-            if (isBidSearch) listOf("mixed", "homogeneous", "reference")
+            if (isBidSearch || this == LOCAL_BID_MIXTURE)
+                listOf("mixed", "homogeneous", "reference")
             else listOf("mixed", "homogeneous")
 }
 
@@ -188,6 +213,9 @@ private class CoordinatedAssetReader(path: Path) {
         val purchase = ordinary(referenceFile("purchaseF0"), scoped = false)
         val expansion = ordinary(referenceFile("expansionE"), scoped = false)
         referenceEquivalence(packed, card, expansion)
+        val neighborMixture = robustDefinition?.let {
+            tokenNeighborMixture(node(it)["tokenNeighborMixture"])
+        }
         return CachedCoordinatedPreviewPolicy(
             manifest.sha256,
             selectedProfile,
@@ -203,7 +231,9 @@ private class CoordinatedAssetReader(path: Path) {
                 tokenSampler = robustDefinition?.let { tokenSampler(node(it)["tokenSelector"]) },
                 expansionDenial =
                     robustDefinition?.let { expansionDenial(node(it)["expansionDenial"]) },
+                tokenNeighborMixture = neighborMixture,
             ),
+            neighborMixture,
         )
     }
 
@@ -288,30 +318,61 @@ private class CoordinatedAssetReader(path: Path) {
         }
         val asset = subject(manifest, root["inferenceAsset"])
         val value = node(asset)
+        val local = text(value, "kind") == "coordinated-robust-inference-asset-2"
         fields(
             value,
-            "kind",
-            "schemaVersion",
-            "profile",
-            "supportProfile",
-            "rulesVersion",
-            "dataVersion",
-            "configuration",
-            "baseInferenceAsset",
-            "currentBundle",
-            "tokenSelector",
-            "expansionDenial",
+            setOf(
+                "kind",
+                "schemaVersion",
+                "profile",
+                "supportProfile",
+                "rulesVersion",
+                "dataVersion",
+                "configuration",
+                "baseInferenceAsset",
+                "currentBundle",
+                "tokenSelector",
+                "expansionDenial",
+            ) + if (local) setOf("tokenNeighborMixture") else emptySet(),
         )
         require(
-            text(value, "kind") == "coordinated-robust-inference-asset-1" &&
-                integer(value, "schemaVersion") == 1
+            if (local) integer(value, "schemaVersion") == 2
+            else
+                text(value, "kind") == "coordinated-robust-inference-asset-1" &&
+                    integer(value, "schemaVersion") == 1
         ) {
             "A robust inference descriptor must explicitly bind the complete policy."
         }
         profile(value, ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
         tokenSampler(value["tokenSelector"])
         expansionDenial(value["expansionDenial"])
+        if (local) {
+            require(tokenNeighborMixture(value["tokenNeighborMixture"]) != null) {
+                "A version-two robust descriptor requires its explicit local token mixture."
+            }
+        }
         return asset
+    }
+
+    private fun tokenNeighborMixture(value: JsonNode?): LocalTokenNeighborMixture? {
+        if (value == null || value.isNull) return null
+        fields(value, "kind", "departureProbability", "radius", "admission")
+        require(text(value, "kind") == LocalTokenNeighborMixture.VERSION) {
+            "Only the shared local token neighbor mixture is supported."
+        }
+        val admission =
+            requireNotNull(
+                TokenNeighborAdmission.entries.singleOrNull {
+                    it.name == text(value, "admission")
+                }
+            ) {
+                "Token neighbor admission requires an explicit supported authority mode."
+            }
+        return LocalTokenNeighborMixture(
+            departureProbability = number(value["departureProbability"], "departure probability"),
+            radius = integer(value, "radius"),
+            admission = admission,
+        )
     }
 
     private fun tokenSampler(value: JsonNode): NearOptimalTokenSampler? {
@@ -368,7 +429,9 @@ private class CoordinatedAssetReader(path: Path) {
             ) +
                 when {
                     version.isFixedPolicyQualification -> setOf("nomineeEvidence")
-                    version.isPolicySearch -> setOf("searchEvidence")
+                    version.isPolicySearch ||
+                        version == RobustQualificationVersion.LOCAL_BID_MIXTURE ->
+                        setOf("searchEvidence")
                     else -> emptySet()
                 },
         )
@@ -382,6 +445,12 @@ private class CoordinatedAssetReader(path: Path) {
             "Robust qualification must bind this exact complete model, sampler and denial policy."
         }
         profile(value, ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
+        require(
+            (version == RobustQualificationVersion.LOCAL_BID_MIXTURE) ==
+                (tokenNeighborMixture(node(asset)["tokenNeighborMixture"]) != null)
+        ) {
+            "Only the registered study95 qualification may admit a local token mixture."
+        }
         val protocolDocument = subject(certificate, value["protocol"])
         val protocol = node(protocolDocument)
         require(
@@ -424,6 +493,8 @@ private class CoordinatedAssetReader(path: Path) {
             RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED,
             RobustQualificationVersion.LEADER_SEARCH_REFINED ->
                 policySearchQualification(certificate, protocolDocument, asset, version)
+            RobustQualificationVersion.LOCAL_BID_MIXTURE ->
+                localMixtureQualification(certificate, protocolDocument, asset)
         }
         for (name in version.banks) {
             val bank = value["banks"][name]
@@ -804,6 +875,352 @@ private class CoordinatedAssetReader(path: Path) {
                 }
             }
         }
+    }
+
+    /** Study95 adds a bounded departure kernel to the unchanged qualified94 policy. */
+    private fun localMixtureQualification(
+        certificate: Document,
+        protocolDocument: Document,
+        asset: Document,
+    ) {
+        val protocol = node(protocolDocument)
+        val descriptor = node(asset)
+        val foundation = node(subject(asset, descriptor["baseInferenceAsset"]))
+        require(
+            text(protocol, "kind") == "local-bid-mixture-1" &&
+                integer(protocol, "study") == 95 &&
+                hash(protocol, "nativeJarSha256") == LOCAL_BID_MIXTURE_NATIVE_JAR_SHA256 &&
+                hash(protocol, "methodSha256") ==
+                    "4c757424a2700de67d2f2dc6ba6b2e7e9bef8c76a96dc714eec158578698179f" &&
+                number(protocol["confidenceMultiplier"], "confidence multiplier") ==
+                    2.5758293035489004 &&
+                integer(protocol, "fullReservedWorlds") == 832 &&
+                integer(protocol, "activeReservedWorlds") == 832 &&
+                integer(protocol, "unusedReservedWorlds") == 0 &&
+                tokenSampler(descriptor["tokenSelector"]) == NearOptimalTokenSampler(.35, 3.0, 4) &&
+                tokenSampler(searchNode(protocol, "baseTokenSelector")) ==
+                    tokenSampler(descriptor["tokenSelector"]) &&
+                expansionDenial(searchNode(protocol, "baseExpansionDenial")) == null &&
+                expansionDenial(descriptor["expansionDenial"]) == null &&
+                hash(protocol, "controlAndRivalsBundleSha256") ==
+                    hash(protocol, "candidateBundleSha256") &&
+                hash(protocol, "reference87BundleSha256") ==
+                    hash(foundation["currentBundle"], "sha256") &&
+                number(protocol["positiveBidConcentrationMaximum"], "concentration maximum") ==
+                    .8 &&
+                hash(protocol, "candidateBundleSha256") ==
+                    hash(descriptor["currentBundle"], "sha256") &&
+                hash(protocol, "inferenceAssetSha256") ==
+                    hash(descriptor["baseInferenceAsset"], "sha256")
+        ) {
+            "Study95 requires its fixed local-mixture method, original832 worlds and qualified94 base."
+        }
+        val names =
+            setOf(
+                "profile",
+                "sourceReadiness",
+                "selection",
+                "developmentReport",
+                "completionAudit",
+                "physicalClosure",
+                "previousTerminal",
+                "previousClosure",
+                "nativeSourceReadiness",
+                "qualifiedBaseline94Protocol",
+                "qualifiedBaseline94Terminal",
+                "qualifiedBaseline94Closure",
+                "qualifiedBaseline94CompletionAudit",
+            )
+        val portable = node(certificate)["searchEvidence"]
+        fields(portable, names)
+        val evidence = names.associateWith { subject(certificate, portable[it]) }
+        fun retained(name: String): Document =
+            requireNotNull(evidence[name]) {
+                "Study95 requires portable $name original evidence."
+            }
+        val profileDocument = retained("profile")
+        val profile = node(profileDocument)
+        val source = node(retained("sourceReadiness"))
+        val nativeSource = node(retained("nativeSourceReadiness"))
+        val selectionDocument = retained("selection")
+        val selection = node(selectionDocument)
+        val developmentDocument = retained("developmentReport")
+        val development = node(developmentDocument)
+        val auditDocument = retained("completionAudit")
+        val audit = node(auditDocument)
+        val closed = node(retained("physicalClosure"))
+        require(
+            text(profile, "kind") == "mac-policy-search-host-1" &&
+                integer(profile, "study") == 95 &&
+                hash(profile["candidateBundle"], "sha256") ==
+                    hash(protocol, "candidateBundleSha256") &&
+                hash(profile["inferenceAsset"], "sha256") ==
+                    hash(protocol, "inferenceAssetSha256") &&
+                hash(profile["nativeJar"], "sha256") == hash(protocol, "nativeJarSha256") &&
+                text(source, "kind") == "local-bid-mixture-source-readiness-1" &&
+                truth(source, "passed") &&
+                truth(source, "sourceOnly") &&
+                hash(source, "methodSha256") == hash(protocol, "methodSha256") &&
+                hash(source, "nativeJarSha256") == hash(protocol, "nativeJarSha256") &&
+                text(nativeSource, "kind") ==
+                    "local-token-mixture-native-source-final-readiness-1" &&
+                truth(nativeSource, "passed") &&
+                truth(nativeSource, "sourceOnly") &&
+                hash(nativeSource["nativeJar"], "sha256") == hash(protocol, "nativeJarSha256") &&
+                retained("nativeSourceReadiness").sha256 ==
+                    hash(protocol["nativeSourceReadiness"], "sha256")
+        ) {
+            "Study95 must retain the exact original native source, immutable model and host profile."
+        }
+        archivedPin(profile, "pins", protocolDocument)
+        archivedPin(profile, "pins", retained("sourceReadiness"))
+        for (document in
+            listOf(profileDocument, protocolDocument, selectionDocument, developmentDocument)) {
+            archivedPin(audit, "artifactPins", document)
+        }
+        require(
+            text(audit, "kind") == "local-bid-mixture-original-audit-1" &&
+                truth(audit, "passed") &&
+                truth(audit, "complete") &&
+                truth(audit, "qualified") &&
+                hash(audit, "protocolSha256") == protocolDocument.sha256 &&
+                hash(audit, "profileSha256") == profileDocument.sha256 &&
+                truth(audit, "originalReproductionsVerified") &&
+                truth(audit, "allWin99StatisticsRecomputed") &&
+                truth(audit, "allObservedConcentrationStatisticsRecomputed") &&
+                integer(audit, "terminalExecutions") == 2648 &&
+                text(closed, "kind") == "local-bid-mixture-physical-closure-1" &&
+                truth(closed, "passed") &&
+                truth(closed, "scienceComplete") &&
+                truth(closed, "qualified") &&
+                truth(closed, "allOwnedProcessesExited") &&
+                !truth(closed, "originalClocksRenewed") &&
+                integer(closed, "auditReruns") == 0 &&
+                integer(closed, "actualCompletedLowerBound") == 2648 &&
+                integer(closed, "actualAttemptedUpperBound") == 2648 &&
+                hash(closed, "protocolSha256") == protocolDocument.sha256 &&
+                hash(closed, "clockSha256") == hash(audit, "clockSha256")
+        ) {
+            "Study95 qualification requires its sole complete original audit and physical closure."
+        }
+        archivedPin(closed, "artifactPins", auditDocument)
+        localMixtureBaseline(protocol, descriptor, evidence)
+        localMixtureBanks(protocol)
+        val cases = protocol["caseConfigs"]
+        require(cases?.isArray == true && cases.size() == 8) {
+            "Study95 requires all eight original ordered local-mixture configurations."
+        }
+        cases.forEachIndexed { index, case ->
+            fields(case, "id", "tokenNeighborMixture")
+            require(
+                text(case, "id") == "n" + index.toString().padStart(2, '0') &&
+                    tokenNeighborMixture(case["tokenNeighborMixture"]) ==
+                        LocalTokenNeighborMixture(
+                            departureProbability = if (index % 2 == 0) .25 else .5,
+                            radius = if (index % 4 < 2) 1 else 2,
+                            admission =
+                                if (index < 4) TokenNeighborAdmission.OFFERED_ONLY
+                                else TokenNeighborAdmission.QUOTED_LEGAL_NEIGHBORS,
+                        )
+            ) {
+                "Study95 may nominate only one of its eight frozen local-mixture configurations."
+            }
+        }
+        require(
+            truth(selection, "complete") &&
+                hash(selection, "protocolSha256") == protocolDocument.sha256 &&
+                truth(development, "complete") &&
+                text(development, "bank") == "development" &&
+                hash(development, "protocolSha256") == protocolDocument.sha256
+        ) {
+            "Study95 nomination requires its complete original development and selection records."
+        }
+        fields(development["cases"], cases.map { text(it, "id") }.toSet())
+        val eligible = cases.filter { case ->
+            val report = development["cases"][text(case, "id")]
+            searchWin(report, 64)
+            number(report["wins"]["mean"], "development win mean") > 0.0 &&
+                observedConcentration(report)
+        }
+        val selected =
+            requireNotNull(
+                eligible.maxByOrNull { case ->
+                    number(
+                        development["cases"][text(case, "id")]["wins"]["mean"],
+                        "development win mean",
+                    )
+                }
+            ) {
+                "Study95 requires one positive eligible complete-development nominee."
+            }
+        require(
+            selection["case"] == selected &&
+                audit["selectedCase"] == selected &&
+                tokenNeighborMixture(descriptor["tokenNeighborMixture"]) ==
+                    tokenNeighborMixture(selected["tokenNeighborMixture"])
+        ) {
+            "Study95 must retain its sole highest eligible win-mean nominee and exact mixture."
+        }
+        for (name in listOf("mixed", "homogeneous", "reference")) {
+            val bank = node(certificate)["banks"][name]
+            require(subject(certificate, bank["evidence"]).sha256 == auditDocument.sha256) {
+                "Every study95 confirmation bank requires its same sealed original audit."
+            }
+            val reportDocument = subject(certificate, bank["report"])
+            archivedPin(audit, "artifactPins", reportDocument)
+            val report = node(reportDocument)
+            require(
+                truth(report, "complete") &&
+                    text(report, "bank") == name &&
+                    hash(report, "protocolSha256") == protocolDocument.sha256
+            ) {
+                "Study95 confirmation reports must retain their original protocol and bank."
+            }
+            fields(report["cases"], text(selected, "id"))
+            val statistics = report["cases"][text(selected, "id")]
+            require(
+                searchWin(statistics, 256) > 0.0 &&
+                    (name == "reference" || observedConcentration(statistics))
+            ) {
+                "Study95 requires all three win gates and both learned-base concentration gates."
+            }
+        }
+    }
+
+    private fun localMixtureBanks(protocol: JsonNode) {
+        val counts =
+            mapOf("development" to 64, "mixed" to 256, "homogeneous" to 256, "reference" to 256)
+        val reserved = protocol["reservedSchedule"]
+        require(text(reserved, "kind") == "local-bid-mixture-schedule-1") {
+            "Study95 must retain its full original reserved schedule."
+        }
+        fields(protocol["banks"], counts.keys)
+        fields(reserved["banks"], counts.keys)
+        val allSeeds = counts.flatMap { (name, count) ->
+            val bank = protocolBank(protocol, name)
+            fields(bank, "name", "worlds", "seeds", "opponentStyle", "replayIndices", "control")
+            val original = reserved["banks"][name]
+            fields(original, "nativeOffset", "count", "seeds")
+            protocolSeedCount(protocol, name, count)
+            val indices =
+                if (name == "development") listOf(0, 21, 42, 63) else listOf(0, 85, 170, 255)
+            val replays = bank["replayIndices"]
+            require(
+                text(bank, "name") == name &&
+                    integer(bank, "worlds") == count &&
+                    integer(original, "count") == count &&
+                    original["seeds"] == bank["seeds"] &&
+                    text(bank, "opponentStyle") ==
+                        if (name in setOf("development", "mixed")) "BALANCED" else "QUALIFIED"
+            ) {
+                "Study95 must retain its exact original832 worlds and ecologies."
+            }
+            require(
+                text(bank, "control") == if (name == "reference") "QUALIFIED87" else "QUALIFIED94"
+            ) {
+                "Study95 must retain the qualified94 banks and separate qualified87 regression control."
+            }
+            require(
+                replays?.isArray == true &&
+                    replays.all { it.isIntegralNumber && it.canConvertToInt() } &&
+                    replays.map(JsonNode::intValue) == indices &&
+                    bank["seeds"].all { it.isIntegralNumber && it.canConvertToInt() }
+            ) {
+                "Study95 requires the fixed original integer worlds and reproduction indices."
+            }
+            bank["seeds"].map(JsonNode::intValue)
+        }
+        require(allSeeds.distinct().size == 832) {
+            "Study95 world banks must be mutually disjoint."
+        }
+    }
+
+    private fun localMixtureBaseline(
+        protocol: JsonNode,
+        descriptor: JsonNode,
+        evidence: Map<String, Document>,
+    ) {
+        fun retained(name: String): Document =
+            requireNotNull(evidence[name]) {
+                "Study95 must retain its original qualified94 and preceding93 evidence."
+            }
+        fields(
+            protocol["qualifiedBaseline94"],
+            "protocol",
+            "terminal",
+            "closure",
+            "completionAudit",
+        )
+        for ((key, name) in
+            mapOf(
+                "protocol" to "Protocol",
+                "terminal" to "Terminal",
+                "closure" to "Closure",
+                "completionAudit" to "CompletionAudit",
+            )) {
+            require(
+                retained("qualifiedBaseline94$name").sha256 ==
+                    hash(protocol["qualifiedBaseline94"][key], "sha256")
+            ) {
+                "Portable study94 evidence must match its prospectively frozen original subject."
+            }
+        }
+        val original = node(retained("qualifiedBaseline94Protocol"))
+        val terminal = node(retained("qualifiedBaseline94Terminal"))
+        val auditDocument = retained("qualifiedBaseline94CompletionAudit")
+        val audit = node(auditDocument)
+        val closed = node(retained("qualifiedBaseline94Closure"))
+        require(
+            text(original, "kind") == "fixed-policy-qualification-campaign-1" &&
+                text(original, "contract") == "final6-c05-small-512-1" &&
+                integer(original, "maximumTerminalExecutions") == 2064 &&
+                hash(original, "rootProspectiveMethodSha256") ==
+                    "22c172eec9af6683cfe8db382154b53440bdc7db89a77d9cf332ac886c4ed377" &&
+                hash(original, "candidateBundleSha256") ==
+                    hash(descriptor["currentBundle"], "sha256") &&
+                tokenSampler(original["selector"]) == tokenSampler(descriptor["tokenSelector"]) &&
+                text(terminal, "kind") == "fixed-policy-qualification-terminal-1" &&
+                text(terminal, "status") == "completed" &&
+                truth(terminal, "qualified") &&
+                text(audit, "kind") == "fixed-policy-qualification-original-audit-1" &&
+                truth(audit, "passed") &&
+                truth(audit, "complete") &&
+                truth(audit, "qualified") &&
+                integer(audit, "terminalExecutions") == 2064 &&
+                hash(audit, "protocolSha256") == retained("qualifiedBaseline94Protocol").sha256 &&
+                hash(terminal, "protocolSha256") == hash(audit, "protocolSha256") &&
+                text(closed, "kind") == "mac-qualification-physical-closure-1" &&
+                truth(closed, "passed") &&
+                truth(closed, "qualified") &&
+                truth(closed, "allOwnedProcessesExited") &&
+                !truth(closed, "originalClocksRenewed") &&
+                integer(closed, "auditReruns") == 0 &&
+                hash(closed, "protocolSha256") == hash(audit, "protocolSha256")
+        ) {
+            "Study95 must retain the complete independently qualified and physically closed94 baseline."
+        }
+        archivedPin(closed, "artifactPins", auditDocument)
+        val priorTerminalDocument = retained("previousTerminal")
+        val priorClosedDocument = retained("previousClosure")
+        val priorTerminal = node(priorTerminalDocument)
+        val priorClosed = node(priorClosedDocument)
+        require(
+            priorTerminalDocument.sha256 == hash(protocol["parentTerminal"], "sha256") &&
+                priorClosedDocument.sha256 == hash(protocol["parentClosure"], "sha256") &&
+                text(priorTerminal, "kind") == "mac-leader-search-terminal-1" &&
+                integer(priorTerminal, "study") == 93 &&
+                integer(priorClosed, "study") == 93 &&
+                text(priorTerminal, "status") in setOf("completed", "failed", "interrupted") &&
+                text(priorClosed, "kind") == "mac-leader-search-physical-closure-1" &&
+                truth(priorClosed, "passed") &&
+                truth(priorClosed, "allOwnedProcessesExited") &&
+                !truth(priorClosed, "originalClocksRenewed") &&
+                integer(priorClosed, "auditReruns") == 0 &&
+                hash(priorClosed, "protocolSha256") == hash(priorTerminal, "protocolSha256")
+        ) {
+            "Study95 must start only after its exact original93 predecessor is physically closed."
+        }
+        archivedPin(priorClosed, "artifactPins", priorTerminalDocument)
     }
 
     private fun archivedPin(owner: JsonNode, key: String, document: Document) {
