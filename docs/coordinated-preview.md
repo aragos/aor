@@ -67,6 +67,8 @@ subjects. Only these registered evaluation versions are accepted:
 | `study91-QUAL1` | 2048 | 8208 |
 | `study92-BID1` | 512 (mixed, homogeneous and reference) | 5208 |
 | `study93-LEADER1` | 256 | 2128 |
+| `study92-BID2` | 256 (mixed, homogeneous and reference) | 2648 |
+| `study93-LEADER2` | 256 | 2128 |
 | `study94-QUAL1` | 512 | 2064 |
 
 Each bank must be complete and pass its 99% win gate. The registered sizes must equal the original
@@ -113,6 +115,17 @@ with its source protocol where applicable. Raw protocol and archived paths remai
 reader checks hashes against the original profile/audit records and opens only confined portable
 copies. Counts come from the actual prepared `worlds` and `seeds` fields; another count field or
 partial bank cannot substitute for the registered method.
+
+The resource-refined `BID2` method preserves all 1664 originally reserved worlds while consuming
+only fixed prefixes: 64 development worlds and 256 in each confirmation bank. Its original audit
+must retain the 832 unused worlds, and its prerequisite must be the exact physically closed study94
+trial. The eight samplers, concentration threshold and strict 99% win gates remain fixed. `BID1`
+continues to require its original larger banks and cannot accept the smaller protocol.
+
+`LEADER2` preserves the original leader settings and world banks, with a separately approved method
+and qualified-anchor priority: study92 `BID2`, then study94, then study91, then verified study87.
+The additional study94 closure and original qualification/source subjects bind its exact complete
+512-world trial, frozen model and nominated sampler. `LEADER1` retains its original anchor contract.
 
 Source verification uses explicitly invented tensor/certificate fixtures only. Such fixtures are
 transport tests, never research evidence or playable scientific assets. An actual package and new

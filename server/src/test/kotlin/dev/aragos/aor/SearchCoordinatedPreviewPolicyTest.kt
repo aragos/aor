@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import java.nio.file.Files
@@ -198,6 +199,83 @@ class SearchCoordinatedPreviewPolicyTest {
                 .isEqualTo(ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
         }
 
+    @Test
+    fun theRefinedBidSearchAdmitsOnlyItsComplete256WorldBanksAndHeldSuffixes() =
+        withFixture(RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED) { fixture ->
+            assertThat(CoordinatedPreviewPolicy.read(fixture.base.manifest).profile)
+                .isEqualTo(ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
+        }
+
+    @Test
+    fun theRefinedBidSearchCannotReuseTheOldLargerRegistration() =
+        withFixture(RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED) { fixture ->
+            fixture.base.changeQualification { it.put("evaluationVersion", "study92-BID1") }
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.base.manifest)
+            }
+        }
+
+    @Test
+    fun protectedOriginalSuffixesCannotDisappearFromTheRefinedProtocol() =
+        withFixture(RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED) { fixture ->
+            fixture.changeProtocol {
+                (it["reservedSchedule"]["banks"]["mixed"]["seeds"] as ArrayNode).remove(511)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.base.manifest)
+            }
+        }
+
+    @Test
+    fun aHeldSuffixWorldCannotReplaceAnActivePrefixWorld() =
+        withFixture(RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED) { fixture ->
+            fixture.changeProtocol {
+                (it["banks"]["mixed"]["seeds"] as ArrayNode).set(
+                    255,
+                    it["reservedSchedule"]["banks"]["mixed"]["seeds"][256],
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.base.manifest)
+            }
+        }
+
+    @Test
+    fun theRefinedBidSearchRequiresItsExactClosed94Trial() =
+        withFixture(RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED) { fixture ->
+            fixture.change("previousClosure") { it.put("protocolSha256", "0".repeat(64)) }
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.base.manifest)
+            }
+        }
+
+    @Test
+    fun theRefinedLeaderSearchAdmitsTheCompleteQualified94Anchor() =
+        withFixture(RobustQualificationVersion.LEADER_SEARCH_REFINED, "94") { fixture ->
+            assertThat(CoordinatedPreviewPolicy.read(fixture.base.manifest).profile)
+                .isEqualTo(ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
+        }
+
+    @Test
+    fun theRefinedLeaderSearchCannotSkipQualified94For91() =
+        withFixture(RobustQualificationVersion.LEADER_SEARCH_REFINED, "91") { fixture ->
+            fixture.change("study94Closure") { it.put("qualified", true) }
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.base.manifest)
+            }
+        }
+
+    @Test
+    fun aRefinedSearchAuditCannotForgetTheHeldReservation() =
+        withFixture(RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED) { fixture ->
+            fixture.change("completionAudit") {
+                (it["protectedReservation"] as ObjectNode).put("unusedReservedWorlds", 0)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                CoordinatedPreviewPolicy.read(fixture.base.manifest)
+            }
+        }
+
     private fun withFixture(
         version: RobustQualificationVersion = RobustQualificationVersion.LEARNED_BID_SEARCH,
         anchor: String = "92",
@@ -222,10 +300,17 @@ private class SearchPreviewFixture(
 ) {
     val base = PreviewAssetFixture(root)
     private val mapper = ObjectMapper()
-    private val bidSearch = version == RobustQualificationVersion.LEARNED_BID_SEARCH
+    private val bidSearch = version.isBidSearch
+    private val refined = version.isRefinedSearch
     private val prefix = if (bidSearch) "learned-bid-search" else "mac-leader-search"
     private val study = if (bidSearch) 92 else 93
-    private val method = if (bidSearch) BID_METHOD else LEADER_METHOD
+    private val method =
+        when {
+            bidSearch && refined -> BID_REFINED_METHOD
+            refined -> LEADER_REFINED_METHOD
+            bidSearch -> BID_METHOD
+            else -> LEADER_METHOD
+        }
     private val native = "14245cba2d1dbd4e62780371efd84d4416bd91592ceca876449d7f417756463f"
     private val bidCases =
         (0..7).map { index ->
@@ -257,7 +342,7 @@ private class SearchPreviewFixture(
     private val sampler =
         when {
             bidSearch || anchorOrigin == "92" -> bidCases[0]["selector"] as Map<*, *>
-            anchorOrigin == "91" ->
+            anchorOrigin in setOf("91", "94") ->
                 mapOf(
                     "kind" to "near-optimal-token-softmax-1",
                     "temperature" to .35,
@@ -276,7 +361,8 @@ private class SearchPreviewFixture(
             "completionAudit",
             "physicalClosure",
         ) +
-            if (bidSearch) emptySet()
+            if (bidSearch && refined) setOf("previousTerminal", "previousClosure")
+            else if (bidSearch) emptySet()
             else {
                 setOf(
                     "anchorFreeze",
@@ -284,7 +370,9 @@ private class SearchPreviewFixture(
                     "previousClosure",
                     "study91Closure",
                     "anchorQualification",
-                ) + if (anchorOrigin == "87") emptySet() else setOf("anchorSourceProtocol")
+                ) +
+                    (if (anchorOrigin == "87") emptySet() else setOf("anchorSourceProtocol")) +
+                    if (refined && anchorOrigin != "92") setOf("study94Closure") else emptySet()
             }
 
     init {
@@ -300,7 +388,7 @@ private class SearchPreviewFixture(
                 .mapIndexed { index, name ->
                     val count =
                         if (name == "development") {
-                            if (bidSearch) 128 else 64
+                            if (bidSearch && !refined) 128 else 64
                         } else version.pairs
                     val seeds = List(count) { index * 10_000 + it }
                     name to
@@ -313,9 +401,10 @@ private class SearchPreviewFixture(
                                 else "QUALIFIED",
                             "replayIndices" to
                                 when {
-                                    name == "development" && bidSearch -> listOf(0, 42, 85, 127)
+                                    name == "development" && bidSearch && !refined ->
+                                        listOf(0, 42, 85, 127)
                                     name == "development" -> listOf(0, 21, 42, 63)
-                                    bidSearch -> listOf(0, 170, 341, 511)
+                                    bidSearch && !refined -> listOf(0, 170, 341, 511)
                                     else -> listOf(0, 85, 170, 255)
                                 },
                         ) +
@@ -341,9 +430,19 @@ private class SearchPreviewFixture(
                     mapOf(
                         "kind" to "$prefix-schedule-1",
                         "banks" to
-                            banks.mapValues { (_, bank) ->
-                                mapOf("count" to bank["worlds"], "seeds" to bank["seeds"])
-                            },
+                            banks.entries
+                                .mapIndexed { index, (name, bank) ->
+                                    val count =
+                                        if (bidSearch && refined) {
+                                            if (name == "development") 128 else 512
+                                        } else bank["worlds"] as Int
+                                    name to
+                                        mapOf(
+                                            "count" to count,
+                                            "seeds" to List(count) { index * 10_000 + it },
+                                        )
+                                }
+                                .toMap(),
                     ),
             )
         base.write(
@@ -363,18 +462,30 @@ private class SearchPreviewFixture(
                         "oldControlSelector" to null,
                         "oldControlBundleSha256" to bundle,
                         "positiveBidConcentrationMaximum" to .8,
-                    )
+                    ) +
+                        if (refined)
+                            mapOf(
+                                "fullReservedWorlds" to 1664,
+                                "activeReservedWorlds" to 832,
+                                "unusedReservedWorlds" to 832,
+                                "scheduleSha256" to "5".repeat(64),
+                                "parentTrialProtocolSha256" to PRIOR94_PROTOCOL,
+                            ) + prerequisite94()
+                        else emptyMap()
                 } else anchor(bundle, asset),
         )
         write(
             "sourceReadiness",
             mapOf(
-                "kind" to "$prefix-runner-source-readiness-1",
+                "kind" to
+                    if (refined) "refined-mac-policy-search-source-readiness-1"
+                    else "$prefix-runner-source-readiness-1",
+                "study" to study,
                 "passed" to true,
                 "sourceOnly" to true,
                 "nativeJarSha256" to native,
             ) +
-                if (bidSearch) {
+                if (bidSearch && !refined) {
                     mapOf(
                         "method" to
                             mapOf("path" to "/unopened-original/method.json", "sha256" to method)
@@ -403,7 +514,10 @@ private class SearchPreviewFixture(
                     cases
                         .mapIndexed { index, case ->
                             case["id"] to
-                                statistics(if (bidSearch) 128 else 64, if (index == 0) .3 else .1)
+                                statistics(
+                                    if (bidSearch && !refined) 128 else 64,
+                                    if (index == 0) .3 else .1,
+                                )
                         }
                         .toMap(),
             ),
@@ -429,7 +543,18 @@ private class SearchPreviewFixture(
                 "allWin99StatisticsRecomputed" to true,
                 "allObservedConcentrationStatisticsRecomputed" to true,
                 "clockSha256" to "2".repeat(64),
-            ),
+            ) +
+                if (bidSearch && refined)
+                    mapOf(
+                        "protectedReservation" to
+                            mapOf(
+                                "fullReservedWorlds" to 1664,
+                                "activeReservedWorlds" to 832,
+                                "unusedReservedWorlds" to 832,
+                                "fullScheduleSha256" to "5".repeat(64),
+                            )
+                    )
+                else emptyMap(),
         )
         write(
             "physicalClosure",
@@ -455,12 +580,23 @@ private class SearchPreviewFixture(
                 "anchorSourceProtocol",
                 mapOf(
                     "kind" to
-                        if (anchorOrigin == "92") "learned-bid-search-1"
-                        else "mac-qualification-campaign-1",
+                        when (anchorOrigin) {
+                            "92" -> "learned-bid-search-1"
+                            "94" -> "fixed-policy-qualification-campaign-1"
+                            else -> "mac-qualification-campaign-1"
+                        },
                     "candidateBundleSha256" to bundle,
-                    "methodSha256" to BID_METHOD,
+                    "baseInferenceAssetSha256" to asset,
+                    "contract" to "final6-c05-small-512-1",
+                    "banks" to
+                        listOf("mixed", "homogeneous").associateWith {
+                            mapOf("count" to 512, "seeds" to List(512) { it })
+                        },
+                    "methodSha256" to if (refined) BID_REFINED_METHOD else BID_METHOD,
                     "rootProspectiveMethodSha256" to
-                        "0687dabf2cb25e1a88740be9a8b29ec5a21a4151b1e7f9df73991de5a76b489b",
+                        if (anchorOrigin == "94")
+                            "22c172eec9af6683cfe8db382154b53440bdc7db89a77d9cf332ac886c4ed377"
+                        else "0687dabf2cb25e1a88740be9a8b29ec5a21a4151b1e7f9df73991de5a76b489b",
                     "selector" to sampler,
                 ),
             )
@@ -468,17 +604,44 @@ private class SearchPreviewFixture(
             "anchorQualification",
             mapOf(
                 "kind" to
-                    if (anchorOrigin == "92") "learned-bid-search-original-audit-1"
-                    else "mac-qualification-original-audit-1",
+                    when (anchorOrigin) {
+                        "92" -> "learned-bid-search-original-audit-1"
+                        "94" -> "fixed-policy-qualification-original-audit-1"
+                        else -> "mac-qualification-original-audit-1"
+                    },
                 "passed" to true,
                 "complete" to true,
                 "qualified" to true,
-                "terminalExecutions" to if (anchorOrigin == "92") 5208 else 8208,
+                "terminalExecutions" to
+                    when (anchorOrigin) {
+                        "92" -> if (refined) 2648 else 5208
+                        "94" -> 2064
+                        else -> 8208
+                    },
                 "protocolSha256" to
                     if (anchorOrigin == "87") "3".repeat(64) else hash("anchorSourceProtocol"),
                 "selectedCase" to bidCases[0],
             ),
         )
+        if (refined)
+            write(
+                "study94Closure",
+                mapOf(
+                    "kind" to "mac-qualification-physical-closure-1",
+                    "passed" to true,
+                    "allOwnedProcessesExited" to true,
+                    "qualified" to (anchorOrigin == "94"),
+                    "scienceComplete" to (anchorOrigin == "94"),
+                    "actualCompletedLowerBound" to 2064,
+                    "protocolSha256" to
+                        if (anchorOrigin == "94") hash("anchorSourceProtocol")
+                        else PRIOR94_PROTOCOL,
+                    "artifactPins" to
+                        if (anchorOrigin == "94")
+                            mapOf("/original/completion-audit.json" to hash("anchorQualification"))
+                        else emptyMap(),
+                ),
+            )
         write(
             "study91Closure",
             mapOf(
@@ -514,7 +677,7 @@ private class SearchPreviewFixture(
                 "allOwnedProcessesExited" to true,
                 "qualified" to (anchorOrigin == "92"),
                 "scienceComplete" to (anchorOrigin == "92"),
-                "actualCompletedLowerBound" to 5208,
+                "actualCompletedLowerBound" to if (refined) 2648 else 5208,
                 "protocolSha256" to
                     if (anchorOrigin == "92") hash("anchorSourceProtocol") else "4".repeat(64),
                 "artifactPins" to
@@ -538,7 +701,7 @@ private class SearchPreviewFixture(
                 "passed" to true,
                 "complete" to true,
                 "qualified" to true,
-                "methodSha256" to LEADER_METHOD,
+                "methodSha256" to if (refined) LEADER_REFINED_METHOD else LEADER_METHOD,
                 "study91Closure" to archived("study91Closure.json", hash("study91Closure")),
                 "old87Certificate" to archived("certificate.json", hash("anchorQualification")),
                 "old87Lineage" to
@@ -548,11 +711,44 @@ private class SearchPreviewFixture(
                         "inferenceAssetSha256" to asset,
                         "nominationSha256" to "1".repeat(64),
                     ),
-            ) + anchor,
+            ) +
+                anchor +
+                if (refined)
+                    mapOf(
+                        "study94Closure" to archived("study94Closure.json", hash("study94Closure"))
+                    )
+                else emptyMap(),
         )
         return mapOf(
             "anchor" to anchor,
             "anchorFreeze" to archived("anchorFreeze.json", hash("anchorFreeze")),
+            "parentTerminal" to archived("previousTerminal.json", hash("previousTerminal")),
+            "parentClosure" to archived("previousClosure.json", hash("previousClosure")),
+        )
+    }
+
+    private fun prerequisite94(): Map<String, Any> {
+        write(
+            "previousTerminal",
+            mapOf(
+                "kind" to "fixed-policy-qualification-terminal-1",
+                "status" to "completed",
+                "protocolSha256" to PRIOR94_PROTOCOL,
+            ),
+        )
+        write(
+            "previousClosure",
+            mapOf(
+                "kind" to "mac-qualification-physical-closure-1",
+                "passed" to true,
+                "allOwnedProcessesExited" to true,
+                "originalClocksRenewed" to false,
+                "auditReruns" to 0,
+                "protocolSha256" to PRIOR94_PROTOCOL,
+                "artifactPins" to mapOf("/original/terminal.json" to hash("previousTerminal")),
+            ),
+        )
+        return mapOf(
             "parentTerminal" to archived("previousTerminal.json", hash("previousTerminal")),
             "parentClosure" to archived("previousClosure.json", hash("previousClosure")),
         )
@@ -571,15 +767,20 @@ private class SearchPreviewFixture(
     }
 
     private fun rebind() {
-        if (!bidSearch) {
+        if (!bidSearch || refined) {
+            if (!bidSearch && refined) {
+                val frozen = read("anchorFreeze")
+                (frozen["study94Closure"] as ObjectNode).put("sha256", hash("study94Closure"))
+                write("anchorFreeze", frozen)
+            }
             val protocol =
                 mapper.readTree(root.resolve("research-protocol.json").toFile()) as ObjectNode
             for ((key, name) in
-                listOf(
-                    "anchorFreeze" to "anchorFreeze",
-                    "parentTerminal" to "previousTerminal",
-                    "parentClosure" to "previousClosure",
-                )) {
+                (if (bidSearch) emptyList() else listOf("anchorFreeze" to "anchorFreeze")) +
+                    listOf(
+                        "parentTerminal" to "previousTerminal",
+                        "parentClosure" to "previousClosure",
+                    )) {
                 (protocol[key] as ObjectNode).put("sha256", hash(name))
             }
             base.write("research-protocol.json", protocol)
@@ -680,5 +881,11 @@ private class SearchPreviewFixture(
             "82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36"
         private const val LEADER_METHOD =
             "20a3a84a7c03a601fffffe20fe08c691ff22e691b87b992b22a1d5fb17ee79fa"
+        private const val BID_REFINED_METHOD =
+            "193edfd32bad8c1143350ed51831a6b229f731cc2cfeb25ec13c791994d822f9"
+        private const val LEADER_REFINED_METHOD =
+            "0ee2ed67c272bc5e9035d7ad77ba8204b6a53d81a3eb9cefc78fcebe09c4aef2"
+        private const val PRIOR94_PROTOCOL =
+            "140427b0db6635b7842b1b51213a5db174382e8088a0d43fc2917aa7a1c37e5e"
     }
 }

@@ -83,17 +83,25 @@ internal enum class RobustQualificationVersion(
     MAC_QUALIFICATION("study91-QUAL1", 2048, 8208),
     MAC_SMALL_QUALIFICATION("study94-QUAL1", 512, 2064),
     LEARNED_BID_SEARCH("study92-BID1", 512, 5208),
-    LEADER_SEARCH("study93-LEADER1", 256, 2128);
+    LEADER_SEARCH("study93-LEADER1", 256, 2128),
+    LEARNED_BID_SEARCH_REFINED("study92-BID2", 256, 2648),
+    LEADER_SEARCH_REFINED("study93-LEADER2", 256, 2128);
+
+    val isBidSearch: Boolean
+        get() = this == LEARNED_BID_SEARCH || this == LEARNED_BID_SEARCH_REFINED
+
+    val isRefinedSearch: Boolean
+        get() = this == LEARNED_BID_SEARCH_REFINED || this == LEADER_SEARCH_REFINED
 
     val isPolicySearch: Boolean
-        get() = this == LEARNED_BID_SEARCH || this == LEADER_SEARCH
+        get() = isBidSearch || this == LEADER_SEARCH || this == LEADER_SEARCH_REFINED
 
     val isFixedPolicyQualification: Boolean
         get() = this == MAC_QUALIFICATION || this == MAC_SMALL_QUALIFICATION
 
     val banks: List<String>
         get() =
-            if (this == LEARNED_BID_SEARCH) listOf("mixed", "homogeneous", "reference")
+            if (isBidSearch) listOf("mixed", "homogeneous", "reference")
             else listOf("mixed", "homogeneous")
 }
 
@@ -412,7 +420,9 @@ private class CoordinatedAssetReader(path: Path) {
             RobustQualificationVersion.MAC_SMALL_QUALIFICATION ->
                 macQualification(certificate, protocol, asset, version)
             RobustQualificationVersion.LEARNED_BID_SEARCH,
-            RobustQualificationVersion.LEADER_SEARCH ->
+            RobustQualificationVersion.LEADER_SEARCH,
+            RobustQualificationVersion.LEARNED_BID_SEARCH_REFINED,
+            RobustQualificationVersion.LEADER_SEARCH_REFINED ->
                 policySearchQualification(certificate, protocolDocument, asset, version)
         }
         for (name in version.banks) {
@@ -565,11 +575,16 @@ private class CoordinatedAssetReader(path: Path) {
     ) {
         val protocol = node(protocolDocument)
         val descriptor = node(asset)
-        val bidSearch = version == RobustQualificationVersion.LEARNED_BID_SEARCH
+        val bidSearch = version.isBidSearch
+        val refined = version.isRefinedSearch
         val study = if (bidSearch) 92 else 93
         val prefix = if (bidSearch) "learned-bid-search" else "mac-leader-search"
         val method =
-            if (bidSearch) {
+            if (bidSearch && refined) {
+                "193edfd32bad8c1143350ed51831a6b229f731cc2cfeb25ec13c791994d822f9"
+            } else if (refined) {
+                "0ee2ed67c272bc5e9035d7ad77ba8204b6a53d81a3eb9cefc78fcebe09c4aef2"
+            } else if (bidSearch) {
                 "82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36"
             } else {
                 "20a3a84a7c03a601fffffe20fe08c691ff22e691b87b992b22a1d5fb17ee79fa"
@@ -602,7 +617,9 @@ private class CoordinatedAssetReader(path: Path) {
                 "completionAudit",
                 "physicalClosure",
             ) +
-                if (bidSearch) {
+                if (bidSearch && refined) {
+                    setOf("previousTerminal", "previousClosure")
+                } else if (bidSearch) {
                     emptySet()
                 } else {
                     setOf(
@@ -612,8 +629,11 @@ private class CoordinatedAssetReader(path: Path) {
                         "study91Closure",
                         "anchorQualification",
                     ) +
-                        if (text(protocol["anchor"], "origin") == "87") emptySet()
-                        else setOf("anchorSourceProtocol")
+                        (if (text(protocol["anchor"], "origin") == "87") emptySet()
+                        else setOf("anchorSourceProtocol")) +
+                        if (refined && text(protocol["anchor"], "origin") != "92")
+                            setOf("study94Closure")
+                        else emptySet()
                 }
         val portable = node(certificate)["searchEvidence"]
         fields(portable, evidenceNames)
@@ -636,7 +656,7 @@ private class CoordinatedAssetReader(path: Path) {
         for (name in listOf("candidateBundle", "inferenceAsset", "nomination", "nativeJar")) {
             fields(profile[name], "path", "sha256")
         }
-        if (bidSearch) fields(source["method"], "path", "sha256")
+        if (bidSearch && !refined) fields(source["method"], "path", "sha256")
         require(
             text(profile, "kind") == "mac-policy-search-host-1" &&
                 integer(profile, "study") == study &&
@@ -647,10 +667,13 @@ private class CoordinatedAssetReader(path: Path) {
                 hash(profile["nomination"], "sha256") == hash(protocol, "nominationSha256") &&
                 hash(profile["nativeJar"], "sha256") == hash(protocol, "nativeJarSha256") &&
                 hash(source, "nativeJarSha256") == hash(protocol, "nativeJarSha256") &&
-                text(source, "kind") == "$prefix-runner-source-readiness-1" &&
+                text(source, "kind") ==
+                    (if (refined) "refined-mac-policy-search-source-readiness-1"
+                    else "$prefix-runner-source-readiness-1") &&
                 truth(source, "passed") &&
                 truth(source, "sourceOnly") &&
-                (if (bidSearch) hash(source["method"], "sha256")
+                (!refined || integer(source, "study") == study) &&
+                (if (bidSearch && !refined) hash(source["method"], "sha256")
                 else hash(source, "methodSha256")) == method
         ) {
             "Search qualification must retain its actual model, original profile and source closure."
@@ -687,6 +710,24 @@ private class CoordinatedAssetReader(path: Path) {
             "Only the complete sealed original search audit and physical closure may qualify."
         }
         archivedPin(closed, "artifactPins", auditDocument)
+        if (bidSearch && refined) {
+            val protected = audit["protectedReservation"]
+            fields(
+                protected,
+                "fullReservedWorlds",
+                "activeReservedWorlds",
+                "unusedReservedWorlds",
+                "fullScheduleSha256",
+            )
+            require(
+                integer(protected, "fullReservedWorlds") == 1664 &&
+                    integer(protected, "activeReservedWorlds") == 832 &&
+                    integer(protected, "unusedReservedWorlds") == 832 &&
+                    hash(protected, "fullScheduleSha256") == hash(protocol, "scheduleSha256")
+            ) {
+                "The original BID2 audit must retain every active and protected unused world."
+            }
+        }
         require(
             truth(selection, "complete") &&
                 hash(selection, "protocolSha256") == protocolDocument.sha256 &&
@@ -699,7 +740,7 @@ private class CoordinatedAssetReader(path: Path) {
         fields(development["cases"], cases.map { text(it, "id") }.toSet())
         val eligible = cases.filter { case ->
             val report = development["cases"][text(case, "id")]
-            searchWin(report, if (bidSearch) 128 else 64)
+            searchWin(report, if (bidSearch && !refined) 128 else 64)
             val concentrationPassed = !bidSearch || observedConcentration(report)
             number(report["wins"]["mean"], "development win mean") > 0.0 && concentrationPassed
         }
@@ -733,8 +774,9 @@ private class CoordinatedAssetReader(path: Path) {
             ) {
                 "Study92 qualification covers only its selected sampler and unchanged four-head policy."
             }
+            if (refined) refinedSearchPrerequisite(protocol, evidence)
         } else {
-            leaderSearchAnchor(protocol, asset, selected, evidence)
+            leaderSearchAnchor(protocol, asset, selected, evidence, refined)
         }
         for (name in version.banks) {
             val bank = node(certificate)["banks"][name]
@@ -774,6 +816,35 @@ private class CoordinatedAssetReader(path: Path) {
         ) {
             "Portable search evidence must retain the exact original archived subject SHA-256."
         }
+    }
+
+    private fun refinedSearchPrerequisite(protocol: JsonNode, evidence: Map<String, Document>) {
+        fun retained(name: String): Document =
+            requireNotNull(evidence[name]) { "Refined search requires portable $name evidence." }
+        val terminalDocument = retained("previousTerminal")
+        val closedDocument = retained("previousClosure")
+        val terminal = node(terminalDocument)
+        val closed = node(closedDocument)
+        fields(protocol["parentTerminal"], "path", "sha256")
+        fields(protocol["parentClosure"], "path", "sha256")
+        require(
+            terminalDocument.sha256 == hash(protocol["parentTerminal"], "sha256") &&
+                closedDocument.sha256 == hash(protocol["parentClosure"], "sha256") &&
+                text(terminal, "kind") == "fixed-policy-qualification-terminal-1" &&
+                text(terminal, "status") in setOf("completed", "failed", "interrupted") &&
+                text(closed, "kind") == "mac-qualification-physical-closure-1" &&
+                truth(closed, "passed") &&
+                truth(closed, "allOwnedProcessesExited") &&
+                !truth(closed, "originalClocksRenewed") &&
+                integer(closed, "auditReruns") == 0 &&
+                hash(protocol, "parentTrialProtocolSha256") ==
+                    "140427b0db6635b7842b1b51213a5db174382e8088a0d43fc2917aa7a1c37e5e" &&
+                hash(terminal, "protocolSha256") == hash(protocol, "parentTrialProtocolSha256") &&
+                hash(closed, "protocolSha256") == hash(terminal, "protocolSha256")
+        ) {
+            "Study92 BID2 must follow the exact physically closed94 trial, never reused91 metrics."
+        }
+        archivedPin(closed, "artifactPins", terminalDocument)
     }
 
     private fun searchWin(report: JsonNode, expected: Int): Double {
@@ -869,7 +940,8 @@ private class CoordinatedAssetReader(path: Path) {
     }
 
     private fun policySearchBanks(protocol: JsonNode, version: RobustQualificationVersion) {
-        val bidSearch = version == RobustQualificationVersion.LEARNED_BID_SEARCH
+        val bidSearch = version.isBidSearch
+        val prefix = bidSearch && version.isRefinedSearch
         val names = setOf("development") + version.banks
         fields(protocol["banks"], names)
         val reserved = protocol["reservedSchedule"]
@@ -883,7 +955,7 @@ private class CoordinatedAssetReader(path: Path) {
         val seeds = names.flatMap { name ->
             val count =
                 if (name == "development") {
-                    if (bidSearch) 128 else 64
+                    if (bidSearch && !prefix) 128 else 64
                 } else version.pairs
             val bank = protocolBank(protocol, name)
             fields(
@@ -896,9 +968,9 @@ private class CoordinatedAssetReader(path: Path) {
             val replays = bank["replayIndices"]
             val expectedReplays =
                 when {
-                    name == "development" && bidSearch -> listOf(0, 42, 85, 127)
+                    name == "development" && bidSearch && !prefix -> listOf(0, 42, 85, 127)
                     name == "development" -> listOf(0, 21, 42, 63)
-                    bidSearch -> listOf(0, 170, 341, 511)
+                    bidSearch && !prefix -> listOf(0, 170, 341, 511)
                     else -> listOf(0, 85, 170, 255)
                 }
             val style = if (name in setOf("development", "mixed")) "BALANCED" else "QUALIFIED"
@@ -910,8 +982,14 @@ private class CoordinatedAssetReader(path: Path) {
                     replays?.isArray == true &&
                     replays.all { it.isIntegralNumber && it.canConvertToInt() } &&
                     replays.map(JsonNode::intValue) == expectedReplays &&
-                    reserved["banks"][name]["seeds"] == values &&
-                    integer(reserved["banks"][name], "count") == count
+                    reserved["banks"][name]["seeds"]?.isArray == true &&
+                    reserved["banks"][name]["seeds"].take(count) == values.toList() &&
+                    integer(reserved["banks"][name], "count") ==
+                        (if (prefix) {
+                            if (name == "development") 128 else 512
+                        } else count) &&
+                    reserved["banks"][name]["seeds"].size() ==
+                        integer(reserved["banks"][name], "count")
             ) {
                 "Policy search must retain its exact complete worlds, ecologies and original reproductions."
             }
@@ -925,6 +1003,26 @@ private class CoordinatedAssetReader(path: Path) {
         require(seeds.distinct().size == seeds.size) {
             "All original policy-search banks must remain disjoint."
         }
+        if (prefix) {
+            val full = names.flatMap { name ->
+                reserved["banks"][name]["seeds"].map { seed ->
+                    require(seed.isIntegralNumber && seed.canConvertToInt()) {
+                        "Protected seed suffixes require signed integers."
+                    }
+                    seed.intValue()
+                }
+            }
+            require(
+                integer(protocol, "fullReservedWorlds") == 1664 &&
+                    integer(protocol, "activeReservedWorlds") == 832 &&
+                    integer(protocol, "unusedReservedWorlds") == 832 &&
+                    full.size == 1664 &&
+                    full.distinct().size == 1664 &&
+                    seeds.size == 832
+            ) {
+                "Study92 BID2 must retain all1664 original worlds and protect the832 unused suffixes."
+            }
+        }
     }
 
     private fun leaderSearchAnchor(
@@ -932,6 +1030,7 @@ private class CoordinatedAssetReader(path: Path) {
         asset: Document,
         selected: JsonNode,
         evidence: Map<String, Document>,
+        refined: Boolean,
     ) {
         fun retained(name: String): Document =
             requireNotNull(evidence[name]) {
@@ -952,6 +1051,10 @@ private class CoordinatedAssetReader(path: Path) {
         val previousClosure = node(previousClosureDocument)
         val prior91Document = retained("study91Closure")
         val prior91 = node(prior91Document)
+        val prior94Document =
+            if (refined && !truth(previousClosure, "qualified")) retained("study94Closure")
+            else null
+        val prior94 = prior94Document?.let(::node)
         val qualificationDocument = retained("anchorQualification")
         require(
             freezeDocument.sha256 == hash(protocol["anchorFreeze"], "sha256") &&
@@ -987,8 +1090,21 @@ private class CoordinatedAssetReader(path: Path) {
             "Leader qualification requires both original prior-study physical closure subjects."
         }
         archivedPin(previousClosure, "artifactPins", previousTerminalDocument)
+        if (prior94Document != null && prior94 != null) {
+            fields(frozen["study94Closure"], "path", "sha256")
+            require(
+                prior94Document.sha256 == hash(frozen["study94Closure"], "sha256") &&
+                    text(prior94, "kind") == "mac-qualification-physical-closure-1" &&
+                    truth(prior94, "passed") &&
+                    truth(prior94, "allOwnedProcessesExited")
+            ) {
+                "Refined leader priority requires the exact original94 physical closure subject."
+            }
+            hash(prior94, "protocolSha256")
+        }
         val origin =
             if (truth(previousClosure, "qualified")) "92"
+            else if (prior94 != null && truth(prior94, "qualified")) "94"
             else if (truth(prior91, "qualified")) "91" else "87"
         require(text(anchor, "origin") == origin) {
             "Qualified anchor priority must remain92, then91, then87."
@@ -1015,7 +1131,12 @@ private class CoordinatedAssetReader(path: Path) {
         val ancestor = node(qualificationDocument)
         val ancestorProtocolDocument = retained("anchorSourceProtocol")
         val ancestorProtocol = node(ancestorProtocolDocument)
-        val count = if (origin == "92") 5208 else 8208
+        val count =
+            when (origin) {
+                "92" -> if (refined) 2648 else 5208
+                "94" -> 2064
+                else -> 8208
+            }
         require(
             truth(ancestor, "passed") &&
                 truth(ancestor, "complete") &&
@@ -1033,9 +1154,11 @@ private class CoordinatedAssetReader(path: Path) {
                 text(ancestor, "kind") == "learned-bid-search-original-audit-1" &&
                     text(ancestorProtocol, "kind") == "learned-bid-search-1" &&
                     hash(ancestorProtocol, "methodSha256") ==
-                        "82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36" &&
+                        (if (refined)
+                            "193edfd32bad8c1143350ed51831a6b229f731cc2cfeb25ec13c791994d822f9"
+                        else "82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36") &&
                     truth(previousClosure, "scienceComplete") &&
-                    integer(previousClosure, "actualCompletedLowerBound") == 5208 &&
+                    integer(previousClosure, "actualCompletedLowerBound") == count &&
                     truth(previousTerminal, "complete") &&
                     hash(previousClosure, "protocolSha256") == ancestorProtocolDocument.sha256 &&
                     hash(previousTerminal, "completionAuditSha256") ==
@@ -1048,6 +1171,32 @@ private class CoordinatedAssetReader(path: Path) {
                 "The92 anchor must retain all three fresh banks and its exact winning token sampler."
             }
             archivedPin(previousClosure, "artifactPins", qualificationDocument)
+        } else if (origin == "94") {
+            val closed94 = requireNotNull(prior94) { "A94 anchor requires its original closure." }
+            require(
+                text(ancestor, "kind") == "fixed-policy-qualification-original-audit-1" &&
+                    text(ancestorProtocol, "kind") == "fixed-policy-qualification-campaign-1" &&
+                    text(ancestorProtocol, "contract") == "final6-c05-small-512-1" &&
+                    hash(ancestorProtocol, "rootProspectiveMethodSha256") ==
+                        "22c172eec9af6683cfe8db382154b53440bdc7db89a77d9cf332ac886c4ed377" &&
+                    truth(closed94, "scienceComplete") &&
+                    integer(closed94, "actualCompletedLowerBound") == 2064 &&
+                    hash(closed94, "protocolSha256") == ancestorProtocolDocument.sha256 &&
+                    hash(ancestorProtocol, "baseInferenceAssetSha256") ==
+                        hash(descriptor["baseInferenceAsset"], "sha256") &&
+                    tokenSampler(anchor["selector"]) == NearOptimalTokenSampler(.35, 3.0, 4) &&
+                    tokenSampler(searchNode(ancestorProtocol, "selector")) ==
+                        tokenSampler(anchor["selector"])
+            ) {
+                "The94 anchor must retain its complete fresh512-world qualification and nominated sampler."
+            }
+            for (bank in listOf("mixed", "homogeneous")) {
+                protocolSeedCount(ancestorProtocol, bank, 512)
+                require(integer(protocolBank(ancestorProtocol, bank), "count") == 512) {
+                    "A94 anchor cannot weaken either original complete512-world bank."
+                }
+            }
+            archivedPin(closed94, "artifactPins", qualificationDocument)
         } else {
             require(
                 text(ancestor, "kind") == "mac-qualification-original-audit-1" &&
