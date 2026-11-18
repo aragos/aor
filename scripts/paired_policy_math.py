@@ -1,7 +1,7 @@
 """Fixed paired-policy tensor arithmetic shared by strict TOKEN2 and C/P/E owners.
 
 Callers own typed public/label/provenance admission. This module owns only the existing
-inclusion-corrected gain, original-policy KL weighting and atomic epoch rollback.
+inclusion-corrected gain, policy KL measurement and atomic epoch rollback.
 """
 import copy
 import json
@@ -55,7 +55,7 @@ def weighted_gain(probabilities, behavior, indices, deltas, inclusion_probabilit
 
 
 def original_kl(log_probabilities, original):
-    """Full offer KL(pi_theta || pi0), including unsampled alternatives."""
+    """Full offer KL to the supplied frozen reference, including unsampled alternatives."""
     if len(original) == 1:
         return log_probabilities.sum()*0.
     reference = b.torch.tensor(original, dtype=b.DTYPE)
@@ -133,6 +133,32 @@ def anchor_metrics(actor, prepared):
         worlds=prepared.anchor_count, states=count, singletonStates=singleton)
 
 
+def collection_metrics(actor, prepared):
+    """Full-offer KL(pi_theta || pi_collect) on the READY TRAIN roots used for gain."""
+    rows = ((observation, root['currentProbabilities'])
+        for observation, root in zip(prepared.roots, prepared.root_records) if observation is not None)
+    with b.torch.no_grad():
+        values = []
+        for chunk in batches(rows):
+            logs, _ = actor([observation for observation, _ in chunk])
+            values.extend(float(original_kl(log, reference)) for log, (_, reference) in zip(logs, chunk))
+    b.require(len(values) == prepared.ready_count > 0 and all(map(math.isfinite, values)),
+        'Collection-policy KL requires a finite value for every READY TRAIN root.')
+    return dict(mean=math.fsum(values)/len(values), maximum=max(values), states=len(values))
+
+
+def kl_rejection(recipe, anchor, collection=None):
+    """The first fixed bound exceeded by the attempted update, if any."""
+    if not (anchor['mean'] <= recipe['maximumMeanOriginalKl'] and
+            anchor['maximum'] <= recipe['maximumStateOriginalKl']):
+        return 'original-kl-limit'
+    if 'maximumMeanCollectionKl' in recipe and not (
+            collection['mean'] <= recipe['maximumMeanCollectionKl'] and
+            collection['maximum'] <= recipe['maximumStateCollectionKl']):
+        return 'collection-kl-limit'
+    return None
+
+
 def minibatch(actor, optimizer, prepared, slots, *, recipe=RECIPE):
     """Accumulate exact declared root/anchor weights before one Adam step."""
     optimizer.zero_grad(set_to_none=True)
@@ -182,21 +208,24 @@ def epoch(actor, optimizer, prepared, seed, config, *, metrics=None, recipe=RECI
             values.append(minibatch(actor, optimizer, prepared, slots[start:start+batch_worlds], recipe=recipe))
     check_clock(config)
     measured = (anchor_metrics if metrics is None else metrics)(actor, prepared)
-    accepted = measured['mean'] <= recipe['maximumMeanOriginalKl'] and \
-        measured['maximum'] <= recipe['maximumStateOriginalKl']
+    collection = (dict(collection=collection_metrics(actor, prepared))
+        if 'maximumMeanCollectionKl' in recipe else {})
+    accepted = kl_rejection(recipe, measured, **collection) is None
     if not accepted:
         actor.load_state_dict(start_actor); optimizer.load_state_dict(start_optimizer)
     return dict(accepted=accepted, anchor=measured,
         minibatchGainMean=math.fsum(item['gain'] for item in values)/len(values),
         minibatchKlMean=math.fsum(item['kl'] for item in values)/len(values),
-        attemptedAdamSteps=sum(item['stepped'] for item in values))
+        attemptedAdamSteps=sum(item['stepped'] for item in values), **collection)
 
 
 def fit_epochs(actor, optimizer, prepared, seeds, config, *, step=epoch,
-        metrics=anchor_metrics, publish=lambda history: None):
+        metrics=anchor_metrics, publish=lambda history: None, recipe=RECIPE):
     """One declared sequence, stopping at the first rolled-back KL epoch; no reselection."""
+    collection = (dict(collection=collection_metrics(actor, prepared))
+        if 'maximumMeanCollectionKl' in recipe else {})
     history = [dict(epoch=0, accepted=True, anchor=metrics(actor, prepared),
-        actorSha256=b.digest(actor.artifact()))]
+        actorSha256=b.digest(actor.artifact()), **collection)]
     accepted = 0; steps = 0
     for index, seed in enumerate(seeds, 1):
         check_clock(config)

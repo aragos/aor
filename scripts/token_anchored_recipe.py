@@ -1,4 +1,4 @@
-"""The warm-anchor numerical recipe is portable metadata, independent of Torch imports."""
+"""Fixed warm-anchor numerical recipes, independent of Torch imports."""
 from token_anchor_distribution import RECORD
 
 
@@ -11,3 +11,16 @@ RECIPE = dict(version='token-anchored-paired-win-improvement-1', epochs=20, batc
     frozenParameters=['valueWeights', 'valueBias'], objectiveVersion='paired-win-share-1',
     distribution=RECORD, minimumReadyFraction=.5,
     residual='raw-unclipped', originalAnchor='frozen94-c05-plus-uniform')
+
+
+PROXIMAL_RECIPE = dict(RECIPE, version='token-anchored-proximal-paired-win-1',
+    originalKlCoefficient=.01, maximumMeanCollectionKl=.025, maximumStateCollectionKl=.10,
+    collectionKlOrientation='current-to-collection', collectionWeighting='equal-ready-root')
+
+
+def validate(record):
+    """Resolve a complete frozen recipe, never an arbitrary hyperparameter override."""
+    for recipe in (RECIPE, PROXIMAL_RECIPE):
+        if record == recipe:
+            return recipe
+    raise ValueError('The warm fit requires an exact supported numerical recipe.')
