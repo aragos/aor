@@ -205,6 +205,16 @@ data class GameState(
             .value
     }
 
+    // Both views of the active seat share these immutable quotes for this snapshot.
+    private val expansionQuotes by lazy { ExpansionProjection.quotes(this) }
+
+    internal fun expansionQuotesFor(viewer: PlayerId?): ExpansionProjection.Quotes =
+        if (stage == Stage.EXPANSION && viewer != null && viewer == flow.actor) {
+            expansionQuotes
+        } else {
+            ExpansionProjection.Quotes.EMPTY
+        }
+
     fun viewForPlayer(player: PlayerId): GameView =
         GameView.forViewer(state = this, viewer = playerState(player))
 
