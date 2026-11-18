@@ -10,6 +10,7 @@ import tarfile
 import expansion_training_evidence as evidence
 import token_paired_campaign_plan as p
 import token_paired_storage as storage
+import token_paired_objective as objectives
 
 
 def normalized_public(value):
@@ -40,8 +41,9 @@ def normalized_anchor(value):
     return dict(index=index,split='TRAIN',observations=observations)
 
 
-def normalized_labels(value, native_public, typed_public):
+def normalized_labels(value, native_public, typed_public,*,objective=objectives.MIXED):
     """Actual terminal scores independently own the normalized reward; sibling returns stay paired."""
+    objectives.validate(objective)
     for key in ('signature','scopeSha256','scienceSha256','iteration','request','streams','status','originSha256'):
         p.require(value[key]==native_public[key], 'Label sidecar differs from the original public world: '+key)
     p.require(value['kind']=='token-paired-labels-1', 'Unknown paired-label contract.')
@@ -63,11 +65,14 @@ def normalized_labels(value, native_public, typed_public):
             p.require(outcome['replicate']==replicate and terminal['continuationSeed']==public['futureSeeds'][replicate]
                 and outcome['replayVerified'] is True, 'Paired future/canonical replay identity changed.')
             p.sha(outcome['canonicalSha256'])
-            evidence.terminal_reward(dict(controlledSeat=native_public['request']['seat'],
-                terminal=dict(terminal,gameDecisions=terminal['decisions'])))
-            rewards.append(terminal['reward'])
-        actions.append(dict(actionIndex=action_index,rewards=rewards))
-    return dict(publicSha256=typed_public.sha256,futureSeeds=public['futureSeeds'],actions=actions)
+            game=dict(controlledSeat=native_public['request']['seat'],terminal=dict(terminal,gameDecisions=terminal['decisions']))
+            if objective==objectives.WIN:rewards.append(evidence.terminal_win_share(game))
+            else:
+                evidence.terminal_reward(game);rewards.append(terminal['reward'])
+        actions.append(dict(actionIndex=action_index,**{'winShares' if objective==objectives.WIN else 'rewards':rewards}))
+    result=dict(publicSha256=typed_public.sha256,futureSeeds=public['futureSeeds'],actions=actions)
+    if objective==objectives.WIN:result['objectiveVersion']=objective
+    return result
 
 
 class Corpus:
@@ -88,9 +93,11 @@ class Corpus:
         recomputed=storage.iteration_corpus(plan,self.record['iteration'],self.record['chunks'])
         p.require(recomputed==self.record,'The complete corpus admission must be independently reproducible.')
 
-    def context(self, dictionary, original, current):
+    def context(self, dictionary, original, current,*,objective=objectives.MIXED):
         import token_paired_data as data
-        return data.Context(iteration=self.record['iteration'],source_sha256=self.subject['sha256'],
+        objectives.validate(objective)
+        context=data.WinContext if objective==objectives.WIN else data.Context
+        return context(iteration=self.record['iteration'],source_sha256=self.subject['sha256'],
             scope_sha256=self.record['scopeSha256'],
             request_bank_sha256=p.digest(self.plan.record['iterations'][self.record['iteration']-1]['origins']),
             dictionary_sha256=p.file_sha(dictionary),dictionary_semantic_sha256=p.digest(p.read(dictionary)),
@@ -107,7 +114,7 @@ class Corpus:
                 p.require(value['request']['split']==split,'Public sidecar crossed a frozen split.')
                 yield value
 
-    def _labels(self, split, public, typed):
+    def _labels(self, split, public, typed,*,objective=objectives.MIXED):
         # Private method: callers are the TRAIN assembly or the admitted validation callback below.
         native={row['request']['globalIndex']:row for row in public}
         typed={row.record['index']:row for row in typed}
@@ -120,7 +127,7 @@ class Corpus:
                     if member.name not in members:continue
                     index=members[member.name]
                     label=storage.member_json(source,member,receipt)
-                    result[index]=normalized_labels(label,native[index],typed[index])
+                    result[index]=normalized_labels(label,native[index],typed[index],objective=objective)
         expected=list(range(512)) if split=='TRAIN' else list(range(512,640))
         p.require(sorted(result)==expected,'Labels must retain every original split position.')
         return tuple(result[index] for index in expected)
@@ -129,8 +136,9 @@ class Corpus:
         import token_paired_data as data
         values=tuple(self.public('TRAIN'))
         roots=tuple(data.PublicRoot.from_record(normalized_public(value),context,model,split='TRAIN') for value in values)
-        labels=self._labels('TRAIN',values,roots)
-        targets=tuple(None if label is None else data.PairedTarget.from_record(root,label)
+        labels=self._labels('TRAIN',values,roots,objective=context.objective)
+        target_type=data.WinPairedTarget if context.objective==objectives.WIN else data.PairedTarget
+        targets=tuple(None if label is None else target_type.from_record(root,label)
             for root,label in zip(roots,labels))
         p.require(original_corpus.record['iteration']==1 and
             original_corpus.record['scopeSha256']==self.record['scopeSha256'],

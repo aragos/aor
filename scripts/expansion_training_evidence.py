@@ -107,9 +107,8 @@ class Archived:
                         yield member.name, decode(stream.read())
 
 
-def terminal_reward(game):
-    """Independent score arithmetic check of the existing .8 win + .2 rank label."""
-    terminal = game['terminal']; scores = terminal['scores']
+def validated_terminal_scores(scores):
+    """Authoritative public totals and winner flags, including all-chaos and tied games."""
     require(len(scores)==4 and {s['player'] for s in scores}=={'p1','p2','p3','p4'},'Missing terminal seats.')
     for score in scores:
         require(all(type(score[k]) is int and 0<=score[k]<2**31 for k in ('cash','advancePoints'))
@@ -121,6 +120,24 @@ def terminal_reward(game):
     totals = [s['total'] for s in scores if s['total'] is not None]
     maximum = max(totals) if totals else None
     require(all(s['winner']==(s['total'] is not None and s['total']==maximum) for s in scores),'Terminal winners differ.')
+    return scores
+
+
+def terminal_win_share(game):
+    """Derive win share from validated terminal winners; never read reward or rank labels."""
+    terminal=game['terminal'];scores=validated_terminal_scores(terminal['scores'])
+    require(type(game['controlledSeat']) is int and 0<=game['controlledSeat']<4,'A terminal win label needs a valid controlled seat.')
+    own=next(score for score in scores if score['player']=='p'+str(game['controlledSeat']+1))
+    result=1/sum(score['winner'] for score in scores) if own['winner'] else 0.
+    require(finite(terminal['winShare'],0,1) and abs(terminal['winShare']-result)<1e-12,
+        'Terminal win share differs from authoritative winners.')
+    require(type(terminal['gameDecisions']) is int and terminal['gameDecisions']>0,'Complete world needs decisions.')
+    return result
+
+
+def terminal_reward(game):
+    """Independent score arithmetic check of the existing .8 win + .2 rank label."""
+    terminal = game['terminal']; scores = validated_terminal_scores(terminal['scores'])
     own = next(s for s in scores if s['player']=='p'+str(game['controlledSeat']+1))
     win = 1/sum(s['winner'] for s in scores) if own['winner'] else 0.
     rank = 0. if own['total'] is None else math.fsum(1. if s['total'] is None or own['total']>s['total']

@@ -12,6 +12,7 @@ import token_paired_data as data
 import token_paired_policy as policy
 import token_paired_identity as identity_owner
 import paired_policy_math as paired_math
+import token_paired_objective as objectives
 from paired_policy_math import gain, original_kl, batches, check_clock, verify_behavior, anchor_metrics, minibatch
 
 
@@ -22,6 +23,12 @@ RECIPE = dict(version='token-paired-expected-improvement-1', epochs=20, batchWor
     anchorWeighting='equal-represented-world-equal-deduplicated-state',
     klOrientation='current-to-original', optimizer='fresh-adam-each-iteration',
     frozenParameters=['valueWeights', 'valueBias'])
+WIN_RECIPE=dict(RECIPE,version='token-paired-win-expected-improvement-1',objectiveVersion=objectives.WIN)
+
+
+def objective_contract(objective):
+    objectives.validate(objective)
+    return (WIN_RECIPE,'token-paired-win') if objective==objectives.WIN else (RECIPE,'token-paired')
 
 
 @dataclass(frozen=True)
@@ -55,17 +62,20 @@ def epoch(actor, optimizer, prepared, seed, config):
     return paired_math.epoch(actor, optimizer, prepared, seed, config, metrics=anchor_metrics)
 
 
-def completed(directory):
+def completed(directory,*,objective=objectives.MIXED):
+    recipe,prefix=objective_contract(objective)
     directory = Path(directory)
     receipt = b.read_json(directory/'finished.json')
-    b.require(receipt['kind'] == 'token-paired-fit-complete-1' and receipt['complete'] is True,
+    b.require(receipt['kind'] == prefix+'-fit-complete-1' and receipt['complete'] is True,
         'A prior fit must have its immutable completed receipt.')
     b.require(set(receipt['artifacts']) == {'identity.json', 'policy.json', 'checkpoint.json', 'history.json'},
         'Paired fit completion must retain the exact model/optimizer/history/identity inventory.')
     for name, expected in receipt['artifacts'].items():
         b.require(b.file_digest(directory/name) == expected, 'A completed paired fit artifact changed.')
     identity = b.read_json(directory/'identity.json')
-    b.require(identity['recipe'] == RECIPE and identity == receipt['identity'],
+    b.require(identity['recipe'] == recipe and identity == receipt['identity'] and
+        (identity['context'].get('objective_version')==objectives.WIN if objective==objectives.WIN
+         else 'objective_version' not in identity['context']),
         'Completed paired fit recipe and subjects must agree.')
     b.require(receipt['outputModelSha256'] == b.file_digest(directory/'policy.json'),
         'Completed model raw subject must match the published policy.')
@@ -86,7 +96,7 @@ def completed(directory):
         maximum = b.number(row['anchor']['maximum'], 'Recorded maximum individual-state KL')
         b.require(row['accepted'] == (mean <= .02 and maximum <= .10),
             'Every recorded epoch must obey the exact fixed original-policy KL acceptance bounds.')
-    b.require(checkpoint['kind'] == 'token-paired-adam-1' and checkpoint['model'] == model and
+    b.require(checkpoint['kind'] == prefix+'-adam-1' and checkpoint['model'] == model and
         checkpoint['acceptedEpochs'] == accepted and checkpoint['adamSteps'] == receipt['adamSteps'] and
         receipt['actorChanged'] == (identity_owner.actor_parameters_sha256(model) !=
             data.sha(identity['inputActorParametersSha256'], 'Input actor parameters')) and
@@ -97,13 +107,13 @@ def completed(directory):
     return receipt
 
 
-def admit_previous(training, original, current, dictionary, previous):
+def admit_previous(training, original, current, dictionary, previous,*,objective=objectives.MIXED):
     training.context.bind(original, current, dictionary); same_model_scope(original, current)
     if training.context.iteration == 1:
         b.require(previous is None, 'Iteration1 has no optimizer/model predecessor.')
         return None
     b.require(previous is not None, 'Iteration2 must consume the sole completed iteration1 actor.')
-    done = completed(previous); old = done['identity']
+    done = completed(previous,objective=objective); old = done['identity']
     b.require(done['operationalPassed'] is True and old['context']['iteration'] == 1 and
         done['outputModelSha256'] == current.sha256 and
         old['context']['original_model_sha256'] == original.sha256 and
@@ -118,14 +128,17 @@ def admit_previous(training, original, current, dictionary, previous):
         modelSha256=done['outputModelSha256'])
 
 
-def fit(training, original, current, dictionary, output, config, *, previous=None):
+def fit(training, original, current, dictionary, output, config, *, previous=None,objective=objectives.MIXED):
     """One fixed TRAIN-only fit. No validation reader or model-selection callback exists."""
     b.require(isinstance(training, data.Training) and isinstance(config, Config),
         'Paired fitting requires typed TRAIN data and the fixed configuration.')
+    recipe,prefix=objective_contract(objective)
+    b.require(training.context.objective==objective,
+        'The fitting objective must match the explicit corpus/context objective contract.')
     b.require(training.ready_count >= 256, 'Public coverage requires at least256 READY branching TRAIN roots.')
-    predecessor = admit_previous(training, original, current, dictionary, previous)
+    predecessor = admit_previous(training, original, current, dictionary, previous,objective=objective)
     if previous is not None:
-        b.require(not (set(config.epochSeeds) & set(completed(previous)['identity']['epochSeeds'])),
+        b.require(not (set(config.epochSeeds) & set(completed(previous,objective=objective)['identity']['epochSeeds'])),
             'Each iteration requires its own fresh prospectively reserved epoch shuffle streams.')
     check_clock(config)
     output = Path(output); b.require(not output.exists(), 'Paired fitting is once-only; output already exists.')
@@ -135,7 +148,9 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
     prepared = Prepared(training, actor); verify_behavior(prepared, policy.TokenPairedPolicy(current.model))
     optimizer = b.torch.optim.Adam([getattr(actor, name) for name in b.PARAMETERS[:-2]],
         lr=RECIPE['learningRate'])
-    identity = dict(kind='token-paired-fit-identity-1', recipe=RECIPE, context=asdict(training.context),
+    sources=(__file__,data.__file__,policy.__file__,identity_owner.__file__,b.__file__,paired_math.__file__)
+    if objective==objectives.WIN:sources=(*sources,objectives.__file__)
+    identity = dict(kind=prefix+'-fit-identity-1', recipe=recipe, context=asdict(training.context),
         inputModelCanonicalSha256=b.digest(current.model),
         inputActorParametersSha256=identity_owner.actor_parameters_sha256(current.model),
         frozenModelFieldsSha256=b.digest({key: value for key, value in current.model.items()
@@ -144,8 +159,7 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         publicCoverage=dict(trainingReady=training.ready_count,
             validationReady=training.validation_ready_count),
         epochSeeds=list(config.epochSeeds), originalDeadline=config.deadline,
-        sourceSha256={Path(path).name: b.file_digest(path) for path in
-            (__file__, data.__file__, policy.__file__, identity_owner.__file__, b.__file__, paired_math.__file__)})
+        sourceSha256={Path(path).name: b.file_digest(path) for path in sources})
     b.atomic_json(output/'identity.json', identity)
     initial = anchor_metrics(actor, prepared)
     history = [dict(epoch=0, accepted=True, anchor=initial, actorSha256=b.digest(actor.artifact()))]
@@ -165,12 +179,12 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
     b.require(identity['trainingSha256'] == training.sha256,
         'Complete immutable TRAIN inputs must survive optimization unchanged.')
     b.require(all(b.file_digest(path) == identity['sourceSha256'][Path(path).name]
-        for path in (__file__, data.__file__, policy.__file__, identity_owner.__file__, b.__file__, paired_math.__file__)),
+        for path in sources),
         'The original numerical source owners must remain unchanged until publication.')
     b.atomic_json(output/'policy.json', model)
-    b.atomic_json(output/'checkpoint.json', dict(kind='token-paired-adam-1',
+    b.atomic_json(output/'checkpoint.json', dict(kind=prefix+'-adam-1',
         model=model, optimizer=b.encode_optimizer(optimizer), acceptedEpochs=accepted, adamSteps=steps))
-    done = dict(kind='token-paired-fit-complete-1', complete=True, identity=identity,
+    done = dict(kind=prefix+'-fit-complete-1', complete=True, identity=identity,
         acceptedEpochs=accepted, attemptedEpochs=len(history)-1, actorChanged=changed,
         operationalPassed=accepted > 0 and changed, adamSteps=steps,
         stopReason='epoch-limit' if accepted == 20 else 'original-kl-limit',
@@ -178,4 +192,35 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         artifacts={name: b.file_digest(output/name) for name in
             ('identity.json', 'policy.json', 'checkpoint.json', 'history.json')})
     b.atomic_json(output/'finished.json', done)
-    return completed(output)
+    return completed(output,objective=objective)
+
+
+def main():
+    """Fit-only projection of a verified native corpus; no collection, qualification or activation."""
+    import argparse
+    import token_paired_campaign_plan as plan_owner
+    from token_paired_corpus import Corpus
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--objective',choices=objectives.VERSIONS,default=objectives.MIXED)
+    for name in ('protocol','corpus','original-corpus','original-actor','current-actor','dictionary','output'):
+        parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--deadline-epoch',type=float,required=True)
+    parser.add_argument('--previous',type=Path)
+    args=parser.parse_args()
+    b.number(args.deadline_epoch,'Original absolute deadline',1.)
+    b.require(time.time()<args.deadline_epoch,'The original numerical deadline expired; no corpus will be opened.')
+    plan=plan_owner.Plan.from_record(plan_owner.read(args.protocol))
+    source=Corpus(plan,plan_owner.subject(args.corpus));anchor=Corpus(plan,plan_owner.subject(args.original_corpus))
+    original=data.FrozenActor(args.original_actor.read_bytes(),b.file_digest(args.original_actor))
+    current=data.FrozenActor(args.current_actor.read_bytes(),b.file_digest(args.current_actor))
+    context=source.context(args.dictionary,original,current,objective=args.objective)
+    training=source.training(context,current.model,original.model,anchor)
+    config=Config(tuple(plan.record['iterations'][context.iteration-1]['shuffleSeeds']),args.deadline_epoch)
+    result=fit(training,original,current,args.dictionary.read_bytes(),args.output,config,
+        previous=args.previous,objective=args.objective)
+    print(json.dumps(dict(kind='token-paired-fit-cli-1',objectiveVersion=args.objective,
+        fitCompletion=plan_owner.subject(args.output/'finished.json'),operationalPassed=result['operationalPassed'],
+        qualificationClaimed=False,validationPerformed=False,activated=False),sort_keys=True))
+
+
+if __name__=='__main__':main()

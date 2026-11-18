@@ -1,0 +1,91 @@
+{
+  "kind": "token-focus-second-prospective-method-1",
+  "study": 97,
+  "localOnly": true,
+  "remoteUseAuthorized": false,
+  "globalDeadlineEpoch": 1795020399.0,
+  "createdEpoch": 1795009169.811007,
+  "originPolicyRule": "Admit only the sole FINAL bundle of originally complete/sealed/valid study96, regardless of its holdout/researchSignal. Original96 terminal, original audit and physical closure must agree on1560 executions and candidate bundle. Otherwise defer, with no substitute origin.",
+  "baseSelector": {
+    "kind": "near-optimal-token-softmax-1",
+    "temperature": 0.35,
+    "maxScoreGap": 3,
+    "neighborRadius": 4
+  },
+  "nativeReadinessSha256": "687c152ffedfe867b4b98b993b6e1cc099aaa10cdadd5b9783d551c5ed120efa",
+  "nativeJarSha256": "6d7a056095ad5f886171823a29b23e466f4f89ad948bfc2f8e6999a71c4a6097",
+  "controlAndRivals": "Immutable qualified94 fca+C05/null mixture in every native paired evaluation, separate from96FINAL starting weights.",
+  "trainableHead": "TOKEN",
+  "immutable": [
+    "CARD",
+    "PURCHASE",
+    "EXPANSION",
+    "valueWeights",
+    "valueBias",
+    "feature dictionaries",
+    "prior",
+    "calibration",
+    "complete-policy selectors except trained TOKEN weights"
+  ],
+  "factorRecipe": "Existing coordinated-es-projection-1 factors generated once around exact96FINAL starting weights with one fresh PCG64 projection seed; preserve the original reference/calibration foundation. Materialize existing256-coordinate owner with only final64 TOKEN coordinates active.",
+  "directionRecipe": "One fresh PCG64 direction seed,16x64 independent standard Gaussian coordinates; expand to256 with first192 zero; do not renormalize directions.",
+  "generations": 1,
+  "directions": 16,
+  "sigma": 1,
+  "trainingWorlds": 16,
+  "trainingOpponentStyle": "BALANCED",
+  "trainingReplayIndices": {
+    "PLUS_00": [
+      0,
+      15
+    ],
+    "MINUS_00": [
+      0,
+      15
+    ]
+  },
+  "fitness": "Mean terminal candidate-seat win share across all16 worlds, no rank/reward shaping.",
+  "update": "For each of64 active coordinates g=sum_j((meanPlus_j-meanMinus_j)*u_j)/32. If RMS64(g)<=1e-12 or nonfinite stop unqualified. Sole final mean TOKEN coordinate=g/RMS64(g), exactly one active-RMS1 step from zero; no elite, clipping, line search or choice among steps.",
+  "holdoutWorlds": 128,
+  "holdoutOpponentStyle": "BALANCED",
+  "holdoutCases": [
+    "START",
+    "FINAL"
+  ],
+  "holdoutReplayIndices": [
+    0,
+    42,
+    85,
+    127
+  ],
+  "holdoutComparators": [
+    "FINAL-minus-START96FINAL candidate-seat wins paired by exact common worlds",
+    "FINAL-minus-qualified94 CONTROL wins paired by exact common worlds"
+  ],
+  "holdoutControlInvariant": "Every repeated qualified94 CONTROL result, diagnostic and available canonical history must match exactly across all mutants and holdout cases.",
+  "researchSignal": "Both paired win lower95 bounds>0 (z=1.959963984540054), all originals reproduced, all source/weights/counts valid. This is promising research only; qualified remains false and no human-play activation.",
+  "maximumTerminalExecutions": 1560,
+  "maximumTrainingTerminalExecutions": 1032,
+  "maximumHoldoutTerminalExecutions": 528,
+  "freshGameWorlds": 144,
+  "freshNumericStreams": 2,
+  "maximumScienceSeconds": 7200,
+  "minimumRemainingSecondsAtPreparation": 7800,
+  "auditSeconds": 600,
+  "workers": 10,
+  "heapMiB": 6144,
+  "maximumRssBytes": 12884901888,
+  "minimumFreeBytes": 17179869184,
+  "maximumDataBytes": 1073741824,
+  "launchViaOwnedTerminal": true,
+  "noRetry": true,
+  "noResume": true,
+  "noTopUp": true,
+  "noAlternativeCandidate": true,
+  "noEarlyQualityInspection": true,
+  "prerequisite": "Original96 complete terminal, original audit and physical closure with all owners gone; frozen source/numeric recipe/RNG proof, root-reviewed zero-game inputs and exact launch; require7800 original seconds remaining, otherwise defer.",
+  "retention": "Retain one32-member population, immutable factors/directions, sole final mean and all terminal/reproduction evidence. No per-decision full trajectories unless required for authoritative newly quoted admission traces. Never prune original evidence during a live trial.",
+  "startingWeightsMustBeOriginal96Final": true,
+  "holdoutIndependentStartingWeights": true,
+  "qualified94ControlWeightsSha256": "fca8593a5d43026d1c7146a9bb76cbce5bfd1a725de28ba18382d537710ff63e"
+}
