@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.ai.InitiativePolicyConfig
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -14,6 +15,34 @@ class RobustTokenInputTest {
             "lookbackTurns" to 8,
             "targetedRivalCount" to 1,
         )
+
+    @Test
+    fun independentOpponentUsesItsOwnSeatAndChangesScienceIdentity() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val lineup = mapOf("opponentStyle" to "QUALIFIED")
+            val control = RobustTokenInput.read(source(fixture, lineup).path)
+            val rival =
+                mapOf(
+                    "kind" to InitiativeRival.VERSION,
+                    "offset" to 1,
+                    "policy" to
+                        mapOf(
+                            "kind" to InitiativePolicyConfig.VERSION,
+                            "maximumTokenLoss" to 3,
+                            "tokenPenalty" to 0.2,
+                            "participation" to 1.0,
+                            "requireAffordableContest" to true,
+                            "attackBonus" to 3.0,
+                        ),
+                )
+            val test =
+                RobustTokenInput.read(source(fixture, lineup + ("initiativeRival" to rival)).path)
+
+            assertThat(test.initiative).isNull()
+            assertThat(test.initiativeRival?.seat(3)).isEqualTo(0)
+            assertThat(test.scienceSha256).isNotEqualTo(control.scienceSha256)
+        }
+    }
 
     @Test
     fun publicCounterConfigurationIsExplicitAndIdentityBound() {

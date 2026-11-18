@@ -67,6 +67,19 @@ internal enum class RobustOpponentStyle {
         }
 }
 
+/** One frozen independent opponent in a declared registration-relative seat. */
+internal data class InitiativeRival(val offset: Int, val policy: InitiativePolicyConfig) {
+    init {
+        require(offset in 1..3) { "The initiative rival must occupy one of the other three seats." }
+    }
+
+    fun seat(targetSeat: Int): Int = (targetSeat + offset) % 4
+
+    companion object {
+        const val VERSION = "public-initiative-rival-1"
+    }
+}
+
 /** A bounded paired shard; the source owns all streams and immutable inference subjects. */
 internal class RobustTokenInput
 private constructor(
@@ -86,6 +99,7 @@ private constructor(
     val adaptiveOpponent: RevealedTokenCounterConfig?,
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
+    val initiativeRival: InitiativeRival?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -155,6 +169,12 @@ private constructor(
             } ?: emptyMap()) +
             (candidateTokenAnchoredPolicy?.let {
                 mapOf("candidateTokenAnchoredPolicy" to it.identity)
+            } ?: emptyMap()) +
+            (initiativeRival?.let {
+                mapOf(
+                    "initiativeRival" to
+                        mapOf("kind" to InitiativeRival.VERSION, "configuration" to it)
+                )
             } ?: emptyMap()) +
             (initiative?.let {
                 mapOf(
@@ -315,6 +335,7 @@ private constructor(
                     "controlSelector",
                     "expansionDenial",
                     "initiative",
+                    "initiativeRival",
                     "tokenNeighborMixture",
                 ),
             )
@@ -420,6 +441,20 @@ private constructor(
             require(tokenNeighborMixture == null || !candidateOnly && expansionDenial == null) {
                 "Local token neighbor experiments require paired roles and no expansion intervention."
             }
+            val initiativeRival =
+                node["initiativeRival"]?.let { rival ->
+                    PurchaseJson.fields(rival, setOf("kind", "offset", "policy"))
+                    require(
+                        rival["kind"].asText() == InitiativeRival.VERSION &&
+                            style == RobustOpponentStyle.QUALIFIED
+                    ) {
+                        "The independently tuned rival requires its explicit version and the frozen base lineup."
+                    }
+                    InitiativeRival(
+                        PurchaseJson.integer(rival["offset"], "rival offset"),
+                        initiative(rival.required("policy")),
+                    )
+                }
             val initiative = node["initiative"]?.let(::initiative)
             require(
                 initiative == null ||
@@ -484,6 +519,7 @@ private constructor(
                     adaptiveOpponent,
                     anchored,
                     initiative,
+                    initiativeRival,
                     seeds,
                     start,
                     count,

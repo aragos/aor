@@ -19,7 +19,7 @@ import time
 MAC_JAVA = ("/Users/aragos/.gradle/jdks/azul_systems__inc_-21-aarch64-os_x.2/"
             "zulu21.50.19-ca-jdk21.0.11-macosx_aarch64/Contents/Home/bin/java")
 HOST = "aragos@192.168.86.44"
-REMOTE = "/home/aragos/aor-worker/initiative-20261118"
+REMOTE = "/home/aragos/aor-worker/initiative-crossplay-20261118"
 SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", HOST]
 MODE = "dev.aragos.aor.training.TrainingMainKt"
 ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "REVEALED_TIE_UNDERCUT")
@@ -45,22 +45,6 @@ def write(path, record, *, replace=False):
 def cfg(loss, penalty, participation, contest, attack):
     return dict(kind="public-initiative-1", maximumTokenLoss=loss, tokenPenalty=penalty,
                 participation=participation, requireAffordableContest=contest, attackBonus=attack)
-
-
-COARSE = [
-    cfg(1, .5, 1., False, 0.),
-    cfg(2, .5, 1., False, 0.),
-    cfg(4, .5, 1., False, 0.),
-    cfg(4, .5, .5, False, 0.),
-    cfg(4, .5, 1., True, 0.),
-    cfg(4, .5, .5, True, 0.),
-    cfg(2, .5, 1., False, 2.),
-    cfg(4, .5, 1., True, 2.),
-    cfg(4, .5, .5, True, 4.),
-    cfg(0, .5, 0., False, 2.),
-    cfg(0, .5, 0., False, 4.),
-    cfg(0, .5, 0., False, 8.),
-]
 
 
 def seed_bank(label, count):
@@ -106,7 +90,6 @@ class Campaign:
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
         self.stop = threading.Event()
-        self.counters = {}
 
     def remaining(self):
         return self.deadline - time.time()
@@ -173,7 +156,7 @@ class Campaign:
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
 
-    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96):
+    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -183,7 +166,7 @@ class Campaign:
         if len(set(streams)) != len(streams):
             raise ValueError("Each declared stage bank requires distinct seed streams.")
         declared = dict(stage=label, configs=configs, banks=banks, paired=paired,
-                        replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline)
+                        replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline, rival=rival)
         write(stage / "method.json", declared)
         choices = configs if paired else {"control": None, **configs}
         jobs = []
@@ -201,6 +184,8 @@ class Campaign:
                     if mode != "QUALIFIED":
                         spec["adaptiveOpponent"] = dict(kind="public-token-history-counter-1",
                             minimumObservations=2,lookbackTurns=8,targetedRivalCount=1)
+                    if rival is not None:
+                        spec["initiativeRival"] = dict(kind="public-initiative-rival-1",offset=1,policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
                     write(source, spec)
@@ -246,7 +231,8 @@ class Campaign:
                     control = records("control", case)
                 summary[mode] = score(current, control)
             ordinary = summary["QUALIFIED"]["mean"]
-            adaptive = statistics.mean(row["mean"] for key, row in summary.items() if key != "QUALIFIED")
+            adaptive_rows = [row["mean"] for mode, row in summary.items() if mode != "QUALIFIED"]
+            adaptive = statistics.mean(adaptive_rows) if adaptive_rows else ordinary
             outcomes[key] = dict(config=config, outcomes=summary, ordinary=ordinary, adaptive=adaptive,
                                  rankScore=.5*(ordinary+adaptive))
         write(stage / "summary.json", outcomes)
@@ -257,48 +243,37 @@ def ranked(outcomes):
     return sorted(outcomes.values(), key=lambda row: (row["rankScore"], row["adaptive"]), reverse=True)
 
 
-def refine(winners):
-    options = {}
-    for row in winners:
-        base = row["config"]
-        changes = [base, dict(base, tokenPenalty=max(.0,base["tokenPenalty"]-.35)),
-                   dict(base, tokenPenalty=min(3.,base["tokenPenalty"]+.65)),
-                   dict(base, participation=.75),
-                   dict(base, attackBonus=0.0 if base["attackBonus"] else 3.0)]
-        for config in changes:
-            options.setdefault(json.dumps(config, sort_keys=True),config)
-    return {f"r{i:02d}": item for i,item in enumerate(options.values())}
-
-
-def main(root, operation):
+def main(root, initial):
     campaign = Campaign(root)
     campaign.validate_runtime()
-    if operation == "smoke":
-        campaign.stage("smoke", {"initiative": COARSE[7]}, 8, ECOLOGIES[:2], paired=True, shard=4)
+    main_result = read(initial / "result.json")
+    champion = main_result["best"] if main_result["status"] == "development-no-nomination" else main_result["comparison"]
+    candidates = [
+        cfg(1, .15, 1., False, 1.),
+        cfg(3, .15, 1., False, 0.),
+        cfg(5, .15, 1., False, 3.),
+        cfg(7, .15, 1., True, 3.),
+        cfg(6, 0., .8, True, 0.),
+        cfg(4, .85, .8, False, 6.),
+        cfg(5, 0., .5, False, 0.),
+        cfg(7, .2, .8, False, 5.),
+    ]
+    trained = campaign.stage("independent-response", {f"r{i}": v for i,v in enumerate(candidates)},
+                             192, ECOLOGIES[:1], shard=96)
+    opponent = ranked(trained)[0]["config"]
+    validate = campaign.stage("response-check", {"response":opponent}, 384, ECOLOGIES[:1], paired=True)
+    if validate["response"]["ordinary"] <= 0:
+        write(root / "result.json", dict(status="response-did-not-win-more", validation=validate))
         return
-    if not (root / "smoke/summary.json").is_file():
-        raise ValueError("Both hosts must pass the bounded smoke before starting the search.")
-    coarse = campaign.stage("coarse", {f"c{i:02d}": value for i, value in enumerate(COARSE)},
-                            192, ECOLOGIES, shard=96)
-    nearby = campaign.stage("refine", refine(ranked(coarse)[:3]), 224, ECOLOGIES, shard=112)
-    merged = ranked(nearby)
-    final = campaign.stage("confirmation", {f"f{i}": row["config"] for i,row in enumerate(merged[:3])},
-                           384, ECOLOGIES, shard=96)
-    winner = ranked(final)[0]
-    if winner["adaptive"] <= 0 or winner["ordinary"] < -.075:
-        write(root / "result.json", dict(status="development-no-nomination", best=winner))
-        return
-    write(root / "nomination.json", winner)
-    audit = campaign.stage("fresh-audit", {"winner":winner["config"]}, 768, ECOLOGIES, paired=True)
-    checked = audit["winner"]["outcomes"]
-    passed = checked["QUALIFIED"]["lower95"] > -.075 and all(
-        checked[mode]["lower95"] > 0 for mode in ECOLOGIES[1:])
-    write(root / "result.json", dict(status="fresh-audit-complete", passed=passed, comparison=audit["winner"]))
+    crossplay = campaign.stage("crossplay", {"champion":champion["config"]}, 512, ECOLOGIES[:1],
+                               paired=True, rival=opponent)
+    write(root / "result.json", dict(status="crossplay-complete", comparison=crossplay, responder=validate,
+                                     initialResultSha256=sha(initial/"result.json")))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("operation", choices=("smoke", "search"))
+    parser.add_argument("--initial", type=Path, required=True)
     args = parser.parse_args()
-    main(args.root.resolve(), args.operation)
+    main(args.root.resolve(), args.initial.resolve())
