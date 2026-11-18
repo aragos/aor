@@ -8,7 +8,14 @@ import robust_token_campaign as c
 
 
 KIND = 'learned-bid-search-1'
+PREFIX = 'learned-bid-search'
+STUDY = 92
+PARENT_TERMINAL_KIND = 'mac-qualification-terminal-1'
+PARENT_CLOSURE_KIND = 'mac-qualification-physical-closure-1'
 METHOD_SHA = '82debbe40373aaa5986a7fe79616598e0d9d6e6ec5e3b51959329c7253cbce36'
+SCHEDULE_SHA = 'a49c271f9a1c1ecf69ce02345713b777209dbd1a5b6657bdefe8880e8616c987'
+RNG_AUDIT_SHA = '7df8f7ab2ddce6807731f55218b4646d2ffed6da2b644b7df74fb51bd576b3f4'
+ROOT_RNG_PROOF_SHA = '66fa3c163699a2ac1e062a271f29af132eef81a76eeccb7b066e5c8600ef4a07'
 NATIVE_SHA = '14245cba2d1dbd4e62780371efd84d4416bd91592ceca876449d7f417756463f'
 CANDIDATE_SHA = 'fca8593a5d43026d1c7146a9bb76cbce5bfd1a725de28ba18382d537710ff63e'
 OLD_CONTROL_SHA = 'e62d749f4d9125cc86107cc2c37d77cb2f23af65c3648105a5fd2636f1ee27f1'
@@ -31,7 +38,8 @@ BANKS = (
     dict(name='reference', worlds=512, opponentStyle='QUALIFIED', control='OLD87',
         replayIndices=[0, 170, 341, 511]),
 )
-FIXED = dict(globalDeadlineEpoch=GLOBAL_DEADLINE, nativeJarSha256=NATIVE_SHA,
+BANK_ORDER = tuple(bank['name'] for bank in BANKS)
+FIXED = dict(study=STUDY, globalDeadlineEpoch=GLOBAL_DEADLINE, nativeJarSha256=NATIVE_SHA,
     candidateBundleSha256=CANDIDATE_SHA, learnedControlBundleSha256=CANDIDATE_SHA,
     learnedControlSelector=CONTROL_SELECTOR, oldControlBundleSha256=OLD_CONTROL_SHA,
     oldControlSelector=None, caseConfigs=CASES, confidenceMultiplier=c.MULTIPLIER,
@@ -129,8 +137,21 @@ def check_prepared(prepared, bank_name):
 def native_chunk(source, directory, bank_name, *, source_path=None):
     import robust_token_audit
     result = robust_token_audit.native_chunk(source,directory,source_path=source_path)
-    check_prepared(c.read(Path(directory)/'prepared.json'),bank_name)
+    prepared=c.read(Path(directory)/'prepared.json')
+    check_prepared(prepared,bank_name)
+    check_inputs(prepared,source)
     return result
+
+
+def check_inputs(prepared, source):
+    for path,digest in prepared['inputPins'].items():
+        c.require(c.sha(path)==digest,'An actual native model or numerical reference input changed.')
+    for name in ('candidateBundle','inferenceAsset','nomination','arena','controlBundle'):
+        if name in source:
+            item=source[name]
+            c.require(prepared['inputPins'].get(item['path'])==item['sha256'] and
+                c.sha(item['path'])==item['sha256'],
+                'Every explicitly declared native model/reference subject must remain physically pinned.')
 
 
 def bid_summary(rows, role):

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import signal
@@ -13,6 +14,18 @@ import threading
 import time
 
 from robust_token_campaign import read, require, sha, write
+
+
+def java_options(profile):
+    """Frozen optional performance settings; default commands retain the earlier experiment."""
+    options=profile.get('jvmOptions',[
+        '-XX:ActiveProcessorCount=1','-XX:ParallelGCThreads=1','-XX:ConcGCThreads=1'])
+    patterns=(r'-XX:(ActiveProcessorCount|ParallelGCThreads|ConcGCThreads|CICompilerCount)=\d+',
+        r'-XX:\+(UseG1GC|UseParallelGC|UseSerialGC)',r'-Xms\d+[mMgG]',r'-XX:-StackTraceInThrowable')
+    require(isinstance(options,list) and all(isinstance(value,str) and
+        any(re.fullmatch(pattern,value) for pattern in patterns) for value in options),
+        'Only explicit CPU, collector, initial-heap and diagnostic-stack performance options are admitted.')
+    return options
 
 
 def census(root):
