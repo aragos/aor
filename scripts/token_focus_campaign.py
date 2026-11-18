@@ -22,6 +22,10 @@ def portable(owner,item):
     c.require(not relative.is_absolute() and relative.parts and '..' not in relative.parts,
         'A numerical artifact must stay inside its original immutable owner directory.')
     path=Path(owner)/relative
+    current=Path(owner)
+    for part in relative.parts:
+        current=current/part
+        c.require(not current.is_symlink(),'An original numerical artifact cannot traverse a symbolic link.')
     c.require(c.sha(path)==item['sha256'],'An original numerical artifact changed.')
     return dict(path=str(path),sha256=item['sha256'])
 
@@ -30,6 +34,7 @@ def numerical_receipt(output,mode):
     folder=Path(output)/'numeric'/mode;owner=folder/'artifacts';path=owner/'receipt.json'
     value=c.read(path)
     c.require(value['kind']==KINDS[mode] and value['complete'] is True and
+        value['recipe']==c.read(Path(output)/'protocol-copy.json')['numericRecipe'] and
         value['inputPins'].get(str(folder/'request.json'))==c.sha(folder/'request.json'),
         'Every numerical phase must retain the original exact request and complete typed receipt.')
     for name,digest in value['inputPins'].items():
@@ -116,6 +121,12 @@ def independent_step(directions,outcome):
 
 def immutable_heads(profile,cases):
     original=search.subject(profile['candidateBundle'])
+    original_token=original['heads']['TOKEN']
+    original_path=Path(profile['candidateBundle']['path']).parent/original_token['path']
+    c.require(c.sha(original_path)==original_token['sha256'],'The original TOKEN weights must remain physically frozen.')
+    original_model=c.read(original_path)
+    actor_blocks={'stateWeights','stateBias','actionWeights','actionBias','actorWeights'}
+    metadata={key:value for key,value in original_model.items() if key not in actor_blocks}
     for case in cases:
         bundle=search.subject(case['bundle']);owner=Path(case['bundle']['path']).parent
         for head in ('CARD','PURCHASE','EXPANSION'):
@@ -123,6 +134,10 @@ def immutable_heads(profile,cases):
             c.require(item['sha256']==original['heads'][head]['sha256'] and
                 c.sha(owner/item['path'])==item['sha256'],
                 'Every population/final member must preserve the three immutable original head bytes.')
+        token=bundle['heads']['TOKEN'];path=owner/token['path']
+        c.require(c.sha(path)==token['sha256'] and
+            {key:value for key,value in c.read(path).items() if key not in actor_blocks}==metadata,
+            'TOKEN dictionaries, priors, values and all non-actor metadata must remain exactly original.')
 
 
 def audit(protocol,profile_path,output,terminal,policy=contract,*,now=time.time):
@@ -167,6 +182,9 @@ def audit(protocol,profile_path,output,terminal,policy=contract,*,now=time.time)
     c.require(c.read(output/'training-outcomes.json')==expected,'The complete original32x16 win-only training matrix must independently reproduce.')
     prepare,prep=numerical_receipt(output,'prepare');pop,pop_rec=numerical_receipt(output,'population')
     update,upd=numerical_receipt(output,'update');final,fin=numerical_receipt(output,'final')
+    c.require(all(record['scopeSha256']==prep['scopeSha256'] for record in (pop_rec,upd,fin)) and
+        population['scopeSha256']==prep['scopeSha256'],
+        'All original numerical phases and population must preserve the one prospectively bound scope.')
     requests=dict(prepare=dict(protocol=contract.declaration(protocol),seedSchedule=plan['seedSchedule'],
         originBundle=profile['candidateBundle'],inferenceAsset=profile['inferenceAsset']),
         population=dict(preparation=prepare,center=portable(Path(prepare['path']).parent,prep['center'])),
@@ -179,6 +197,11 @@ def audit(protocol,profile_path,output,terminal,policy=contract,*,now=time.time)
         upd['population']==pop and upd['outcomes']==contract.declaration(output/'training-outcomes.json') and fin['update']==update,
         'Final materialization must descend from the sole complete original numerical update.')
     direction_item=portable(Path(prepare['path']).parent,prep['directions'])
+    draw=search.subject(portable(Path(prepare['path']).parent,prep['directionDraw']))
+    c.require(draw['seed']==plan['reservedSchedule']['directionSeed'] and draw['drawShape']==[16,64] and
+        draw['expandedShape']==[16,256] and draw['zeroPrefix']==192 and draw['renormalized'] is False and
+        draw['directionsSha256']==direction_item['sha256'],
+        'The original declared direction stream must draw only16x64 Gaussian values and preserve the zero prefix.')
     differences,gradient,coordinates=independent_step(search.subject(direction_item),expected)
     center=search.subject(portable(Path(update['path']).parent,upd['center']))
     c.require(upd['antitheticWinDifferences']==differences and upd['step']['gradient']==gradient and

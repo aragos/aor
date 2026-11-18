@@ -24,7 +24,12 @@ def bundle(owner,token):
     owner.mkdir(parents=True)
     heads={}
     for head in ('CARD','PURCHASE','EXPANSION','TOKEN'):
-        path=owner/(head+'.json');path.write_text(token if head=='TOKEN' else head)
+        path=owner/(head+'.json')
+        if head=='TOKEN':
+            c.write(path,dict(encoderVersion='invented',stateFeatureNames=['s'],actionFeatureNames=['a'],
+                valueWeights=[7],valueBias=0,prior=[.3],stateWeights=[token],stateBias=[token],
+                actionWeights=[token],actionBias=[token],actorWeights=[token]))
+        else:path.write_text(head)
         heads[head]=dict(path=path.name,sha256=c.sha(path))
     path=owner/'bundle.json';c.write(path,dict(heads=heads));return subject(path)
 
@@ -39,6 +44,7 @@ def fixture(root):
         globalDeadlineEpoch=1795020399.,minimumRemainingSecondsAtPreparation=7800,preparedEpoch=1795011399.,
         workers=10,heapMiB=6144,maximumRssBytes=12*1024**3,minimumFreeBytes=16*1024**3,
         maximumDataBytes=1024**3,nativeJarSha256=c.sha(jar),baseSelector=policy.mixture.CONTROL_SELECTOR,
+        numericRecipe=dict(constructed=True),reservedSchedule=dict(directionSeed=1234),
         banks=dict(training=dict(nativeOffset=1,count=16,seeds=list(range(16))),
             holdout=dict(nativeOffset=2,count=128,seeds=list(range(100,228)))))
     schedule=root/'schedule.json';c.write(schedule,dict(kind='invented',banks=plan['banks']))
@@ -58,6 +64,7 @@ def fixture(root):
             path=artifact/name;path.parent.mkdir(parents=True,exist_ok=True);c.write(path,value)
         raw_files={str(path.relative_to(artifact)):c.sha(path) for path in artifact.rglob('*') if path.is_file()}
         c.write(artifact/'receipt.json',dict(kind=learner.KINDS[mode],complete=True,
+            recipe=plan['numericRecipe'],scopeSha256='a'*64,
             inputPins={str(folder/'request.json'):c.sha(folder/'request.json')},files=raw_files,**fields))
         return subject(artifact/'receipt.json')
     vectors=[[0.]*192+[1.]*64 for _ in range(16)]
@@ -68,6 +75,10 @@ def fixture(root):
     artifact=Path(prep['path']).parent;record=c.read(prep['path'])
     record.update(directions=dict(path='directions.json',sha256=c.sha(artifact/'directions.json')),
         center=dict(path='center.json',sha256=c.sha(artifact/'center.json')))
+    c.write(artifact/'direction-draw.json',dict(seed=1234,drawShape=[16,64],expandedShape=[16,256],zeroPrefix=192,
+        renormalized=False,directionsSha256=c.sha(artifact/'directions.json')))
+    record['directionDraw']=dict(path='direction-draw.json',sha256=c.sha(artifact/'direction-draw.json'))
+    record['files']['direction-draw.json']=c.sha(artifact/'direction-draw.json')
     Path(prep['path']).write_bytes(c.canonical(record));prep=subject(prep['path'])
     pop_root=output/'numeric/population/artifacts';pop_root.mkdir(parents=True)
     members=[]
@@ -75,7 +86,7 @@ def fixture(root):
         item=bundle(pop_root/f'member-{index:02d}',str(index))
         members.append(dict(index=index,direction=index//2,sign=1 if index%2==0 else -1,
             bundle=dict(path=str(Path(item['path']).relative_to(pop_root)),sha256=item['sha256'])))
-    population=dict(members=members,worldSeeds=plan['banks']['training']['seeds'],
+    population=dict(members=members,worldSeeds=plan['banks']['training']['seeds'],scopeSha256='a'*64,
         generationBankSha256=hashlib.sha256(c.canonical(plan['banks']['training'])[:-1]).hexdigest())
     # The generic receipt writer permits an existing constructed artifact directory here only.
     pop_request=output/'numeric/population/request.json'
@@ -84,6 +95,7 @@ def fixture(root):
     c.write(pop_root/'population.json',population)
     pop_files={str(path.relative_to(pop_root)):c.sha(path) for path in pop_root.rglob('*') if path.is_file()}
     c.write(pop_root/'receipt.json',dict(kind=learner.KINDS['population'],complete=True,
+        recipe=plan['numericRecipe'],scopeSha256='a'*64,
         inputPins={str(pop_request):c.sha(pop_request)},files=pop_files,preparation=prep,
         population=dict(path='population.json',sha256=c.sha(pop_root/'population.json'))))
     pop=subject(pop_root/'receipt.json')
@@ -115,6 +127,7 @@ def fixture(root):
     final_root=output/'numeric/final/artifacts';final_bundle=bundle(final_root/'model','final TOKEN')
     final_request=final_root.parent/'request.json';c.write(final_request,dict(kind='token-focus-step-numeric-final-1',preparation=prep,update=update))
     c.write(final_root/'receipt.json',dict(kind=learner.KINDS['final'],complete=True,
+        recipe=plan['numericRecipe'],scopeSha256='a'*64,
         inputPins={str(final_request):c.sha(final_request)},
         files={str(path.relative_to(final_root)):c.sha(path) for path in final_root.rglob('*') if path.is_file()},
         preparation=prep,update=update,center=subject(Path(update['path']).parent/'center.json'),
@@ -213,12 +226,14 @@ class ContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);terminal=root/'terminal.json';closed=root/'closed.json';audit=root/'completion-audit.json'
             case=policy.mixture.CASES[4]
-            c.write(audit,dict(complete=True,passed=True,qualified=True,protocolSha256=policy.PARENT_PROTOCOL_SHA,selectedCase=case))
+            c.write(audit,dict(kind='local-bid-mixture-original-audit-1',complete=True,passed=True,qualified=True,
+                terminalExecutions=2648,protocolSha256=policy.PARENT_PROTOCOL_SHA,selectedCase=case))
             c.write(terminal,dict(kind=policy.PARENT_TERMINAL_KIND,study=95,status='completed',complete=True,qualified=True,
-                protocolSha256=policy.PARENT_PROTOCOL_SHA,selectedCase=case,completionAuditSha256=c.sha(audit)))
+                protocolSha256=policy.PARENT_PROTOCOL_SHA,knownCompletedTerminalExecutions=2648,
+                selectedCase=case,completionAuditSha256=c.sha(audit)))
             c.write(closed,dict(kind=policy.PARENT_CLOSURE_KIND,study=95,passed=True,qualified=True,scienceComplete=True,
                 allOwnedProcessesExited=True,originalClocksRenewed=False,auditReruns=0,
-                protocolSha256=policy.PARENT_PROTOCOL_SHA,artifactPins={str(audit):c.sha(audit)}))
+                protocolSha256=policy.PARENT_PROTOCOL_SHA,actualCompletedLowerBound=2648,artifactPins={str(audit):c.sha(audit)}))
             self.assertEqual(policy.origin_policy(subject(terminal),subject(closed))['tokenNeighborMixture'],case['tokenNeighborMixture'])
 
     def test_native_source_preserves_selected_mixture_only_for_candidate(self):
@@ -249,10 +264,33 @@ class ContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'three immutable original head bytes'):
                 learner.immutable_heads(dict(candidateBundle=origin),[dict(bundle=other)])
 
+    def test_token_value_or_dictionary_changes_are_independently_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);origin=bundle(root/'original','start');other=bundle(root/'other','mutant')
+            record=c.read(other['path']);path=Path(other['path']).parent/record['heads']['TOKEN']['path']
+            model=c.read(path);model['valueBias']=1;path.write_bytes(c.canonical(model))
+            record['heads']['TOKEN']['sha256']=c.sha(path);Path(other['path']).write_bytes(c.canonical(record))
+            with self.assertRaisesRegex(ValueError,'all non-actor metadata must remain exactly original'):
+                learner.immutable_heads(dict(candidateBundle=origin),[dict(bundle=subject(other['path']))])
+
     def test_extra_numeric_phase_cannot_be_hidden(self):
         with tempfile.TemporaryDirectory() as temporary:
             args=fixture(Path(temporary));(args[2]/'numeric/retry').mkdir()
             with self.assertRaisesRegex(ValueError,'unreported numerical phase'):
+                learner.audit(*args[:5],now=lambda:args[5]['deadlineEpoch']+1)
+
+    def test_numerical_phase_cannot_change_the_frozen_recipe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args=fixture(Path(temporary));path=args[2]/'numeric/update/artifacts/receipt.json'
+            value=c.read(path);value['recipe']={'changed':True};path.write_bytes(c.canonical(value))
+            with self.assertRaisesRegex(ValueError,'original exact request'):
+                learner.numerical_receipt(args[2],'update')
+
+    def test_phase_scope_cannot_change_despite_matching_artifact_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args=fixture(Path(temporary));path=args[2]/'numeric/update/artifacts/receipt.json'
+            value=c.read(path);value['scopeSha256']='b'*64;path.write_bytes(c.canonical(value))
+            with self.assertRaisesRegex(ValueError,'one prospectively bound scope'):
                 learner.audit(*args[:5],now=lambda:args[5]['deadlineEpoch']+1)
 
     def test_controller_entrypoint_belongs_to_retained_source_closure(self):

@@ -57,7 +57,9 @@ def origin_policy(terminal_item,closure_item):
     audit=c.read(audit_path)
     c.require(terminal['complete'] is True and terminal['status']=='completed' and closed['qualified'] is True and
         closed['scienceComplete'] is True and audit['complete'] is True and audit['passed'] is True and
-        audit['qualified'] is True and audit['protocolSha256']==PARENT_PROTOCOL_SHA and
+        audit['kind']=='local-bid-mixture-original-audit-1' and audit['qualified'] is True and
+        terminal['knownCompletedTerminalExecutions']==closed['actualCompletedLowerBound']==audit['terminalExecutions']==2648 and
+        audit['protocolSha256']==PARENT_PROTOCOL_SHA and
         terminal['completionAuditSha256']==c.sha(audit_path)==closed['artifactPins'].get(str(audit_path)) and
         audit['selectedCase']==terminal['selectedCase'] and terminal['selectedCase'] in mixture.CASES,
         'The original qualified95 audit and closure must bind its sole selected mixture exactly.')
