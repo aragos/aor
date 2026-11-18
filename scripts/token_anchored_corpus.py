@@ -223,6 +223,11 @@ class Corpus:
 def normalized_labels(value, native_public, root):
     shared.require(root.record['split'] == 'TRAIN',
         'Warm fitting cannot decode sealed diagnostic labels or any non-TRAIN split.')
+    return _checked_labels(value, native_public, root)
+
+
+def _checked_labels(value, native_public, root):
+    # The caller owns the TRAIN/diagnostic read boundary before decoding the file.
     for key in ('signature', 'scopeSha256', 'scienceSha256', 'round', 'request', 'streams', 'status', 'originSha256'):
         shared.require(value[key] == native_public[key], 'Warm label sidecar changed its original public binding: '+key)
     shared.require(value['kind'] == 'token-anchored-paired-labels-1', 'Warm fitting rejects a legacy label contract.')
