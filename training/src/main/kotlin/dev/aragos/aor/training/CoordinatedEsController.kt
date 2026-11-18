@@ -7,6 +7,7 @@ import dev.aragos.aor.ai.CoordinatedPolicySelector
 import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.TerritoryEncoder
@@ -25,6 +26,7 @@ internal class CoordinatedEsController(
     support: JointSupportProfile? = null,
     tokenSampler: NearOptimalTokenSampler? = null,
     expansionDenial: PublicLeaderAttackConfig? = null,
+    private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -48,18 +50,27 @@ internal class CoordinatedEsController(
             support,
             tokenSampler,
             expansionDenial,
+            tokenNeighborMixture,
         )
 
     override fun controls(decision: String): Boolean =
         selector.controls(decision) || reference.controls(decision)
 
+    override fun tokenNeighborMixture(): LocalTokenNeighborMixture? = tokenNeighborMixture
+
     override fun choose(decision: SimulationDecision): String? {
         if (!selector.controls(decision.observation.decision)) return reference.choose(decision)
-        return selector.choose(decision.view, decision.observation, decision.seed) {
-            requireNotNull(reference.choose(decision)) {
-                "The complete qualified G3/E/T reference must supply its offered command."
-            }
-        }
+        return selector.choose(
+            decision.view,
+            decision.observation,
+            decision.seed,
+            referenceCommand = {
+                requireNotNull(reference.choose(decision)) {
+                    "The complete qualified G3/E/T reference must supply its offered command."
+                }
+            },
+            tokenQuote = decision.tokenQuote,
+        )
     }
 
     companion object {

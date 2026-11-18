@@ -7,6 +7,54 @@ import kotlin.test.assertFailsWith
 
 /** Invented complete model subjects; no game, neural forward or fresh scientific stream. */
 class RobustTokenInputTest {
+    @Test
+    fun typedLocalMixtureIsBoundOnlyWhenExplicitlyOffered() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val ordinary = RobustTokenInput.read(source(fixture).path)
+            assertThat(ordinary.scienceIdentity).doesNotContainKey("tokenNeighborMixture")
+            val mixture =
+                mapOf(
+                    "kind" to "local-token-neighbor-mixture-1",
+                    "departureProbability" to .5,
+                    "radius" to 2,
+                    "admission" to "QUOTED_LEGAL_NEIGHBORS",
+                )
+            val experimental =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf("tokenNeighborMixture" to mixture),
+                        )
+                        .path
+                )
+            assertThat(experimental.scienceIdentity["tokenNeighborMixture"]).isEqualTo(mixture)
+            assertThat(experimental.scienceSha256).isNotEqualTo(ordinary.scienceSha256)
+        }
+    }
+
+    @Test
+    fun localMixtureRejectsUnknownAdmissionInsteadOfSilentlyUsingOfferedActions() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            assertFailsWith<IllegalArgumentException> {
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "tokenNeighborMixture" to
+                                    mapOf(
+                                        "kind" to "local-token-neighbor-mixture-1",
+                                        "departureProbability" to .5,
+                                        "radius" to 2,
+                                        "admission" to "ANY_LEGAL_ACTION",
+                                    )
+                            ),
+                        )
+                        .path
+                )
+            }
+        }
+    }
+
     private val denial =
         mapOf(
             "kind" to "public-leader-attack-bonus-1",

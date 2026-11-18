@@ -1,8 +1,10 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
+import dev.aragos.aor.ai.TokenNeighborAdmission
 import java.nio.file.Path
 
 /** Public-state opponent interventions around each rival's actual qualified token command. */
@@ -31,6 +33,7 @@ private constructor(
     val control: CoordinatedEsBundle,
     val controlSampler: NearOptimalTokenSampler?,
     val expansionDenial: PublicLeaderAttackConfig?,
+    val tokenNeighborMixture: LocalTokenNeighborMixture?,
     val opponentStyle: RobustOpponentStyle,
     val seeds: List<Int>,
     val start: Int,
@@ -74,6 +77,17 @@ private constructor(
                             "minimumWinProbability" to it.minimumWinProbability,
                         )
                 )
+            } ?: emptyMap()) +
+            (tokenNeighborMixture?.let {
+                mapOf(
+                    "tokenNeighborMixture" to
+                        mapOf(
+                            "kind" to LocalTokenNeighborMixture.VERSION,
+                            "departureProbability" to it.departureProbability,
+                            "radius" to it.radius,
+                            "admission" to it.admission.name,
+                        )
+                )
             } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -107,6 +121,30 @@ private constructor(
         )
 
     companion object {
+        private fun neighborMixture(node: JsonNode): LocalTokenNeighborMixture? {
+            if (node.isNull) return null
+            PurchaseJson.fields(node, setOf("kind", "departureProbability", "radius", "admission"))
+            require(
+                node["kind"]?.asText() == LocalTokenNeighborMixture.VERSION &&
+                    node["departureProbability"].isNumber
+            ) {
+                "Declare the typed local token mixture and numeric departure probability."
+            }
+            val admission =
+                requireNotNull(
+                    TokenNeighborAdmission.entries.singleOrNull {
+                        it.name == node["admission"]?.asText()
+                    }
+                ) {
+                    "Declare one typed local token neighbor admission."
+                }
+            return LocalTokenNeighborMixture(
+                node["departureProbability"].doubleValue(),
+                PurchaseJson.integer(node["radius"], "local token radius"),
+                admission,
+            )
+        }
+
         private fun samplerIdentity(value: NearOptimalTokenSampler?): Map<String, Any>? =
             value?.let {
                 mapOf(
@@ -173,6 +211,7 @@ private constructor(
                     "controlBundle",
                     "controlSelector",
                     "expansionDenial",
+                    "tokenNeighborMixture",
                 ),
             )
             require(node["kind"]?.asText() == "robust-token-chunk-1") {
@@ -225,6 +264,7 @@ private constructor(
             val candidateSampler = sampler(node.required("selector"))
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
+            val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)
             val seeds = node.required("seeds").map { PurchaseJson.integer(it, "world seed") }
             require(seeds.size in 1..16384 && seeds.distinct().size == seeds.size) {
                 "A robust bank requires 1–16384 distinct prospectively fixed world seeds."
@@ -266,6 +306,9 @@ private constructor(
             ) {
                 "The leader-denial mechanism requires paired identical model and token policies; only expansion may differ."
             }
+            require(tokenNeighborMixture == null || !candidateOnly && expansionDenial == null) {
+                "Local token neighbor experiments require paired roles and no expansion intervention."
+            }
             val pins =
                 asset.pins +
                     nominationPins +
@@ -289,6 +332,7 @@ private constructor(
                     control,
                     controlSampler,
                     expansionDenial,
+                    tokenNeighborMixture,
                     style,
                     seeds,
                     start,

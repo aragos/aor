@@ -9,6 +9,8 @@ import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.LocalTokenNeighborMixture
+import dev.aragos.aor.ai.LocalTokenNeighborPolicy
 import java.security.MessageDigest
 import kotlin.math.abs
 
@@ -45,7 +47,10 @@ internal object RobustTokenIntervention {
 }
 
 /** Per-game public/own behavior counters. These never become an action-selection input. */
-internal class RobustTokenDiagnostics(private val controlledSeat: Int) {
+internal class RobustTokenDiagnostics(
+    private val controlledSeat: Int,
+    private val recordTokenAdmissions: Boolean = false,
+) {
     private val controlledBids = mutableMapOf<Int, Int>()
     private val rivalBids = mutableMapOf<Int, Int>()
     private val orderPositions = mutableMapOf<Int, Int>()
@@ -57,6 +62,44 @@ internal class RobustTokenDiagnostics(private val controlledSeat: Int) {
     private var leaderAttackOpportunities = 0
     private var attacksOnPublicLeader = 0
     private val decisions = MessageDigest.getInstance("SHA-256")
+    private val quotedBids = mutableMapOf<Int, Int>()
+    private val quoteAdmissions = mutableListOf<Map<String, Any>>()
+
+    fun admitted(value: SimulationTokenQuoteAdmission) {
+        val amount = value.quote.amount
+        val owner = value.acceptedView.players.single { it.id.value == value.original.playerId }
+        quotedBids[amount] = (quotedBids[amount] ?: 0) + 1
+        quoteAdmissions.add(
+            mapOf(
+                "command" to value.command,
+                "amount" to amount,
+                "originalOfferedAmounts" to
+                    value.original.candidates.map {
+                        LocalTokenNeighborPolicy.amount(it.command)
+                    },
+                "quote" to
+                    mapOf(
+                        "amount" to amount,
+                        "cost" to value.quote.cost,
+                        "tokensReceived" to value.quote.tokensReceived,
+                        "cashAfter" to value.quote.cashAfter,
+                        "stockAfter" to value.quote.stockAfter,
+                        "poolAfter" to value.quote.poolAfter,
+                    ),
+                "ownerResourceBefore" to
+                    mapOf(
+                        "cash" to owner.cash,
+                        "stock" to owner.stockTokens,
+                        "pool" to owner.poolTokens,
+                    ),
+                "originalObservationSha256" to CpePairedDigest.json(value.original),
+                "acceptedObservationSha256" to CpePairedDigest.json(value.accepted),
+                "acceptedCandidateSha256" to CpePairedDigest.json(value.candidate),
+                "acceptedQuotedViewSha256" to CpePairedDigest.json(value.acceptedView),
+                "retainedForDecisionTrace" to true,
+            )
+        )
+    }
 
     fun chosen(decision: SimulationDecision, command: String) {
         decisions.update(
@@ -120,7 +163,14 @@ internal class RobustTokenDiagnostics(private val controlledSeat: Int) {
             "controlledAttacksOnCurrentPublicLeader" to attacksOnPublicLeader,
             "chosenPolicyDecisionsSha256" to
                 decisions.digest().joinToString("") { "%02x".format(it) },
-        )
+        ) +
+            if (recordTokenAdmissions)
+                mapOf(
+                    "controlledUnofferedTokenBidCounts" to
+                        quotedBids.toSortedMap().mapKeys { it.key.toString() },
+                    "controlledTokenQuoteAdmissions" to quoteAdmissions.toList(),
+                )
+            else emptyMap()
 }
 
 /** Only prescribed reproduction roots retain and verify the complete canonical authority text. */
@@ -165,7 +215,7 @@ internal object RobustTokenGame {
         val style = input.opponentStyle.at(index, seat)
         val references =
             arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
-        val diagnostics = RobustTokenDiagnostics(seat)
+        val diagnostics = RobustTokenDiagnostics(seat, input.tokenNeighborMixture != null)
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
@@ -180,6 +230,7 @@ internal object RobustTokenGame {
                     JointSupportProfile.KNOWN_OWN_CHAOS_1,
                     if (candidate) input.sampler else input.controlSampler,
                     if (candidate) input.expansionDenial else null,
+                    if (candidate) input.tokenNeighborMixture else null,
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {
@@ -192,6 +243,16 @@ internal object RobustTokenGame {
                 } else style
             object : SimulationController {
                 override fun controls(decision: String): Boolean = qualified.controls(decision)
+
+                override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
+                    qualified.tokenNeighborMixture()
+
+                override fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) {
+                    check(player == seat && candidate) {
+                        "Only the evaluated candidate may admit a new quoted token neighbor."
+                    }
+                    diagnostics.admitted(admission)
+                }
 
                 override fun choose(decision: SimulationDecision): String? {
                     val original = qualified.choose(decision) ?: return null
