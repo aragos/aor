@@ -463,6 +463,31 @@ before any games run.
 
 ## Full-game strategy experiments
 
+### Public-history counter-bidders
+
+The native robust arena can explicitly use `REVEALED_UNDERCUT`, `REVEALED_OVERBID`,
+`REVEALED_TIE_UNDERCUT` or `REVEALED_TIE_OVERBID`. `REVEALED_BALANCED` rotates those four styles
+with `(globalIndex / 4 + controlledSeat) % 4`. They learn the controlled fixture seat's recent
+**publicly revealed** bids; the existing `UNDERCUT` and `OVERBID` instead adjust each rival's own
+qualified-policy bid. None of these interventions predicts or reads sealed current commitments.
+
+Revealed styles require an explicit `adaptiveOpponent` object with
+`kind: "public-token-history-counter-1"`, `minimumObservations`, `lookbackTurns` and
+`targetedRivalCount`. One targeted rival means the next registered seat cyclically after the fixture
+target, leaving the other two qualified opponents unchanged. Three is a separate stress ecology.
+The predictor uses the bounded recent mode, resolving modal ties by the latest public observation.
+It keeps the original policy during warmup or when its exact neighboring command is not offered.
+Tie-aware variants use capital priority and explicit public tie insertion. New styles/configurations
+are part of the immutable science identity; omitted options retain the old behavior.
+
+Arena and collector integrations share `RevealedTokenCounterLeague`. Construct one per independent
+game, feed simulated public prefix views chronologically with `observe`, and wrap every seat's
+baseline controller. Use `fork` for independent continuations after a common prefix, including after
+simultaneous root commands: it copies public learning and each rival's pending tie intent. Histories
+never consume chosen current commands. Diagnostics retain a bounded proof prefix and a digest of
+all public reveals and counter decisions. Source checks use constructed views; actual benchmark
+worlds and evaluation gates require a separately frozen protocol.
+
 Use `arena` for a frozen complete-game comparison and `strategy-search` for a small search over
 `planning.*` weights. Both use ordinary engine play, HARD opponents, the same chance seeds
 on both sides of each comparison and a rotating replacement seat. Model paths resolve relative to
