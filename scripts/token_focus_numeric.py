@@ -107,7 +107,12 @@ def prepared(inputs, item):
         factor.record['scopeSha256'] == value['scopeSha256'],
         'The factor map must use the exact protocol-owned numerical origin, never the selector reference.')
     schedule = inputs.json(inputs.portable(owner, value['seedSchedule']))
+    protocol = inputs.json(inputs.portable(owner, value['protocol']))
     asset = inputs.json(value['inferenceAsset'])
+    require(protocol['scheduleSha256'] == value['seedSchedule']['sha256'] and
+        protocol['reservedSchedule'] == schedule and
+        factor.record['projectionSeed'] == schedule['projectionSeed'],
+        'The retained factors and complete schedule must match their original protocol seed declarations.')
     require(value['scopeSha256'] == scope_identity(value['protocol']['sha256'],
         value['seedSchedule']['sha256'], origin['sha256'], value['inferenceAsset']['sha256'], asset),
         'The complete protocol, full schedule, numerical origin and selector foundation must retain their scope.')
@@ -146,13 +151,18 @@ def prepare(inputs, request, out):
     exact(request, ('kind', 'protocol', 'seedSchedule', 'originBundle', 'inferenceAsset'), 'TOKEN preparation')
     protocol = inputs.json(request['protocol'])
     asset = inputs.json(request['inferenceAsset'])
-    require(protocol['numericRecipe'] == RECIPE and protocol['methodSha256'] == METHOD_SHA and
+    require(protocol['kind'] == 'token-focus-step-campaign-1' and protocol['study'] == 96 and
+        protocol['numericRecipe'] == RECIPE and protocol['methodSha256'] == METHOD_SHA and
         protocol['originWeightsSha256'] == request['originBundle']['sha256'] and
         protocol['inferenceAssetSha256'] == request['inferenceAsset']['sha256'] and
         asset['kind'] == 'coordinated-inference-asset-1',
         'The exact one-step protocol must bind its numerical origin and unchanged inference foundation.')
     actors = wire.load_bundle(inputs, request['originBundle'])
     schedule = inputs.json(request['seedSchedule'])
+    require(protocol['seedSchedule'] == request['seedSchedule'] and
+        protocol['scheduleSha256'] == request['seedSchedule']['sha256'] and
+        protocol['reservedSchedule'] == schedule,
+        'The complete numerical schedule must be the exact subject and body frozen in the protocol.')
     require(schedule['kind'] == 'token-focus-step-schedule-1' and
         projection.seed(schedule['projectionSeed']) != projection.seed(schedule['directionSeed']) and
         set(schedule['banks']) == {'training', 'holdout'} and

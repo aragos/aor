@@ -88,13 +88,14 @@ class NumericProtocolTests(unittest.TestCase):
             currentBundle=dict(path='not-the-numerical-origin.json', sha256='d' * 64),
             originalBundle=dict(path='original-subtraction-reference.json', sha256='e' * 64),
             calibration=dict(path='unchanged-calibration.json', sha256='f' * 64)))
-        cls.protocol = write(cls.root / 'protocol.json', dict(numericRecipe=numeric.RECIPE,
-            methodSha256=numeric.METHOD_SHA, originWeightsSha256=cls.origin['sha256'],
-            inferenceAssetSha256=cls.asset['sha256']))
         cls.schedule_value = dict(kind='token-focus-step-schedule-1', projectionSeed=97, directionSeed=101,
             banks=dict(training=dict(count=16, seeds=list(range(16))),
                        holdout=dict(count=128, seeds=list(range(16, 144)))))
         cls.schedule = write(cls.root / 'schedule.json', cls.schedule_value)
+        cls.protocol = write(cls.root / 'protocol.json', dict(kind='token-focus-step-campaign-1', study=96,
+            numericRecipe=numeric.RECIPE, methodSha256=numeric.METHOD_SHA,
+            originWeightsSha256=cls.origin['sha256'], inferenceAssetSha256=cls.asset['sha256'],
+            seedSchedule=cls.schedule, scheduleSha256=cls.schedule['sha256'], reservedSchedule=cls.schedule_value))
         cls.prepare_request = dict(kind='token-focus-step-numeric-prepare-1', protocol=cls.protocol,
             seedSchedule=cls.schedule, originBundle=cls.origin, inferenceAsset=cls.asset)
         request = write(cls.root / 'prepare-request.json', cls.prepare_request)
@@ -229,19 +230,34 @@ class NumericProtocolTests(unittest.TestCase):
     def test_duplicate_numeric_stream_stops_before_factor_generation(self):
         schedule = copy.deepcopy(self.schedule_value)
         schedule['directionSeed'] = schedule['projectionSeed']
+        subject = write(self.case / 'wrong-schedule.json', schedule)
+        protocol = write(self.case / 'protocol.json', dict(read(self.protocol), seedSchedule=subject,
+            scheduleSha256=subject['sha256'], reservedSchedule=schedule))
         with patch.object(numeric.projection, 'generate') as draw:
             with self.assertRaisesRegex(ValueError, 'distinct positive'):
                 self.execute('prepare', dict(self.prepare_request,
-                    seedSchedule=write(self.case / 'wrong-schedule.json', schedule)))
+                    protocol=protocol, seedSchedule=subject))
             draw.assert_not_called()
 
     def test_overlapping_native_world_banks_stop_before_factor_generation(self):
         schedule = copy.deepcopy(self.schedule_value)
         schedule['banks']['holdout']['seeds'][0] = schedule['banks']['training']['seeds'][0]
+        subject = write(self.case / 'wrong-worlds.json', schedule)
+        protocol = write(self.case / 'protocol.json', dict(read(self.protocol), seedSchedule=subject,
+            scheduleSha256=subject['sha256'], reservedSchedule=schedule))
         with patch.object(numeric.projection, 'generate') as draw:
             with self.assertRaisesRegex(ValueError, '144 distinct'):
                 self.execute('prepare', dict(self.prepare_request,
-                    seedSchedule=write(self.case / 'wrong-worlds.json', schedule)))
+                    protocol=protocol, seedSchedule=subject))
+            draw.assert_not_called()
+
+    def test_a_resealed_valid_different_schedule_cannot_bypass_the_frozen_protocol(self):
+        schedule = copy.deepcopy(self.schedule_value)
+        schedule['projectionSeed'] = 113
+        subject = write(self.case / 'different-valid-schedule.json', schedule)
+        with patch.object(numeric.projection, 'generate') as draw:
+            with self.assertRaisesRegex(ValueError, 'exact subject and body'):
+                self.execute('prepare', dict(self.prepare_request, seedSchedule=subject))
             draw.assert_not_called()
 
     def test_wrong_world_order_cannot_supply_fitness(self):
