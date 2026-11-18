@@ -1,5 +1,7 @@
 package dev.aragos.aor
 
+import kotlinx.collections.immutable.toPersistentList
+
 const val RULES_VERSION = "ah1996-three-epoch-5"
 const val LEGACY_RULES_VERSION = "ah1996-three-epoch-4"
 const val DATA_VERSION = "ah1996-catalog-16"
@@ -179,13 +181,28 @@ data class GameState(
             flow.decisions.lastOrNull() as? TurnDecision.Roll
         }
 
+    // Derived queries belong to this immutable snapshot, outside equality and recorded state.
+    // Each seat is computed only when requested. Copies own new caches, including sealed choices.
+    private val choicesByPlayer by lazy {
+        players.keys.associateWith { player ->
+            lazy {
+                val choices =
+                    if (stage.isTurnPhase || flow.decisions.isNotEmpty()) {
+                        TurnEngine.choices(this, player)
+                    } else {
+                        stage.legalChoices(state = this, player = player)
+                    }
+                choices.copy(commands = choices.commands.toPersistentList())
+            }
+        }
+    }
+
     fun legalChoices(player: PlayerId): LegalChoices {
         playerState(player)
-        return if (stage.isTurnPhase || flow.decisions.isNotEmpty()) {
-            TurnEngine.choices(this, player)
-        } else {
-            stage.legalChoices(state = this, player = player)
-        }
+        return checkNotNull(choicesByPlayer[player]) {
+                "A registered player requires an owned legal-choice query: $player."
+            }
+            .value
     }
 
     fun viewForPlayer(player: PlayerId): GameView =
