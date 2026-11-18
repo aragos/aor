@@ -64,6 +64,7 @@ subjects. Only these registered evaluation versions are accepted:
 | `study89-SIX1` | 2048 | 36920 |
 | `study90-FULL1` | 2048 | 16464 |
 | `study90-SMALL1` | 1024 | 8272 |
+| `study91-QUAL1` | 2048 | 8208 |
 
 Each bank must be complete and pass its 99% win gate. The registered sizes must equal the original
 protocol's counts and budget. Study 89 additionally requires its six-generation final-mean recipe.
@@ -72,6 +73,16 @@ No development winner, partial run or arbitrary smaller bank can authorize a pre
 Study 90 retains the `leader-denial-campaign-1` protocol, explicit `FULL` or `SMALL` data mode,
 approved method hash and original confidence multiplier. Admission counts its actual seed arrays,
 including the development prefix; a separately invented count cannot replace those declarations.
+
+Study 91 is a fresh qualification of one already nominated complete policy. Its
+`mac-qualification-campaign-1` protocol binds the model, token selector, original approved method,
+two complete world arrays and original reproductions. Its certificate additionally carries five
+portable `nomineeEvidence` subjects with the exact hashes retained in the raw original protocol:
+the study 89 source protocol, complete training/development review, physical interruption closure,
+final-mean receipt and complete development report. Archived absolute research paths are retained
+as provenance; the server opens only the separate confined portable copies. The original source
+must retain its final-six recipe. This qualification claims no new fitting and no completed
+qualification from the earlier interrupted trial.
 
 Source verification uses explicitly invented tensor/certificate fixtures only. Such fixtures are
 transport tests, never research evidence or playable scientific assets. An actual package and new

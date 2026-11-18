@@ -80,6 +80,7 @@ internal enum class RobustQualificationVersion(
     LEAGUE_SIX("study89-SIX1", 2048, 36920),
     DENIAL_FULL("study90-FULL1", 2048, 16464),
     DENIAL_SMALL("study90-SMALL1", 1024, 8272),
+    MAC_QUALIFICATION("study91-QUAL1", 2048, 8208),
 }
 
 private class CoordinatedAssetReader(path: Path) {
@@ -318,21 +319,36 @@ private class CoordinatedAssetReader(path: Path) {
 
     private fun robustQualification(certificate: Document, asset: Document) {
         val value = node(certificate)
+        val version =
+            requireNotNull(
+                RobustQualificationVersion.entries.singleOrNull {
+                    it.wireValue == text(value, "evaluationVersion")
+                }
+            ) {
+                "A robust certificate requires an explicitly registered evaluation version."
+            }
         fields(
             value,
-            "kind",
-            "schemaVersion",
-            "passed",
-            "complete",
-            "profile",
-            "supportProfile",
-            "rulesVersion",
-            "dataVersion",
-            "configuration",
-            "inferenceAssetSha256",
-            "evaluationVersion",
-            "protocol",
-            "banks",
+            setOf(
+                "kind",
+                "schemaVersion",
+                "passed",
+                "complete",
+                "profile",
+                "supportProfile",
+                "rulesVersion",
+                "dataVersion",
+                "configuration",
+                "inferenceAssetSha256",
+                "evaluationVersion",
+                "protocol",
+                "banks",
+            ) +
+                if (version == RobustQualificationVersion.MAC_QUALIFICATION) {
+                    setOf("nomineeEvidence")
+                } else {
+                    emptySet()
+                },
         )
         require(
             text(value, "kind") == "coordinated-robust-win-qualification-1" &&
@@ -344,14 +360,6 @@ private class CoordinatedAssetReader(path: Path) {
             "Robust qualification must bind this exact complete model, sampler and denial policy."
         }
         profile(value, ServerBotProfile.COORDINATED_ROBUST_SUPPORT_1)
-        val version =
-            requireNotNull(
-                RobustQualificationVersion.entries.singleOrNull {
-                    it.wireValue == text(value, "evaluationVersion")
-                }
-            ) {
-                "A robust certificate requires an explicitly registered evaluation version."
-            }
         val protocol = node(subject(certificate, value["protocol"]))
         require(
             integer(protocol, "maximumTerminalExecutions") == version.maximumTerminalExecutions
@@ -359,21 +367,7 @@ private class CoordinatedAssetReader(path: Path) {
             "Qualification must retain its original approved execution budget."
         }
         when (version) {
-            RobustQualificationVersion.LEAGUE_SIX -> {
-                val recipe =
-                    requireNotNull(protocol["numericRecipe"]) {
-                        "Study89 qualification requires its original numeric recipe."
-                    }
-                require(
-                    text(protocol, "kind") == "robust-league-campaign-1" &&
-                        integer(protocol, "activeGenerations") == 6 &&
-                        text(recipe, "kind") == "robust-league-normalized-antithetic-es-2" &&
-                        integer(recipe, "generations") == 6 &&
-                        text(recipe, "candidate") == "FINAL_MEAN_6_ONLY"
-                ) {
-                    "Study89 qualification requires the prospectively fixed six-generation final mean."
-                }
-            }
+            RobustQualificationVersion.LEAGUE_SIX -> sixGenerationProtocol(protocol)
             RobustQualificationVersion.DENIAL_FULL,
             RobustQualificationVersion.DENIAL_SMALL -> {
                 val full = version == RobustQualificationVersion.DENIAL_FULL
@@ -395,17 +389,36 @@ private class CoordinatedAssetReader(path: Path) {
                 }
                 protocolSeedCount(protocol, "development", if (full) 512 else 256)
             }
+            RobustQualificationVersion.MAC_QUALIFICATION ->
+                macQualification(certificate, protocol, asset)
         }
         fields(value["banks"], "mixed", "homogeneous")
         for (name in listOf("mixed", "homogeneous")) {
             val bank = value["banks"][name]
             fields(bank, "complete", "pairs", "win99Passed", "evidence", "report")
-            if (version == RobustQualificationVersion.LEAGUE_SIX) {
+            if (
+                version == RobustQualificationVersion.LEAGUE_SIX ||
+                    version == RobustQualificationVersion.MAC_QUALIFICATION
+            ) {
                 require(integer(protocolBank(protocol, name), "count") == version.pairs) {
-                    "Study89 qualification must retain its registered independent bank counts."
+                    "Qualification must retain its registered independent bank counts."
                 }
             } else {
                 protocolSeedCount(protocol, name, version.pairs)
+            }
+            if (version == RobustQualificationVersion.MAC_QUALIFICATION) {
+                protocolSeedCount(protocol, name, version.pairs)
+                val expectedStyle = if (name == "mixed") "BALANCED" else "QUALIFIED"
+                val approved = protocolBank(protocol, name)
+                val replays = approved["replayIndices"]
+                require(
+                    text(approved, "opponentStyle") == expectedStyle &&
+                        replays?.isArray == true &&
+                        replays.all { it.isIntegralNumber && it.canConvertToInt() } &&
+                        replays.map { it.intValue() } == listOf(0, 682, 1365, 2047)
+                ) {
+                    "Study91 qualification requires both original ecologies and reproductions."
+                }
             }
             require(
                 truth(bank, "complete") &&
@@ -419,6 +432,75 @@ private class CoordinatedAssetReader(path: Path) {
         }
     }
 
+    private fun sixGenerationProtocol(protocol: JsonNode) {
+        val recipe =
+            requireNotNull(protocol["numericRecipe"]) {
+                "Study89 nomination requires its original numeric recipe."
+            }
+        require(
+            text(protocol, "kind") == "robust-league-campaign-1" &&
+                integer(protocol, "activeGenerations") == 6 &&
+                text(recipe, "kind") == "robust-league-normalized-antithetic-es-2" &&
+                integer(recipe, "generations") == 6 &&
+                text(recipe, "candidate") == "FINAL_MEAN_6_ONLY"
+        ) {
+            "Study89 nomination requires the prospectively fixed six-generation final mean."
+        }
+    }
+
+    /**
+     * Archived research paths stay unchanged; only the bound portable evidence copies are opened.
+     */
+    private fun macQualification(certificate: Document, protocol: JsonNode, asset: Document) {
+        val descriptor = node(asset)
+        val sampler =
+            requireNotNull(protocol["selector"]) {
+                "Study91 qualification must explicitly retain its nominated token selector."
+            }
+        require(
+            text(protocol, "kind") == "mac-qualification-campaign-1" &&
+                hash(protocol, "rootProspectiveMethodSha256") ==
+                    "0687dabf2cb25e1a88740be9a8b29ec5a21a4151b1e7f9df73991de5a76b489b" &&
+                number(protocol["confidenceMultiplier"], "confidence multiplier") ==
+                    2.5758293035489004 &&
+                hash(protocol, "candidateBundleSha256") ==
+                    hash(descriptor["currentBundle"], "sha256") &&
+                hash(protocol, "baseInferenceAssetSha256") ==
+                    hash(descriptor["baseInferenceAsset"], "sha256") &&
+                tokenSampler(sampler) == tokenSampler(descriptor["tokenSelector"]) &&
+                expansionDenial(descriptor["expansionDenial"]) == null
+        ) {
+            "Study91 qualification must bind its sole nominated complete policy and original method."
+        }
+        hash(protocol, "nominationSha256")
+        val names =
+            setOf(
+                "sourceProtocol",
+                "completeTrainingDevelopmentReview",
+                "interruptedPhysicalClosure",
+                "finalMeanReceipt",
+                "completeDevelopmentReport",
+            )
+        val archived = protocol["nomineeEvidence"]
+        val portable = node(certificate)["nomineeEvidence"]
+        fields(archived, names)
+        fields(portable, names)
+        val evidence = names.associateWith { name ->
+            subject(certificate, portable[name]).also {
+                require(it.sha256 == hash(archived[name], "sha256")) {
+                    "Study91 must preserve the exact original89 nomination and development subjects."
+                }
+            }
+        }
+        sixGenerationProtocol(
+            node(
+                requireNotNull(evidence["sourceProtocol"]) {
+                    "Study91 nomination must retain its original89 source protocol."
+                }
+            )
+        )
+    }
+
     private fun protocolBank(protocol: JsonNode, name: String): JsonNode =
         requireNotNull(protocol["banks"]?.let { it[name] }) {
             "The approved protocol must retain each original world bank."
@@ -427,7 +509,7 @@ private class CoordinatedAssetReader(path: Path) {
     private fun protocolSeedCount(protocol: JsonNode, name: String, expected: Int) {
         val seeds = protocolBank(protocol, name)["seeds"]
         require(seeds != null && seeds.isArray && seeds.size() == expected) {
-            "Study90 qualification must retain the registered $name world prefix."
+            "Qualification must retain the registered $name world prefix."
         }
     }
 
