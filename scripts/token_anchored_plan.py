@@ -16,7 +16,7 @@ from token_anchored_recipe import RECIPE
 
 KIND = 'token-anchored-campaign-1'
 ADAPTIVE_STYLES = ('REVEALED_UNDERCUT', 'REVEALED_OVERBID',
-    'REVEALED_TIE_UNDERCUT', 'REVEALED_TIE_OVERBID', 'REVEALED_BALANCED')
+    'REVEALED_TIE_UNDERCUT', 'REVEALED_TIE_OVERBID', 'REVEALED_BALANCED', 'QUALIFIED_REVEALED_BALANCED')
 ORDINARY_STYLES = ('QUALIFIED', 'UNDERCUT', 'OVERBID', 'MIXED', 'BALANCED')
 SELECTION = dict(candidate='SOLE_LAST_ROUND', ordinaryWinLower99GreaterThan=-.03,
     adaptiveWinLower99GreaterThan=0., validationSelection=False, intermediateSelection=False)

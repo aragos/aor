@@ -73,6 +73,15 @@ class PlanTests(unittest.TestCase):
         plan = owner.Plan.from_record(record())
         self.assertEqual([plan.owner(index) for index in range(10)], ['DESKTOP']*4+['MAC']+['DESKTOP']*4+['MAC'])
 
+    def test_half_ordinary_mixed_league_has_one_canonical_four_field_config(self):
+        value = record(); config = dict(kind='public-token-history-counter-1', minimumObservations=2,
+            lookbackTurns=8, targetedRivalCount=1)
+        for row in value['rounds']:
+            row.update(opponentStyle='QUALIFIED_REVEALED_BALANCED', adaptiveOpponent=copy.deepcopy(config))
+        plan = owner.Plan.from_record(value)
+        self.assertEqual(plan.record['rounds'][0]['adaptiveOpponent'], config)
+        self.assertNotIn('adaptiveOrdinaryFraction', plan.record['rounds'][0]['adaptiveOpponent'])
+
     def test_empty_random_remainder_is_not_an_unrecorded_proposal_option(self):
         value = record(); value['numericalRecipe']['maximumMeanOriginalKl'] = .02
         with self.assertRaisesRegex(ValueError, 'exact warm policy'):
