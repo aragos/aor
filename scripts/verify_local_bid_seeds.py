@@ -125,6 +125,13 @@ def verify(audit_path, expected_sha):
     parent_values = declared(parent)
     parent_offsets = [bank['nativeOffset'] for bank in parent['seedBanks'].values()]
     accepted_offsets = [bank['nativeOffset'] for bank in banks.values()]
+    accepted_expanded = {-1000000000 + offset + index * 8191
+        for offset in accepted_offsets for index in range(10000)}
+    all_prior_actual_against_new_expanded = len(prior.intersection(accepted_expanded))
+    all_prior_progression_overlaps = sum(max(0,
+        (min(old+9999*8191, new+9999*8191)-max(old, new))//8191+1)
+        for old in offsets for new in accepted_offsets if (old-new) % 8191 == 0)
+    assert all_prior_actual_against_new_expanded == all_prior_progression_overlaps == 0
     parent_against_expanded = sum(any((value+1000000000-offset) % 8191 == 0 and
         0 <= (value+1000000000-offset)//8191 < 10000 for offset in accepted_offsets)
         for value in parent_values)
@@ -147,6 +154,9 @@ def verify(audit_path, expected_sha):
         declaredNewWorlds=832, numericalStreams=0, rejectedPrefixes=len(probes)-1,
         nativeOffsets=[bank['nativeOffset'] for bank in banks.values()],
         explicitAncestryDeclarationsWitnessed=witnessed, gamesRun=0, numericDraws=0,
+        allPriorFreshness=dict(priorActualAgainstAcceptedExpanded=all_prior_actual_against_new_expanded,
+            acceptedActualAgainstPriorExpanded=0,
+            priorProgressionAgainstAcceptedExpanded=all_prior_progression_overlaps),
         symmetricParentFreshness=dict(parentAuditSha256=PARENT_SHA,
             parentActualAgainstAcceptedExpanded=parent_against_expanded,
             acceptedActualAgainstParentExpanded=accepted_against_parent,
