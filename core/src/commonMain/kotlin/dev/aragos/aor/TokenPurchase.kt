@@ -30,6 +30,9 @@ class TokenPurchase private constructor(val amount: Int) {
     }
 
     companion object {
+        /** Number of full batches retained for public past-turn observations. */
+        const val PAST_REVEAL_LIMIT = 8
+
         /** Validate [amount] against available [cash] before computing its absolute cost. */
         fun affordable(amount: Int, cash: Int): TokenPurchase {
             require(cash >= 0) { "Available cash cannot be negative." }

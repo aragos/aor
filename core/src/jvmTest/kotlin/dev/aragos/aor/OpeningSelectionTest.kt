@@ -135,6 +135,24 @@ class OpeningSelectionTest {
         assertThat(completed.state.stage).isEqualTo(Stage.FINISHED)
     }
 
+    @Test
+    fun priorBidsRebuildFromRecordedCommandsWithoutRevealingCurrentSealedBids() {
+        val completed = opening().complete()
+        val states =
+            completed.lines.runningFold(GameState(completed.state.header)) { state, line ->
+                state.step(TextCodec.parse(line))
+            }
+        val opening = states.first { it.turnNumber == 2 && it.stage == Stage.TOKEN_PURCHASE }
+        val seat = opening.playerIds.first()
+        val current = opening.step(TextCodec.parse("$seat: buy-tokens 0"))
+
+        assertThat(current.viewForDecision(opening.playerIds[1]).pastTokenPurchases)
+            .containsExactly(opening.viewForDecision(seat).pastTokenPurchases.single())
+        assertThat(current.viewForDecision(opening.playerIds[1]).revealedTokenPurchases).isEmpty()
+        assertThat(opening.viewForDecision(seat).pastTokenPurchases.single().keys)
+            .containsExactlyElementsIn(opening.playerIds)
+    }
+
     private fun firstTurn(): Scenario =
         keepTwo(opening())
             .play(

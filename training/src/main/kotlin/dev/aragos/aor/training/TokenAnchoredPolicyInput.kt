@@ -56,11 +56,7 @@ private constructor(
                     TerritoryPolicyInput.read(residualSource.path),
                     anchor.distribution,
                 )
-            require(
-                residual.model.stateFeatureNames == anchor.bundle.models.token.stateFeatureNames &&
-                    residual.model.actionFeatureNames ==
-                        anchor.bundle.models.token.actionFeatureNames
-            ) {
+            require(residual.extendsAnchor(anchor.bundle.models.token)) {
                 "The runtime learned actor must retain the complete frozen TOKEN2 dictionary."
             }
             return TokenAnchoredPolicyInput(source, anchor, residualSource, residual)

@@ -2,7 +2,6 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import dev.aragos.aor.ai.TerritoryEncoder
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -34,7 +33,7 @@ internal class TokenPairedStore(private val input: TokenPairedInput, val directo
         artifacts.write(
             "dictionary.json",
             mapOf(
-                "encoderVersion" to TerritoryEncoder.TOKEN_2.version,
+                "encoderVersion" to input.encoder.version,
                 "stateFeatureNames" to input.dictionary.stateFeatureNames,
                 "actionFeatureNames" to input.dictionary.actionFeatureNames,
             ),
