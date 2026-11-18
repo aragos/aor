@@ -1,7 +1,7 @@
 /* Reversible USER_INITIATED overrides for exactly ten identified research worker pthreads.
  * No Java/JVMTI API, game state, VM flag, model, clock, or bytecode is inspected or modified.
  * Options: begin:<expected-pid>:<new-absolute-receipt> or end:<expected-pid>:<new-receipt>.
- * Thread names must be exactly pool-1-thread-1 through pool-1-thread-10 before any override.
+ * Thread names must be exactly Java: pool-1-thread-1 through Java: pool-1-thread-10 before any override.
  */
 #include <jni.h>
 #include <pthread.h>
@@ -63,7 +63,7 @@ static int identify_workers(void) {
         if (thread != NULL && pthread_getname_np(thread, name, sizeof(name)) == 0) {
             for (int index = 0; index < WORKERS; index++) {
                 char expected[32];
-                snprintf(expected, sizeof(expected), "pool-1-thread-%d", index + 1);
+                snprintf(expected, sizeof(expected), "Java: pool-1-thread-%d", index + 1);
                 if (strcmp(name, expected) == 0) {
                     if (selected[index].thread != NULL) {
                         found = -100;
@@ -141,7 +141,7 @@ JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *vm, char *options, void *reserved)
         getpid(), begin ? "begin" : "end", identified, before, after, errors,
         (unsigned)QOS_CLASS_USER_INITIATED);
     for (int index = 0; index < WORKERS; index++) {
-        fprintf(receipt, "%s{\"name\":\"pool-1-thread-%d\",\"machPort\":%u,"
+        fprintf(receipt, "%s{\"name\":\"Java: pool-1-thread-%d\",\"machPort\":%u,"
             "\"originalRequestedQos\":%u,\"originalRelativePriority\":%d,\"overrideActive\":%s}",
             index == 0 ? "" : ",", index + 1, selected[index].port,
             (unsigned)selected[index].requested_qos, selected[index].requested_relative_priority,

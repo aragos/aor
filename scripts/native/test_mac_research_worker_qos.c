@@ -9,7 +9,7 @@ static int stop_workers = 0;
 
 static void *blocked_worker(void *argument) {
     char name[32];
-    snprintf(name, sizeof(name), "pool-1-thread-%d", (int)(intptr_t)argument + 1);
+    snprintf(name, sizeof(name), "Java: pool-1-thread-%d", (int)(intptr_t)argument + 1);
     pthread_setname_np(name);
     int policy = 0;
     struct sched_param parameters;
