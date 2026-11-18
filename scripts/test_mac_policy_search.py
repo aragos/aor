@@ -23,7 +23,7 @@ def game(winner):
         decisions=20,elapsedMillis=0)
 
 
-def producer(source, folder, concentrated=False):
+def producer(source, folder, concentrated=False, *, candidate_wins=True):
     """The explicit fixture producer emits native-shaped JSON, not gameplay or model output."""
     folder.mkdir(parents=True)
     identity=dict(kind='robust-token-science-1',protocolSha256=source['protocolSha256'],
@@ -32,13 +32,15 @@ def producer(source, folder, concentrated=False):
         inferenceAssetSha256=source['inferenceAsset']['sha256'],nominationSha256=source['nomination']['sha256'],
         roles=['CANDIDATE','CONTROL'])
     if 'tokenNeighborMixture' in source:identity['tokenNeighborMixture']=source['tokenNeighborMixture']
+    if 'controlBundle' in source:identity['controlAndRivalsBundleSha256']=source['controlBundle']['sha256']
+    if 'controlSelector' in source:identity['controlSelector']=source['controlSelector']
     science=hashlib.sha256(c.canonical(identity)[:-1]).hexdigest()
     source_sha=hashlib.sha256(c.canonical(source)).hexdigest()
     c.write(folder/'prepared.json',dict(passed=True,newGames=0,modelForwards=0,
         scienceIdentity=identity,scienceSha256=science,sourceSha256=source_sha))
     rows=[];replays=[]
     for index in range(source['globalStart'],source['globalStart']+source['count']):
-        seat=index%4;roles=dict(CANDIDATE=game(seat),CONTROL=game((seat+1)%4))
+        seat=index%4;roles=dict(CANDIDATE=game(seat if candidate_wins else (seat+2)%4),CONTROL=game((seat+1)%4))
         diagnostics=dict(CANDIDATE=dict(controlledBidCounts={'21':9,'22':1} if concentrated else {'21':5,'22':5}),
             CONTROL=dict(controlledBidCounts={'21':10}))
         if 'tokenNeighborMixture' in source:

@@ -190,28 +190,31 @@ class Campaign:
             protocolSha256=c.sha(self.protocol),qualificationClaimed=False))
         return reports
 
-    def run(self):
+    def run_work(self):
+        development=self.bank('development',self.plan['caseConfigs'])
+        selected=self.contract.select(development)
+        c.write(self.output/'selection.json',dict(complete=True,case=selected,protocolSha256=c.sha(self.protocol)))
+        qualified=False
+        if selected is not None:
+            for name in self.contract.BANK_ORDER[1:]:
+                report=self.bank(name,[selected])[selected['id']]
+                if not self.contract.passed(report,name):break
+                qualified=name==self.contract.BANK_ORDER[-1]
+        return dict(kind=self.contract.PREFIX+'-terminal-1',study=self.plan['study'],complete=True,
+            status='completed',qualified=qualified,selectedCase=selected,protocolSha256=c.sha(self.protocol),
+            knownCompletedTerminalExecutions=self.known,reservedTerminalUpperBound=self.reserved,
+            finishedEpoch=time.time(),activated=False)
+
+    def run(self, *, auditor=audit):
         previous={event:signal.signal(event,self.stop) for event in (signal.SIGINT,signal.SIGTERM,signal.SIGHUP)}
         try:
-            development=self.bank('development',self.plan['caseConfigs'])
-            selected=self.contract.select(development)
-            c.write(self.output/'selection.json',dict(complete=True,case=selected,protocolSha256=c.sha(self.protocol)))
-            qualified=False
-            if selected is not None:
-                for name in self.contract.BANK_ORDER[1:]:
-                    report=self.bank(name,[selected])[selected['id']]
-                    if not self.contract.passed(report,name):break
-                    qualified=name==self.contract.BANK_ORDER[-1]
-            terminal=dict(kind=self.contract.PREFIX+'-terminal-1',study=self.plan['study'],complete=True,
-                status='completed',qualified=qualified,selectedCase=selected,protocolSha256=c.sha(self.protocol),
-                knownCompletedTerminalExecutions=self.known,reservedTerminalUpperBound=self.reserved,
-                finishedEpoch=time.time(),activated=False)
-            result=audit(self.protocol,self.profile_path,self.output,terminal,self.contract)
+            terminal=self.run_work()
+            result=auditor(self.protocol,self.profile_path,self.output,terminal,self.contract)
             c.require(not self.cancelled.is_set() and time.time()<=self.clock['auditDeadlineEpoch'],
                 'The original statistical audit cannot finish after interruption or its original allowance.')
             c.write(self.output/'completion-audit.json',result)
             terminal['completionAuditSha256']=c.sha(self.output/'completion-audit.json')
-            c.write(self.output/'terminal.json',terminal);self.status(status='completed',qualified=qualified)
+            c.write(self.output/'terminal.json',terminal);self.status(status='completed',qualified=terminal['qualified'])
             return terminal
         except BaseException as error:
             self.stop()
@@ -226,7 +229,7 @@ class Campaign:
             for event,handler in previous.items():signal.signal(event,handler)
 
 
-def launch(args, contract):
+def launch(args, contract, *, entrypoint=None):
     plan=contract.validate(c.read(args.protocol));profile=verify_profile(args.profile,plan)
     prerequisite(plan,contract)
     review=c.read(args.approval)
@@ -239,7 +242,7 @@ def launch(args, contract):
     environment.update(PATH='/usr/bin:/bin:/usr/sbin:/sbin',LANG='en_US.UTF-8',LC_ALL='en_US.UTF-8',
         TZ='UTC',PYTHONDONTWRITEBYTECODE='1',PYTHONNOUSERSITE='1',OMP_NUM_THREADS='1',
         MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',VECLIB_MAXIMUM_THREADS='1')
-    command=[profile['python'],'-E','-s','-B',str(Path(__file__).resolve()),'--contract',contract.__name__,
+    command=[profile['python'],'-E','-s','-B',str(Path(entrypoint or __file__).resolve()),'--contract',contract.__name__,
         '--protocol',str(args.protocol),'--profile',str(args.profile),'--approval',str(args.approval),
         '--approval-sha256',args.approval_sha256,'--output',str(args.output)]
     caffeine=subprocess.Popen(['/usr/bin/caffeinate','-i','-w',str(os.getpid())],env=environment,
@@ -253,7 +256,7 @@ def launch(args, contract):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
-        'local_bid_mixture_contract'),required=True)
+        'local_bid_mixture_contract','token_focus_contract'),required=True)
     for name in ('protocol','profile','approval','output'):
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--approval-sha256',required=True)

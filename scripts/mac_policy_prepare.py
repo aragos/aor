@@ -80,7 +80,8 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
     native=c.read(native_readiness)
     source=c.read(source_readiness)
     scripts_to_copy=source_closure(Path(__file__).parent,
-        ('mac_policy_search.py','mac_policy_prepare.py','mac_policy_close.py',contract.__name__+'.py'))
+        ('mac_policy_search.py','mac_policy_prepare.py','mac_policy_close.py',contract.__name__+'.py',
+         *getattr(contract,'EXECUTABLES',())))
     c.require(source['passed'] is True and source['sourceOnly'] is True and
         all(c.sha(path)==digest for path,digest in source['sourceFiles'].items()) and
         all(source['sourceFiles'].get(str(path.resolve()))==c.sha(path) for path in scripts_to_copy),
@@ -148,7 +149,7 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
-        'local_bid_mixture_contract'),required=True)
+        'local_bid_mixture_contract','token_focus_contract'),required=True)
     for name in ('method','schedule','seed-audit','root-proof','parent-terminal','parent-closure',
                  'old-profile','native-readiness','source-readiness','candidate','root','python'):
         parser.add_argument('--'+name,type=Path,required=True)
