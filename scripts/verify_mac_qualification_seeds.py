@@ -76,7 +76,7 @@ def verify(audit_path, expected_sha):
         checked(item)
     for item in audit.values():
         if isinstance(item, dict) and set(item) == {'path', 'sha256'}:
-            checked(item)
+            assert sha(item['path']) == item['sha256'], item['path']
     assert sha(Path(audit_path).with_name('audit_frozen.py')) == audit['auditScriptSha256']
     prior, offsets = inventory(audit['carriedForwardAudit'])
     assert len(prior) == audit['priorActualValues'] == 1094687
