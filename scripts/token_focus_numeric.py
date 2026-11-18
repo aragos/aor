@@ -39,7 +39,10 @@ def mac_owner():
     require(np.__version__ == '2.5.4' and torch.__version__.split('+')[0] == '2.14.0',
         'The fixed Mac NumPy2.5.4/Torch2.14.0 numerical runtime must remain unchanged.')
     torch.set_num_threads(1)
-    require(torch.get_num_threads() == 1, 'Numerical materialization must stay single threaded.')
+    if torch.get_num_interop_threads() != 1:
+        torch.set_num_interop_threads(1)
+    require(torch.get_num_threads() == torch.get_num_interop_threads() == 1,
+        'Numerical materialization must stay single threaded, including Torch inter-op work.')
 
 
 class Output(wire.Output):
