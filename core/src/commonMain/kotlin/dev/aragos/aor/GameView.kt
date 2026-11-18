@@ -152,8 +152,7 @@ data class GameView(
         ): GameView {
             val decision = ActivityView.from(state).choice
             fun needed(vararg choices: String): Boolean = !decisionOnly || decision in choices
-            val expansionInspections =
-                viewer?.let { ExpansionProjection.inspections(state, it) }.orEmpty()
+            val expansion = state.expansionQuotesFor(viewer?.player?.id)
             return GameView(
                 stage = state.stage,
                 currentEpoch = state.currentEpoch.number,
@@ -271,7 +270,7 @@ data class GameView(
                             .value
                     },
                 burdenReferences = viewer?.let { burdenReferences(state, it) }.orEmpty(),
-                expansionOffers = ExpansionProjection.offers(expansionInspections),
+                expansionOffers = expansion.offers,
                 expansionForecast =
                     viewer
                         ?.takeIf {
@@ -288,7 +287,7 @@ data class GameView(
                         ?.takeIf { !decisionOnly || state.board.markerCount(it.player.id) == 25 }
                         ?.let { ExpansionProjection.reductions(state, it) }
                         .orEmpty(),
-                expansionInspections = expansionInspections,
+                expansionInspections = expansion.inspections,
                 commodityPayouts =
                     if (
                         needed(
