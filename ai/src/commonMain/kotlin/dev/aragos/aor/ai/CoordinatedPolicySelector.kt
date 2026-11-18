@@ -135,9 +135,23 @@ class CoordinatedPolicySelector(
                 tokenSampler?.let {
                     NearOptimalTokenPolicy.select(encoded, deterministic, it, 0.0).probabilities
                 } ?: encoded.actions.indices.map { if (it == deterministic.index) 1.0 else 0.0 }
+            // TOKEN2 sorts canonical commands lexically; ordinary quotes retain signed numeric
+            // order. Match each probability to its command before applying the departure kernel.
+            val byCommand =
+                encoded.actions
+                    .mapIndexed { index, action ->
+                        action.command to probabilities[index]
+                    }
+                    .toMap()
+            val offeredProbabilities =
+                observation.candidates.map { candidate ->
+                    requireNotNull(byCommand[candidate.command]) {
+                        "Every original token offer must retain its exact encoded baseline probability."
+                    }
+                }
             return LocalTokenNeighborPolicy.distribution(
                     observation,
-                    probabilities,
+                    offeredProbabilities,
                     tokenNeighborMixture,
                     tokenQuote,
                 )
