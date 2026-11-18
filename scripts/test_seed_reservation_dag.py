@@ -7,6 +7,19 @@ import seed_reservation_dag as dag
 
 
 class ReservationDagTest(unittest.TestCase):
+    def test_differently_sized_banks_keep_original_order_and_distinct_worlds(self):
+        counts = {'development': 3, 'mixed': 5, 'homogeneous': 5, 'reference': 5}
+        banks, _, _ = dag.reserve(set(), set(), counts, 200)
+        self.assertEqual([200, 201, 202, 203],
+            [bank['nativeOffset'] for bank in banks.values()])
+        self.assertEqual([3, 5, 5, 5], [len(bank['seeds']) for bank in banks.values()])
+        values = [value for bank in banks.values() for value in bank['seeds']]
+        self.assertEqual(18, len(set(values)))
+
+    def test_exhausted_prefix_window_stops_instead_of_retrying_forever(self):
+        with self.assertRaisesRegex(ValueError, 'single bounded metadata search window'):
+            dag.reserve(set(), set(range(dag.STRIDE)), {'mixed': 1}, 1000)
+
     def test_exact_prior_integer_rejects_prefix_and_holds_every_probed_offset(self):
         banks, probes, rejected = dag.reserve({dag.BASE + 100}, set(), {'a': 2, 'b': 2}, 100)
         self.assertEqual([100, 101], rejected)
