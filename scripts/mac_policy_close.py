@@ -64,7 +64,8 @@ def close(protocol, profile_path, output, owner_record, contract):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract'),required=True)
+    parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
+        'local_bid_mixture_contract'),required=True)
     for name in ('protocol','profile','output','owner-record','receipt'):
         parser.add_argument('--'+name,type=Path,required=True)
     args=parser.parse_args();contract=importlib.import_module(args.contract)

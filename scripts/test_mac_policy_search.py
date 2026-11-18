@@ -31,6 +31,7 @@ def producer(source, folder, concentrated=False):
         selector=source['selector'],candidateBundleSha256=source['candidateBundle']['sha256'],
         inferenceAssetSha256=source['inferenceAsset']['sha256'],nominationSha256=source['nomination']['sha256'],
         roles=['CANDIDATE','CONTROL'])
+    if 'tokenNeighborMixture' in source:identity['tokenNeighborMixture']=source['tokenNeighborMixture']
     science=hashlib.sha256(c.canonical(identity)[:-1]).hexdigest()
     source_sha=hashlib.sha256(c.canonical(source)).hexdigest()
     c.write(folder/'prepared.json',dict(passed=True,newGames=0,modelForwards=0,
@@ -40,6 +41,9 @@ def producer(source, folder, concentrated=False):
         seat=index%4;roles=dict(CANDIDATE=game(seat),CONTROL=game((seat+1)%4))
         diagnostics=dict(CANDIDATE=dict(controlledBidCounts={'21':9,'22':1} if concentrated else {'21':5,'22':5}),
             CONTROL=dict(controlledBidCounts={'21':10}))
+        if 'tokenNeighborMixture' in source:
+            for value in diagnostics.values():
+                value.update(controlledUnofferedTokenBidCounts={},controlledTokenQuoteAdmissions=[])
         hashes={role:hashlib.sha256(f'explicit-invented:{index}:{role}'.encode()).hexdigest()
             if index in source['replayIndices'] else None for role in roles}
         styles=('QUALIFIED','UNDERCUT','OVERBID','MIXED')
@@ -62,17 +66,20 @@ def producer(source, folder, concentrated=False):
     return rows,total
 
 
-def fixture(root):
+def fixture(root, *, policy_contract=policy):
     """A test-only injected contract keeps production identities unmodified and has no executor."""
+    policy=policy_contract
     banks={};start=1
     for bank in policy.BANKS:
         banks[bank['name']]=dict(bank,seeds=list(range(start,start+bank['worlds'])))
         start+=bank['worlds']
-    plan=dict(kind='constructed-policy-search-fixture-1',study=92,banks=banks,caseConfigs=policy.CASES,
-        chunkSize=256,maximumTerminalExecutions=2648,maximumScienceSeconds=16200,auditSeconds=600,
+    plan=dict(kind='constructed-policy-search-fixture-1',study=policy.STUDY,banks=banks,caseConfigs=policy.CASES,
+        chunkSize=256,maximumTerminalExecutions=2648,
+        maximumScienceSeconds=policy.FIXED['maximumScienceSeconds'],auditSeconds=600,
         minimumRemainingSecondsAtPreparation=10800,globalDeadlineEpoch=policy.GLOBAL_DEADLINE,
         preparedEpoch=policy.GLOBAL_DEADLINE-20000,workers=10,heapMiB=6144,
-        fullReservedWorlds=1664,activeReservedWorlds=832,unusedReservedWorlds=832,scheduleSha256='f'*64,
+        fullReservedWorlds=sum(policy.FULL_BANK_COUNTS.values()),activeReservedWorlds=832,
+        unusedReservedWorlds=sum(policy.FULL_BANK_COUNTS.values())-832,scheduleSha256='f'*64,
         maximumRssBytes=12*1024**3,minimumFreeBytes=16*1024**3,maximumDataBytes=768*1024**2)
     protocol=root/'protocol.json';profile_path=root/'profile.json';output=root/'run';output.mkdir()
     runtime=root/'runtime/lib';runtime.mkdir(parents=True)
@@ -82,18 +89,24 @@ def fixture(root):
         path.write_text('explicit tiny constructed '+key+'\n')
         subjects[key]=dict(path=str(path),sha256=c.sha(path))
     plan['nativeJarSha256']=subjects['nativeJar']['sha256'];c.write(protocol,plan)
-    profile=dict(kind='mac-policy-search-host-1',study=92,root=str(root),classpath=str(runtime/'*'),
+    profile=dict(kind='mac-policy-search-host-1',study=policy.STUDY,root=str(root),classpath=str(runtime/'*'),
         **{key:plan[key] for key in ('workers','heapMiB','maximumRssBytes','minimumFreeBytes','maximumDataBytes')},
         **subjects,pins={value['path']:value['sha256'] for value in subjects.values()})
     c.write(profile_path,profile)
     def source_value(value,actual,bank,case,chunk,protocol_sha):
         data=value['banks'][bank];start=chunk*256
-        return dict(kind='robust-token-chunk-1',protocolSha256=protocol_sha,
+        source=dict(kind='robust-token-chunk-1',protocolSha256=protocol_sha,
             **{key:subjects[key] for key in ('candidateBundle','inferenceAsset','nomination','arena')},
-            selector=case['selector'],seeds=data['seeds'],opponentStyle=data['opponentStyle'],
+            selector=case.get('selector',policy.CONTROL_SELECTOR),seeds=data['seeds'],opponentStyle=data['opponentStyle'],
             globalStart=start,count=min(256,data['worlds']-start),replayIndices=data['replayIndices'])
+        if 'tokenNeighborMixture' in case:source['tokenNeighborMixture']=case['tokenNeighborMixture']
+        return source
+    def native_records(source,path,bank):
+        result=native_audit.native_chunk(source,path)
+        if hasattr(policy,'quote_traces'):policy.quote_traces(result[0],source)
+        return result
     contract=SimpleNamespace(PREFIX='constructed-policy-search',BANK_ORDER=policy.BANK_ORDER,
-        validate=lambda value:value,native_source=source_value,native_chunk=lambda source,path,bank:native_audit.native_chunk(source,path),
+        validate=lambda value:value,native_source=source_value,native_chunk=native_records,
         aggregate=policy.aggregate,select=policy.select,passed=policy.passed)
     clock=c.science_clock(plan,policy.GLOBAL_DEADLINE-18000,c.sha(protocol),contract.PREFIX)
     c.write(output/'clock.json',clock);c.write(output/'launch.json',dict(constructedOnly=True))
@@ -106,7 +119,7 @@ def fixture(root):
             for chunk in range((banks[name]['worlds']+255)//256):
                 folder=output/'chunks'/name/case['id']/f'chunk-{chunk}';folder.mkdir(parents=True)
                 source=source_value(plan,profile,name,case,chunk,c.sha(protocol));c.write(folder/'source.json',source)
-                values,count=producer(source,folder/'native',concentrated=case['id']=='s00')
+                values,count=producer(source,folder/'native',concentrated=case==policy.CASES[0])
                 rows.extend(values);total+=count
                 c.write(folder/'receipt.json',dict(complete=True,sourceSha256=c.sha(folder/'source.json'),
                     finishedSha256=c.sha(folder/'native/finished.json'),

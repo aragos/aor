@@ -45,6 +45,9 @@ def native_chunk(source, native, *, source_path=None):
     if 'expansionDenial' in source:
         c.require(identity['expansionDenial'] == source['expansionDenial'],
             'The native intervention must retain the exact declared leader-denial setting.')
+    if 'tokenNeighborMixture' in source:
+        c.require(identity['tokenNeighborMixture'] == source['tokenNeighborMixture'],
+            'The native candidate mixture must retain its exact original declared parameters.')
     names = {'prepared.json', 'worlds.jsonl'} | ({'reproductions.jsonl'} if owned else set())
     c.require(set(completed['files']) == names,
         'Native completion must retain exactly its original prepared, outcome and prescribed replay files.')

@@ -252,7 +252,8 @@ def launch(args, contract):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract'),required=True)
+    parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
+        'local_bid_mixture_contract'),required=True)
     for name in ('protocol','profile','approval','output'):
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--approval-sha256',required=True)

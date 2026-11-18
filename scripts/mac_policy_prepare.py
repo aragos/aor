@@ -20,7 +20,10 @@ def declaration(path):
 
 
 def build_protocol(contract, method, schedule, seed_audit, root_proof, parent_terminal,
-                   parent_closure, arena_sha, *, now=time.time, extra=None):
+                   parent_closure, arena_sha, *, now=time.time, extra=None, native_readiness=None):
+    if hasattr(contract, 'prepare_protocol'):
+        return contract.prepare_protocol(method, schedule, seed_audit, root_proof, parent_terminal,
+            parent_closure, arena_sha, native_readiness=native_readiness, now=now, extra=extra)
     method=contract.read_method(method)
     c.require(c.sha(schedule)==contract.SCHEDULE_SHA and c.sha(seed_audit)==contract.RNG_AUDIT_SHA and
         c.sha(root_proof)==contract.ROOT_RNG_PROOF_SHA,
@@ -73,7 +76,7 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
     root=Path(root).resolve();candidate=Path(candidate).resolve();old=c.read(old_profile)
     c.require(not root.exists(),'A local search preparation is new-only and cannot replace an earlier attempt.')
     plan=build_protocol(contract,method,schedule,seed_audit,root_proof,parent_terminal,parent_closure,
-        old['arena']['sha256'],extra=extra)
+        old['arena']['sha256'],extra=extra,native_readiness=native_readiness)
     native=c.read(native_readiness)
     source=c.read(source_readiness)
     scripts_to_copy=source_closure(Path(__file__).parent,
@@ -105,6 +108,11 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
         root/'protocol.json',Path(python),Path(old['java']),Path(method),Path(schedule),Path(seed_audit),
         Path(root_proof),Path(parent_terminal),Path(parent_closure),Path(native_readiness),Path(source_readiness)]}
     pins.update({path:digest for path,digest in old['pins'].items() if path.endswith('/lib/server/libjvm.dylib')})
+    if hasattr(contract, 'input_subjects'):
+        for item in contract.input_subjects(plan):
+            c.require(c.sha(item['path'])==item['sha256'],
+                'An original contract-owned preparation input changed before native admission.')
+            pins[item['path']]=item['sha256']
     admissions={}
     for name in contract.BANK_ORDER:
         source=contract.native_source(plan,profile,name,plan['caseConfigs'][0],0,c.sha(root/'protocol.json'))
@@ -139,7 +147,8 @@ def prepare(contract, method, schedule, seed_audit, root_proof, parent_terminal,
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract'),required=True)
+    parser.add_argument('--contract',choices=('learned_bid_contract','mac_leader_contract',
+        'local_bid_mixture_contract'),required=True)
     for name in ('method','schedule','seed-audit','root-proof','parent-terminal','parent-closure',
                  'old-profile','native-readiness','source-readiness','candidate','root','python'):
         parser.add_argument('--'+name,type=Path,required=True)
