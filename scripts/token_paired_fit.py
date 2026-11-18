@@ -161,17 +161,9 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         epochSeeds=list(config.epochSeeds), originalDeadline=config.deadline,
         sourceSha256={Path(path).name: b.file_digest(path) for path in sources})
     b.atomic_json(output/'identity.json', identity)
-    initial = anchor_metrics(actor, prepared)
-    history = [dict(epoch=0, accepted=True, anchor=initial, actorSha256=b.digest(actor.artifact()))]
-    accepted = 0; steps = 0
-    for index, seed in enumerate(config.epochSeeds, 1):
-        result = epoch(actor, optimizer, prepared, seed, config)
-        history.append(dict(result, epoch=index, actorSha256=b.digest(actor.artifact())))
-        b.atomic_json(output/'history.json', history)
-        if not result['accepted']:
-            break
-        accepted += 1; steps += result['attemptedAdamSteps']
-    check_clock(config)
+    history, accepted, steps = paired_math.fit_epochs(actor, optimizer, prepared,
+        config.epochSeeds, config, step=epoch, metrics=anchor_metrics,
+        publish=lambda history: b.atomic_json(output/'history.json', history))
     model = actor.artifact()
     b.require(all(model[name] == current.model[name] for name in b.PARAMETERS[-2:]),
         'Paired actor fitting must preserve both value parameter arrays exactly.')
