@@ -39,11 +39,26 @@ class CoordinatedPolicySelector(
     private val tokenSampler: NearOptimalTokenSampler? = null,
     private val expansionDenial: PublicLeaderAttackConfig? = null,
     private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
+    private val tokenAnchoredResidual: TokenAnchoredResidual? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
 
     init {
+        require(tokenAnchoredResidual == null || tokenNeighborMixture == null) {
+            "The offered-only anchored actor cannot also admit a token-neighbor mixture."
+        }
+        require(tokenAnchoredResidual == null || tokenSampler != null) {
+            "An anchored token residual requires its explicitly frozen anchor sampler."
+        }
+        require(
+            tokenAnchoredResidual == null ||
+                tokenAnchoredResidual.model.stateFeatureNames == current.token.stateFeatureNames &&
+                    tokenAnchoredResidual.model.actionFeatureNames ==
+                        current.token.actionFeatureNames
+        ) {
+            "The anchored residual must preserve the complete frozen TOKEN2 dictionary."
+        }
         require(
             current.card.stateFeatureNames == original.card.stateFeatureNames &&
                 current.card.actionFeatureNames == original.card.actionFeatureNames &&
@@ -130,6 +145,27 @@ class CoordinatedPolicySelector(
                 original.token,
                 tokenSelector,
             )
+        if (tokenAnchoredResidual != null) {
+            val probabilities =
+                NearOptimalTokenPolicy.select(
+                        encoded,
+                        deterministic,
+                        requireNotNull(tokenSampler) { "The frozen token sampler is required." },
+                        0.0,
+                    )
+                    .probabilities
+            return TokenAnchoredPolicy.choose(
+                    encoded,
+                    TokenAnchoredPolicy.evaluate(
+                        encoded,
+                        probabilities,
+                        tokenAnchoredResidual,
+                        deterministic.index,
+                    ),
+                    seed,
+                )
+                .command
+        }
         if (tokenNeighborMixture != null && tokenNeighborMixture.departureProbability > 0.0) {
             val probabilities =
                 tokenSampler?.let {
