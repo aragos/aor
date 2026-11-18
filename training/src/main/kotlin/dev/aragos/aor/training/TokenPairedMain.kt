@@ -8,7 +8,12 @@ import java.time.Instant
 
 /** New output only; preparation parses and snapshots without choosing a policy action. */
 object TokenPairedMain {
-    val modes = setOf("token-paired-prepare", "token-paired-collect", "token-paired-reproduce")
+    val modes =
+        setOf("prepare", "collect", "reproduce")
+            .flatMap {
+                listOf("token-paired-$it", "token-anchored-paired-$it")
+            }
+            .toSet()
 
     @JvmStatic fun main(arguments: Array<String>) = run(arguments.toList())
 
@@ -16,7 +21,9 @@ object TokenPairedMain {
         require(arguments.size % 2 == 0) { "Token paired arguments must be option/value pairs." }
         val fields = arguments.chunked(2).associate { it[0] to it[1] }
         require(fields.size * 2 == arguments.size) { "Token paired options cannot repeat." }
-        val mode = fields["--mode"]
+        val declaredMode = fields["--mode"]
+        val anchoredMode = declaredMode?.startsWith("token-anchored-paired-") == true
+        val mode = declaredMode?.replace("token-anchored-paired-", "token-paired-")
         val required =
             setOf("--mode", "--source", "--output") +
                 when (mode) {
@@ -33,6 +40,9 @@ object TokenPairedMain {
             TokenPairedInput.read(
                 Path.of(requireNotNull(fields["--source"]) { "Source is required." })
             )
+        require(anchoredMode == (input.anchor != null)) {
+            "Legacy and anchored sources require their own explicit collection mode."
+        }
         val seconds =
             if (mode == "token-paired-prepare") 0
             else
@@ -58,7 +68,9 @@ object TokenPairedMain {
         if (mode == "token-paired-prepare") return
         val workers =
             requireNotNull(fields["--workers"]?.toIntOrNull()) { "Workers must be integral." }
-        require(workers in 1..10) { "Token collection permits at most ten workers." }
+        require(workers in 1..(if (anchoredMode) 16 else 10)) {
+            "The selected token family must respect its bounded worker limit."
+        }
         val artifacts = TrainingArtifacts(output)
         val started = Instant.now()
         artifacts.write(
@@ -104,23 +116,18 @@ object TokenPairedMain {
             Path.of(requireNotNull(fields["--original"]) { "Original evidence is required." })
                 .toRealPath()
         val (expected, subject) = TokenPairedStore(input, originalDirectory).readCompleted(index)
-        val actual =
-            PurchaseJson.mapper.readTree(
-                PurchaseJson.mapper.writeValueAsBytes(
-                    TokenPairedCollector(input, deadline).reproduce(index)
-                )
-            )
+        val actual = input.originWire(TokenPairedCollector(input, deadline).reproduce(index))
         verifyReproduction(expected, actual)
         TrainingArtifacts(output)
             .write(
                 "replay-$index.json",
                 mapOf(
-                    "kind" to "token-paired-reproduction-1",
+                    "kind" to input.kind("reproduction"),
                     "signature" to input.signature,
                     "scopeSha256" to input.scopeSha256,
                     "scienceSha256" to input.scienceSha256,
                     "globalIndex" to index,
-                    "request" to TokenPairedRequest(index),
+                    "request" to input.request(index),
                     "sourceSha256" to input.source.sha256,
                     "original" to
                         mapOf(

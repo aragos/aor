@@ -10,6 +10,38 @@ import kotlin.test.assertFailsWith
 
 class TokenPairedContractTest {
     @Test
+    fun anchoredLayoutHasAnExplicitSplitAndSmallBoundedShards() {
+        val layout = TokenPairedLayout(originCount = 24, trainCount = 16, anchored = true)
+
+        assertThat(TokenPairedRequest(15, layout).split).isEqualTo(TokenPairedSplit.TRAIN)
+        assertThat(TokenPairedRequest(16, layout).split).isEqualTo(TokenPairedSplit.VALIDATION)
+        assertThat(TokenPairedRange(16, 8, layout).indices.toList())
+            .containsExactlyElementsIn(16..23)
+    }
+
+    @Test
+    fun anchoredLayoutCannotRelaxLegacyRequestAndRangeInvariants() {
+        assertFailsWith<IllegalArgumentException> { TokenPairedLayout(24, 16) }
+        assertFailsWith<IllegalArgumentException> { TokenPairedRange(16, 8) }
+        assertFailsWith<IllegalArgumentException> { TokenPairedRequest(640) }
+    }
+
+    @Test
+    fun layoutParametersNeverBecomePublicObservationOrRequestFeatures() {
+        val legacy =
+            PurchaseJson.mapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(
+                TokenPairedRequest(15)
+            )
+        val anchored =
+            PurchaseJson.mapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(
+                TokenPairedRequest(15, TokenPairedLayout(24, 16, anchored = true))
+            )
+
+        assertThat(legacy).isEqualTo(anchored)
+        assertThat(legacy.has("layout")).isFalse()
+    }
+
+    @Test
     fun portableEcologySeparatesRelocatedWrappersFromActualHeadIdentity() {
         TokenPairedFixture().use { fixture ->
             val original = fixture.input.policyBindings
