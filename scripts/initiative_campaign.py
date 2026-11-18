@@ -22,7 +22,7 @@ HOST = "aragos@192.168.86.44"
 REMOTE = "/home/aragos/aor-worker/initiative-crossplay-20261118"
 SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", HOST]
 MODE = "dev.aragos.aor.training.TrainingMainKt"
-ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "REVEALED_TIE_UNDERCUT")
+ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "INDEPENDENT_INITIATIVE")
 
 
 def read(path):
@@ -177,14 +177,17 @@ class Campaign:
                     source = stage / f"{name}.json"
                     spec = dict(self.template, protocolSha256=sha(stage / "method.json"),
                                 seeds=banks[mode], globalStart=start, count=min(shard, count-start),
-                                opponentStyle=mode, candidateOnly=not paired,
+                                opponentStyle="QUALIFIED" if mode == "INDEPENDENT_INITIATIVE" else mode,
+                                candidateOnly=not paired,
                                 replayIndices=declared["replayIndices"])
                     spec = {key: dict(value, path="../"+value["path"]) if isinstance(value,dict) and
                             set(value)=={"path", "sha256"} else value for key,value in spec.items()}
-                    if mode != "QUALIFIED":
+                    if mode.startswith("REVEALED_"):
                         spec["adaptiveOpponent"] = dict(kind="public-token-history-counter-1",
                             minimumObservations=2,lookbackTurns=8,targetedRivalCount=1)
-                    if rival is not None:
+                    if mode == "INDEPENDENT_INITIATIVE":
+                        if rival is None:
+                            raise ValueError("This ecology requires its frozen independently tuned rival.")
                         spec["initiativeRival"] = dict(kind="public-initiative-rival-1",offset=1,policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
@@ -230,7 +233,7 @@ class Campaign:
                 else:
                     control = records("control", case)
                 summary[mode] = score(current, control)
-            ordinary = summary["QUALIFIED"]["mean"]
+            ordinary = summary.get("QUALIFIED", next(iter(summary.values())))["mean"]
             adaptive_rows = [row["mean"] for mode, row in summary.items() if mode != "QUALIFIED"]
             adaptive = statistics.mean(adaptive_rows) if adaptive_rows else ordinary
             outcomes[key] = dict(config=config, outcomes=summary, ordinary=ordinary, adaptive=adaptive,
@@ -265,10 +268,32 @@ def main(root, initial):
     if validate["response"]["ordinary"] <= 0:
         write(root / "result.json", dict(status="response-did-not-win-more", validation=validate))
         return
-    crossplay = campaign.stage("crossplay", {"champion":champion["config"]}, 512, ECOLOGIES[:1],
+    crossplay = campaign.stage("crossplay", {"champion":champion["config"]}, 512, ECOLOGIES[-1:],
                                paired=True, rival=opponent)
     write(root / "result.json", dict(status="crossplay-complete", comparison=crossplay, responder=validate,
                                      initialResultSha256=sha(initial/"result.json")))
+
+    # Reserve enough time for a distinct fresh audit before starting a response-aware update.
+    if campaign.remaining() < 2700:
+        return
+    base = champion["config"]
+    followup = {"champion":base, "responder":opponent,
+                "lower-penalty":dict(base, tokenPenalty=max(0.,base["tokenPenalty"]-.3)),
+                "more-initiative":dict(base, maximumTokenLoss=min(8,base["maximumTokenLoss"]+2),
+                                       participation=1.)}
+    mixed = campaign.stage("response-aware", followup, 192, ECOLOGIES, rival=opponent)
+    viable = [candidate for candidate in ranked(mixed) if candidate["ordinary"] >= -.075 and
+              all(candidate["outcomes"][mode]["mean"] > 0 for mode in ECOLOGIES[1:])]
+    if not viable:
+        write(root / "mixed-result.json", dict(status="response-aware-no-nomination", score=mixed))
+        return
+    audit = campaign.stage("mixed-fresh-audit", {"selected":viable[0]["config"]}, 512,
+                           ECOLOGIES, paired=True, rival=opponent)
+    comparisons = audit["selected"]["outcomes"]
+    passed = comparisons["QUALIFIED"]["lower95"] > -.075 and all(
+        comparisons[mode]["lower95"] > 0 for mode in ECOLOGIES[1:])
+    write(root / "mixed-result.json", dict(status="mixed-fresh-audit-complete", passed=passed, audit=audit))
+
 
 
 if __name__ == "__main__":
