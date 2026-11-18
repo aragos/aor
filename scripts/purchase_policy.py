@@ -271,8 +271,8 @@ def prior_probabilities(count, baseline):
     return [0.97 if index == baseline else 0.03 / (count - 1) for index in range(count)]
 
 
-def reference_forward(model, observation, *, contract=PURCHASE_CONTRACT):
-    """Independent scalar Float64 oracle; values/probabilities use only safe features."""
+def reference_actor_outputs(model, observation, *, contract=PURCHASE_CONTRACT):
+    """Independent scalar Float64 network oracle, before any policy probability transform."""
     validate_model(model, contract=contract)
     validate_observation(observation, model, contract=contract)
     state = [observation["stateFeatures"].get(name, 0.0)
@@ -287,7 +287,18 @@ def reference_forward(model, observation, *, contract=PURCHASE_CONTRACT):
             hidden[unit] + model["actionBias"][unit] + sum(
                 model["actionWeights"][unit * len(values) + index] * value
                 for index, value in enumerate(values))) for unit in range(HIDDEN))
-        residuals.append(max(-RESIDUAL_LIMIT, min(RESIDUAL_LIMIT, result)))
+        residuals.append(result)
+    value_logit = model["valueBias"] + sum(
+        weight * value for weight, value in zip(model["valueWeights"], hidden))
+    value = (1.0 / (1.0 + math.exp(-value_logit)) if value_logit >= 0
+             else math.exp(value_logit) / (1.0 + math.exp(value_logit)))
+    return {"residuals": residuals, "value": value}
+
+
+def reference_forward(model, observation, *, contract=PURCHASE_CONTRACT):
+    """Independent scalar Float64 oracle; values/probabilities use only safe features."""
+    raw = reference_actor_outputs(model, observation, contract=contract)
+    residuals = [max(-RESIDUAL_LIMIT, min(RESIDUAL_LIMIT, value)) for value in raw['residuals']]
     prior = prior_probabilities(len(residuals), observation["baselineIndex"])
     logits = [math.log(probability) + residual
               for probability, residual in zip(prior, residuals)]
@@ -296,11 +307,7 @@ def reference_forward(model, observation, *, contract=PURCHASE_CONTRACT):
     else:
         shifted = [math.exp(value - max(logits)) for value in logits]
         probabilities = [value / sum(shifted) for value in shifted]
-    value_logit = model["valueBias"] + sum(
-        weight * value for weight, value in zip(model["valueWeights"], hidden))
-    value = (1.0 / (1.0 + math.exp(-value_logit)) if value_logit >= 0
-             else math.exp(value_logit) / (1.0 + math.exp(value_logit)))
-    return {"logits": logits, "probabilities": probabilities, "value": value}
+    return {"logits": logits, "probabilities": probabilities, "value": raw['value']}
 
 
 def select(probabilities, uniform):
@@ -403,18 +410,28 @@ class ResidualPolicy(nn.Module):
                                    torch.cat([item.action_values for item in prepared]))
         return state, action, torch.tensor(owners)
 
+    def actor_outputs(self, prepared):
+        """Unclipped actor logits and frozen-value predictions for validated sparse inputs.
+
+        A policy version owns its probability transform. The historical residual policy keeps
+        its clamp below; explicitly anchored policies use these same network calculations raw.
+        """
+        state, action, owners = self._batch_inputs(prepared)
+        hidden = torch.tanh(state @ self.stateWeights.T + self.stateBias)
+        action_hidden = torch.tanh(
+            hidden[owners] + action @ self.actionWeights.T + self.actionBias)
+        residuals = action_hidden @ self.actorWeights
+        values = torch.sigmoid(hidden @ self.valueWeights + self.valueBias)
+        return residuals, values
+
     def forward(self, observations):
         require(1 <= len(observations) <= 256, "A numerical batch requires 1–256 decisions.")
         count = sum(item.action_count if isinstance(item, _PreparedObservation)
                     else len(item["actions"]) for item in observations)
         require(count <= 16384, "A numerical batch exceeds 16384 candidate actions.")
         prepared = [self.prepare(item) for item in observations]
-        state, action, owners = self._batch_inputs(prepared)
-        hidden = torch.tanh(state @ self.stateWeights.T + self.stateBias)
-        action_hidden = torch.tanh(
-            hidden[owners] + action @ self.actionWeights.T + self.actionBias)
-        residuals = torch.clamp(action_hidden @ self.actorWeights,
-                                -RESIDUAL_LIMIT, RESIDUAL_LIMIT)
+        raw, values = self.actor_outputs(prepared)
+        residuals = torch.clamp(raw, -RESIDUAL_LIMIT, RESIDUAL_LIMIT)
         log_probabilities = []
         cursor = 0
         for observation in prepared:
@@ -428,7 +445,6 @@ class ResidualPolicy(nn.Module):
                 log_probability = log_probability + (prior - log_probability).detach()
             log_probabilities.append(log_probability)
             cursor += size
-        values = torch.sigmoid(hidden @ self.valueWeights + self.valueBias)
         return log_probabilities, values
 
 
