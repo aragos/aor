@@ -5,6 +5,7 @@ old subtraction reference. File subjects/model validation/factor materialization
 reuse their existing owners. This adapter alone owns the64-active-coordinate step.
 """
 import argparse
+from dataclasses import dataclass
 import json
 import math
 import os
@@ -19,6 +20,34 @@ import coordinated_es_projection as projection
 import robust_league_numeric as wire
 
 METHOD_SHA = '1a13821a64de5c1dfdf685f46128969c793a09a03667e6431d55e9c8fe467369'
+
+
+@dataclass(frozen=True)
+class StageSpec:
+    """Only prospectively registered study boundaries may select this unchanged arithmetic."""
+    study: int
+
+    def __post_init__(self):
+        es.require(type(self.study) is int and self.study in (96, 97),
+            'Select only the registered TOKEN study96 or study97 specification.')
+
+    @property
+    def record(self):
+        return dict(study=self.study, methodSha256=self.method_sha,
+            protocolKind=self.protocol_kind, scheduleKind='token-focus-step-schedule-1',
+            originRule='CLOSED96_SOLE_FINAL' if self.study == 97 else 'CLOSED95_QUALIFIED_MIXTURE_ELSE94')
+
+    @property
+    def method_sha(self):
+        return METHOD_SHA if self.study == 96 else '6193986dbd71fad6cd227562132d198ecd147469360187b79582d804788a7b7c'
+
+    @property
+    def protocol_kind(self):
+        return 'token-focus-step-campaign-1' if self.study == 96 else 'token-focus-second-campaign-1'
+
+
+STAGES = {study: StageSpec(study) for study in (96, 97)}
+DEFAULT_STAGE = STAGES[96]
 RECIPE = dict(kind='token-focus-normalized-antithetic-es-1', dimensions=256,
     activeStart=192, activeDimensions=64, generations=1, directions=16, mutants=32,
     worlds=16, sigma=1., stepRmsActive64=1., minimumGradientRms=1e-12,
@@ -46,6 +75,10 @@ def mac_owner():
 
 
 class Output(wire.Output):
+    def __init__(self, path, stage=DEFAULT_STAGE):
+        super().__init__(path)
+        self.stage = stage
+
     def finish(self, mode, record, inputs):
         inputs.unchanged()
         modules = (sys.modules[__name__], wire, es, projection, projection.b,
@@ -56,15 +89,18 @@ class Output(wire.Output):
             for path in sorted(self.path.rglob('*')) if path.is_file()}
         return self.json('receipt.json', dict(kind=KINDS[mode], complete=True, recipe=RECIPE,
             inputPins=inputs.pins, sourceFiles=sources, files=files,
+            **(dict(stageSpec=self.stage.record) if self.stage.study != 96 else {}),
             environment=dict(platform=platform.platform(), numpy=np.__version__,
                 torch=torch.__version__, python=platform.python_version(), numericOwner='MAC',
                 dtype='float64', threads=1), **record))
 
 
-def read_receipt(inputs, item, mode):
+def read_receipt(inputs, item, mode, stage=DEFAULT_STAGE):
     value = inputs.json(item)
     require(value['kind'] == KINDS[mode] and value['complete'] is True and value['recipe'] == RECIPE,
         'The complete numerical predecessor must belong to this one-step TOKEN recipe.')
+    require(value.get('stageSpec') == (stage.record if stage.study != 96 else None),
+        'A numeric receipt cannot cross its registered study boundary.')
     owner = Path(item['path']).absolute()
     for path, digest in value['inputPins'].items():
         inputs.raw(dict(path=path, sha256=digest))
@@ -98,8 +134,8 @@ def read_center(inputs, item, scope, generation):
     return value
 
 
-def prepared(inputs, item):
-    value, owner = read_receipt(inputs, item, 'prepare')
+def prepared(inputs, item, stage=DEFAULT_STAGE):
+    value, owner = read_receipt(inputs, item, 'prepare', stage)
     origin = inputs.portable(owner, value['originBundle'])
     actors = wire.load_bundle(inputs, origin)
     factor = projection.Projection(inputs.raw(inputs.portable(owner, value['projection'])))
@@ -114,7 +150,7 @@ def prepared(inputs, item):
         factor.record['projectionSeed'] == schedule['projectionSeed'],
         'The retained factors and complete schedule must match their original protocol seed declarations.')
     require(value['scopeSha256'] == scope_identity(value['protocol']['sha256'],
-        value['seedSchedule']['sha256'], origin['sha256'], value['inferenceAsset']['sha256'], asset),
+        value['seedSchedule']['sha256'], origin['sha256'], value['inferenceAsset']['sha256'], asset, stage),
         'The complete protocol, full schedule, numerical origin and selector foundation must retain their scope.')
     table = es.DirectionTable.from_record(inputs.json(inputs.portable(owner, value['directions'])))
     require(table.scope == factor.scope and table.generation == 1 and
@@ -129,11 +165,12 @@ def immutable_heads(actors, current):
         'CARD/PURCHASE/EXPANSION must retain their exact original raw bytes.')
 
 
-def scope_identity(protocol_sha, schedule_sha, origin_sha, asset_sha, asset):
+def scope_identity(protocol_sha, schedule_sha, origin_sha, asset_sha, asset, stage=DEFAULT_STAGE):
     return es.digest(dict(kind='token-focus-step-scope-1', protocolSha256=protocol_sha,
         seedScheduleSha256=schedule_sha, originBundleSha256=origin_sha, inferenceAssetSha256=asset_sha,
         selectorOriginalBundleSha256=asset['originalBundle']['sha256'],
-        selectorCalibrationSha256=asset['calibration']['sha256'], recipe=RECIPE))
+        selectorCalibrationSha256=asset['calibration']['sha256'], recipe=RECIPE,
+        **(dict(stageSpec=stage.record) if stage.study != 96 else {})))
 
 
 def generate_directions(scope, seed):
@@ -147,16 +184,54 @@ def generate_directions(scope, seed):
         numpyVersion=np.__version__, directionsSha256=es.digest(table.record))
 
 
-def prepare(inputs, request, out):
+def closed96_origin(inputs, protocol, origin):
+    """Admit the original completed96 FINAL; holdout/researchSignal never selects an origin."""
+    policy = protocol['originPolicy']
+    require(policy['study'] == 96 and policy['tokenNeighborMixture'] is None,
+        'Study97 starts only from the closed96 sole FINAL with the fixed null mixture.')
+    terminal = inputs.json(protocol['parentTerminal'])
+    require(terminal.get('kind') == 'token-focus-step-terminal-1' and terminal.get('study') == 96 and
+        terminal.get('complete') is True and terminal.get('status') == 'completed' and
+        terminal.get('qualified') is False and terminal.get('knownCompletedTerminalExecutions') == 1560 and
+        terminal.get('reservedTerminalUpperBound') == 1560,
+        'Only an originally complete1560-execution study96 may supply a study97 starting model.')
+    audit = inputs.json(policy['original96Audit'])
+    closure = inputs.json(protocol['parentClosure'])
+    final = policy['original96Final']
+    require(terminal['candidateBundle'] == final and final['sha256'] == origin['sha256'] and
+        inputs.raw(final) == inputs.raw(origin) and
+        terminal['completionAuditSha256'] == policy['original96Audit']['sha256'] and
+        terminal['protocolSha256'] == audit['protocolSha256'] == closure['protocolSha256'] ==
+            protocol['parentTrialProtocolSha256'] and
+        audit.get('kind') == 'token-focus-step-original-audit-1' and audit.get('passed') is True and
+        audit.get('complete') is True and audit.get('qualified') is False and audit.get('terminalExecutions') == 1560 and
+        closure.get('kind') == 'token-focus-step-physical-closure-1' and closure.get('study') == 96 and
+        closure.get('passed') is True and closure.get('scienceComplete') is True and
+        closure.get('qualified') is False and closure.get('allOwnedProcessesExited') is True and
+        closure.get('originalClocksRenewed') is False and closure.get('auditReruns') == 0 and
+        all(closure.get(name) == 1560 for name in ('actualCompletedLowerBound',
+            'actualAttemptedLowerBound', 'actualAttemptedUpperBound',
+            'knownCompletedTerminalExecutions', 'controllerReservedTerminalUpperBound')) and
+        audit['artifactPins'].get(final['path']) == final['sha256'] and
+        closure['artifactPins'].get(final['path']) == final['sha256'] and
+        closure['artifactPins'].get(policy['original96Audit']['path']) == policy['original96Audit']['sha256'] and
+        closure['artifactPins'].get(protocol['parentTerminal']['path']) == protocol['parentTerminal']['sha256'],
+        'The original96 terminal, original audit, physical closure and sole FINAL must join exactly; no fallback is allowed.')
+
+
+def prepare(inputs, request, out, stage=DEFAULT_STAGE):
     exact(request, ('kind', 'protocol', 'seedSchedule', 'originBundle', 'inferenceAsset'), 'TOKEN preparation')
     protocol = inputs.json(request['protocol'])
     asset = inputs.json(request['inferenceAsset'])
-    require(protocol['kind'] == 'token-focus-step-campaign-1' and protocol['study'] == 96 and
-        protocol['numericRecipe'] == RECIPE and protocol['methodSha256'] == METHOD_SHA and
+    require(protocol['kind'] == stage.protocol_kind and protocol['study'] == stage.study and
+        protocol['numericRecipe'] == RECIPE and protocol['methodSha256'] == stage.method_sha and
+        protocol.get('numericStageSpec', DEFAULT_STAGE.record if stage.study == 96 else None) == stage.record and
         protocol['originWeightsSha256'] == request['originBundle']['sha256'] and
         protocol['inferenceAssetSha256'] == request['inferenceAsset']['sha256'] and
         asset['kind'] == 'coordinated-inference-asset-1',
         'The exact one-step protocol must bind its numerical origin and unchanged inference foundation.')
+    if stage.study == 97:
+        closed96_origin(inputs, protocol, request['originBundle'])
     actors = wire.load_bundle(inputs, request['originBundle'])
     schedule = inputs.json(request['seedSchedule'])
     require(protocol['seedSchedule'] == request['seedSchedule'] and
@@ -173,7 +248,7 @@ def prepare(inputs, request, out):
     require(all(type(seed) is int and -(2**31) <= seed < 2**31 for seed in worlds) and
         len(set(worlds)) == 144, 'The complete native world reservation must contain144 distinct Int32 seeds.')
     scope = scope_identity(request['protocol']['sha256'], request['seedSchedule']['sha256'],
-        request['originBundle']['sha256'], request['inferenceAsset']['sha256'], asset)
+        request['originBundle']['sha256'], request['inferenceAsset']['sha256'], asset, stage)
     factor = projection.generate(actors, scope, request['originBundle']['sha256'], schedule['projectionSeed'])
     table, draws = generate_directions(factor.scope, schedule['directionSeed'])
     zero = projection.materialize(factor, actors, [0.] * 256)
@@ -197,9 +272,9 @@ def prepare(inputs, request, out):
         center=out.json('center.json', center_record(scope, 0, [0.] * 256))), inputs)
 
 
-def population(inputs, request, out):
+def population(inputs, request, out, stage=DEFAULT_STAGE):
     exact(request, ('kind', 'preparation', 'center'), 'TOKEN population')
-    prep, owner, actors, factor, schedule, table = prepared(inputs, request['preparation'])
+    prep, owner, actors, factor, schedule, table = prepared(inputs, request['preparation'], stage)
     center = read_center(inputs, request['center'], prep['scopeSha256'], 0)
     require(inputs.raw(request['center']) == inputs.raw(inputs.portable(owner, prep['center'])),
         'Only the original zero center may generate the single population.')
@@ -252,9 +327,9 @@ def active_step(vectors, differences):
         activeCenterRms=es.rms(result[192:]), fullCenterRms=es.rms(result))
 
 
-def update_values(inputs, preparation, population, outcomes_item):
-    prep, _, _, _, schedule, table = prepared(inputs, preparation)
-    pop_receipt, pop_owner = read_receipt(inputs, population, 'population')
+def update_values(inputs, preparation, population, outcomes_item, stage=DEFAULT_STAGE):
+    prep, _, _, _, schedule, table = prepared(inputs, preparation, stage)
+    pop_receipt, pop_owner = read_receipt(inputs, population, 'population', stage)
     require(pop_receipt['preparation'] == preparation and
         pop_receipt['scopeSha256'] == prep['scopeSha256'], 'The population must retain this exact preparation.')
     pop_item = inputs.portable(pop_owner, pop_receipt['population'])
@@ -285,25 +360,25 @@ def update_values(inputs, preparation, population, outcomes_item):
     return prep, means, differences, step
 
 
-def update(inputs, request, out):
+def update(inputs, request, out, stage=DEFAULT_STAGE):
     exact(request, ('kind', 'preparation', 'population', 'outcomes'), 'TOKEN update')
     prep, means, differences, step = update_values(inputs, request['preparation'],
-        request['population'], request['outcomes'])
+        request['population'], request['outcomes'], stage)
     center = out.json('center.json', center_record(prep['scopeSha256'], 1, step['coordinates']))
     return out.finish('update', dict(scopeSha256=prep['scopeSha256'], preparation=request['preparation'],
         population=request['population'], outcomes=request['outcomes'], center=center,
         memberWinMeans=means, antitheticWinDifferences=differences, step=step, fitness='WIN_SHARE_ONLY'), inputs)
 
 
-def final(inputs, request, out):
+def final(inputs, request, out, stage=DEFAULT_STAGE):
     exact(request, ('kind', 'preparation', 'update'), 'TOKEN final mean')
-    prep, _, actors, factor, _, _ = prepared(inputs, request['preparation'])
-    updated, owner = read_receipt(inputs, request['update'], 'update')
+    prep, _, actors, factor, _, _ = prepared(inputs, request['preparation'], stage)
+    updated, owner = read_receipt(inputs, request['update'], 'update', stage)
     require(updated['preparation'] == request['preparation'] and updated['scopeSha256'] == prep['scopeSha256'],
         'The sole final mean must descend from this exact completed update and preparation.')
     # Recompute arithmetic only: no RNG, projection generation, game or neural forward.
     _, means, differences, step = update_values(inputs, request['preparation'],
-        updated['population'], updated['outcomes'])
+        updated['population'], updated['outcomes'], stage)
     require(updated['memberWinMeans'] == means and updated['antitheticWinDifferences'] == differences and
         updated['step'] == step, 'The completed update must equal its sole verified win-only arithmetic result.')
     center_item = inputs.portable(owner, updated['center'])
@@ -322,21 +397,23 @@ def final(inputs, request, out):
 OPERATIONS = dict(prepare=prepare, population=population, update=update, final=final)
 
 
-def run(mode, request_path, output, owner_guard=mac_owner):
-    require(mode in OPERATIONS, 'Use an explicit TOKEN numerical operation.')
+def run(mode, request_path, output, owner_guard=mac_owner, stage=DEFAULT_STAGE):
+    require(mode in OPERATIONS and isinstance(stage, StageSpec),
+        'Use an explicit TOKEN operation and registered immutable stage specification.')
     owner_guard()
     inputs = wire.Inputs()
     path = Path(request_path).absolute()
     request = inputs.json(dict(path=str(path), sha256=wire.sha(path.read_bytes())))
     require(request.get('kind') == 'token-focus-step-numeric-' + mode + '-1',
         'The explicit numerical request kind must match its operation.')
-    return OPERATIONS[mode](inputs, request, Output(output))
+    return OPERATIONS[mode](inputs, request, Output(output, stage), stage)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--stage', choices=('96', '97'), default='96')
     parser.add_argument('--mode', choices=tuple(OPERATIONS), required=True)
     parser.add_argument('--request', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    print(json.dumps(run(args.mode, args.request, args.output), sort_keys=True))
+    print(json.dumps(run(args.mode, args.request, args.output, stage=STAGES[int(args.stage)]), sort_keys=True))
