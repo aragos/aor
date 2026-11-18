@@ -85,6 +85,24 @@ class RobustTokenInputTest {
     }
 
     @Test
+    fun revealedBalancedRotationCoversEachStyleEquallyInEveryControlledSeat() {
+        for (seat in 0..3) {
+            val counts =
+                (0..511)
+                    .groupingBy { RobustOpponentStyle.REVEALED_BALANCED.at(it, seat) }
+                    .eachCount()
+            assertThat(counts.keys)
+                .containsExactly(
+                    RobustOpponentStyle.REVEALED_UNDERCUT,
+                    RobustOpponentStyle.REVEALED_OVERBID,
+                    RobustOpponentStyle.REVEALED_TIE_UNDERCUT,
+                    RobustOpponentStyle.REVEALED_TIE_OVERBID,
+                )
+            assertThat(counts.values).containsExactly(128, 128, 128, 128)
+        }
+    }
+
+    @Test
     fun typedLocalMixtureIsBoundOnlyWhenExplicitlyOffered() {
         CoordinatedWinQualificationFixture().use { fixture ->
             val ordinary = RobustTokenInput.read(source(fixture).path)

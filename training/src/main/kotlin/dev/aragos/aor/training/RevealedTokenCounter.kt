@@ -5,6 +5,7 @@ import dev.aragos.aor.Command
 import dev.aragos.aor.GameView
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
+import dev.aragos.aor.ai.LocalTokenNeighborPolicy
 
 /** Bounded within-game learning from the controlled seat's already revealed token purchases. */
 internal data class RevealedTokenCounterConfig(
@@ -59,11 +60,26 @@ internal data class RevealedTokenCounterConfig(
  * seats counter the target; all others retain their complete baseline policy. No hidden prefix
  * records or chosen current commands are accepted by this history owner.
  */
-internal class RevealedTokenCounterLeague(
+internal class RevealedTokenCounterLeague
+private constructor(
     private val target: PlayerId,
     private val registeredPlayers: List<PlayerId>,
     private val config: RevealedTokenCounterConfig,
+    private val counter: RevealedTokenCounter,
+    private val counterTurns: MutableMap<PlayerId, Int>,
 ) {
+    constructor(
+        target: PlayerId,
+        registeredPlayers: List<PlayerId>,
+        config: RevealedTokenCounterConfig,
+    ) : this(
+        target,
+        registeredPlayers.toList(),
+        config,
+        RevealedTokenCounter(target, config),
+        mutableMapOf(),
+    )
+
     init {
         require(
             registeredPlayers.distinct().size == registeredPlayers.size &&
@@ -74,9 +90,22 @@ internal class RevealedTokenCounterLeague(
         }
     }
 
-    private val counter = RevealedTokenCounter(target, config)
+    fun observe(view: GameView) {
+        counter.observe(PublicTokenReveal.from(view, target))
+        if (view.stage != Stage.TOKEN_PURCHASE) {
+            registeredPlayers.filter(::isTargeted).forEach { actor -> counter.order(view, actor) }
+        }
+    }
 
-    fun observe(view: GameView) = counter.observe(PublicTokenReveal.from(view, target))
+    /** Independent continuation after a simulated prefix; no mutable learning state is shared. */
+    fun fork(): RevealedTokenCounterLeague =
+        RevealedTokenCounterLeague(
+            target,
+            registeredPlayers,
+            config,
+            counter.fork(),
+            counterTurns.toMutableMap(),
+        )
 
     fun isTargeted(actor: PlayerId): Boolean {
         val index = registeredPlayers.indexOf(actor)
@@ -92,25 +121,32 @@ internal class RevealedTokenCounterLeague(
         style: RobustOpponentStyle,
         base: SimulationController,
     ): SimulationController {
-        require(style.isRevealedCounter || style == RobustOpponentStyle.QUALIFIED) {
+        require(
+            (style.isRevealedCounter && style != RobustOpponentStyle.REVEALED_BALANCED) ||
+                style == RobustOpponentStyle.QUALIFIED
+        ) {
             "The public-history adapter accepts only its explicit counter or qualified style."
         }
         val active = isTargeted(actor) && style.isRevealedCounter
         return object : SimulationController by base {
-            private var counterTurn: Int? = null
-
             override fun controls(decision: String): Boolean =
                 base.controls(decision) ||
                     (active && style.isTieAware && decision == "choose-turn-position")
 
             override fun choose(decision: SimulationDecision): String? {
+                require(decision.observation.playerId == actor.value) {
+                    "A public counter wrapper must retain its original deciding seat."
+                }
                 observe(decision.view)
-                val original = base.choose(decision)
+                val original =
+                    if (base.controls(decision.observation.decision)) {
+                        base.choose(decision)
+                    } else null
                 if (!active) return original
                 val turn = decision.view.turnNumber ?: return original
                 val offered = decision.observation.candidates.map { it.command }
                 if (decision.observation.decision == "choose-turn-position") {
-                    return if (counterTurn == turn) {
+                    return if (counterTurns[actor] == turn) {
                         counter.tie(
                             original,
                             offered,
@@ -122,22 +158,29 @@ internal class RevealedTokenCounterLeague(
                     } else original
                 }
                 if (original == null) return null
-                return when (decision.observation.decision) {
-                    "buy-tokens" -> {
-                        val result =
-                            counter.bid(
-                                original,
-                                offered,
-                                turn,
-                                actor,
-                                decision.view.capitalOrder,
-                                style,
-                            )
-                        counterTurn = if (result.active) turn else null
-                        result.command
+                val command =
+                    when (decision.observation.decision) {
+                        "buy-tokens" -> {
+                            val result =
+                                counter.bid(
+                                    original,
+                                    offered,
+                                    turn,
+                                    actor,
+                                    decision.view.capitalOrder,
+                                    style,
+                                )
+                            if (result.active) counterTurns[actor] = turn
+                            else counterTurns.remove(actor)
+                            result.command
+                        }
+                        else -> original
                     }
-                    else -> original
+                if (decision.observation.decision == "expand") {
+                    val pool = decision.view.players.single { it.id == actor }.poolTokens
+                    counter.expansion(actor, command, pool)
                 }
+                return command
             }
         }
     }
@@ -204,8 +247,48 @@ internal class RevealedTokenCounter(
     private var tieDecisions = 0
     private var warmups = 0
     private var unavailable = 0
+    private var orderOutcomes = 0
+    private var earlierOutcomes = 0
+    private var laterOutcomes = 0
+    private var predictionHits = 0
+    private var predictionsResolved = 0
     private var digest = CpePairedDigest.json(emptyList<String>())
     private val proofs = mutableListOf<Map<String, Any?>>()
+
+    private data class PendingBid(val turn: Int, val prediction: Int?, val chosen: Int)
+
+    private data class ExpansionActivity(
+        val decisions: Int = 0,
+        val attacks: Int = 0,
+        val cards: Int = 0,
+        val discardedPool: Long = 0,
+    )
+
+    private val pending = mutableMapOf<PlayerId, PendingBid>()
+    private val resolvedTurns = mutableMapOf<PlayerId, Int>()
+    private val activity = mutableMapOf<PlayerId, ExpansionActivity>()
+
+    fun fork(): RevealedTokenCounter =
+        RevealedTokenCounter(target, config).also { copy ->
+            copy.recent.addAll(recent)
+            copy.latest = latest
+            copy.reveals = reveals
+            copy.bidDecisions = bidDecisions
+            copy.changedBids = changedBids
+            copy.tieDecisions = tieDecisions
+            copy.warmups = warmups
+            copy.unavailable = unavailable
+            copy.orderOutcomes = orderOutcomes
+            copy.earlierOutcomes = earlierOutcomes
+            copy.laterOutcomes = laterOutcomes
+            copy.predictionHits = predictionHits
+            copy.predictionsResolved = predictionsResolved
+            copy.digest = digest
+            copy.proofs.addAll(proofs)
+            copy.pending.putAll(pending)
+            copy.resolvedTurns.putAll(resolvedTurns)
+            copy.activity.putAll(activity)
+        }
 
     fun observe(reveal: PublicTokenReveal?) {
         if (reveal == null) return
@@ -283,6 +366,8 @@ internal class RevealedTokenCounter(
             }
         bidDecisions++
         if (result.command != original) changedBids++
+        pending[actor] =
+            PendingBid(turn, prediction, LocalTokenNeighborPolicy.amount(result.command))
         record(
             mapOf(
                 "phase" to "buy-tokens",
@@ -301,6 +386,56 @@ internal class RevealedTokenCounter(
             )
         )
         return result
+    }
+
+    /**
+     * Join predictions only after the engine publicly exposes bids and the resolved order boxes.
+     */
+    fun order(view: GameView, actor: PlayerId) {
+        if (view.stage == Stage.TOKEN_PURCHASE) return
+        val turn = view.turnNumber ?: return
+        val attempt = pending[actor] ?: return
+        if (attempt.turn != turn || resolvedTurns[actor] == turn) return
+        val targetBid = view.revealedTokenPurchases[target] ?: return
+        val actorBid = view.revealedTokenPurchases[actor] ?: return
+        val targetBox = view.orderBoxes[target] ?: return
+        val actorBox = view.orderBoxes[actor] ?: return
+        require(actorBid == attempt.chosen) {
+            "A public counter outcome must retain its own actually committed command."
+        }
+        resolvedTurns[actor] = turn
+        orderOutcomes++
+        if (actorBox < targetBox) earlierOutcomes++
+        if (actorBox > targetBox) laterOutcomes++
+        if (attempt.prediction != null) {
+            predictionsResolved++
+            if (attempt.prediction == targetBid) predictionHits++
+        }
+        record(
+            mapOf(
+                "phase" to "order-revealed",
+                "turn" to turn,
+                "actor" to actor.value,
+                "target" to target.value,
+                "prediction" to attempt.prediction,
+                "actualTargetBid" to targetBid,
+                "actualRivalBid" to actorBid,
+                "targetOrderBox" to targetBox,
+                "rivalOrderBox" to actorBox,
+                "rivalBeforeTarget" to (actorBox < targetBox),
+            )
+        )
+    }
+
+    fun expansion(actor: PlayerId, command: String, pool: Int) {
+        val before = activity[actor] ?: ExpansionActivity()
+        activity[actor] =
+            before.copy(
+                decisions = before.decisions + 1,
+                attacks = before.attacks + if (command.startsWith("attack ")) 1 else 0,
+                cards = before.cards + if (command == "buy-expansion-card") 1 else 0,
+                discardedPool = before.discardedPool + if (command == "pass") pool else 0,
+            )
     }
 
     fun tie(
@@ -348,6 +483,22 @@ internal class RevealedTokenCounter(
                     "warmups" to warmups,
                     "unavailableTargets" to unavailable,
                     "tieDecisions" to tieDecisions,
+                    "resolvedOrderOutcomes" to orderOutcomes,
+                    "rivalBeforeTargetCount" to earlierOutcomes,
+                    "rivalAfterTargetCount" to laterOutcomes,
+                    "resolvedPredictions" to predictionsResolved,
+                    "predictionHits" to predictionHits,
+                    "rivalExpansionActivity" to
+                        activity
+                            .mapKeys { it.key.value }
+                            .mapValues { (_, row) ->
+                                mapOf(
+                                    "decisions" to row.decisions,
+                                    "attacks" to row.attacks,
+                                    "expansionCards" to row.cards,
+                                    "discardedPoolAtPass" to row.discardedPool,
+                                )
+                            },
                     "latestWindow" to recent.map(PublicTokenReveal::record),
                     "decisionProofs" to proofs.toList(),
                     "proofLimit" to PROOF_LIMIT,
