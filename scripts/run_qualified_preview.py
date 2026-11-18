@@ -30,7 +30,8 @@ def main():
         raise ValueError('The reviewed local JDK changed.')
     if sha(root/'asset/manifest.json') != config['manifestSha256']:
         raise ValueError('The complete qualified policy identity changed.')
-    if config['host'] != '127.0.0.1' or config['port'] != 18777:
+    if (config['host'] != '127.0.0.1' or type(config['port']) is not int or
+            not 1 <= config['port'] <= 65535):
         raise ValueError('This prepared local preview has an explicit loopback address and port.')
     if not (root/'data').is_dir():
         raise ValueError('The preview requires its own persistent data directory.')
