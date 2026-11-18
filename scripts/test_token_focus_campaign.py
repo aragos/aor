@@ -157,6 +157,14 @@ class ContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'fewer than7800 original seconds'):
                     policy.validate(value)
 
+    def test_all_original_training_holdout_and_numeric_streams_stay_reserved(self):
+        schedule=Path(__file__).parent/'testdata/token-focus-step-schedule.json'
+        reserved=c.read(schedule);value=dict(reservedSchedule=reserved,scheduleSha256=c.sha(schedule),banks=copy.deepcopy(reserved['banks']))
+        policy.validate_worlds(value)
+        value['banks']['holdout']['seeds']=value['banks']['holdout']['seeds'][:-1]
+        with self.assertRaisesRegex(ValueError,'world must remain complete and unchanged'):
+            policy.validate_worlds(value)
+
     def test_active64_normalization_differs_from_full256(self):
         matrix=dict(members=[dict(winShares=[1.] *16) if index==0 else dict(winShares=[0.] *16) for index in range(32)])
         _,gradient,coordinates=learner.independent_step(dict(vectors=[[0.]*192+[1.]*64]*16),matrix)
