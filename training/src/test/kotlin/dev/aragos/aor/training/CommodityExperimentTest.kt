@@ -340,7 +340,7 @@ class CommodityExperimentTest {
                 checkNotNull(state.players[scenario.actor]) { "The fixture requires its actor." }
             val live = state.deck + actor.hand.map { it.definition.id }
             assertThat(live.distinct()).hasSize(live.size)
-            assertThat(live.toSet().intersect(state.playedCards)).isEmpty()
+            assertThat(live.toSet().intersect(state.publiclyDiscardedCards)).isEmpty()
             assertThat(state.viewForPlayer(scenario.actor).unplayedCards.map { it.id }.toSet())
                 .isEqualTo(live.toSet())
             assertThat(

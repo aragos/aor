@@ -256,7 +256,7 @@ object CommodityExperiment {
                     ),
                 players = players,
                 board = board,
-                playedCards = excluded.toSet(),
+                publiclyDiscardedCards = excluded.toSet(),
                 capitalSelection =
                     CapitalSelection.fromBids(
                         ids.mapIndexed { index, id -> id to ids.size - index }.toMap()
