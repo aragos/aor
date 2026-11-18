@@ -345,7 +345,9 @@ private class ProfileFixture(
                 val command =
                     if (state.stage == Stage.BIDDING) {
                         "bid-capital 0"
-                    } else state.legalChoices(actor).commands.first()
+                    } else {
+                        state.legalChoices(actor).commands.first()
+                    }
                 service.driver.submit(current, actor, TextCodec.parseCommand(command))
             }
         }

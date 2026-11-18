@@ -125,9 +125,11 @@ internal enum class RobustQualificationVersion(
 
     val banks: List<String>
         get() =
-            if (isBidSearch || this == LOCAL_BID_MIXTURE)
+            if (isBidSearch || this == LOCAL_BID_MIXTURE) {
                 listOf("mixed", "homogeneous", "reference")
-            else listOf("mixed", "homogeneous")
+            } else {
+                listOf("mixed", "homogeneous")
+            }
 }
 
 private class CoordinatedAssetReader(path: Path) {
@@ -336,10 +338,12 @@ private class CoordinatedAssetReader(path: Path) {
             ) + if (local) setOf("tokenNeighborMixture") else emptySet(),
         )
         require(
-            if (local) integer(value, "schemaVersion") == 2
-            else
+            if (local) {
+                integer(value, "schemaVersion") == 2
+            } else {
                 text(value, "kind") == "coordinated-robust-inference-asset-1" &&
                     integer(value, "schemaVersion") == 1
+            }
         ) {
             "A robust inference descriptor must explicitly bind the complete policy."
         }
@@ -1019,8 +1023,11 @@ private class CoordinatedAssetReader(path: Path) {
                             departureProbability = if (index % 2 == 0) .25 else .5,
                             radius = if (index % 4 < 2) 1 else 2,
                             admission =
-                                if (index < 4) TokenNeighborAdmission.OFFERED_ONLY
-                                else TokenNeighborAdmission.QUOTED_LEGAL_NEIGHBORS,
+                                if (index < 4) {
+                                    TokenNeighborAdmission.OFFERED_ONLY
+                                } else {
+                                    TokenNeighborAdmission.QUOTED_LEGAL_NEIGHBORS
+                                },
                         )
             ) {
                 "Study95 may nominate only one of its eight frozen local-mixture configurations."

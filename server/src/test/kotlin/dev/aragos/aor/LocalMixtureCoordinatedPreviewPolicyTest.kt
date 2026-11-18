@@ -265,12 +265,18 @@ private class LocalMixturePreviewFixture(private val root: Path) {
                             "worlds" to count,
                             "seeds" to List(count) { index * 1000 + it },
                             "opponentStyle" to
-                                if (name in setOf("development", "mixed")) "BALANCED"
-                                else "QUALIFIED",
+                                if (name in setOf("development", "mixed")) {
+                                    "BALANCED"
+                                } else {
+                                    "QUALIFIED"
+                                },
                             "control" to if (name == "reference") "QUALIFIED87" else "QUALIFIED94",
                             "replayIndices" to
-                                if (name == "development") listOf(0, 21, 42, 63)
-                                else listOf(0, 85, 170, 255),
+                                if (name == "development") {
+                                    listOf(0, 21, 42, 63)
+                                } else {
+                                    listOf(0, 85, 170, 255)
+                                },
                         )
                 }
                 .toMap()
