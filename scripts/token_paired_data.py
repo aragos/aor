@@ -11,6 +11,7 @@ import re
 
 import purchase_policy as b
 import token_paired_policy as actor
+import token_paired_objective as objectives
 
 
 def sha(value, label):
@@ -76,9 +77,13 @@ class Context:
 
     def __post_init__(self):
         b.integer(self.iteration, 'Iteration', 1, 2)
-        for key, value in vars(self).items():
+        for key in Context.__dataclass_fields__:
+            value=getattr(self,key)
             if key != 'iteration':
                 sha(value, key)
+
+    @property
+    def objective(self):return objectives.MIXED
 
     def bind(self, original, current, dictionary):
         b.require(isinstance(original, FrozenActor) and isinstance(current, FrozenActor) and
@@ -97,6 +102,18 @@ class Context:
             'The original TOKEN2 anchor must be the fixed zero-output initializer.')
         b.require(self.iteration != 1 or original.raw == current.raw,
             'Iteration1 must use the exact original actor bytes.')
+
+
+@dataclass(frozen=True)
+class WinContext(Context):
+    objective_version: str=objectives.WIN
+
+    def __post_init__(self):
+        super().__post_init__()
+        b.require(self.objective_version==objectives.WIN,'Pure-win context requires its exact objective contract.')
+
+    @property
+    def objective(self):return self.objective_version
 
 
 def observation(raw, model):
@@ -186,10 +203,15 @@ class PairedTarget:
     public: PublicRoot
     rewards: tuple
 
+    @property
+    def objective(self):return objectives.MIXED
+
     def __post_init__(self):
         b.require(isinstance(self.public, PublicRoot) and self.public.ready and
             type(self.rewards) is tuple and len(self.rewards) == len(self.public.record['proposedIndices']),
             'Typed paired targets require every sampled sibling at a READY public root.')
+        b.require(self.objective==self.public.context.objective,
+            'Paired targets and public context must use the same explicit objective contract.')
         for row in self.rewards:
             b.require(type(row) is tuple and len(row) == 2, 'Each immutable target has exactly two futures.')
             for value in row:
@@ -222,6 +244,30 @@ class PairedTarget:
         reference = self.rewards[0]
         return tuple(math.fsum(value-base for value, base in zip(row, reference))/2
             for row in self.rewards)
+
+
+class WinPairedTarget(PairedTarget):
+    """The inherited tuple storage contains only winner shares; its wire never accepts rewards."""
+    @property
+    def objective(self):return objectives.WIN
+
+    def __post_init__(self):
+        super().__post_init__()
+        b.require(all(any(abs(value-valid)<1e-12 for valid in (0.,.25,1/3,.5,1.))
+            for row in self.rewards for value in row),
+            'Pure-win targets must contain possible four-player winner shares.')
+
+    @classmethod
+    def from_record(cls,public,record,*,split='TRAIN'):
+        b.require(public.record['split']==split and split in ('TRAIN','VALIDATION'),
+            'Paired labels require the explicitly admitted split.')
+        b.require(public.ready,'Missing/singleton roots do not invent paired labels.')
+        exact(record,('objectiveVersion','publicSha256','futureSeeds','actions'),'Pure-win paired labels')
+        b.require(record['objectiveVersion']==objectives.WIN,'Pure-win labels require their exact objective version.')
+        for action in record['actions']:exact(action,('actionIndex','winShares'),'Pure-win paired action')
+        projected=dict(publicSha256=record['publicSha256'],futureSeeds=record['futureSeeds'],
+            actions=[dict(actionIndex=action['actionIndex'],rewards=action['winShares']) for action in record['actions']])
+        return super().from_record(public,projected,split=split)
 
 
 @dataclass(frozen=True)

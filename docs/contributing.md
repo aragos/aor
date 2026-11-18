@@ -1289,6 +1289,29 @@ retain the separate frozen Purchase prior, and require predicted advantage above
 retain the same roles and hashed snapshots. Selection data does not establish strength;
 independent complete-game confirmation is required before any client integration.
 
+### Pure-win paired numerical projection
+
+The fit-only [paired TOKEN CLI](../scripts/token_paired_fit.py) accepts the explicit opt-in
+`--objective paired-win-share-1`. It opens an already verified paired corpus, derives each
+continuation's win share from terminal totals and winner flags, and fits paired action-minus-reference
+win differences. Tied winners share one win; an all-chaos game supplies zero. Reward and rank labels
+do not enter this objective. Omission retains the legacy mixed-reward objective and wire format.
+
+```sh
+python scripts/token_paired_fit.py --objective paired-win-share-1 \
+  --protocol PROTOCOL.json --corpus CORPUS.json --original-corpus ORIGINAL_CORPUS.json \
+  --original-actor INITIAL_ACTOR.json --current-actor CURRENT_ACTOR.json \
+  --dictionary DICTIONARY.json --deadline-epoch UNIX_SECONDS --output NEW_FIT_DIRECTORY
+```
+
+Use the numerical environment's Python and a future absolute deadline. Epoch shuffle streams come
+from the pinned protocol; iteration two also requires `--previous` with the sole completed first-fit
+directory. Pure-win contexts, targets, optimizer receipts and predecessor checks have separate
+objective identities and cannot be mixed with legacy fitting contracts. This does not change the
+TOKEN2 model or collector's action distribution: the original zero-output initializer and corpus
+admission constraints still apply. The command performs no collection, validation, qualification or
+activation; the legacy campaign/admission path deliberately rejects its new fit receipt kind.
+
 Native diagnostic sources can additionally set `tokenOrder.candidateSelector` and/or
 `tokenOrder.incumbentSelector`. `MODEL` is the unchanged default. `ADJACENT_VETO` requires that side's
 model and keeps its original choice only when it differs from the actual ordinary baseline by one;
