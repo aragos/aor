@@ -30,7 +30,7 @@ ASSET_SHA=mixture.ASSET_SHA
 NOMINATION_SHA=mixture.NOMINATION_SHA
 BANK_ORDER=('training','holdout')
 CASES=[dict(id='START')]
-EXECUTABLES=('token_focus_campaign.py',)
+EXECUTABLES=('token_focus_campaign.py','token_focus_close.py')
 CASE_IDS=tuple(f'{sign}_{direction:02d}' for direction in range(16) for sign in ('PLUS','MINUS'))
 CONFIDENCE=1.959963984540054
 
@@ -70,6 +70,9 @@ def read_method(path,*,stage=None):
 
 def origin_policy(terminal_item,closure_item,*,stage=None):
     spec=stage_spec(stage)
+    if spec.study==97:
+        c.require(Path(terminal_item['path']).is_file() and Path(closure_item['path']).is_file(),
+            'Defer study97 until the original96 terminal and physical closure exist.')
     terminal=search.subject(terminal_item);closed=search.subject(closure_item)
     c.require(terminal['kind']==spec.parent_terminal_kind and closed['kind']==spec.parent_closure_kind and
         terminal['study']==closed['study']==spec.parent_study and terminal['protocolSha256']==closed['protocolSha256']==spec.parent_protocol_sha and

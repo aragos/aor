@@ -9,7 +9,7 @@ import mac_qualification_close as metadata
 import robust_token_campaign as c
 
 
-def close(protocol, profile_path, output, owner_record, contract):
+def close(protocol, profile_path, output, owner_record, contract, *, status_transition=None):
     protocol,output=Path(protocol),Path(output)
     plan=contract.validate(c.read(protocol));profile=search.verify_profile(profile_path,plan)
     terminal,clock,launch=(c.read(output/name) for name in ('terminal.json','clock.json','launch.json'))
@@ -44,12 +44,17 @@ def close(protocol, profile_path, output, owner_record, contract):
             audit['clockSha256']==c.sha(output/'clock.json') and audit['qualified'] is terminal['qualified'],
             'A completed search requires its sealed original audit; later closure cannot rerun it.')
         for name,digest in audit['artifactPins'].items():
+            if status_transition is not None and name==str(output/'status.json'):
+                c.require(status_transition['path']==name and status_transition['originalSha256']==digest and
+                    status_transition['finalSha256']==c.sha(name),
+                    'Only the explicitly verified operational status finalization may differ from the original audit.')
+                continue
             c.require(c.sha(name)==digest,'An originally audited search artifact changed.')
     else:c.require(terminal['qualified'] is False,'An interrupted search cannot claim qualification.')
     for path in output.rglob('*'):
         if path.is_file():pins[str(path)]=c.sha(path)
     for path in (protocol,Path(profile_path),Path(owner_record)):pins[str(path)]=c.sha(path)
-    return dict(kind=contract.PREFIX+'-physical-closure-1',study=plan['study'],passed=True,
+    result=dict(kind=contract.PREFIX+'-physical-closure-1',study=plan['study'],passed=True,
         scienceComplete=terminal['complete'],qualified=terminal['qualified'],
         originalTerminalStatus=terminal['status'],protocolSha256=c.sha(protocol),clockSha256=c.sha(output/'clock.json'),
         ownedPids=sorted(pids),ownedGroups=sorted(groups),allOwnedProcessesExited=True,
@@ -60,6 +65,8 @@ def close(protocol, profile_path, output, owner_record, contract):
         knownCompletedTerminalExecutions=terminal['knownCompletedTerminalExecutions'],
         controllerReservedTerminalUpperBound=terminal['reservedTerminalUpperBound'],artifactPins=pins,
         newGames=0,newFits=0,modelForwards=0,effectRecordsParsed=0,checkedEpoch=time.time())
+    if status_transition is not None:result['operationalStatusFinalization']=status_transition
+    return result
 
 
 if __name__=='__main__':

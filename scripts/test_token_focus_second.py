@@ -57,6 +57,13 @@ class SecondStageTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'Defer study97'):
                 policy.origin_policy(terminal,closed)
 
+    def test_missing96_terminal_or_closure_defers_without_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            with self.assertRaisesRegex(ValueError,'Defer study97 until the original96'):
+                policy.origin_policy(dict(path=str(root/'missing-terminal'),sha256='a'*64),
+                    dict(path=str(root/'missing-closure'),sha256='b'*64))
+
     def test_an_alternative_origin_cannot_replace_the_audited_final(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);terminal,closed,_=parent(root)
@@ -109,6 +116,14 @@ class SecondStageTests(unittest.TestCase):
             result=learner.audit(*args[:5],now=lambda:args[5]['deadlineEpoch']+1)
             self.assertEqual(result['terminalExecutions'],1560);self.assertFalse(result['qualified'])
             self.assertEqual(result['kind'],'token-focus-second-original-audit-1')
+
+    def test_numerical_receipt_cannot_substitute_registered96_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args=fixture(Path(temporary),study=97,separate_control=True)
+            path=args[2]/'numeric/update/artifacts/receipt.json';value=c.read(path)
+            value['stageSpec']['study']=96;path.write_bytes(c.canonical(value))
+            with self.assertRaisesRegex(ValueError,'source-registered stage identity'):
+                learner.numerical_receipt(args[2],'update')
 
 
 if __name__=='__main__':unittest.main()

@@ -216,7 +216,8 @@ def audit(protocol,profile_path,output,terminal,policy=contract,*,now=time.time)
     c.require(report==c.read(output/'holdout.json') and terminal['researchSignal'] is report['researchSignal'] and
         terminal['candidateBundle']==final_case['bundle'] and executions==1560==terminal['knownCompletedTerminalExecutions']==
         terminal['reservedTerminalUpperBound'],'All original research effects and1560 executions must reproduce without qualification.')
-    pins={str(path):c.sha(path) for path in output.rglob('*') if path.is_file()}
+    # Progress status is replaced by the shared lifecycle after this audit finishes.
+    pins={str(path):c.sha(path) for path in output.rglob('*') if path.is_file() and path!=output/'status.json'}
     return dict(kind=policy.PREFIX+'-original-audit-1',passed=True,complete=True,qualified=False,
         researchSignal=report['researchSignal'],protocolSha256=c.sha(protocol),profileSha256=c.sha(profile_path),
         clockSha256=c.sha(output/'clock.json'),terminalExecutions=executions,artifactPins=pins,

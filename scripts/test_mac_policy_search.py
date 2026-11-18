@@ -36,7 +36,7 @@ def producer(source, folder, concentrated=False, *, candidate_wins=True):
     if 'controlSelector' in source:identity['controlSelector']=source['controlSelector']
     science=hashlib.sha256(c.canonical(identity)[:-1]).hexdigest()
     source_sha=hashlib.sha256(c.canonical(source)).hexdigest()
-    c.write(folder/'prepared.json',dict(passed=True,newGames=0,modelForwards=0,
+    c.write(folder/'prepared.json',dict(passed=True,newGames=0,modelForwards=0,inputPins={},
         scienceIdentity=identity,scienceSha256=science,sourceSha256=source_sha))
     rows=[];replays=[]
     for index in range(source['globalStart'],source['globalStart']+source['count']):
