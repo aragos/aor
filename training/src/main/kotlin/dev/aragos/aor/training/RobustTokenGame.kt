@@ -216,6 +216,12 @@ internal object RobustTokenGame {
         val references =
             arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
         val diagnostics = RobustTokenDiagnostics(seat, input.tokenNeighborMixture != null)
+        val league =
+            input.adaptiveOpponent?.let {
+                // Simulation owns the documented p1..p4 registration identifiers.
+                val players = (1..4).map { number -> PlayerId("p$number") }
+                RevealedTokenCounterLeague(players[seat], players, it)
+            }
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
@@ -241,36 +247,45 @@ internal object RobustTokenGame {
                         RobustOpponentStyle.OVERBID,
                     )[(position - 1).coerceAtLeast(0)]
                 } else style
-            object : SimulationController {
-                override fun controls(decision: String): Boolean = qualified.controls(decision)
+            val baseline =
+                object : SimulationController {
+                    override fun controls(decision: String): Boolean = qualified.controls(decision)
 
-                override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
-                    qualified.tokenNeighborMixture()
+                    override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
+                        qualified.tokenNeighborMixture()
 
-                override fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) {
-                    check(player == seat && candidate) {
-                        "Only the evaluated candidate may admit a new quoted token neighbor."
+                    override fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) {
+                        check(player == seat && candidate) {
+                            "Only the evaluated candidate may admit a new quoted token neighbor."
+                        }
+                        diagnostics.admitted(admission)
                     }
-                    diagnostics.admitted(admission)
-                }
 
-                override fun choose(decision: SimulationDecision): String? {
-                    val original = qualified.choose(decision) ?: return null
-                    val command =
-                        if (player != seat && decision.observation.decision == "buy-tokens") {
-                            RobustTokenIntervention.command(
-                                original,
-                                decision.observation.candidates.map(BotCandidate::command),
-                                rival,
-                                decision.view.turnNumber ?: 0,
-                                decision.view.players
-                                    .single { it.id.value == decision.observation.playerId }
-                                    .stockTokens,
-                            )
-                        } else original
-                    diagnostics.chosen(decision, command)
-                    return command
+                    override fun choose(decision: SimulationDecision): String? {
+                        val original = qualified.choose(decision) ?: return null
+                        val command =
+                            if (
+                                player != seat &&
+                                    !rival.isRevealedCounter &&
+                                    decision.observation.decision == "buy-tokens"
+                            ) {
+                                RobustTokenIntervention.command(
+                                    original,
+                                    decision.observation.candidates.map(BotCandidate::command),
+                                    rival,
+                                    decision.view.turnNumber ?: 0,
+                                    decision.view.players
+                                        .single { it.id.value == decision.observation.playerId }
+                                        .stockTokens,
+                                )
+                            } else original
+                        return command
+                    }
                 }
+            val controller = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+            object : SimulationController by controller {
+                override fun choose(decision: SimulationDecision): String? =
+                    controller.choose(decision)?.also { diagnostics.chosen(decision, it) }
             }
         }
         require(controllers.keys == setOf(0, 1, 2, 3)) {
@@ -294,6 +309,10 @@ internal object RobustTokenGame {
                 )
         val terminal = ArenaGame.from(game).copy(elapsedMillis = 0)
         CoordinatedEsAttempts.terminal(terminal)
-        return RobustTokenGameResult(terminal, diagnostics.result(), trace?.sha256)
+        return RobustTokenGameResult(
+            terminal,
+            diagnostics.result() + (league?.diagnostics() ?: emptyMap()),
+            trace?.sha256,
+        )
     }
 }
