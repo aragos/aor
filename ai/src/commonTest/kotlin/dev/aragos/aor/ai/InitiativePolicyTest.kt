@@ -99,4 +99,42 @@ class InitiativePolicyTest {
 
         assertEquals("buy-tokens 21", InitiativePolicy.bid(empty, seat, "buy-tokens 21", 7, config))
     }
+
+    @Test
+    fun earlyCardPurchaseBonusFallsAsThePriceRises() {
+        val options =
+            TerritoryObservation(
+                TerritoryEncoder.EXPANSION_2.version,
+                emptyMap(),
+                listOf(
+                    TerritoryAction("buy-expansion-card", mapOf("kind.buyCard" to 1.0)),
+                    TerritoryAction("pass", mapOf("kind.pass" to 1.0)),
+                ),
+                baselineIndex = 1,
+            )
+        val normal = IncumbentResidualChoice(listOf(0.0, 0.0), listOf(0.0, 1.0), 1, "pass")
+        val expansion =
+            view.copy(
+                stage = Stage.EXPANSION,
+                orderBoxes = mapOf(seat to 1),
+                expansionCardCost = 3,
+            )
+        val buying = config.copy(cardBonus = 2.0)
+
+        assertEquals(
+            "buy-expansion-card",
+            InitiativePolicy.expansion(expansion, seat, options, normal, buying).command,
+        )
+        assertEquals(
+            "pass",
+            InitiativePolicy.expansion(
+                    expansion.copy(expansionCardCost = 9),
+                    seat,
+                    options,
+                    normal,
+                    buying,
+                )
+                .command,
+        )
+    }
 }

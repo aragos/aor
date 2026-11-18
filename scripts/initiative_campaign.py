@@ -19,7 +19,7 @@ import time
 MAC_JAVA = ("/Users/aragos/.gradle/jdks/azul_systems__inc_-21-aarch64-os_x.2/"
             "zulu21.50.19-ca-jdk21.0.11-macosx_aarch64/Contents/Home/bin/java")
 HOST = "aragos@192.168.86.44"
-REMOTE = "/home/aragos/aor-worker/initiative-crossplay-20261118"
+REMOTE = "/home/aragos/aor-worker/initiative-cards-20261118"
 SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", HOST]
 MODE = "dev.aragos.aor.training.TrainingMainKt"
 ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "INDEPENDENT_INITIATIVE")
@@ -156,7 +156,7 @@ class Campaign:
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
 
-    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None):
+    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None, baseline=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -166,9 +166,9 @@ class Campaign:
         if len(set(streams)) != len(streams):
             raise ValueError("Each declared stage bank requires distinct seed streams.")
         declared = dict(stage=label, configs=configs, banks=banks, paired=paired,
-                        replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline, rival=rival)
+                        replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline, rival=rival, baseline=baseline)
         write(stage / "method.json", declared)
-        choices = configs if paired else {"control": None, **configs}
+        choices = configs if paired else {"control": baseline, **configs}
         jobs = []
         for key, policy in choices.items():
             for case, mode in enumerate(ecologies):
@@ -246,59 +246,42 @@ def ranked(outcomes):
     return sorted(outcomes.values(), key=lambda row: (row["rankScore"], row["adaptive"]), reverse=True)
 
 
-def main(root, initial):
+def main(root, initial, cross):
     campaign = Campaign(root)
     campaign.validate_runtime()
-    main_result = read(initial / "result.json")
-    champion = main_result["best"] if main_result["status"] == "development-no-nomination" else main_result["comparison"]
-    candidates = [
-        cfg(1, .15, 1., False, 1.),
-        cfg(3, .15, 1., False, 0.),
-        cfg(5, .15, 1., False, 3.),
-        cfg(7, .15, 1., True, 3.),
-        cfg(6, 0., .8, True, 0.),
-        cfg(4, .85, .8, False, 6.),
-        cfg(5, 0., .5, False, 0.),
-        cfg(7, .2, .8, False, 5.),
-    ]
-    trained = campaign.stage("independent-response", {f"r{i}": v for i,v in enumerate(candidates)},
-                             192, ECOLOGIES[:1], shard=96)
-    opponent = ranked(trained)[0]["config"]
-    validate = campaign.stage("response-check", {"response":opponent}, 384, ECOLOGIES[:1], paired=True)
-    if validate["response"]["ordinary"] <= 0:
-        write(root / "result.json", dict(status="response-did-not-win-more", validation=validate))
+    if campaign.remaining() < 1000:
+        write(root / "result.json", dict(status="insufficient-time-for-card-screen"))
         return
-    crossplay = campaign.stage("crossplay", {"champion":champion["config"]}, 512, ECOLOGIES[-1:],
-                               paired=True, rival=opponent)
-    write(root / "result.json", dict(status="crossplay-complete", comparison=crossplay, responder=validate,
-                                     initialResultSha256=sha(initial/"result.json")))
-
-    # Reserve enough time for a distinct fresh audit before starting a response-aware update.
-    if campaign.remaining() < 2700:
+    earlier = read(initial / "result.json")
+    base = earlier["best"] if earlier["status"] == "development-no-nomination" else earlier["comparison"]
+    if (cross / "mixed-result.json").exists():
+        followup = read(cross / "mixed-result.json")
+        if followup.get("passed"):
+            base = followup["audit"]["selected"]
+    base = base["config"]
+    runs = {
+        "cheap-card-light": dict(base, cardBonus=1.0),
+        "cheap-card-medium": dict(base, cardBonus=2.5),
+        "cheap-card-strong": dict(base, cardBonus=5.0),
+        "cards-before-attacks": dict(base, attackBonus=0.0, cardBonus=3.5),
+        "attack-and-cards": dict(base, attackBonus=max(2.0,base["attackBonus"]), cardBonus=3.5),
+        "card-bonus-only": dict(cfg(0,.5,0.,False,0.), cardBonus=3.5),
+    }
+    conditions = ECOLOGIES[:2]
+    fitted = campaign.stage("cheap-card-screen", runs, 176, conditions, shard=88, baseline=base)
+    winner = ranked(fitted)[0]
+    if winner["adaptive"] < .025 or winner["ordinary"] < -.025 or campaign.remaining() < 950:
+        write(root/"result.json",dict(status="card-screen-complete",differenceFromBase=winner))
         return
-    base = champion["config"]
-    followup = {"champion":base, "responder":opponent,
-                "lower-penalty":dict(base, tokenPenalty=max(0.,base["tokenPenalty"]-.3)),
-                "more-initiative":dict(base, maximumTokenLoss=min(8,base["maximumTokenLoss"]+2),
-                                       participation=1.)}
-    mixed = campaign.stage("response-aware", followup, 192, ECOLOGIES, rival=opponent)
-    viable = [candidate for candidate in ranked(mixed) if candidate["ordinary"] >= -.075 and
-              all(candidate["outcomes"][mode]["mean"] > 0 for mode in ECOLOGIES[1:])]
-    if not viable:
-        write(root / "mixed-result.json", dict(status="response-aware-no-nomination", score=mixed))
-        return
-    audit = campaign.stage("mixed-fresh-audit", {"selected":viable[0]["config"]}, 512,
-                           ECOLOGIES, paired=True, rival=opponent)
-    comparisons = audit["selected"]["outcomes"]
-    passed = comparisons["QUALIFIED"]["lower95"] > -.075 and all(
-        comparisons[mode]["lower95"] > 0 for mode in ECOLOGIES[1:])
-    write(root / "mixed-result.json", dict(status="mixed-fresh-audit-complete", passed=passed, audit=audit))
-
+    audit = campaign.stage("cheap-card-fresh-audit", {"card":winner["config"],"qualified94":None},
+                           448, conditions, shard=112, baseline=base)
+    write(root/"result.json",dict(status="card-fresh-audit-complete",differenceFromBase=audit))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--initial", type=Path, required=True)
+    parser.add_argument("--cross", type=Path, required=True)
     args = parser.parse_args()
-    main(args.root.resolve(), args.initial.resolve())
+    main(args.root.resolve(), args.initial.resolve(), args.cross.resolve())

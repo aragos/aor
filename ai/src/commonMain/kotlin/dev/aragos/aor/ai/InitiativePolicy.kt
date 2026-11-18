@@ -11,7 +11,8 @@ import dev.aragos.aor.TokenPurchaseOfferView
  * Tunable initiative bids use printed order boxes and authoritative quotes. [maximumTokenLoss]
  * limits tokens sacrificed relative to the normal choice. [tokenPenalty] uses expected printed box
  * numbers per forgone token. [participation] is the chance of using a positive-scoring switch.
- * [attackBonus] tunes early-box attacks in calibrated expansion score units.
+ * [attackBonus] tunes early-box attacks in calibrated expansion score units. [cardBonus] is the
+ * maximum bump for a three-token draw with an empty hand.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -19,6 +20,7 @@ data class InitiativePolicyConfig(
     val participation: Double,
     val requireAffordableContest: Boolean,
     val attackBonus: Double,
+    val cardBonus: Double = 0.0,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -30,6 +32,9 @@ data class InitiativePolicyConfig(
         }
         require(attackBonus.isFinite() && attackBonus in 0.0..8.0) {
             "Initiative expansion bonus must be between zero and eight calibrated score units."
+        }
+        require(cardBonus.isFinite() && cardBonus in 0.0..8.0) {
+            "Initiative card bonus must be between zero and eight calibrated score units."
         }
     }
 
@@ -109,11 +114,27 @@ object InitiativePolicy {
         normal: IncumbentResidualChoice,
         config: InitiativePolicyConfig,
     ): IncumbentResidualChoice {
-        if (config.attackBonus == 0.0 || (view.orderBoxes[player] ?: 6) > 3) return normal
+        if (
+            (config.attackBonus == 0.0 && config.cardBonus == 0.0) ||
+                (view.orderBoxes[player] ?: 6) > 3
+        ) {
+            return normal
+        }
+        val cost = view.expansionCardCost
+        val cardScore =
+            if (config.cardBonus == 0.0 || cost == null) 0.0
+            else {
+                val handCount = view.players.single { it.id == player }.handCount
+                config.cardBonus * (3.0 / cost) * (4.0 / (4 + handCount))
+            }
         val scores =
             normal.scores.zip(observation.actions) { score, action ->
-                if ("kind.attack" !in action.features) score
-                else score + config.attackBonus * (action.features["winProbability"] ?: 0.0)
+                when {
+                    "kind.attack" in action.features ->
+                        score + config.attackBonus * (action.features["winProbability"] ?: 0.0)
+                    "kind.buyCard" in action.features -> score + cardScore
+                    else -> score
+                }
             }
         if (scores == normal.scores) return normal
         return IncumbentResidualPolicy.selectScores(observation, normal.residualDifferences, scores)

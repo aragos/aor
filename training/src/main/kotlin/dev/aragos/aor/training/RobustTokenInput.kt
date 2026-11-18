@@ -291,6 +291,7 @@ private constructor(
                     "requireAffordableContest",
                     "attackBonus",
                 ),
+                setOf("cardBonus"),
             )
             require(
                 node["kind"]?.asText() == InitiativePolicyConfig.VERSION &&
@@ -305,6 +306,7 @@ private constructor(
                 participation = PurchaseJson.number(node["participation"], "participation"),
                 requireAffordableContest = node["requireAffordableContest"].booleanValue(),
                 attackBonus = PurchaseJson.number(node["attackBonus"], "attack bonus"),
+                cardBonus = node["cardBonus"]?.let { PurchaseJson.number(it, "card bonus") } ?: 0.0,
             )
         }
 
