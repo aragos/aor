@@ -129,6 +129,11 @@ class QuoteEvidenceTests(unittest.TestCase):
     def test_authority_quote_is_distinct_from_original_offered_observation(self):
         self.check(trace_world())
 
+    def test_native_serialized_constructed_quote_matches_python_wire_contract(self):
+        value=c.read(TESTDATA/'local-token-quote-admission.json')
+        world=trace_world();world['diagnostics']['CANDIDATE']=value
+        self.check(world)
+
     def test_missing_trace_cannot_hide_accepted_unoffered_bid(self):
         world=trace_world();world['diagnostics']['CANDIDATE']['controlledTokenQuoteAdmissions']=[]
         with self.assertRaisesRegex(ValueError,'one retained original owner-quote'):self.check(world)
