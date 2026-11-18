@@ -471,6 +471,11 @@ with `(globalIndex / 4 + controlledSeat) % 4`. They learn the controlled fixture
 **publicly revealed** bids; the existing `UNDERCUT` and `OVERBID` instead adjust each rival's own
 qualified-policy bid. None of these interventions predicts or reads sealed current commitments.
 
+`QUALIFIED_REVEALED_BALANCED` is a separate fixed training ecology: the same expression modulo8
+assigns cells0–3 to ordinary94 and cells4–7 to the four revealed styles. Its ordinary fraction is
+explicitly retained in the adaptive science identity. Use the same ecology/configuration for each
+fitting round; ordinary and fully adaptive evaluation banks remain separate.
+
 Revealed styles require an explicit `adaptiveOpponent` object with
 `kind: "public-token-history-counter-1"`, `minimumObservations`, `lookbackTurns` and
 `targetedRivalCount`. One targeted rival means the next registered seat cyclically after the fixture
@@ -487,6 +492,17 @@ simultaneous root commands: it copies public learning and each rival's pending t
 never consume chosen current commands. Diagnostics retain a bounded proof prefix and a digest of
 all public reveals and counter decisions. Source checks use constructed views; actual benchmark
 worlds and evaluation gates require a separately frozen protocol.
+
+Diagnostics also join forecasts and selected counter bids to the actually revealed amounts and
+printed order boxes once ties resolve. Targeted rivals retain expansion attack/card/unspent-pool
+counts, so a baseline pilot can distinguish predictable bidding from expansion failing to use its
+order advantage. These counters do not add attack or raid strategy.
+
+An optional `candidateTokenAnchoredPolicy` subject binds the versioned frozen-anchor/residual
+wrapper for candidate TOKEN decisions only. This mode retains qualified94 bundles and C05 on both
+roles, including all C/P/E and rival behavior. It binds the complete anchor, residual and wrapper
+closure and cannot combine with denial or local-neighbor interventions. Omission preserves the
+existing complete-policy path.
 
 Use `arena` for a frozen complete-game comparison and `strategy-search` for a small search over
 `planning.*` weights. Both use ordinary engine play, HARD opponents, the same chance seeds

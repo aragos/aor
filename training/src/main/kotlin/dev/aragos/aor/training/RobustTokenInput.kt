@@ -18,7 +18,8 @@ internal enum class RobustOpponentStyle {
     REVEALED_OVERBID,
     REVEALED_TIE_UNDERCUT,
     REVEALED_TIE_OVERBID,
-    REVEALED_BALANCED;
+    REVEALED_BALANCED,
+    QUALIFIED_REVEALED_BALANCED;
 
     val isRevealedCounter: Boolean
         get() =
@@ -27,7 +28,8 @@ internal enum class RobustOpponentStyle {
                 REVEALED_OVERBID,
                 REVEALED_TIE_UNDERCUT,
                 REVEALED_TIE_OVERBID,
-                REVEALED_BALANCED -> true
+                REVEALED_BALANCED,
+                QUALIFIED_REVEALED_BALANCED -> true
                 else -> false
             }
 
@@ -47,6 +49,19 @@ internal enum class RobustOpponentStyle {
                     REVEALED_TIE_UNDERCUT,
                     REVEALED_TIE_OVERBID,
                 )[(index / 4 + seat) % 4]
+            QUALIFIED_REVEALED_BALANCED -> {
+                val cell = (index / 4 + seat) % 8
+                if (cell < 4) {
+                    QUALIFIED
+                } else {
+                    listOf(
+                        REVEALED_UNDERCUT,
+                        REVEALED_OVERBID,
+                        REVEALED_TIE_UNDERCUT,
+                        REVEALED_TIE_OVERBID,
+                    )[cell - 4]
+                }
+            }
             else -> this
         }
 }
@@ -68,6 +83,7 @@ private constructor(
     val tokenNeighborMixture: LocalTokenNeighborMixture?,
     val opponentStyle: RobustOpponentStyle,
     val adaptiveOpponent: RevealedTokenCounterConfig?,
+    val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -94,7 +110,12 @@ private constructor(
             "configuration" to arena.configurations.single().id,
             "selector" to selectorIdentity,
             "opponentStyle" to opponentStyle.name,
-            "styleRotation" to "index-div4-plus-seat-mod4-1",
+            "styleRotation" to
+                if (opponentStyle == RobustOpponentStyle.QUALIFIED_REVEALED_BALANCED) {
+                    "index-div4-plus-seat-mod8-half-qualified-1"
+                } else {
+                    "index-div4-plus-seat-mod4-1"
+                },
             "seeds" to seeds,
             "replayIndices" to replayIndices,
             "roles" to roles,
@@ -122,7 +143,17 @@ private constructor(
                         )
                 )
             } ?: emptyMap()) +
-            (adaptiveOpponent?.let { mapOf("adaptiveOpponent" to it.identity) } ?: emptyMap())
+            (adaptiveOpponent?.let {
+                mapOf(
+                    "adaptiveOpponent" to it.identity,
+                    "adaptiveOrdinaryFraction" to
+                        if (opponentStyle == RobustOpponentStyle.QUALIFIED_REVEALED_BALANCED) .5
+                        else 0.0,
+                )
+            } ?: emptyMap()) +
+            (candidateTokenAnchoredPolicy?.let {
+                mapOf("candidateTokenAnchoredPolicy" to it.identity)
+            } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
     fun verify() {
@@ -243,6 +274,7 @@ private constructor(
                     "candidateBundle",
                     "candidateOnly",
                     "adaptiveOpponent",
+                    "candidateTokenAnchoredPolicy",
                     "controlBundle",
                     "controlSelector",
                     "expansionDenial",
@@ -351,6 +383,32 @@ private constructor(
             require(tokenNeighborMixture == null || !candidateOnly && expansionDenial == null) {
                 "Local token neighbor experiments require paired roles and no expansion intervention."
             }
+            val anchoredNode = node["candidateTokenAnchoredPolicy"]?.takeUnless(JsonNode::isNull)
+            val anchored = anchoredNode?.let {
+                val c05 = NearOptimalTokenSampler(.35, 3.0, 4)
+                require(
+                    candidate.source.sha256 == TokenFrozenAnchor.QUALIFIED_94 &&
+                        control.source.sha256 == TokenFrozenAnchor.QUALIFIED_94 &&
+                        candidateSampler == c05 &&
+                        controlSampler == c05 &&
+                        expansionDenial == null &&
+                        tokenNeighborMixture == null
+                ) {
+                    "An anchored candidate requires frozen94 bundles/C05 controls and no other intervention."
+                }
+                TokenAnchoredPolicyInput.read(
+                        TokenPairedSubject.read(it, source.path.parent),
+                        arena,
+                    )
+                    .also { policy ->
+                        require(
+                            policy.anchor.asset.source.sha256 == asset.source.sha256 &&
+                                policy.anchor.bundle.source.sha256 == candidate.source.sha256
+                        ) {
+                            "The candidate residual must preserve the exact arena reference and anchor bundle."
+                        }
+                    }
+            }
             val pins =
                 asset.pins +
                     nominationPins +
@@ -361,7 +419,8 @@ private constructor(
                     (listOf(control.source) + control.subjects.values).associate {
                         it.path.toString() to it.sha256
                     } +
-                    mapOf(source.path.toString() to source.sha256)
+                    mapOf(source.path.toString() to source.sha256) +
+                    (anchored?.pins ?: emptyMap())
             return RobustTokenInput(
                     source,
                     protocol,
@@ -377,6 +436,7 @@ private constructor(
                     tokenNeighborMixture,
                     style,
                     adaptiveOpponent,
+                    anchored,
                     seeds,
                     start,
                     count,

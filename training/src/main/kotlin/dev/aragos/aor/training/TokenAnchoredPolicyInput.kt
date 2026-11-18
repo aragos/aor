@@ -11,6 +11,14 @@ private constructor(
     val residualSource: TokenPairedSubject,
     val residual: TokenAnchoredResidual,
 ) {
+    val identity: Map<String, Any> =
+        mapOf(
+            "kind" to VERSION,
+            "sourceSha256" to source.sha256,
+            "anchor" to anchor.identity,
+            "residualSha256" to residualSource.sha256,
+        )
+
     val pins =
         anchor.pins +
             mapOf(
