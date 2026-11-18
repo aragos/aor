@@ -26,23 +26,41 @@ def completed(directory):
     subject = b.read_json(directory/'identity.json'); model = policy.token.validate_model(
         b.read_json(directory/'policy.json'))
     history = b.read_json(directory/'history.json'); checkpoint = b.read_json(directory/'checkpoint.json')
-    b.require(subject == done['identity'] and subject['recipe'] == RECIPE and
+    recipe = recipe_owner.validate(subject['recipe'])
+    b.require(subject == done['identity'] and
         subject['context']['probability_contract_sha256'] == b.digest(distribution.RECORD),
         'Warm completion must bind the exact numerical recipe and probability contract.')
-    attempts = b.integer(done['attemptedEpochs'], 'Attempted warm epochs', 1, RECIPE['epochs'])
+    attempts = b.integer(done['attemptedEpochs'], 'Attempted warm epochs', 1, recipe['epochs'])
     accepted = b.integer(done['acceptedEpochs'], 'Accepted warm epochs', 0, attempts)
     b.require(len(history) == attempts+1 and [row['epoch'] for row in history] == list(range(attempts+1))
         and history[0]['accepted'] is True and all(row['accepted'] for row in history[1:accepted+1]) and
         (accepted == attempts or accepted == attempts-1 and history[-1]['accepted'] is False),
         'Warm history must retain all accepted epochs and at most its first rejected rollback.')
-    b.require((accepted == attempts == RECIPE['epochs'] and done['stopReason'] == 'epoch-limit') or
-        (accepted == attempts-1 and done['stopReason'] == 'original-kl-limit'),
-        'Warm fit completes only at its fixed epoch limit or first original-KL rejection.')
-    for row in history[1:]:
-        mean = b.number(row['anchor']['mean'], 'Recorded warm mean KL')
-        maximum = b.number(row['anchor']['maximum'], 'Recorded warm maximum KL')
-        b.require(row['accepted'] == (mean <= RECIPE['maximumMeanOriginalKl'] and
-            maximum <= RECIPE['maximumStateOriginalKl']), 'Warm acceptance must obey both fixed KL bounds.')
+    proximal = 'maximumMeanCollectionKl' in recipe
+    rejection = None
+    for row in history:
+        anchor = row['anchor']
+        b.number(anchor['mean'], 'Recorded warm mean KL')
+        b.number(anchor['maximum'], 'Recorded warm maximum KL')
+        b.require(('collection' in row) == proximal,
+            'Only the proximal recipe records TRAIN collection-policy KL.')
+        collection = row.get('collection')
+        if proximal:
+            mean = b.number(collection['mean'], 'Recorded mean collection-policy KL')
+            maximum = b.number(collection['maximum'], 'Recorded maximum collection-policy KL')
+            b.integer(collection['states'], 'Measured READY TRAIN roots', 1, subject['context']['train_count'])
+            b.require(collection['states'] == history[0]['collection']['states'],
+                'Every epoch must measure the same READY TRAIN roots.')
+            if row['epoch'] == 0:
+                b.require(abs(mean) <= 2e-12 and abs(maximum) <= 2e-12,
+                    'The input actor must reproduce the frozen collection policy.')
+        if row['epoch'] > 0:
+            rejection = arithmetic.kl_rejection(recipe, anchor, collection)
+            b.require(row['accepted'] == (rejection is None),
+                'Warm acceptance must obey every fixed recipe KL bound.')
+    b.require((accepted == attempts == recipe['epochs'] and done['stopReason'] == 'epoch-limit') or
+        (accepted == attempts-1 and rejection is not None and done['stopReason'] == rejection),
+        'Warm fit completes only at its fixed epoch limit or first applicable KL rejection.')
     b.require(checkpoint['kind'] == 'token-anchored-paired-adam-1' and checkpoint['model'] == model and
         checkpoint['acceptedEpochs'] == accepted and checkpoint['adamSteps'] == done['adamSteps'] and
         history[-1]['actorSha256'] == b.digest(model) and done['outputModelSha256'] ==
@@ -56,7 +74,7 @@ def completed(directory):
     return done
 
 
-def admit_previous(training, original, current, dictionary, previous):
+def admit_previous(training, original, current, dictionary, previous, recipe):
     training.context.bind(original, current, dictionary); legacy.same_model_scope(original, current)
     if training.context.round == 1:
         b.require(previous is None, 'The zero-residual warm round has no predecessor.')
@@ -65,7 +83,8 @@ def admit_previous(training, original, current, dictionary, previous):
     done = completed(previous); old = done['identity']; context = asdict(training.context)
     stable = ('scope_sha256', 'dictionary_sha256', 'dictionary_semantic_sha256',
         'original_model_sha256', 'anchor_sha256', 'probability_contract_sha256', 'train_count', 'validation_count')
-    b.require(old['context']['round']+1 == context['round'] and done['outputModelSha256'] == current.sha256
+    b.require(old['recipe'] == recipe and old['context']['round']+1 == context['round']
+        and done['outputModelSha256'] == current.sha256
         and all(old['context'][key] == context[key] for key in stable) and
         old['anchorSha256'] == training.anchor_sha256 and
         old['context']['source_sha256'] != context['source_sha256'] and
@@ -74,12 +93,15 @@ def admit_previous(training, original, current, dictionary, previous):
     return dict(finishedSha256=b.file_digest(Path(previous)/'finished.json'), modelSha256=current.sha256)
 
 
-def fit(training, original, current, dictionary, output, config, *, previous=None):
+def fit(training, original, current, dictionary, output, config, *, previous=None, recipe=RECIPE):
+    recipe = recipe_owner.validate(recipe)
     b.require(isinstance(training, data.Training) and isinstance(config, legacy.Config),
         'Warm fitting requires its typed TRAIN population and prospectively declared epoch seeds/deadline.')
-    b.require(training.ready_count >= math.ceil(training.context.train_count*RECIPE['minimumReadyFraction']),
+    b.require(recipe == RECIPE or training.context.round == 1,
+        'The proximal comparison uses the first and sole round of its pilot.')
+    b.require(training.ready_count >= math.ceil(training.context.train_count*recipe['minimumReadyFraction']),
         'The complete original TRAIN population must meet the prospective public READY exposure floor.')
-    predecessor = admit_previous(training, original, current, dictionary, previous)
+    predecessor = admit_previous(training, original, current, dictionary, previous, recipe)
     if previous is not None:
         b.require(not (set(config.epochSeeds) & set(completed(previous)['identity']['epochSeeds'])),
             'Warm rounds require fresh prospectively declared epoch shuffle streams.')
@@ -89,11 +111,11 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
     actor = policy.TokenAnchoredPolicy(current.model); prepared = arithmetic.Prepared(training, actor)
     arithmetic.verify_behavior(prepared, policy.TokenAnchoredPolicy(current.model))
     optimizer = b.torch.optim.Adam([getattr(actor, name) for name in b.PARAMETERS[:-2]],
-        lr=RECIPE['learningRate'])
+        lr=recipe['learningRate'])
     sources = (__file__, policy.__file__, data.__file__, distribution.__file__, arithmetic.__file__,
         legacy.__file__, identity.__file__, b.__file__, recipe_owner.__file__,
         policy.token.__file__, data.legacy.__file__, data.objective.__file__)
-    subject = dict(kind='token-anchored-paired-fit-identity-1', recipe=RECIPE,
+    subject = dict(kind='token-anchored-paired-fit-identity-1', recipe=recipe,
         context=asdict(training.context), trainingSha256=training.sha256, anchorSha256=training.anchor_sha256,
         predecessor=predecessor, inputActorParametersSha256=identity.actor_parameters_sha256(current.model),
         frozenModelFieldsSha256=b.digest({key: value for key, value in current.model.items()
@@ -101,10 +123,10 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         originalDeadline=config.deadline, sourceSha256={Path(path).name: b.file_digest(path) for path in sources})
     b.atomic_json(output/'identity.json', subject)
     def warm_epoch(actor, optimizer, prepared, seed, config):
-        return arithmetic.epoch(actor, optimizer, prepared, seed, config, recipe=RECIPE)
+        return arithmetic.epoch(actor, optimizer, prepared, seed, config, recipe=recipe)
 
     history, accepted, steps = arithmetic.fit_epochs(actor, optimizer, prepared, config.epochSeeds, config,
-        step=warm_epoch,
+        step=warm_epoch, recipe=recipe,
         publish=lambda history: b.atomic_json(output/'history.json', history))
     model = actor.artifact()
     b.require(all(model[name] == current.model[name] for name in b.PARAMETERS[-2:]) and
@@ -115,10 +137,13 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
     b.atomic_json(output/'checkpoint.json', dict(kind='token-anchored-paired-adam-1', model=model,
         optimizer=b.encode_optimizer(optimizer), acceptedEpochs=accepted, adamSteps=steps))
     changed = identity.actor_parameters_sha256(model) != subject['inputActorParametersSha256']
+    last = history[-1]
+    stop_reason = ('epoch-limit' if last['accepted'] else
+        arithmetic.kl_rejection(recipe, last['anchor'], last.get('collection')))
     b.atomic_json(output/'finished.json', dict(kind='token-anchored-paired-fit-complete-1', complete=True,
         identity=subject, acceptedEpochs=accepted, attemptedEpochs=len(history)-1, adamSteps=steps,
         actorChanged=changed, operationalPassed=accepted > 0 and changed,
-        stopReason='epoch-limit' if accepted == RECIPE['epochs'] else 'original-kl-limit',
+        stopReason=stop_reason,
         outputModelSha256=b.file_digest(output/'policy.json'),
         artifacts={name: b.file_digest(output/name) for name in ARTIFACTS},
         qualificationClaimed=False, activated=False))
@@ -138,10 +163,12 @@ def main():
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--deadline-epoch', type=float, required=True)
     parser.add_argument('--previous', type=Path)
+    parser.add_argument('--numerical-recipe', help='Declared recipe version; defaults to the primary recipe.')
     args = parser.parse_args()
     b.number(args.deadline_epoch, 'Original absolute deadline', 1.)
     b.require(time.time() < args.deadline_epoch, 'Original warm deadline expired before any corpus is opened.')
     plan = plan_owner.Plan.from_record(read(args.protocol), raw_sha256=file_sha(args.protocol))
+    recipe = plan.numerical_recipe(args.numerical_recipe)
     corpus = corpus_owner.Corpus(plan, subject(args.corpus))
     anchor = corpus_owner.Corpus(plan, subject(args.original_corpus))
     original = frozen_owner.FrozenActor(args.original_actor.read_bytes(), file_sha(args.original_actor))
@@ -163,7 +190,8 @@ def main():
                 pins[str(Path(chunk['native'])/name)] = value['sha256']
             for reproduction in chunk['reproductions']:
                 pins[reproduction['subject']['path']] = reproduction['subject']['sha256']
-    done = fit(training, original, current, args.dictionary.read_bytes(), args.output, config, previous=args.previous)
+    done = fit(training, original, current, args.dictionary.read_bytes(), args.output, config,
+        previous=args.previous, recipe=recipe)
     b.require(all(file_sha(path) == expected for path, expected in pins.items()),
         'Every actual original warm corpus/model input must remain unchanged until numerical publication.')
     b.atomic_json(args.output/'numeric-complete.json', dict(kind='token-anchored-numeric-stage-complete-1',

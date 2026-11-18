@@ -11,7 +11,7 @@ import hashlib
 
 import token_paired_campaign_plan as shared
 import token_anchor_distribution as distribution
-from token_anchored_recipe import RECIPE
+from token_anchored_recipe import PROXIMAL_RECIPE, RECIPE
 
 
 KIND = 'token-anchored-campaign-1'
@@ -71,6 +71,9 @@ class Plan:
         shared.require(type(rounds) is list and 1 <= len(rounds) <= 16 and
             [row['round'] for row in rounds] == list(range(1, len(rounds)+1)),
             'The complete finite round sequence is declared once; no automatic successor exists.')
+        if 'comparisonNumericalRecipe' in record:
+            shared.require(len(rounds) == 1 and record['comparisonNumericalRecipe'] == PROXIMAL_RECIPE,
+                'Only the fixed proximal comparison may share a prospectively declared one-round corpus.')
         streams = []
         ecology = None
         for row in rounds:
@@ -145,6 +148,16 @@ class Plan:
     def owner(self, chunk):
         table = self.record['ownership']
         return 'DESKTOP' if chunk % table['cycle'] < table['desktopChunksPerCycle'] else 'MAC'
+
+    def numerical_recipe(self, version=None):
+        record = self.record
+        primary = record['numericalRecipe']
+        if version is None or version == primary['version']:
+            return primary
+        comparison = record.get('comparisonNumericalRecipe')
+        shared.require(comparison is not None and version == comparison['version'],
+            'Every fitted recipe must be declared in the original campaign protocol.')
+        return comparison
 
     def collection_source(self, round_number, chunk, profile, current):
         record = self.record; row = record['rounds'][round_number-1]

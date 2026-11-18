@@ -4,7 +4,7 @@ import unittest
 
 import token_anchor_distribution as distribution
 import token_anchored_plan as owner
-from token_anchored_recipe import RECIPE
+from token_anchored_recipe import PROXIMAL_RECIPE, RECIPE
 
 
 def record():
@@ -85,6 +85,23 @@ class PlanTests(unittest.TestCase):
     def test_empty_random_remainder_is_not_an_unrecorded_proposal_option(self):
         value = record(); value['numericalRecipe']['maximumMeanOriginalKl'] = .02
         with self.assertRaisesRegex(ValueError, 'exact warm policy'):
+            owner.Plan.from_record(value)
+
+    def test_only_predeclared_proximal_recipe_can_share_collection(self):
+        value = record()
+        value['rounds'] = value['rounds'][:1]
+        value['maximumTerminalExecutions'] = owner.declared_budget(value)['maximum']
+        with self.assertRaisesRegex(ValueError, 'declared in the original'):
+            owner.Plan.from_record(value).numerical_recipe(PROXIMAL_RECIPE['version'])
+        value['comparisonNumericalRecipe'] = copy.deepcopy(PROXIMAL_RECIPE)
+        plan = owner.Plan.from_record(value)
+        self.assertEqual(plan.numerical_recipe(), RECIPE)
+        self.assertEqual(plan.numerical_recipe(PROXIMAL_RECIPE['version']), PROXIMAL_RECIPE)
+
+    def test_proximal_comparison_cannot_add_a_second_training_round(self):
+        value = record()
+        value['comparisonNumericalRecipe'] = copy.deepcopy(PROXIMAL_RECIPE)
+        with self.assertRaisesRegex(ValueError, 'one-round corpus'):
             owner.Plan.from_record(value)
 
 

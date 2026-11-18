@@ -15,6 +15,7 @@ import token_anchor_distribution as distribution
 import token_anchored_data as data
 import token_anchored_policy as policy
 import token_anchored_fit as fit
+from token_anchored_recipe import PROXIMAL_RECIPE
 import token_paired_data as legacy
 import token_paired_fit as old_fit
 import token_paired_objective as objective
@@ -206,6 +207,30 @@ class DataAndFitTests(unittest.TestCase):
             self.assertGreater(result['probabilities'][0], .2/3)
             with self.assertRaisesRegex(ValueError, 'prior fit'):
                 old_fit.completed(output, objective=objective.WIN)
+
+    def test_proximal_fit_rolls_back_on_collection_limit_and_seals_the_reason(self):
+        training, original, dictionary = fixture()
+        observe = arithmetic.collection_metrics
+
+        def measured(actor, prepared):
+            metrics = observe(actor, prepared)
+            if metrics['maximum'] > 0.:
+                return dict(metrics, maximum=.101)
+            return metrics
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)/'fit'
+            with patch.object(arithmetic, 'collection_metrics', side_effect=measured):
+                done = fit.fit(training, original, original, dictionary, output,
+                    old_fit.Config(tuple(range(1, 21)), time.time()+30), recipe=PROXIMAL_RECIPE)
+            self.assertEqual(done['stopReason'], 'collection-kl-limit')
+            self.assertEqual(done['acceptedEpochs'], 0)
+            self.assertEqual(done['adamSteps'], 0)
+            self.assertEqual(b.read_json(output/'policy.json'), original.model)
+            history = b.read_json(output/'history.json')
+            self.assertEqual(history[-1]['collection']['states'], training.ready_count)
+            self.assertGreater(history[-1]['collection']['mean'], 0.)
+            self.assertEqual(done, fit.completed(output))
 
     def test_expired_fit_creates_no_output(self):
         training, original, dictionary = fixture()
