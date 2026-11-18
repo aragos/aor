@@ -7,7 +7,11 @@ An accepted reservation protects its complete declarations even when a later run
 import hashlib
 import json
 from collections import defaultdict
+from dataclasses import dataclass
+import datetime
 from pathlib import Path
+import shutil
+import subprocess
 
 
 STRIDE = 8191
@@ -134,3 +138,109 @@ def reserve(prior, offsets, counts, prefix):
             return banks, probes, sorted(rejected)
         rejected.update(first + index for index in range(len(counts)))
     raise ValueError('No fresh prefix inside the single bounded metadata search window.')
+
+
+def reserve_numerical(prior, offsets, names, prefix):
+    """Declare bounded integer stream identifiers without constructing or drawing any RNG."""
+    require(names and len(names) == len(set(names)),
+        'Numerical stream names must be nonempty and mutually distinct.')
+    residues = defaultdict(list)
+    for offset in sorted(offsets):
+        residues[offset % STRIDE].append(offset)
+    probes, held = [], set()
+    for first in range(prefix, prefix + STRIDE):
+        values = list(range(first, first + len(names)))
+        overlap = conflicts(values, prior, residues)
+        probes.append(dict(firstSeed=first, collisions=len(overlap), conflictingValues=overlap))
+        if not overlap:
+            return dict(zip(names, values)), probes, sorted(held)
+        held.update(values)
+    raise ValueError('No fresh numerical prefix inside the single bounded metadata search window.')
+
+
+@dataclass(frozen=True)
+class MetadataRecipe:
+    """Fixed protocol declarations; this type has no model, outcome or RNG capabilities."""
+    family: int
+    audit_kind: str
+    schedule_kind: str
+    counts: dict
+    native_prefix: int
+    numerical_prefix: int
+    numerical_names: tuple
+    maximum_executions: int
+    expected_ancestors: int
+    expected_prior_values: int
+    expected_offsets: int
+    reproductions: dict
+    note: str
+
+    def __post_init__(self):
+        require(self.counts and self.numerical_names and
+            not set(self.counts).intersection(self.numerical_names) and
+            len(self.numerical_names) == len(set(self.numerical_names)),
+            'Native bank and numerical stream names must remain distinct and nonempty.')
+        require(self.native_prefix >= 0 and self.numerical_prefix >= 0 and
+            self.maximum_executions > 0,
+            'Metadata prefixes and the execution budget must use valid nonnegative units.')
+
+
+def prepare_metadata(parent_path, parent_sha, method_path, method_sha, output, recipe, source_file):
+    """Write a fresh reservation DAG node using one fixed, already-approved typed recipe."""
+    parent_path, method_path = Path(parent_path).resolve(), Path(method_path).resolve()
+    require(sha(method_path) == method_sha, 'Use the exact prospectively approved method subject.')
+    _, pins = ancestry(parent_path, parent_sha)
+    prior, offsets = protection(parent_path, parent_sha)
+    require(len(pins) == recipe.expected_ancestors and
+        len(prior) == recipe.expected_prior_values and len(offsets) == recipe.expected_offsets,
+        'The complete prior metadata ancestry and protection inventory must remain unchanged.')
+    banks, native_probes, rejected = reserve(prior, offsets, recipe.counts, recipe.native_prefix)
+    native_values = {value for bank in banks.values() for value in bank['seeds']}
+    protected_offsets = offsets | set(rejected) | {bank['nativeOffset'] for bank in banks.values()}
+    numerical, numeric_probes, held = reserve_numerical(
+        prior | native_values, protected_offsets, recipe.numerical_names, recipe.numerical_prefix)
+    output = Path(output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copyfile(source_file, output / 'audit_frozen.py')
+    shutil.copyfile(__file__, output / 'seed_reservation_dag.py')
+    write(output / 'stream-banks.json', banks)
+    write(output / 'rng-streams.json', numerical)
+    write(output / 'schedule.json', dict(kind=recipe.schedule_kind, banks=banks, **numerical))
+    plan = dict(kind='native-numerical-rng-preparation-plan-1', family=recipe.family,
+        banks=recipe.counts, maximumTerminalExecutions=recipe.maximum_executions,
+        nativePrefix=recipe.native_prefix, numericalPrefix=recipe.numerical_prefix,
+        numericalStreams=list(recipe.numerical_names), reproductionIndices=recipe.reproductions,
+        worldFormula='-1000000000 + nativeOffset + globalIndex*8191',
+        authorization='Metadata declarations only; no scientific games, fits or RNG draws.')
+    write(output / 'preparation-plan.json', plan)
+    seed_banks = dict(banks, **{name: dict(count=1, seeds=[value])
+        for name, value in numerical.items()})
+    audit = dict(kind=recipe.audit_kind, schemaVersion=1, family=recipe.family,
+        auditedAt=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        protectionStorage='parent-dag-1', carriedForwardAudit=subject(parent_path),
+        verifiedAncestors=pins[1:], preparationPlan=subject(output / 'preparation-plan.json'),
+        prospectiveMethod=subject(method_path),
+        sourceCommit=subprocess.check_output(['git', '-C', str(Path(source_file).resolve().parent.parent),
+            'rev-parse', 'HEAD'], text=True).strip(),
+        auditScriptSha256=sha(output / 'audit_frozen.py'),
+        collisionOwner=subject(output / 'seed_reservation_dag.py'),
+        worldFormula=plan['worldFormula'], conservativePairsPerOffset=EXPANSION,
+        priorActualValues=len(prior), priorActualValuesSha256=values_digest(prior),
+        inheritedConservativeOffsets=sorted(offsets), newlyProtectedProbeOffsets=rejected,
+        conservativelyExpandedOffsets=sorted(offsets | set(rejected)),
+        heldRejectedNumericalValues=held, seedBanks=seed_banks,
+        nativeReservationProbes=native_probes, numericalReservationProbes=numeric_probes,
+        streamBanks=subject(output / 'stream-banks.json'),
+        rngStreams=subject(output / 'rng-streams.json'), schedule=subject(output / 'schedule.json'),
+        declaredNewActualValues=len(native_values) + len(numerical),
+        declaredNewWorlds=len(native_values), declaredNumericalStreams=len(numerical),
+        maximumTerminalExecutions=recipe.maximum_executions, allIntersectionsZero=True,
+        scientificStreamUseAuthorized=False, scientificStreamUseRequiresRootSeedReview=True,
+        modelsRead=0, gamesRun=0, fitsRun=0, numericDraws=0, humanInputsRead=0, note=recipe.note)
+    write(output / 'seed-audit.json', audit)
+    return dict(audit=subject(output / 'seed-audit.json'), schedule=audit['schedule'],
+        ancestryPins=len(pins), priorActualValues=len(prior), inheritedConservativeOffsets=len(offsets),
+        freshNativeWorlds=len(native_values), numericalIntegers=numerical,
+        nativeOffsets=[bank['nativeOffset'] for bank in banks.values()],
+        rejectedNativePrefixes=len(native_probes)-1, rejectedNumericPrefixes=len(numeric_probes)-1,
+        scientificStreamUseAuthorized=False)
