@@ -20,9 +20,9 @@ RECIPE = dag.MetadataRecipe(
     note='All prior streams and unused worlds through95 remain held. PCG64 identifiers are declarations only; no factors or directions are generated.')
 
 
-def validate_method(method):
-    dag.require(method['kind'] == 'token-focus-step-prospective-method-1' and
-        method['study'] == 96 and method['localOnly'] is True and
+def validate_method(method, *, kind="token-focus-step-prospective-method-1", study=96):
+    dag.require(method['kind'] == kind and
+        method['study'] == study and method['localOnly'] is True and
         method['remoteUseAuthorized'] is False and method['globalDeadlineEpoch'] == 1795020399.0,
         'Study96 must retain its original local-only method and user deadline.')
     dag.require(method['trainingWorlds'] == 16 and method['holdoutWorlds'] == 128 and

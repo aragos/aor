@@ -2,6 +2,7 @@
 import argparse
 from collections import defaultdict
 import datetime
+from dataclasses import dataclass
 import json
 from pathlib import Path
 
@@ -14,15 +15,36 @@ COUNTS = {'training': 16, 'holdout': 128}
 NUMERICAL = ('projectionSeed', 'directionSeed')
 
 
-def verify(audit_path, expected_sha):
+@dataclass(frozen=True)
+class VerificationSpec:
+    family: int
+    audit_kind: str
+    method_kind: str
+    method_sha: str
+    parent_sha: str
+    native_prefix: int
+    numerical_prefix: int
+    ancestors: int
+    prior_values: int
+    offsets: int
+    proof_kind: str
+
+
+FIRST = VerificationSpec(96, 'token-focus-step-frozen-ancestry-1',
+    'token-focus-step-prospective-method-1', METHOD_SHA, PARENT_SHA,
+    96000000, 96001000, 77, 1102879, 3179, 'token-focus-step-independent-seed-proof-1')
+
+
+def verify(audit_path, expected_sha, spec=FIRST):
     p = inventory_owner
     assert p.sha(audit_path) == expected_sha, 'The independently reviewed audit bytes must be exact.'
     audit = p.read(audit_path)
-    assert audit['kind'] == 'token-focus-step-frozen-ancestry-1' and audit['family'] == 96
+    assert audit['kind'] == spec.audit_kind and audit['family'] == spec.family
     assert audit['protectionStorage'] == 'parent-dag-1'
-    assert audit['carriedForwardAudit']['sha256'] == PARENT_SHA
-    assert audit['prospectiveMethod']['sha256'] == METHOD_SHA
+    assert audit['carriedForwardAudit']['sha256'] == spec.parent_sha
+    assert audit['prospectiveMethod']['sha256'] == spec.method_sha
     method = p.checked(audit['prospectiveMethod'])
+    assert method['kind'] == spec.method_kind and method['study'] == spec.family
     assert method['trainingWorlds'] == 16 and method['holdoutWorlds'] == 128
     assert method['freshGameWorlds'] == 144 and method['freshNumericStreams'] == 2
     assert method['maximumTerminalExecutions'] == 1560 and method['generations'] == 1
@@ -33,7 +55,7 @@ def verify(audit_path, expected_sha):
     ancestors = [audit['carriedForwardAudit'], *audit['verifiedAncestors']]
     assert ancestors == [audit['carriedForwardAudit'], parent['carriedForwardAudit'],
         *parent['verifiedAncestors']]
-    assert len(ancestors) == len({item['path'] for item in ancestors}) == 77
+    assert len(ancestors) == len({item['path'] for item in ancestors}) == spec.ancestors
     for item in ancestors:
         p.checked(item)
     for item in audit.values():
@@ -41,9 +63,9 @@ def verify(audit_path, expected_sha):
             assert p.sha(item['path']) == item['sha256'], item['path']
     assert p.sha(Path(audit_path).with_name('audit_frozen.py')) == audit['auditScriptSha256']
     prior, offsets = p.inventory(audit['carriedForwardAudit'])
-    assert len(prior) == audit['priorActualValues'] == 1102879
+    assert len(prior) == audit['priorActualValues'] == spec.prior_values
     assert p.digest(prior) == audit['priorActualValuesSha256']
-    assert len(offsets) == 3179 and sorted(offsets) == audit['inheritedConservativeOffsets']
+    assert len(offsets) == spec.offsets and sorted(offsets) == audit['inheritedConservativeOffsets']
     residues = defaultdict(list)
     for offset in offsets:
         residues[offset % 8191].append(offset)
@@ -54,7 +76,7 @@ def verify(audit_path, expected_sha):
             for old in progression_residues[(value+1000000000) % 8191])]
 
     probes, rejected = [], set()
-    for first in range(96000000, 96000000 + len(audit['nativeReservationProbes'])):
+    for first in range(spec.native_prefix, spec.native_prefix + len(audit['nativeReservationProbes'])):
         found = {}
         for index, count in enumerate(COUNTS.values()):
             offset = first + index
@@ -83,7 +105,7 @@ def verify(audit_path, expected_sha):
     for offset in numerical_offsets:
         numerical_residues[offset % 8191].append(offset)
     numeric_probes, held = [], set()
-    for first in range(96001000, 96001000 + len(audit['numericalReservationProbes'])):
+    for first in range(spec.numerical_prefix, spec.numerical_prefix + len(audit['numericalReservationProbes'])):
         values = [first, first+1]
         conflicts = overlaps(values, prior | set(native), numerical_residues)
         numeric_probes.append(dict(firstSeed=first, collisions=len(conflicts),
@@ -116,12 +138,12 @@ def verify(audit_path, expected_sha):
     assert audit['declaredNumericalStreams'] == 2 and audit['maximumTerminalExecutions'] == 1560
     assert audit['scientificStreamUseAuthorized'] is False
     assert audit['modelsRead'] == audit['gamesRun'] == audit['fitsRun'] == audit['numericDraws'] == audit['humanInputsRead'] == 0
-    return dict(kind='token-focus-step-independent-seed-proof-1', passed=True,
+    return dict(kind=spec.proof_kind, passed=True,
         createdUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         auditSha256=p.sha(audit_path), scheduleSha256=audit['schedule']['sha256'],
         independentVerifierSha256=p.sha(__file__),
         independentInventoryOwner=dict(path=str(Path(p.__file__).resolve()), sha256=p.sha(p.__file__)),
-        ancestryPinsRehashed=77, priorActualValues=len(prior), inheritedConservativeOffsets=len(offsets),
+        ancestryPinsRehashed=spec.ancestors, priorActualValues=len(prior), inheritedConservativeOffsets=len(offsets),
         declaredNewWorlds=144, declaredNumericalStreams=2, declaredNewActualValues=146,
         nativeOffsets=sorted(accepted_offsets), numericalIntegers=streams,
         rejectedNativePrefixes=len(probes)-1, rejectedNumericPrefixes=len(numeric_probes)-1,
