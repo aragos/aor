@@ -81,11 +81,15 @@ internal enum class RobustQualificationVersion(
     DENIAL_FULL("study90-FULL1", 2048, 16464),
     DENIAL_SMALL("study90-SMALL1", 1024, 8272),
     MAC_QUALIFICATION("study91-QUAL1", 2048, 8208),
+    MAC_SMALL_QUALIFICATION("study94-QUAL1", 512, 2064),
     LEARNED_BID_SEARCH("study92-BID1", 512, 5208),
     LEADER_SEARCH("study93-LEADER1", 256, 2128);
 
     val isPolicySearch: Boolean
         get() = this == LEARNED_BID_SEARCH || this == LEADER_SEARCH
+
+    val isFixedPolicyQualification: Boolean
+        get() = this == MAC_QUALIFICATION || this == MAC_SMALL_QUALIFICATION
 
     val banks: List<String>
         get() =
@@ -355,8 +359,7 @@ private class CoordinatedAssetReader(path: Path) {
                 "banks",
             ) +
                 when {
-                    version == RobustQualificationVersion.MAC_QUALIFICATION ->
-                        setOf("nomineeEvidence")
+                    version.isFixedPolicyQualification -> setOf("nomineeEvidence")
                     version.isPolicySearch -> setOf("searchEvidence")
                     else -> emptySet()
                 },
@@ -405,8 +408,9 @@ private class CoordinatedAssetReader(path: Path) {
                 }
                 protocolSeedCount(protocol, "development", if (full) 512 else 256)
             }
-            RobustQualificationVersion.MAC_QUALIFICATION ->
-                macQualification(certificate, protocol, asset)
+            RobustQualificationVersion.MAC_QUALIFICATION,
+            RobustQualificationVersion.MAC_SMALL_QUALIFICATION ->
+                macQualification(certificate, protocol, asset, version)
             RobustQualificationVersion.LEARNED_BID_SEARCH,
             RobustQualificationVersion.LEADER_SEARCH ->
                 policySearchQualification(certificate, protocolDocument, asset, version)
@@ -415,7 +419,7 @@ private class CoordinatedAssetReader(path: Path) {
             val bank = value["banks"][name]
             if (
                 version == RobustQualificationVersion.LEAGUE_SIX ||
-                    version == RobustQualificationVersion.MAC_QUALIFICATION
+                    version.isFixedPolicyQualification
             ) {
                 require(integer(protocolBank(protocol, name), "count") == version.pairs) {
                     "Qualification must retain its registered independent bank counts."
@@ -423,18 +427,24 @@ private class CoordinatedAssetReader(path: Path) {
             } else {
                 protocolSeedCount(protocol, name, version.pairs)
             }
-            if (version == RobustQualificationVersion.MAC_QUALIFICATION) {
+            if (version.isFixedPolicyQualification) {
                 protocolSeedCount(protocol, name, version.pairs)
                 val expectedStyle = if (name == "mixed") "BALANCED" else "QUALIFIED"
                 val approved = protocolBank(protocol, name)
                 val replays = approved["replayIndices"]
+                val expectedReplays =
+                    if (version == RobustQualificationVersion.MAC_SMALL_QUALIFICATION) {
+                        listOf(0, 170, 341, 511)
+                    } else {
+                        listOf(0, 682, 1365, 2047)
+                    }
                 require(
                     text(approved, "opponentStyle") == expectedStyle &&
                         replays?.isArray == true &&
                         replays.all { it.isIntegralNumber && it.canConvertToInt() } &&
-                        replays.map { it.intValue() } == listOf(0, 682, 1365, 2047)
+                        replays.map { it.intValue() } == expectedReplays
                 ) {
-                    "Study91 qualification requires both original ecologies and reproductions."
+                    "Fixed-policy qualification requires both original ecologies and reproductions."
                 }
             }
             require(
@@ -468,16 +478,29 @@ private class CoordinatedAssetReader(path: Path) {
     /**
      * Archived research paths stay unchanged; only the bound portable evidence copies are opened.
      */
-    private fun macQualification(certificate: Document, protocol: JsonNode, asset: Document) {
+    private fun macQualification(
+        certificate: Document,
+        protocol: JsonNode,
+        asset: Document,
+        version: RobustQualificationVersion,
+    ) {
         val descriptor = node(asset)
+        val small = version == RobustQualificationVersion.MAC_SMALL_QUALIFICATION
+        val expectedKind =
+            if (small) "fixed-policy-qualification-campaign-1" else "mac-qualification-campaign-1"
+        val expectedMethod =
+            if (small) {
+                "22c172eec9af6683cfe8db382154b53440bdc7db89a77d9cf332ac886c4ed377"
+            } else {
+                "0687dabf2cb25e1a88740be9a8b29ec5a21a4151b1e7f9df73991de5a76b489b"
+            }
         val sampler =
             requireNotNull(protocol["selector"]) {
-                "Study91 qualification must explicitly retain its nominated token selector."
+                "Fixed-policy qualification must explicitly retain its nominated token selector."
             }
         require(
-            text(protocol, "kind") == "mac-qualification-campaign-1" &&
-                hash(protocol, "rootProspectiveMethodSha256") ==
-                    "0687dabf2cb25e1a88740be9a8b29ec5a21a4151b1e7f9df73991de5a76b489b" &&
+            text(protocol, "kind") == expectedKind &&
+                hash(protocol, "rootProspectiveMethodSha256") == expectedMethod &&
                 number(protocol["confidenceMultiplier"], "confidence multiplier") ==
                     2.5758293035489004 &&
                 hash(protocol, "candidateBundleSha256") ==
@@ -487,7 +510,17 @@ private class CoordinatedAssetReader(path: Path) {
                 tokenSampler(sampler) == tokenSampler(descriptor["tokenSelector"]) &&
                 expansionDenial(descriptor["expansionDenial"]) == null
         ) {
-            "Study91 qualification must bind its sole nominated complete policy and original method."
+            "Fixed-policy qualification must bind its sole nominated policy and original method."
+        }
+        if (small) {
+            require(
+                text(protocol, "contract") == "final6-c05-small-512-1" &&
+                    truth(protocol, "priorTrialClosureRequired") &&
+                    hash(protocol, "priorTrialProtocolSha256") ==
+                        "15f47b8113241a3596e2db54446c223d3443dfd39d98e45b0c53c562951a7fac"
+            ) {
+                "Study94 qualification requires its registered fresh small trial and prior closure."
+            }
         }
         hash(protocol, "nominationSha256")
         val names =

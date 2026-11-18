@@ -67,6 +67,7 @@ subjects. Only these registered evaluation versions are accepted:
 | `study91-QUAL1` | 2048 | 8208 |
 | `study92-BID1` | 512 (mixed, homogeneous and reference) | 5208 |
 | `study93-LEADER1` | 256 | 2128 |
+| `study94-QUAL1` | 512 | 2064 |
 
 Each bank must be complete and pass its 99% win gate. The registered sizes must equal the original
 protocol's counts and budget. Study 89 additionally requires its six-generation final-mean recipe.
@@ -85,6 +86,12 @@ final-mean receipt and complete development report. Archived absolute research p
 as provenance; the server opens only the separate confined portable copies. The original source
 must retain its final-six recipe. This qualification claims no new fitting and no completed
 qualification from the earlier interrupted trial.
+
+Study 94 retains the same fixed-policy and original-nominee requirements under the separately
+registered `fixed-policy-qualification-campaign-1` contract `final6-c05-small-512-1`. Its fresh
+512-world banks, original study 91 protocol link and required prior physical closure are explicit;
+the original study 91 registration still requires 2048 worlds per bank. Neither old outcomes nor
+a smaller prefix of that earlier qualification can authorize the new trial.
 
 Study 92 retains the `learned-bid-search-1` protocol, its eight frozen token samplers and complete
 128-world development panel. Both learned-base confirmation banks must pass the observed 80%
