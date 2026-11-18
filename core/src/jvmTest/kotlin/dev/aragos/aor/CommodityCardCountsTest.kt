@@ -46,6 +46,27 @@ class CommodityCardCountsTest {
     }
 
     @Test
+    fun masterArtDiscardReducesBothSharedCommodityCounts() {
+        val initial =
+            state().copy(stage = Stage.BUY_CARD).let { state ->
+                state.replacePlayer(
+                    state
+                        .playerState(p1)
+                        .copy(
+                            advances =
+                                PlayerAdvances(listOf(AdvanceAcquisition(AdvanceId.MASTER_ART, 1)))
+                        )
+                )
+            }
+
+        val discarded = TurnCommand.DiscardCard("held").applyTo(initial, p1)
+        val counts = discarded.publicView().commodityCards.associateBy { it.commodity }
+
+        assertThat(counts[Commodity.CLOTH]?.unplayed).isEqualTo(0)
+        assertThat(counts[Commodity.WINE]?.unplayed).isEqualTo(0)
+    }
+
+    @Test
     fun hiddenCardLocationsAndPrivateDiscardsDoNotChangePublicCounts() {
         val held = state()
         val owner = held.playerState(p1)

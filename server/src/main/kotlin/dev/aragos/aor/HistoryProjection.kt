@@ -196,12 +196,15 @@ internal object HistoryProjection {
         return when {
             entry.actor != viewer && command is Command.ReturnCard ->
                 "${entry.actor}: return-card <hidden>"
-            entry.actor != viewer && command is TurnCommand.DiscardCard ->
-                "${entry.actor}: discard-card <hidden>"
             command is BoardCommand.OfferCard && viewer !in BoardGame.tradeParticipants(before) ->
                 "${entry.actor}: offer-card <hidden>"
-            command is CardCommand.PlayCard -> {
-                val reference = command.reference
+            command is CardCommand.PlayCard || command is TurnCommand.DiscardCard -> {
+                val reference =
+                    when (command) {
+                        is CardCommand.PlayCard -> command.reference
+                        is TurnCommand.DiscardCard -> command.reference
+                        else -> error("A public card action requires a card reference.")
+                    }
                 val card =
                     before.playerState(entry.actor).hand.singleOrNull { card ->
                         card.reference == reference

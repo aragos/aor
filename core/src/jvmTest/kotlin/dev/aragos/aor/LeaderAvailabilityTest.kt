@@ -87,7 +87,7 @@ class LeaderAvailabilityTest {
     }
 
     @Test
-    fun privatelyDiscardingALeaderDoesNotExposeItsIdentityThroughAvailability() {
+    fun masterArtDiscardRemovesTheLeaderFromPublicAvailability() {
         val before = state().copy(stage = Stage.BUY_CARD)
         val owner = before.playerState(p1)
         val discardable =
@@ -105,8 +105,16 @@ class LeaderAvailabilityTest {
 
         val discarded = TurnCommand.DiscardCard("hand-1").applyTo(discardable, p1)
 
-        assertThat(discarded.viewForPlayer(p2).unplayedAdvanceLeaders)
-            .isEqualTo(before.viewForPlayer(p2).unplayedAdvanceLeaders)
+        assertThat(
+                discarded
+                    .publicView()
+                    .unplayedAdvanceLeaders
+                    .single { it.advance == AdvanceId.NATIONALISM }
+                    .epochs
+                    .first()
+                    .leaders
+            )
+            .isEmpty()
     }
 
     @Test

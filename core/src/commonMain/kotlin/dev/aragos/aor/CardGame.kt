@@ -171,14 +171,10 @@ object CardGame {
         val resolution =
             CardRules.resolve(state.cardContext(), actor, CardPlay(card.definition.id, choice))
         val committed =
-            state
-                .replacePlayer(
-                    player.copy(
-                        hand = player.hand.filterNot { held -> held.reference == reference }
-                    )
-                )
-                .copy(playedCards = state.playedCards + card.definition.id)
-        return apply(committed.discardCards(listOf(card)), resolution)
+            state.replacePlayer(
+                player.copy(hand = player.hand.filterNot { held -> held.reference == reference })
+            )
+        return apply(committed.discardCards(listOf(card), publicly = true), resolution)
     }
 
     /** Shared phase and decision ownership checks for commands and read-only card offers. */
