@@ -43,7 +43,11 @@ class FrozenActor:
         sha(self.sha256, 'Actor')
         b.require(type(self.raw) is bytes and hashlib.sha256(self.raw).hexdigest() == self.sha256,
             'Frozen actor bytes must match their original raw subject.')
-        actor.validate_model(json.loads(self.raw))
+        self.validate_model(json.loads(self.raw))
+
+    @staticmethod
+    def validate_model(model):
+        return actor.validate_model(model)
 
     @property
     def model(self):
@@ -116,11 +120,11 @@ class WinContext(Context):
     def objective(self):return self.objective_version
 
 
-def observation(raw, model):
+def observation(raw, model, *, contract=actor.CONTRACT):
     exact(raw, ('encoderVersion', 'stateFeatures', 'actions', 'baselineIndex'), 'Observation')
     for action in raw['actions']:
         exact(action, ('command', 'features'), 'Offered action')
-    b.validate_observation(raw, model, contract=actor.CONTRACT)
+    b.validate_observation(raw, model, contract=contract)
     return b.canonical(raw)
 
 

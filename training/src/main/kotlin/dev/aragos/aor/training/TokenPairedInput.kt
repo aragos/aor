@@ -6,6 +6,7 @@ import dev.aragos.aor.PlayerId
 import dev.aragos.aor.PublicCatalog
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryPolicyModel
+import dev.aragos.aor.ai.TokenAnchoredResidual
 import dev.aragos.aor.ai.TokenObservationEncoder
 import java.nio.file.Path
 
@@ -75,10 +76,13 @@ private constructor(
     val version = if (anchor == null) VERSION else ANCHORED_VERSION
     val roundField = if (anchor == null) "iteration" else "round"
     val configuration = arena.configurations.single()
+    val encoder =
+        if (anchor == null) TerritoryEncoder.TOKEN_2
+        else TerritoryEncoder.fromVersion(original.encoderVersion)
     val dictionary =
         TokenObservationEncoder.dictionary(
             PublicCatalog.forPlayers(4, configuration.rules),
-            TerritoryEncoder.TOKEN_2,
+            encoder,
         )
     val policyBindings: JsonNode = PurchaseJson.mapper.valueToTree(arena.overlayMetadata())
     val ecologyIdentity =
@@ -145,12 +149,12 @@ private constructor(
         require(
             listOf(current, original).all {
                 it.schemaVersion == 3 &&
-                    it.encoderVersion == TerritoryEncoder.TOKEN_2.version &&
+                    it.encoderVersion == encoder.version &&
                     it.stateFeatureNames == dictionary.stateFeatureNames &&
                     it.actionFeatureNames == dictionary.actionFeatureNames
             }
         ) {
-            "Token collection requires schema 3 and the complete TOKEN_2 dictionary."
+            "Token collection requires schema 3 and the complete declared token dictionary."
         }
         require(
             original.actorWeights.all { it == 0.0 } &&
@@ -160,16 +164,13 @@ private constructor(
             "The original token actor must be the prospective zero-output initializer."
         }
         anchor?.let {
-            val warm = it.bundle.models.token
+            val warm = TokenAnchoredResidual.initialize(it.bundle.models.token, encoder, dictionary)
             require(
-                original.stateWeights == warm.stateWeights &&
-                    original.stateBias == warm.stateBias &&
-                    original.actionWeights == warm.actionWeights &&
-                    original.actionBias == warm.actionBias &&
+                original == warm &&
                     current.valueWeights.all { value -> value == 0.0 } &&
                     current.valueBias == 0.0
             ) {
-                "An anchored learner starts from exact94 embeddings with a separate zero readout/value."
+                "An anchored learner starts from exact94 embeddings and zero new columns and outputs."
             }
         }
     }

@@ -121,6 +121,8 @@ data class GameState(
     val capitalSelection: CapitalSelection = CapitalSelection(),
     val turnNumber: Int? = null,
     val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
+    /** Bounded simultaneous reveals, oldest first, reconstructed from commands during replay. */
+    internal val recentTokenPurchases: List<Map<PlayerId, Int>> = emptyList(),
 ) {
     /** Derived board queries are shared only within this immutable game snapshot. */
     internal val boardContext: BoardRulesContext by lazy { BoardGame.context(this) }

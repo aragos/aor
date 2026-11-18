@@ -24,9 +24,10 @@ data class CoordinatedPolicyModels(
 
 /**
  * Shared complete C/P/E/T chooser. Callers retain unsupported phases and scope/admission ownership.
- * Every input is the acting player's ordinary view; no history, labels or hidden state is accepted.
- * [referenceCommand] in [choose] is called exactly once for E/T, never for C/P. It must return the
- * offered command from the complete qualified raw reference, before this outer residual selector.
+ * Every input is the acting player's ordinary view. The opt-in TOKEN3 residual sees bounded public
+ * past reveals. [referenceCommand] in [choose] is called exactly once for E/T, never for C/P. It
+ * must return the offered command from the complete qualified raw reference, before this outer
+ * residual selector.
  */
 class CoordinatedPolicySelector(
     ordinary: BotModel,
@@ -52,10 +53,7 @@ class CoordinatedPolicySelector(
             "An anchored token residual requires its explicitly frozen anchor sampler."
         }
         require(
-            tokenAnchoredResidual == null ||
-                tokenAnchoredResidual.model.stateFeatureNames == current.token.stateFeatureNames &&
-                    tokenAnchoredResidual.model.actionFeatureNames ==
-                        current.token.actionFeatureNames
+            tokenAnchoredResidual == null || tokenAnchoredResidual.extendsAnchor(current.token)
         ) {
             "The anchored residual must preserve the complete frozen TOKEN2 dictionary."
         }
@@ -146,6 +144,7 @@ class CoordinatedPolicySelector(
                 tokenSelector,
             )
         if (tokenAnchoredResidual != null) {
+            val learned = tokenAnchoredResidual.observation(view, player, encoded)
             val probabilities =
                 NearOptimalTokenPolicy.select(
                         encoded,
@@ -155,9 +154,9 @@ class CoordinatedPolicySelector(
                     )
                     .probabilities
             return TokenAnchoredPolicy.choose(
-                    encoded,
+                    learned,
                     TokenAnchoredPolicy.evaluate(
-                        encoded,
+                        learned,
                         probabilities,
                         tokenAnchoredResidual,
                         deterministic.index,

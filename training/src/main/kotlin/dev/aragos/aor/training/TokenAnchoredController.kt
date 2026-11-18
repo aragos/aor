@@ -17,6 +17,8 @@ internal class TokenAnchoredController(
     private val current: TerritoryPolicyModel,
     private val record: ((TokenPairedDecision) -> Unit)? = null,
 ) : SimulationController {
+    private val residual = TokenAnchoredResidual(current, anchor.distribution)
+
     override fun controls(decision: String): Boolean = qualified.controls(decision)
 
     override fun choose(decision: SimulationDecision): String? {
@@ -27,24 +29,27 @@ internal class TokenAnchoredController(
             requireNotNull(rawReference.choose(decision)) {
                 "Anchored TOKEN encoding requires the unchanged raw G3 reference command."
             }
-        val observation =
+        val seat = PlayerId(decision.observation.playerId)
+        val raw =
             TokenObservationEncoder.from(
                 decision.view,
-                PlayerId(decision.observation.playerId),
+                seat,
                 decision.observation,
                 recommended,
                 TerritoryEncoder.TOKEN_2,
             )
+        val observation = residual.observation(decision.view, seat, raw)
         val evaluation =
             TokenAnchoredPolicy.evaluate(
-                observation,
+                raw,
                 anchor.bundle.models.token,
                 anchor.asset.original.models.token,
                 requireNotNull(anchor.asset.calibration.selectors[CoordinatedEsHead.TOKEN]) {
                     "The frozen token calibration is required."
                 },
                 anchor.sampler,
-                TokenAnchoredResidual(current, anchor.distribution),
+                residual,
+                residualObservation = observation,
             )
         val choice = TokenAnchoredPolicy.choose(observation, evaluation, decision.seed)
         record?.invoke(

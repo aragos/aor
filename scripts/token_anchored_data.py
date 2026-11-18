@@ -13,6 +13,11 @@ import purchase_policy as b
 import token_paired_data as legacy
 import token_paired_objective as objective
 import token_anchor_distribution as distribution
+import token_anchored_policy as policy
+
+
+class FrozenActor(legacy.FrozenActor):
+    validate_model = staticmethod(policy.validate_model)
 
 
 @dataclass(frozen=True)
@@ -54,12 +59,12 @@ class Context:
         b.require(isinstance(original, legacy.FrozenActor) and isinstance(current, legacy.FrozenActor) and
             original.sha256 == self.original_model_sha256 and current.sha256 == self.current_model_sha256 and
             original.dictionary_sha256 == current.dictionary_sha256 == self.dictionary_semantic_sha256,
-            'Warm context must bind exact zero/current residuals and the complete TOKEN2 dictionary.')
+            'Warm context must bind exact zero/current residuals and the full declared token dictionary.')
         b.require(type(dictionary) is bytes and b.digest(json.loads(dictionary)) == self.dictionary_semantic_sha256
             and hashlib.sha256(dictionary).hexdigest() == self.dictionary_sha256,
             'Warm context requires both raw and semantic native dictionary identity.')
         legacy.exact(json.loads(dictionary), ('encoderVersion', 'stateFeatureNames', 'actionFeatureNames'),
-            'Native TOKEN2 dictionary')
+            'Native token dictionary')
         b.require(all(value == 0. for value in original.model['actorWeights']) and
             all(value == 0. for value in original.model['valueWeights']) and original.model['valueBias'] == 0.,
             'Warm anchor uses a distinct zero-output residual, never the nonzero frozen94 actor.')
@@ -104,7 +109,7 @@ def check_proposals(record):
 
 
 def check_anchor(record, model):
-    legacy.observation(record['observation'], model)
+    legacy.observation(record['observation'], model, contract=policy.actor_contract(model))
     count = len(record['observation']['actions'])
     frozen = distribution.anchor_probabilities(record['anchor94Probabilities'], count)
     original = legacy.probabilities(record['originalProbabilities'], count, 'Warm original probabilities')
