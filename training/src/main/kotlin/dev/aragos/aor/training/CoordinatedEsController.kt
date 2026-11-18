@@ -13,6 +13,7 @@ import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
 import dev.aragos.aor.ai.TerritoryPhase
+import dev.aragos.aor.ai.TokenAnchoredResidual
 import dev.aragos.aor.ai.TokenObservationEncoder
 
 /** Own-seat complete policy; reference E/T is called once and cannot overwrite the outer choice. */
@@ -27,6 +28,7 @@ internal class CoordinatedEsController(
     tokenSampler: NearOptimalTokenSampler? = null,
     expansionDenial: PublicLeaderAttackConfig? = null,
     private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
+    tokenAnchoredResidual: TokenAnchoredResidual? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -51,6 +53,7 @@ internal class CoordinatedEsController(
             tokenSampler,
             expansionDenial,
             tokenNeighborMixture,
+            tokenAnchoredResidual,
         )
 
     override fun controls(decision: String): Boolean =
