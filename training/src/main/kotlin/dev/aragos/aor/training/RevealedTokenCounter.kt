@@ -122,7 +122,9 @@ private constructor(
         base: SimulationController,
     ): SimulationController {
         require(
-            (style.isRevealedCounter && style != RobustOpponentStyle.REVEALED_BALANCED) ||
+            (style.isRevealedCounter &&
+                style != RobustOpponentStyle.REVEALED_BALANCED &&
+                style != RobustOpponentStyle.QUALIFIED_REVEALED_BALANCED) ||
                 style == RobustOpponentStyle.QUALIFIED
         ) {
             "The public-history adapter accepts only its explicit counter or qualified style."

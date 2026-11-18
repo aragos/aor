@@ -103,6 +103,70 @@ class RobustTokenInputTest {
     }
 
     @Test
+    fun mixedTrainingEcologyRetainsHalfOrdinaryAndCrossedSeatStyleBalance() {
+        for (seat in 0..3) {
+            val counts =
+                (0..287)
+                    .filter { it % 4 == seat }
+                    .groupingBy { RobustOpponentStyle.QUALIFIED_REVEALED_BALANCED.at(it, seat) }
+                    .eachCount()
+            assertThat(counts[RobustOpponentStyle.QUALIFIED]).isEqualTo(36)
+            for (style in
+                listOf(
+                    RobustOpponentStyle.REVEALED_UNDERCUT,
+                    RobustOpponentStyle.REVEALED_OVERBID,
+                    RobustOpponentStyle.REVEALED_TIE_UNDERCUT,
+                    RobustOpponentStyle.REVEALED_TIE_OVERBID,
+                )) {
+                assertThat(counts[style]).isEqualTo(9)
+            }
+        }
+    }
+
+    @Test
+    fun theOrdinaryFractionIsPartOfTheMixedEcologyScienceIdentity() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val input =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "opponentStyle" to "QUALIFIED_REVEALED_BALANCED",
+                                "adaptiveOpponent" to publicCounter,
+                            ),
+                        )
+                        .path
+                )
+
+            assertThat(input.scienceIdentity["adaptiveOrdinaryFraction"]).isEqualTo(.5)
+        }
+    }
+
+    @Test
+    fun anAnchoredCandidateCannotSilentlyReplaceAnUnqualifiedToyBase() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val policy =
+                fixture.save(
+                    "not-a-qualified-anchor.json",
+                    mapOf("kind" to TokenAnchoredPolicyInput.VERSION),
+                )
+
+            val failure =
+                assertFailsWith<IllegalArgumentException> {
+                    RobustTokenInput.read(
+                        source(
+                                fixture,
+                                mapOf("candidateTokenAnchoredPolicy" to fixture.ref(policy)),
+                            )
+                            .path
+                    )
+                }
+
+            assertThat(failure).hasMessageThat().contains("requires frozen94")
+        }
+    }
+
+    @Test
     fun typedLocalMixtureIsBoundOnlyWhenExplicitlyOffered() {
         CoordinatedWinQualificationFixture().use { fixture ->
             val ordinary = RobustTokenInput.read(source(fixture).path)
@@ -208,6 +272,7 @@ class RobustTokenInputTest {
             assertThat(record["modelForwards"]).isEqualTo(0)
             assertThat(record["maximumTerminalExecutions"]).isEqualTo(6)
             assertThat(input.asset.current.source.sha256).isEqualTo(input.candidate.source.sha256)
+            assertThat(input.scienceIdentity).doesNotContainKey("candidateTokenAnchoredPolicy")
         }
     }
 
