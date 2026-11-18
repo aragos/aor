@@ -409,7 +409,7 @@ def launch(args):
         review['protocolSha256'] == c.sha(args.protocol) and review['profileSha256'] == c.sha(args.profile) and
         not args.output.exists(), 'The once-only Terminal launch requires exact root approval and a fresh attempt.')
     environment = {name:os.environ[name] for name in
-        ('HOME','USER','LOGNAME','SSH_AUTH_SOCK','TMPDIR','__CF_USER_TEXT_ENCODING') if name in os.environ}
+        ('HOME','USER','LOGNAME','TMPDIR','__CF_USER_TEXT_ENCODING') if name in os.environ}
     environment.update(PATH='/usr/bin:/bin:/usr/sbin:/sbin', LANG='en_US.UTF-8', LC_ALL='en_US.UTF-8', TZ='UTC',
         PYTHONDONTWRITEBYTECODE='1', PYTHONNOUSERSITE='1', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
         OPENBLAS_NUM_THREADS='1', VECLIB_MAXIMUM_THREADS='1')
