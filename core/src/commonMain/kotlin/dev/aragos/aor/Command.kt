@@ -182,6 +182,9 @@ sealed interface Command {
                         purchase.applyTo(buying).let { paid -> paid.copy(writtenCash = paid.cash) }
                     },
                 turnOrderSelection = selection,
+                recentTokenPurchases =
+                    submitted.recentTokenPurchases.takeLast(TokenPurchase.PAST_REVEAL_LIMIT - 1) +
+                        listOf(purchases),
                 stage = if (selection.isResolved) Stage.DRAW_CARD else Stage.TURN_ORDER_TIE,
                 flow = submitted.flow.copy(phaseStarted = false, actor = null),
             )

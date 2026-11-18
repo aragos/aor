@@ -1,5 +1,7 @@
 package dev.aragos.aor.ai
 
+import dev.aragos.aor.GameView
+import dev.aragos.aor.PlayerId
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
@@ -38,14 +40,101 @@ data class TokenAnchoredResidual(
     val model: TerritoryPolicyModel,
     val distribution: TokenAnchorDistribution,
 ) {
+    val encoder = TerritoryEncoder.fromVersion(model.encoderVersion)
+
     init {
         require(
             model.schemaVersion == 3 &&
-                model.encoderVersion == TerritoryEncoder.TOKEN_2.version &&
+                encoder in setOf(TerritoryEncoder.TOKEN_2, TerritoryEncoder.TOKEN_3) &&
                 model.valueWeights.all { it == 0.0 } &&
                 model.valueBias == 0.0
         ) {
-            "An anchored TOKEN2 residual requires schema3 and unchanged zero value output."
+            "An anchored token residual requires schema 3 and unchanged zero value output."
+        }
+    }
+
+    /** The TOKEN3 residual may add inputs while the frozen anchor retains TOKEN2 semantics. */
+    fun extendsAnchor(anchor: TerritoryPolicyModel): Boolean =
+        extendsAnchorDictionary(model, anchor, encoder)
+
+    /** Preserve the anchor's legal support and reference while extending the actor inputs. */
+    fun observation(
+        view: GameView,
+        seat: PlayerId,
+        base: TerritoryObservation,
+    ): TerritoryObservation =
+        if (encoder == TerritoryEncoder.TOKEN_3)
+            TokenObservationEncoder.withHistory(view, seat, base)
+        else base
+
+    companion object {
+        /** The warm start retains exact existing embeddings and sets all new columns to zero. */
+        fun initialize(
+            anchor: TerritoryPolicyModel,
+            encoder: TerritoryEncoder,
+            dictionary: TerritoryFeatureDictionary,
+        ): TerritoryPolicyModel {
+            val model =
+                anchor.copy(
+                    encoderVersion = encoder.version,
+                    stateFeatureNames = dictionary.stateFeatureNames,
+                    actionFeatureNames = dictionary.actionFeatureNames,
+                    stateWeights =
+                        extend(
+                            anchor.stateWeights,
+                            anchor.stateFeatureNames,
+                            dictionary.stateFeatureNames,
+                        ),
+                    actionWeights =
+                        extend(
+                            anchor.actionWeights,
+                            anchor.actionFeatureNames,
+                            dictionary.actionFeatureNames,
+                        ),
+                    actorWeights = List(anchor.hiddenSize) { 0.0 },
+                    valueWeights = List(anchor.hiddenSize) { 0.0 },
+                    valueBias = 0.0,
+                )
+            require(
+                anchor.encoderVersion == TerritoryEncoder.TOKEN_2.version &&
+                    extendsAnchorDictionary(model, anchor, encoder)
+            ) {
+                "Warm token initialization requires the exact TOKEN2 anchor and residual dictionary."
+            }
+            return model
+        }
+
+        private fun extendsAnchorDictionary(
+            model: TerritoryPolicyModel,
+            anchor: TerritoryPolicyModel,
+            encoder: TerritoryEncoder,
+        ): Boolean =
+            when (encoder) {
+                TerritoryEncoder.TOKEN_2 ->
+                    model.stateFeatureNames == anchor.stateFeatureNames &&
+                        model.actionFeatureNames == anchor.actionFeatureNames
+                TerritoryEncoder.TOKEN_3 ->
+                    model.stateFeatureNames ==
+                        (anchor.stateFeatureNames + TokenOrderHistoryFeatures.stateNames)
+                            .sorted() &&
+                        model.actionFeatureNames ==
+                            (anchor.actionFeatureNames + TokenOrderHistoryFeatures.actionNames)
+                                .sorted()
+                else -> false
+            }
+
+        private fun extend(
+            weights: List<Double>,
+            previousNames: List<String>,
+            nextNames: List<String>,
+        ): List<Double> {
+            if (previousNames == nextNames) return weights
+            val columns = previousNames.withIndex().associate { (index, name) -> name to index }
+            return List(weights.size / previousNames.size * nextNames.size) { index ->
+                val row = index / nextNames.size
+                val previous = columns[nextNames[index % nextNames.size]]
+                if (previous == null) 0.0 else weights[row * previousNames.size + previous]
+            }
         }
     }
 }
@@ -93,17 +182,21 @@ object TokenAnchoredPolicy {
         selector: IncumbentResidualSelector,
         sampler: NearOptimalTokenSampler,
         residual: TokenAnchoredResidual,
+        residualObservation: TerritoryObservation = observation,
     ): TokenAnchoredEvaluation {
         require(
-            residual.model.stateFeatureNames == anchor.stateFeatureNames &&
-                residual.model.actionFeatureNames == anchor.actionFeatureNames
+            residual.extendsAnchor(anchor) &&
+                residualObservation.baselineIndex == observation.baselineIndex &&
+                (residualObservation === observation ||
+                    residualObservation.actions.map(TerritoryAction::command) ==
+                        observation.actions.map(TerritoryAction::command))
         ) {
-            "The learned residual must preserve the complete frozen anchor dictionary."
+            "The learned residual must preserve the frozen anchor support and baseline index."
         }
         val deterministic = IncumbentResidualPolicy.choose(observation, anchor, original, selector)
         val probabilities =
             NearOptimalTokenPolicy.select(observation, deterministic, sampler, 0.0).probabilities
-        return evaluate(observation, probabilities, residual, deterministic.index)
+        return evaluate(residualObservation, probabilities, residual, deterministic.index)
     }
 
     fun evaluate(
@@ -112,8 +205,8 @@ object TokenAnchoredPolicy {
         residual: TokenAnchoredResidual,
         anchorIndex: Int = anchorIndex(observation, anchorProbabilities),
     ): TokenAnchoredEvaluation {
-        require(observation.encoderVersion == TerritoryEncoder.TOKEN_2.version) {
-            "Anchored residual inference requires the explicit TOKEN2 observation."
+        require(observation.encoderVersion == residual.model.encoderVersion) {
+            "Anchored residual inference requires its declared token observation version."
         }
         val values =
             ResidualPolicyMath.rawResiduals(

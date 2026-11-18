@@ -43,12 +43,22 @@ object TokenObservationEncoder {
                             prospectFields.map { "prospect.${province.id.value}.$kind.$it" }
                         }
                     } +
-                    if (encoder == TerritoryEncoder.TOKEN_2) capitalChoiceNames else emptyList())
+                    if (encoder != TerritoryEncoder.TOKEN_1) capitalChoiceNames else emptyList())
+                .let { names ->
+                    if (encoder == TerritoryEncoder.TOKEN_3)
+                        names + TokenOrderHistoryFeatures.stateNames
+                    else names
+                }
                 .distinct()
                 .sorted(),
             (amounts +
                     listOf("kind.token", "negative", "zero", "positive") +
-                    if (encoder == TerritoryEncoder.TOKEN_2) bidAmountNames else emptyList())
+                    if (encoder != TerritoryEncoder.TOKEN_1) bidAmountNames else emptyList())
+                .let { names ->
+                    if (encoder == TerritoryEncoder.TOKEN_3)
+                        names + TokenOrderHistoryFeatures.actionNames
+                    else names
+                }
                 .sorted(),
         )
     }
@@ -69,6 +79,13 @@ object TokenObservationEncoder {
                 observation.playerId == seat.value
         ) {
             "Token encoding requires the actual acting seat's commitment window."
+        }
+        if (encoder == TerritoryEncoder.TOKEN_3) {
+            return withHistory(
+                view,
+                seat,
+                from(view, seat, observation, baselineCommand, TerritoryEncoder.TOKEN_2),
+            )
         }
         val state =
             TerritoryFeatures()
@@ -169,6 +186,31 @@ object TokenObservationEncoder {
             state,
             actions,
             actions.indexOfFirst { it.command == baselineCommand },
+        )
+    }
+
+    /** Reuse the frozen TOKEN2 observation, preserving every canonical offer and baseline index. */
+    internal fun withHistory(
+        view: GameView,
+        seat: PlayerId,
+        base: TerritoryObservation,
+    ): TerritoryObservation {
+        require(base.encoderVersion == TerritoryEncoder.TOKEN_2.version) {
+            "Public bid history extends a complete TOKEN2 observation."
+        }
+        val history = TokenOrderHistoryFeatures(view, seat)
+        val amounts = view.tokenPurchaseOffers.associate { "buy-tokens ${it.amount}" to it.amount }
+        return base.copy(
+            encoderVersion = TerritoryEncoder.TOKEN_3.version,
+            stateFeatures = base.stateFeatures + history.state(),
+            actions =
+                base.actions.map { action ->
+                    val amount =
+                        requireNotNull(amounts[action.command]) {
+                            "Bid-order features require a canonical owner-visible purchase offer."
+                        }
+                    action.copy(features = action.features + history.action(amount))
+                },
         )
     }
 }

@@ -1,5 +1,5 @@
-"""Explicit warm94 TOKEN2 residual, separate from every legacy prior/clamped actor reader."""
-from dataclasses import dataclass
+"""Explicit warm94 TOKEN2 or public-history residual."""
+from dataclasses import dataclass, replace
 import copy
 
 import purchase_policy as b
@@ -7,13 +7,53 @@ import token_paired_policy as token
 import token_anchor_distribution as distribution
 
 
-def initialize(anchor_model):
+HISTORY_CONTRACT = replace(token.CONTRACT, encoder='aor-token-observation-3', actor='aor-token-policy-3')
+HISTORY_STATE = ('bidHistory.sampleShare',) + tuple(
+    f'bidHistory.role.{role}.{field}'
+    for role in range(6) for field in ('last', 'mean', 'span'))
+HISTORY_ACTION = ('bidOrder.bestBox', 'bidOrder.worstBox') + tuple(
+    f'bidOrder.role.{role}.{field}' for role in range(1, 6)
+    for field in ('before', 'tie'))
+
+
+def actor_contract(model):
+    return HISTORY_CONTRACT if model.get('encoderVersion') == HISTORY_CONTRACT.encoder else token.CONTRACT
+
+
+def validate_model(model):
+    if actor_contract(model) == token.CONTRACT:
+        return token.validate_model(model)
+    b.validate_model(model, contract=HISTORY_CONTRACT)
+    b.require(set(token.ORDER_NAMES + HISTORY_STATE) <= set(model['stateFeatureNames']) and
+        set(token.AMOUNT_NAMES + HISTORY_ACTION) <= set(model['actionFeatureNames']),
+        'TOKEN3 requires the original public TOKEN2 features and the declared bid history vocabulary.')
+    return model
+
+
+def initialize(anchor_model, *, dictionary=None):
     """Exact frozen94 embeddings, with a new zero actor/value readout; opens no file or RNG."""
     model = copy.deepcopy(token.validate_model(anchor_model))
+    if dictionary is not None:
+        b.require(dictionary.get('encoderVersion') == HISTORY_CONTRACT.encoder and
+            set(dictionary) == {'encoderVersion', 'stateFeatureNames', 'actionFeatureNames'},
+            'An extended initializer requires the explicit TOKEN3 dictionary.')
+        for prefix, extra in (('state', HISTORY_STATE), ('action', HISTORY_ACTION)):
+            key = prefix + 'FeatureNames'
+            old = model[key]
+            names = dictionary[key]
+            b.require(names == sorted(old + list(extra)),
+                'TOKEN3 initialization must preserve the anchor and add exactly its history features.')
+            by_name = {name: index for index, name in enumerate(old)}
+            weights = model[prefix + 'Weights']
+            model[prefix + 'Weights'] = [
+                weights[row*len(old) + by_name[name]] if name in by_name else 0.
+                for row in range(b.HIDDEN) for name in names]
+            model[key] = list(names)
+        model['encoderVersion'] = HISTORY_CONTRACT.encoder
     model['actorWeights'] = [0.]*b.HIDDEN
     model['valueWeights'] = [0.]*b.HIDDEN
     model['valueBias'] = 0.
-    return token.validate_model(model)
+    return validate_model(model)
 
 
 @dataclass(frozen=True)
@@ -26,11 +66,16 @@ class PreparedObservation:
         return self.observation.action_count
 
 
-class TokenAnchoredPolicy(token.TokenPairedPolicy):
-    def __init__(self, model, *, contract=distribution.RECORD):
+class TokenAnchoredPolicy(b.ResidualPolicy):
+    def __init__(self, model, *, contract=distribution.RECORD, history_enabled=True):
         distribution.validate(contract)
-        super().__init__(model)
+        if not history_enabled:
+            require_zero_history_weights(model)
+        super().__init__(validate_model(model), actor_contract(model))
+        self.valueWeights.requires_grad_(False)
+        self.valueBias.requires_grad_(False)
         self.distribution_contract = copy.deepcopy(contract)
+        self.history_enabled = history_enabled
 
     def prepare_record(self, record):
         return self.prepare(record['observation'], record['anchor94Probabilities'])
@@ -40,6 +85,12 @@ class TokenAnchoredPolicy(token.TokenPairedPolicy):
             b.require(anchor94 is None, 'Prepared anchored observations already own their frozen anchor.')
             super().prepare(observation.observation)
             return observation
+        if not self.history_enabled:
+            observation = dict(observation, stateFeatures={
+                name: value for name, value in observation['stateFeatures'].items()
+                if name not in HISTORY_STATE}, actions=[
+                    dict(action, features={name: value for name, value in action['features'].items()
+                        if name not in HISTORY_ACTION}) for action in observation['actions']])
         base = super().prepare(observation)
         return PreparedObservation(base, distribution.anchor_probabilities(anchor94, base.action_count))
 
@@ -67,7 +118,19 @@ class TokenAnchoredPolicy(token.TokenPairedPolicy):
         return logs, values
 
 
+def require_zero_history_weights(model):
+    """A history-off export must give the same probabilities on unmasked runtime inputs."""
+    validate_model(model)
+    for prefix, extension in (('state', HISTORY_STATE), ('action', HISTORY_ACTION)):
+        names = model[prefix + 'FeatureNames']
+        weights = model[prefix + 'Weights']
+        columns = [index for index, name in enumerate(names) if name in extension]
+        b.require(all(weights[row*len(names) + column] == 0.
+            for row in range(b.HIDDEN) for column in columns),
+            'A history-off actor requires zero weights on every masked history column.')
+
+
 def reference_forward(model, observation, anchor94, *, contract=distribution.RECORD):
-    raw = b.reference_actor_outputs(model, observation, contract=token.CONTRACT)
+    raw = b.reference_actor_outputs(model, observation, contract=actor_contract(model))
     return dict(probabilities=distribution.probabilities(anchor94, raw['residuals'], contract=contract),
         value=raw['value'], residuals=raw['residuals'])

@@ -30,6 +30,7 @@ enum class TerritoryPhase(
 enum class TerritoryEncoder(val version: String, val phase: TerritoryPhase) {
     TOKEN_1(TerritoryPhase.TOKEN.encoderVersion, TerritoryPhase.TOKEN),
     TOKEN_2("aor-token-observation-2", TerritoryPhase.TOKEN),
+    TOKEN_3("aor-token-observation-3", TerritoryPhase.TOKEN),
     EXPANSION_1(TerritoryPhase.EXPANSION.encoderVersion, TerritoryPhase.EXPANSION),
     EXPANSION_2("aor-expansion-observation-2", TerritoryPhase.EXPANSION);
 
@@ -138,7 +139,9 @@ data class TerritoryPolicyModel(
             schemaVersion == 1 &&
                 TerritoryPhase.entries.any { it.encoderVersion == encoderVersion } ||
                 schemaVersion == 2 && encoderVersion == TerritoryEncoder.EXPANSION_2.version ||
-                schemaVersion == 3 && encoderVersion == TerritoryEncoder.TOKEN_2.version
+                schemaVersion == 3 &&
+                    (encoderVersion == TerritoryEncoder.TOKEN_2.version ||
+                        encoderVersion == TerritoryEncoder.TOKEN_3.version)
         ) {
             "Unsupported territory policy schema or encoder."
         }

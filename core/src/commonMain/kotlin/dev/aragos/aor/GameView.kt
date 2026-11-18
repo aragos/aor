@@ -141,6 +141,8 @@ data class GameView(
     val purchaseShippingForecast: ShippingOfferView? = null,
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
     val windmillOffer: WindmillOfferView? = null,
+    /** Signed bids from up to eight completed prior turns, oldest first; only at token bidding. */
+    val pastTokenPurchases: List<Map<PlayerId, Int>> = emptyList(),
 ) {
     companion object {
         internal fun forViewer(
@@ -170,6 +172,9 @@ data class GameView(
                 turnOrder = state.turnOrder,
                 orderBoxes = state.orderBoxes,
                 revealedTokenPurchases = TurnOrderProjection.revealedPurchases(state),
+                pastTokenPurchases =
+                    if (state.stage == Stage.TOKEN_PURCHASE) state.recentTokenPurchases
+                    else emptyList(),
                 provisionalTieOrder = state.turnOrderSelection.ties.firstOrNull()?.placed.orEmpty(),
                 board =
                     state.board.pieces.map { (province, pieces) ->
