@@ -4,7 +4,7 @@ import unittest
 
 import token_anchor_distribution as distribution
 import token_anchored_plan as owner
-from token_anchored_recipe import PROXIMAL_RECIPE, RECIPE
+from token_anchored_recipe import FIT_CASES, PROXIMAL_RECIPE, RECIPE
 
 
 def record():
@@ -102,6 +102,27 @@ class PlanTests(unittest.TestCase):
         value = record()
         value['comparisonNumericalRecipe'] = copy.deepcopy(PROXIMAL_RECIPE)
         with self.assertRaisesRegex(ValueError, 'one-round corpus'):
+            owner.Plan.from_record(value)
+
+    def test_shared_history_fit_requires_explicit_arm(self):
+        value = record()
+        value['rounds'] = value['rounds'][:1]
+        value['maximumTerminalExecutions'] = owner.declared_budget(value)['maximum']
+        value['comparisonNumericalRecipe'] = copy.deepcopy(PROXIMAL_RECIPE)
+        value['fitCases'] = copy.deepcopy(FIT_CASES)
+        plan = owner.Plan.from_record(value)
+        with self.assertRaisesRegex(ValueError, 'Choose one explicit'):
+            plan.fit_case()
+        self.assertEqual([plan.fit_case(case['id']) for case in FIT_CASES], FIT_CASES)
+
+    def test_history_mode_cannot_change_after_case_declaration(self):
+        value = record()
+        value['rounds'] = value['rounds'][:1]
+        value['maximumTerminalExecutions'] = owner.declared_budget(value)['maximum']
+        value['comparisonNumericalRecipe'] = copy.deepcopy(PROXIMAL_RECIPE)
+        value['fitCases'] = copy.deepcopy(FIT_CASES)
+        value['fitCases'][0]['historyEnabled'] = True
+        with self.assertRaisesRegex(ValueError, 'all three fixed fit cases'):
             owner.Plan.from_record(value)
 
 

@@ -17,16 +17,30 @@ from token_anchored_recipe import RECIPE
 ARTIFACTS = ('identity.json', 'policy.json', 'checkpoint.json', 'history.json')
 
 
+def history_mode(model, recipe, case):
+    """TOKEN3 requires a fixed pilot arm; existing TOKEN2 fits have no history inputs."""
+    if policy.actor_contract(model) != policy.HISTORY_CONTRACT:
+        b.require(case is None, 'A history fit case requires the shared TOKEN3 dictionary.')
+        return True
+    case = recipe_owner.validate_fit_case(case, recipe)
+    if not case['historyEnabled']:
+        policy.require_zero_history_weights(model)
+    return case['historyEnabled']
+
+
 def completed(directory):
     directory = Path(directory); done = b.read_json(directory/'finished.json')
     b.require(done['kind'] == 'token-anchored-paired-fit-complete-1' and done['complete'] is True,
         'Warm paired fitting requires its own completed receipt, never a legacy objective/model contract.')
     b.require(set(done['artifacts']) == set(ARTIFACTS) and all(b.file_digest(directory/name) == digest
         for name, digest in done['artifacts'].items()), 'A completed warm fit artifact changed.')
-    subject = b.read_json(directory/'identity.json'); model = policy.token.validate_model(
+    subject = b.read_json(directory/'identity.json'); model = policy.validate_model(
         b.read_json(directory/'policy.json'))
     history = b.read_json(directory/'history.json'); checkpoint = b.read_json(directory/'checkpoint.json')
     recipe = recipe_owner.validate(subject['recipe'])
+    history_mode(model, recipe, subject.get('fitCase'))
+    b.require('fitCase' not in subject or subject['context']['round'] == 1,
+        'A history fit case completes in the first and sole round of its pilot.')
     b.require(subject == done['identity'] and
         subject['context']['probability_contract_sha256'] == b.digest(distribution.RECORD),
         'Warm completion must bind the exact numerical recipe and probability contract.')
@@ -83,7 +97,7 @@ def admit_previous(training, original, current, dictionary, previous, recipe):
     done = completed(previous); old = done['identity']; context = asdict(training.context)
     stable = ('scope_sha256', 'dictionary_sha256', 'dictionary_semantic_sha256',
         'original_model_sha256', 'anchor_sha256', 'probability_contract_sha256', 'train_count', 'validation_count')
-    b.require(old['recipe'] == recipe and old['context']['round']+1 == context['round']
+    b.require(old['recipe'] == recipe and old.get('fitCase') is None and old['context']['round']+1 == context['round']
         and done['outputModelSha256'] == current.sha256
         and all(old['context'][key] == context[key] for key in stable) and
         old['anchorSha256'] == training.anchor_sha256 and
@@ -93,23 +107,25 @@ def admit_previous(training, original, current, dictionary, previous, recipe):
     return dict(finishedSha256=b.file_digest(Path(previous)/'finished.json'), modelSha256=current.sha256)
 
 
-def fit(training, original, current, dictionary, output, config, *, previous=None, recipe=RECIPE):
+def fit(training, original, current, dictionary, output, config, *, previous=None, recipe=RECIPE, fit_case=None):
     recipe = recipe_owner.validate(recipe)
     b.require(isinstance(training, data.Training) and isinstance(config, legacy.Config),
         'Warm fitting requires its typed TRAIN population and prospectively declared epoch seeds/deadline.')
-    b.require(recipe == RECIPE or training.context.round == 1,
-        'The proximal comparison uses the first and sole round of its pilot.')
+    b.require(recipe == RECIPE and fit_case is None or training.context.round == 1,
+        'The proximal comparison and history fit cases use the first and sole round of their pilots.')
     b.require(training.ready_count >= math.ceil(training.context.train_count*recipe['minimumReadyFraction']),
         'The complete original TRAIN population must meet the prospective public READY exposure floor.')
     predecessor = admit_previous(training, original, current, dictionary, previous, recipe)
+    history_enabled = history_mode(current.model, recipe, fit_case)
     if previous is not None:
         b.require(not (set(config.epochSeeds) & set(completed(previous)['identity']['epochSeeds'])),
             'Warm rounds require fresh prospectively declared epoch shuffle streams.')
     arithmetic.check_clock(config); output = Path(output)
     b.require(not output.exists(), 'Warm fitting is once-only; output already exists.')
     output.mkdir(parents=True); b.torch.set_num_threads(1); b.torch.use_deterministic_algorithms(True)
-    actor = policy.TokenAnchoredPolicy(current.model); prepared = arithmetic.Prepared(training, actor)
-    arithmetic.verify_behavior(prepared, policy.TokenAnchoredPolicy(current.model))
+    actor = policy.TokenAnchoredPolicy(current.model, history_enabled=history_enabled)
+    prepared = arithmetic.Prepared(training, actor)
+    arithmetic.verify_behavior(prepared, actor)
     optimizer = b.torch.optim.Adam([getattr(actor, name) for name in b.PARAMETERS[:-2]],
         lr=recipe['learningRate'])
     sources = (__file__, policy.__file__, data.__file__, distribution.__file__, arithmetic.__file__,
@@ -121,6 +137,8 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         frozenModelFieldsSha256=b.digest({key: value for key, value in current.model.items()
             if key not in b.PARAMETERS[:-2]}), epochSeeds=list(config.epochSeeds),
         originalDeadline=config.deadline, sourceSha256={Path(path).name: b.file_digest(path) for path in sources})
+    if fit_case is not None:
+        subject['fitCase'] = fit_case
     b.atomic_json(output/'identity.json', subject)
     def warm_epoch(actor, optimizer, prepared, seed, config):
         return arithmetic.epoch(actor, optimizer, prepared, seed, config, recipe=recipe)
@@ -129,6 +147,7 @@ def fit(training, original, current, dictionary, output, config, *, previous=Non
         step=warm_epoch, recipe=recipe,
         publish=lambda history: b.atomic_json(output/'history.json', history))
     model = actor.artifact()
+    history_mode(model, recipe, fit_case)
     b.require(all(model[name] == current.model[name] for name in b.PARAMETERS[-2:]) and
         training.sha256 == subject['trainingSha256'] and all(b.file_digest(path) ==
         subject['sourceSha256'][Path(path).name] for path in sources),
@@ -156,7 +175,6 @@ def main():
     import time
     import token_anchored_plan as plan_owner
     import token_anchored_corpus as corpus_owner
-    import token_paired_data as frozen_owner
     from token_paired_campaign_plan import subject, read, file_sha
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('protocol', 'corpus', 'original-corpus', 'original-actor', 'current-actor', 'dictionary', 'output'):
@@ -164,15 +182,20 @@ def main():
     parser.add_argument('--deadline-epoch', type=float, required=True)
     parser.add_argument('--previous', type=Path)
     parser.add_argument('--numerical-recipe', help='Declared recipe version; defaults to the primary recipe.')
+    parser.add_argument('--fit-case', help='Required case identifier for a declared history ablation.')
     args = parser.parse_args()
     b.number(args.deadline_epoch, 'Original absolute deadline', 1.)
     b.require(time.time() < args.deadline_epoch, 'Original warm deadline expired before any corpus is opened.')
     plan = plan_owner.Plan.from_record(read(args.protocol), raw_sha256=file_sha(args.protocol))
-    recipe = plan.numerical_recipe(args.numerical_recipe)
+    fit_case = plan.fit_case(args.fit_case)
+    b.require(fit_case is None or args.numerical_recipe is None,
+        'An explicit fit case owns its numerical recipe.')
+    recipe = plan.numerical_recipe(args.numerical_recipe if fit_case is None else fit_case['recipeVersion'])
     corpus = corpus_owner.Corpus(plan, subject(args.corpus))
     anchor = corpus_owner.Corpus(plan, subject(args.original_corpus))
-    original = frozen_owner.FrozenActor(args.original_actor.read_bytes(), file_sha(args.original_actor))
-    current = frozen_owner.FrozenActor(args.current_actor.read_bytes(), file_sha(args.current_actor))
+    original = data.FrozenActor(args.original_actor.read_bytes(), file_sha(args.original_actor))
+    current = data.FrozenActor(args.current_actor.read_bytes(), file_sha(args.current_actor))
+    history_mode(current.model, recipe, fit_case)
     context = corpus.context(args.dictionary, original, current)
     b.require(context.original_model_sha256 == plan.record['originalActorSha256'] and
         context.current_model_sha256 == corpus.record['currentActorSha256'] and
@@ -191,7 +214,7 @@ def main():
             for reproduction in chunk['reproductions']:
                 pins[reproduction['subject']['path']] = reproduction['subject']['sha256']
     done = fit(training, original, current, args.dictionary.read_bytes(), args.output, config,
-        previous=args.previous, recipe=recipe)
+        previous=args.previous, recipe=recipe, fit_case=fit_case)
     b.require(all(file_sha(path) == expected for path, expected in pins.items()),
         'Every actual original warm corpus/model input must remain unchanged until numerical publication.')
     b.atomic_json(args.output/'numeric-complete.json', dict(kind='token-anchored-numeric-stage-complete-1',

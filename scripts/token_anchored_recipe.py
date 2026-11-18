@@ -18,9 +18,24 @@ PROXIMAL_RECIPE = dict(RECIPE, version='token-anchored-proximal-paired-win-1',
     collectionKlOrientation='current-to-collection', collectionWeighting='equal-ready-root')
 
 
+FIT_CASES = [
+    dict(id='original-history-off', recipeVersion=RECIPE['version'], historyEnabled=False),
+    dict(id='proximal-history-off', recipeVersion=PROXIMAL_RECIPE['version'], historyEnabled=False),
+    dict(id='proximal-history-on', recipeVersion=PROXIMAL_RECIPE['version'], historyEnabled=True),
+]
+
+
 def validate(record):
     """Resolve a complete frozen recipe, never an arbitrary hyperparameter override."""
     for recipe in (RECIPE, PROXIMAL_RECIPE):
         if record == recipe:
             return recipe
     raise ValueError('The warm fit requires an exact supported numerical recipe.')
+
+
+def validate_fit_case(record, recipe):
+    """Preserve the declared recipe and feature mask of a fixed pilot arm."""
+    for case in FIT_CASES:
+        if record == case and type(record['historyEnabled']) is bool and case['recipeVersion'] == recipe['version']:
+            return case
+    raise ValueError('The history fit case must bind its exact fixed recipe and feature mask.')
