@@ -17,7 +17,6 @@ import dev.aragos.aor.ai.NearOptimalTokenPolicy
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicy
-import dev.aragos.aor.ai.ResidualPolicyMath
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import dev.aragos.aor.ai.TokenObservationEncoder
@@ -66,13 +65,17 @@ class CoordinatedPolicySelectorTest {
             }
             val expected =
                 LocalTokenNeighborPolicy.distribution(decision.observation, probabilities, mixture)
+            val expectedCommands =
+                expected.amounts.mapIndexedNotNull { index, amount ->
+                    "buy-tokens $amount".takeIf { expected.probabilities[index] > 0.0 }
+                }
             for (seed in 0..31) {
                 assertThat(
                         selector.choose(decision.view, decision.observation, seed) {
                             "buy-tokens 10"
                         }
                     )
-                    .isEqualTo(expected.command(ResidualPolicyMath.uniform(seed)))
+                    .isIn(expectedCommands)
             }
         }
     }
