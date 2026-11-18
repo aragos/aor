@@ -7,6 +7,83 @@ import kotlin.test.assertFailsWith
 
 /** Invented complete model subjects; no game, neural forward or fresh scientific stream. */
 class RobustTokenInputTest {
+    private val publicCounter =
+        mapOf(
+            "kind" to RevealedTokenCounterConfig.VERSION,
+            "minimumObservations" to 2,
+            "lookbackTurns" to 8,
+            "targetedRivalCount" to 1,
+        )
+
+    @Test
+    fun publicCounterConfigurationIsExplicitAndIdentityBound() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val input =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "opponentStyle" to "REVEALED_UNDERCUT",
+                                "adaptiveOpponent" to publicCounter,
+                            ),
+                        )
+                        .path
+                )
+
+            assertThat(input.scienceIdentity["adaptiveOpponent"]).isEqualTo(publicCounter)
+            assertThat(input.adaptiveOpponent?.targetedRivalCount).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun historyStylesCannotSilentlyChooseLearningParameters() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            assertFailsWith<IllegalArgumentException> {
+                RobustTokenInput.read(
+                    source(fixture, mapOf("opponentStyle" to "REVEALED_UNDERCUT")).path
+                )
+            }
+        }
+    }
+
+    @Test
+    fun ordinaryStylesCannotAccidentallyEnablePublicHistory() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            assertFailsWith<IllegalArgumentException> {
+                RobustTokenInput.read(
+                    source(fixture, mapOf("adaptiveOpponent" to publicCounter)).path
+                )
+            }
+        }
+    }
+
+    @Test
+    fun impossibleObservationMinimumIsRejected() {
+        assertFailsWith<IllegalArgumentException> { RevealedTokenCounterConfig(3, 2, 1) }
+    }
+
+    @Test
+    fun moreThanThreeTargetedRivalsIsRejected() {
+        assertFailsWith<IllegalArgumentException> { RevealedTokenCounterConfig(2, 8, 4) }
+    }
+
+    @Test
+    fun oldBalancedRotationRetainsItsOriginalFourEcologies() {
+        val original =
+            listOf(
+                RobustOpponentStyle.QUALIFIED,
+                RobustOpponentStyle.UNDERCUT,
+                RobustOpponentStyle.OVERBID,
+                RobustOpponentStyle.MIXED,
+            )
+        for (index in 0..15) {
+            for (seat in 0..3) {
+                assertThat(RobustOpponentStyle.BALANCED.at(index, seat))
+                    .isEqualTo(original[(index / 4 + seat) % 4])
+            }
+        }
+    }
+
     @Test
     fun typedLocalMixtureIsBoundOnlyWhenExplicitlyOffered() {
         CoordinatedWinQualificationFixture().use { fixture ->

@@ -13,7 +13,27 @@ internal enum class RobustOpponentStyle {
     UNDERCUT,
     OVERBID,
     MIXED,
-    BALANCED;
+    BALANCED,
+    REVEALED_UNDERCUT,
+    REVEALED_OVERBID,
+    REVEALED_TIE_UNDERCUT,
+    REVEALED_TIE_OVERBID;
+
+    val isRevealedCounter: Boolean
+        get() =
+            this in
+                setOf(
+                    REVEALED_UNDERCUT,
+                    REVEALED_OVERBID,
+                    REVEALED_TIE_UNDERCUT,
+                    REVEALED_TIE_OVERBID,
+                )
+
+    val isTieAware: Boolean
+        get() = this == REVEALED_TIE_UNDERCUT || this == REVEALED_TIE_OVERBID
+
+    val countersEarlier: Boolean
+        get() = this == REVEALED_UNDERCUT || this == REVEALED_TIE_UNDERCUT
 
     fun at(index: Int, seat: Int): RobustOpponentStyle =
         if (this == BALANCED) entries[(index / 4 + seat) % 4] else this
@@ -35,6 +55,7 @@ private constructor(
     val expansionDenial: PublicLeaderAttackConfig?,
     val tokenNeighborMixture: LocalTokenNeighborMixture?,
     val opponentStyle: RobustOpponentStyle,
+    val adaptiveOpponent: RevealedTokenCounterConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -88,7 +109,8 @@ private constructor(
                             "admission" to it.admission.name,
                         )
                 )
-            } ?: emptyMap())
+            } ?: emptyMap()) +
+            (adaptiveOpponent?.let { mapOf("adaptiveOpponent" to it.identity) } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
     fun verify() {
@@ -208,6 +230,7 @@ private constructor(
                 setOf(
                     "candidateBundle",
                     "candidateOnly",
+                    "adaptiveOpponent",
                     "controlBundle",
                     "controlSelector",
                     "expansionDenial",
@@ -298,6 +321,13 @@ private constructor(
                     }
                     it.booleanValue()
                 } ?: false
+            val adaptiveOpponent =
+                node["adaptiveOpponent"]?.takeUnless(JsonNode::isNull)?.let {
+                    RevealedTokenCounterConfig.read(it)
+                }
+            require(style.isRevealedCounter == (adaptiveOpponent != null)) {
+                "Public-history rival styles require their explicit identity-bound adaptiveOpponent config."
+            }
             require(
                 expansionDenial == null ||
                     !candidateOnly &&
@@ -334,6 +364,7 @@ private constructor(
                     expansionDenial,
                     tokenNeighborMixture,
                     style,
+                    adaptiveOpponent,
                     seeds,
                     start,
                     count,
