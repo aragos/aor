@@ -213,10 +213,10 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 checkNotNull(state.prompts().singleOrNull()) {
                     "A running game requires one decision: ${configuration.id}/$seed."
                 }
-            val actors =
+            val (choice, actors) =
                 when (prompt) {
-                    is Prompt.SinglePlayer -> listOf(prompt.player)
-                    is Prompt.MultiPlayer -> prompt.players
+                    is Prompt.SinglePlayer -> prompt.choice to listOf(prompt.player)
+                    is Prompt.MultiPlayer -> prompt.choice to prompt.players
                     is Prompt.System ->
                         error("Training authority must resolve system requests first.")
                 }
@@ -224,11 +224,20 @@ class Simulation(private val maxDecisions: Int = 12000) {
             val actions = actors.mapIndexed { actorIndex, actor ->
                 val seat = players.indexOfFirst { it.id == actor }
                 val competitor = competitors[seat]
-                val observation = BotObservations.from(state, actor)
+                val controller = controlled[seat]?.takeIf { it.controls(choice) }
+                val view = controller?.let { state.viewForPlayer(actor) }
+                val observation =
+                    if (view == null) BotObservations.from(state, actor)
+                    else
+                        BotObservations.from(
+                            view,
+                            state.legalChoices(actor),
+                            actor,
+                            choice,
+                            rulesVersion = state.header.rulesVersion,
+                        )
                 observation.candidates.flatMapTo(features) { it.features.keys }
                 val policySeed = simulationPolicySeed(seed, step, seat)
-                val controller = controlled[seat]?.takeIf { it.controls(observation.decision) }
-                val view = if (controller != null) state.viewForPlayer(actor) else null
                 val tokenQuotes =
                     SimulationTokenQuotes.create(
                         state,
