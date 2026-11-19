@@ -94,6 +94,19 @@ test('a robust qualified proposal preserves its sampled command without worker i
     assert.equal(submitted[0].command, proposal.command);
 });
 
+test('a broad Hard proposal submits the authorized advance choice', async context => {
+    const proposal = {profile: 'aor-broad-hard-1', assetSha256: 'b'.repeat(64), command: 'buy-advance P'};
+    let calls = 0;
+    const {submitted} = fixture(context, {
+        runner: async () => work([{...job('p2'), proposal}]),
+        think: async () => {calls++; return 'pass';},
+    });
+    await settle();
+
+    assert.equal(calls, 0);
+    assert.equal(submitted[0].command, proposal.command);
+});
+
 test('an unknown proposal profile stops without worker fallback or submission', async context => {
     const decision = {...job('p2'), proposal: {profile: 'unknown', assetSha256: 'a'.repeat(64), command: 'pass'}};
     let calls = 0;

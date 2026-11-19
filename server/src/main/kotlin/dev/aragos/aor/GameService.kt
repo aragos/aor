@@ -77,11 +77,18 @@ class GameService(
     internal val driver: GameDriver = GameDriver(),
     private val accounts: AccountStore? = null,
     internal val serverBotPolicy: ServerBotPolicy? = null,
+    private val broadBotPolicy: ServerBotPolicy? = null,
 ) {
     private val credentialsRandom = SecureRandom()
+    private val serverPolicies = listOfNotNull(serverBotPolicy, broadBotPolicy)
 
     internal fun forAccounts(accounts: AccountStore): GameService =
-        GameService(store, driver, accounts, serverBotPolicy)
+        GameService(store, driver, accounts, serverBotPolicy, broadBotPolicy)
+
+    internal fun serverPolicy(profile: ServerBotProfile): ServerBotPolicy? =
+        serverPolicies.firstOrNull {
+            it.profile == profile
+        }
 
     fun create(
         names: List<String>,
@@ -135,7 +142,6 @@ class GameService(
                             bots,
                             players.size,
                             rules,
-                            serverBotPolicy,
                         ),
                     botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
                 )
@@ -822,12 +828,12 @@ class GameService(
         requests: List<AutomatedPlayerRequest>,
         playerCount: Int,
         rules: RuleOptions,
-        policy: ServerBotPolicy? = null,
     ): Map<PlayerId, AutomatedPlayer> =
         players.zip(requests).associate { (player, request) ->
-            val selected = policy?.takeIf {
-                request.difficulty == BotDifficulty.HARD && it.profile.supports(playerCount, rules)
-            }
+            val selected =
+                if (request.difficulty == BotDifficulty.HARD) {
+                    serverPolicies.firstOrNull { it.profile.supports(playerCount, rules) }
+                } else null
             player.id to
                 AutomatedPlayer(
                     request.difficulty,

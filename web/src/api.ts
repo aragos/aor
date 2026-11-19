@@ -1,3 +1,5 @@
+import type {ServerBotProfile} from './ai/serverBotProfiles';
+
 export interface IncomeView {
     ordinary: number; baseIncome: number; middleClassBonus: number; interestProfit: number; reliefSpaces: number;
 }
@@ -176,7 +178,7 @@ export interface BotJob {
     /** Optional actor-visible card projection; authority and hidden opponent state are excluded. */
     card?: unknown;
     /** An exact server-profile proposal bypasses local worker inference for this decision. */
-    proposal?: {profile: 'aor-coordinated-83-support-1' | 'aor-coordinated-win-support-1' | 'aor-coordinated-robust-support-1'; assetSha256: string; command: string} | null;
+    proposal?: {profile: ServerBotProfile; assetSha256: string; command: string} | null;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;

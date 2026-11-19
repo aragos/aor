@@ -11,23 +11,29 @@ import dev.aragos.aor.ai.TokenNeighborQuote
 enum class ServerBotProfile(val version: String) {
     COORDINATED_83_SUPPORT_1("aor-coordinated-83-support-1"),
     COORDINATED_WIN_SUPPORT_1("aor-coordinated-win-support-1"),
-    COORDINATED_ROBUST_SUPPORT_1("aor-coordinated-robust-support-1");
+    COORDINATED_ROBUST_SUPPORT_1("aor-coordinated-robust-support-1"),
+    BROAD_HARD_1("aor-broad-hard-1");
 
     fun supports(playerCount: Int, rules: RuleOptions): Boolean =
         BotConfiguration(
-            playerCount = playerCount,
-            map = rules.map,
-            initialCard = rules.initialCard,
-            deckModification = rules.deckModification,
-            immediateMasterArtDiscard = rules.immediateMasterArtDiscard,
-            drawThreeKeepTwo = rules.drawThreeKeepTwo,
-        ) == JointPolicyScope.configuration
+                playerCount = playerCount,
+                map = rules.map,
+                initialCard = rules.initialCard,
+                deckModification = rules.deckModification,
+                immediateMasterArtDiscard = rules.immediateMasterArtDiscard,
+                drawThreeKeepTwo = rules.drawThreeKeepTwo,
+            )
+            .let(::supportsConfiguration)
 
     fun supports(observation: BotObservation, difficulty: BotDifficulty): Boolean =
         difficulty == BotDifficulty.HARD &&
             observation.rulesVersion == JointPolicyScope.RULES_VERSION &&
             observation.dataVersion == JointPolicyScope.DATA_VERSION &&
-            observation.configuration == JointPolicyScope.configuration
+            observation.configuration?.let(::supportsConfiguration) == true
+
+    private fun supportsConfiguration(configuration: BotConfiguration): Boolean =
+        if (this == BROAD_HARD_1) configuration != JointPolicyScope.configuration
+        else configuration == JointPolicyScope.configuration
 
     companion object {
         fun fromVersion(version: String): ServerBotProfile? = entries.singleOrNull {

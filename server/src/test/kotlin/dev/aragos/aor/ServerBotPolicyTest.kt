@@ -68,6 +68,32 @@ class ServerBotPolicyTest {
         }
 
     @Test
+    fun unpackedHardSetupReceivesTheRegisteredBroadPolicy() {
+        val broad =
+            OfferedProfile(assetSha256 = "b".repeat(64), profile = ServerBotProfile.BROAD_HARD_1)
+        ProfileFixture(rules = RuleOptions(map = MapRule.EUROPEAN), broadPolicy = broad).use {
+            fixture ->
+            val proposal = fixture.claim().observations.single().proposal
+
+            assertThat(proposal?.profile).isEqualTo(ServerBotProfile.BROAD_HARD_1.version)
+            assertThat(proposal?.assetSha256).isEqualTo(broad.assetSha256)
+            assertThat(fixture.policy.calls).isEmpty()
+        }
+    }
+
+    @Test
+    fun exactPilotSetupRetainsItsRegisteredCoordinatedPolicy() {
+        val broad = OfferedProfile(profile = ServerBotProfile.BROAD_HARD_1)
+        ProfileFixture(broadPolicy = broad).use { fixture ->
+            val proposal = fixture.claim().observations.single().proposal
+
+            assertThat(proposal?.profile)
+                .isEqualTo(ServerBotProfile.COORDINATED_83_SUPPORT_1.version)
+            assertThat(broad.calls).isEmpty()
+        }
+    }
+
+    @Test
     fun proposalUsesOnlyTheActingSeatsViewAndExistingSeed(): Unit =
         ProfileFixture().use { fixture ->
             val work = fixture.claim()
@@ -312,11 +338,17 @@ private class ProfileFixture(
     humans: Int = 1,
     policyProfile: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
     quotedTokenAmount: Int? = null,
+    broadPolicy: ServerBotPolicy? = null,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-server-profile-")
     val policy = OfferedProfile(profile = policyProfile, quotedTokenAmount = quotedTokenAmount)
     val service =
-        GameService(FileGameStore(directory), GameDriver(FixedRandom()), serverBotPolicy = policy)
+        GameService(
+            FileGameStore(directory),
+            GameDriver(FixedRandom()),
+            serverBotPolicy = policy,
+            broadBotPolicy = broadPolicy,
+        )
     val game =
         service.create(
             List(humans) { "Human $it" },

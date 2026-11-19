@@ -450,12 +450,8 @@ internal object BotAutomation {
         observation: BotObservation? = null,
     ): ServerPolicyDecision? {
         val profile = ServerBotProfile.fromVersion(bot.policyVersion) ?: return null
-        val policy = service.serverBotPolicy
-        if (
-            policy == null ||
-                policy.profile != profile ||
-                policy.assetSha256 != bot.policyAssetSha256
-        ) {
+        val policy = service.serverPolicy(profile)
+        if (policy == null || policy.assetSha256 != bot.policyAssetSha256) {
             throw ServiceFailure(503, "BOT_POLICY_UNAVAILABLE")
         }
         val actual = observation ?: BotObservations.from(game.state(), seat)
