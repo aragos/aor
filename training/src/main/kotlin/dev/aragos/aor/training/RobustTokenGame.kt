@@ -56,6 +56,7 @@ internal class RobustTokenDiagnostics(
     private val orderPositions = mutableMapOf<Int, Int>()
     private val seenTurns = mutableSetOf<Int>()
     private var committedCash = 0L
+    private var opening: Map<String, Any>? = null
     private var discardedTokensAtPass = 0L
     private var expansionCards = 0
     private var attacks = 0
@@ -119,6 +120,16 @@ internal class RobustTokenDiagnostics(
         val player = PlayerId(decision.observation.playerId)
         val own = view.players.single { it.id == player }
         val turn = view.turnNumber
+        if (turn == 1 && view.stage == Stage.TOKEN_PURCHASE) {
+            opening =
+                mapOf(
+                    "bid" to LocalTokenNeighborPolicy.amount(command),
+                    "capital" to
+                        requireNotNull(own.capital) { "An opening bidder needs a capital." },
+                    "capitalPosition" to view.capitalOrder.indexOf(player),
+                    "cash" to own.cash,
+                )
+        }
         if (
             turn != null &&
                 view.stage !in setOf(Stage.TOKEN_PURCHASE, Stage.TURN_ORDER_TIE) &&
@@ -164,6 +175,7 @@ internal class RobustTokenDiagnostics(
             "chosenPolicyDecisionsSha256" to
                 decisions.digest().joinToString("") { "%02x".format(it) },
         ) +
+            (opening?.let { mapOf("openingBid" to it) } ?: emptyMap()) +
             if (recordTokenAdmissions)
                 mapOf(
                     "controlledUnofferedTokenBidCounts" to

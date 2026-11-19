@@ -99,6 +99,35 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun firstTurnUsesLegalBidsForItsCapitalPriority() {
+        val opening = view.copy(turnNumber = 1, pastTokenPurchases = emptyList())
+        val tested = config.copy(openingMix = OpeningBidMix(listOf(17, 18), listOf(20)))
+        val earlier = InitiativePolicy.bid(opening, seat, "buy-tokens 21", 7, tested)
+        val later =
+            InitiativePolicy.bid(
+                opening.copy(capitalOrder = players.reversed()),
+                seat,
+                "buy-tokens 21",
+                7,
+                tested,
+            )
+
+        assertEquals("buy-tokens 18", earlier)
+        assertEquals("buy-tokens 20", later)
+    }
+
+    @Test
+    fun absoluteOpeningBidsDoNotApplyOnLaterTurnsWithoutHistory() {
+        val oldSave = view.copy(pastTokenPurchases = emptyList())
+        val tested = config.copy(openingMix = OpeningBidMix(listOf(18)))
+
+        assertEquals(
+            "buy-tokens 21",
+            InitiativePolicy.bid(oldSave, seat, "buy-tokens 21", 7, tested),
+        )
+    }
+
+    @Test
     fun buysOneMoreTokenWhenItUnlocksTheBetterExpansionPlanAtTheSameOrder() {
         val markets =
             state.catalog.provinces.zip(listOf(5, 5, 6, 6)).map { (province, cost) ->

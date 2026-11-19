@@ -9,6 +9,23 @@ import dev.aragos.aor.TokenPurchaseOfferView
 import kotlin.math.pow
 
 /**
+ * Absolute bids for the first turn. An optional second mix applies to players in the later half of
+ * capital selection, when they can place themselves relative to more rivals on tied bids.
+ */
+data class OpeningBidMix(val bids: List<Int>, val laterCapitalBids: List<Int> = emptyList()) {
+    init {
+        require(bids.isNotEmpty()) { "An opening mix requires at least one default bid." }
+        require(
+            listOf(bids, laterCapitalBids).all {
+                it == it.distinct() && it.all { bid -> bid in 0..36 }
+            }
+        ) {
+            "An opening mix requires distinct bids between zero and 36 in each group."
+        }
+    }
+}
+
+/**
  * Tunable initiative bids use printed order boxes and authoritative quotes. [maximumTokenLoss]
  * limits tokens sacrificed relative to the normal choice. [tokenPenalty] uses expected printed box
  * numbers per forgone token. [participation] is the chance of using a positive-scoring switch.
@@ -21,6 +38,7 @@ import kotlin.math.pow
  * [extraCashPenalty] charges those same score units per dollar above the original bid.
  * [counterAnticipation] is the weight of a forecast when a rival repeatedly tracks our usual bid.
  * [respectRivalCash] clips historical predictions to each rival's currently published cash.
+ * [openingMix] selects from absolute first-turn bids when at least one can be bought.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -36,6 +54,7 @@ data class InitiativePolicyConfig(
     val extraCashPenalty: Double = 0.15,
     val counterAnticipation: Double = 0.0,
     val respectRivalCash: Boolean = false,
+    val openingMix: OpeningBidMix? = null,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -86,9 +105,18 @@ object InitiativePolicy {
         require(view.stage == Stage.TOKEN_PURCHASE) { "Initiative bids require a purchase window." }
         if (config.participation == 0.0) return normal
         val hasHistory = view.pastTokenPurchases.isNotEmpty()
-        if (!hasHistory && config.openingSpread == 0) return normal
+        if (!hasHistory && config.openingSpread == 0 && config.openingMix == null) return normal
         val draw = TerritoryPolicy.uniform(seed xor 0x6EA14F52)
         if (draw >= config.participation) return normal
+        if (!hasHistory && view.turnNumber == 1 && config.openingMix != null) {
+            val mix = config.openingMix
+            val capitalPosition = view.capitalOrder.indexOf(player)
+            val later = capitalPosition >= (view.capitalOrder.size + 1) / 2
+            val amounts =
+                if (later && mix.laterCapitalBids.isNotEmpty()) mix.laterCapitalBids else mix.bids
+            val legal = view.tokenPurchaseOffers.filter { it.amount in amounts }
+            if (legal.isNotEmpty()) return bidCommand(sampleBid(legal, seed))
+        }
         val originalAmount = LocalTokenNeighborPolicy.amount(normal)
         val original = view.tokenPurchaseOffers.single { it.amount == originalAmount }
         if (original.tokensReceived == 0) return normal
