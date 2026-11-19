@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.CathedralAttackOdds
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
@@ -629,7 +630,12 @@ private constructor(
                         rule,
                         setOf("kind", "maximumTrailingPoints", "requireGreaterCommodityDenial"),
                         optional =
-                            setOf("maximumAdditionalTokens", "maximumOddsDrop", "earliestTurn"),
+                            setOf(
+                                "maximumAdditionalTokens",
+                                "maximumOddsDrop",
+                                "earliestTurn",
+                                "cathedralOdds",
+                            ),
                     )
                     require(
                         rule["kind"]?.asText() == LeadingRivalRetargetingConfig.VERSION &&
@@ -655,6 +661,15 @@ private constructor(
                             rule["earliestTurn"]?.let {
                                 PurchaseJson.integer(it, "earliest retargeting turn")
                             } ?: 4,
+                        cathedralOdds =
+                            rule["cathedralOdds"]?.let { setting ->
+                                val named = PurchaseJson.text(setting, "Cathedral attack odds")
+                                requireNotNull(
+                                    CathedralAttackOdds.entries.singleOrNull { it.name == named }
+                                ) {
+                                    "Use DICE_ONLY, DEFENSE, or BOTH for Cathedral attack odds."
+                                }
+                            } ?: CathedralAttackOdds.DICE_ONLY,
                     )
                 }
             val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)
