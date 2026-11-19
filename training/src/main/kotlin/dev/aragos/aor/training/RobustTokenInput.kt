@@ -3,6 +3,7 @@ package dev.aragos.aor.training
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
+import dev.aragos.aor.ai.LinearPublicThreat
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
@@ -634,6 +635,7 @@ private constructor(
                     PurchaseJson.fields(
                         rule,
                         setOf("kind", "maximumTrailingPoints", "requireGreaterCommodityDenial"),
+                        optional = setOf("forecast"),
                     )
                     require(
                         rule["kind"]?.asText() == LeadingRivalRetargetingConfig.VERSION &&
@@ -647,6 +649,24 @@ private constructor(
                             "maximum trailing points",
                         ),
                         rule["requireGreaterCommodityDenial"].booleanValue(),
+                        rule["forecast"]?.let { model ->
+                            PurchaseJson.fields(
+                                model,
+                                setOf("kind", "weights"),
+                                optional = setOf("maximumForecastGap"),
+                            )
+                            require(model["kind"].asText() == LinearPublicThreat.VERSION) {
+                                "Retargeting requires the versioned public winner forecast."
+                            }
+                            LinearPublicThreat(
+                                PurchaseJson.array(model["weights"], "forecast coefficients").map {
+                                    PurchaseJson.number(it, "forecast coefficient")
+                                },
+                                model["maximumForecastGap"]?.let {
+                                    PurchaseJson.number(it, "maximum forecast gap")
+                                },
+                            )
+                        },
                     )
                 }
             val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)

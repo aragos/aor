@@ -14,6 +14,7 @@ import dev.aragos.aor.TextCodec
 data class LeadingRivalRetargetingConfig(
     val maximumTrailingPoints: Int,
     val requireGreaterCommodityDenial: Boolean,
+    val forecast: LinearPublicThreat? = null,
 ) {
     init {
         require(maximumTrailingPoints in 1..10000) {
@@ -35,7 +36,8 @@ internal object LeadingRivalRetargeting {
         ordinary: String,
         config: LeadingRivalRetargetingConfig,
     ): String {
-        if ((view.turnNumber ?: 0) < 4 || !ordinary.startsWith("attack ")) return ordinary
+        val turn = view.turnNumber ?: return ordinary
+        if (turn < 4 || !ordinary.startsWith("attack ")) return ordinary
         val original = TextCodec.parseCommand(ordinary) as? BoardCommand.Attack ?: return ordinary
         val scores =
             view.scores
@@ -45,7 +47,25 @@ internal object LeadingRivalRetargeting {
                 .toMap()
         val own = scores[actor] ?: return ordinary
         val lead = scores.maxOfOrNull { it.value } ?: return ordinary
-        if (lead - own !in 1..config.maximumTrailingPoints) return ordinary
+        val scoreEligible = lead - own in 1..config.maximumTrailingPoints
+        val forecast = config.forecast?.takeIf { turn <= 9 }
+        val leaders =
+            if (forecast != null) {
+                if (forecast.maximumForecastGap == null && !scoreEligible) return ordinary
+                val probabilities = forecast.probabilities(view, turn)
+                val self = probabilities[actor] ?: return ordinary
+                val maximum = probabilities.values.maxOrNull() ?: return ordinary
+                val difference = maximum - self
+                if (
+                    difference <= 1e-8 ||
+                        forecast.maximumForecastGap?.let { difference > it } == true
+                )
+                    return ordinary
+                probabilities.filterValues { maximum - it <= 1e-8 }.keys
+            } else {
+                if (!scoreEligible) return ordinary
+                scores.filterValues { it == lead }.keys
+            }
         val marketOwners =
             view.board
                 .mapNotNull { province ->
@@ -53,8 +73,7 @@ internal object LeadingRivalRetargeting {
                 }
                 .toMap()
         val originalDefender = marketOwners[original.province] ?: return ordinary
-        val rivalScore = scores[originalDefender] ?: return ordinary
-        if (rivalScore >= lead) return ordinary
+        if (originalDefender !in scores || originalDefender in leaders) return ordinary
 
         val offers =
             view.expansionOffers
@@ -77,7 +96,7 @@ internal object LeadingRivalRetargeting {
         val baseline = action(original.province) ?: return ordinary
         return offers.keys
             .asSequence()
-            .filter { province -> marketOwners[province]?.let { scores[it] == lead } == true }
+            .filter { province -> marketOwners[province]?.let { it in leaders } == true }
             .mapNotNull(::action)
             .filter { move ->
                 move.cost <= baseline.cost + 2 &&

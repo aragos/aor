@@ -18,7 +18,7 @@ POLICIES = {
 }
 
 
-def study(campaign, label, policies, plan, count):
+def study(campaign, label, policies, plan, count, *, variant_options=None):
     baseline = plan["baseline"]
     rivals = {int(offset): policy for offset, policy in plan["rivals"].items()}
     scopes = {
@@ -28,13 +28,14 @@ def study(campaign, label, policies, plan, count):
         "familiar": ("REVEALED_UNDERCUT", None, {"openingBidPrior": 19}),
     }
     summaries = {policy: {} for policy in policies}
+    overrides = variant_options or {"leading_rival_variants": policies}
     for name, (ecology, roster, counter) in scopes.items():
         options = dict.fromkeys(("control", *policies), counter) if counter else None
         folder = f"{label}-{name}"
         result = campaign.stage(
             folder, dict.fromkeys(policies, baseline), count, (ecology,), shard=128,
             baseline=baseline, lineup=roster, counter_variants=options,
-            leading_rival_variants=policies,
+            **overrides,
         )
         control = load_games(campaign.root / folder, "control")
         for policy in policies:
