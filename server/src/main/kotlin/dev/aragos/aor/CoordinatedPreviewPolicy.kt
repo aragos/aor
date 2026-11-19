@@ -20,6 +20,7 @@ import dev.aragos.aor.ai.IncumbentResidualSelector
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
@@ -53,6 +54,14 @@ private const val MIXED_INITIATIVE_AUDIT_SHA256 =
 private const val MIXED_INITIATIVE_CERTIFICATE_SHA256 =
     "ddadaa3f4c2f990078cdae90eed35c4fbe707525645a9cfe82903743ff980e98"
 private val MIXED_INITIATIVE_TABLES = listOf("mixed-table", "adaptive-table")
+private const val MIXED_PREVIEW_MANIFEST_SHA256 =
+    "a5c2c88cf9d5de620304cd976c92c41dea5d1026e8cc9c27fe8436c98d917da4"
+private const val RETARGETING_CERTIFICATE_SHA256 =
+    "7b22ba487b110275d326c969f828e5ab80a6da86c51c2e5d3735a886d51b48a2"
+private const val RETARGETING_TRAINING_SHA256 =
+    "fcaae16011c32bebfdc0617777a3ffe8cfb80a7b0c83666d31cd916a5dec0630"
+private const val RETARGETING_AUDIT_SHA256 =
+    "b760171f77df67a656cd402c84d4581aebce2d9840d95fda709149fba9ddcbf0"
 private val VALID_WIN_SHARES = setOf(0.0, .25, 1.0 / 3.0, .5, 1.0)
 
 /**
@@ -164,9 +173,35 @@ private class CoordinatedAssetReader(path: Path) {
     fun read(): ServerBotPolicy {
         val manifest = document(manifestPath)
         val root = node(manifest)
-        if (text(root, "kind") != "coordinated-initiative-preview-1") {
-            return readCoordinated(manifest, root)
+        return when (text(root, "kind")) {
+            "coordinated-initiative-preview-1" -> readInitiative(manifest, root)
+            "coordinated-leading-rival-preview-1" -> {
+                fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+                require(integer(root, "schemaVersion") == 1) {
+                    "The leading-rival preview requires schema version 1."
+                }
+                val base = subject(manifest, root["basePreview"])
+                require(base.sha256 == MIXED_PREVIEW_MANIFEST_SHA256) {
+                    "Retargeting must preserve the exact mixed-table incumbent."
+                }
+                val qualification = subject(manifest, root["qualification"])
+                readInitiative(
+                    base,
+                    node(base),
+                    manifest.sha256,
+                    retargetingQualification(qualification, base),
+                )
+            }
+            else -> readCoordinated(manifest, root)
         }
+    }
+
+    private fun readInitiative(
+        manifest: Document,
+        root: JsonNode,
+        assetHash: String = manifest.sha256,
+        retargeting: LeadingRivalRetargetingConfig? = null,
+    ): ServerBotPolicy {
         fields(root, "kind", "schemaVersion", "basePreview", "qualification")
         require(integer(root, "schemaVersion") == 1) {
             "The initiative preview requires schema version 1."
@@ -180,7 +215,8 @@ private class CoordinatedAssetReader(path: Path) {
             base,
             node(base),
             initiativeQualification(qualification, base),
-            manifest.sha256,
+            assetHash,
+            retargeting,
         )
     }
 
@@ -189,6 +225,7 @@ private class CoordinatedAssetReader(path: Path) {
         root: JsonNode,
         initiative: InitiativePolicyConfig? = null,
         assetHash: String = manifest.sha256,
+        retargeting: LeadingRivalRetargetingConfig? = null,
     ): ServerBotPolicy {
         val robust = text(root, "kind") == "coordinated-robust-support-preview-1"
         val winOnly = text(root, "kind") == "coordinated-win-support-preview-1"
@@ -277,8 +314,99 @@ private class CoordinatedAssetReader(path: Path) {
                     robustDefinition?.let { expansionDenial(node(it)["expansionDenial"]) },
                 tokenNeighborMixture = neighborMixture,
                 initiative = initiative,
+                leadingRivalRetargeting = retargeting,
             ),
             neighborMixture,
+        )
+    }
+
+    private fun retargetingQualification(
+        document: Document,
+        base: Document,
+    ): LeadingRivalRetargetingConfig {
+        val receipt = node(document)
+        fields(
+            receipt,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "auditSha256",
+            "retargeting",
+            "comparisons",
+        )
+        require(
+            text(receipt, "kind") == "public-leading-rival-qualification-1" &&
+                document.sha256 == RETARGETING_CERTIFICATE_SHA256 &&
+                hash(receipt, "basePreviewSha256") == base.sha256 &&
+                hash(receipt, "nativeJarSha256") == RETARGETING_TRAINING_SHA256 &&
+                hash(receipt, "auditSha256") == RETARGETING_AUDIT_SHA256
+        ) {
+            "The retargeting certificate must match the complete independently audited comparisons."
+        }
+        val cases =
+            mapOf(
+                "mixed" to 1024,
+                "adaptive" to 1024,
+                "familiar" to 1024,
+                "experienced" to 512,
+                "known16" to 768,
+            )
+        val comparisons = receipt["comparisons"]
+        fields(comparisons, *cases.keys.toTypedArray())
+        val allSeeds = mutableSetOf<Int>()
+        val performance = cases.mapValues { (name, count) ->
+            val case = comparisons[name]
+            fields(case, "worlds", "evidenceSha256")
+            hash(case, "evidenceSha256")
+            val worlds = case["worlds"]
+            require(worlds.isArray && worlds.size() == count) {
+                "The retargeting test needs every declared game in $name."
+            }
+            val deltas = worlds.map { row ->
+                fields(row, "seed", "candidate", "control")
+                require(allSeeds.add(integer(row, "seed"))) {
+                    "Each qualified world must occur once across all retargeting comparisons."
+                }
+                val candidate = number(row["candidate"], "candidate win share")
+                val control = number(row["control"], "control win share")
+                require(candidate in VALID_WIN_SHARES && control in VALID_WIN_SHARES) {
+                    "Each retargeting result must use a valid four-seat winner share."
+                }
+                candidate - control
+            }
+            val independent =
+                if (name == "experienced") deltas.chunked(4).map { it.average() } else deltas
+            val mean = independent.average()
+            val error =
+                sqrt(
+                    independent.sumOf { (it - mean) * (it - mean) } /
+                        ((independent.size - 1) * independent.size)
+                )
+            mean to (mean - 1.96 * error)
+        }
+        val ordinary =
+            listOf("mixed", "adaptive", "familiar").map { name ->
+                checkNotNull(performance[name]) {
+                    "The retargeting test needs the $name comparison."
+                }
+            }
+        require(
+            ordinary.minOf { it.second } > -.025 &&
+                ordinary.map { it.first }.average() >= .015 &&
+                ordinary.count { it.second > 0.0 } >= 2 &&
+                (performance["experienced"]?.second ?: -1.0) > 0.0 &&
+                (performance["known16"]?.second ?: -1.0) > -.025
+        ) {
+            "The retargeting candidate must meet both fresh and informed-rival win thresholds."
+        }
+        val policy = receipt["retargeting"]
+        fields(policy, "kind", "maximumTrailingPoints", "requireGreaterCommodityDenial")
+        require(text(policy, "kind") == LeadingRivalRetargetingConfig.VERSION) {
+            "The retargeting certificate must identify its shared expansion rule."
+        }
+        return LeadingRivalRetargetingConfig(
+            maximumTrailingPoints = integer(policy, "maximumTrailingPoints"),
+            requireGreaterCommodityDenial = truth(policy, "requireGreaterCommodityDenial"),
         )
     }
 
