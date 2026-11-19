@@ -246,7 +246,7 @@ def ranked(outcomes):
     return sorted(outcomes.values(), key=lambda row: (row["rankScore"], row["adaptive"]), reverse=True)
 
 
-def main(root, initial, cross):
+def main(root, initial):
     campaign = Campaign(root)
     campaign.validate_runtime()
     if campaign.remaining() < 1000:
@@ -254,10 +254,6 @@ def main(root, initial, cross):
         return
     earlier = read(initial / "result.json")
     base = earlier["best"] if earlier["status"] == "development-no-nomination" else earlier["comparison"]
-    if (cross / "mixed-result.json").exists():
-        followup = read(cross / "mixed-result.json")
-        if followup.get("passed"):
-            base = followup["audit"]["selected"]
     base = base["config"]
     runs = {
         "cheap-card-light": dict(base, cardBonus=1.0),
@@ -282,6 +278,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--initial", type=Path, required=True)
-    parser.add_argument("--cross", type=Path, required=True)
     args = parser.parse_args()
-    main(args.root.resolve(), args.initial.resolve(), args.cross.resolve())
+    main(args.root.resolve(), args.initial.resolve())
