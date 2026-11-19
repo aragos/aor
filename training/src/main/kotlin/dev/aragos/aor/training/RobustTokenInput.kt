@@ -68,15 +68,22 @@ internal enum class RobustOpponentStyle {
 }
 
 /** One frozen independent opponent in a declared registration-relative seat. */
-internal data class InitiativeRival(val offset: Int, val policy: InitiativePolicyConfig) {
+internal data class InitiativeRival(val offsets: List<Int>, val policy: InitiativePolicyConfig) {
     init {
-        require(offset in 1..3) { "The initiative rival must occupy one of the other three seats." }
+        require(
+            offsets.isNotEmpty() &&
+                offsets == offsets.distinct().sorted() &&
+                offsets.all { it in 1..3 }
+        ) {
+            "The initiative lineup requires distinct registration-relative rival seats."
+        }
     }
 
-    fun seat(targetSeat: Int): Int = (targetSeat + offset) % 4
+    fun seats(targetSeat: Int): List<Int> = offsets.map { (targetSeat + it) % 4 }
 
     companion object {
         const val VERSION = "public-initiative-rival-1"
+        const val LINEUP = "public-initiative-lineup-1"
     }
 }
 
@@ -443,17 +450,24 @@ private constructor(
             }
             val initiativeRival =
                 node["initiativeRival"]?.let { rival ->
-                    PurchaseJson.fields(rival, setOf("kind", "offset", "policy"))
-                    require(
-                        rival["kind"].asText() == InitiativeRival.VERSION &&
-                            style == RobustOpponentStyle.QUALIFIED
-                    ) {
-                        "The independently tuned rival requires its explicit version and the frozen base lineup."
+                    require(style == RobustOpponentStyle.QUALIFIED) {
+                        "The independent initiative lineup requires the frozen base opposition."
                     }
-                    InitiativeRival(
-                        PurchaseJson.integer(rival["offset"], "rival offset"),
-                        initiative(rival.required("policy")),
-                    )
+                    val offsets =
+                        when (rival["kind"]?.asText()) {
+                            InitiativeRival.VERSION -> {
+                                PurchaseJson.fields(rival, setOf("kind", "offset", "policy"))
+                                listOf(PurchaseJson.integer(rival["offset"], "rival offset"))
+                            }
+                            InitiativeRival.LINEUP -> {
+                                PurchaseJson.fields(rival, setOf("kind", "offsets", "policy"))
+                                PurchaseJson.array(rival["offsets"], "rival offsets").map {
+                                    PurchaseJson.integer(it, "rival offset")
+                                }
+                            }
+                            else -> error("Supply a versioned public initiative lineup.")
+                        }
+                    InitiativeRival(offsets, initiative(rival.required("policy")))
                 }
             val initiative = node["initiative"]?.let(::initiative)
             require(

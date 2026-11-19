@@ -19,7 +19,7 @@ import time
 MAC_JAVA = ("/Users/aragos/.gradle/jdks/azul_systems__inc_-21-aarch64-os_x.2/"
             "zulu21.50.19-ca-jdk21.0.11-macosx_aarch64/Contents/Home/bin/java")
 HOST = "aragos@192.168.86.44"
-REMOTE = "/home/aragos/aor-worker/initiative-crossplay-20261118"
+REMOTE = "/home/aragos/aor-worker/initiative-mirror-20261118"
 SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", HOST]
 MODE = "dev.aragos.aor.training.TrainingMainKt"
 ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "INDEPENDENT_INITIATIVE")
@@ -188,7 +188,7 @@ class Campaign:
                     if mode == "INDEPENDENT_INITIATIVE":
                         if rival is None:
                             raise ValueError("This ecology requires its frozen independently tuned rival.")
-                        spec["initiativeRival"] = dict(kind="public-initiative-rival-1",offset=1,policy=rival)
+                        spec["initiativeRival"] = dict(kind="public-initiative-lineup-1",offsets=[1,2,3],policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
                     write(source, spec)
@@ -249,51 +249,30 @@ def ranked(outcomes):
 def main(root, initial):
     campaign = Campaign(root)
     campaign.validate_runtime()
-    main_result = read(initial / "result.json")
-    champion = main_result["best"] if main_result["status"] == "development-no-nomination" else main_result["comparison"]
-    candidates = [
-        cfg(1, .15, 1., False, 1.),
-        cfg(3, .15, 1., False, 0.),
-        cfg(5, .15, 1., False, 3.),
-        cfg(7, .15, 1., True, 3.),
-        cfg(6, 0., .8, True, 0.),
-        cfg(4, .85, .8, False, 6.),
-        cfg(5, 0., .5, False, 0.),
-        cfg(7, .2, .8, False, 5.),
-    ]
-    trained = campaign.stage("independent-response", {f"r{i}": v for i,v in enumerate(candidates)},
-                             192, ECOLOGIES[:1], shard=96)
-    opponent = ranked(trained)[0]["config"]
-    validate = campaign.stage("response-check", {"response":opponent}, 384, ECOLOGIES[:1], paired=True)
-    if validate["response"]["ordinary"] <= 0:
-        write(root / "result.json", dict(status="response-did-not-win-more", validation=validate))
+    first = read(initial / "result.json")
+    if campaign.remaining() < 650 or first["status"] != "fresh-audit-complete" or not first["passed"]:
+        write(root / "result.json", dict(status="no-admitted-policy-or-time-for-mirror"))
         return
-    crossplay = campaign.stage("crossplay", {"champion":champion["config"]}, 512, ECOLOGIES[-1:],
-                               paired=True, rival=opponent)
-    write(root / "result.json", dict(status="crossplay-complete", comparison=crossplay, responder=validate,
-                                     initialResultSha256=sha(initial/"result.json")))
-
-    # Reserve enough time for a distinct fresh audit before starting a response-aware update.
-    if campaign.remaining() < 2700:
-        return
-    base = champion["config"]
-    followup = {"champion":base, "responder":opponent,
-                "lower-penalty":dict(base, tokenPenalty=max(0.,base["tokenPenalty"]-.3)),
-                "more-initiative":dict(base, maximumTokenLoss=min(8,base["maximumTokenLoss"]+2),
-                                       participation=1.)}
-    mixed = campaign.stage("response-aware", followup, 192, ECOLOGIES, rival=opponent)
-    viable = [candidate for candidate in ranked(mixed) if candidate["ordinary"] >= -.075 and
-              all(candidate["outcomes"][mode]["mean"] > 0 for mode in ECOLOGIES[1:])]
-    if not viable:
-        write(root / "mixed-result.json", dict(status="response-aware-no-nomination", score=mixed))
-        return
-    audit = campaign.stage("mixed-fresh-audit", {"selected":viable[0]["config"]}, 512,
-                           ECOLOGIES, paired=True, rival=opponent)
-    comparisons = audit["selected"]["outcomes"]
-    passed = comparisons["QUALIFIED"]["lower95"] > -.075 and all(
-        comparisons[mode]["lower95"] > 0 for mode in ECOLOGIES[1:])
-    write(root / "mixed-result.json", dict(status="mixed-fresh-audit-complete", passed=passed, audit=audit))
-
+    champion = first["comparison"]["config"]
+    count = 384
+    result = campaign.stage("mirrored-table", {"policy":champion}, count,
+                            ECOLOGIES[-1:], paired=True, rival=champion)
+    folder = root / "mirrored-table"
+    evidence = [json.loads(line) for start in range(0,count,96)
+        for line in (folder / f"policy-0-{start}" / "worlds.jsonl").read_text().splitlines()]
+    tiers = {}
+    for role in ("CANDIDATE","CONTROL"):
+        win = [row["roles"][role]["wins"][row["seat"]] for row in evidence]
+        bid_counts = {}
+        for row in evidence:
+            for bid,n in row["diagnostics"][role]["controlledBidCounts"].items():
+                bid_counts[bid] = bid_counts.get(bid,0)+n
+        tiers[role] = dict(winShare=statistics.mean(win),
+            allChaosWorlds=sum(not any(row["roles"][role]["wins"]) for row in evidence),
+            bidMode=max(bid_counts,key=bid_counts.__getitem__),
+            bidModeShare=max(bid_counts.values())/sum(bid_counts.values()))
+    write(root / "result.json", dict(status="mirrored-table-complete", results=tiers,
+        pairedComparison=result, initialResultSha256=sha(initial/"result.json")))
 
 
 if __name__ == "__main__":

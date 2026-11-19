@@ -212,7 +212,7 @@ internal object RobustTokenGame {
         }
         val arena = input.arena
         val seat = index % 4
-        val initiativeRivalSeat = input.initiativeRival?.seat(seat)
+        val initiativeRivalSeats = input.initiativeRival?.seats(seat).orEmpty()
         val style = input.opponentStyle.at(index, seat)
         val references =
             arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
@@ -241,7 +241,11 @@ internal object RobustTokenGame {
                     if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
                     when {
                         candidate -> input.initiative
-                        player == initiativeRivalSeat -> input.initiativeRival.policy
+                        player in initiativeRivalSeats ->
+                            requireNotNull(input.initiativeRival) {
+                                    "Every configured rival has one frozen initiative policy."
+                                }
+                                .policy
                         else -> null
                     },
                 )
@@ -319,7 +323,8 @@ internal object RobustTokenGame {
         return RobustTokenGameResult(
             terminal,
             diagnostics.result() +
-                (initiativeRivalSeat?.let { mapOf("initiativeRivalSeat" to it) } ?: emptyMap()) +
+                (if (initiativeRivalSeats.isEmpty()) emptyMap()
+                else mapOf("initiativeRivalSeats" to initiativeRivalSeats)) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()),
             trace?.sha256,

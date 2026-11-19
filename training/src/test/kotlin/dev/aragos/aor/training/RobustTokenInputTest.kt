@@ -39,7 +39,7 @@ class RobustTokenInputTest {
                 RobustTokenInput.read(source(fixture, lineup + ("initiativeRival" to rival)).path)
 
             assertThat(test.initiative).isNull()
-            assertThat(test.initiativeRival?.seat(3)).isEqualTo(0)
+            assertThat(test.initiativeRival?.seats(3)).containsExactly(0)
             assertThat(test.scienceSha256).isNotEqualTo(control.scienceSha256)
         }
     }
