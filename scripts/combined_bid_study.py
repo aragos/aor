@@ -37,7 +37,7 @@ def compare(folder):
         before, after = (row["roles"]["CANDIDATE"]["wins"] for row in (left, right))
         individual.append(after[seat] - before[seat])
         challenger = (seat + 1) % 4
-        table.append(before[challenger] - after[challenger])
+        table.append(sum(after[i] - before[i] for i in range(4) if i != challenger))
     return {"trackedSeatWinEffect": interval(individual), "automationWinEffect": interval(table),
             "changedOpeningWorlds": moves}
 
