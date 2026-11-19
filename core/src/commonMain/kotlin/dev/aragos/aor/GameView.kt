@@ -144,13 +144,24 @@ data class GameView(
     /** Signed bids from up to eight completed prior turns, oldest first; only at token bidding. */
     val pastTokenPurchases: List<Map<PlayerId, Int>> = emptyList(),
 ) {
+    /** Public fields reused by full and decision-only views of the same immutable state. */
+    internal class Common(state: GameState) {
+        val activity: ActivityView = ActivityView.from(state)
+        val board: List<ProvinceView> =
+            state.board.pieces.map { (province, pieces) -> ProvinceView.from(province, pieces) }
+        val catalog: PublicCatalog = PublicCatalog.from(state.catalog)
+        val scores: List<ScoreView> = ScoreView.from(state)
+        val commodityPayouts: List<CommodityPayoutView> by lazy { CommodityPayoutView.from(state) }
+    }
+
     companion object {
         internal fun forViewer(
             state: GameState,
             viewer: PlayerState?,
             decisionOnly: Boolean = false,
         ): GameView {
-            val decision = ActivityView.from(state).choice
+            val common = state.commonView
+            val decision = common.activity.choice
             fun needed(vararg choices: String): Boolean = !decisionOnly || decision in choices
             val expansion = state.expansionQuotesFor(viewer?.player?.id)
             return GameView(
@@ -175,16 +186,8 @@ data class GameView(
                     if (state.stage == Stage.TOKEN_PURCHASE) state.recentTokenPurchases
                     else emptyList(),
                 provisionalTieOrder = state.turnOrderSelection.ties.firstOrNull()?.placed.orEmpty(),
-                board =
-                    state.board.pieces.map { (province, pieces) ->
-                        ProvinceView.from(province, pieces)
-                    },
-                catalog =
-                    PublicCatalog.forPlayers(
-                        state.playerIds.size,
-                        state.rules,
-                        state.catalog.version,
-                    ),
+                board = common.board,
+                catalog = common.catalog,
                 lockedProvinces =
                     viewer
                         .takeUnless { decisionOnly }
@@ -199,11 +202,11 @@ data class GameView(
                                 .toSet()
                         }
                         .orEmpty(),
-                activity = ActivityView.from(state),
+                activity = common.activity,
                 deckRemaining = state.deck.size,
                 unplayedCards = if (decisionOnly) emptyList() else CardAvailability.unplayed(state),
                 endingTriggered = state.endingTriggered,
-                scores = ScoreView.from(state),
+                scores = common.scores,
                 adjustments = state.adjustments,
                 effects = state.effects,
                 cathedralPairs = CathedralPairView.from(state),
@@ -302,7 +305,7 @@ data class GameView(
                             "place-event-marker",
                         )
                     ) {
-                        CommodityPayoutView.from(state)
+                        common.commodityPayouts
                     } else emptyList(),
                 commodityCards =
                     if (needed("play-cards", "expand", "buy-tokens")) {
@@ -546,8 +549,10 @@ data class PublicCatalog(
             playerCount: Int,
             rules: RuleOptions = RuleOptions(),
             version: CatalogVersion = CatalogVersion.CATALOG_16,
-        ): PublicCatalog {
-            val configuration = CatalogConfiguration(playerCount, rules, version)
+        ): PublicCatalog = from(CatalogConfiguration(playerCount, rules, version))
+
+        internal fun from(configuration: CatalogConfiguration): PublicCatalog {
+            val playerCount = configuration.playerCount
             return PublicCatalog(
                 configuration.provinces,
                 AdvanceData.definitions,
@@ -570,10 +575,13 @@ data class PublicCatalog(
                         greenWins = CompetitionRules.greenWinningRolls(box),
                     )
                 },
-                dataVersion = version.wireValue,
+                dataVersion = configuration.version.wireValue,
                 commodityCards =
                     configuration.commodities.map { commodity ->
-                        CommodityCardCountView(commodity.id, commodity.cardsByEpoch(rules))
+                        CommodityCardCountView(
+                            commodity.id,
+                            commodity.cardsByEpoch(configuration.rules),
+                        )
                     },
             )
         }

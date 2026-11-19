@@ -126,6 +126,7 @@ data class GameState(
 ) {
     /** Derived board queries are shared only within this immutable game snapshot. */
     internal val boardContext: BoardRulesContext by lazy { BoardGame.context(this) }
+    internal val commonView: GameView.Common by lazy { GameView.Common(this) }
 
     val catalog: CatalogConfiguration by lazy {
         CatalogConfiguration(playerIds.size, rules, CatalogVersion.fromWire(header.dataVersion))
