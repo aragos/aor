@@ -314,7 +314,13 @@ internal object RobustTokenGame {
                 ?.takeIf { input.commodityRollouts }
                 ?.let { timing ->
                     PairedActionRolloutObserver(seat, timing)
-                } ?: if (input.expansionCardRollouts) PairedActionRolloutObserver(seat) else null
+                }
+                ?: when {
+                    input.expansionCardRollouts -> PairedActionRolloutObserver(seat)
+                    input.cardTerritoryRollouts ->
+                        PairedActionRolloutObserver(seat, compareTerritory = true)
+                    else -> null
+                }
         val competitors =
             List(4) { player ->
                 Competitor(

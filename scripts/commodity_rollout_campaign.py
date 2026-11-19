@@ -9,19 +9,27 @@ from initiative_campaign import Campaign, interval, read, seed_bank, sha, write
 
 REMOTE = "/home/aragos/aor-worker/commodity-rollouts-20261118"
 EXPANSION_REMOTE = "/home/aragos/aor-worker/expansion-card-rollouts-20261118"
+TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 
-def simulated_positions(campaign, root, baseline, count, *, expansion=False):
-    topic = "buy-or-pass" if expansion else "play-or-hold"
+def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False):
+    topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
+    if expansion:
+        topic, bank = "buy-or-pass", "expansion-buy-or-pass-v1"
+    elif territory:
+        topic, bank = "buy-or-expand", "card-versus-territory-v1"
     stage = root / topic
     stage.mkdir(exist_ok=campaign.resume)
-    seeds = seed_bank("expansion-buy-or-pass-v1" if expansion else "commodity-play-or-hold-v1", count)
+    seeds = seed_bank(bank, count)
     timing = {"kind": "affordable-commodity-retention-1", "futureWeight": .10,
               "minimumGrowth": 8, "currentPayoutLimit": 10}
     method = {"kind": "natural-commodity-root-screen-1", "seeds": seeds, "initiative": baseline,
               "commodityTiming": timing, "tailReplicates": 2, "runtime": campaign.runtime}
     if expansion:
         method["kind"] = "natural-card-purchase-root-screen-1"
+        method.pop("commodityTiming")
+    elif territory:
+        method["kind"] = "natural-card-versus-territory-root-screen-1"
         method.pop("commodityTiming")
     declared = stage / "method.json"
     if not declared.exists():
@@ -40,6 +48,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False):
                        replayIndices=[0,count-1], initiative=baseline)
         if expansion:
             request["expansionCardRollouts"] = True
+        elif territory:
+            request["cardTerritoryRollouts"] = True
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
         if not source.exists():
@@ -113,12 +123,51 @@ def expansion_report(stage):
             "buyWinShareDelta":groups}
 
 
-def main(root, previous, count, resume, expansion):
-    campaign = Campaign(root, remote=EXPANSION_REMOTE if expansion else REMOTE, resume=resume)
+def territory_report(stage):
+    observations, origins = [], 0
+    for path in sorted(stage.glob("root-*/worlds.jsonl")):
+        for line in path.open():
+            record = json.loads(line)["diagnostics"]["CANDIDATE"]["cardTerritoryRollouts"]
+            origins += 1
+            if record["status"] != "paired":
+                continue
+            outcomes = zip(record["tails"]["buy"], record["tails"]["territory"], strict=True)
+            gain = statistics.mean(a["terminal"]["winShare"] - b["terminal"]["winShare"]
+                                   for a, b in outcomes)
+            observations.append((record, gain))
+    filters = {
+        "all": lambda row: True,
+        "peaceful-market": lambda row: not row["attack"],
+        "attack": lambda row: row["attack"],
+        "first-epoch": lambda row: row["epoch"] == 1,
+        "later-epoch": lambda row: row["epoch"] > 1,
+        "cheap-card": lambda row: row["price"] == 3,
+        "costlier-card": lambda row: row["price"] > 3,
+        "empty-hand": lambda row: row["handSize"] == 0,
+    }
+    groups = {}
+    for name, predicate in filters.items():
+        gains = [gain for row, gain in observations if predicate(row)]
+        if gains:
+            groups[name] = interval(gains)
+    return {"origins": origins, "eligible": len(observations), "terminalRollouts": 4 * len(observations),
+            "buyMinusTerritory": groups}
+
+
+def main(root, previous, count, resume, expansion, territory=False):
+    remote = TERRITORY_REMOTE if territory else EXPANSION_REMOTE if expansion else REMOTE
+    campaign = Campaign(root, remote=remote, resume=resume)
     campaign.validate_runtime()
-    first = read(previous / "automata-initiative-20261118/result.json")
-    stage = simulated_positions(campaign, root, first["comparison"]["config"], count, expansion=expansion)
-    write(root / "result.json", expansion_report(stage) if expansion else report(stage))
+    if territory:
+        qualified = read(previous / "automata-heterogeneous-20261118/table-fresh.json")
+        if not qualified["passed"]:
+            raise ValueError("The card tradeoff requires the qualified mixed-table policy.")
+        baseline = qualified["config"]
+    else:
+        baseline = read(previous / "automata-initiative-20261118/result.json")["comparison"]["config"]
+    stage = simulated_positions(campaign, root, baseline, count, expansion=expansion, territory=territory)
+    summarize = territory_report if territory else expansion_report if expansion else report
+    write(root / "result.json", summarize(stage))
 
 
 if __name__ == "__main__":
@@ -126,9 +175,12 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--previous", type=Path, required=True)
     parser.add_argument("--count", type=int, default=384)
-    parser.add_argument("--expansion-card", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--expansion-card", action="store_true")
+    mode.add_argument("--card-versus-territory", action="store_true")
     parser.add_argument("--resume", action="store_true")
     arguments = parser.parse_args()
     if arguments.count not in range(32,1537):
         parser.error("--count must be between 32 and 1536")
-    main(arguments.root.resolve(),arguments.previous.resolve(),arguments.count,arguments.resume,arguments.expansion_card)
+    main(arguments.root.resolve(), arguments.previous.resolve(), arguments.count, arguments.resume,
+         arguments.expansion_card, arguments.card_versus_territory)

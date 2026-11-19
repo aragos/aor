@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.BoardCommand
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameState
 import dev.aragos.aor.Stage
@@ -13,6 +14,7 @@ import dev.aragos.aor.ai.CommodityTimingPolicy
 internal class PairedActionRolloutObserver(
     override val seat: Int,
     private val timing: CommodityTimingConfig? = null,
+    private val compareTerritory: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -24,7 +26,12 @@ internal class PairedActionRolloutObserver(
 
     private var root: Root? = null
     val evidenceKey: String
-        get() = if (timing != null) "commodityRollouts" else "expansionCardRollouts"
+        get() =
+            when {
+                timing != null -> "commodityRollouts"
+                compareTerritory -> "cardTerritoryRollouts"
+                else -> "expansionCardRollouts"
+            }
 
     override fun chosen(
         state: GameState,
@@ -34,8 +41,11 @@ internal class PairedActionRolloutObserver(
     ) {
         if (root != null) return
         root =
-            if (timing != null) commodityRoot(state, number, observation, command, timing)
-            else expansionCardRoot(state, number, observation, command)
+            when {
+                timing != null -> commodityRoot(state, number, observation, command, timing)
+                compareTerritory -> cardTerritoryRoot(state, number, observation, command)
+                else -> expansionCardRoot(state, number, observation, command)
+            }
     }
 
     private fun commodityRoot(
@@ -98,6 +108,48 @@ internal class PairedActionRolloutObserver(
                 "pool" to observation.availableTokens,
                 "handSize" to view.hand.size,
                 "completePeacefulMarkets" to markets,
+                "finalTurn" to view.endingTriggered,
+            ),
+        )
+    }
+
+    private fun cardTerritoryRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (state.stage != Stage.EXPANSION) return null
+        if (observation.candidates.none { it.command == "buy-expansion-card" }) return null
+        val actor = state.playerIds[seat]
+        val move = TextCodec.parseAction(command, state, actor).command
+        val destination =
+            when (move) {
+                is BoardCommand.Place -> move.province
+                is BoardCommand.Attack -> move.province
+                else -> return null
+            }
+        val view = state.viewForDecision(actor)
+        val offer =
+            view.expansionOffers.singleOrNull { it.destination == destination } ?: return null
+        val cost = offer.requiredTokens
+        if (!offer.establishesMarker || move is BoardCommand.Place && move.tokens != cost)
+            return null
+        val price =
+            requireNotNull(view.expansionCardCost) { "An offered expansion card needs its price." }
+        if (price + cost <= observation.availableTokens) return null
+        return Root(
+            state,
+            number,
+            command,
+            mapOf("buy" to "buy-expansion-card", "territory" to command),
+            mapOf(
+                "price" to price,
+                "territoryTokens" to cost,
+                "pool" to observation.availableTokens,
+                "handSize" to view.hand.size,
+                "attack" to (move is BoardCommand.Attack),
+                "recordedChance" to (offer.competitionWinProbability ?: 1.0),
                 "finalTurn" to view.endingTriggered,
             ),
         )
