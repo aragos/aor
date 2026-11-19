@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.AdvanceId
 import dev.aragos.aor.BoardCommand
+import dev.aragos.aor.CardCommand
 import dev.aragos.aor.Command
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameState
@@ -30,6 +31,7 @@ internal class PairedActionRolloutObserver(
     private val compareRivalDenial: Boolean = false,
     private val reserveExpansionCard: Boolean = false,
     private val compareCapitals: Boolean = false,
+    private val compareLeaderProtection: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -51,6 +53,7 @@ internal class PairedActionRolloutObserver(
                 compareRivalDenial -> "rivalMarketDenialRollouts"
                 reserveExpansionCard -> "reserveExpansionCardRollouts"
                 compareCapitals -> "capitalChoiceRollouts"
+                compareLeaderProtection -> "leaderProtectionRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -69,8 +72,27 @@ internal class PairedActionRolloutObserver(
                 compareRivalDenial -> denialRoot(state, number, observation, command)
                 reserveExpansionCard -> reserveRoot(state, number, observation, command)
                 compareCapitals -> capitalRoot(state, number, observation, command)
+                compareLeaderProtection -> protectionRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
+    }
+
+    private fun protectionRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (state.stage != Stage.PLAY_CARDS || !command.startsWith("play ")) return null
+        val actor = state.playerIds[seat]
+        val plan =
+            ExposedLeaderProtection.forPlay(
+                state.viewForDecision(actor),
+                actor,
+                observation,
+                command,
+            ) ?: return null
+        return Root(state, number, command, plan.alternatives, plan.facts)
     }
 
     private fun capitalRoot(
@@ -451,6 +473,22 @@ internal class PairedActionRolloutObserver(
                                             action.command == BoardCommand.BuyExpansionCard
                                     }
                             mapOf("cardBoughtThisTurn" to cardReceived)
+                        } else emptyMap()) +
+                        (if (compareLeaderProtection) {
+                            val leader =
+                                checkNotNull(captured.context["leader"]) {
+                                    "Protection receipts must name the original exposed leader."
+                                }
+                            val patrons =
+                                session.entries
+                                    .asSequence()
+                                    .filterIsInstance<Entry.Action>()
+                                    .takeWhile { it.command !is Command.BuyTokens }
+                                    .count { entry ->
+                                        val action = entry.command as? CardCommand.PatronizeLeader
+                                        action?.leader?.cardId == leader && entry.actor != actor
+                                    }
+                            mapOf("claimsThisTurn" to patrons)
                         } else emptyMap()) +
                         (if (reliefUnlock) {
                             val spaces =

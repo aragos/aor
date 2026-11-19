@@ -15,9 +15,10 @@ TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
                         lookahead=False, epochs=(), chance_trial=False, short_training_futures=0,
                         relief_unlock=False, commodity_expansion=False, midgame_bids=False,
-                        rival_denial=False, reserve_card=False, capital_choices=False):
+                        rival_denial=False, reserve_card=False, capital_choices=False,
+                        leader_protection=False):
     if sum((expansion, territory, relief_unlock, commodity_expansion, midgame_bids,
-            rival_denial, reserve_card, capital_choices)) > 1:
+            rival_denial, reserve_card, capital_choices, leader_protection)) > 1:
         raise ValueError("A paired study requires one root intervention.")
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
@@ -36,6 +37,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         topic, bank = "reserve-expansion-card", "reserve-market-and-card-v1"
     elif capital_choices:
         topic, bank = "capital-choice", "all-offered-capitals-v1"
+    elif leader_protection:
+        topic, bank = "leader-protection", "matched-protection-escrow-v1"
     if lookahead:
         if not territory:
             raise ValueError("Short lookahead requires the card versus territory comparison.")
@@ -83,6 +86,9 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
     elif capital_choices:
         method["kind"] = "all-offered-capitals-1"
         method.pop("commodityTiming")
+    elif leader_protection:
+        method["kind"] = "matched-protection-escrow-1"
+        method.pop("commodityTiming")
     if lookahead:
         method["checkpointTurns"] = [1, 3]
     if epochs:
@@ -128,6 +134,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
             request.update(opponentStyle="MIXED", reserveExpansionCardRollouts=True)
         elif capital_choices:
             request.update(opponentStyle="MIXED", capitalChoiceRollouts=True)
+        elif leader_protection:
+            request.update(opponentStyle="MIXED", leaderProtectionRollouts=True)
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
             if commodity_expansion:
