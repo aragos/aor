@@ -63,6 +63,33 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun repeatedPublicCounterCanAuthorizeTheSpecialistsLowerBid() {
+        val traced =
+            view.copy(
+                turnNumber = 6,
+                tokenPurchaseOffers =
+                    (16..21).map { amount ->
+                        TokenPurchaseOfferView(
+                            amount,
+                            amount,
+                            amount,
+                            40 - amount,
+                            36 - amount,
+                            amount,
+                        )
+                    },
+                pastTokenPurchases = List(4) { players.zip(listOf(18, 17, 40, 40)).toMap() },
+            )
+        val ordinary = config.copy(tokenPenalty = .15)
+        val active = ordinary.copy(revealedCounterResponse = RevealedCounterResponse(4, 5, .2, .85))
+
+        assertEquals(
+            "buy-tokens 16",
+            InitiativePolicy.bid(traced, seat, "buy-tokens 21", 7, active),
+        )
+    }
+
+    @Test
     fun publicMarketPressureFavorsMovingBeforeTheNearbyCapital() {
         val nearby = players[1]
         val distant = players[2]

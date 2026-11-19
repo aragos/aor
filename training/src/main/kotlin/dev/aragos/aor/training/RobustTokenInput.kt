@@ -6,6 +6,7 @@ import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
+import dev.aragos.aor.ai.RevealedCounterResponse
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import java.nio.file.Path
 
@@ -383,6 +384,7 @@ private constructor(
                         "respectRivalCash",
                         "openingMix",
                         "localOrderWeight",
+                        "revealedCounterResponse",
                     ),
             )
             require(
@@ -431,6 +433,37 @@ private constructor(
                     node["localOrderWeight"]?.let {
                         PurchaseJson.number(it, "land-pressure order weight")
                     } ?: 0.0,
+                revealedCounterResponse =
+                    node["revealedCounterResponse"]?.let { response ->
+                        PurchaseJson.fields(
+                            response,
+                            setOf(
+                                "minimumReveals",
+                                "maximumTokenLoss",
+                                "bidScoreTolerance",
+                                "counterAnticipation",
+                            ),
+                        )
+                        RevealedCounterResponse(
+                            minimumReveals =
+                                PurchaseJson.integer(response["minimumReveals"], "minimum reveals"),
+                            maximumTokenLoss =
+                                PurchaseJson.integer(
+                                    response["maximumTokenLoss"],
+                                    "maximum token loss",
+                                ),
+                            bidScoreTolerance =
+                                PurchaseJson.number(
+                                    response["bidScoreTolerance"],
+                                    "bid score tolerance",
+                                ),
+                            counterAnticipation =
+                                PurchaseJson.number(
+                                    response["counterAnticipation"],
+                                    "forecast weight",
+                                ),
+                        )
+                    },
             )
         }
 

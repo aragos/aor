@@ -26,6 +26,31 @@ data class OpeningBidMix(val bids: List<Int>, val laterCapitalBids: List<Int> = 
 }
 
 /**
+ * Override later bids only when prior public reveals show a rival tracking our recent purchases.
+ * [minimumReveals] counts completed sealed batches, regardless of how many seats stayed active.
+ */
+data class RevealedCounterResponse(
+    val minimumReveals: Int,
+    val maximumTokenLoss: Int,
+    val bidScoreTolerance: Double,
+    val counterAnticipation: Double,
+) {
+    init {
+        require(minimumReveals in 4..8 && maximumTokenLoss in 0..8) {
+            "A counter response requires four through eight reveals and a bounded token loss."
+        }
+        require(
+            bidScoreTolerance.isFinite() &&
+                bidScoreTolerance in 0.0..1.0 &&
+                counterAnticipation.isFinite() &&
+                counterAnticipation in 0.0..1.0
+        ) {
+            "Counter response score tolerance and forecast weight must be between zero and one."
+        }
+    }
+}
+
+/**
  * Tunable initiative bids use printed order boxes and authoritative quotes. [maximumTokenLoss]
  * limits tokens sacrificed relative to the normal choice. [tokenPenalty] uses expected printed box
  * numbers per forgone token. [participation] is the chance of using a positive-scoring switch.
@@ -40,6 +65,7 @@ data class OpeningBidMix(val bids: List<Int>, val laterCapitalBids: List<Int> = 
  * [respectRivalCash] clips historical predictions to each rival's currently published cash.
  * [openingMix] selects from absolute first-turn bids when at least one can be bought.
  * [localOrderWeight] adds the bounded public land-pressure adjustment in printed box units.
+ * [revealedCounterResponse] applies its later-bid adjustments only once a rival is detected.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -57,6 +83,7 @@ data class InitiativePolicyConfig(
     val respectRivalCash: Boolean = false,
     val openingMix: OpeningBidMix? = null,
     val localOrderWeight: Double = 0.0,
+    val revealedCounterResponse: RevealedCounterResponse? = null,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -129,11 +156,24 @@ object InitiativePolicy {
         val originalAmount = LocalTokenNeighborPolicy.amount(normal)
         val original = view.tokenPurchaseOffers.single { it.amount == originalAmount }
         if (original.tokensReceived == 0) return normal
+        val rivals = view.players.filter { it.id != player }
+        val response =
+            config.revealedCounterResponse?.takeIf {
+                view.pastTokenPurchases.size >= it.minimumReveals
+            }
+        val detected =
+            if (response != null || config.counterAnticipation > 0.0) {
+                BidResponseForecast.next(view.pastTokenPurchases, player, rivals)
+            } else emptyMap()
+        val activeResponse = response?.takeIf { detected.isNotEmpty() }
+        val maximumLoss = activeResponse?.maximumTokenLoss ?: config.maximumTokenLoss
+        val anticipation = activeResponse?.counterAnticipation ?: config.counterAnticipation
+        val scoreTolerance = activeResponse?.bidScoreTolerance ?: config.bidScoreTolerance
         val contest = view.expansionForecast?.contestedMarkets?.minOfOrNull { it.requiredTokens }
         val smaller =
             view.tokenPurchaseOffers.filter { quote ->
                 quote.amount in 1 until original.amount &&
-                    original.tokensReceived - quote.tokensReceived <= config.maximumTokenLoss &&
+                    original.tokensReceived - quote.tokensReceived <= maximumLoss &&
                     (!config.requireAffordableContest ||
                         contest != null && quote.poolAfter >= contest)
             }
@@ -160,7 +200,6 @@ object InitiativePolicy {
         val priority = view.capitalOrder.withIndex().associate { it.value to it.index }
         val priorityOfPlayer =
             requireNotNull(priority[player]) { "The bidder needs a capital choice." }
-        val rivals = view.players.filter { it.id != player }
         val localAdjustments =
             if (config.localOrderWeight > 0.0) {
                 InitiativeGeography.orderAdjustments(view, player, original.poolAfter)
@@ -186,16 +225,12 @@ object InitiativePolicy {
         val weights =
             DoubleArray(rows.size) { index -> config.historyDecay.pow(rows.lastIndex - index) }
         val totalWeight = weights.sum()
-        val expectedCounters =
-            if (config.counterAnticipation > 0.0) {
-                BidResponseForecast.next(view.pastTokenPurchases, player, rivals)
-            } else emptyMap()
         val responses =
-            if (expectedCounters.isEmpty()) null
+            if (anticipation == 0.0 || detected.isEmpty()) null
             else
                 predictions.map { row ->
                     row.mapIndexed { index, bid ->
-                        expectedCounters[rivals[index].id]?.let { bid.copy(amount = it) } ?: bid
+                        detected[rivals[index].id]?.let { bid.copy(amount = it) } ?: bid
                     }
                 }
         fun meanBox(amount: Int, scenarios: List<List<RivalBid>>): Double =
@@ -213,8 +248,7 @@ object InitiativePolicy {
         fun expectedBox(amount: Int): Double {
             val historical = meanBox(amount, predictions)
             if (responses == null) return historical
-            return historical +
-                config.counterAnticipation * (meanBox(amount, responses) - historical)
+            return historical + anticipation * (meanBox(amount, responses) - historical)
         }
         val baselineBox = expectedBox(original.amount)
         fun gain(quote: TokenPurchaseOfferView): Double =
@@ -227,11 +261,11 @@ object InitiativePolicy {
         val scored = (smaller + larger).map { it to gain(it) }.filter { it.second > 0.0 }
         val (best, bestScore) =
             scored.maxWithOrNull(compareBy({ it.second }, { it.first.amount })) ?: return normal
-        if (config.bidScoreTolerance == 0.0) return bidCommand(best)
-        val nearBest = scored.filter { (_, score) -> bestScore - score <= config.bidScoreTolerance }
+        if (scoreTolerance == 0.0) return bidCommand(best)
+        val nearBest = scored.filter { (_, score) -> bestScore - score <= scoreTolerance }
         val shortlist =
             nearBest.map { (quote, _) -> quote } +
-                listOfNotNull(original.takeIf { bestScore <= config.bidScoreTolerance })
+                listOfNotNull(original.takeIf { bestScore <= scoreTolerance })
         return bidCommand(sampleBid(shortlist, seed))
     }
 
