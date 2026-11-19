@@ -437,14 +437,20 @@ private constructor(
                 node,
                 setOf("bids"),
                 optional =
-                    setOf("laterCapitalBids", "retainOrdinaryForLaterCapital", "participation"),
+                    setOf(
+                        "laterCapitalBids",
+                        "retainOrdinaryForLaterCapital",
+                        "participation",
+                        "weights",
+                        "laterCapitalWeights",
+                    ),
             )
-            fun bids(field: String): List<Int> =
+            fun integers(field: String): List<Int> =
                 PurchaseJson.array(node[field], field).map { PurchaseJson.integer(it, field) }
             return OpeningBidMix(
-                bids = bids("bids"),
+                bids = integers("bids"),
                 laterCapitalBids =
-                    node["laterCapitalBids"]?.let { bids("laterCapitalBids") } ?: emptyList(),
+                    node["laterCapitalBids"]?.let { integers("laterCapitalBids") } ?: emptyList(),
                 retainOrdinaryForLaterCapital =
                     node["retainOrdinaryForLaterCapital"]?.let { setting ->
                         require(setting.isBoolean) {
@@ -456,6 +462,10 @@ private constructor(
                     node["participation"]?.let {
                         PurchaseJson.number(it, "opening mix participation")
                     } ?: 1.0,
+                weights = node["weights"]?.let { integers("weights") } ?: emptyList(),
+                laterCapitalWeights =
+                    node["laterCapitalWeights"]?.let { integers("laterCapitalWeights") }
+                        ?: emptyList(),
             )
         }
 

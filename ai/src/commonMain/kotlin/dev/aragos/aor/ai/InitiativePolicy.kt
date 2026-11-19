@@ -13,12 +13,16 @@ import kotlin.math.pow
  * capital selection, when they can place themselves relative to more rivals on tied bids.
  * [retainOrdinaryForLaterCapital] keeps the regular opening behavior for that group.
  * [participation] is the first-turn probability of choosing this mix instead of a regular bid.
+ * Optional integer weights align with each group's bids. Missing weights give the legal bids equal
+ * mass. If offers differ, sampling renormalizes over the available amounts.
  */
 data class OpeningBidMix(
     val bids: List<Int>,
     val laterCapitalBids: List<Int> = emptyList(),
     val retainOrdinaryForLaterCapital: Boolean = false,
     val participation: Double = 1.0,
+    val weights: List<Int> = emptyList(),
+    val laterCapitalWeights: List<Int> = emptyList(),
 ) {
     init {
         require(bids.isNotEmpty()) { "An opening mix requires at least one default bid." }
@@ -34,6 +38,26 @@ data class OpeningBidMix(
         }
         require(participation.isFinite() && participation in 0.0..1.0) {
             "Opening mix participation must be a probability between zero and one."
+        }
+        require(
+            listOf(bids to weights, laterCapitalBids to laterCapitalWeights).all { (group, mass) ->
+                mass.isEmpty() || mass.size == group.size && mass.all { it in 1..1_000_000 }
+            }
+        ) {
+            "Opening weights must align with each bid group and be positive integers up to 1,000,000."
+        }
+    }
+
+    internal fun offered(
+        quotes: List<TokenPurchaseOfferView>,
+        laterCapitalChoice: Boolean,
+    ): List<Pair<TokenPurchaseOfferView, Int>> {
+        val later = laterCapitalChoice && laterCapitalBids.isNotEmpty()
+        val group = if (later) laterCapitalBids else bids
+        val mass = if (later) laterCapitalWeights else weights
+        return quotes.mapNotNull { quote ->
+            val index = group.indexOf(quote.amount)
+            if (index < 0) null else quote to (mass.getOrNull(index) ?: 1)
         }
     }
 }
@@ -129,11 +153,17 @@ object InitiativePolicy {
                 mix.participation == 1.0 ||
                     TerritoryPolicy.uniform(seed xor 0x2A68C5D9) < mix.participation
             if (chooseMix && (!later || !mix.retainOrdinaryForLaterCapital)) {
-                val amounts =
-                    if (later && mix.laterCapitalBids.isNotEmpty()) mix.laterCapitalBids
-                    else mix.bids
-                val legal = view.tokenPurchaseOffers.filter { it.amount in amounts }
-                if (legal.isNotEmpty()) return bidCommand(sampleBid(legal, seed))
+                val legal = mix.offered(view.tokenPurchaseOffers, later)
+                if (legal.isNotEmpty()) {
+                    val drawWithinOffers =
+                        TerritoryPolicy.uniform(seed xor 0x6F7B4439) * legal.sumOf { it.second }
+                    var end = 0
+                    val selected = legal.first { (_, weight) ->
+                        end += weight
+                        drawWithinOffers < end
+                    }
+                    return bidCommand(selected.first)
+                }
             }
         }
         val originalAmount = LocalTokenNeighborPolicy.amount(normal)

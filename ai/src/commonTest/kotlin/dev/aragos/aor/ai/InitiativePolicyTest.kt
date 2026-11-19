@@ -12,6 +12,7 @@ import dev.aragos.aor.Stage
 import dev.aragos.aor.TokenPurchaseOfferView
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class InitiativePolicyTest {
     private val players = (1..4).map { PlayerId("p$it") }
@@ -114,6 +115,19 @@ class InitiativePolicyTest {
 
         assertEquals("buy-tokens 18", earlier)
         assertEquals("buy-tokens 20", later)
+    }
+
+    @Test
+    fun weightedOpeningRenormalizesOnlyOverOfferedBids() {
+        val opening = view.copy(turnNumber = 1, pastTokenPurchases = emptyList())
+        val tested =
+            config.copy(openingMix = OpeningBidMix(listOf(0, 18, 19), weights = listOf(900, 9, 1)))
+
+        val picks =
+            (1..512).map { InitiativePolicy.bid(opening, seat, "buy-tokens 21", it, tested) }
+
+        assertEquals(setOf("buy-tokens 18", "buy-tokens 19"), picks.toSet())
+        assertTrue(picks.count { it == "buy-tokens 18" } > 400)
     }
 
     @Test
