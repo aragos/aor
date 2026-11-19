@@ -16,10 +16,12 @@ from initiative_series_rivals import GAMES_PER_GROUP, profiles
 
 
 REMOTE = "/home/aragos/aor-worker/weighted-opening-20261119"
+PRESSURE_REMOTE = "/home/aragos/aor-worker/weighted-opening-with-pressure-20261119"
 BIDS = tuple(range(15, 23))
 DEVELOP = ("mixed", "known-16", "known-18", "known-22", "experienced")
 FRESH = ("mixed", "known-14", "known-20", "experienced", "contested")
 RETAIN = .35
+PRESSURE_BID_LIMIT = .32
 
 
 def selection_context(plan, condition, worlds, fresh):
@@ -27,7 +29,8 @@ def selection_context(plan, condition, worlds, fresh):
     learning = condition == "experienced"
     stress = condition.startswith("known-")
     if not learning and not stress:
-        capital = setup([], [1, 4, 7]) if condition == "contested" else None
+        auction = {"contested": [1, 4, 7], "contested-steep": [3, 5, 9]}.get(condition)
+        capital = setup([], auction) if auction else None
         return "QUALIFIED", {"lineup": lineup(roster)}, capital
     surviving = lineup({offset: policy for offset, policy in roster.items() if offset != 1})
     if stress:
@@ -51,7 +54,8 @@ def selection_context(plan, condition, worlds, fresh):
 def tournament(campaign, plan, names, condition, worlds, fresh=False):
     style, context, capital = selection_context(plan, condition, worlds, fresh)
     phase = "fresh" if fresh else "develop"
-    label = f"weighted-{phase}-{condition}"
+    prefix = "pressure-weighted" if "retargeting" in plan else "weighted"
+    label = f"{prefix}-{phase}-{condition}"
     arms = ("control", *names)
     summary = campaign.stage(
         label, names, worlds, (style,), shard=128, baseline=plan["baseline"],
@@ -60,6 +64,7 @@ def tournament(campaign, plan, names, condition, worlds, fresh=False):
         capital_variants=dict.fromkeys(arms, capital) if capital else None,
         series_priors=dict.fromkeys(arms, context["priors"]) if "priors" in context else None,
         series_responses=dict.fromkeys(arms, context["responses"]) if "responses" in context else None,
+        leading_rival_variants=dict.fromkeys(arms, plan["retargeting"]) if "retargeting" in plan else None,
     )
     games = {name: load_games(campaign.root / label, name) for name in arms}
     common = []
@@ -127,13 +132,29 @@ def projected(vectors, probabilities):
     ) for coefficient, amount in zip(vector, distribution, strict=True))
 
 
-def fit(cases, regularization):
+def bounded_distribution(log_weights, cap):
+    proportions = normalize(log_weights)
+    if cap is None:
+        return proportions
+    result = [0.0] * len(proportions)
+    remaining = 1.0
+    pending = sorted(range(len(proportions)), key=lambda i: proportions[i], reverse=True)
+    for i, choice in enumerate(pending):
+        available = sum(proportions[key] for key in pending[i:])
+        result[choice] = min(cap, remaining * proportions[choice] / available)
+        remaining -= result[choice]
+    if abs(remaining) > 1e-9:
+        raise ValueError("The maximum per-bid mass must permit a normalized legal distribution.")
+    return result
+
+
+def fit(cases, regularization, cap=None):
     """Smooth robust optimization with a stated uniform prior over legal candidate amounts."""
     effects = tuple(coefficients(cases, .15).values())
     weights = [[0.0] * len(BIDS) for _ in range(2)]
     soft_minimum = .025
     for _ in range(240):
-        distributions = [normalize(group) for group in weights]
+        distributions = [bounded_distribution(group, cap) for group in weights]
         risk = normalize([-projected(effect, distributions) / soft_minimum for effect in effects])
         case_masses = [.75 * chance + .25 / len(effects) for chance in risk]
         for group, logits in enumerate(weights):
@@ -141,7 +162,8 @@ def fit(cases, regularization):
                 gradient = sum(mass * effect[group][i] for mass, effect in
                                zip(case_masses, effects, strict=True))
                 logits[i] += 1.6 * (gradient - regularization * logits[i])
-    integer = [[max(1, round(mass * 10_000)) for mass in normalize(group)] for group in weights]
+    integer = [[max(1, round(mass * 10_000)) for mass in bounded_distribution(group, cap)]
+               for group in weights]
     return integer
 
 
@@ -186,8 +208,9 @@ def report(rows, name):
             "seatToLeftWinDelta": interval(rival)}
 
 
-def main(root, previous, count, resume):
-    campaign = Campaign(root, remote=REMOTE, batch_size=2, resume=resume)
+def main(root, previous, count, resume, *, pressure=False):
+    campaign = Campaign(root, remote=PRESSURE_REMOTE if pressure else REMOTE,
+                        batch_size=2, resume=resume)
     campaign.validate_runtime()
     preview_path = previous / "automata-heterogeneous-20261118/table-fresh.json"
     rivals_path = preview_path.with_name("roster.json")
@@ -199,27 +222,40 @@ def main(root, previous, count, resume):
         raise ValueError("Training requires the exact qualified reference and verified stronger rival.")
     if learner["targets"]["preview"] != anchor["config"]:
         raise ValueError("Prior public games must belong to the pinned reference policy.")
+    development = (*DEVELOP, "contested") if pressure else DEVELOP
+    fresh_cases = (*FRESH[:-1], "contested-steep") if pressure else FRESH
     plan = {
         "baseline": anchor["config"], "rivals": read(rivals_path)["rivals"],
         "history": learner["histories"]["preview"], "payoff": learner["payoff"],
         "sources": {name: sha(source) for name, source in (("preview", preview_path),
                     ("rivals", rivals_path), ("learner", learner_path))},
-        "bids": BIDS, "developmentWorlds": count, "freshWorlds": 640,
-        "development": DEVELOP, "fresh": FRESH, "retainedReferenceProbability": RETAIN,
+        "bids": BIDS, "developmentWorlds": count, "freshWorlds": 768 if pressure else 640,
+        "development": development, "fresh": fresh_cases, "retainedReferenceProbability": RETAIN,
     }
+    if pressure:
+        current = previous / "automata-credible-leader-pressure-20261119/result.json"
+        adversarial = previous / "automata-retargeting-adversarial-test-20261119/result.json"
+        ordinary, challenged = read(current), read(adversarial)
+        if (not ordinary["passed"] or not challenged["passed"]
+                or ordinary["configuration"] != challenged["configuration"]):
+            raise ValueError("The new opening search requires the same independently qualified attack rule.")
+        plan.update(retargeting=ordinary["configuration"],
+                    maximumWeight=PRESSURE_BID_LIMIT,
+                    postAttackQualificationSha256=sha(current),
+                    afterAdversarialQualificationSha256=sha(adversarial))
     declaration = root / "plan.json"
-    normalized = dict(plan, bids=list(BIDS), development=list(DEVELOP), fresh=list(FRESH))
+    normalized = dict(plan, bids=list(BIDS), development=list(development), fresh=list(fresh_cases))
     if not declaration.exists():
         write(declaration, normalized)
     elif read(declaration) != normalized:
         raise ValueError("The weighted opening study needs its original cases and sample sizes.")
     fixed = {f"bid-{bid}": with_mix(plan["baseline"], [bid]) for bid in BIDS}
     training, validation = {}, {}
-    for condition in DEVELOP:
+    for condition in development:
         rows, _ = tournament(campaign, plan, fixed, condition, count)
         training[condition] = [row for i, row in enumerate(rows) if (i // 4) % 3 != 2]
         validation[condition] = [row for i, row in enumerate(rows) if (i // 4) % 3 == 2]
-    fits = {name: fit(training, penalty) for name, penalty in
+    fits = {name: fit(training, penalty, plan.get("maximumWeight")) for name, penalty in
             (("risk-focused", .012), ("high-entropy", .028))}
     choice, estimates = verify_fit(validation, fits)
     write(root / "screen.json", {
@@ -232,7 +268,7 @@ def main(root, previous, count, resume):
         return
     candidate = policy(plan["baseline"], fits[choice])
     fresh = {}
-    for condition in FRESH:
+    for condition in fresh_cases:
         raw, _ = tournament(campaign, plan, {choice: candidate}, condition,
                             plan["freshWorlds"], fresh=True)
         fresh[condition] = report(raw, choice)
@@ -249,7 +285,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--previous", required=True, type=Path)
-    parser.add_argument("--count", type=int, default=384, choices=(192, 384, 768))
+    parser.add_argument("--count", type=int, default=384, choices=(192, 384, 512, 768))
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--pressure", action="store_true")
     args = parser.parse_args()
-    main(args.root.resolve(), args.previous.resolve(), args.count, args.resume)
+    main(args.root.resolve(), args.previous.resolve(), args.count, args.resume,
+         pressure=args.pressure)
