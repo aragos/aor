@@ -107,12 +107,16 @@ class WorkerUnavailable(RuntimeError):
 
 
 class Campaign:
-    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=10, resume=False, background=False):
+    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=10, resume=False, background=False,
+                 batch_size=1):
+        if not 1 <= batch_size <= 4:
+            raise ValueError("A campaign can assign at most four native shards to a worker at a time.")
         self.root = root.resolve()
         self.remote = remote
         self.mac_reserve = mac_reserve_gib * (1024 ** 3)
         self.resume = resume
         self.background = background
+        self.batch_size = batch_size
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
@@ -158,6 +162,20 @@ class Campaign:
             self.validate_result(target, source)
             target.rename(stage / name)
 
+    def native_command(self, host, mode, arguments):
+        mac, desktop = (3, 6) if self.background else (8, 16)
+        worker_count, heap, java = (mac, "5g", MAC_JAVA) if host == "MAC" else (desktop, "7g", "/usr/bin/java")
+        if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
+            raise WorkerUnavailable("Mac free disk space fell below the campaign reserve.")
+        folder = str(self.root) if host == "MAC" else self.remote
+        command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
+                   java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
+                   "-cp", f"{folder}/lib/*", MODE, "--mode", mode, *arguments,
+                   "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
+        if self.background:
+            command = ["/usr/bin/nice", "-n", "8", *command]
+        return command
+
     def execute(self, stage, task, host):
         name, source = task
         stage_dir = stage.name
@@ -166,18 +184,10 @@ class Campaign:
         target = stage / name
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
-        mac, desktop = (3, 6) if self.background else (8, 16)
-        worker_count, heap, java = (mac, "5g", MAC_JAVA) if host == "MAC" else (desktop, "7g", "/usr/bin/java")
-        if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
-            raise WorkerUnavailable("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
-        command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
-                   java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
-                   "-cp", f"{folder}/lib/*", MODE, "--mode", "robust-token-screen-chunk",
-                   "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
-                   "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
-        if self.background:
-            command = ["/usr/bin/nice", "-n", "8", *command]
+        command = self.native_command(host, "robust-token-screen-chunk",
+                                      ["--source", f"{folder}/{relative_source}",
+                                       "--output", f"{folder}/{relative_output}"])
         started = time.monotonic()
         with (stage / f"{name}.log").open("ab") as log:
             if host == "MAC":
@@ -198,6 +208,59 @@ class Campaign:
         receipt = dict(host=host, seconds=time.monotonic() - started, games=games)
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
+
+    def execute_batch(self, stage, tasks, host):
+        if len(tasks) == 1:
+            self.execute(stage, tasks[0], host)
+            return
+        if any((stage / name).exists() for name, _ in tasks):
+            raise ValueError("Refusing to overwrite a completed native result directory in a batch.")
+        started = time.monotonic()
+        with tempfile.TemporaryDirectory(dir=stage, prefix=".native-batch-") as scratch:
+            temporary = Path(scratch)
+            plan = temporary / "plan.json"
+            write(plan, {"kind": "robust-token-batch-1", "jobs": [
+                {"source": f"../{source.name}", "output": name} for name, source in tasks]})
+            base = str(self.root) if host == "MAC" else self.remote
+            stage_relative = f"{stage.name}/{temporary.name}"
+            command = self.native_command(host, "robust-token-batch",
+                                          ["--plan", f"{base}/{stage_relative}/plan.json"])
+            log_path = stage / f"{temporary.name.lstrip('.')}.log"
+            with log_path.open("ab") as log:
+                if host == "MAC":
+                    self.call(command, stdout=log)
+                    output = temporary
+                else:
+                    output = self.desktop_batch(
+                        stage, tasks, base, stage_relative, temporary, plan, command, log)
+            validated = [(name, self.validate_result(output / name, source)) for name, source in tasks]
+            elapsed = time.monotonic() - started
+            for name, games in validated:
+                (output / name).rename(stage / name)
+                receipt = {"host": host, "seconds": elapsed / len(validated), "games": games,
+                           "batchSeconds": elapsed, "batchSize": len(validated)}
+                write(stage / f"{name}.receipt.json", receipt)
+            print(json.dumps({"stage": stage.name, "jobs": [name for name, _ in validated],
+                              "host": host, "seconds": elapsed,
+                              "games": sum(games for _, games in validated)}), flush=True)
+
+    def desktop_batch(self, stage, tasks, base, relative, temporary, plan, command, log):
+        request_bytes = BytesIO()
+        with tarfile.open(fileobj=request_bytes, mode="w") as archive:
+            archive.add(plan, arcname=f"{relative}/plan.json", recursive=False)
+            for _, source in tasks:
+                archive.add(source, arcname=f"{stage.name}/{source.name}", recursive=False)
+        parent = shlex.quote(f"{base}/{relative}")
+        root = shlex.quote(base)
+        self.desktop_call(f"mkdir -p {parent} && cd {root} && tar -xf -",
+                          input_bytes=request_bytes.getvalue(), stdout=log, limit=60)
+        self.desktop_call(shlex.join(command), stdout=log, limit=600 * len(tasks))
+        response = self.desktop_call(
+            f"cd {parent} && tar -czf - {shlex.join([name for name, _ in tasks])}",
+            stdout=subprocess.PIPE, limit=90).stdout
+        with tarfile.open(fileobj=BytesIO(response), mode="r:gz") as archive:
+            archive.extractall(temporary, filter="data")
+        return temporary
 
     def desktop_shard_state(self, relative_output):
         target = shlex.quote(f"{self.remote}/{relative_output}")
@@ -286,6 +349,15 @@ class Campaign:
         pending = []
         for name, source in jobs:
             receipt = stage / f"{name}.receipt.json"
+            target = stage / name
+            if self.resume and not receipt.exists() and target.exists():
+                if (target / "finished.json").is_file():
+                    games = self.validate_result(target, source)
+                    write(receipt, {"host": "RECOVERED", "seconds": 0.0, "games": games,
+                                    "recoveredCompletedResult": True})
+                else:
+                    evidence = Path(tempfile.mkdtemp(dir=stage, prefix=".interrupted-"))
+                    target.rename(evidence / name)
             if reuse_complete or self.resume and receipt.exists():
                 games = self.validate_result(stage / name, source)
                 if read(receipt)["games"] != games:
@@ -331,14 +403,20 @@ class Campaign:
             try:
                 while not self.stop.is_set():
                     try:
-                        task = todo.get_nowait()
+                        batch = [todo.get_nowait()]
                     except queue.Empty:
                         return
+                    for _ in range(self.batch_size - 1):
+                        try:
+                            batch.append(todo.get_nowait())
+                        except queue.Empty:
+                            break
                     try:
-                        self.execute(stage, task, host)
+                        self.execute_batch(stage, batch, host)
                     except WorkerUnavailable as error:
-                        todo.put(task)
-                        print(json.dumps(dict(stage=stage.name, job=task[0], host=host,
+                        for task in batch:
+                            todo.put(task)
+                        print(json.dumps(dict(stage=stage.name, jobs=[task[0] for task in batch], host=host,
                                               workerUnavailable=str(error))), flush=True)
                         return host
             except Exception:
