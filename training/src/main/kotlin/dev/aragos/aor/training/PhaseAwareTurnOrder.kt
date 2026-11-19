@@ -17,12 +17,15 @@ internal enum class TieOrderPolicy(val wire: String) {
     EARLY("early"),
     LATE("late"),
     PHASE_AWARE("phase-aware"),
+    ROOT_CONTROL("root-control"),
+    ROOT_LATE("root-late"),
 }
 
 /** Experimentally change a tied slot after commitments have been revealed and paid. */
 internal class PhaseAwareTurnOrder(
     private val reference: SimulationController,
     private val policy: TieOrderPolicy,
+    private val sampleTurn: Int = 2,
 ) : SimulationController by reference {
     var firstTie: Map<String, Any>? = null
         private set
@@ -46,6 +49,8 @@ internal class PhaseAwareTurnOrder(
                 TextCodec.parseCommand(candidate.command) as? Command.ChooseTurnPosition
             }
         if (slots.size < 2) return ordinary()
+        val sampleOnce = policy == TieOrderPolicy.ROOT_CONTROL || policy == TieOrderPolicy.ROOT_LATE
+        if (sampleOnce && (turn < sampleTurn || firstTie != null)) return ordinary()
         if (firstTie == null) {
             firstTie =
                 mapOf(
@@ -53,19 +58,32 @@ internal class PhaseAwareTurnOrder(
                     "purchases" to view.revealedTokenPurchases.mapKeys { it.key.value },
                     "pools" to view.players.associate { it.id.value to it.poolTokens },
                     "slots" to slots.map { it.slot },
-                )
+                ) +
+                    if (sampleOnce) {
+                        mapOf(
+                            "features" to
+                                rootFeatures(
+                                    view,
+                                    PlayerId(decision.observation.playerId),
+                                    slots.size,
+                                )
+                        )
+                    } else emptyMap()
         }
         val preference =
             when (policy) {
-                TieOrderPolicy.ORDINARY -> return ordinary()
+                TieOrderPolicy.ORDINARY,
+                TieOrderPolicy.ROOT_CONTROL -> return ordinary()
                 TieOrderPolicy.EARLY -> "always-early"
                 TieOrderPolicy.LATE -> "always-late"
+                TieOrderPolicy.ROOT_LATE -> "single-late"
                 TieOrderPolicy.PHASE_AWARE ->
                     phasePreference(view, PlayerId(decision.observation.playerId))
             }
         preferences[preference] = (preferences[preference] ?: 0) + 1
         return when (preference) {
             "protect-markets",
+            "single-late",
             "always-late" -> slots.maxBy { it.slot }.toText()
             "pay-now",
             "cheap-card",
@@ -76,6 +94,33 @@ internal class PhaseAwareTurnOrder(
 
     fun evidence(): Map<String, Any> =
         mapOf("preferences" to preferences, "firstTie" to firstTie.orEmpty())
+
+    private fun rootFeatures(view: GameView, actor: PlayerId, slots: Int): Map<String, Int> {
+        val self = view.players.first { it.id == actor }
+        val own = view.scores.firstOrNull { it.player == actor }?.total ?: 0
+        val rival =
+            view.scores.filter { it.player != actor }.mapNotNull { it.total }.maxOrNull() ?: own
+        val preference = phasePreference(view, actor)
+        val amount = view.revealedTokenPurchases[actor]
+        val before =
+            view.revealedTokenPurchases.count { (p, bid) ->
+                p != actor && amount != null && bid < amount
+            }
+        return mapOf(
+            "turn" to (view.turnNumber ?: 0),
+            "slots" to slots,
+            "scoreLead" to own - rival,
+            "cash" to self.cash,
+            "pool" to self.poolTokens,
+            "hand" to self.handCount,
+            "ownedMarkers" to self.boardMarkers,
+            "deck" to view.deckRemaining,
+            "earlierUntiedSeats" to before,
+            "immediateCommodity" to if (preference == "pay-now") 1 else 0,
+            "thinHand" to if (preference == "cheap-card") 1 else 0,
+            "concentratedMarkets" to if (preference == "protect-markets") 1 else 0,
+        )
+    }
 
     /** A bounded signal from current coloured holdings and the actor's own hand. */
     private fun phasePreference(view: GameView, actor: PlayerId): String {

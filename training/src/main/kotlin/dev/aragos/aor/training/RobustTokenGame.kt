@@ -383,7 +383,12 @@ internal object RobustTokenGame {
                 input.tieOrderPolicy
                     ?.takeIf { candidate }
                     ?.let { policy ->
-                        PhaseAwareTurnOrder(regular, policy).also { tieController = it }
+                        PhaseAwareTurnOrder(
+                                regular,
+                                policy,
+                                sampleTurn = 3 + Math.floorMod(input.seeds[index], 7),
+                            )
+                            .also { tieController = it }
                     } ?: regular
             object : SimulationController by controller {
                 override fun choose(decision: SimulationDecision): String? =
