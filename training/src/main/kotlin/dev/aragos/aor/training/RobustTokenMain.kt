@@ -12,7 +12,9 @@ import java.util.concurrent.TimeUnit
 object RobustTokenMain {
     val modes = setOf("robust-token-prepare", "robust-token-screen-chunk", RobustTokenBatch.MODE)
 
-    fun run(arguments: List<String>) {
+    fun run(arguments: List<String>) = run(arguments, RobustTokenAssets())
+
+    internal fun run(arguments: List<String>, assets: RobustTokenAssets) {
         require(arguments.size % 2 == 0) { "Robust arguments must be option/value pairs." }
         val fields = arguments.chunked(2).associate { it[0] to it[1] }
         val mode = requireNotNull(fields["--mode"]) { "An explicit robust mode is required." }
@@ -33,7 +35,8 @@ object RobustTokenMain {
         }
         val input =
             RobustTokenInput.read(
-                Path.of(requireNotNull(fields["--source"]) { "Source required." })
+                Path.of(requireNotNull(fields["--source"]) { "Source required." }),
+                assets,
             )
         val output =
             Path.of(requireNotNull(fields["--output"]) { "Output required." })

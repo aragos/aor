@@ -538,7 +538,7 @@ private constructor(
             return CapitalAuctionConfig(bid, mix, rivals)
         }
 
-        fun read(path: Path): RobustTokenInput {
+        fun read(path: Path, assets: RobustTokenAssets = RobustTokenAssets()): RobustTokenInput {
             val source = CoordinatedEsWire.source(path)
             val node = PurchaseJson.read(source.path)
             PurchaseJson.fields(
@@ -583,41 +583,18 @@ private constructor(
             fun subject(name: String) =
                 TokenPairedSubject.read(node.required(name), source.path.parent)
             val arenaSource = subject("arena")
-            val parsed = ArenaSpecification.read(arenaSource.path)
-            val asset =
-                CoordinatedInferenceAsset.read(
-                    subject("inferenceAsset"),
-                    parsed.configurations.single(),
-                )
-            // The old homogeneous descriptor supplies frozen reference composition only. New
-            // worlds use the separately admitted source seeds; its historical arena seeds are
-            // unused.
-            val arena =
-                CoordinatedInferenceEcology.read(
-                    arenaSource,
-                    asset,
-                    CoordinatedQualificationBank(
-                        parsed.seed,
-                        List(4096) { StrategyArena.seed(parsed.seed, it) },
-                    ),
-                    "homogeneous",
-                )
+            val reference = assets.reference(arenaSource, subject("inferenceAsset"))
+            val (arena, asset) = reference
             val nomination = subject("nomination")
             val nominationPins = CoordinatedPolicyNomination.read(nomination, asset.source)
             val candidate =
                 node["candidateBundle"]?.let {
-                    CoordinatedEsBundle.read(
-                        TokenPairedSubject.read(it, source.path.parent),
-                        CoordinatedEsBundle.dictionaries(arena.configurations.single()),
-                    )
+                    assets.bundle(TokenPairedSubject.read(it, source.path.parent), reference)
                 } ?: asset.current
             candidate.models.validateFrozenValues(asset.original.models)
             val control =
                 node["controlBundle"]?.let {
-                    CoordinatedEsBundle.read(
-                        TokenPairedSubject.read(it, source.path.parent),
-                        CoordinatedEsBundle.dictionaries(arena.configurations.single()),
-                    )
+                    assets.bundle(TokenPairedSubject.read(it, source.path.parent), reference)
                 } ?: asset.current
             control.models.validateFrozenValues(asset.original.models)
             val candidateSampler = sampler(node.required("selector"))
@@ -821,9 +798,8 @@ private constructor(
                     }
             }
             val pins =
-                asset.pins +
+                reference.pins +
                     nominationPins +
-                    CoordinatedWinEcology.pins(arenaSource, arena) +
                     (listOf(candidate.source) + candidate.subjects.values).associate {
                         it.path.toString() to it.sha256
                     } +

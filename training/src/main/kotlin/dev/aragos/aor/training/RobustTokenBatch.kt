@@ -44,6 +44,7 @@ internal object RobustTokenBatch {
             "A robust batch requires existing sources outside its output directories."
         }
         require(outputs.none(Files::exists)) { "Robust batch outputs must be new directories." }
+        val assets = RobustTokenAssets()
         for (job in jobs) {
             val remaining = TimeUnit.NANOSECONDS.toSeconds(deadline - System.nanoTime())
             check(remaining > 0) { "The robust batch deadline elapsed before the next shard." }
@@ -59,7 +60,8 @@ internal object RobustTokenBatch {
                     remaining.toString(),
                     "--workers",
                     workers.toString(),
-                )
+                ),
+                assets,
             )
         }
     }
