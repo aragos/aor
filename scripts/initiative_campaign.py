@@ -156,7 +156,7 @@ class Campaign:
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
 
-    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None, rival_offsets=(1,2,3)):
+    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None, rival_offsets=(1,2,3), baseline=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -167,9 +167,9 @@ class Campaign:
             raise ValueError("Each declared stage bank requires distinct seed streams.")
         declared = dict(stage=label, configs=configs, banks=banks, paired=paired,
                         replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline,
-                        rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [])
+                        rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [], baseline=baseline)
         write(stage / "method.json", declared)
-        choices = configs if paired else {"control": None, **configs}
+        choices = configs if paired else {"control": baseline, **configs}
         jobs = []
         for key, policy in choices.items():
             for case, mode in enumerate(ecologies):
@@ -292,6 +292,22 @@ def main(root, initial):
                                512, ECOLOGIES[-1:], paired=True, rival=responder, rival_offsets=(1,))
     write(root / "extra-result.json", dict(status="deeper-undercut-crossplay-complete",
         response=check, comparison=challenge))
+
+
+    if campaign.remaining() < 650:
+        return
+    mixed = response_path.parent.parent / "mixed-result.json"
+    if not mixed.is_file():
+        return
+    alternative = read(mixed)
+    if not alternative.get("passed"):
+        return
+    wider = alternative["audit"]["selected"]["config"]
+    if wider == champion:
+        return
+    direct = campaign.stage("deeper-undercut-direct", {"wider":wider}, 384,
+                            ECOLOGIES[-1:], rival=responder, rival_offsets=(1,), baseline=champion)
+    write(root / "deeper-undercut-direct/result.json", dict(status="direct-comparison-complete", results=direct))
 
 
 
