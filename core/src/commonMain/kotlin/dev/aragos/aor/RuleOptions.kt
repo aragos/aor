@@ -1,5 +1,7 @@
 package dev.aragos.aor
 
+import kotlinx.collections.immutable.toPersistentList
+
 /** The supported game variants, resolved and recorded before play begins. */
 data class RuleOptions(
     val deckModification: Boolean = false,
@@ -9,12 +11,14 @@ data class RuleOptions(
     val drawThreeKeepTwo: Boolean = false,
 ) {
     /** Physical cards assigned to an epoch before recycled discards are added. */
-    fun cardsForEpoch(epoch: Epoch): List<String> {
-        val printed = CardData.forEpoch(epoch).map(CardDefinition::id)
-        if (!deckModification || epoch == Epoch.THREE) return printed
-        return if (epoch == Epoch.ONE) printed.filterNot { it == "war" } + "timber-2-1"
-        else printed.filterNot { it == "timber-2-1" } + "war"
-    }
+    fun cardsForEpoch(epoch: Epoch): List<String> = decks.assigned[epoch.ordinal]
+
+    /** In deck-introduction order, regardless of later public discards or hidden locations. */
+    internal fun introducedCards(through: Epoch): List<CardDefinition> =
+        decks.introduced[through.ordinal]
+
+    private val decks: DeckLists
+        get() = if (deckModification) modifiedDecks else printedDecks
 
     /** An explicit canonical snapshot for durable creation histories. */
     fun configurationCommands(): List<RuleOptionCommand> =
@@ -31,6 +35,31 @@ data class RuleOptions(
 
     companion object {
         val AH1996: RuleOptions = RuleOptions()
+
+        private val printedDecks by lazy { DeckLists(modified = false) }
+        private val modifiedDecks by lazy { DeckLists(modified = true) }
+    }
+
+    private class DeckLists(modified: Boolean) {
+        val assigned =
+            Epoch.entries.map { epoch ->
+                val printed = CardData.forEpoch(epoch).map(CardDefinition::id)
+                val ordered =
+                    when {
+                        !modified || epoch == Epoch.THREE -> printed
+                        epoch == Epoch.ONE -> printed.filterNot { it == "war" } + "timber-2-1"
+                        else -> printed.filterNot { it == "timber-2-1" } + "war"
+                    }
+                ordered.toPersistentList()
+            }
+        val introduced =
+            Epoch.entries.map { through ->
+                assigned
+                    .take(through.ordinal + 1)
+                    .flatten()
+                    .map(CardData::definition)
+                    .toPersistentList()
+            }
     }
 }
 
