@@ -149,6 +149,34 @@ internal data class CapitalAuctionConfig(
     }
 }
 
+/** Three complete rivals seated in deterministic rotations relative to the evaluated seat. */
+internal class RotatingRivalModels(private val bundles: Map<Int, CoordinatedEsBundle>) {
+    init {
+        require(
+            bundles.keys == setOf(1, 2, 3) &&
+                bundles.values.map { it.source.sha256 }.distinct().size == 3
+        ) {
+            "A varied table requires three distinct complete opponents at offsets one through three."
+        }
+    }
+
+    val sources: Map<String, String> =
+        bundles.entries.associate { (offset, bundle) ->
+            offset.toString() to bundle.source.sha256
+        }
+
+    /** Cover each rival offset independently of the four-seat rotation across world indices. */
+    fun seated(index: Int, evaluatedSeat: Int): Map<Int, CoordinatedEsBundle> =
+        bundles.entries.associate { (offset, bundle) ->
+            val rotated = 1 + ((offset - 1 + index % 3) % 3)
+            (evaluatedSeat + rotated) % 4 to bundle
+        }
+
+    companion object {
+        const val VERSION = "rotating-complete-rivals-1"
+    }
+}
+
 /** A bounded paired shard; the source owns all streams and immutable inference subjects. */
 internal class RobustTokenInput
 private constructor(
@@ -161,6 +189,7 @@ private constructor(
     val candidate: CoordinatedEsBundle,
     val sampler: NearOptimalTokenSampler?,
     val control: CoordinatedEsBundle,
+    val rivalModels: RotatingRivalModels?,
     val controlSampler: NearOptimalTokenSampler?,
     val expansionDenial: PublicLeaderAttackConfig?,
     val tokenNeighborMixture: LocalTokenNeighborMixture?,
@@ -266,6 +295,12 @@ private constructor(
             (if (secondCapitalGeography)
                 mapOf("secondCapitalGeography" to SecondCapitalGeography.VERSION)
             else emptyMap()) +
+            (rivalModels?.let {
+                mapOf(
+                    "rivalModelRoster" to
+                        mapOf("kind" to RotatingRivalModels.VERSION, "subjects" to it.sources)
+                )
+            } ?: emptyMap()) +
             (leadingRivalRetargeting?.let {
                 mapOf(
                     "leadingRivalRetargeting" to
@@ -561,6 +596,7 @@ private constructor(
                     "seriesOpeningResponses",
                     "candidateTokenAnchoredPolicy",
                     "controlBundle",
+                    "rivalModelRoster",
                     "controlSelector",
                     "expansionDenial",
                     "leadingRivalRetargeting",
@@ -619,6 +655,30 @@ private constructor(
                     )
                 } ?: asset.current
             control.models.validateFrozenValues(asset.original.models)
+            val rivalModels =
+                node["rivalModelRoster"]?.let { roster ->
+                    PurchaseJson.fields(roster, setOf("kind", "bundles"))
+                    val subjects = roster["bundles"]
+                    require(
+                        roster["kind"]?.asText() == RotatingRivalModels.VERSION &&
+                            subjects.isArray &&
+                            subjects.size() == 3
+                    ) {
+                        "A rotating table needs its version and exactly three named offsets."
+                    }
+                    val dictionaries =
+                        CoordinatedEsBundle.dictionaries(arena.configurations.single())
+                    RotatingRivalModels(
+                        subjects.associate { rival ->
+                            PurchaseJson.fields(rival, setOf("offset", "bundle"))
+                            val modelSource =
+                                TokenPairedSubject.read(rival["bundle"], source.path.parent)
+                            val model = CoordinatedEsBundle.read(modelSource, dictionaries)
+                            model.models.validateFrozenValues(asset.original.models)
+                            PurchaseJson.integer(rival["offset"], "rival bundle offset") to model
+                        }
+                    )
+                }
             val candidateSampler = sampler(node.required("selector"))
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
@@ -840,6 +900,7 @@ private constructor(
                     candidate,
                     candidateSampler,
                     control,
+                    rivalModels,
                     controlSampler,
                     expansionDenial,
                     tokenNeighborMixture,

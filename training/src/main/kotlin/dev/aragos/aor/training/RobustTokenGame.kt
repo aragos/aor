@@ -249,6 +249,7 @@ internal object RobustTokenGame {
         }
         val arena = input.arena
         val seat = index % 4
+        val rivalModels = input.rivalModels?.seated(index, seat).orEmpty()
         val rivalPolicies =
             input.initiativeLineup?.seated(seat)
                 ?: input.initiativeRival
@@ -284,13 +285,14 @@ internal object RobustTokenGame {
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
             val chooseGeography = candidate && input.secondCapitalGeography
+            val models = if (candidate) input.candidate else rivalModels[player] ?: input.control
             val capitalBids = input.capitalAuction?.bidsFor((player - seat + 4) % 4).orEmpty()
             val qualified =
                 CoordinatedEsController(
                     reference,
                     ordinary,
                     input.asset.baseline.model,
-                    if (candidate) input.candidate.models else input.control.models,
+                    models.models,
                     input.asset.original.models,
                     input.asset.calibration.selectors,
                     JointSupportProfile.KNOWN_OWN_CHAOS_1,
@@ -404,6 +406,14 @@ internal object RobustTokenGame {
             diagnostics.result() +
                 (if (rivalPolicies.isEmpty()) emptyMap()
                 else mapOf("initiativeRivalSeats" to rivalPolicies.keys.toList())) +
+                (if (rivalModels.isEmpty()) emptyMap()
+                else
+                    mapOf(
+                        "rivalModelBundles" to
+                            rivalModels.entries.associate { (player, bundle) ->
+                                player.toString() to bundle.source.sha256
+                            }
+                    )) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()),
             trace?.sha256,
