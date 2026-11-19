@@ -26,7 +26,8 @@ internal data class CapitalOrderOpeningBid(val earlyBid: Int, val lateBid: Int) 
  * Bounded learning from public token purchases. An optional [openingBidPrior] represents a
  * prediction a rival acquired across completed games and fixed before the simulated game starts.
  * [forecastQuantile] selects a lower or upper order statistic of recent bids. Omission uses the
- * observed mode and breaks equal frequencies by recency.
+ * observed mode and breaks equal frequencies by recency. [seriesMidgamePrior] is an amount learned
+ * from completed previous games and fixed for turns three through ten before play starts.
  */
 internal data class RevealedTokenCounterConfig(
     val minimumObservations: Int,
@@ -36,6 +37,7 @@ internal data class RevealedTokenCounterConfig(
     val forecastQuantile: Double? = null,
     val capitalOrderOpeningPrior: CapitalOrderOpeningBid? = null,
     val capitalOrderOpeningResponse: CapitalOrderOpeningBid? = null,
+    val seriesMidgamePrior: Int? = null,
 ) {
     init {
         require(lookbackTurns in 1..16 && minimumObservations in 1..lookbackTurns) {
@@ -46,6 +48,9 @@ internal data class RevealedTokenCounterConfig(
             forecastQuantile == null || forecastQuantile.isFinite() && forecastQuantile in 0.0..1.0
         ) {
             "A public counter quantile must be between zero and one."
+        }
+        require(seriesMidgamePrior == null || seriesMidgamePrior in -40..100) {
+            "A prior midgame amount must fit the declared signed experiment range."
         }
     }
 
@@ -62,7 +67,8 @@ internal data class RevealedTokenCounterConfig(
                 (capitalOrderOpeningPrior?.let { mapOf("capitalOrderOpeningPrior" to it) }
                     ?: emptyMap()) +
                 (capitalOrderOpeningResponse?.let { mapOf("capitalOrderOpeningResponse" to it) }
-                    ?: emptyMap())
+                    ?: emptyMap()) +
+                (seriesMidgamePrior?.let { mapOf("seriesMidgamePrior" to it) } ?: emptyMap())
 
     companion object {
         const val VERSION = "public-token-history-counter-1"
@@ -363,18 +369,20 @@ internal class RevealedTokenCounter(
             "Only a distinct rival in an explicit public counter style may counter a token bid."
         }
         val history = recent.filter { it.turn < turn }
+        val prior = config.seriesMidgamePrior?.takeIf { turn in 3..10 }
         val prediction =
-            if (history.size < config.minimumObservations) {
-                config.capitalOrderOpeningPrior?.amount(target, capitalOrder)
-                    ?: config.openingBidPrior
-            } else if (config.forecastQuantile != null) {
-                val index = (config.forecastQuantile * (history.size - 1)).toInt()
-                history.map(PublicTokenReveal::amount).sorted()[index]
-            } else {
-                val counts = history.groupingBy(PublicTokenReveal::amount).eachCount()
-                val maximum = counts.values.max()
-                history.last { counts[it.amount] == maximum }.amount
-            }
+            prior
+                ?: if (history.size < config.minimumObservations) {
+                    config.capitalOrderOpeningPrior?.amount(target, capitalOrder)
+                        ?: config.openingBidPrior
+                } else if (config.forecastQuantile != null) {
+                    val index = (config.forecastQuantile * (history.size - 1)).toInt()
+                    history.map(PublicTokenReveal::amount).sorted()[index]
+                } else {
+                    val counts = history.groupingBy(PublicTokenReveal::amount).eachCount()
+                    val maximum = counts.values.max()
+                    history.last { counts[it.amount] == maximum }.amount
+                }
         val learned =
             config.capitalOrderOpeningResponse
                 ?.takeIf { turn == 1 }
@@ -445,7 +453,7 @@ internal class RevealedTokenCounter(
                 "capitalOrder" to capitalOrder.map(PlayerId::value),
                 "latestEvidenceTurn" to history.lastOrNull()?.turn,
                 "strictlyPastPublicEvidence" to history.all { it.turn < turn },
-            )
+            ) + (prior?.let { mapOf("seriesMidgamePrior" to it) } ?: emptyMap())
         )
         return result
     }

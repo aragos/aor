@@ -271,12 +271,14 @@ internal object RobustTokenGame {
                 val players = (1..4).map { number -> PlayerId("p$number") }
                 val prior = input.seriesOpeningPriors.getOrNull(index)
                 val response = input.seriesOpeningResponses.getOrNull(index)
+                val midgame = input.seriesMidgamePriors.getOrNull(index)
                 val learned =
-                    if (prior == null && response == null) it
+                    if (prior == null && response == null && midgame == null) it
                     else
                         it.copy(
                             capitalOrderOpeningPrior = prior,
                             capitalOrderOpeningResponse = response,
+                            seriesMidgamePrior = midgame,
                         )
                 RevealedTokenCounterLeague(players[seat], players, learned)
             }

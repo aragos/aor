@@ -168,6 +168,7 @@ private constructor(
     val adaptiveOpponent: RevealedTokenCounterConfig?,
     val seriesOpeningPriors: List<CapitalOrderOpeningBid>,
     val seriesOpeningResponses: List<CapitalOrderOpeningBid>,
+    val seriesMidgamePriors: List<Int>,
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
@@ -246,6 +247,8 @@ private constructor(
             else mapOf("seriesOpeningPriors" to seriesOpeningPriors)) +
             (if (seriesOpeningResponses.isEmpty()) emptyMap()
             else mapOf("seriesOpeningResponses" to seriesOpeningResponses)) +
+            (if (seriesMidgamePriors.isEmpty()) emptyMap()
+            else mapOf("seriesMidgamePriors" to seriesMidgamePriors)) +
             (candidateTokenAnchoredPolicy?.let {
                 mapOf("candidateTokenAnchoredPolicy" to it.identity)
             } ?: emptyMap()) +
@@ -559,6 +562,7 @@ private constructor(
                     "adaptiveOpponent",
                     "seriesOpeningPriors",
                     "seriesOpeningResponses",
+                    "seriesMidgamePriors",
                     "candidateTokenAnchoredPolicy",
                     "controlBundle",
                     "controlSelector",
@@ -711,6 +715,22 @@ private constructor(
             }
             val seriesOpeningPriors = seriesOpeningBids("seriesOpeningPriors")
             val seriesOpeningResponses = seriesOpeningBids("seriesOpeningResponses")
+            val seriesMidgamePriors =
+                node["seriesMidgamePriors"]
+                    ?.let { prior ->
+                        require(adaptiveOpponent != null) {
+                            "A midgame series prior requires an explicit public-history rival."
+                        }
+                        val amounts =
+                            PurchaseJson.array(prior, "midgame series prior").map {
+                                PurchaseJson.integer(it, "prior midgame bid")
+                            }
+                        require(amounts.size == seeds.size && amounts.all { it in -40..100 }) {
+                            "Every declared game needs its own frozen midgame signed amount."
+                        }
+                        amounts
+                    }
+                    .orEmpty()
             require(
                 expansionDenial == null ||
                     !candidateOnly &&
@@ -847,6 +867,7 @@ private constructor(
                     adaptiveOpponent,
                     seriesOpeningPriors,
                     seriesOpeningResponses,
+                    seriesMidgamePriors,
                     anchored,
                     initiative,
                     initiativeRival,
