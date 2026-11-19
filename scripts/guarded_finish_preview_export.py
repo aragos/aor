@@ -26,7 +26,7 @@ def export(lab, previous, prior, output, source):
     check(checked["passed"] and checked["policy"] == GUARD,
           "Publish only the exact qualified finishing guard.")
     check(sha(prior / "manifest.json") == BASE, "Use the exact live early attack model as a base.")
-    solver = Path("server/src/main/kotlin/dev/aragos/aor/FinalAdvancePlan.kt")
+    solver = Path("core/src/commonMain/kotlin/dev/aragos/aor/FinalAdvancePlan.kt")
     check(planner_definition(source) == planner_definition(solver),
           "The online quote must run the same complete solver tested in native games.")
     for jar in ("core-jvm.jar", "ai-jvm.jar"):

@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.FinalAdvanceGuard
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotModels
@@ -235,7 +236,7 @@ fun main(arguments: Array<String>) {
             """
             AoR standalone offline opponent trainer (JDK 21+).
             Use train-opponents.py for enforced CPU, memory and elapsed-time limits.
-            --mode coverage|train|evaluate  --output PATH  --hours HOURS (maximum 72)
+            --mode coverage|train|evaluate|evaluate-finish  --output PATH  --hours HOURS (maximum 72)
             --workers N  --configurations 1..${TrainingMatrix.configurations.size}  --seeds N  --seed N
             --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
             --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
@@ -316,16 +317,22 @@ fun main(arguments: Array<String>) {
                 }
                 artifacts.model(initial)
             }
-            "evaluate" -> {
+            "evaluate",
+            "evaluate-finish" -> {
+                val guard =
+                    if (options.mode == "evaluate-finish") {
+                        FinalAdvanceGuard(currentLead = 100, projectedLead = 250)
+                    } else null
                 val comparison =
                     tournaments.compare(
                         candidate = initial,
-                        incumbent = BotModels.default,
+                        incumbent = if (guard == null) BotModels.default else initial,
                         configurations = configurations,
                         seedsPerConfiguration = options.seeds,
                         seedOffset = options.seed,
                         heldOut = true,
                         reportMatrix = { artifacts.write("evaluation-matrix.json", it) },
+                        candidateFinishGuard = guard,
                         completed = completed,
                     )
                 artifacts.write("evaluation.json", comparison)
@@ -539,8 +546,8 @@ private data class TrainingOptions(
                     batch = fields["--batch"]?.toInt() ?: 16,
                     difficulty = BotDifficulty.valueOf(fields["--difficulty"] ?: "NORMAL"),
                 )
-            require(options.mode in setOf("coverage", "train", "evaluate")) {
-                "Mode must be coverage, train, or evaluate."
+            require(options.mode in setOf("coverage", "train", "evaluate", "evaluate-finish")) {
+                "Mode must be coverage, train, evaluate, or evaluate-finish."
             }
             require(options.hours.isFinite() && options.hours > 0.0 && options.hours <= 72.0) {
                 "A training invocation may run for more than zero and at most 72 hours."
