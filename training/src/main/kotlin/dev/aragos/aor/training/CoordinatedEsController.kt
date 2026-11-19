@@ -11,6 +11,7 @@ import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
+import dev.aragos.aor.ai.OpeningAuctionFallback
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryObservation
@@ -33,6 +34,7 @@ internal class CoordinatedEsController(
     tokenAnchoredResidual: TokenAnchoredResidual? = null,
     initiative: InitiativePolicyConfig? = null,
     leadingRivalRetargeting: LeadingRivalRetargetingConfig? = null,
+    openingAuctionFallback: OpeningAuctionFallback? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -60,6 +62,7 @@ internal class CoordinatedEsController(
             tokenAnchoredResidual,
             initiative,
             leadingRivalRetargeting,
+            openingAuctionFallback,
         )
 
     override fun controls(decision: String): Boolean =
