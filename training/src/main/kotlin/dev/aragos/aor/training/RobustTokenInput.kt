@@ -236,7 +236,7 @@ private constructor(
                 mapOf("nextTurnBaseRollouts" to "colored-base-followthrough-1")
             else emptyMap()) +
             (if (caravanAttackRollouts)
-                mapOf("caravanAttackRollouts" to "caravan-attack-followthrough-1")
+                mapOf("caravanAttackRollouts" to "caravan-attack-followthrough-2")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +

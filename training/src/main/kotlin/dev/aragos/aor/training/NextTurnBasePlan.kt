@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.BoardCommand
 import dev.aragos.aor.ExpansionAction
+import dev.aragos.aor.ExpansionOfferView
 import dev.aragos.aor.GameState
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ProvinceId
@@ -96,6 +97,7 @@ internal class PlannedMarketContinuation(
     private val target: ProvinceId,
     private val turn: Int,
     private val gateway: ProvinceId? = null,
+    private val followUp: ExpansionAction = ExpansionAction.PLACE,
 ) : SimulationController by reference {
     var followedThrough = false
         private set
@@ -111,20 +113,25 @@ internal class PlannedMarketContinuation(
                     })
         ) {
             val quote = decision.view.expansionOffers.singleOrNull { it.destination == target }
-            if (
-                quote != null &&
-                    quote.primaryAction == ExpansionAction.PLACE &&
-                    quote.establishesMarker &&
-                    !quote.uncertain &&
-                    quote.blockers.isEmpty()
-            ) {
-                val placement = BoardCommand.Place(quote.requiredTokens, target).toText()
-                if (decision.observation.candidates.any { it.command == placement }) {
+            if (quote != null && quote.primaryAction == followUp && quote.admitsPlannedMarket()) {
+                val command =
+                    if (followUp == ExpansionAction.ATTACK) BoardCommand.Attack(target).toText()
+                    else BoardCommand.Place(quote.requiredTokens, target).toText()
+                if (decision.observation.candidates.any { it.command == command }) {
                     followedThrough = true
-                    return placement
+                    return command
                 }
             }
         }
         return reference.choose(decision)
     }
 }
+
+internal fun ExpansionOfferView.admitsPlannedMarket(): Boolean =
+    establishesMarker &&
+        blockers.isEmpty() &&
+        when (primaryAction) {
+            ExpansionAction.PLACE -> !uncertain
+            ExpansionAction.ATTACK -> (competitionWinProbability ?: 0.0) >= .65
+            ExpansionAction.INSPECT -> false
+        }

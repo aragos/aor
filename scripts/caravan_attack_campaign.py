@@ -9,7 +9,7 @@ from commodity_rollout_campaign import simulated_positions
 from initiative_campaign import Campaign, interval, read, write
 
 
-REMOTE = "/home/aragos/aor-worker/caravan-followthrough-20261119"
+REMOTE = "/home/aragos/aor-worker/caravan-followthrough-v2-20261119"
 KEY = "caravanAttackRollouts"
 ARMS = ("ordinary", "attack-gateway", "attack-and-place")
 
@@ -31,13 +31,15 @@ def collect(stage, count):
                      for arm in ARMS]
             if len(seeds[0]) != 2 or any(pair != seeds[0] for pair in seeds[1:]):
                 raise ValueError("All legal alternatives must replay both matched futures.")
-            if not .45 <= root["attackChance"] <= 1 or not 2 <= root["targetCost"] <= 6:
+            if not .45 <= root["attackChance"] <= 1 or not 2 <= root["targetCost"] <= 10:
                 raise ValueError("The selected gateway must meet the declared cost and risk range.")
             wins = [statistics.mean(sample["terminal"]["winShare"] for sample in tails[arm])
                     for arm in ARMS]
             rows.append({
                 "turn": root["turn"],
                 "chance": root["attackChance"],
+                "secondAction": root["targetAction"],
+                "redirectedFirstAttack": root["redirectedFirstAttack"],
                 "followThrough": statistics.mean(
                     sample["followedThrough"] for sample in tails["attack-and-place"]),
                 "gatewayEffect": wins[1] - wins[0],
@@ -72,6 +74,8 @@ def main(root, previous, count, resume):
     write(root / "result.json", {
         "worlds": count,
         "all": summary(evidence),
+        "nextAttack": summary([row for row in evidence if row["secondAction"] == "ATTACK"]),
+        "redirectedFirstAttack": summary([row for row in evidence if row["redirectedFirstAttack"]]),
         "throughTurn6": summary([row for row in evidence if row["turn"] <= 6]),
     })
 

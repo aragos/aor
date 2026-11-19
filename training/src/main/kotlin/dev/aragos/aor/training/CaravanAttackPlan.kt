@@ -21,6 +21,7 @@ internal data class CaravanAttackPlan(
     val destination: ProvinceId,
     val firstCost: Int,
     val secondCost: Int,
+    val secondAction: ExpansionAction,
     val chance: Double,
 ) {
     companion object {
@@ -42,9 +43,9 @@ internal data class CaravanAttackPlan(
                 public.expansionInspections
                     .filter { quote ->
                         !quote.reachable &&
-                            quote.primaryAction == ExpansionAction.PLACE &&
                             quote.establishesMarker &&
-                            quote.requiredTokens in 2..6
+                            quote.missingAccess.isEmpty() &&
+                            quote.requiredTokens in 2..10
                     }
                     .map { it.destination }
                     .toSet()
@@ -64,7 +65,6 @@ internal data class CaravanAttackPlan(
                 .asSequence()
                 .filter { quote ->
                     quote.destination in gateways &&
-                        quote.destination != current.province &&
                         quote.primaryAction == ExpansionAction.ATTACK &&
                         quote.blockers.isEmpty() &&
                         quote.requiredTokens <= reference.requiredTokens + 2 &&
@@ -81,11 +81,7 @@ internal data class CaravanAttackPlan(
                     val access =
                         successful.expansionOffers
                             .filter { offer ->
-                                offer.destination in closed &&
-                                    offer.primaryAction == ExpansionAction.PLACE &&
-                                    offer.establishesMarker &&
-                                    !offer.uncertain &&
-                                    offer.blockers.isEmpty()
+                                offer.destination in closed && offer.admitsPlannedMarket()
                             }
                             .minWithOrNull(
                                 compareBy({ it.requiredTokens }, { it.destination.value })
@@ -95,6 +91,7 @@ internal data class CaravanAttackPlan(
                         access.destination,
                         quote.requiredTokens,
                         access.requiredTokens,
+                        access.primaryAction,
                         requireNotNull(quote.competitionWinProbability) {
                             "A shortlisted attack must have a quoted dice probability."
                         },

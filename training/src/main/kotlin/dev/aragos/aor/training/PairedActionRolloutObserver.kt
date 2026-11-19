@@ -117,6 +117,8 @@ internal class PairedActionRolloutObserver(
                     "target" to plan.destination.value,
                     "gatewayCost" to plan.firstCost,
                     "targetCost" to plan.secondCost,
+                    "targetAction" to plan.secondAction.name,
+                    "redirectedFirstAttack" to (plan.attack.toText() != command),
                     "attackChance" to plan.chance,
                 ),
             caravanPlan = plan,
@@ -523,6 +525,7 @@ internal class PairedActionRolloutObserver(
                                         plan.destination,
                                         originTurn,
                                         gateway = plan.attack.province,
+                                        followUp = plan.secondAction,
                                     )
                                 }
                             else -> null
