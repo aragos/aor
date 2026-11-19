@@ -20,7 +20,8 @@ MAC_JAVA = ("/Users/aragos/.gradle/jdks/azul_systems__inc_-21-aarch64-os_x.2/"
             "zulu21.50.19-ca-jdk21.0.11-macosx_aarch64/Contents/Home/bin/java")
 HOST = "aragos@192.168.86.44"
 REMOTE = "/home/aragos/aor-worker/initiative-mirror-20261118"
-SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", HOST]
+SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+       "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", HOST]
 MODE = "dev.aragos.aor.training.TrainingMainKt"
 ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "INDEPENDENT_INITIATIVE")
 
