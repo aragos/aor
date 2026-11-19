@@ -103,6 +103,27 @@ class RobustTokenInputTest {
     }
 
     @Test
+    fun theCapitalAuctionStudyCanRecordTheExistingPolicy() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val input =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "opponentStyle" to "QUALIFIED",
+                                "candidateOnly" to true,
+                                "capitalAuction" to
+                                    mapOf("kind" to CapitalAuctionConfig.VERSION, "bid" to null),
+                            ),
+                        )
+                        .path
+                )
+
+            assertThat(input.capitalAuction).isEqualTo(CapitalAuctionConfig(null))
+        }
+    }
+
+    @Test
     fun publicCounterConfigurationIsExplicitAndIdentityBound() {
         CoordinatedWinQualificationFixture().use { fixture ->
             val input =
