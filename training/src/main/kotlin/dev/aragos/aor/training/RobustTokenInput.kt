@@ -114,6 +114,7 @@ private constructor(
     val midgameBidRollouts: Boolean,
     val rivalMarketDenialRollouts: Boolean,
     val reserveExpansionCardRollouts: Boolean,
+    val capitalChoiceRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -222,6 +223,8 @@ private constructor(
             else emptyMap()) +
             (if (reserveExpansionCardRollouts)
                 mapOf("reserveExpansionCardRollouts" to "reserve-market-and-card-1")
+            else emptyMap()) +
+            (if (capitalChoiceRollouts) mapOf("capitalChoiceRollouts" to "all-offered-capitals-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -425,6 +428,7 @@ private constructor(
                     "midgameBidRollouts",
                     "rivalMarketDenialRollouts",
                     "reserveExpansionCardRollouts",
+                    "capitalChoiceRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -655,6 +659,11 @@ private constructor(
                     }
                     setting.booleanValue()
                 } ?: false
+            val capitalChoiceRollouts =
+                node["capitalChoiceRollouts"]?.let { setting ->
+                    require(setting.isBoolean) { "The capital choice study requires a boolean." }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -713,6 +722,22 @@ private constructor(
             }
             require(!commodityExpansionRollouts || commodityRollouts) {
                 "A commodity expansion plan requires a declared ordinary holding opportunity."
+            }
+            require(
+                !capitalChoiceRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        !cardTerritoryRollouts &&
+                        !reliefUnlockRollouts &&
+                        !midgameBidRollouts &&
+                        !rivalMarketDenialRollouts &&
+                        !reserveExpansionCardRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.MIXED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "The opening-capital study requires one fixed mixed candidate-only comparison."
             }
             require(
                 !reserveExpansionCardRollouts ||
@@ -831,6 +856,7 @@ private constructor(
                     midgameBidRollouts,
                     rivalMarketDenialRollouts,
                     reserveExpansionCardRollouts,
+                    capitalChoiceRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

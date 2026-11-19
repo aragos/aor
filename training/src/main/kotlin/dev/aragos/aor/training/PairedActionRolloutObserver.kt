@@ -29,6 +29,7 @@ internal class PairedActionRolloutObserver(
     private val commodityExpansion: Boolean = false,
     private val compareRivalDenial: Boolean = false,
     private val reserveExpansionCard: Boolean = false,
+    private val compareCapitals: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -49,6 +50,7 @@ internal class PairedActionRolloutObserver(
                 reliefUnlock -> "reliefUnlockRollouts"
                 compareRivalDenial -> "rivalMarketDenialRollouts"
                 reserveExpansionCard -> "reserveExpansionCardRollouts"
+                compareCapitals -> "capitalChoiceRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -66,8 +68,53 @@ internal class PairedActionRolloutObserver(
                 reliefUnlock -> reliefRoot(state, number, observation, command)
                 compareRivalDenial -> denialRoot(state, number, observation, command)
                 reserveExpansionCard -> reserveRoot(state, number, observation, command)
+                compareCapitals -> capitalRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
+    }
+
+    private fun capitalRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (
+            state.stage != Stage.CAPITAL_CHOICE ||
+                observation.decision != "choose-capital" ||
+                observation.candidates.size < 2
+        )
+            return null
+        val actor = state.playerIds[seat]
+        val position = state.capitalOrder.indexOf(actor)
+        check(position >= 0) { "An observed capital choice requires the actor's auction place." }
+        val options =
+            observation.candidates.associateBy { candidate ->
+                candidate.command.removePrefix("choose-capital ")
+            }
+        val properties =
+            listOf(
+                "commodity",
+                "reach",
+                "capitalOpportunity",
+                "initialCommodity",
+                "capitalCommodityPotential",
+                "capitalLeaderOpportunity",
+            )
+        return Root(
+            state,
+            number,
+            command,
+            options.mapValues { (_, available) -> available.command },
+            mapOf(
+                "capitalPosition" to position,
+                "availableCash" to observation.availableCash,
+                "options" to
+                    options.mapValues { (_, candidate) ->
+                        properties.associateWith { candidate.features[it] ?: 0.0 }
+                    },
+            ),
+        )
     }
 
     private fun commodityRoot(
@@ -301,9 +348,9 @@ internal class PairedActionRolloutObserver(
                     (territoryEpoch?.let { mapOf("requestedEpoch" to it) } ?: emptyMap())
         val actor = captured.state.playerIds[seat]
         val originTurn =
-            requireNotNull(captured.state.turnNumber) {
-                "A rollout requires an active origin turn."
-            }
+            captured.state.turnNumber
+                ?: if (compareCapitals) 0
+                else error("A rollout outside setup requires an active origin turn.")
         val rootFacts =
             mapOf(
                 "status" to "paired",
