@@ -39,6 +39,7 @@ data class OpeningBidMix(val bids: List<Int>, val laterCapitalBids: List<Int> = 
  * [counterAnticipation] is the weight of a forecast when a rival repeatedly tracks our usual bid.
  * [respectRivalCash] clips historical predictions to each rival's currently published cash.
  * [openingMix] selects from absolute first-turn bids when at least one can be bought.
+ * [localOrderWeight] adds the bounded public land-pressure adjustment in printed box units.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -55,6 +56,7 @@ data class InitiativePolicyConfig(
     val counterAnticipation: Double = 0.0,
     val respectRivalCash: Boolean = false,
     val openingMix: OpeningBidMix? = null,
+    val localOrderWeight: Double = 0.0,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -86,6 +88,9 @@ data class InitiativePolicyConfig(
         require(counterAnticipation.isFinite() && counterAnticipation in 0.0..1.0) {
             "The counter anticipation weight must be between zero and one."
         }
+        require(localOrderWeight.isFinite() && localOrderWeight in 0.0..1.0) {
+            "The land-pressure order weight must be between zero and one printed box per rival."
+        }
     }
 
     companion object {
@@ -95,6 +100,10 @@ data class InitiativePolicyConfig(
 
 /** Compare candidate bids against joint rows of strictly past, publicly revealed purchases. */
 object InitiativePolicy {
+    private data class RivalBid(val amount: Int, val winsTie: Boolean, val adjustment: Double) {
+        fun earlierThan(bid: Int): Boolean = amount < bid || amount == bid && winsTie
+    }
+
     fun bid(
         view: GameView,
         player: PlayerId,
@@ -152,6 +161,10 @@ object InitiativePolicy {
         val priorityOfPlayer =
             requireNotNull(priority[player]) { "The bidder needs a capital choice." }
         val rivals = view.players.filter { it.id != player }
+        val localAdjustments =
+            if (config.localOrderWeight > 0.0) {
+                InitiativeGeography.orderAdjustments(view, player, original.poolAfter)
+            } else emptyMap()
         val rows = view.pastTokenPurchases.takeLast(4)
         val predictions = rows.map { bids ->
             rivals.map { rival ->
@@ -161,9 +174,13 @@ object InitiativePolicy {
                         requireNotNull(bids[rival.id]) { "A revealed row needs every rival's bid." }
                 val cash = rival.cash.coerceAtLeast(0)
                 val forecast = if (config.respectRivalCash) bid.coerceIn(-cash, cash) else bid
-                forecast to
-                    (requireNotNull(priority[rival.id]) { "Rivals need capital choice order." } >
-                        priorityOfPlayer)
+                RivalBid(
+                    amount = forecast,
+                    winsTie =
+                        requireNotNull(priority[rival.id]) { "Rivals need capital choice order." } >
+                            priorityOfPlayer,
+                    adjustment = localAdjustments[rival.id] ?: 0.0,
+                )
             }
         }
         val weights =
@@ -177,17 +194,21 @@ object InitiativePolicy {
             if (expectedCounters.isEmpty()) null
             else
                 predictions.map { row ->
-                    row.mapIndexed { index, (bid, tiePriority) ->
-                        (expectedCounters[rivals[index].id] ?: bid) to tiePriority
+                    row.mapIndexed { index, bid ->
+                        expectedCounters[rivals[index].id]?.let { bid.copy(amount = it) } ?: bid
                     }
                 }
-        fun meanBox(amount: Int, scenarios: List<List<Pair<Int, Boolean>>>): Double =
+        fun meanBox(amount: Int, scenarios: List<List<RivalBid>>): Double =
             scenarios.withIndex().sumOf { (index, row) ->
-                weights[index] *
-                    boxes[
-                        row.count { (bid, tiePriority) ->
-                            bid < amount || bid == amount && tiePriority
-                        }]
+                var count = 0
+                var local = 0.0
+                for (bid in row) {
+                    if (bid.earlierThan(amount)) {
+                        count += 1
+                        local += bid.adjustment
+                    }
+                }
+                weights[index] * (boxes[count] + config.localOrderWeight * local)
             } / totalWeight
         fun expectedBox(amount: Int): Double {
             val historical = meanBox(amount, predictions)

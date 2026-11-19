@@ -382,6 +382,7 @@ private constructor(
                         "counterAnticipation",
                         "respectRivalCash",
                         "openingMix",
+                        "localOrderWeight",
                     ),
             )
             require(
@@ -426,6 +427,10 @@ private constructor(
                         setting.booleanValue()
                     } ?: false,
                 openingMix = node["openingMix"]?.let(::openingMix),
+                localOrderWeight =
+                    node["localOrderWeight"]?.let {
+                        PurchaseJson.number(it, "land-pressure order weight")
+                    } ?: 0.0,
             )
         }
 

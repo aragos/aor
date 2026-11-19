@@ -12,6 +12,7 @@ import dev.aragos.aor.Stage
 import dev.aragos.aor.TokenPurchaseOfferView
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class InitiativePolicyTest {
     private val players = (1..4).map { PlayerId("p$it") }
@@ -59,6 +60,37 @@ class InitiativePolicyTest {
     @Test
     fun usesTheCheapestUsefulUndercut() {
         assertEquals("buy-tokens 20", InitiativePolicy.bid(view, seat, "buy-tokens 21", 7, config))
+    }
+
+    @Test
+    fun publicMarketPressureFavorsMovingBeforeTheNearbyCapital() {
+        val nearby = players[1]
+        val distant = players[2]
+        val position =
+            view.copy(
+                players =
+                    view.players.map { player ->
+                        when (player.id) {
+                            nearby -> player.copy(capital = "florence")
+                            distant -> player.copy(capital = "constantinople")
+                            else -> player
+                        }
+                    },
+                expansionForecast =
+                    ExpansionForecastView(
+                        listOf(
+                            PeacefulExpansionProspectView(ProvinceId("florence"), 4, false, false)
+                        ),
+                        overseasSlots = 0,
+                    ),
+            )
+
+        val pressure = InitiativeGeography.orderAdjustments(position, seat, pool = 4)
+
+        assertTrue(
+            requireNotNull(pressure[nearby]) > requireNotNull(pressure[distant]),
+            "A rival's public base at an intended market should raise its priority.",
+        )
     }
 
     @Test
