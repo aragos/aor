@@ -59,6 +59,25 @@ def frozen_plan(previous):
         fitted = read(capital_path)
         if fitted.get("bids"):
             proposals["contested-capital"] = strategy(live["config"], fitted["bids"])
+    population = previous / "automata-population-20261118"
+    specialists = []
+    for generation in sorted(population.glob("population-*.json")):
+        if not generation.stem.removeprefix("population-").isdigit():
+            continue
+        trained = read(generation)
+        for name, results in trained["confirm"].items():
+            gains = [point["mean"] for point in results.values()]
+            if sum(point["lower95"] > 0 for point in results.values()) >= 2 and min(gains) >= -.08:
+                specialists.append((statistics.mean(gains), generation.name, name,
+                                    trained["proposals"][name]))
+    if specialists:
+        _, _, _, specialist = max(specialists, key=lambda choice: choice[:3])
+        proposals["adaptive-specialist"] = strategy(specialist)
+        fitted_opening = proposals.get("fitted-opening")
+        if fitted_opening is not None and "openingMix" in fitted_opening["initiative"]:
+            proposals["adaptive-with-fitted-opening"] = strategy(dict(
+                specialist, openingMix=fitted_opening["initiative"]["openingMix"],
+            ))
     seen = {json.dumps(control, sort_keys=True)}
     policies = {}
     for name, proposal in proposals.items():
