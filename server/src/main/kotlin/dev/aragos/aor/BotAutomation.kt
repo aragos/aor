@@ -466,13 +466,18 @@ internal object BotAutomation {
         val view = state.viewForPlayer(seat)
         val tokenQuotes =
             ServerTokenNeighborQuotes(state, seat, actual, policy.tokenNeighborMixture)
-        val command =
+        val ordinary =
             policy.choose(
                 view,
                 actual,
                 bot.seed xor decisionId(game, seat).hashCode(),
                 tokenQuotes,
             )
+        val command =
+            policy.finalAdvanceGuard
+                ?.takeIf { actual.decision == "purchase-advances" }
+                ?.choose(state, view, seat, ordinary)
+                ?.takeIf { finish -> actual.candidates.any { it.command == finish } } ?: ordinary
         if (actual.candidates.none { it.command == command } && !tokenQuotes.accepts(command)) {
             throw ServiceFailure(503, "BOT_POLICY_FAILED")
         }

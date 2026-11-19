@@ -45,6 +45,10 @@ interface ServerBotPolicy {
     val tokenNeighborMixture: LocalTokenNeighborMixture?
         get() = null
 
+    /** If present, the game authority may quote the actor's same-phase finish. */
+    val finalAdvanceGuard: FinalAdvanceGuard?
+        get() = null
+
     fun choose(view: GameView, observation: BotObservation, seed: Int): String
 
     /**

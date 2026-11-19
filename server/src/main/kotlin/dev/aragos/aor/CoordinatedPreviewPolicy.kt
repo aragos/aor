@@ -71,6 +71,10 @@ private const val ADOPTING_TARGETING_BASE_SHA256 =
     "09fffe9479450b5e9b2bd9cd741f09fb1da79acf820d5e2f5b5907d64514b0e8"
 private const val ADOPTING_TARGETING_CERTIFICATE_SHA256 =
     "53541f22ef5cf2b3bbe1049053436724785c6fdcbdd968d84a0d833895851566"
+private const val GUARDED_FINISH_BASE_SHA256 =
+    "81cabbabc39721924422ccfc0f83e7d0d76468f508eaa93d720f0e819b8556af"
+private const val GUARDED_FINISH_CERTIFICATE_SHA256 =
+    "9efb2d1422ff6fba85ce734b87cb11a9ff9ef52ea09f9ed4bc3c48937b0175ea"
 private const val RETARGETING_TRAINING_SHA256 =
     "fcaae16011c32bebfdc0617777a3ffe8cfb80a7b0c83666d31cd916a5dec0630"
 private const val RETARGETING_AUDIT_SHA256 =
@@ -122,6 +126,12 @@ private class CachedCoordinatedPreviewPolicy(
 object CoordinatedPreviewPolicy {
     fun read(path: Path): ServerBotPolicy = CoordinatedAssetReader(path).read()
 }
+
+private class GuardedFinishPreview(
+    base: ServerBotPolicy,
+    override val assetSha256: String,
+    override val finalAdvanceGuard: FinalAdvanceGuard,
+) : ServerBotPolicy by base
 
 private class CapitalGeographyPreview(
     private val base: ServerBotPolicy,
@@ -215,8 +225,70 @@ private class CoordinatedAssetReader(path: Path) {
             "coordinated-second-capital-preview-1" -> readSecondCapital(manifest, root)
             "coordinated-evolved-targeting-preview-1" -> readEvolvedTargeting(manifest, root)
             "coordinated-adopting-targeting-preview-1" -> readAdoptingTargeting(manifest, root)
+            "coordinated-guarded-finish-preview-1" -> readGuardedFinish(manifest, root)
             else -> readCoordinated(manifest, root)
         }
+    }
+
+    private fun readGuardedFinish(manifest: Document, root: JsonNode): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "Guarded finish requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == GUARDED_FINISH_BASE_SHA256) {
+            "Guarded finish must extend the exact qualified early attack strategy."
+        }
+        val evidence = subject(manifest, root["qualification"])
+        require(evidence.sha256 == GUARDED_FINISH_CERTIFICATE_SHA256) {
+            "Guarded finish requires its pinned independent qualification."
+        }
+        val certificate = node(evidence)
+        fields(
+            certificate,
+            "kind",
+            "basePreviewSha256",
+            "solverSha256",
+            "nativeJarSha256",
+            "guard",
+            "comparisons",
+            "completionLowerBounds",
+        )
+        require(
+            text(certificate, "kind") == "guarded-finish-qualification-1" &&
+                hash(certificate, "basePreviewSha256") == base.sha256
+        ) {
+            "The finish certificate must bind the exact previous local strategy."
+        }
+        hash(certificate, "solverSha256")
+        hash(certificate, "nativeJarSha256")
+        val guard = certificate["guard"]
+        fields(guard, "kind", "minimumPassLead", "margin")
+        val minimumPassLead = integer(guard, "minimumPassLead")
+        val margin = integer(guard, "margin")
+        require(
+            text(guard, "kind") == FinalAdvancePlan.VERSION &&
+                minimumPassLead == 100 &&
+                margin == 250
+        ) {
+            "The preview requires the tested guard for a substantial current and estimated final lead."
+        }
+        val cases = listOf("mixed", "known-16")
+        val wins = verifiedTargetingWins(certificate["comparisons"], cases, 1536)
+        val completion = certificate["completionLowerBounds"]
+        fields(completion, *cases.toTypedArray())
+        require(
+            wins.minOf { it.second } > -.01 &&
+                wins.map { it.first }.average() >= 0.0 &&
+                cases.all { number(completion[it], "lower bound for completed advances") > 0.0 }
+        ) {
+            "Completing advances must improve in both tables while retaining competitive win rates."
+        }
+        return GuardedFinishPreview(
+            readAdoptingTargeting(base, node(base)),
+            manifest.sha256,
+            FinalAdvanceGuard(minimumPassLead, margin),
+        )
     }
 
     private fun readLeadingRival(
