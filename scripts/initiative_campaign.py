@@ -184,7 +184,7 @@ class Campaign:
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
               rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
-              card_timing=None):
+              card_timing=None, science_survival=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -206,6 +206,8 @@ class Campaign:
             declared["openingBidPrior"] = opening_bid_prior
         if card_timing:
             declared["cardTiming"] = card_timing
+        if science_survival:
+            declared["scienceSurvival"] = science_survival
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -234,6 +236,8 @@ class Campaign:
                         spec["initiative"] = policy
                     if card_timing and key in card_timing:
                         spec["commodityTiming"] = card_timing[key]
+                    if science_survival and key in science_survival:
+                        spec["scienceSurvival"] = science_survival[key]
                     declare(source, spec)
                     jobs.append((name, source))
         pending = []

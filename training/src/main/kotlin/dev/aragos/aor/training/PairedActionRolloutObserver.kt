@@ -47,18 +47,22 @@ internal class PairedActionRolloutObserver(
             when {
                 timing != null -> commodityRoot(state, number, observation, command, timing)
                 stabilizationEpoch != null -> stabilizationRoot(state, number, observation, command)
-                protection != null ->
-                    protection
-                        .opportunity(state, state.playerIds[seat], observation, command)
-                        ?.let {
-                            Root(
-                                state,
-                                number,
-                                command,
-                                mapOf("protect" to it.command, "ordinary" to command),
-                                it.facts,
-                            )
-                        }
+                protection != null && observation.decision == protection.decision ->
+                    state.playerIds[seat].let { actor ->
+                        if ((state.playerState(actor).misery.value ?: 0) < 350) return
+                        protection
+                            .opportunity(state.viewForPlayer(actor), actor, observation, command)
+                            ?.let {
+                                Root(
+                                    state,
+                                    number,
+                                    command,
+                                    mapOf("protect" to it.command, "ordinary" to command),
+                                    it.facts,
+                                )
+                            }
+                    }
+                protection != null -> null
                 else -> expansionCardRoot(state, number, observation, command)
             }
     }

@@ -113,6 +113,7 @@ private constructor(
     val expansionCardRollouts: Boolean,
     val stabilizationRollouts: Boolean,
     val miseryProtectionRollouts: Boolean,
+    val scienceSurvival: ScienceSurvival?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -209,7 +210,13 @@ private constructor(
             else emptyMap()) +
             (if (miseryProtectionRollouts)
                 mapOf("miseryProtectionRollouts" to "grain-and-science-1")
-            else emptyMap())
+            else emptyMap()) +
+            (scienceSurvival?.let {
+                mapOf(
+                    "scienceSurvival" to
+                        mapOf("kind" to ScienceSurvival.VERSION, "configuration" to it)
+                )
+            } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
     fun verify() {
@@ -394,6 +401,7 @@ private constructor(
                     "expansionCardRollouts",
                     "stabilizationRollouts",
                     "miseryProtectionRollouts",
+                    "scienceSurvival",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -503,6 +511,17 @@ private constructor(
                     }
                     setting.booleanValue()
                 } ?: false
+            val scienceSurvival =
+                node["scienceSurvival"]?.let { setting ->
+                    PurchaseJson.fields(setting, setOf("kind", "maximumDistance", "maximumPrice"))
+                    require(setting["kind"]?.asText() == ScienceSurvival.VERSION) {
+                        "Declare the exact optional near-Chaos science policy."
+                    }
+                    ScienceSurvival(
+                        PurchaseJson.integer(setting["maximumDistance"], "misery distance"),
+                        PurchaseJson.integer(setting["maximumPrice"], "maximum science price"),
+                    )
+                }
             val adaptiveOpponent =
                 node["adaptiveOpponent"]?.takeUnless(JsonNode::isNull)?.let {
                     RevealedTokenCounterConfig.read(it)
@@ -661,6 +680,7 @@ private constructor(
                     expansionCardRollouts,
                     stabilizationRollouts,
                     miseryProtectionRollouts,
+                    scienceSurvival,
                     seeds,
                     start,
                     count,

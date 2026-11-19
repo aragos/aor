@@ -61,6 +61,7 @@ internal class RobustTokenDiagnostics(
     private var attacks = 0
     private var leaderAttackOpportunities = 0
     private var attacksOnPublicLeader = 0
+    var scienceSurvivalOverrides = 0
     private val decisions = MessageDigest.getInstance("SHA-256")
     private val quotedBids = mutableMapOf<Int, Int>()
     private val quoteAdmissions = mutableListOf<Map<String, Any>>()
@@ -161,6 +162,7 @@ internal class RobustTokenDiagnostics(
             "controlledAttacks" to attacks,
             "controlledLeaderAttackDecisionOpportunities" to leaderAttackOpportunities,
             "controlledAttacksOnCurrentPublicLeader" to attacksOnPublicLeader,
+            "scienceSurvivalOverrides" to scienceSurvivalOverrides,
             "chosenPolicyDecisionsSha256" to
                 decisions.digest().joinToString("") { "%02x".format(it) },
         ) +
@@ -278,6 +280,14 @@ internal object RobustTokenGame {
 
                         override fun choose(decision: SimulationDecision): String? {
                             val original = qualified.choose(decision) ?: return null
+                            val protection =
+                                input.scienceSurvival
+                                    ?.takeIf { candidate }
+                                    ?.choose(decision.view, decision.observation, original)
+                            if (protection != null) {
+                                log.scienceSurvivalOverrides++
+                                return protection
+                            }
                             val command =
                                 if (
                                     player != seat &&
