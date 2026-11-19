@@ -111,6 +111,7 @@ private constructor(
     val commodityTiming: CommodityTimingConfig?,
     val commodityRollouts: Boolean,
     val commodityExpansionRollouts: Boolean,
+    val midgameBidRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -211,6 +212,8 @@ private constructor(
             else emptyMap()) +
             (if (commodityExpansionRollouts)
                 mapOf("commodityExpansionRollouts" to "hold-expand-play-1")
+            else emptyMap()) +
+            (if (midgameBidRollouts) mapOf("midgameBidRollouts" to "sealed-bid-neighbors-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -411,6 +414,7 @@ private constructor(
                     "commodityTiming",
                     "commodityRollouts",
                     "commodityExpansionRollouts",
+                    "midgameBidRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -624,6 +628,11 @@ private constructor(
                     }
                     setting.booleanValue()
                 } ?: false
+            val midgameBidRollouts =
+                node["midgameBidRollouts"]?.let { setting ->
+                    require(setting.isBoolean) { "The midgame bid study requires a boolean." }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -682,6 +691,19 @@ private constructor(
             }
             require(!commodityExpansionRollouts || commodityRollouts) {
                 "A commodity expansion plan requires a declared ordinary holding opportunity."
+            }
+            require(
+                !midgameBidRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        !cardTerritoryRollouts &&
+                        !reliefUnlockRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.MIXED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "Midgame bid rollouts require a fixed mixed table and one candidate-only comparison."
             }
             require(
                 !expansionCardRollouts ||
@@ -755,6 +777,7 @@ private constructor(
                     commodityTiming,
                     commodityRollouts,
                     commodityExpansionRollouts,
+                    midgameBidRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

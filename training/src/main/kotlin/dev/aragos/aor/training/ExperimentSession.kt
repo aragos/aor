@@ -67,6 +67,20 @@ private constructor(
     val entries: List<Entry>
         get() = recordedEntries?.toList().orEmpty()
 
+    /** Verify the recorded tail relative to its exact authority snapshot and return its digest. */
+    internal fun verifiedContinuation(initial: GameState, deadlineNanos: Long): String {
+        val recorded =
+            checkNotNull(recordedEntries) { "A replay-checked continuation must record entries." }
+        val canonical = recorded.map(Entry::toText)
+        val replayed =
+            canonical.fold(initial) { current, entry ->
+                checkTokenValueDeadline(deadlineNanos)
+                current.step(TextCodec.parse(entry))
+            }
+        check(replayed == state) { "A paired continuation must replay to the identical state." }
+        return CpePairedDigest.json(canonical)
+    }
+
     /**
      * Copies state and counters without serializing them. Omit [seed] to copy the exact current RNG
      * position; provide one to start an independent continuation stream. Branch mutations are

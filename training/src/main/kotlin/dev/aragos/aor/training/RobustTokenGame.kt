@@ -174,7 +174,10 @@ internal class RobustTokenDiagnostics(
 }
 
 /** Only prescribed reproduction roots retain and verify the complete canonical authority text. */
-private class RobustCanonicalTrace(override val seat: Int) : SimulationTrace {
+private class RobustCanonicalTrace(
+    override val seat: Int,
+    private val observer: SimulationTrace? = null,
+) : SimulationTrace {
     var sha256: String? = null
         private set
 
@@ -186,10 +189,21 @@ private class RobustCanonicalTrace(override val seat: Int) : SimulationTrace {
         observation: BotObservation,
         chosen: BotCandidate,
         model: BotModel,
-    ) = Unit
+    ) {
+        observer?.decision(
+            number,
+            snapshotEntryCount,
+            commandEntryIndex,
+            view,
+            observation,
+            chosen,
+            model,
+        )
+    }
 
     override fun verified(header: GameHeader, entries: List<String>) {
         sha256 = CpePairedDigest.json(mapOf("header" to header, "entries" to entries))
+        observer?.verified(header, entries)
     }
 }
 
@@ -347,7 +361,11 @@ internal object RobustTokenGame {
                     BotDifficulty.HARD,
                 )
             }
-        val trace = if (index in input.replayIndices) RobustCanonicalTrace(seat) else null
+        val midgame =
+            if (input.midgameBidRollouts) MidgameBidRollout(seat, 5 + (index / 4) % 4, deadline)
+            else null
+        val canonical =
+            if (index in input.replayIndices) RobustCanonicalTrace(seat, midgame) else null
         val game =
             Simulation()
                 .play(
@@ -356,7 +374,7 @@ internal object RobustTokenGame {
                     competitors,
                     deadlineNanos = deadline,
                     controllers = evaluatedControllers,
-                    trace = trace,
+                    trace = canonical ?: midgame,
                     stateObserver = observer,
                 )
         val terminal = ArenaGame.from(game).copy(elapsedMillis = 0)
@@ -376,6 +394,20 @@ internal object RobustTokenGame {
                     )
                 }
                 .orEmpty()
+        val bidEvidence =
+            midgame
+                ?.let {
+                    mapOf(
+                        "midgameBidRollouts" to
+                            it.outcomes(
+                                arena.configurations.single().id,
+                                input.seeds[index],
+                                competitors.map(Competitor::model),
+                                { controllers(RobustTokenDiagnostics(seat)) },
+                            )
+                    )
+                }
+                .orEmpty()
         return RobustTokenGameResult(
             terminal,
             diagnostics.result() +
@@ -383,8 +415,9 @@ internal object RobustTokenGame {
                 else mapOf("initiativeRivalSeats" to initiativeRivalSeats)) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()) +
-                rolloutEvidence,
-            trace?.sha256,
+                rolloutEvidence +
+                bidEvidence,
+            canonical?.sha256,
         )
     }
 }

@@ -328,7 +328,7 @@ internal class PairedActionRolloutObserver(
                         continuation.finish(session, seat, configuration, chanceSeed, record)
                     mapOf(
                         "terminal" to terminal,
-                        "canonicalSha256" to verifiedCanonical(session, captured.state, deadline),
+                        "canonicalSha256" to session.verifiedContinuation(captured.state, deadline),
                     ) +
                         (commodityController?.let {
                             mapOf(
@@ -449,7 +449,7 @@ internal class PairedActionRolloutObserver(
                     .reachTurn(session, originTurn + 3)
                 mapOf(
                     "checkpoint" to checkpoint(session.state, actor, session.decisions),
-                    "canonicalSha256" to verifiedCanonical(session, start, deadline),
+                    "canonicalSha256" to session.verifiedContinuation(start, deadline),
                     "seed" to shortSeed,
                 ) +
                     if (resampledDrawStudy) {
@@ -457,21 +457,6 @@ internal class PairedActionRolloutObserver(
                     } else emptyMap()
             }
         }
-    }
-
-    private fun verifiedCanonical(
-        session: ExperimentSession,
-        initial: GameState,
-        deadline: Long,
-    ): String {
-        val canonical = session.entries.map(Entry::toText)
-        val replayed =
-            canonical.fold(initial) { state, entry ->
-                checkTokenValueDeadline(deadline)
-                state.step(TextCodec.parse(entry))
-            }
-        check(replayed == session.state) { "The paired continuation must replay exactly." }
-        return CpePairedDigest.json(canonical)
     }
 
     /** Separate positive range from the signed seeds used by the full terminal futures. */

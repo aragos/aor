@@ -14,8 +14,8 @@ TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
                         lookahead=False, epochs=(), chance_trial=False, short_training_futures=0,
-                        relief_unlock=False, commodity_expansion=False):
-    if sum((expansion, territory, relief_unlock, commodity_expansion)) > 1:
+                        relief_unlock=False, commodity_expansion=False, midgame_bids=False):
+    if sum((expansion, territory, relief_unlock, commodity_expansion, midgame_bids)) > 1:
         raise ValueError("A paired study requires one root intervention.")
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
@@ -26,6 +26,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         topic, bank = "unlock-relief", "first-tier-relief-v1"
     elif commodity_expansion:
         topic, bank = "commodity-sequence", "hold-expand-play-v1"
+    elif midgame_bids:
+        topic, bank = "midgame-bids", "sealed-bid-neighbors-v1"
     if lookahead:
         if not territory:
             raise ValueError("Short lookahead requires the card versus territory comparison.")
@@ -60,6 +62,10 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         method.pop("commodityTiming")
     elif commodity_expansion:
         method["kind"] = "hold-expand-play-1"
+    elif midgame_bids:
+        method["kind"] = "sealed-bid-neighbors-1"
+        method["turns"] = [5,6,7,8]
+        method.pop("commodityTiming")
     if lookahead:
         method["checkpointTurns"] = [1, 3]
     if epochs:
@@ -97,6 +103,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
                 request["shortTrainingFutures"] = short_training_futures
         elif relief_unlock:
             request["reliefUnlockRollouts"] = True
+        elif midgame_bids:
+            request.update(opponentStyle="MIXED",midgameBidRollouts=True)
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
             if commodity_expansion:
