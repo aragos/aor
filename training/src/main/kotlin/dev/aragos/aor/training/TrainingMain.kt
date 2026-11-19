@@ -236,7 +236,8 @@ fun main(arguments: Array<String>) {
             """
             AoR standalone offline opponent trainer (JDK 21+).
             Use train-opponents.py for enforced CPU, memory and elapsed-time limits.
-            --mode coverage|train|evaluate|evaluate-finish  --output PATH  --hours HOURS (maximum 72)
+            --mode coverage|train|evaluate|evaluate-finish|train-opening
+                --output PATH --hours HOURS (maximum 72)
             --workers N  --configurations 1..${TrainingMatrix.configurations.size}  --seeds N  --seed N
             --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
             --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
@@ -339,6 +340,16 @@ fun main(arguments: Array<String>) {
                 println("Evaluation: $comparison")
             }
             "train" -> train(options, initial, tournaments, artifacts, ledger, completed)
+            "train-opening" ->
+                OpeningHandTraining.run(
+                    tournaments,
+                    configurations,
+                    options.seeds,
+                    options.seed,
+                    initial,
+                    artifacts,
+                    ledger,
+                )
             else -> error("Unknown training mode ${options.mode}.")
         }
     }
@@ -546,8 +557,11 @@ private data class TrainingOptions(
                     batch = fields["--batch"]?.toInt() ?: 16,
                     difficulty = BotDifficulty.valueOf(fields["--difficulty"] ?: "NORMAL"),
                 )
-            require(options.mode in setOf("coverage", "train", "evaluate", "evaluate-finish")) {
-                "Mode must be coverage, train, evaluate, or evaluate-finish."
+            require(
+                options.mode in
+                    setOf("coverage", "train", "evaluate", "evaluate-finish", "train-opening")
+            ) {
+                "Mode must be coverage, train, evaluate, evaluate-finish, or train-opening."
             }
             require(options.hours.isFinite() && options.hours > 0.0 && options.hours <= 72.0) {
                 "A training invocation may run for more than zero and at most 72 hours."

@@ -222,7 +222,7 @@ private fun summarize(pairs: List<PairResult>): ModelComparison {
     )
 }
 
-private fun pairedEffect(values: List<Double>): PairedEffect {
+internal fun pairedEffect(values: List<Double>): PairedEffect {
     val mean = values.average()
     val variance =
         if (values.size <= 1) 0.0

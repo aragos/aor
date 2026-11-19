@@ -100,6 +100,10 @@ diagnostic `candidate.json`. Schema/rules/catalog metadata protects inference co
 matching metadata alone establishes no playing-strength claim. Broader qualification remains
 [open work](follow-ups.md).
 
+Run `--mode train-opening --seeds 8` to fit opening-card returns in Draw Three Keep Two.
+The executor plays the three legal returns from the same dealt hand and uses a disjoint seed bank
+for evaluation. Its `candidate.json` contains ordinary model weights scoped to this decision.
+
 ### Portable simulation benchmark
 
 For the learned purchase workload, [automata_benchmark.py](../scripts/automata_benchmark.py) packages
