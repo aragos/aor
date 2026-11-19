@@ -197,6 +197,7 @@ private constructor(
     val secondCapitalGeography: Boolean,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val rivalTargetingLineup: RivalTargetingLineup?,
+    val finalAdvanceMargin: Int?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -303,6 +304,11 @@ private constructor(
                 mapOf(
                     "rivalTargetingLineup" to
                         mapOf("kind" to RivalTargetingLineup.VERSION, "policy" to it)
+                )
+            } ?: emptyMap()) +
+            (finalAdvanceMargin?.let {
+                mapOf(
+                    "finalAdvancePlan" to mapOf("kind" to FinalAdvancePlan.VERSION, "margin" to it)
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -628,6 +634,7 @@ private constructor(
                     "expansionDenial",
                     "leadingRivalRetargeting",
                     "rivalTargetingLineup",
+                    "finalAdvancePlan",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -687,6 +694,18 @@ private constructor(
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val finalAdvanceMargin =
+                node["finalAdvancePlan"]?.let { plan ->
+                    PurchaseJson.fields(plan, setOf("kind", "margin"))
+                    require(plan["kind"]?.asText() == FinalAdvancePlan.VERSION) {
+                        "The final advance plan requires a supported version."
+                    }
+                    PurchaseJson.integer(plan["margin"], "projected score margin").also { margin ->
+                        require(margin in 0..1000) {
+                            "The final advance margin must be between 0 and 1,000 score points."
+                        }
+                    }
+                }
             val rivalTargetingLineup =
                 node["rivalTargetingLineup"]?.let { lineup ->
                     PurchaseJson.fields(lineup, setOf("kind", "offsets", "policy"))
@@ -929,6 +948,7 @@ private constructor(
                     secondCapitalGeography,
                     leadingRivalRetargeting,
                     rivalTargetingLineup,
+                    finalAdvanceMargin,
                     seeds,
                     start,
                     count,

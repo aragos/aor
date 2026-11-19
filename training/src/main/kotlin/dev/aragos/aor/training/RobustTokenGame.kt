@@ -283,6 +283,7 @@ internal object RobustTokenGame {
                         )
                 RevealedTokenCounterLeague(players[seat], players, learned)
             }
+        var finalAdvanceController: FinalAdvanceController? = null
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
@@ -376,7 +377,13 @@ internal object RobustTokenGame {
                         return command
                     }
                 }
-            val controller = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+            val regular = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+            val controller =
+                input.finalAdvanceMargin
+                    ?.takeIf { candidate }
+                    ?.let { margin ->
+                        FinalAdvanceController(regular, margin).also { finalAdvanceController = it }
+                    } ?: regular
             object : SimulationController by controller {
                 override fun choose(decision: SimulationDecision): String? =
                     controller.choose(decision)?.also { diagnostics.chosen(decision, it) }
@@ -410,6 +417,13 @@ internal object RobustTokenGame {
                 else mapOf("initiativeRivalSeats" to rivalPolicies.keys.toList())) +
                 (if (targetingRivals.isEmpty()) emptyMap()
                 else mapOf("retargetingRivalSeats" to targetingRivals.toList())) +
+                (finalAdvanceController?.let {
+                    mapOf(
+                        "finalAdvancePlans" to it.availablePlans,
+                        "finalAdvanceOverrides" to it.overrides,
+                        "finalAdvanceLastBuyOverrides" to it.lastAdvanceOverrides,
+                    )
+                } ?: emptyMap()) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()),
             trace?.sha256,

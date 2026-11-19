@@ -50,6 +50,8 @@ constructor(
     val batchStartNumber: Int = number,
     /** Explicit actor-only quote capability; absent from every ordinary controller input. */
     val tokenQuote: TokenNeighborQuote? = null,
+    /** A bounded actor-only forecast for completing the printed advance set in this phase. */
+    val finalAdvanceForecast: ((ordinary: String) -> FinalAdvancePlan?)? = null,
 )
 
 /** Explicit experiment-only policy extension; null retains the ordinary baseline command. */
@@ -58,6 +60,8 @@ fun interface SimulationController {
     fun controls(decision: String): Boolean = true
 
     fun tokenNeighborMixture(): LocalTokenNeighborMixture? = null
+
+    fun wantsFinalAdvanceForecast(): Boolean = false
 
     /** Observation-only receipt, delivered after authority admission and never used to select. */
     fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) = Unit
@@ -237,6 +241,14 @@ class Simulation(private val maxDecisions: Int = 12000) {
                         observation,
                         controller?.tokenNeighborMixture(),
                     )
+                val origin = state
+                val finalAdvanceForecast =
+                    if (
+                        controller?.wantsFinalAdvanceForecast() == true &&
+                            observation.decision == "purchase-advances"
+                    ) {
+                        { ordinary: String -> FinalAdvancePlan.find(origin, actor, ordinary) }
+                    } else null
                 val command =
                     controller?.choose(
                         SimulationDecision(
@@ -250,6 +262,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                             observation = observation,
                             batchStartNumber = step,
                             tokenQuote = tokenQuotes?.capability,
+                            finalAdvanceForecast = finalAdvanceForecast,
                         )
                     )
                 val accepted =

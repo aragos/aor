@@ -292,7 +292,7 @@ class Campaign:
               rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
               counter_variants=None, lineup=None, capital_variants=None, series_priors=None,
               series_responses=None, leading_rival_variants=None, capital_geography_variants=(),
-              series_midgame_priors=None, rival_targeting_lineups=None):
+              series_midgame_priors=None, rival_targeting_lineups=None, final_advance_variants=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -330,6 +330,8 @@ class Campaign:
             declared["seriesMidgamePriors"] = series_midgame_priors
         if rival_targeting_lineups:
             declared["rivalTargetingLineups"] = rival_targeting_lineups
+        if final_advance_variants:
+            declared["finalAdvanceVariants"] = final_advance_variants
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -374,6 +376,8 @@ class Campaign:
                         spec["seriesMidgamePriors"] = series_midgame_priors[key]
                     if rival_targeting_lineups and key in rival_targeting_lineups:
                         spec["rivalTargetingLineup"] = rival_targeting_lineups[key]
+                    if final_advance_variants and key in final_advance_variants:
+                        spec["finalAdvancePlan"] = final_advance_variants[key]
                     declare(source, spec)
                     jobs.append((name, source))
         pending = []
