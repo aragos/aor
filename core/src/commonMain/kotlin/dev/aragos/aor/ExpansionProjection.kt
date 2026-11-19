@@ -239,41 +239,25 @@ internal object ExpansionProjection {
         )
     }
 
-    private data class Evaluation(
-        val plan: PlacementPlan? = null,
-        val blocker: ViolationCode? = null,
-    )
-
     private fun evaluate(
         context: BoardRulesContext,
         viewer: PlayerState,
         province: ProvinceId,
         tokens: Int,
         routes: List<ExpansionRoute>,
-    ): Evaluation {
+    ): PlacementAssessment {
         if (
             !ExpansionReach.canEnter(context.player(viewer.player.id), context.province(province))
         ) {
-            return Evaluation(blocker = ViolationCode.PROVINCE_ACCESS_DENIED)
+            return PlacementAssessment(ViolationCode.PROVINCE_ACCESS_DENIED)
         }
-        var firstFailure: ViolationCode? = null
-        for (route in routes) {
-            try {
-                return Evaluation(
-                    plan =
-                        BoardPlacementRules.evaluate(
-                            context,
-                            viewer.player.id,
-                            province,
-                            tokens,
-                            route,
-                            viewer.poolTokens,
-                        )
-                )
-            } catch (failure: RuleViolation) {
-                if (firstFailure == null) firstFailure = failure.code
-            }
-        }
-        return Evaluation(blocker = firstFailure ?: ViolationCode.UNREACHABLE_PROVINCE)
+        return BoardPlacementRules.assessGeneratedRoutes(
+            context,
+            viewer.player.id,
+            province,
+            tokens,
+            viewer.poolTokens,
+            routes,
+        )
     }
 }

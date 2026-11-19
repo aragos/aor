@@ -559,12 +559,7 @@ object BoardGame {
         tokens: Int,
         pool: Int,
         routes: List<ExpansionRoute>,
-    ): Boolean = routes.any { route ->
-        try {
-            BoardPlacementRules.evaluate(context, actor, province, tokens, route, pool)
-            true
-        } catch (failure: RuleViolation) {
-            false
-        }
-    }
+    ): Boolean =
+        BoardPlacementRules.assessGeneratedRoutes(context, actor, province, tokens, pool, routes)
+            .plan != null
 }
