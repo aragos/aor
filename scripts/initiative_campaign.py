@@ -12,6 +12,7 @@ import shutil
 import statistics
 import subprocess
 import tarfile
+import tempfile
 import threading
 import time
 
@@ -20,7 +21,8 @@ MAC_JAVA = ("/Users/aragos/.gradle/jdks/azul_systems__inc_-21-aarch64-os_x.2/"
             "zulu21.50.19-ca-jdk21.0.11-macosx_aarch64/Contents/Home/bin/java")
 HOST = "aragos@192.168.86.44"
 REMOTE = "/home/aragos/aor-worker/initiative-cards-20261118"
-SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", HOST]
+SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+       "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", HOST]
 MODE = "dev.aragos.aor.training.TrainingMainKt"
 ECOLOGIES = ("QUALIFIED", "REVEALED_UNDERCUT", "INDEPENDENT_INITIATIVE")
 
@@ -84,12 +86,14 @@ def score(records, controls, role="CANDIDATE"):
 
 
 class Campaign:
-    def __init__(self, root):
+    def __init__(self, root, resume=False, recover_desktop_job=None):
         self.root = root.resolve()
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
         self.stop = threading.Event()
+        self.resume = resume
+        self.recover_desktop_job = recover_desktop_job
 
     def remaining(self):
         return self.deadline - time.time()
@@ -126,7 +130,7 @@ class Campaign:
                    "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
                    "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
         started = time.monotonic()
-        with (stage / f"{name}.log").open("xb") as log:
+        with (stage / f"{name}.log").open("ab" if self.resume else "xb") as log:
             if host == "MAC":
                 self.call(command, stdout=log)
             else:
@@ -134,11 +138,24 @@ class Campaign:
                 cmd = "mkdir -p " + shlex.quote(f"{REMOTE}/{stage_dir}") + " && cat > " + shlex.quote(remote_path)
                 self.call(SSH + [cmd], input_bytes=source.read_bytes(), stdout=log)
                 self.call(SSH + [shlex.join(command)], stdout=log)
-                archive = subprocess.check_output(SSH + [
-                    f"cd {shlex.quote(REMOTE + '/' + stage_dir)} && tar -czf - {shlex.quote(name)}"],
-                    timeout=max(2,self.remaining()))
-                with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as stream:
-                    stream.extractall(stage, filter="data")
+                self.collect_desktop(stage, task)
+        self.record_result(stage, task, host, time.monotonic() - started)
+
+    def collect_desktop(self, stage, task):
+        name, source = task
+        archive = subprocess.check_output(SSH + [
+            f"cd {shlex.quote(REMOTE + '/' + stage.name)} && tar -czf - {shlex.quote(name)}"],
+            timeout=min(60, max(2, self.remaining())))
+        with tempfile.TemporaryDirectory(dir=stage) as directory:
+            with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as stream:
+                stream.extractall(directory, filter="data")
+            recovered = Path(directory) / name
+            self.validate_result(recovered, source)
+            recovered.rename(stage / name)
+
+    @staticmethod
+    def validate_result(target, source):
+        name = target.name
         done = read(target / "finished.json")
         definition = read(source)
         if not done["complete"] or done["sourceSha256"] != sha(source):
@@ -152,22 +169,33 @@ class Campaign:
             row["seed"] != definition["seeds"][i] or row["scienceSha256"] != done["scienceSha256"]
             for i, row in zip(wanted, rows, strict=True)):
             raise ValueError(f"{name} incomplete seed/index/science identity.")
-        receipt = dict(host=host, seconds=time.monotonic()-started, games=done["completedGames"])
+        return done["completedGames"]
+
+    def record_result(self, stage, task, host, seconds):
+        name, source = task
+        receipt = dict(host=host, seconds=seconds, games=self.validate_result(stage / name, source))
         write(stage / f"{name}.receipt.json", receipt)
-        print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
+        print(json.dumps(dict(stage=stage.name, job=name, **receipt)), flush=True)
+
+    def freeze(self, path, value):
+        if self.resume and path.exists():
+            if read(path) != value:
+                raise ValueError(f"Original declaration differs for {path}.")
+        else:
+            write(path, value)
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None, baseline=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
-        stage.mkdir()
+        stage.mkdir(exist_ok=self.resume)
         banks = {mode: seed_bank(f"{label}/{mode}", count) for mode in ecologies}
         streams = [seed for bank in banks.values() for seed in bank]
         if len(set(streams)) != len(streams):
             raise ValueError("Each declared stage bank requires distinct seed streams.")
         declared = dict(stage=label, configs=configs, banks=banks, paired=paired,
                         replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline, rival=rival, baseline=baseline)
-        write(stage / "method.json", declared)
+        self.freeze(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
         for key, policy in choices.items():
@@ -191,11 +219,21 @@ class Campaign:
                         spec["initiativeRival"] = dict(kind="public-initiative-rival-1",offset=1,policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
-                    write(source, spec)
+                    self.freeze(source, spec)
                     jobs.append((name, source))
         todo = queue.SimpleQueue()
         for job in jobs:
-            todo.put(job)
+            name, source = job
+            if self.resume and (stage / f"{name}.receipt.json").exists():
+                games = self.validate_result(stage / name, source)
+                if games != read(stage / f"{name}.receipt.json")["games"]:
+                    raise ValueError(f"Original game count differs for {name}.")
+            elif self.resume and self.recover_desktop_job == f"{label}/{name}":
+                started = time.monotonic()
+                self.collect_desktop(stage, job)
+                self.record_result(stage, job, "DESKTOP", time.monotonic() - started)
+            else:
+                todo.put(job)
 
         def run_host(host):
             try:
@@ -238,7 +276,7 @@ class Campaign:
             adaptive = statistics.mean(adaptive_rows) if adaptive_rows else ordinary
             outcomes[key] = dict(config=config, outcomes=summary, ordinary=ordinary, adaptive=adaptive,
                                  rankScore=.5*(ordinary+adaptive))
-        write(stage / "summary.json", outcomes)
+        self.freeze(stage / "summary.json", outcomes)
         return outcomes
 
 
@@ -246,8 +284,8 @@ def ranked(outcomes):
     return sorted(outcomes.values(), key=lambda row: (row["rankScore"], row["adaptive"]), reverse=True)
 
 
-def main(root, initial):
-    campaign = Campaign(root)
+def main(root, initial, resume, recover_desktop_job):
+    campaign = Campaign(root, resume=resume, recover_desktop_job=recover_desktop_job)
     campaign.validate_runtime()
     if campaign.remaining() < 1000:
         write(root / "result.json", dict(status="insufficient-time-for-card-screen"))
@@ -278,5 +316,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--initial", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--recover-desktop-job", metavar="STAGE/JOB",
+                        help="collect a completed Ubuntu shard after a lost SSH connection")
     args = parser.parse_args()
-    main(args.root.resolve(), args.initial.resolve())
+    if args.recover_desktop_job and not args.resume:
+        parser.error("--recover-desktop-job requires --resume")
+    main(args.root.resolve(), args.initial.resolve(), args.resume, args.recover_desktop_job)
