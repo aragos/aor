@@ -198,6 +198,7 @@ private constructor(
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val rivalTargetingLineup: RivalTargetingLineup?,
     val finalAdvanceMargin: Int?,
+    val finalAdvancePassLead: Int?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -308,7 +309,12 @@ private constructor(
             } ?: emptyMap()) +
             (finalAdvanceMargin?.let {
                 mapOf(
-                    "finalAdvancePlan" to mapOf("kind" to FinalAdvancePlan.VERSION, "margin" to it)
+                    "finalAdvancePlan" to
+                        buildMap {
+                            put("kind", FinalAdvancePlan.VERSION)
+                            put("margin", it)
+                            finalAdvancePassLead?.let { lead -> put("minimumPassLead", lead) }
+                        }
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -696,13 +702,21 @@ private constructor(
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
             val finalAdvanceMargin =
                 node["finalAdvancePlan"]?.let { plan ->
-                    PurchaseJson.fields(plan, setOf("kind", "margin"))
+                    PurchaseJson.fields(plan, setOf("kind", "margin"), setOf("minimumPassLead"))
                     require(plan["kind"]?.asText() == FinalAdvancePlan.VERSION) {
                         "The final advance plan requires a supported version."
                     }
                     PurchaseJson.integer(plan["margin"], "projected score margin").also { margin ->
                         require(margin in 0..1000) {
                             "The final advance margin must be between 0 and 1,000 score points."
+                        }
+                    }
+                }
+            val finalAdvancePassLead =
+                node["finalAdvancePlan"]?.get("minimumPassLead")?.let {
+                    PurchaseJson.integer(it, "public lead required to replace pass").also { lead ->
+                        require(lead in 1..1000) {
+                            "A guarded finish must require a public lead between 1 and 1,000 points."
                         }
                     }
                 }
@@ -949,6 +963,7 @@ private constructor(
                     leadingRivalRetargeting,
                     rivalTargetingLineup,
                     finalAdvanceMargin,
+                    finalAdvancePassLead,
                     seeds,
                     start,
                     count,

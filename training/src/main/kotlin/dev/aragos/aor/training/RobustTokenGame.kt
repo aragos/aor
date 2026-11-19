@@ -382,7 +382,9 @@ internal object RobustTokenGame {
                 input.finalAdvanceMargin
                     ?.takeIf { candidate }
                     ?.let { margin ->
-                        FinalAdvanceController(regular, margin).also { finalAdvanceController = it }
+                        FinalAdvanceController(regular, margin, input.finalAdvancePassLead).also {
+                            finalAdvanceController = it
+                        }
                     } ?: regular
             object : SimulationController by controller {
                 override fun choose(decision: SimulationDecision): String? =

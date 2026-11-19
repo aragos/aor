@@ -102,6 +102,7 @@ private constructor(
 internal class FinalAdvanceController(
     private val reference: SimulationController,
     private val minimumMargin: Int,
+    private val minimumPassLead: Int? = null,
 ) : SimulationController by reference {
     var availablePlans = 0
         private set
@@ -116,12 +117,25 @@ internal class FinalAdvanceController(
 
     override fun choose(decision: SimulationDecision): String? {
         val usual = reference.choose(decision) ?: return null
-        val plan = decision.finalAdvanceForecast?.invoke(usual) ?: return usual
+        val forecast = decision.finalAdvanceForecast ?: return usual
+        if (minimumPassLead != null && (usual != "pass" || !leadsBy(decision, minimumPassLead))) {
+            return usual
+        }
+        val plan = forecast(usual) ?: return usual
         availablePlans++
         if (plan.projectedMargin < minimumMargin || plan.firstCommand == usual) return usual
         if (decision.observation.candidates.none { it.command == plan.firstCommand }) return usual
         overrides++
         if (plan.advances.size == 1) lastAdvanceOverrides++
         return plan.firstCommand
+    }
+
+    private fun leadsBy(decision: SimulationDecision, minimumLead: Int): Boolean {
+        val actor = PlayerId(decision.observation.playerId)
+        val scores = decision.view.scores
+        val own = scores.firstOrNull { it.player == actor }?.total ?: return false
+        val rival =
+            scores.filter { it.player != actor }.mapNotNull { it.total }.maxOrNull() ?: return false
+        return own.toLong() - rival >= minimumLead
     }
 }
