@@ -81,6 +81,23 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun mixesSimilarBidsWithoutGivingUpAClearOrderAdvantage() {
+        val mixed = config.copy(tokenPenalty = .15, bidScoreTolerance = .2)
+        val bids = (1..128).map { InitiativePolicy.bid(view, seat, "buy-tokens 21", it, mixed) }
+
+        assertEquals(setOf("buy-tokens 19", "buy-tokens 20"), bids.toSet())
+    }
+
+    @Test
+    fun openingMixUsesOnlyBidsWithinItsDeclaredSpread() {
+        val mixed = config.copy(openingSpread = 1)
+        val opening = view.copy(pastTokenPurchases = emptyList())
+        val bids = (1..128).map { InitiativePolicy.bid(opening, seat, "buy-tokens 21", it, mixed) }
+
+        assertEquals(setOf("buy-tokens 20", "buy-tokens 21"), bids.toSet())
+    }
+
+    @Test
     fun respectsTheContestedPoolRequirement() {
         val forecast =
             ExpansionForecastView(

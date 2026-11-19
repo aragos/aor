@@ -1,5 +1,6 @@
 """Bounded two-host search over bid initiative and expansion follow-through."""
 import argparse
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 from io import BytesIO
@@ -81,6 +82,22 @@ def score(records, controls, role="CANDIDATE"):
     first_ratio = lambda rows: sum(r["controlledOrderPositions"].get("1", 0) for r in rows) / max(
         1, sum(sum(r["controlledOrderPositions"].values()) for r in rows))
     result["firstOrderShare"] = dict(candidate=first_ratio(changes), baseline=first_ratio(baselines))
+    def bid_mode_share(rows):
+        counts = Counter()
+        for row in rows:
+            counts.update(row["controlledBidCounts"])
+        return max(counts.values(), default=0) / max(1, counts.total())
+
+    result["bidModeShare"] = dict(candidate=bid_mode_share(changes),
+                                  baseline=bid_mode_share(baselines))
+    def counter_accuracy(rows):
+        counters = [row["publicTokenCounter"] for row in rows if row["publicTokenCounter"]]
+        predictions = sum(counter["resolvedPredictions"] for counter in counters)
+        hits = sum(counter["predictionHits"] for counter in counters)
+        return hits / predictions if predictions else None
+
+    result["counterAccuracy"] = dict(candidate=counter_accuracy(changes),
+                                     baseline=counter_accuracy(baselines))
     return result
 
 

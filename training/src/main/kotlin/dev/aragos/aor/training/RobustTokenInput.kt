@@ -298,7 +298,7 @@ private constructor(
                     "requireAffordableContest",
                     "attackBonus",
                 ),
-                optional = setOf("historyDecay"),
+                optional = setOf("historyDecay", "bidScoreTolerance", "openingSpread"),
             )
             require(
                 node["kind"]?.asText() == InitiativePolicyConfig.VERSION &&
@@ -315,6 +315,12 @@ private constructor(
                 attackBonus = PurchaseJson.number(node["attackBonus"], "attack bonus"),
                 historyDecay =
                     node["historyDecay"]?.let { PurchaseJson.number(it, "history decay") } ?: 1.0,
+                bidScoreTolerance =
+                    node["bidScoreTolerance"]?.let {
+                        PurchaseJson.number(it, "bid score tolerance")
+                    } ?: 0.0,
+                openingSpread =
+                    node["openingSpread"]?.let { PurchaseJson.integer(it, "opening spread") } ?: 0,
             )
         }
 

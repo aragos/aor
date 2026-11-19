@@ -14,6 +14,8 @@ import kotlin.math.pow
  * numbers per forgone token. [participation] is the chance of using a positive-scoring switch.
  * [attackBonus] tunes early-box attacks in calibrated expansion score units. [historyDecay] is the
  * weight of a revealed row relative to the next newer row. A value of one weights all rows equally.
+ * [bidScoreTolerance] bounds the estimated score loss when mixing similar bids. [openingSpread]
+ * limits the amount sacrificed for an opening mix before any bids have been revealed.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -22,6 +24,8 @@ data class InitiativePolicyConfig(
     val requireAffordableContest: Boolean,
     val attackBonus: Double,
     val historyDecay: Double = 1.0,
+    val bidScoreTolerance: Double = 0.0,
+    val openingSpread: Int = 0,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -36,6 +40,12 @@ data class InitiativePolicyConfig(
         }
         require(historyDecay.isFinite() && historyDecay in 0.0..1.0) {
             "Initiative history decay must be between zero and one."
+        }
+        require(bidScoreTolerance.isFinite() && bidScoreTolerance in 0.0..1.0) {
+            "Initiative bid score tolerance must be between zero and one."
+        }
+        require(openingSpread in 0..maximumTokenLoss) {
+            "The opening mix must respect the maximum token sacrifice."
         }
     }
 
@@ -54,12 +64,26 @@ object InitiativePolicy {
         config: InitiativePolicyConfig,
     ): String {
         require(view.stage == Stage.TOKEN_PURCHASE) { "Initiative bids require a purchase window." }
-        if (config.participation == 0.0 || view.pastTokenPurchases.isEmpty()) return normal
+        if (config.participation == 0.0) return normal
+        val hasHistory = view.pastTokenPurchases.isNotEmpty()
+        if (!hasHistory && config.openingSpread == 0) return normal
         val draw = TerritoryPolicy.uniform(seed xor 0x6EA14F52)
         if (draw >= config.participation) return normal
         val originalAmount = LocalTokenNeighborPolicy.amount(normal)
         val original = view.tokenPurchaseOffers.single { it.amount == originalAmount }
         if (original.tokensReceived == 0) return normal
+        val contest = view.expansionForecast?.contestedMarkets?.minOfOrNull { it.requiredTokens }
+        val candidates =
+            view.tokenPurchaseOffers.filter { quote ->
+                quote.amount in 1 until original.amount &&
+                    original.tokensReceived - quote.tokensReceived <= config.maximumTokenLoss &&
+                    (!config.requireAffordableContest ||
+                        contest != null && quote.poolAfter >= contest)
+            }
+        if (!hasHistory) {
+            val opening = candidates.filter { it.amount >= original.amount - config.openingSpread }
+            return bidCommand(sampleBid(opening + original, seed))
+        }
         val boxes = OrderBoxes.forPlayers(view.players.size)
         val priority = view.capitalOrder.withIndex().associate { it.value to it.index }
         val priorityOfPlayer =
@@ -89,25 +113,29 @@ object InitiativePolicy {
                         }]
             } / totalWeight
         val baselineBox = expectedBox(original.amount)
-        val contest = view.expansionForecast?.contestedMarkets?.minOfOrNull { it.requiredTokens }
-        val candidates =
-            view.tokenPurchaseOffers.filter { quote ->
-                quote.amount in 1 until original.amount &&
-                    original.tokensReceived - quote.tokensReceived <= config.maximumTokenLoss &&
-                    (!config.requireAffordableContest ||
-                        contest != null && quote.poolAfter >= contest)
-            }
         fun gain(quote: TokenPurchaseOfferView): Double =
             baselineBox -
                 expectedBox(quote.amount) -
                 config.tokenPenalty * (original.tokensReceived - quote.tokensReceived)
-        val best =
-            candidates
-                .map { it to gain(it) }
-                .filter { it.second > 0.0 }
-                .maxWithOrNull(compareBy({ it.second }, { it.first.amount }))
-                ?.first
-        return best?.let { "buy-tokens ${it.amount}" } ?: normal
+        val scored = candidates.map { it to gain(it) }.filter { it.second > 0.0 }
+        val (best, bestScore) =
+            scored.maxWithOrNull(compareBy({ it.second }, { it.first.amount })) ?: return normal
+        if (config.bidScoreTolerance == 0.0) return bidCommand(best)
+        val nearBest = scored.filter { (_, score) -> bestScore - score <= config.bidScoreTolerance }
+        val shortlist =
+            nearBest.map { (quote, _) -> quote } +
+                listOfNotNull(original.takeIf { bestScore <= config.bidScoreTolerance })
+        return bidCommand(sampleBid(shortlist, seed))
+    }
+
+    private fun bidCommand(quote: TokenPurchaseOfferView): String = "buy-tokens ${quote.amount}"
+
+    private fun sampleBid(
+        choices: List<TokenPurchaseOfferView>,
+        seed: Int,
+    ): TokenPurchaseOfferView {
+        val draw = TerritoryPolicy.uniform(seed xor 0x6F7B4439)
+        return choices[(draw * choices.size).toInt()]
     }
 
     fun expansion(
