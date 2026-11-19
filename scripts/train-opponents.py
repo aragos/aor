@@ -71,7 +71,7 @@ def parse_options(arguments):
                 "Follow trainer output with tail -f OUTPUT/trainer.log. "
                 "Send SIGTERM to the supervisor PID for graceful shutdown."),
     )
-    parser.add_argument("--mode", choices=("coverage", "train", "evaluate", "evaluate-finish",
+    parser.add_argument("--mode", choices=("coverage", "train", "evaluate", "evaluate-finish", "train-opening",
                                          "pilot", "pilot-diagnose",
                                          "arena", "strategy-search", "strategy-replay",
                                          "token-value-pilot", "token-order-collect", "purchase-collect", "card-collect", "joint-collect", "territory-collect", "territory-value-collect"),

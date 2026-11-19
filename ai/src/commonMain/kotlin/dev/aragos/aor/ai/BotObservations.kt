@@ -119,6 +119,10 @@ private class ObservationProjection(
     private val stabilization = (view.stabilizationCost ?: 0L).toDouble()
     private val economic by lazy(LazyThreadSafetyMode.NONE) { BotEconomicProjection(view, seat) }
     private val purchases by lazy(LazyThreadSafetyMode.NONE) { BotPurchaseProjection(view, seat) }
+    private val openingHand by
+        lazy(LazyThreadSafetyMode.NONE) {
+            OpeningHandProjection(catalog, view.hand)
+        }
     private val tokenValue by
         lazy(LazyThreadSafetyMode.NONE) {
             BotTokenValueProjection(view, seat, endgame)
@@ -487,6 +491,9 @@ private class ObservationProjection(
                 val card = view.hand.single { it.reference == parts[1] }
                 group = "card.${card.reference}"
                 add("cards", -cardValue(card.reference) / 7.5)
+                if (parts.first() == "return-card") {
+                    features.putAll(openingHand.afterReturning(card.reference))
+                }
                 if (card.reference in view.burdenReferences) add("burden", -1.0)
                 if (parts.first() == "offer-card") add("cards", 1.0)
                 else add("cash", stabilizationReduction())
@@ -654,7 +661,12 @@ private class ObservationProjection(
     private fun contextualFeatures(base: Map<String, Double>): Map<String, Double> = buildMap {
         putAll(base)
         for ((feature, value) in base) {
-            if (feature.startsWith("capitalHand.") || feature.startsWith("planning.")) continue
+            if (
+                feature.startsWith("capitalHand.") ||
+                    feature.startsWith("planning.") ||
+                    feature.startsWith(OPENING_HAND_FEATURE_PREFIX)
+            )
+                continue
             if (endgame != 0.0) put("endgame.$feature", value * endgame)
             for (condition in conditions) put("$condition.$feature", value)
         }
