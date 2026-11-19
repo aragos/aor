@@ -106,8 +106,10 @@ def coefficients(cases, rival_penalty):
         vectors = []
         for later in (False, True):
             subset = [row["outcomes"] for row in rows if row["later"] == later]
-            if len(subset) < 24:
-                raise ValueError("Both capital groups need at least 24 paired observations.")
+            # Contested auctions can deterministically put the actor in the later group. The
+            # absent group has zero unconditional weight for that table.
+            if 0 < len(subset) < 24:
+                raise ValueError("An observed capital group needs at least 24 paired observations.")
             vectors.append([
                 sum(own - baseline - rival_penalty * (rival - base_rival)
                     for result in subset
