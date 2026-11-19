@@ -20,6 +20,7 @@ def compare(folder):
     before, after = (load_games(folder, role) for role in ARMS)
     if set(before) != set(after) or set(before) != set(range(WORLDS)):
         raise ValueError("Measure the entire common seed bank with three automated seats.")
+    automation = []
     challenger = []
     tracked = []
     for index in range(WORLDS):
@@ -31,9 +32,11 @@ def compare(folder):
             raise ValueError("Both arms must reproduce the exact same seats and first bids.")
         old, new = (row["roles"]["CANDIDATE"]["wins"] for row in (a, b))
         human = (seat + 1) % 4
-        challenger.append(old[human] - new[human])
+        automation.append(sum(new[i] - old[i] for i in range(4) if i != human))
+        challenger.append(new[human] - old[human])
         tracked.append(new[seat] - old[seat])
-    return {"automationWinShareEffect": interval(challenger), "trackedSeatEffect": interval(tracked)}
+    return {"automationWinShareEffect": interval(automation), "trackedSeatEffect": interval(tracked),
+            "challengerWinShareEffect": interval(challenger)}
 
 
 def main(root, previous, resume):
