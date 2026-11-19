@@ -107,11 +107,12 @@ class WorkerUnavailable(RuntimeError):
 
 
 class Campaign:
-    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=10, resume=False):
+    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=10, resume=False, background=False):
         self.root = root.resolve()
         self.remote = remote
         self.mac_reserve = mac_reserve_gib * (1024 ** 3)
         self.resume = resume
+        self.background = background
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
@@ -165,7 +166,8 @@ class Campaign:
         target = stage / name
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
-        worker_count, heap, java = (8, "5g", MAC_JAVA) if host == "MAC" else (16, "7g", "/usr/bin/java")
+        mac, desktop = (3, 6) if self.background else (8, 16)
+        worker_count, heap, java = (mac, "5g", MAC_JAVA) if host == "MAC" else (desktop, "7g", "/usr/bin/java")
         if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
             raise WorkerUnavailable("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
@@ -174,6 +176,8 @@ class Campaign:
                    "-cp", f"{folder}/lib/*", MODE, "--mode", "robust-token-screen-chunk",
                    "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
                    "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
+        if self.background:
+            command = ["/usr/bin/nice", "-n", "8", *command]
         started = time.monotonic()
         with (stage / f"{name}.log").open("ab") as log:
             if host == "MAC":

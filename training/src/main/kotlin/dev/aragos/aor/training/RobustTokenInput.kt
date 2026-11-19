@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
+import dev.aragos.aor.ai.OpeningBidMix
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import java.nio.file.Path
@@ -332,6 +333,7 @@ private constructor(
                         "extraCashPenalty",
                         "counterAnticipation",
                         "respectRivalCash",
+                        "openingMix",
                     ),
             )
             require(
@@ -375,6 +377,17 @@ private constructor(
                         require(setting.isBoolean) { "The rival cash constraint must be boolean." }
                         setting.booleanValue()
                     } ?: false,
+                openingMix = node["openingMix"]?.let(::openingMix),
+            )
+        }
+
+        private fun openingMix(node: JsonNode): OpeningBidMix {
+            PurchaseJson.fields(node, setOf("bids"), optional = setOf("laterCapitalBids"))
+            fun bids(field: String): List<Int> =
+                PurchaseJson.array(node[field], field).map { PurchaseJson.integer(it, field) }
+            return OpeningBidMix(
+                bids("bids"),
+                node["laterCapitalBids"]?.let { bids("laterCapitalBids") } ?: emptyList(),
             )
         }
 
