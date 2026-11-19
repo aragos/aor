@@ -67,6 +67,10 @@ private const val EVOLVED_TARGETING_BASE_SHA256 =
     "b0c26ece3b090559c735f627f55cc3ebb2fe44a40c09923841e068909569054f"
 private const val EVOLVED_TARGETING_CERTIFICATE_SHA256 =
     "8f54235ce8cbfb68d0f1c78504d5127de7c5d35581438e60f9978e36415fc1f2"
+private const val ADOPTING_TARGETING_BASE_SHA256 =
+    "09fffe9479450b5e9b2bd9cd741f09fb1da79acf820d5e2f5b5907d64514b0e8"
+private const val ADOPTING_TARGETING_CERTIFICATE_SHA256 =
+    "53541f22ef5cf2b3bbe1049053436724785c6fdcbdd968d84a0d833895851566"
 private const val RETARGETING_TRAINING_SHA256 =
     "fcaae16011c32bebfdc0617777a3ffe8cfb80a7b0c83666d31cd916a5dec0630"
 private const val RETARGETING_AUDIT_SHA256 =
@@ -210,6 +214,7 @@ private class CoordinatedAssetReader(path: Path) {
             "coordinated-leading-rival-preview-1" -> readLeadingRival(manifest, root)
             "coordinated-second-capital-preview-1" -> readSecondCapital(manifest, root)
             "coordinated-evolved-targeting-preview-1" -> readEvolvedTargeting(manifest, root)
+            "coordinated-adopting-targeting-preview-1" -> readAdoptingTargeting(manifest, root)
             else -> readCoordinated(manifest, root)
         }
     }
@@ -259,7 +264,12 @@ private class CoordinatedAssetReader(path: Path) {
         return CapitalGeographyPreview(readLeadingRival(base, node(base), replacement), assetHash)
     }
 
-    private fun readEvolvedTargeting(manifest: Document, root: JsonNode): ServerBotPolicy {
+    private fun readEvolvedTargeting(
+        manifest: Document,
+        root: JsonNode,
+        replacement: LeadingRivalRetargetingConfig? = null,
+        assetHash: String = manifest.sha256,
+    ): ServerBotPolicy {
         fields(root, "kind", "schemaVersion", "basePreview", "qualification")
         require(integer(root, "schemaVersion") == 1) {
             "The evolved-targeting preview requires schema version 1."
@@ -269,8 +279,51 @@ private class CoordinatedAssetReader(path: Path) {
             "The evolved attack rule must extend the exact independently qualified capital preview."
         }
         val evidence = subject(manifest, root["qualification"])
-        val replacement = evolvedTargetingQualification(evidence, base)
-        return readSecondCapital(base, node(base), replacement, manifest.sha256)
+        val qualified = evolvedTargetingQualification(evidence, base)
+        return readSecondCapital(base, node(base), replacement ?: qualified, assetHash)
+    }
+
+    private fun readAdoptingTargeting(manifest: Document, root: JsonNode): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "The adopting-rival preview requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == ADOPTING_TARGETING_BASE_SHA256) {
+            "The early targeting rule must extend the exact evolved-targeting preview."
+        }
+        val evidence = subject(manifest, root["qualification"])
+        require(evidence.sha256 == ADOPTING_TARGETING_CERTIFICATE_SHA256) {
+            "The early targeting preview requires its pinned independent qualification."
+        }
+        val certificate = node(evidence)
+        fields(certificate, "kind", "basePreviewSha256", "nativeJarSha256", "policy", "comparisons")
+        require(
+            text(certificate, "kind") == "adopting-targeting-qualification-1" &&
+                hash(certificate, "basePreviewSha256") == base.sha256
+        ) {
+            "The adoption comparison must use the exact previously qualified strategy."
+        }
+        hash(certificate, "nativeJarSha256")
+        val scores =
+            verifiedTargetingWins(
+                certificate["comparisons"],
+                listOf("none-adopt", "one-adopts", "all-adopt"),
+                1024,
+            )
+        require(
+            scores.minOf { it.second } > -.025 &&
+                scores.map { it.first }.average() >= .015 &&
+                scores.count { it.second > 0.0 } >= 2
+        ) {
+            "The early targeting rule must improve independently against adopting and ordinary rivals."
+        }
+        return readEvolvedTargeting(
+            base,
+            node(base),
+            readTargetingParameters(certificate["policy"]),
+            manifest.sha256,
+        )
     }
 
     private fun evolvedTargetingQualification(
@@ -298,17 +351,38 @@ private class CoordinatedAssetReader(path: Path) {
         }
         hash(certificate, "nativeJarSha256")
         hash(certificate, "auditSha256")
-        val modes = listOf("mixed", "known-16", "independent-mix", "experienced")
-        val tables = certificate["comparisons"]
+        val scores =
+            verifiedTargetingWins(
+                certificate["comparisons"],
+                listOf("mixed", "known-16", "independent-mix", "experienced"),
+                1280,
+                clusteredMode = "experienced",
+            )
+        require(
+            scores.minOf { it.second } > -.025 &&
+                scores.map { it.first }.average() >= .025 &&
+                scores.count { it.second > 0.0 } >= 2
+        ) {
+            "Expanded targeting must improve win share across fresh, diverse and informed opponents."
+        }
+        return readTargetingParameters(certificate["policy"])
+    }
+
+    private fun verifiedTargetingWins(
+        tables: JsonNode,
+        modes: List<String>,
+        count: Int,
+        clusteredMode: String? = null,
+    ): List<Pair<Double, Double>> {
         fields(tables, *modes.toTypedArray())
         val seen = mutableSetOf<Int>()
-        val scores = modes.map { mode ->
+        return modes.map { mode ->
             val table = tables[mode]
             fields(table, "worlds", "evidenceSha256")
             hash(table, "evidenceSha256")
             val worlds = table["worlds"]
-            require(worlds.isArray && worlds.size() == 1280) {
-                "The evolved attack rule requires all 1,280 paired games in $mode."
+            require(worlds.isArray && worlds.size() == count) {
+                "The targeting certificate requires all $count paired games in $mode."
             }
             val effects = worlds.map { row ->
                 fields(row, "seed", "candidate", "control")
@@ -322,16 +396,11 @@ private class CoordinatedAssetReader(path: Path) {
                 }
                 candidate - baseline
             }
-            winLowerBound(if (mode == "experienced") independentSeriesEffects(effects) else effects)
+            winLowerBound(if (mode == clusteredMode) independentSeriesEffects(effects) else effects)
         }
-        require(
-            scores.minOf { it.second } > -.025 &&
-                scores.map { it.first }.average() >= .025 &&
-                scores.count { it.second > 0.0 } >= 2
-        ) {
-            "Expanded targeting must improve win share across fresh, diverse and informed opponents."
-        }
-        val policy = certificate["policy"]
+    }
+
+    private fun readTargetingParameters(policy: JsonNode): LeadingRivalRetargetingConfig {
         fields(
             policy,
             "kind",
