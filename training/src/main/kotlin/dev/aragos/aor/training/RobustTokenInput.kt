@@ -5,6 +5,7 @@ import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
+import dev.aragos.aor.ai.OpeningAuctionFallback
 import dev.aragos.aor.ai.OpeningBidMix
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.SecondCapitalGeography
@@ -201,6 +202,7 @@ private constructor(
     val finalAdvancePassLead: Int?,
     val phaseBidProfile: PhaseBidProfile?,
     val previewPeerOffsets: Set<Int>,
+    val openingAuctionFallback: OpeningAuctionFallback?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -330,6 +332,15 @@ private constructor(
                 mapOf(
                     "initiative" to
                         mapOf("kind" to InitiativePolicyConfig.VERSION, "configuration" to it)
+                )
+            } ?: emptyMap()) +
+            (openingAuctionFallback?.let {
+                mapOf(
+                    "openingAuctionFallback" to
+                        mapOf(
+                            "minimumPaidBid" to it.minimumPaidBid,
+                            "policy" to it.policy,
+                        )
                 )
             } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
@@ -652,6 +663,7 @@ private constructor(
                     "finalAdvancePlan",
                     "phaseAwareBids",
                     "previewPeerOffsets",
+                    "openingAuctionFallback",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -872,7 +884,21 @@ private constructor(
                         }
                     InitiativeRival(offsets, initiative(rival.required("policy")))
                 }
-            val initiative = node["initiative"]?.let(::initiative)
+            val initiativePolicy = node["initiative"]?.let(::initiative)
+            val openingAuctionFallback =
+                node["openingAuctionFallback"]?.let { fallback ->
+                    PurchaseJson.fields(fallback, setOf("minimumPaidBid", "policy"))
+                    require(candidateOnly && initiativePolicy != null) {
+                        "The opening fallback requires an explicit candidate-only initiative policy."
+                    }
+                    OpeningAuctionFallback(
+                        PurchaseJson.integer(
+                            fallback.required("minimumPaidBid"),
+                            "minimum paid bid",
+                        ),
+                        initiative(fallback.required("policy")),
+                    )
+                }
             val initiativeLineup = node["initiativeLineup"]?.let(::initiativeLineup)
             val previewPeerOffsets =
                 node["previewPeerOffsets"]
@@ -935,7 +961,7 @@ private constructor(
                 "Fixed rivals must occupy different seats from the public-history counter."
             }
             require(
-                initiative == null ||
+                initiativePolicy == null ||
                     expansionDenial == null &&
                         tokenNeighborMixture == null &&
                         !node.has("candidateTokenAnchoredPolicy")
@@ -999,7 +1025,7 @@ private constructor(
                     seriesOpeningResponses,
                     seriesMidgamePriors,
                     anchored,
-                    initiative,
+                    initiativePolicy,
                     initiativeRival,
                     initiativeLineup,
                     capitalAuction,
@@ -1010,6 +1036,7 @@ private constructor(
                     finalAdvancePassLead,
                     phaseBidProfile,
                     previewPeerOffsets,
+                    openingAuctionFallback,
                     seeds,
                     start,
                     count,

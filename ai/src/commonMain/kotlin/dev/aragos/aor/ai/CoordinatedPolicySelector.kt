@@ -43,6 +43,7 @@ class CoordinatedPolicySelector(
     private val tokenAnchoredResidual: TokenAnchoredResidual? = null,
     private val initiative: InitiativePolicyConfig? = null,
     private val leadingRivalRetargeting: LeadingRivalRetargetingConfig? = null,
+    private val openingAuctionFallback: OpeningAuctionFallback? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
@@ -215,6 +216,14 @@ class CoordinatedPolicySelector(
             tokenSampler?.let {
                 NearOptimalTokenPolicy.choose(encoded, deterministic, it, seed).command
             } ?: deterministic.command
-        return initiative?.let { InitiativePolicy.bid(view, player, normal, seed, it) } ?: normal
+        val initiativeForBid =
+            openingAuctionFallback
+                ?.takeIf { fallback ->
+                    view.turnNumber == 1 &&
+                        view.revealedBids.values.any { it >= fallback.minimumPaidBid }
+                }
+                ?.policy ?: initiative
+        return initiativeForBid?.let { InitiativePolicy.bid(view, player, normal, seed, it) }
+            ?: normal
     }
 }
