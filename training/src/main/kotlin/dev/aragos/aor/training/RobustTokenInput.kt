@@ -687,6 +687,8 @@ private constructor(
                     PurchaseJson.fields(
                         rule,
                         setOf("kind", "maximumTrailingPoints", "requireGreaterCommodityDenial"),
+                        optional =
+                            setOf("maximumAdditionalTokens", "maximumOddsDrop", "earliestTurn"),
                     )
                     require(
                         rule["kind"]?.asText() == LeadingRivalRetargetingConfig.VERSION &&
@@ -700,6 +702,18 @@ private constructor(
                             "maximum trailing points",
                         ),
                         rule["requireGreaterCommodityDenial"].booleanValue(),
+                        maximumAdditionalTokens =
+                            rule["maximumAdditionalTokens"]?.let {
+                                PurchaseJson.integer(it, "additional attack tokens")
+                            } ?: 2,
+                        maximumOddsDrop =
+                            rule["maximumOddsDrop"]?.let {
+                                PurchaseJson.number(it, "maximum odds drop")
+                            } ?: .15,
+                        earliestTurn =
+                            rule["earliestTurn"]?.let {
+                                PurchaseJson.integer(it, "earliest retargeting turn")
+                            } ?: 4,
                     )
                 }
             val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)
