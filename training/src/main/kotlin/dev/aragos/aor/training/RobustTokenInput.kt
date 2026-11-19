@@ -164,7 +164,8 @@ private constructor(
     val tokenNeighborMixture: LocalTokenNeighborMixture?,
     val opponentStyle: RobustOpponentStyle,
     val adaptiveOpponent: RevealedTokenCounterConfig?,
-    val seriesOpeningPriors: List<CapitalOrderOpeningPrior>,
+    val seriesOpeningPriors: List<CapitalOrderOpeningBid>,
+    val seriesOpeningResponses: List<CapitalOrderOpeningBid>,
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
@@ -239,6 +240,8 @@ private constructor(
             } ?: emptyMap()) +
             (if (seriesOpeningPriors.isEmpty()) emptyMap()
             else mapOf("seriesOpeningPriors" to seriesOpeningPriors)) +
+            (if (seriesOpeningResponses.isEmpty()) emptyMap()
+            else mapOf("seriesOpeningResponses" to seriesOpeningResponses)) +
             (candidateTokenAnchoredPolicy?.let {
                 mapOf("candidateTokenAnchoredPolicy" to it.identity)
             } ?: emptyMap()) +
@@ -529,6 +532,7 @@ private constructor(
                     "candidateOnly",
                     "adaptiveOpponent",
                     "seriesOpeningPriors",
+                    "seriesOpeningResponses",
                     "candidateTokenAnchoredPolicy",
                     "controlBundle",
                     "controlSelector",
@@ -631,30 +635,34 @@ private constructor(
             require(style.isRevealedCounter == (adaptiveOpponent != null)) {
                 "Public-history rival styles require their explicit identity-bound adaptiveOpponent config."
             }
-            val seriesOpeningPriors =
-                node["seriesOpeningPriors"]
-                    ?.let { definition ->
-                        require(adaptiveOpponent != null) {
-                            "Series opening priors require an explicit public-history opponent."
-                        }
-                        PurchaseJson.array(definition, "series opening priors").map { opening ->
-                            PurchaseJson.fields(opening, setOf("earlyBid", "lateBid"))
-                            CapitalOrderOpeningPrior(
+            fun seriesOpeningBids(field: String): List<CapitalOrderOpeningBid> {
+                val definition = node[field] ?: return emptyList()
+                require(adaptiveOpponent != null) {
+                    "Series opening profiles require an explicit public-history opponent."
+                }
+                val profiles =
+                    PurchaseJson.array(definition, field).map { opening ->
+                        PurchaseJson.fields(opening, setOf("earlyBid", "lateBid"))
+                        CapitalOrderOpeningBid(
+                            earlyBid =
                                 PurchaseJson.integer(
                                     opening["earlyBid"],
                                     "earlier chooser opening bid",
                                 ),
+                            lateBid =
                                 PurchaseJson.integer(
                                     opening["lateBid"],
                                     "later chooser opening bid",
                                 ),
-                            )
-                        }
+                        )
                     }
-                    .orEmpty()
-            require(seriesOpeningPriors.isEmpty() || seriesOpeningPriors.size == seeds.size) {
-                "The series study needs one frozen opening profile per declared world."
+                require(profiles.isEmpty() || profiles.size == seeds.size) {
+                    "The series study needs one frozen opening profile per declared world."
+                }
+                return profiles
             }
+            val seriesOpeningPriors = seriesOpeningBids("seriesOpeningPriors")
+            val seriesOpeningResponses = seriesOpeningBids("seriesOpeningResponses")
             require(
                 expansionDenial == null ||
                     !candidateOnly &&
@@ -781,6 +789,7 @@ private constructor(
                     style,
                     adaptiveOpponent,
                     seriesOpeningPriors,
+                    seriesOpeningResponses,
                     anchored,
                     initiative,
                     initiativeRival,

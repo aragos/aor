@@ -48,7 +48,7 @@ class RevealedTokenCounterTest {
                     1,
                     1,
                     1,
-                    capitalOrderOpeningPrior = CapitalOrderOpeningPrior(17, 21),
+                    capitalOrderOpeningPrior = CapitalOrderOpeningBid(17, 21),
                 )
             )
 
@@ -63,7 +63,7 @@ class RevealedTokenCounterTest {
                     1,
                     1,
                     1,
-                    capitalOrderOpeningPrior = CapitalOrderOpeningPrior(17, 21),
+                    capitalOrderOpeningPrior = CapitalOrderOpeningBid(17, 21),
                 )
             )
 
@@ -80,6 +80,22 @@ class RevealedTokenCounterTest {
                     .command
             )
             .isEqualTo("buy-tokens 20")
+    }
+
+    @Test
+    fun aLearnedOpeningResponseCanDeliberatelyBidAboveThePredictedTarget() {
+        val counter =
+            counter(
+                RevealedTokenCounterConfig(
+                    1,
+                    1,
+                    1,
+                    capitalOrderOpeningPrior = CapitalOrderOpeningBid(17, 21),
+                    capitalOrderOpeningResponse = CapitalOrderOpeningBid(22, 20),
+                )
+            )
+
+        assertThat(bid(counter, turn = 1).command).isEqualTo("buy-tokens 22")
     }
 
     @Test

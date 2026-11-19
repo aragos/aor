@@ -17,13 +17,13 @@ FITTED = ("series-modal", "capital-modal", "capital-low")
 VARIANTS = ("fixed-known", *FITTED)
 
 
-def revealed_openings(folder, role):
+def revealed_openings(folder, role, expected_worlds=640):
     for evidence in sorted(folder.glob(f"{role}-0-*/worlds.jsonl")):
         output = evidence.parent
         Campaign.validate_result(output, folder / f"{output.name}.json")
     records = load_games(folder, role)
-    if set(records) != set(range(640)):
-        raise ValueError("The series learns from the completed 640-world adaptive comparison.")
+    if expected_worlds < WORLDS or set(records) != set(range(expected_worlds)):
+        raise ValueError("The series must learn from a complete, independently defined comparison.")
     result = []
     for index in sorted(records)[:WORLDS]:
         row = records[index]
