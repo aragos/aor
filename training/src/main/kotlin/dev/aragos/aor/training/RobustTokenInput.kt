@@ -298,6 +298,7 @@ private constructor(
                     "requireAffordableContest",
                     "attackBonus",
                 ),
+                optional = setOf("historyDecay"),
             )
             require(
                 node["kind"]?.asText() == InitiativePolicyConfig.VERSION &&
@@ -312,6 +313,8 @@ private constructor(
                 participation = PurchaseJson.number(node["participation"], "participation"),
                 requireAffordableContest = node["requireAffordableContest"].booleanValue(),
                 attackBonus = PurchaseJson.number(node["attackBonus"], "attack bonus"),
+                historyDecay =
+                    node["historyDecay"]?.let { PurchaseJson.number(it, "history decay") } ?: 1.0,
             )
         }
 

@@ -61,6 +61,26 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun weightsARecentRivalBidShiftMoreThanOldRows() {
+        val shifted =
+            view.copy(
+                pastTokenPurchases =
+                    List(3) { players.associateWith { 21 } } + players.associateWith { 20 }
+            )
+
+        assertEquals(
+            "buy-tokens 19",
+            InitiativePolicy.bid(
+                shifted,
+                seat,
+                "buy-tokens 21",
+                7,
+                config.copy(tokenPenalty = 1.5, historyDecay = .5),
+            ),
+        )
+    }
+
+    @Test
     fun respectsTheContestedPoolRequirement() {
         val forecast =
             ExpansionForecastView(

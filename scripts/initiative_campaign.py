@@ -85,8 +85,9 @@ def score(records, controls, role="CANDIDATE"):
 
 
 class Campaign:
-    def __init__(self, root):
+    def __init__(self, root, *, remote=REMOTE):
         self.root = root.resolve()
+        self.remote = remote
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
@@ -117,10 +118,10 @@ class Campaign:
         target = stage / name
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
-        worker_count, heap, java = (6, "5g", MAC_JAVA) if host == "MAC" else (12, "7g", "/usr/bin/java")
+        worker_count, heap, java = (8, "5g", MAC_JAVA) if host == "MAC" else (16, "7g", "/usr/bin/java")
         if host == "MAC" and shutil.disk_usage(self.root).free < 16*(1024**3):
             raise RuntimeError("Mac free disk space fell below the 16 GiB floor.")
-        folder = str(self.root) if host == "MAC" else REMOTE
+        folder = str(self.root) if host == "MAC" else self.remote
         command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
                    java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
                    "-cp", f"{folder}/lib/*", MODE, "--mode", "robust-token-screen-chunk",
@@ -131,12 +132,12 @@ class Campaign:
             if host == "MAC":
                 self.call(command, stdout=log)
             else:
-                remote_path = f"{REMOTE}/{relative_source}"
-                cmd = "mkdir -p " + shlex.quote(f"{REMOTE}/{stage_dir}") + " && cat > " + shlex.quote(remote_path)
+                remote_path = f"{self.remote}/{relative_source}"
+                cmd = "mkdir -p " + shlex.quote(f"{self.remote}/{stage_dir}") + " && cat > " + shlex.quote(remote_path)
                 self.call(SSH + [cmd], input_bytes=source.read_bytes(), stdout=log)
                 self.call(SSH + [shlex.join(command)], stdout=log)
                 archive = subprocess.check_output(SSH + [
-                    f"cd {shlex.quote(REMOTE + '/' + stage_dir)} && tar -czf - {shlex.quote(name)}"],
+                    f"cd {shlex.quote(self.remote + '/' + stage_dir)} && tar -czf - {shlex.quote(name)}"],
                     timeout=max(2,self.remaining()))
                 with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as stream:
                     stream.extractall(stage, filter="data")

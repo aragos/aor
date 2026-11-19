@@ -6,12 +6,14 @@ import dev.aragos.aor.OrderBoxes
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.TokenPurchaseOfferView
+import kotlin.math.pow
 
 /**
  * Tunable initiative bids use printed order boxes and authoritative quotes. [maximumTokenLoss]
  * limits tokens sacrificed relative to the normal choice. [tokenPenalty] uses expected printed box
  * numbers per forgone token. [participation] is the chance of using a positive-scoring switch.
- * [attackBonus] tunes early-box attacks in calibrated expansion score units.
+ * [attackBonus] tunes early-box attacks in calibrated expansion score units. [historyDecay] is the
+ * weight of a revealed row relative to the next newer row. A value of one weights all rows equally.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -19,6 +21,7 @@ data class InitiativePolicyConfig(
     val participation: Double,
     val requireAffordableContest: Boolean,
     val attackBonus: Double,
+    val historyDecay: Double = 1.0,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -30,6 +33,9 @@ data class InitiativePolicyConfig(
         }
         require(attackBonus.isFinite() && attackBonus in 0.0..8.0) {
             "Initiative expansion bonus must be between zero and eight calibrated score units."
+        }
+        require(historyDecay.isFinite() && historyDecay in 0.0..1.0) {
+            "Initiative history decay must be between zero and one."
         }
     }
 
@@ -71,15 +77,17 @@ object InitiativePolicy {
                         priorityOfPlayer)
             }
         }
+        val weights =
+            DoubleArray(rows.size) { index -> config.historyDecay.pow(rows.lastIndex - index) }
+        val totalWeight = weights.sum()
         fun expectedBox(amount: Int): Double =
-            predictions
-                .map { row ->
+            predictions.withIndex().sumOf { (index, row) ->
+                weights[index] *
                     boxes[
                         row.count { (bid, tiePriority) ->
                             bid < amount || bid == amount && tiePriority
                         }]
-                }
-                .average()
+            } / totalWeight
         val baselineBox = expectedBox(original.amount)
         val contest = view.expansionForecast?.contestedMarkets?.minOfOrNull { it.requiredTokens }
         val candidates =
