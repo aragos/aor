@@ -113,6 +113,7 @@ private constructor(
     val commodityExpansionRollouts: Boolean,
     val midgameBidRollouts: Boolean,
     val rivalMarketDenialRollouts: Boolean,
+    val reserveExpansionCardRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -218,6 +219,9 @@ private constructor(
             else emptyMap()) +
             (if (rivalMarketDenialRollouts)
                 mapOf("rivalMarketDenialRollouts" to "matched-rival-market-denial-1")
+            else emptyMap()) +
+            (if (reserveExpansionCardRollouts)
+                mapOf("reserveExpansionCardRollouts" to "reserve-market-and-card-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -420,6 +424,7 @@ private constructor(
                     "commodityExpansionRollouts",
                     "midgameBidRollouts",
                     "rivalMarketDenialRollouts",
+                    "reserveExpansionCardRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -643,6 +648,13 @@ private constructor(
                     require(setting.isBoolean) { "The rival market study requires a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val reserveExpansionCardRollouts =
+                node["reserveExpansionCardRollouts"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The expansion card reserve study requires a boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -701,6 +713,21 @@ private constructor(
             }
             require(!commodityExpansionRollouts || commodityRollouts) {
                 "A commodity expansion plan requires a declared ordinary holding opportunity."
+            }
+            require(
+                !reserveExpansionCardRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        !cardTerritoryRollouts &&
+                        !reliefUnlockRollouts &&
+                        !midgameBidRollouts &&
+                        !rivalMarketDenialRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.MIXED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "The expansion card reserve study requires one fixed mixed candidate-only comparison."
             }
             require(
                 !rivalMarketDenialRollouts ||
@@ -803,6 +830,7 @@ private constructor(
                     commodityExpansionRollouts,
                     midgameBidRollouts,
                     rivalMarketDenialRollouts,
+                    reserveExpansionCardRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

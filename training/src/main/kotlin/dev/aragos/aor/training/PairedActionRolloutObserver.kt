@@ -28,6 +28,7 @@ internal class PairedActionRolloutObserver(
     private val reliefUnlock: Boolean = false,
     private val commodityExpansion: Boolean = false,
     private val compareRivalDenial: Boolean = false,
+    private val reserveExpansionCard: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -47,6 +48,7 @@ internal class PairedActionRolloutObserver(
                 compareTerritory -> "cardTerritoryRollouts"
                 reliefUnlock -> "reliefUnlockRollouts"
                 compareRivalDenial -> "rivalMarketDenialRollouts"
+                reserveExpansionCard -> "reserveExpansionCardRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -63,6 +65,7 @@ internal class PairedActionRolloutObserver(
                 compareTerritory -> cardTerritoryRoot(state, number, observation, command)
                 reliefUnlock -> reliefRoot(state, number, observation, command)
                 compareRivalDenial -> denialRoot(state, number, observation, command)
+                reserveExpansionCard -> reserveRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
     }
@@ -161,6 +164,32 @@ internal class PairedActionRolloutObserver(
                 command,
             ) ?: return null
         return Root(state, number, command, nominated.actions, nominated.facts)
+    }
+
+    private fun reserveRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (observation.decision != "expand") return null
+        if (!command.startsWith("place ") && !command.startsWith("attack ")) return null
+        val actor = state.playerIds[seat]
+        val reserve =
+            ExpansionCardReserve.from(state.viewForDecision(actor), observation, command)
+                ?: return null
+        return Root(
+            state,
+            number,
+            command,
+            mapOf(
+                "ordinary" to command,
+                "reserve-then-ordinary" to reserve.alternative,
+                "reserve-and-buy" to reserve.alternative,
+                "buy-first" to BoardCommand.BuyExpansionCard.toText(),
+            ),
+            reserve.facts,
+        )
     }
 
     private fun cardTerritoryRoot(
@@ -342,6 +371,8 @@ internal class PairedActionRolloutObserver(
                             when {
                                 arm == "purchase-and-relieve" ->
                                     preferRelief(originalControllers, originTurn)
+                                arm == "reserve-and-buy" ->
+                                    preferExpansionCard(originalControllers, originTurn)
                                 commodityController != null ->
                                     originalControllers + (seat to commodityController)
                                 else -> originalControllers
@@ -362,6 +393,18 @@ internal class PairedActionRolloutObserver(
                                 "plannedCardPlay" to it.scheduledPlay,
                             )
                         } ?: emptyMap()) +
+                        (if (reserveExpansionCard) {
+                            val cardReceived =
+                                session.entries
+                                    .asSequence()
+                                    .filterIsInstance<Entry.Action>()
+                                    .takeWhile { it.command !is Command.BuyTokens }
+                                    .any { action ->
+                                        action.actor == actor &&
+                                            action.command == BoardCommand.BuyExpansionCard
+                                    }
+                            mapOf("cardBoughtThisTurn" to cardReceived)
+                        } else emptyMap()) +
                         (if (reliefUnlock) {
                             val spaces =
                                 session.entries
@@ -403,6 +446,34 @@ internal class PairedActionRolloutObserver(
                         )
                 )
             } else emptyMap()
+    }
+
+    private fun preferExpansionCard(
+        original: Map<Int, SimulationController>,
+        turn: Int,
+    ): Map<Int, SimulationController> {
+        val reference =
+            checkNotNull(original[seat]) {
+                "An expansion-card sequence requires its ordinary continuation."
+            }
+        val wrapper =
+            object : SimulationController by reference {
+                private var pending = true
+
+                override fun choose(decision: SimulationDecision): String? {
+                    if (
+                        pending &&
+                            decision.view.turnNumber == turn &&
+                            decision.observation.decision == "expand"
+                    ) {
+                        pending = false
+                        val card = BoardCommand.BuyExpansionCard.toText()
+                        if (decision.observation.candidates.any { it.command == card }) return card
+                    }
+                    return reference.choose(decision)
+                }
+            }
+        return original + (seat to wrapper)
     }
 
     private fun preferRelief(
