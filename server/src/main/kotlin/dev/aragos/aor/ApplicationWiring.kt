@@ -48,6 +48,8 @@ fun createConfiguredGameService(environment: Map<String, String> = System.getenv
         serverBotPolicy =
             botAsset("AOR_COORDINATED_BOT_ASSET")?.let(CoordinatedPreviewPolicy::read),
         broadBotPolicy = botAsset("AOR_BROAD_BOT_ASSET")?.let(BroadPreviewPolicy::read),
+        threePlayerBotPolicy =
+            botAsset("AOR_THREE_PLAYER_BOT_ASSET")?.let(BroadPreviewPolicy::readThreePlayer),
     )
 }
 

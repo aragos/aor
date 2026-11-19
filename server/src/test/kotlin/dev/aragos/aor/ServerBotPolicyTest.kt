@@ -82,6 +82,30 @@ class ServerBotPolicyTest {
     }
 
     @Test
+    fun threePlayerHardSetupUsesTheSpecialistBeforeTheBroadPolicy() {
+        val broad = OfferedProfile(profile = ServerBotProfile.BROAD_HARD_1)
+        val specialist =
+            OfferedProfile(
+                assetSha256 = "c".repeat(64),
+                profile = ServerBotProfile.THREE_PLAYER_HARD_1,
+            )
+        ProfileFixture(
+                playerCount = 3,
+                rules = RuleOptions(map = MapRule.EUROPEAN),
+                broadPolicy = broad,
+                threePlayerPolicy = specialist,
+            )
+            .use { fixture ->
+                val proposal = fixture.claim().observations.single().proposal
+
+                assertThat(proposal?.profile)
+                    .isEqualTo(ServerBotProfile.THREE_PLAYER_HARD_1.version)
+                assertThat(proposal?.assetSha256).isEqualTo(specialist.assetSha256)
+                assertThat(broad.calls).isEmpty()
+            }
+    }
+
+    @Test
     fun exactPilotSetupRetainsItsRegisteredCoordinatedPolicy() {
         val broad = OfferedProfile(profile = ServerBotProfile.BROAD_HARD_1)
         ProfileFixture(broadPolicy = broad).use { fixture ->
@@ -339,6 +363,8 @@ private class ProfileFixture(
     policyProfile: ServerBotProfile = ServerBotProfile.COORDINATED_83_SUPPORT_1,
     quotedTokenAmount: Int? = null,
     broadPolicy: ServerBotPolicy? = null,
+    threePlayerPolicy: ServerBotPolicy? = null,
+    playerCount: Int = 4,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-server-profile-")
     val policy = OfferedProfile(profile = policyProfile, quotedTokenAmount = quotedTokenAmount)
@@ -348,12 +374,13 @@ private class ProfileFixture(
             GameDriver(FixedRandom()),
             serverBotPolicy = policy,
             broadBotPolicy = broadPolicy,
+            threePlayerBotPolicy = threePlayerPolicy,
         )
     val game =
         service.create(
             List(humans) { "Human $it" },
             rules = rules,
-            bots = List(4 - humans) { AutomatedPlayerRequest("Bot $it", difficulty) },
+            bots = List(playerCount - humans) { AutomatedPlayerRequest("Bot $it", difficulty) },
         )
     val runnerId = UUID.randomUUID().toString()
     private val access = GameAccess.SeatToken(game.links.first().path.substringAfter("token="))

@@ -78,12 +78,14 @@ class GameService(
     private val accounts: AccountStore? = null,
     internal val serverBotPolicy: ServerBotPolicy? = null,
     private val broadBotPolicy: ServerBotPolicy? = null,
+    private val threePlayerBotPolicy: ServerBotPolicy? = null,
 ) {
     private val credentialsRandom = SecureRandom()
-    private val serverPolicies = listOfNotNull(serverBotPolicy, broadBotPolicy)
+    private val serverPolicies =
+        listOfNotNull(serverBotPolicy, threePlayerBotPolicy, broadBotPolicy)
 
     internal fun forAccounts(accounts: AccountStore): GameService =
-        GameService(store, driver, accounts, serverBotPolicy, broadBotPolicy)
+        GameService(store, driver, accounts, serverBotPolicy, broadBotPolicy, threePlayerBotPolicy)
 
     internal fun serverPolicy(profile: ServerBotProfile): ServerBotPolicy? =
         serverPolicies.firstOrNull {

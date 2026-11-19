@@ -5,6 +5,9 @@ const api = process.env.MAP_API_URL;
 const web = process.env.MAP_WEB_URL;
 const cdp = process.env.MAP_CDP_URL;
 const modelHash = process.env.AOR_TEST_BROAD_MODEL_SHA256;
+const playerCount = Number(process.env.AOR_TEST_BROAD_PLAYER_COUNT ?? '6');
+const profile = process.env.AOR_TEST_BROAD_PROFILE ?? 'aor-broad-hard-1';
+const botCount = playerCount - 1;
 assert.match(modelHash, /^[a-f0-9]{64}$/);
 const page = await open(web);
 
@@ -38,7 +41,7 @@ try {
     const result = await fetch(`${api}/api/games`, {method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: 'Native Hard variant playtest', players: ['Ada'],
-            bots: Array.from({length: 5}, () => ({difficulty: 'HARD'})),
+            bots: Array.from({length: botCount}, () => ({difficulty: 'HARD'})),
             options: {map: 'european', 'initial-card': 'no-events', 'draw-three-keep-two': 'enabled'}})});
     assert(result.ok, await result.clone().text());
     const game = await result.json();
@@ -48,17 +51,17 @@ try {
     await page.wait(`document.querySelector('.selected-action-confirmation')`, 'opening return confirmation');
     await page.evaluate(`document.querySelector('.selected-action-confirmation').click()`);
     await page.wait(`document.querySelector('#bid')`, 'all automata return an opening card');
-    await page.wait(`window.broadBotProof.proposals.filter(job => job.decision === 'bid-capital').length >= 5`,
+    await page.wait(`window.broadBotProof.proposals.filter(job => job.decision === 'bid-capital').length >= ${botCount}`,
         'native capital proposals for every automated seat');
 
     const {proposals, workerJobs} = await page.evaluate('window.broadBotProof');
     const opening = proposals.filter(job => job.decision === 'return-card');
-    assert.equal(new Set(opening.map(job => job.seat)).size, 5);
+    assert.equal(new Set(opening.map(job => job.seat)).size, botCount);
     assert.equal(workerJobs, 0);
-    assert(proposals.every(job => job.admitted && job.proposal.profile === 'aor-broad-hard-1' &&
-        job.proposal.assetSha256 === modelHash && job.configuration.playerCount === 6 &&
+    assert(proposals.every(job => job.admitted && job.proposal.profile === profile &&
+        job.proposal.assetSha256 === modelHash && job.configuration.playerCount === playerCount &&
         job.configuration.drawThreeKeepTwo));
-    console.log('The native Hard model returned opening cards and submitted legal capital proposals in a six-player European game.');
+    console.log(`The native Hard model returned opening cards and submitted legal capital proposals in a ${playerCount}-player European game.`);
 } finally {
     page.ws.close();
     await fetch(`${cdp}/json/close/${page.target.id}`);

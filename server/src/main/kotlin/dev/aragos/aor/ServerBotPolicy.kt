@@ -12,7 +12,8 @@ enum class ServerBotProfile(val version: String) {
     COORDINATED_83_SUPPORT_1("aor-coordinated-83-support-1"),
     COORDINATED_WIN_SUPPORT_1("aor-coordinated-win-support-1"),
     COORDINATED_ROBUST_SUPPORT_1("aor-coordinated-robust-support-1"),
-    BROAD_HARD_1("aor-broad-hard-1");
+    BROAD_HARD_1("aor-broad-hard-1"),
+    THREE_PLAYER_HARD_1("aor-three-player-hard-1");
 
     fun supports(playerCount: Int, rules: RuleOptions): Boolean =
         BotConfiguration(
@@ -32,8 +33,11 @@ enum class ServerBotProfile(val version: String) {
             observation.configuration?.let(::supportsConfiguration) == true
 
     private fun supportsConfiguration(configuration: BotConfiguration): Boolean =
-        if (this == BROAD_HARD_1) configuration != JointPolicyScope.configuration
-        else configuration == JointPolicyScope.configuration
+        when (this) {
+            BROAD_HARD_1 -> configuration != JointPolicyScope.configuration
+            THREE_PLAYER_HARD_1 -> configuration.playerCount == 3
+            else -> configuration == JointPolicyScope.configuration
+        }
 
     companion object {
         fun fromVersion(version: String): ServerBotProfile? = entries.singleOrNull {
