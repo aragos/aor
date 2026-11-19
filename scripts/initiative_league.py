@@ -50,8 +50,8 @@ def rank(summaries):
     return sorted(summaries, key=score, reverse=True)
 
 
-def main(root, previous):
-    campaign = Campaign(root, remote=REMOTE, mac_reserve_gib=14)
+def main(root, previous, resume):
+    campaign = Campaign(root, remote=REMOTE, resume=resume)
     campaign.validate_runtime()
     if campaign.remaining() < 3600:
         raise ValueError("The combined league needs at least one hour for its two cohorts.")
@@ -65,7 +65,13 @@ def main(root, previous):
     candidates = roster(mixture)
     screen = compare(campaign, "league-screen", candidates, 128, live, mixture, opening_bid)
     finalists = {name: candidates[name] for name in rank(screen)[:4]}
-    write(root / "league-screen.json", {"outcomes": screen, "finalists": finalists})
+    screen_result = root / "league-screen.json"
+    screen_payload = {"outcomes": screen, "finalists": finalists}
+    if resume and screen_result.exists():
+        if read(screen_result) != screen_payload:
+            raise ValueError("The completed screen no longer matches its verified shards.")
+    else:
+        write(screen_result, screen_payload)
     confirmation = compare(campaign, "league-confirm", finalists, 256, live, mixture, opening_bid)
     write(root / "league-confirm.json", {
         "outcomes": confirmation,
@@ -78,5 +84,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--previous", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
-    main(args.root.resolve(), args.previous.resolve())
+    main(args.root.resolve(), args.previous.resolve(), args.resume)

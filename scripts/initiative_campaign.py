@@ -102,10 +102,11 @@ def score(records, controls, role="CANDIDATE"):
 
 
 class Campaign:
-    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=16):
+    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=10, resume=False):
         self.root = root.resolve()
         self.remote = remote
         self.mac_reserve = mac_reserve_gib * (1024 ** 3)
+        self.resume = resume
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
@@ -146,7 +147,7 @@ class Campaign:
                    "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
                    "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
         started = time.monotonic()
-        with (stage / f"{name}.log").open("xb") as log:
+        with (stage / f"{name}.log").open("ab" if self.resume else "xb") as log:
             if host == "MAC":
                 self.call(command, stdout=log)
             else:
@@ -187,11 +188,10 @@ class Campaign:
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
-        if not reuse_complete:
-            stage.mkdir()
+        stage.mkdir(exist_ok=self.resume or reuse_complete)
 
         def declare(path, value):
-            if not reuse_complete:
+            if not reuse_complete and not (self.resume and path.exists()):
                 write(path, value)
             elif read(path) != value:
                 raise ValueError(f"The existing declaration does not match {path}.")
@@ -232,13 +232,17 @@ class Campaign:
                         spec["initiative"] = policy
                     declare(source, spec)
                     jobs.append((name, source))
-        if reuse_complete:
-            for name, source in jobs:
+        pending = []
+        for name, source in jobs:
+            receipt = stage / f"{name}.receipt.json"
+            if reuse_complete or self.resume and receipt.exists():
                 games = self.validate_result(stage / name, source)
-                if read(stage / f"{name}.receipt.json")["games"] != games:
+                if read(receipt)["games"] != games:
                     raise ValueError(f"The existing receipt does not match {name}.")
-        else:
-            self.execute_jobs(stage, jobs)
+            else:
+                pending.append((name, source))
+        if pending:
+            self.execute_jobs(stage, pending)
 
         def records(name, case):
             result = []
@@ -264,7 +268,7 @@ class Campaign:
             adaptive = statistics.mean(adaptive_rows) if adaptive_rows else ordinary
             outcomes[key] = dict(config=config, outcomes=summary, ordinary=ordinary, adaptive=adaptive,
                                  rankScore=.5*(ordinary+adaptive))
-        write(stage / "summary.json", outcomes)
+        declare(stage / "summary.json", outcomes)
         return outcomes
 
     def execute_jobs(self, stage, jobs):
