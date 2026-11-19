@@ -54,7 +54,7 @@ def selection_context(plan, condition, worlds, fresh):
 def tournament(campaign, plan, names, condition, worlds, fresh=False):
     style, context, capital = selection_context(plan, condition, worlds, fresh)
     phase = "fresh" if fresh else "develop"
-    prefix = "pressure-weighted" if "retargeting" in plan else "weighted"
+    prefix = plan.get("stagePrefix", "pressure-weighted" if "retargeting" in plan else "weighted")
     label = f"{prefix}-{phase}-{condition}"
     arms = ("control", *names)
     summary = campaign.stage(
@@ -65,6 +65,7 @@ def tournament(campaign, plan, names, condition, worlds, fresh=False):
         series_priors=dict.fromkeys(arms, context["priors"]) if "priors" in context else None,
         series_responses=dict.fromkeys(arms, context["responses"]) if "responses" in context else None,
         leading_rival_variants=dict.fromkeys(arms, plan["retargeting"]) if "retargeting" in plan else None,
+        capital_geography_variants=arms if plan.get("secondCapitalGeography") else (),
     )
     games = {name: load_games(campaign.root / label, name) for name in arms}
     common = []
@@ -100,7 +101,7 @@ def tournament(campaign, plan, names, condition, worlds, fresh=False):
     return common, {name: row["outcomes"][style] for name, row in summary.items()}
 
 
-def coefficients(cases, rival_penalty):
+def coefficients(cases, rival_penalty, bids=BIDS):
     results = {}
     for condition, rows in cases.items():
         vectors = []
@@ -115,7 +116,7 @@ def coefficients(cases, rival_penalty):
                     for result in subset
                     for own, rival in (result[f"bid-{bid}"],)
                     for baseline, base_rival in (result["control"],)) / len(rows)
-                for bid in BIDS
+                for bid in bids
             ])
         results[condition] = vectors
     return results
@@ -150,10 +151,10 @@ def bounded_distribution(log_weights, cap):
     return result
 
 
-def fit(cases, regularization, cap=None):
+def fit(cases, regularization, cap=None, bids=BIDS):
     """Smooth robust optimization with a stated uniform prior over legal candidate amounts."""
-    effects = tuple(coefficients(cases, .15).values())
-    weights = [[0.0] * len(BIDS) for _ in range(2)]
+    effects = tuple(coefficients(cases, .15, bids).values())
+    weights = [[0.0] * len(bids) for _ in range(2)]
     soft_minimum = .025
     for _ in range(240):
         distributions = [bounded_distribution(group, cap) for group in weights]
@@ -173,8 +174,8 @@ def probabilities(weights):
     return [[mass / sum(group) for mass in group] for group in weights]
 
 
-def verify_fit(validation, fits):
-    effects = coefficients(validation, 0)
+def verify_fit(validation, fits, bids=BIDS):
+    effects = coefficients(validation, 0, bids)
     nominees = []
     estimates = {}
     for name, weights in fits.items():
@@ -188,9 +189,9 @@ def verify_fit(validation, fits):
     return (max(nominees)[-1] if nominees else None), estimates
 
 
-def policy(anchor, weights):
+def policy(anchor, weights, bids=BIDS):
     return dict(anchor, openingMix={
-        "bids": list(BIDS), "weights": weights[0], "laterCapitalBids": list(BIDS),
+        "bids": list(bids), "weights": weights[0], "laterCapitalBids": list(bids),
         "laterCapitalWeights": weights[1], "participation": 1 - RETAIN,
     })
 
