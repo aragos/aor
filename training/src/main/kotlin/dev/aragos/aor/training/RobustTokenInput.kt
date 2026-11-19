@@ -197,6 +197,7 @@ private constructor(
     val secondCapitalGeography: Boolean,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val rivalTargetingLineup: RivalTargetingLineup?,
+    val phaseBidProfile: PhaseBidProfile?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -303,6 +304,11 @@ private constructor(
                 mapOf(
                     "rivalTargetingLineup" to
                         mapOf("kind" to RivalTargetingLineup.VERSION, "policy" to it)
+                )
+            } ?: emptyMap()) +
+            (phaseBidProfile?.let {
+                mapOf(
+                    "phaseAwareBids" to mapOf("kind" to "phase-aware-bids-1", "profile" to it.wire)
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -628,6 +634,7 @@ private constructor(
                     "expansionDenial",
                     "leadingRivalRetargeting",
                     "rivalTargetingLineup",
+                    "phaseAwareBids",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -687,6 +694,18 @@ private constructor(
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val phaseBidProfile =
+                node["phaseAwareBids"]?.let { bids ->
+                    PurchaseJson.fields(bids, setOf("kind", "profile"))
+                    require(bids["kind"]?.asText() == "phase-aware-bids-1") {
+                        "Use the supported version of the phase-aware bidding profile."
+                    }
+                    requireNotNull(
+                        PhaseBidProfile.entries.firstOrNull { it.wire == bids["profile"]?.asText() }
+                    ) {
+                        "The phase-aware bidding profile must select a supported allocation."
+                    }
+                }
             val rivalTargetingLineup =
                 node["rivalTargetingLineup"]?.let { lineup ->
                     PurchaseJson.fields(lineup, setOf("kind", "offsets", "policy"))
@@ -929,6 +948,7 @@ private constructor(
                     secondCapitalGeography,
                     leadingRivalRetargeting,
                     rivalTargetingLineup,
+                    phaseBidProfile,
                     seeds,
                     start,
                     count,
