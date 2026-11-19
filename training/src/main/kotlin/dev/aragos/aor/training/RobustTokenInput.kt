@@ -169,6 +169,7 @@ private constructor(
     val initiativeRival: InitiativeRival?,
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
+    val recordOpeningContext: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -253,6 +254,7 @@ private constructor(
             (capitalAuction?.let {
                 mapOf("capitalAuction" to it.science())
             } ?: emptyMap()) +
+            (if (recordOpeningContext) mapOf("recordOpeningContext" to true) else emptyMap()) +
             (initiative?.let {
                 mapOf(
                     "initiative" to
@@ -516,6 +518,7 @@ private constructor(
                     "initiativeRival",
                     "initiativeLineup",
                     "capitalAuction",
+                    "recordOpeningContext",
                     "tokenNeighborMixture",
                 ),
             )
@@ -601,6 +604,11 @@ private constructor(
                     require(it.isBoolean) {
                         "Candidate-only collection requires an explicit JSON boolean."
                     }
+                    it.booleanValue()
+                } ?: false
+            val recordOpeningContext =
+                node["recordOpeningContext"]?.let {
+                    require(it.isBoolean) { "Opening-context collection requires a JSON boolean." }
                     it.booleanValue()
                 } ?: false
             val adaptiveOpponent =
@@ -740,6 +748,7 @@ private constructor(
                     initiativeRival,
                     initiativeLineup,
                     capitalAuction,
+                    recordOpeningContext,
                     seeds,
                     start,
                     count,

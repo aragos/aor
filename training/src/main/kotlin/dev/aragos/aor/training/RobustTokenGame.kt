@@ -12,6 +12,7 @@ import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.LocalTokenNeighborPolicy
+import dev.aragos.aor.ai.OpeningBidContext
 import java.security.MessageDigest
 import kotlin.math.abs
 
@@ -52,6 +53,7 @@ internal class RobustTokenDiagnostics(
     private val controlledSeat: Int,
     private val recordTokenAdmissions: Boolean = false,
     private val recordCapital: Boolean = false,
+    private val recordOpeningContext: Boolean = false,
 ) {
     private val controlledBids = mutableMapOf<Int, Int>()
     private val rivalBids = mutableMapOf<Int, Int>()
@@ -132,7 +134,12 @@ internal class RobustTokenDiagnostics(
                     "capital" to capitalId,
                     "capitalPosition" to capitalPosition,
                     "cash" to own.cash,
-                )
+                ) +
+                    (if (recordOpeningContext) {
+                        mapOf("context" to OpeningBidContext.from(view, player))
+                    } else {
+                        emptyMap()
+                    })
             if (recordCapital) {
                 capital =
                     mapOf(
@@ -263,6 +270,7 @@ internal object RobustTokenGame {
                 seat,
                 input.tokenNeighborMixture != null,
                 recordCapital = input.capitalAuction != null,
+                recordOpeningContext = input.recordOpeningContext,
             )
         val league =
             input.adaptiveOpponent?.let {
