@@ -12,11 +12,13 @@ import kotlin.math.pow
  * Absolute bids for the first turn. An optional second mix applies to players in the later half of
  * capital selection, when they can place themselves relative to more rivals on tied bids.
  * [retainOrdinaryForLaterCapital] keeps the regular opening behavior for that group.
+ * [participation] is the first-turn probability of choosing this mix instead of a regular bid.
  */
 data class OpeningBidMix(
     val bids: List<Int>,
     val laterCapitalBids: List<Int> = emptyList(),
     val retainOrdinaryForLaterCapital: Boolean = false,
+    val participation: Double = 1.0,
 ) {
     init {
         require(bids.isNotEmpty()) { "An opening mix requires at least one default bid." }
@@ -29,6 +31,9 @@ data class OpeningBidMix(
         }
         require(!retainOrdinaryForLaterCapital || laterCapitalBids.isEmpty()) {
             "A later-capital mix cannot also request the regular opening behavior."
+        }
+        require(participation.isFinite() && participation in 0.0..1.0) {
+            "Opening mix participation must be a probability between zero and one."
         }
     }
 }
@@ -120,7 +125,10 @@ object InitiativePolicy {
             val mix = config.openingMix
             val capitalPosition = view.capitalOrder.indexOf(player)
             val later = capitalPosition >= (view.capitalOrder.size + 1) / 2
-            if (!later || !mix.retainOrdinaryForLaterCapital) {
+            val chooseMix =
+                mix.participation == 1.0 ||
+                    TerritoryPolicy.uniform(seed xor 0x2A68C5D9) < mix.participation
+            if (chooseMix && (!later || !mix.retainOrdinaryForLaterCapital)) {
                 val amounts =
                     if (later && mix.laterCapitalBids.isNotEmpty()) mix.laterCapitalBids
                     else mix.bids

@@ -433,7 +433,8 @@ private constructor(
             PurchaseJson.fields(
                 node,
                 setOf("bids"),
-                optional = setOf("laterCapitalBids", "retainOrdinaryForLaterCapital"),
+                optional =
+                    setOf("laterCapitalBids", "retainOrdinaryForLaterCapital", "participation"),
             )
             fun bids(field: String): List<Int> =
                 PurchaseJson.array(node[field], field).map { PurchaseJson.integer(it, field) }
@@ -448,6 +449,10 @@ private constructor(
                         }
                         setting.booleanValue()
                     } ?: false,
+                participation =
+                    node["participation"]?.let {
+                        PurchaseJson.number(it, "opening mix participation")
+                    } ?: 1.0,
             )
         }
 

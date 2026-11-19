@@ -138,6 +138,35 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun openingMixCanShareProbabilityWithTheRegularOpeningBids() {
+        val opening =
+            view.copy(
+                turnNumber = 1,
+                pastTokenPurchases = emptyList(),
+                tokenPurchaseOffers =
+                    (16..21).map { amount ->
+                        TokenPurchaseOfferView(
+                            amount,
+                            amount,
+                            amount,
+                            40 - amount,
+                            36 - amount,
+                            amount,
+                        )
+                    },
+            )
+        val tested =
+            config.copy(
+                openingSpread = 2,
+                openingMix = OpeningBidMix(listOf(16, 17), participation = .4),
+            )
+
+        val bids = (1..128).map { InitiativePolicy.bid(opening, seat, "buy-tokens 21", it, tested) }
+
+        assertEquals(setOf(16, 17, 19, 20, 21).map { "buy-tokens $it" }.toSet(), bids.toSet())
+    }
+
+    @Test
     fun absoluteOpeningBidsDoNotApplyOnLaterTurnsWithoutHistory() {
         val oldSave = view.copy(pastTokenPurchases = emptyList())
         val tested = config.copy(openingMix = OpeningBidMix(listOf(18)))

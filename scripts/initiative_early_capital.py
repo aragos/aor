@@ -15,7 +15,7 @@ PRIMARY_WORLDS = 768
 STRESS_WORLDS = 1536
 
 
-def behavior(folder, label, size, bids=None):
+def behavior(folder, label, size, bids=None, *, allow_reference_opening=False):
     for name in ("control", label):
         for evidence in folder.glob(f"{name}-0-*/worlds.jsonl"):
             output = evidence.parent
@@ -37,12 +37,13 @@ def behavior(folder, label, size, bids=None):
             raise ValueError("A first-turn mix cannot change capital choice or initial cash.")
         later = opening["capitalPosition"] >= 2
         if bids is not None:
-            if later and (row["roles"] != candidate["roles"]
-                          or opening != reference["openingBid"]
-                          or choice["chosenPolicyDecisionsSha256"] !=
-                          reference["chosenPolicyDecisionsSha256"]):
-                raise ValueError("Later capital choices must retain every reference decision.")
-            if not later and opening["bid"] not in bids:
+            same = opening == reference["openingBid"]
+            if later or allow_reference_opening and same:
+                if (row["roles"] != candidate["roles"] or not same
+                    or choice["chosenPolicyDecisionsSha256"] !=
+                       reference["chosenPolicyDecisionsSha256"]):
+                    raise ValueError("An ordinary initial bid must preserve every reference decision.")
+            elif opening["bid"] not in bids:
                 raise ValueError("Earlier capital choices must apply the qualified bid mix.")
         a = candidate["roles"]["CANDIDATE"]["wins"][seat]
         b = row["roles"]["CANDIDATE"]["wins"][seat]
@@ -71,14 +72,16 @@ def freeze(previous):
     }
 
 
-def run(campaign, plan, label, style, size, **options):
-    stage = f"early-capital-fresh-{label}"
+def run(campaign, plan, label, style, size, *, stage_prefix="early-capital-fresh",
+        allow_reference_opening=False, **options):
+    stage = f"{stage_prefix}-{label}"
     result = campaign.stage(stage,{CANDIDATE:plan["candidate"]},size,(style,),shard=128,
                             baseline=plan["reference"],**options)
     return {
         "all":result[CANDIDATE]["outcomes"][style],
         "capitalGroups":behavior(campaign.root/stage,CANDIDATE,size,
-                                 plan["candidate"]["openingMix"]["bids"]),
+                                 plan["candidate"]["openingMix"]["bids"],
+                                 allow_reference_opening=allow_reference_opening),
     }
 
 
