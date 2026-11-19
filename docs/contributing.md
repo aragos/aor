@@ -113,7 +113,8 @@ includes an opponent that changes its preferred order as the game develops. Use
 `--mode evaluate-initiative --model PATH --opponents PATH` for a fresh comparison of the
 conservative candidate against the frozen Hard roster with the advance guard in both arms.
 Set `--challenger PATH` to compare ordinary serialized model weights, including learned bid weights,
-against the same four bidding styles.
+against the same bidding styles. The held-out range counter uses recent revealed bids to buy
+around the candidate's usual amounts when earlier or later order suits its own hand.
 
 ### Portable simulation benchmark
 

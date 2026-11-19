@@ -17,6 +17,7 @@ internal object VariantInitiativeTraining {
         UNDERCUT,
         PAIRED_OFFSETS,
         SWITCHING,
+        RANGE_COUNTER,
     }
 
     private data class Design(
@@ -32,7 +33,13 @@ internal object VariantInitiativeTraining {
         val opposition: Opposition,
     )
 
-    private data class Outcome(val winShare: Double, val reward: Double, val changedBids: Int)
+    private data class Outcome(
+        val winShare: Double,
+        val reward: Double,
+        val changedBids: Int,
+        val counterOffers: Int,
+        val counterWinShare: Double,
+    )
 
     private data class World(
         val game: Game,
@@ -45,6 +52,8 @@ internal object VariantInitiativeTraining {
         val changedBidWorlds: Int,
         val winEffect: PairedEffect,
         val rewardEffect: PairedEffect,
+        val counterWinEffect: PairedEffect,
+        val changedCounterWorlds: Int,
     )
 
     private val designs =
@@ -103,7 +112,7 @@ internal object VariantInitiativeTraining {
                 development,
                 seeds.coerceAtMost(2),
                 seedOffset,
-                Opposition.entries.filterNot { it == Opposition.SWITCHING },
+                listOf(Opposition.ORDINARY, Opposition.UNDERCUT, Opposition.PAIRED_OFFSETS),
                 designs,
                 incumbent,
                 ledger,
@@ -274,6 +283,8 @@ internal object VariantInitiativeTraining {
         check(games.map(Game::seed).distinct().size == games.size) {
             "Initiative comparisons require distinct prospectively selected game seeds."
         }
+        var completed = 0
+        val phase = if (heldOut) "Held-out bidding" else "Bidding screen"
         val results =
             tournaments.run(
                 games.map { game ->
@@ -303,7 +314,12 @@ internal object VariantInitiativeTraining {
                         World(game, control, outcomes)
                     }
                 }
-            )
+            ) {
+                completed++
+                if (completed % 128 == 0 || completed == games.size) {
+                    println("$phase $completed/${games.size} paired worlds")
+                }
+            }
         return results.sortedBy { it.game.seed }
     }
 
@@ -334,6 +350,7 @@ internal object VariantInitiativeTraining {
         val actor = PlayerId("p${game.seat + 1}")
         val adversary = (game.seat + 1) % count
         var changes = 0
+        var counterOffers = 0
         val controllers = buildMap {
             if (design != null) {
                 put(
@@ -362,8 +379,15 @@ internal object VariantInitiativeTraining {
                 put(
                     adversary,
                     tokenController { decision ->
-                        opposedBid(decision, actor, game.opposition)
-                            ?: ordinary(decision, competitors[adversary])
+                        val nominal = ordinary(decision, competitors[adversary])
+                        val counter =
+                            if (game.opposition == Opposition.RANGE_COUNTER) {
+                                RangeCounterBid.choose(decision, actor, nominal)
+                            } else {
+                                opposedBid(decision, actor, game.opposition)
+                            }
+                        if (counter != null && counter != nominal) counterOffers++
+                        counter ?: nominal
                     },
                 )
             }
@@ -382,7 +406,13 @@ internal object VariantInitiativeTraining {
                             .orEmpty(),
                 )
         synchronized(ledger) { ledger.add(terminal) }
-        return Outcome(terminal.winShare(game.seat), terminal.reward(game.seat), changes)
+        return Outcome(
+            terminal.winShare(game.seat),
+            terminal.reward(game.seat),
+            changes,
+            counterOffers,
+            terminal.winShare(adversary),
+        )
     }
 
     private fun opposedBid(
@@ -401,7 +431,8 @@ internal object VariantInitiativeTraining {
                 Opposition.UNDERCUT -> -1
                 Opposition.PAIRED_OFFSETS -> if ((turn - 3) % 4 < 2) -1 else 2
                 Opposition.SWITCHING -> if (decision.view.hand.size <= 1 || turn % 3 == 0) -2 else 3
-                Opposition.ORDINARY -> return null
+                Opposition.ORDINARY,
+                Opposition.RANGE_COUNTER -> return null
             }
         val command = Command.BuyTokens(forecast + offset).toText()
         return command.takeIf { offer ->
@@ -441,6 +472,14 @@ internal object VariantInitiativeTraining {
             pairedEffect(
                 comparisons.map { (candidate, control) -> candidate.reward - control.reward }
             ),
+            pairedEffect(
+                comparisons.map { (candidate, control) ->
+                    candidate.counterWinShare - control.counterWinShare
+                }
+            ),
+            comparisons.count { (candidate, control) ->
+                candidate.counterOffers > 0 || control.counterOffers > 0
+            },
         )
     }
 
