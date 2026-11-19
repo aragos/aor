@@ -290,7 +290,8 @@ class Campaign:
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
               rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
-              counter_variants=None, lineup=None, capital_variants=None, series_priors=None):
+              counter_variants=None, lineup=None, capital_variants=None, series_priors=None,
+              lineup_variants=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -314,6 +315,8 @@ class Campaign:
             declared["counterVariants"] = counter_variants
         if lineup:
             declared["initiativeLineup"] = lineup
+        if lineup_variants:
+            declared["initiativeLineupVariants"] = lineup_variants
         if capital_variants:
             declared["capitalAuctionVariants"] = capital_variants
         if series_priors:
@@ -346,8 +349,9 @@ class Campaign:
                         spec["initiativeRival"] = dict(kind="public-initiative-lineup-1",offsets=list(rival_offsets),policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
-                    if lineup:
-                        spec["initiativeLineup"] = lineup
+                    active_lineup = lineup_variants.get(key,lineup) if lineup_variants else lineup
+                    if active_lineup:
+                        spec["initiativeLineup"] = active_lineup
                     if capital_variants and key in capital_variants:
                         spec["capitalAuction"] = capital_variants[key]
                     if series_priors and key in series_priors:
