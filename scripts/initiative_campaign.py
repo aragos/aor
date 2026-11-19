@@ -13,6 +13,7 @@ import shutil
 import statistics
 import subprocess
 import tarfile
+import tempfile
 import threading
 import time
 
@@ -101,6 +102,10 @@ def score(records, controls, role="CANDIDATE"):
     return result
 
 
+class WorkerUnavailable(RuntimeError):
+    """A transport or resource interruption that allows a shard to run on the other worker."""
+
+
 class Campaign:
     def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=10, resume=False):
         self.root = root.resolve()
@@ -123,11 +128,34 @@ class Campaign:
             if sha(lib / name) != digest:
                 raise ValueError(f"Frozen runtime changed for {name}.")
 
-    def call(self, cmd, *, stdout=None, input_bytes=None):
+    def call(self, cmd, *, stdout=None, input_bytes=None, limit=None):
         remaining = self.remaining()
         if remaining < 2 or self.stop.is_set():
             raise RuntimeError("No additional tasks may start after the original deadline.")
+        if limit is not None:
+            remaining = min(remaining, limit)
         return subprocess.run(cmd, check=True, timeout=remaining, input=input_bytes, stdout=stdout)
+
+    def desktop_call(self, command, **options):
+        try:
+            return self.call(SSH + [command], **options)
+        except subprocess.TimeoutExpired as error:
+            raise WorkerUnavailable("The Ubuntu worker exceeded its shard transport limit.") from error
+        except subprocess.CalledProcessError as error:
+            if error.returncode != 255:
+                raise
+            raise WorkerUnavailable("The Ubuntu worker's SSH connection was interrupted.") from error
+
+    def fetch_desktop(self, stage, name, source):
+        parent = shlex.quote(f"{self.remote}/{stage.name}")
+        archive = self.desktop_call(f"cd {parent} && tar -czf - {shlex.quote(name)}",
+                                    stdout=subprocess.PIPE, limit=60).stdout
+        with tempfile.TemporaryDirectory(dir=stage) as directory:
+            with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as stream:
+                stream.extractall(directory, filter="data")
+            target = Path(directory) / name
+            self.validate_result(target, source)
+            target.rename(stage / name)
 
     def execute(self, stage, task, host):
         name, source = task
@@ -139,7 +167,7 @@ class Campaign:
             raise ValueError("Refusing to overwrite a native result directory.")
         worker_count, heap, java = (8, "5g", MAC_JAVA) if host == "MAC" else (16, "7g", "/usr/bin/java")
         if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
-            raise RuntimeError("Mac free disk space fell below the campaign reserve.")
+            raise WorkerUnavailable("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
         command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
                    java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
@@ -147,23 +175,33 @@ class Campaign:
                    "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
                    "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
         started = time.monotonic()
-        with (stage / f"{name}.log").open("ab" if self.resume else "xb") as log:
+        with (stage / f"{name}.log").open("ab") as log:
             if host == "MAC":
                 self.call(command, stdout=log)
             else:
-                remote_path = f"{self.remote}/{relative_source}"
-                cmd = "mkdir -p " + shlex.quote(f"{self.remote}/{stage_dir}") + " && cat > " + shlex.quote(remote_path)
-                self.call(SSH + [cmd], input_bytes=source.read_bytes(), stdout=log)
-                self.call(SSH + [shlex.join(command)], stdout=log)
-                archive = subprocess.check_output(SSH + [
-                    f"cd {shlex.quote(self.remote + '/' + stage_dir)} && tar -czf - {shlex.quote(name)}"],
-                    timeout=max(2,self.remaining()))
-                with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as stream:
-                    stream.extractall(stage, filter="data")
+                stale = self.desktop_shard_state(relative_output) if self.resume else b"missing"
+                if stale == b"partial":
+                    raise WorkerUnavailable(f"Ubuntu has incomplete earlier evidence for shard {name}.")
+                if stale == b"missing":
+                    remote_path = shlex.quote(f"{self.remote}/{relative_source}")
+                    parent = shlex.quote(f"{self.remote}/{stage_dir}")
+                    cmd = f"mkdir -p {parent} && cat > {remote_path}"
+                    self.desktop_call(cmd, input_bytes=source.read_bytes(), stdout=log, limit=45)
+                    games = read(source)["count"]
+                    self.desktop_call(shlex.join(command), stdout=log, limit=max(600, 3 * games))
+                self.fetch_desktop(stage, name, source)
         games = self.validate_result(target, source)
         receipt = dict(host=host, seconds=time.monotonic() - started, games=games)
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
+
+    def desktop_shard_state(self, relative_output):
+        target = shlex.quote(f"{self.remote}/{relative_output}")
+        return self.desktop_call(
+            f"if test -f {target}/finished.json; then printf complete; "
+            f"elif test -e {target}; then printf partial; else printf missing; fi",
+            stdout=subprocess.PIPE, limit=45,
+        ).stdout
 
     @staticmethod
     def validate_result(target, source):
@@ -283,15 +321,26 @@ class Campaign:
                         task = todo.get_nowait()
                     except queue.Empty:
                         return
-                    self.execute(stage, task, host)
+                    try:
+                        self.execute(stage, task, host)
+                    except WorkerUnavailable as error:
+                        todo.put(task)
+                        print(json.dumps(dict(stage=stage.name, job=task[0], host=host,
+                                              workerUnavailable=str(error))), flush=True)
+                        return host
             except Exception:
                 self.stop.set()
                 raise
 
         with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(run_host, host) for host in ("MAC", "DESKTOP")]
-            for future in futures:
-                future.result()
+            hosts = ("MAC", "DESKTOP")
+            futures = [pool.submit(run_host, host) for host in hosts]
+            unavailable = {future.result() for future in futures}
+        for host in hosts:
+            if not todo.empty() and host not in unavailable:
+                run_host(host)
+        if not todo.empty():
+            raise WorkerUnavailable("All eligible workers stopped with incomplete simulation shards.")
 
 
 def ranked(outcomes):
