@@ -13,7 +13,7 @@ TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 
 def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
-                        lookahead=False, epochs=()):
+                        lookahead=False, epochs=(), chance_trial=False):
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
         topic, bank = "buy-or-pass", "expansion-buy-or-pass-v1"
@@ -27,6 +27,10 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         if not territory:
             raise ValueError("Requested root epochs require the card versus territory comparison.")
         topic, bank = "late-card-tradeoff", "card-territory-late-epochs-v1"
+    if chance_trial:
+        if not territory:
+            raise ValueError("The chance trial requires the card versus territory comparison.")
+        topic, bank = "chance-alignment", "card-territory-chance-alignment-v1"
     stage = root / topic
     stage.mkdir(exist_ok=campaign.resume)
     seeds = seed_bank(bank, count)
@@ -44,6 +48,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         method["checkpointTurns"] = [1, 3]
     if epochs:
         method["requestedEpochs"] = list(epochs)
+    if chance_trial:
+        method["chanceModes"] = ["sequential", "turn-and-outcome-channel-1"]
     declared = stage / "method.json"
     if not declared.exists():
         write(declared, method)
@@ -67,6 +73,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
                 request["lookaheadCheckpoints"] = True
             if epochs:
                 request["cardTerritoryEpochs"] = list(epochs)
+            if chance_trial:
+                request["chanceAlignmentTrial"] = True
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
         if not source.exists():

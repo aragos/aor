@@ -15,7 +15,6 @@ import dev.aragos.aor.TextCodec
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
 import java.util.concurrent.CancellationException
-import kotlin.random.Random
 
 /**
  * In-memory experiment authority using ordinary production transitions. Sessions stop at resolved
@@ -29,14 +28,25 @@ import kotlin.random.Random
 class ExperimentSession
 private constructor(
     initial: GameState,
-    private val random: ExperimentRandom,
+    private val random: ExperimentChance,
     private val recordedEntries: MutableList<Entry>?,
 ) {
     constructor(
         initial: GameState,
         seed: Long,
         recordEntries: Boolean = false,
-    ) : this(initial, ExperimentRandom(seed), if (recordEntries) mutableListOf() else null)
+    ) : this(initial, ExperimentChance(seed), if (recordEntries) mutableListOf() else null)
+
+    internal constructor(
+        initial: GameState,
+        seed: Long,
+        recordEntries: Boolean,
+        chanceMode: ExperimentChanceMode,
+    ) : this(
+        initial,
+        ExperimentChance(seed, chanceMode),
+        if (recordEntries) mutableListOf() else null,
+    )
 
     var state: GameState = initial
         private set
@@ -65,7 +75,7 @@ private constructor(
     fun fork(seed: Long? = null): ExperimentSession =
         ExperimentSession(
                 state,
-                if (seed == null) random.copy() else ExperimentRandom(seed),
+                if (seed == null) random.copy() else ExperimentChance(seed, random.mode),
                 recordedEntries?.toMutableList(),
             )
             .also { branch ->
@@ -126,16 +136,19 @@ private constructor(
         repeat(10000) {
             checkBudget(deadlineNanos)
             val need = (state.prompts().singleOrNull() as? Prompt.System)?.need ?: return
+            fun stream() = random.forNeed(need, state.turnNumber, state.currentEpoch.number)
             val outcome =
                 when (need) {
-                    is SystemNeed.Shuffle -> Entry.Shuffle(need.cards.shuffled(random))
+                    is SystemNeed.Shuffle -> Entry.Shuffle(need.cards.shuffled(stream()))
                     is SystemNeed.Draw -> GameOutcome.Draw(need.player, need.reference, need.card)
-                    is SystemNeed.GameRoll ->
+                    is SystemNeed.GameRoll -> {
+                        val rolls = stream()
                         GameOutcome.Roll(
                             need.kind,
-                            List(need.diceCount) { DieRoll(random.nextInt(1, 7)) },
+                            List(need.diceCount) { DieRoll(rolls.nextInt(1, 7)) },
                             need.players,
                         )
+                    }
                     is SystemNeed.Trade ->
                         GameOutcome.Trade(
                             need.owner,
@@ -144,7 +157,7 @@ private constructor(
                                 .playerState(need.owner)
                                 .hand
                                 .map(HandCard::reference)
-                                .random(random),
+                                .random(stream()),
                         )
                 }
             stepAuthority(outcome)
@@ -187,21 +200,5 @@ private constructor(
                 throw CancellationException("The experiment deadline elapsed or it was canceled.")
             }
         }
-    }
-}
-
-/** SplitMix64 state is copied explicitly, so branches never share a mutable RNG. */
-private class ExperimentRandom(private var position: Long) : Random() {
-    fun copy(): ExperimentRandom = ExperimentRandom(position)
-
-    override fun nextBits(bitCount: Int): Int {
-        require(bitCount in 0..32) { "Random bit count must be between zero and 32." }
-        if (bitCount == 0) return 0
-        position += -7046029254386353131L
-        var mixed = position
-        mixed = (mixed xor (mixed ushr 30)) * -4658895280553007687L
-        mixed = (mixed xor (mixed ushr 27)) * -7723592293110705685L
-        mixed = mixed xor (mixed ushr 31)
-        return (mixed ushr (64 - bitCount)).toInt()
     }
 }

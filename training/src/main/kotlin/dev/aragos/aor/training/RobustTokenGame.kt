@@ -322,6 +322,7 @@ internal object RobustTokenGame {
                             seat,
                             compareTerritory = true,
                             traceLookahead = input.lookaheadCheckpoints,
+                            compareChance = input.chanceAlignmentTrial,
                             territoryEpoch =
                                 input.cardTerritoryEpochs
                                     .takeIf { it.isNotEmpty() }

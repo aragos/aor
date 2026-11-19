@@ -114,6 +114,7 @@ private constructor(
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
     val cardTerritoryEpochs: List<Int>,
+    val chanceAlignmentTrial: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -212,6 +213,8 @@ private constructor(
             else emptyMap()) +
             (if (cardTerritoryEpochs.isNotEmpty())
                 mapOf("cardTerritoryEpochs" to cardTerritoryEpochs)
+            else emptyMap()) +
+            (if (chanceAlignmentTrial) mapOf("chanceAlignmentTrial" to "turn-and-outcome-channel-1")
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -398,6 +401,7 @@ private constructor(
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
                     "cardTerritoryEpochs",
+                    "chanceAlignmentTrial",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -503,6 +507,11 @@ private constructor(
             val lookaheadCheckpoints =
                 node["lookaheadCheckpoints"]?.let { setting ->
                     require(setting.isBoolean) { "Short lookahead checkpoints require a boolean." }
+                    setting.booleanValue()
+                } ?: false
+            val chanceAlignmentTrial =
+                node["chanceAlignmentTrial"]?.let { setting ->
+                    require(setting.isBoolean) { "The chance alignment trial must be boolean." }
                     setting.booleanValue()
                 } ?: false
             val cardTerritoryEpochs =
@@ -651,6 +660,9 @@ private constructor(
             require(cardTerritoryEpochs.isEmpty() || cardTerritoryRollouts) {
                 "Requested root epochs belong to the declared card versus territory study."
             }
+            require(!chanceAlignmentTrial || cardTerritoryRollouts) {
+                "The chance alignment trial belongs to the declared card versus territory study."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -675,6 +687,7 @@ private constructor(
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,
                     cardTerritoryEpochs,
+                    chanceAlignmentTrial,
                     seeds,
                     start,
                     count,

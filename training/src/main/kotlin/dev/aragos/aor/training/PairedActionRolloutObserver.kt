@@ -18,6 +18,7 @@ internal class PairedActionRolloutObserver(
     private val compareTerritory: Boolean = false,
     private val traceLookahead: Boolean = false,
     private val territoryEpoch: Int? = null,
+    private val compareChance: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -175,15 +176,22 @@ internal class PairedActionRolloutObserver(
             requireNotNull(captured.state.turnNumber) {
                 "A rollout requires an active origin turn."
             }
-        val tails =
+        fun outcomes(chanceMode: ExperimentChanceMode) =
             captured.actions.mapValues { (_, action) ->
                 (0..1).map { replicate ->
                     val chanceSeed = CardAdvantageExecutor.chanceSeed(seed, replicate)
                     val session =
-                        ExperimentSession(captured.state, chanceSeed, recordEntries = true)
+                        ExperimentSession(
+                            captured.state,
+                            chanceSeed,
+                            recordEntries = true,
+                            chanceMode = chanceMode,
+                        )
                     session.apply(mapOf(actor to action), deadline)
                     val checkpoints =
-                        if (traceLookahead) mutableMapOf<Int, Map<String, Any>>() else null
+                        if (traceLookahead && chanceMode == ExperimentChanceMode.SEQUENTIAL) {
+                            mutableMapOf<Int, Map<String, Any>>()
+                        } else null
                     val record: ((GameState, Int) -> Unit)? = checkpoints?.let { values ->
                         { state, decisions ->
                             val turn = state.turnNumber ?: originTurn
@@ -234,8 +242,12 @@ internal class PairedActionRolloutObserver(
             "turn" to originTurn,
             "epoch" to captured.state.currentEpoch.number,
             "ordinary" to captured.chosen,
-            "tails" to tails,
-        ) + captured.context
+            "tails" to outcomes(ExperimentChanceMode.SEQUENTIAL),
+        ) +
+            captured.context +
+            if (compareChance) {
+                mapOf("alignedChanceTails" to outcomes(ExperimentChanceMode.BY_TURN_AND_EVENT))
+            } else emptyMap()
     }
 
     private fun checkpoint(state: GameState, actor: PlayerId, decisions: Int): Map<String, Any> {
