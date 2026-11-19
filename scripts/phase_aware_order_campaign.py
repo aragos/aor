@@ -10,7 +10,7 @@ from initiative_opening_strategy import load_games
 from weighted_opening_campaign import selection_context
 
 
-REMOTE = "/home/aragos/aor-worker/phase-aware-turn-order-20261119"
+REMOTE = "/home/aragos/aor-worker/phase-aware-turn-order-v2-20261119"
 POLICIES = {name: {"kind": "phase-aware-tie-1", "policy": value}
             for name, value in (("control", "ordinary"), ("early", "early"),
                                 ("late", "late"), ("phase-aware", "phase-aware"))}

@@ -33,16 +33,19 @@ internal class PhaseAwareTurnOrder(
         decision == "choose-turn-position" || reference.controls(decision)
 
     override fun choose(decision: SimulationDecision): String? {
+        fun ordinary(): String? =
+            reference.takeIf { it.controls(decision.observation.decision) }?.choose(decision)
+
         val view = decision.view
         val turn = view.turnNumber
         if (decision.observation.decision != "choose-turn-position" || turn == null || turn < 2) {
-            return reference.choose(decision)
+            return ordinary()
         }
         val slots =
             decision.observation.candidates.mapNotNull { candidate ->
                 TextCodec.parseCommand(candidate.command) as? Command.ChooseTurnPosition
             }
-        if (slots.size < 2) return reference.choose(decision)
+        if (slots.size < 2) return ordinary()
         if (firstTie == null) {
             firstTie =
                 mapOf(
@@ -54,7 +57,7 @@ internal class PhaseAwareTurnOrder(
         }
         val preference =
             when (policy) {
-                TieOrderPolicy.ORDINARY -> return reference.choose(decision)
+                TieOrderPolicy.ORDINARY -> return ordinary()
                 TieOrderPolicy.EARLY -> "always-early"
                 TieOrderPolicy.LATE -> "always-late"
                 TieOrderPolicy.PHASE_AWARE ->
@@ -67,7 +70,7 @@ internal class PhaseAwareTurnOrder(
             "pay-now",
             "cheap-card",
             "always-early" -> slots.minBy { it.slot }.toText()
-            else -> reference.choose(decision)
+            else -> ordinary()
         }
     }
 
