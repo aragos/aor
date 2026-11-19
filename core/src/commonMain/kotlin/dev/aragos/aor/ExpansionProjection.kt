@@ -152,15 +152,21 @@ internal object ExpansionProjection {
         val plan = evaluated?.plan
         val blocker = evaluated?.blocker
         val partial =
-            if (controlled) {
+            if (routes.isEmpty()) {
                 emptyList()
             } else {
-                // A province has at most six spaces. Never enumerate pool-sized commitments.
-                (1 until province.marketNumber).mapNotNull { tokens ->
+                val limit =
+                    minOf(
+                        province.marketNumber - 1,
+                        viewer.poolTokens,
+                        BoardPlacementRules.peacefulCapacity(occupants, province.marketNumber),
+                    )
+                (1..limit).mapNotNull { tokens ->
+                    if (tokens == required) return@mapNotNull null
                     val candidate =
                         evaluate(context, viewer, province.id, tokens, routes).plan
                             as? PlacementPlan.Peaceful
-                    if (candidate == null || tokens == required) {
+                    if (candidate == null) {
                         null
                     } else {
                         PartialPlacementView(tokens, viewer.poolTokens - tokens)
