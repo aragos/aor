@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.FinalExpansionConfig
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
@@ -126,6 +127,7 @@ private constructor(
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
     val initiativeLineup: InitiativeLineup?,
+    val finalExpansion: FinalExpansionConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -205,6 +207,12 @@ private constructor(
             (initiativeLineup?.let {
                 mapOf(
                     "initiativeLineup" to mapOf("kind" to InitiativeLineup.VERSION, "rivals" to it)
+                )
+            } ?: emptyMap()) +
+            (finalExpansion?.let {
+                mapOf(
+                    "finalExpansion" to
+                        mapOf("kind" to FinalExpansionConfig.VERSION, "configuration" to it)
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -385,6 +393,30 @@ private constructor(
             return InitiativeLineup(policies.toSortedMap())
         }
 
+        private fun finalExpansion(node: JsonNode): FinalExpansionConfig {
+            PurchaseJson.fields(
+                node,
+                setOf(
+                    "kind",
+                    "marginScale",
+                    "bonus",
+                    "ownedCommodityWeight",
+                    "publicCommodityWeight",
+                ),
+            )
+            require(node["kind"]?.asText() == FinalExpansionConfig.VERSION) {
+                "Declare the exact last-turn expansion policy version."
+            }
+            return FinalExpansionConfig(
+                marginScale = PurchaseJson.number(node["marginScale"], "final score margin scale"),
+                bonus = PurchaseJson.number(node["bonus"], "final expansion weight"),
+                ownedCommodityWeight =
+                    PurchaseJson.number(node["ownedCommodityWeight"], "own commodity weight"),
+                publicCommodityWeight =
+                    PurchaseJson.number(node["publicCommodityWeight"], "public commodity weight"),
+            )
+        }
+
         fun read(path: Path): RobustTokenInput {
             val source = CoordinatedEsWire.source(path)
             val node = PurchaseJson.read(source.path)
@@ -414,6 +446,7 @@ private constructor(
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
+                    "finalExpansion",
                     "tokenNeighborMixture",
                 ),
             )
@@ -542,6 +575,7 @@ private constructor(
                 }
             val initiative = node["initiative"]?.let(::initiative)
             val initiativeLineup = node["initiativeLineup"]?.let(::initiativeLineup)
+            val finalExpansion = node["finalExpansion"]?.let(::finalExpansion)
             require(
                 initiativeLineup == null ||
                     initiativeRival == null &&
@@ -623,6 +657,7 @@ private constructor(
                     initiative,
                     initiativeRival,
                     initiativeLineup,
+                    finalExpansion,
                     seeds,
                     start,
                     count,

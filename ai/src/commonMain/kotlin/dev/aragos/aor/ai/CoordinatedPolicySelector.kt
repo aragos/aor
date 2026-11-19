@@ -42,6 +42,7 @@ class CoordinatedPolicySelector(
     private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
     private val tokenAnchoredResidual: TokenAnchoredResidual? = null,
     private val initiative: InitiativePolicyConfig? = null,
+    private val finalExpansion: FinalExpansionConfig? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
@@ -133,12 +134,17 @@ class CoordinatedPolicySelector(
                     original.expansion,
                     expansionSelector,
                 )
-            initiative?.let {
-                return InitiativePolicy.expansion(view, player, encoded, deterministic, it).command
-            }
-            return expansionDenial?.let {
-                PublicLeaderAttackPolicy.choose(view, player, encoded, deterministic, it).command
-            } ?: deterministic.command
+            val selected =
+                initiative?.let {
+                    InitiativePolicy.expansion(view, player, encoded, deterministic, it)
+                }
+                    ?: expansionDenial?.let {
+                        PublicLeaderAttackPolicy.choose(view, player, encoded, deterministic, it)
+                    }
+                    ?: deterministic
+            return finalExpansion?.let {
+                FinalExpansionPolicy.choose(view, player, encoded, selected, it).command
+            } ?: selected.command
         }
         val encoded =
             TokenObservationEncoder.from(
