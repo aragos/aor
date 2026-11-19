@@ -197,6 +197,7 @@ private constructor(
     val secondCapitalGeography: Boolean,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val rivalTargetingLineup: RivalTargetingLineup?,
+    val tieOrderPolicy: TieOrderPolicy?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -304,6 +305,9 @@ private constructor(
                     "rivalTargetingLineup" to
                         mapOf("kind" to RivalTargetingLineup.VERSION, "policy" to it)
                 )
+            } ?: emptyMap()) +
+            (tieOrderPolicy?.let {
+                mapOf("tieOrderPolicy" to mapOf("kind" to "phase-aware-tie-1", "policy" to it.wire))
             } ?: emptyMap()) +
             (initiative?.let {
                 mapOf(
@@ -628,6 +632,7 @@ private constructor(
                     "expansionDenial",
                     "leadingRivalRetargeting",
                     "rivalTargetingLineup",
+                    "tieOrderPolicy",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -687,6 +692,18 @@ private constructor(
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val tieOrderPolicy =
+                node["tieOrderPolicy"]?.let { order ->
+                    PurchaseJson.fields(order, setOf("kind", "policy"))
+                    require(order["kind"]?.asText() == "phase-aware-tie-1") {
+                        "Use the versioned phase-aware position profile."
+                    }
+                    requireNotNull(
+                        TieOrderPolicy.entries.firstOrNull { it.wire == order["policy"]?.asText() }
+                    ) {
+                        "The phase-aware tie profile must select a supported order policy."
+                    }
+                }
             val rivalTargetingLineup =
                 node["rivalTargetingLineup"]?.let { lineup ->
                     PurchaseJson.fields(lineup, setOf("kind", "offsets", "policy"))
@@ -929,6 +946,7 @@ private constructor(
                     secondCapitalGeography,
                     leadingRivalRetargeting,
                     rivalTargetingLineup,
+                    tieOrderPolicy,
                     seeds,
                     start,
                     count,

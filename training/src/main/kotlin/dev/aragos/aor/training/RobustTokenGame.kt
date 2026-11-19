@@ -283,6 +283,8 @@ internal object RobustTokenGame {
                         )
                 RevealedTokenCounterLeague(players[seat], players, learned)
             }
+        var tieController: PhaseAwareTurnOrder? = null
+        val orderEvidence = input.tieOrderPolicy?.let { OrderPhaseEvidence() }
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
@@ -376,10 +378,25 @@ internal object RobustTokenGame {
                         return command
                     }
                 }
-            val controller = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+            val regular = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+            val controller =
+                input.tieOrderPolicy
+                    ?.takeIf { candidate }
+                    ?.let { policy ->
+                        PhaseAwareTurnOrder(regular, policy).also { tieController = it }
+                    } ?: regular
             object : SimulationController by controller {
                 override fun choose(decision: SimulationDecision): String? =
-                    controller.choose(decision)?.also { diagnostics.chosen(decision, it) }
+                    controller.choose(decision)?.also { command ->
+                        diagnostics.chosen(decision, command)
+                        if (candidate) {
+                            orderEvidence?.observe(
+                                decision,
+                                PlayerId(decision.observation.playerId),
+                                command,
+                            )
+                        }
+                    }
             }
         }
         require(controllers.keys == setOf(0, 1, 2, 3)) {
@@ -410,6 +427,9 @@ internal object RobustTokenGame {
                 else mapOf("initiativeRivalSeats" to rivalPolicies.keys.toList())) +
                 (if (targetingRivals.isEmpty()) emptyMap()
                 else mapOf("retargetingRivalSeats" to targetingRivals.toList())) +
+                (tieController?.let { mapOf("tieChoices" to it.evidence()) } ?: emptyMap()) +
+                (orderEvidence?.let { mapOf("orderPhaseEvidence" to it.evidence()) }
+                    ?: emptyMap()) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()),
             trace?.sha256,
