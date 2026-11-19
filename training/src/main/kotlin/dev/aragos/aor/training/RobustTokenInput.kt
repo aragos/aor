@@ -197,6 +197,7 @@ private constructor(
     val secondCapitalGeography: Boolean,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val rivalTargetingLineup: RivalTargetingLineup?,
+    val caravanRoute: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -305,6 +306,7 @@ private constructor(
                         mapOf("kind" to RivalTargetingLineup.VERSION, "policy" to it)
                 )
             } ?: emptyMap()) +
+            (if (caravanRoute) mapOf("caravanRoute" to CaravanAttackPlan.VERSION) else emptyMap()) +
             (initiative?.let {
                 mapOf(
                     "initiative" to
@@ -628,6 +630,7 @@ private constructor(
                     "expansionDenial",
                     "leadingRivalRetargeting",
                     "rivalTargetingLineup",
+                    "caravanRoute",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -687,6 +690,13 @@ private constructor(
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val caravanRoute =
+                node["caravanRoute"]?.let { route ->
+                    require(route.isTextual && route.textValue() == CaravanAttackPlan.VERSION) {
+                        "Use the supported single-route Caravan plan."
+                    }
+                    true
+                } ?: false
             val rivalTargetingLineup =
                 node["rivalTargetingLineup"]?.let { lineup ->
                     PurchaseJson.fields(lineup, setOf("kind", "offsets", "policy"))
@@ -929,6 +939,7 @@ private constructor(
                     secondCapitalGeography,
                     leadingRivalRetargeting,
                     rivalTargetingLineup,
+                    caravanRoute,
                     seeds,
                     start,
                     count,

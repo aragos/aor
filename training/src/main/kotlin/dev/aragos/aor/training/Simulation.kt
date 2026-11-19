@@ -50,6 +50,8 @@ constructor(
     val batchStartNumber: Int = number,
     /** Explicit actor-only quote capability; absent from every ordinary controller input. */
     val tokenQuote: TokenNeighborQuote? = null,
+    /** Optional owned route quotation using only one projected successful competition. */
+    val caravanForecast: ((ordinaryAttack: String) -> CaravanAttackPlan?)? = null,
 )
 
 /** Explicit experiment-only policy extension; null retains the ordinary baseline command. */
@@ -58,6 +60,8 @@ fun interface SimulationController {
     fun controls(decision: String): Boolean = true
 
     fun tokenNeighborMixture(): LocalTokenNeighborMixture? = null
+
+    fun wantsCaravanForecast(): Boolean = false
 
     /** Observation-only receipt, delivered after authority admission and never used to select. */
     fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) = Unit
@@ -237,6 +241,17 @@ class Simulation(private val maxDecisions: Int = 12000) {
                         observation,
                         controller?.tokenNeighborMixture(),
                     )
+                val origin = state
+                val caravanForecast =
+                    if (
+                        controller?.wantsCaravanForecast() == true &&
+                            observation.decision == "expand" &&
+                            view != null
+                    ) {
+                        { ordinary: String ->
+                            CaravanAttackPlan.select(origin, actor, view, observation, ordinary)
+                        }
+                    } else null
                 val command =
                     controller?.choose(
                         SimulationDecision(
@@ -250,6 +265,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                             observation = observation,
                             batchStartNumber = step,
                             tokenQuote = tokenQuotes?.capability,
+                            caravanForecast = caravanForecast,
                         )
                     )
                 val accepted =
