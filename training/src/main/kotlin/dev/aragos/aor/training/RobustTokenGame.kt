@@ -284,6 +284,7 @@ internal object RobustTokenGame {
                 RevealedTokenCounterLeague(players[seat], players, learned)
             }
         var finalAdvanceController: FinalAdvanceController? = null
+        var phaseBids: PhaseAwareBid? = null
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
@@ -378,7 +379,7 @@ internal object RobustTokenGame {
                     }
                 }
             val regular = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
-            val controller =
+            val finishing =
                 input.finalAdvanceMargin
                     ?.takeIf { candidate }
                     ?.let { margin ->
@@ -386,6 +387,12 @@ internal object RobustTokenGame {
                             finalAdvanceController = it
                         }
                     } ?: regular
+            val controller =
+                input.phaseBidProfile
+                    ?.takeIf { candidate }
+                    ?.let { profile ->
+                        PhaseAwareBid(finishing, profile).also { phaseBids = it }
+                    } ?: finishing
             object : SimulationController by controller {
                 override fun choose(decision: SimulationDecision): String? =
                     controller.choose(decision)?.also { diagnostics.chosen(decision, it) }
@@ -426,6 +433,8 @@ internal object RobustTokenGame {
                         "finalAdvanceLastBuyOverrides" to it.lastAdvanceOverrides,
                     )
                 } ?: emptyMap()) +
+                (phaseBids?.let { mapOf("phaseAwareBidDecisions" to it.evidence()) }
+                    ?: emptyMap()) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()),
             trace?.sha256,

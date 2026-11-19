@@ -199,6 +199,7 @@ private constructor(
     val rivalTargetingLineup: RivalTargetingLineup?,
     val finalAdvanceMargin: Int?,
     val finalAdvancePassLead: Int?,
+    val phaseBidProfile: PhaseBidProfile?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -315,6 +316,11 @@ private constructor(
                             put("margin", it)
                             finalAdvancePassLead?.let { lead -> put("minimumPassLead", lead) }
                         }
+                )
+            } ?: emptyMap()) +
+            (phaseBidProfile?.let {
+                mapOf(
+                    "phaseAwareBids" to mapOf("kind" to "phase-aware-bids-1", "profile" to it.wire)
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -641,6 +647,7 @@ private constructor(
                     "leadingRivalRetargeting",
                     "rivalTargetingLineup",
                     "finalAdvancePlan",
+                    "phaseAwareBids",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -718,6 +725,18 @@ private constructor(
                         require(lead in 1..1000) {
                             "A guarded finish must require a public lead between 1 and 1,000 points."
                         }
+                    }
+                }
+            val phaseBidProfile =
+                node["phaseAwareBids"]?.let { bids ->
+                    PurchaseJson.fields(bids, setOf("kind", "profile"))
+                    require(bids["kind"]?.asText() == "phase-aware-bids-1") {
+                        "Use the supported version of the phase-aware bidding profile."
+                    }
+                    requireNotNull(
+                        PhaseBidProfile.entries.firstOrNull { it.wire == bids["profile"]?.asText() }
+                    ) {
+                        "The phase-aware bidding profile must select a supported allocation."
                     }
                 }
             val rivalTargetingLineup =
@@ -964,6 +983,7 @@ private constructor(
                     rivalTargetingLineup,
                     finalAdvanceMargin,
                     finalAdvancePassLead,
+                    phaseBidProfile,
                     seeds,
                     start,
                     count,
