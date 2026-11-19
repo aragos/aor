@@ -12,6 +12,7 @@ import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.LocalTokenNeighborPolicy
+import dev.aragos.aor.ai.SecondCapitalGeography
 import java.security.MessageDigest
 import kotlin.math.abs
 
@@ -282,6 +283,7 @@ internal object RobustTokenGame {
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
+            val chooseGeography = candidate && input.secondCapitalGeography
             val capitalBids = input.capitalAuction?.bidsFor((player - seat + 4) % 4).orEmpty()
             val qualified =
                 CoordinatedEsController(
@@ -312,6 +314,7 @@ internal object RobustTokenGame {
                 object : SimulationController {
                     override fun controls(decision: String): Boolean =
                         capitalBids.isNotEmpty() && decision == "bid-capital" ||
+                            chooseGeography && decision == SecondCapitalGeography.DECISION ||
                             qualified.controls(decision)
 
                     override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
@@ -325,6 +328,18 @@ internal object RobustTokenGame {
                     }
 
                     override fun choose(decision: SimulationDecision): String? {
+                        if (
+                            chooseGeography &&
+                                decision.observation.decision == SecondCapitalGeography.DECISION
+                        ) {
+                            return SecondCapitalGeography.choose(
+                                decision.view,
+                                decision.observation,
+                            )
+                                ?: qualified
+                                    .takeIf { it.controls(SecondCapitalGeography.DECISION) }
+                                    ?.choose(decision)
+                        }
                         if (
                             capitalBids.isNotEmpty() &&
                                 decision.observation.decision == "bid-capital"

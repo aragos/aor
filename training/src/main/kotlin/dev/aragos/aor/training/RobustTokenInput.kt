@@ -7,6 +7,7 @@ import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
+import dev.aragos.aor.ai.SecondCapitalGeography
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import java.nio.file.Path
 
@@ -172,6 +173,7 @@ private constructor(
     val initiativeRival: InitiativeRival?,
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
+    val secondCapitalGeography: Boolean,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val seeds: List<Int>,
     val start: Int,
@@ -261,6 +263,9 @@ private constructor(
             (capitalAuction?.let {
                 mapOf("capitalAuction" to it.science())
             } ?: emptyMap()) +
+            (if (secondCapitalGeography)
+                mapOf("secondCapitalGeography" to SecondCapitalGeography.VERSION)
+            else emptyMap()) +
             (leadingRivalRetargeting?.let {
                 mapOf(
                     "leadingRivalRetargeting" to
@@ -563,6 +568,7 @@ private constructor(
                     "initiativeRival",
                     "initiativeLineup",
                     "capitalAuction",
+                    "secondCapitalGeography",
                     "tokenNeighborMixture",
                 ),
             )
@@ -753,6 +759,15 @@ private constructor(
                     }
                     readCapitalAuction(setting)
                 }
+            val secondCapitalGeography =
+                node["secondCapitalGeography"]?.let { setting ->
+                    require(
+                        setting.isTextual && setting.asText() == SecondCapitalGeography.VERSION
+                    ) {
+                        "Select the versioned second-capital geography policy."
+                    }
+                    true
+                } ?: false
             require(
                 initiativeLineup == null ||
                     initiativeRival == null &&
@@ -837,6 +852,7 @@ private constructor(
                     initiativeRival,
                     initiativeLineup,
                     capitalAuction,
+                    secondCapitalGeography,
                     leadingRivalRetargeting,
                     seeds,
                     start,

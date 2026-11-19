@@ -250,7 +250,7 @@ object BotModels {
                     "protection" to 0.25,
                     "initialCommodity" to 2.0,
                     "capitalCommodityPotential" to 0.8,
-                    "capitalOpportunity" to 0.5,
+                    SecondCapitalGeography.FEATURE to 0.5,
                     "capitalLeaderOpportunity" to 0.15,
                     "endgame.cash" to 0.3,
                     "endgame.income" to -2.6,

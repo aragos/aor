@@ -336,7 +336,7 @@ private class ObservationProjection(
                                 candidate.access.all { it.isSatisfiedBy(self.advances) }
                         }
                 add(
-                    "capitalOpportunity",
+                    SecondCapitalGeography.FEATURE,
                     available.sumOf { candidate ->
                         (candidate.commodities.sumOf(::commodityMarginal) + 2.0) /
                             candidate.marketNumber
