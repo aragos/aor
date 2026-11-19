@@ -276,8 +276,18 @@ def main(root, initial):
     write(root / "result.json", dict(status="mirrored-table-complete", results=tiers,
         pairedComparison=result, initialResultSha256=sha(initial/"result.json")))
 
+    run_deeper_rival(campaign, champion, initial)
+    if campaign.remaining() >= 720:
+        overbid_styles = ("REVEALED_OVERBID", "REVEALED_TIE_OVERBID")
+        overbid = campaign.stage("late-order-audit", {"policy": champion}, 384,
+                                 overbid_styles, paired=True)
+        write(root / "late-order-audit/result.json", overbid)
+
+
+def run_deeper_rival(campaign, champion, initial):
     if campaign.remaining() < 1000:
         return
+    root = campaign.root
     response_path = initial.parent / "automata-initiative-crossplay-20261118/independent-response/summary.json"
     if not response_path.is_file():
         return
@@ -293,8 +303,6 @@ def main(root, initial):
                                512, ECOLOGIES[-1:], paired=True, rival=responder, rival_offsets=(1,))
     write(root / "extra-result.json", dict(status="deeper-undercut-crossplay-complete",
         response=check, comparison=challenge))
-
-
     if campaign.remaining() < 650:
         return
     mixed = response_path.parent.parent / "mixed-result.json"
