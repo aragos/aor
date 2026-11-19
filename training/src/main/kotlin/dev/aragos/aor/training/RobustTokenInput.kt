@@ -117,6 +117,7 @@ private constructor(
     val chanceAlignmentTrial: Boolean,
     val shortTrainingFutures: Int,
     val resampledDrawStudy: Boolean,
+    val reliefUnlockRollouts: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -221,6 +222,8 @@ private constructor(
             (if (shortTrainingFutures > 0) mapOf("shortTrainingFutures" to shortTrainingFutures)
             else emptyMap()) +
             (if (resampledDrawStudy) mapOf("resampledDrawStudy" to "hidden-draw-order-1")
+            else emptyMap()) +
+            (if (reliefUnlockRollouts) mapOf("reliefUnlockRollouts" to "first-tier-relief-1")
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -410,6 +413,7 @@ private constructor(
                     "chanceAlignmentTrial",
                     "shortTrainingFutures",
                     "resampledDrawStudy",
+                    "reliefUnlockRollouts",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -535,6 +539,13 @@ private constructor(
                 node["resampledDrawStudy"]?.let { setting ->
                     require(setting.isBoolean) {
                         "The resampled draw study requires a JSON boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
+            val reliefUnlockRollouts =
+                node["reliefUnlockRollouts"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The relief unlock study requires a JSON boolean."
                     }
                     setting.booleanValue()
                 } ?: false
@@ -681,6 +692,18 @@ private constructor(
             require(!lookaheadCheckpoints || cardTerritoryRollouts) {
                 "Short lookahead checkpoints belong to the declared card versus territory study."
             }
+            require(
+                !reliefUnlockRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        !cardTerritoryRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.QUALIFIED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "Relief unlock rollouts require one fixed candidate-only policy in a qualified table."
+            }
             require(cardTerritoryEpochs.isEmpty() || cardTerritoryRollouts) {
                 "Requested root epochs belong to the declared card versus territory study."
             }
@@ -723,6 +746,7 @@ private constructor(
                     chanceAlignmentTrial,
                     shortTrainingFutures,
                     resampledDrawStudy,
+                    reliefUnlockRollouts,
                     seeds,
                     start,
                     count,

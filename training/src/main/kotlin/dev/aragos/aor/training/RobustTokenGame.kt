@@ -317,6 +317,8 @@ internal object RobustTokenGame {
                 }
                 ?: when {
                     input.expansionCardRollouts -> PairedActionRolloutObserver(seat)
+                    input.reliefUnlockRollouts ->
+                        PairedActionRolloutObserver(seat, reliefUnlock = true)
                     input.cardTerritoryRollouts ->
                         PairedActionRolloutObserver(
                             seat,

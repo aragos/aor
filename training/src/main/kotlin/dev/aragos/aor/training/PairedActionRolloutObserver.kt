@@ -1,11 +1,14 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.AdvanceId
 import dev.aragos.aor.BoardCommand
+import dev.aragos.aor.Command
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameState
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.TextCodec
+import dev.aragos.aor.TurnCommand
 import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.CommodityTimingConfig
@@ -22,6 +25,7 @@ internal class PairedActionRolloutObserver(
     private val compareChance: Boolean = false,
     private val shortTrainingFutures: Int = 0,
     private val resampledDrawStudy: Boolean = false,
+    private val reliefUnlock: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -37,6 +41,7 @@ internal class PairedActionRolloutObserver(
             when {
                 timing != null -> "commodityRollouts"
                 compareTerritory -> "cardTerritoryRollouts"
+                reliefUnlock -> "reliefUnlockRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -51,6 +56,7 @@ internal class PairedActionRolloutObserver(
             when {
                 timing != null -> commodityRoot(state, number, observation, command, timing)
                 compareTerritory -> cardTerritoryRoot(state, number, observation, command)
+                reliefUnlock -> reliefRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
     }
@@ -172,6 +178,50 @@ internal class PairedActionRolloutObserver(
         )
     }
 
+    private fun reliefRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (observation.decision != "purchase-advances" || command != "pass") return null
+        val actor = state.playerIds[seat]
+        val owner = state.playerState(actor)
+        val misery = owner.misery.value ?: return null
+        if (misery < 50 || owner.advances.tierCount != 0) return null
+        val view = state.viewForDecision(actor)
+        if (view.reliefRatingAvailable == 0) return null
+        val turn = requireNotNull(state.turnNumber) { "An advance purchase needs an active turn." }
+        val alternative =
+            observation.candidates
+                .asSequence()
+                .filter { it.family == "advance" }
+                .filter { candidate ->
+                    val buy = TextCodec.parseCommand(candidate.command) as? TurnCommand.BuyAdvance
+                    buy != null &&
+                        owner.advances.acquire(AdvanceId.fromLetter(buy.letter), turn).tierCount ==
+                            1
+                }
+                .minWithOrNull(compareBy({ it.cashCost }, { it.command })) ?: return null
+        return Root(
+            state,
+            number,
+            command,
+            mapOf(
+                "pass" to "pass",
+                "purchase" to alternative.command,
+                "purchase-and-relieve" to alternative.command,
+            ),
+            mapOf(
+                "misery" to misery,
+                "availableRating" to view.reliefRatingAvailable,
+                "price" to alternative.cashCost,
+                "cash" to owner.cash,
+                "buy" to alternative.command,
+            ),
+        )
+    }
+
     fun evidence(
         configuration: String,
         seed: Int,
@@ -212,7 +262,7 @@ internal class PairedActionRolloutObserver(
                 )
         }
         fun outcomes(chanceMode: ExperimentChanceMode) =
-            captured.actions.mapValues { (_, action) ->
+            captured.actions.mapValues { (arm, action) ->
                 (0..1).map { replicate ->
                     val chanceSeed = CardAdvantageExecutor.chanceSeed(seed, replicate)
                     val session =
@@ -240,7 +290,9 @@ internal class PairedActionRolloutObserver(
                     val continuation =
                         FrozenPolicyContinuation(
                             models,
-                            controllers(),
+                            if (arm == "purchase-and-relieve") {
+                                preferRelief(controllers(), originTurn)
+                            } else controllers(),
                             seed,
                             deadline,
                             decisionOffset = captured.number,
@@ -251,6 +303,17 @@ internal class PairedActionRolloutObserver(
                         "terminal" to terminal,
                         "canonicalSha256" to verifiedCanonical(session, captured.state, deadline),
                     ) +
+                        (if (reliefUnlock) {
+                            val spaces =
+                                session.entries
+                                    .asSequence()
+                                    .filterIsInstance<Entry.Action>()
+                                    .takeWhile { it.command !is Command.BuyTokens }
+                                    .filter { it.actor == actor }
+                                    .mapNotNull { it.command as? TurnCommand.RelieveMisery }
+                                    .sumOf { it.spaces }
+                            mapOf("immediateReliefSpaces" to spaces)
+                        } else emptyMap()) +
                         if (checkpoints != null) {
                             val atEnd = checkpoint(session.state, actor, session.decisions)
                             mapOf(
@@ -281,6 +344,36 @@ internal class PairedActionRolloutObserver(
                         )
                 )
             } else emptyMap()
+    }
+
+    private fun preferRelief(
+        policies: Map<Int, SimulationController>,
+        turn: Int,
+    ): Map<Int, SimulationController> {
+        val ordinary =
+            requireNotNull(policies[seat]) { "Relief needs the actor's reference policy." }
+        val controller =
+            object : SimulationController by ordinary {
+                override fun controls(decision: String): Boolean =
+                    decision == "purchase-relief" || ordinary.controls(decision)
+
+                override fun choose(decision: SimulationDecision): String? {
+                    if (
+                        decision.observation.decision == "purchase-relief" &&
+                            decision.view.turnNumber == turn
+                    ) {
+                        val spaces =
+                            decision.view.reliefOffers
+                                .filter { it.affordable }
+                                .maxOfOrNull { it.spaces }
+                        if (spaces != null) return TurnCommand.RelieveMisery(spaces).toText()
+                    }
+                    return ordinary
+                        .takeIf { it.controls(decision.observation.decision) }
+                        ?.choose(decision)
+                }
+            }
+        return policies + (seat to controller)
     }
 
     private fun shortFutures(
