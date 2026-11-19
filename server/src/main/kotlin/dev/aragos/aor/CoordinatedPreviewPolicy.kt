@@ -79,6 +79,10 @@ private const val REPEATED_UNDERCUT_BASE_SHA256 =
     "9b12cafae44a4f9af59fb616a06809efc28292a3b60157173a463a4ff4d15c0d"
 private const val REPEATED_UNDERCUT_CERTIFICATE_SHA256 =
     "25039bc7f6eeddd4f6671c80ec7316ba7285f44402b2b7fc0199db3c9acd7968"
+private const val ALTERNATING_BID_BASE_SHA256 =
+    "bbfd7576375af65c3ab68d2e02c01d65e6fe947a93c454c81a350c6897ad70de"
+private const val ALTERNATING_BID_CERTIFICATE_SHA256 =
+    "66e77dd6435a019db931b152f3f1071ef1cff107edb597b584b76343c4b3e654"
 private const val RETARGETING_TRAINING_SHA256 =
     "fcaae16011c32bebfdc0617777a3ffe8cfb80a7b0c83666d31cd916a5dec0630"
 private const val RETARGETING_AUDIT_SHA256 =
@@ -140,9 +144,16 @@ private class GuardedFinishPreview(
 private class RepeatedUndercutPreview(
     private val base: ServerBotPolicy,
     override val assetSha256: String,
+    private val detectAlternation: Boolean,
 ) : ServerBotPolicy by base {
     override fun choose(view: GameView, observation: BotObservation, seed: Int): String =
-        RepeatedUndercutBid.choose(view, observation, seed, base.choose(view, observation, seed))
+        RepeatedUndercutBid.choose(
+            view,
+            observation,
+            seed,
+            base.choose(view, observation, seed),
+            detectAlternation,
+        )
 
     override fun choose(
         view: GameView,
@@ -155,6 +166,7 @@ private class RepeatedUndercutPreview(
             observation,
             seed,
             base.choose(view, observation, seed, tokenQuote),
+            detectAlternation,
         )
 }
 
@@ -252,11 +264,85 @@ private class CoordinatedAssetReader(path: Path) {
             "coordinated-adopting-targeting-preview-1" -> readAdoptingTargeting(manifest, root)
             "coordinated-guarded-finish-preview-1" -> readGuardedFinish(manifest, root)
             "coordinated-repeated-undercut-preview-1" -> readRepeatedUndercut(manifest, root)
+            "coordinated-alternating-bid-preview-1" -> readAlternatingBid(manifest, root)
             else -> readCoordinated(manifest, root)
         }
     }
 
-    private fun readRepeatedUndercut(manifest: Document, root: JsonNode): ServerBotPolicy {
+    private fun readAlternatingBid(manifest: Document, root: JsonNode): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "The alternating bid preview requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == ALTERNATING_BID_BASE_SHA256) {
+            "Alternating bids must extend the exact qualified response to repeated low bids."
+        }
+        val evidence = subject(manifest, root["qualification"])
+        require(evidence.sha256 == ALTERNATING_BID_CERTIFICATE_SHA256) {
+            "Alternating bids require the exact simulated comparison and held-out evidence."
+        }
+        val certificate = node(evidence)
+        fields(
+            certificate,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "policySha256",
+            "comparisons",
+        )
+        require(
+            text(certificate, "kind") == "alternating-bid-qualification-1" &&
+                hash(certificate, "basePreviewSha256") == base.sha256
+        ) {
+            "The wider bid response must identify the exact prior strategy."
+        }
+        hash(certificate, "nativeJarSha256")
+        hash(certificate, "policySha256")
+        val modes =
+            listOf(
+                "ordinary",
+                "alternate-16-18",
+                "alternate-17-19",
+                "alternate-17-18",
+                "cycle-16-19-17-20",
+                "rolling",
+            )
+        val teamWinShares = VALID_WIN_SHARES + setOf(2.0 / 3.0, .75)
+        val results =
+            verifiedTargetingWins(
+                certificate["comparisons"],
+                modes,
+                640,
+                validWinShares = teamWinShares,
+            )
+        val initial = results.subList(1, 3)
+        val holdout = results.subList(3, 5)
+        require(
+            results.first().second > -.02 &&
+                initial.minOf { it.second } > -.03 &&
+                initial.map { it.first }.average() >= .02 &&
+                initial.any { it.second > 0.0 } &&
+                results.drop(3).minOf { it.second } > -.025 &&
+                holdout.map { it.first }.average() >= .015 &&
+                holdout.any { it.second > 0.0 }
+        ) {
+            "The qualified response must help against both sets of bid cycles while retaining other play."
+        }
+        return readRepeatedUndercut(
+            base,
+            node(base),
+            detectAlternation = true,
+            assetHash = manifest.sha256,
+        )
+    }
+
+    private fun readRepeatedUndercut(
+        manifest: Document,
+        root: JsonNode,
+        detectAlternation: Boolean = false,
+        assetHash: String = manifest.sha256,
+    ): ServerBotPolicy {
         fields(root, "kind", "schemaVersion", "basePreview", "qualification")
         require(integer(root, "schemaVersion") == 1) {
             "The repeated-undercut preview requires schema version 1."
@@ -295,7 +381,11 @@ private class CoordinatedAssetReader(path: Path) {
         ) {
             "The adaptive response must improve against repeated low bids and stay competitive elsewhere."
         }
-        return RepeatedUndercutPreview(readGuardedFinish(base, node(base)), manifest.sha256)
+        return RepeatedUndercutPreview(
+            readGuardedFinish(base, node(base)),
+            assetHash,
+            detectAlternation,
+        )
     }
 
     private fun readGuardedFinish(manifest: Document, root: JsonNode): ServerBotPolicy {
@@ -513,6 +603,7 @@ private class CoordinatedAssetReader(path: Path) {
         modes: List<String>,
         count: Int,
         clusteredMode: String? = null,
+        validWinShares: Set<Double> = VALID_WIN_SHARES,
     ): List<Pair<Double, Double>> {
         fields(tables, *modes.toTypedArray())
         val seen = mutableSetOf<Int>()
@@ -531,7 +622,7 @@ private class CoordinatedAssetReader(path: Path) {
                 }
                 val candidate = number(row["candidate"], "candidate win share")
                 val baseline = number(row["control"], "control win share")
-                require(candidate in VALID_WIN_SHARES && baseline in VALID_WIN_SHARES) {
+                require(candidate in validWinShares && baseline in validWinShares) {
                     "Every fresh result must use an awarded four-player winner share."
                 }
                 candidate - baseline

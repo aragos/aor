@@ -41,6 +41,38 @@ class RepeatedUndercutBidTest {
         assertThat(chosen).isEqualTo(ordinary)
     }
 
+    @Test
+    fun alternatingBidsCanActivateTheWiderResponse() {
+        val view = tokenView(lowBids = listOf(17, 18, 17, 18))
+
+        val chosen =
+            RepeatedUndercutBid.choose(
+                view,
+                observation,
+                seed = 5,
+                ordinary = ordinary,
+                detectAlternation = true,
+            )
+
+        assertThat(chosen).isEqualTo(earlier)
+    }
+
+    @Test
+    fun twoAdjacentLowBidsDoNotActivateTheWiderResponse() {
+        val view = tokenView(lowBids = listOf(17, 17, 18, 18))
+
+        val chosen =
+            RepeatedUndercutBid.choose(
+                view,
+                observation,
+                seed = 5,
+                ordinary = ordinary,
+                detectAlternation = true,
+            )
+
+        assertThat(chosen).isEqualTo(ordinary)
+    }
+
     private fun tokenView(lowBids: List<Int>): GameView =
         GameState(GameHeader(players, actor))
             .viewForPlayer(actor)

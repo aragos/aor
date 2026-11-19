@@ -12,7 +12,13 @@ internal object RepeatedUndercutBid {
         SECURE_MARKETS(1),
     }
 
-    fun choose(view: GameView, observation: BotObservation, seed: Int, ordinary: String): String {
+    fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        ordinary: String,
+        detectAlternation: Boolean = false,
+    ): String {
         val turn = view.turnNumber ?: return ordinary
         if (turn !in 3..10 || view.stage != Stage.TOKEN_PURCHASE) return ordinary
         val paid = TextCodec.parseCommand(ordinary) as? Command.BuyTokens ?: return ordinary
@@ -20,7 +26,10 @@ internal object RepeatedUndercutBid {
         val history = view.pastTokenPurchases.takeLast(4)
         if (history.size < 2) return ordinary
         val actor = PlayerId(observation.playerId)
-        if (!repeatedUndercut(history, actor)) {
+        if (
+            !repeatedUndercut(history, actor) &&
+                !(detectAlternation && alternatingUndercut(history, actor))
+        ) {
             return ordinary
         }
         val forecast = view.expansionForecast ?: return ordinary
@@ -82,6 +91,17 @@ internal object RepeatedUndercutBid {
         if (history.size != 4) return false
         return history.first().keys.any { rival ->
             rival != actor && history.count { row -> (row[rival] ?: Int.MIN_VALUE) in 15..17 } >= 3
+        }
+    }
+
+    private fun alternatingUndercut(history: List<Map<PlayerId, Int>>, actor: PlayerId): Boolean {
+        if (history.size != 4) return false
+        return history.first().keys.any { rival ->
+            if (rival == actor) return@any false
+            val bids = history.mapNotNull { it[rival] }
+            bids.size == 4 &&
+                bids.all { it in 15..20 } &&
+                bids.zipWithNext().all { (left, right) -> (left in 15..17) != (right in 15..17) }
         }
     }
 
