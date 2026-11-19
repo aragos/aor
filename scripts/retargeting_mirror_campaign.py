@@ -34,7 +34,8 @@ def score(campaign, label, plan, opening, count):
             row = records[i]
             root = row["diagnostics"]["CANDIDATE"]
             original = rows["control"][i]
-            if row["seed"] != original["seed"] or root["openingBid"] != +                    original["diagnostics"]["CANDIDATE"]["openingBid"]:
+            opening_bid = original["diagnostics"]["CANDIDATE"]["openingBid"]
+            if row["seed"] != original["seed"] or root["openingBid"] != opening_bid:
                 raise ValueError("Changing expansion competitors must preserve every first bid.")
             if opening is not None and root["openingBid"]["bid"] != opening:
                 raise ValueError("The independent exploiter must play its declared opening amount.")
