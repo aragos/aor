@@ -310,11 +310,24 @@ internal object RobustTokenGame {
             "Every robust league seat must retain a complete reference controller."
         }
         val observer =
-            input.commodityTiming
-                ?.takeIf { input.commodityRollouts }
-                ?.let { timing ->
-                    PairedActionRolloutObserver(seat, timing)
-                } ?: if (input.expansionCardRollouts) PairedActionRolloutObserver(seat) else null
+            when {
+                input.commodityRollouts ->
+                    PairedActionRolloutObserver(
+                        seat,
+                        timing =
+                            requireNotNull(input.commodityTiming) {
+                                "Commodity continuations need a timing trigger."
+                            },
+                    )
+                input.expansionCardRollouts -> PairedActionRolloutObserver(seat)
+                input.stabilizationRollouts ->
+                    PairedActionRolloutObserver(
+                        seat,
+                        stabilizationEpoch =
+                            Math.floorMod(input.seeds[index] xor 0x72510B47, 3) + 1,
+                    )
+                else -> null
+            }
         val competitors =
             List(4) { player ->
                 Competitor(

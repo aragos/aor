@@ -1,5 +1,7 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.AdvanceCategory
+import dev.aragos.aor.Commodity
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameState
 import dev.aragos.aor.Stage
@@ -13,6 +15,7 @@ import dev.aragos.aor.ai.CommodityTimingPolicy
 internal class PairedActionRolloutObserver(
     override val seat: Int,
     private val timing: CommodityTimingConfig? = null,
+    private val stabilizationEpoch: Int? = null,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -24,7 +27,12 @@ internal class PairedActionRolloutObserver(
 
     private var root: Root? = null
     val evidenceKey: String
-        get() = if (timing != null) "commodityRollouts" else "expansionCardRollouts"
+        get() =
+            when {
+                timing != null -> "commodityRollouts"
+                stabilizationEpoch != null -> "stabilizationRollouts"
+                else -> "expansionCardRollouts"
+            }
 
     override fun chosen(
         state: GameState,
@@ -34,8 +42,11 @@ internal class PairedActionRolloutObserver(
     ) {
         if (root != null) return
         root =
-            if (timing != null) commodityRoot(state, number, observation, command, timing)
-            else expansionCardRoot(state, number, observation, command)
+            when {
+                timing != null -> commodityRoot(state, number, observation, command, timing)
+                stabilizationEpoch != null -> stabilizationRoot(state, number, observation, command)
+                else -> expansionCardRoot(state, number, observation, command)
+            }
     }
 
     private fun commodityRoot(
@@ -103,6 +114,56 @@ internal class PairedActionRolloutObserver(
         )
     }
 
+    private fun stabilizationRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        val actions = mapOf("cash" to "stabilize cash", "misery" to "stabilize misery")
+        if (state.currentEpoch.number != stabilizationEpoch || command !in actions.values)
+            return null
+        if (!actions.values.all { choice -> observation.candidates.any { it.command == choice } })
+            return null
+        val actor = state.playerIds[seat]
+        val view = state.viewForPlayer(actor)
+        val self = view.players.single { it.id == actor }
+        val cost =
+            requireNotNull(view.stabilizationCost) { "Stabilization requires its cash quote." }
+        val misery = requireNotNull(self.misery.value) { "A stabilizing player has a misery box." }
+        val grain =
+            view.commodityPayouts
+                .single { it.commodity == Commodity.GRAIN }
+                .owners
+                .firstOrNull { it.player == actor }
+                ?.marketCount ?: 0
+        val advances =
+            requireNotNull(view.catalog) { "A stabilization view needs its public advances." }
+                .advances
+        val science = advances.count {
+            it.category == AdvanceCategory.SCIENCE && it.id in self.advances
+        }
+        return Root(
+            state,
+            number,
+            command,
+            actions,
+            mapOf(
+                "price" to cost,
+                "cash" to self.cash,
+                "misery" to misery,
+                "miseryAfter" to (view.stabilizationMisery ?: 1000),
+                "immediateChaos" to (view.stabilizationMisery == null),
+                "handSize" to view.hand.size,
+                "grainMarkets" to grain,
+                "science" to science,
+                "famineOutstanding" to view.unplayedCards.any { it.id == "famine" },
+                "mysticismOutstanding" to view.unplayedCards.any { it.id == "mysticism-abounds" },
+                "finalTurn" to view.endingTriggered,
+            ),
+        )
+    }
+
     fun evidence(
         configuration: String,
         seed: Int,
@@ -110,7 +171,10 @@ internal class PairedActionRolloutObserver(
         controllers: () -> Map<Int, SimulationController>,
         deadline: Long,
     ): Map<String, Any> {
-        val captured = root ?: return mapOf("status" to "no-eligible-root")
+        val captured =
+            root
+                ?: return mapOf("status" to "no-eligible-root") +
+                    (stabilizationEpoch?.let { mapOf("requestedEpoch" to it) } ?: emptyMap())
         val actor = captured.state.playerIds[seat]
         val tails =
             captured.actions.mapValues { (_, action) ->

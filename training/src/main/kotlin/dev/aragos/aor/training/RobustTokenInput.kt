@@ -111,6 +111,7 @@ private constructor(
     val commodityTiming: CommodityTimingConfig?,
     val commodityRollouts: Boolean,
     val expansionCardRollouts: Boolean,
+    val stabilizationRollouts: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -202,6 +203,8 @@ private constructor(
             (if (commodityRollouts) mapOf("commodityRollouts" to "play-versus-hold-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
+            else emptyMap()) +
+            (if (stabilizationRollouts) mapOf("stabilizationRollouts" to "cash-versus-misery-1")
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -385,6 +388,7 @@ private constructor(
                     "commodityTiming",
                     "commodityRollouts",
                     "expansionCardRollouts",
+                    "stabilizationRollouts",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -477,6 +481,13 @@ private constructor(
                 node["expansionCardRollouts"]?.let { setting ->
                     require(setting.isBoolean) {
                         "The expansion card rollout switch must be boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
+            val stabilizationRollouts =
+                node["stabilizationRollouts"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The stabilization rollout switch must be boolean."
                     }
                     setting.booleanValue()
                 } ?: false
@@ -592,6 +603,17 @@ private constructor(
             ) {
                 "Expansion card rollouts require a fixed candidate-only league and one comparison."
             }
+            require(
+                !stabilizationRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.QUALIFIED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "Stabilization rollouts require a fixed candidate-only league and one comparison."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -613,6 +635,7 @@ private constructor(
                     commodityTiming,
                     commodityRollouts,
                     expansionCardRollouts,
+                    stabilizationRollouts,
                     seeds,
                     start,
                     count,
