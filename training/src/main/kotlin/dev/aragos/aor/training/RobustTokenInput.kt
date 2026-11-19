@@ -87,6 +87,24 @@ internal data class InitiativeRival(val offsets: List<Int>, val policy: Initiati
     }
 }
 
+/** Several independent policies fixed to registration-relative seats before a world starts. */
+internal data class InitiativeLineup(val policiesByOffset: Map<Int, InitiativePolicyConfig>) {
+    init {
+        require(policiesByOffset.isNotEmpty() && policiesByOffset.keys.all { it in 1..3 }) {
+            "A heterogeneous lineup needs distinct rival offsets from one through three."
+        }
+    }
+
+    fun seated(controlledSeat: Int): Map<Int, InitiativePolicyConfig> =
+        policiesByOffset.mapKeys { (offset, _) ->
+            (controlledSeat + offset) % 4
+        }
+
+    companion object {
+        const val VERSION = "public-initiative-heterogeneous-1"
+    }
+}
+
 /** A bounded paired shard; the source owns all streams and immutable inference subjects. */
 internal class RobustTokenInput
 private constructor(
@@ -107,6 +125,7 @@ private constructor(
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
+    val initiativeLineup: InitiativeLineup?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -181,6 +200,11 @@ private constructor(
                 mapOf(
                     "initiativeRival" to
                         mapOf("kind" to InitiativeRival.VERSION, "configuration" to it)
+                )
+            } ?: emptyMap()) +
+            (initiativeLineup?.let {
+                mapOf(
+                    "initiativeLineup" to mapOf("kind" to InitiativeLineup.VERSION, "rivals" to it)
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -343,6 +367,24 @@ private constructor(
             )
         }
 
+        private fun initiativeLineup(node: JsonNode): InitiativeLineup {
+            PurchaseJson.fields(node, setOf("kind", "rivals"))
+            require(node["kind"]?.asText() == InitiativeLineup.VERSION) {
+                "Declare the exact heterogeneous initiative lineup version."
+            }
+            val policies = buildMap {
+                for (rival in PurchaseJson.array(node["rivals"], "heterogeneous rivals")) {
+                    PurchaseJson.fields(rival, setOf("offset", "policy"))
+                    val offset = PurchaseJson.integer(rival["offset"], "heterogeneous rival offset")
+                    require(offset !in this) {
+                        "A heterogeneous rival seat may be declared only once."
+                    }
+                    put(offset, initiative(rival["policy"]))
+                }
+            }
+            return InitiativeLineup(policies.toSortedMap())
+        }
+
         fun read(path: Path): RobustTokenInput {
             val source = CoordinatedEsWire.source(path)
             val node = PurchaseJson.read(source.path)
@@ -371,6 +413,7 @@ private constructor(
                     "expansionDenial",
                     "initiative",
                     "initiativeRival",
+                    "initiativeLineup",
                     "tokenNeighborMixture",
                 ),
             )
@@ -498,6 +541,23 @@ private constructor(
                     InitiativeRival(offsets, initiative(rival.required("policy")))
                 }
             val initiative = node["initiative"]?.let(::initiative)
+            val initiativeLineup = node["initiativeLineup"]?.let(::initiativeLineup)
+            require(
+                initiativeLineup == null ||
+                    initiativeRival == null &&
+                        (style == RobustOpponentStyle.QUALIFIED || style.isRevealedCounter)
+            ) {
+                "Use one fixed initiative lineup with ordinary or explicitly learning opponents."
+            }
+            require(
+                initiativeLineup == null ||
+                    adaptiveOpponent == null ||
+                    initiativeLineup.policiesByOffset.keys.all {
+                        it > adaptiveOpponent.targetedRivalCount
+                    }
+            ) {
+                "Fixed rivals must occupy different seats from the public-history counter."
+            }
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -562,6 +622,7 @@ private constructor(
                     anchored,
                     initiative,
                     initiativeRival,
+                    initiativeLineup,
                     seeds,
                     start,
                     count,

@@ -16,6 +16,16 @@ class RobustTokenInputTest {
             "targetedRivalCount" to 1,
         )
 
+    private val fixedPolicy =
+        mapOf(
+            "kind" to InitiativePolicyConfig.VERSION,
+            "maximumTokenLoss" to 3,
+            "tokenPenalty" to 0.2,
+            "participation" to 1.0,
+            "requireAffordableContest" to true,
+            "attackBonus" to 3.0,
+        )
+
     @Test
     fun independentOpponentUsesItsOwnSeatAndChangesScienceIdentity() {
         CoordinatedWinQualificationFixture().use { fixture ->
@@ -25,15 +35,7 @@ class RobustTokenInputTest {
                 mapOf(
                     "kind" to InitiativeRival.VERSION,
                     "offset" to 1,
-                    "policy" to
-                        mapOf(
-                            "kind" to InitiativePolicyConfig.VERSION,
-                            "maximumTokenLoss" to 3,
-                            "tokenPenalty" to 0.2,
-                            "participation" to 1.0,
-                            "requireAffordableContest" to true,
-                            "attackBonus" to 3.0,
-                        ),
+                    "policy" to fixedPolicy,
                 )
             val test =
                 RobustTokenInput.read(source(fixture, lineup + ("initiativeRival" to rival)).path)
@@ -41,6 +43,62 @@ class RobustTokenInputTest {
             assertThat(test.initiative).isNull()
             assertThat(test.initiativeRival?.seats(3)).containsExactly(0)
             assertThat(test.scienceSha256).isNotEqualTo(control.scienceSha256)
+        }
+    }
+
+    @Test
+    fun aLearningRivalAndTwoFixedRivalsUseTheirDeclaredDistinctSeats() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val input =
+                RobustTokenInput.read(
+                    source(
+                            fixture,
+                            mapOf(
+                                "opponentStyle" to "REVEALED_UNDERCUT",
+                                "adaptiveOpponent" to publicCounter,
+                                "initiativeLineup" to
+                                    mapOf(
+                                        "kind" to InitiativeLineup.VERSION,
+                                        "rivals" to
+                                            listOf(
+                                                mapOf("offset" to 2, "policy" to fixedPolicy),
+                                                mapOf(
+                                                    "offset" to 3,
+                                                    "policy" to
+                                                        (fixedPolicy + ("maximumTokenLoss" to 1)),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                        )
+                        .path
+                )
+
+            val roster =
+                requireNotNull(input.initiativeLineup) { "The announced lineup must load." }
+            assertThat(roster.seated(3).mapValues { (_, policy) -> policy.maximumTokenLoss })
+                .containsExactly(1, 3, 2, 1)
+        }
+    }
+
+    @Test
+    fun aFixedRivalCannotOccupyTheLearningRivalSeat() {
+        CoordinatedWinQualificationFixture().use { fixture ->
+            val request =
+                source(
+                    fixture,
+                    mapOf(
+                        "opponentStyle" to "REVEALED_UNDERCUT",
+                        "adaptiveOpponent" to publicCounter,
+                        "initiativeLineup" to
+                            mapOf(
+                                "kind" to InitiativeLineup.VERSION,
+                                "rivals" to listOf(mapOf("offset" to 1, "policy" to fixedPolicy)),
+                            ),
+                    ),
+                )
+
+            assertFailsWith<IllegalArgumentException> { RobustTokenInput.read(request.path) }
         }
     }
 

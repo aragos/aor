@@ -212,7 +212,13 @@ internal object RobustTokenGame {
         }
         val arena = input.arena
         val seat = index % 4
-        val initiativeRivalSeats = input.initiativeRival?.seats(seat).orEmpty()
+        val rivalPolicies =
+            input.initiativeLineup?.seated(seat)
+                ?: input.initiativeRival
+                    ?.let { rival ->
+                        rival.seats(seat).associateWith { rival.policy }
+                    }
+                    .orEmpty()
         val style = input.opponentStyle.at(index, seat)
         val references =
             arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
@@ -239,15 +245,7 @@ internal object RobustTokenGame {
                     if (candidate) input.expansionDenial else null,
                     if (candidate) input.tokenNeighborMixture else null,
                     if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
-                    when {
-                        candidate -> input.initiative
-                        player in initiativeRivalSeats ->
-                            requireNotNull(input.initiativeRival) {
-                                    "Every configured rival has one frozen initiative policy."
-                                }
-                                .policy
-                        else -> null
-                    },
+                    if (candidate) input.initiative else rivalPolicies[player],
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {
@@ -323,8 +321,8 @@ internal object RobustTokenGame {
         return RobustTokenGameResult(
             terminal,
             diagnostics.result() +
-                (if (initiativeRivalSeats.isEmpty()) emptyMap()
-                else mapOf("initiativeRivalSeats" to initiativeRivalSeats)) +
+                (if (rivalPolicies.isEmpty()) emptyMap()
+                else mapOf("initiativeRivalSeats" to rivalPolicies.keys.toList())) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
                     ?: emptyMap()),
             trace?.sha256,
