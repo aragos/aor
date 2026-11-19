@@ -330,6 +330,8 @@ private constructor(
                         "maximumExtraTokens",
                         "planWeight",
                         "extraCashPenalty",
+                        "counterAnticipation",
+                        "respectRivalCash",
                     ),
             )
             require(
@@ -364,6 +366,15 @@ private constructor(
                     node["extraCashPenalty"]?.let {
                         PurchaseJson.number(it, "extra token cash penalty")
                     } ?: 0.15,
+                counterAnticipation =
+                    node["counterAnticipation"]?.let {
+                        PurchaseJson.number(it, "counter anticipation weight")
+                    } ?: 0.0,
+                respectRivalCash =
+                    node["respectRivalCash"]?.let { setting ->
+                        require(setting.isBoolean) { "The rival cash constraint must be boolean." }
+                        setting.booleanValue()
+                    } ?: false,
             )
         }
 
