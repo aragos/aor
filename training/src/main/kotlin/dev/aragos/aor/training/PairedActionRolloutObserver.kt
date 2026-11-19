@@ -16,6 +16,7 @@ internal class PairedActionRolloutObserver(
     override val seat: Int,
     private val timing: CommodityTimingConfig? = null,
     private val stabilizationEpoch: Int? = null,
+    private val protection: MiseryProtection? = null,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -31,6 +32,7 @@ internal class PairedActionRolloutObserver(
             when {
                 timing != null -> "commodityRollouts"
                 stabilizationEpoch != null -> "stabilizationRollouts"
+                protection != null -> "miseryProtectionRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -45,6 +47,18 @@ internal class PairedActionRolloutObserver(
             when {
                 timing != null -> commodityRoot(state, number, observation, command, timing)
                 stabilizationEpoch != null -> stabilizationRoot(state, number, observation, command)
+                protection != null ->
+                    protection
+                        .opportunity(state, state.playerIds[seat], observation, command)
+                        ?.let {
+                            Root(
+                                state,
+                                number,
+                                command,
+                                mapOf("protect" to it.command, "ordinary" to command),
+                                it.facts,
+                            )
+                        }
                 else -> expansionCardRoot(state, number, observation, command)
             }
     }
@@ -174,7 +188,8 @@ internal class PairedActionRolloutObserver(
         val captured =
             root
                 ?: return mapOf("status" to "no-eligible-root") +
-                    (stabilizationEpoch?.let { mapOf("requestedEpoch" to it) } ?: emptyMap())
+                    (stabilizationEpoch?.let { mapOf("requestedEpoch" to it) } ?: emptyMap()) +
+                    (protection?.let { mapOf("kind" to it.name.lowercase()) } ?: emptyMap())
         val actor = captured.state.playerIds[seat]
         val tails =
             captured.actions.mapValues { (_, action) ->

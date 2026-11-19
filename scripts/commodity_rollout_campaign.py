@@ -12,12 +12,15 @@ EXPANSION_REMOTE = "/home/aragos/aor-worker/expansion-card-rollouts-20261118"
 STABILIZATION_REMOTE = "/home/aragos/aor-worker/stabilization-rollouts-20261119"
 
 
-def simulated_positions(campaign, root, baseline, count, *, expansion=False, stabilization=False):
+def simulated_positions(campaign, root, baseline, count, *, expansion=False, stabilization=False,
+                        protection=False):
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
         topic, bank = "buy-or-pass", "expansion-buy-or-pass-v1"
     elif stabilization:
         topic, bank = "cash-or-misery", "stabilization-cash-or-misery-v1"
+    elif protection:
+        topic, bank = "preventive-misery", "preventive-misery-grain-and-science-v1"
     stage = root / topic
     stage.mkdir(exist_ok=campaign.resume)
     seeds = seed_bank(bank, count)
@@ -30,6 +33,9 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, sta
         method.pop("commodityTiming")
     elif stabilization:
         method["kind"] = "natural-stabilization-root-screen-1"
+        method.pop("commodityTiming")
+    elif protection:
+        method["kind"] = "natural-misery-protection-root-screen-1"
         method.pop("commodityTiming")
     declared = stage / "method.json"
     if not declared.exists():
@@ -50,6 +56,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, sta
             request["expansionCardRollouts"] = True
         elif stabilization:
             request["stabilizationRollouts"] = True
+        elif protection:
+            request["miseryProtectionRollouts"] = True
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
         if not source.exists():

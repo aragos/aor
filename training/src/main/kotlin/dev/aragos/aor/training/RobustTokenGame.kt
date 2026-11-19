@@ -326,6 +326,12 @@ internal object RobustTokenGame {
                         stabilizationEpoch =
                             Math.floorMod(input.seeds[index] xor 0x72510B47, 3) + 1,
                     )
+                input.miseryProtectionRollouts ->
+                    PairedActionRolloutObserver(
+                        seat,
+                        protection =
+                            MiseryProtection.entries[(index / 4) % MiseryProtection.entries.size],
+                    )
                 else -> null
             }
         val competitors =
