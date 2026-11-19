@@ -8,7 +8,8 @@ data class FinalAdvanceGuard(val currentLead: Int, val projectedLead: Int) {
         }
     }
 
-    internal fun choose(
+    /** Evaluate a proposed pass against the same authoritative purchase state and actor view. */
+    fun choose(
         state: GameState,
         view: GameView,
         actor: PlayerId,
