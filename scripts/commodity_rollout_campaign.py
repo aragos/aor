@@ -13,7 +13,7 @@ TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 
 def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
-                        lookahead=False, epochs=(), chance_trial=False):
+                        lookahead=False, epochs=(), chance_trial=False, short_training_futures=0):
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
         topic, bank = "buy-or-pass", "expansion-buy-or-pass-v1"
@@ -31,6 +31,10 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         if not territory:
             raise ValueError("The chance trial requires the card versus territory comparison.")
         topic, bank = "chance-alignment", "card-territory-chance-alignment-v1"
+    if short_training_futures:
+        if not territory:
+            raise ValueError("Abbreviated training futures require the card versus territory comparison.")
+        topic, bank = "short-teacher", "card-territory-short-teacher-v1"
     stage = root / topic
     stage.mkdir(exist_ok=campaign.resume)
     seeds = seed_bank(bank, count)
@@ -50,6 +54,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         method["requestedEpochs"] = list(epochs)
     if chance_trial:
         method["chanceModes"] = ["sequential", "turn-and-outcome-channel-1"]
+    if short_training_futures:
+        method["shortTrainingFutures"] = short_training_futures
     declared = stage / "method.json"
     if not declared.exists():
         write(declared, method)
@@ -75,6 +81,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
                 request["cardTerritoryEpochs"] = list(epochs)
             if chance_trial:
                 request["chanceAlignmentTrial"] = True
+            if short_training_futures:
+                request["shortTrainingFutures"] = short_training_futures
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
         if not source.exists():

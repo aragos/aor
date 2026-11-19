@@ -115,6 +115,7 @@ private constructor(
     val lookaheadCheckpoints: Boolean,
     val cardTerritoryEpochs: List<Int>,
     val chanceAlignmentTrial: Boolean,
+    val shortTrainingFutures: Int,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -215,6 +216,8 @@ private constructor(
                 mapOf("cardTerritoryEpochs" to cardTerritoryEpochs)
             else emptyMap()) +
             (if (chanceAlignmentTrial) mapOf("chanceAlignmentTrial" to "turn-and-outcome-channel-1")
+            else emptyMap()) +
+            (if (shortTrainingFutures > 0) mapOf("shortTrainingFutures" to shortTrainingFutures)
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -402,6 +405,7 @@ private constructor(
                     "lookaheadCheckpoints",
                     "cardTerritoryEpochs",
                     "chanceAlignmentTrial",
+                    "shortTrainingFutures",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -514,6 +518,15 @@ private constructor(
                     require(setting.isBoolean) { "The chance alignment trial must be boolean." }
                     setting.booleanValue()
                 } ?: false
+            val shortTrainingFutures =
+                node["shortTrainingFutures"]?.let { setting ->
+                    PurchaseJson.integer(setting, "number of short training futures").also { count
+                        ->
+                        require(count in 2..8) {
+                            "Short rollout training requires two through eight additional futures per action."
+                        }
+                    }
+                } ?: 0
             val cardTerritoryEpochs =
                 node["cardTerritoryEpochs"]
                     ?.let { setting ->
@@ -663,6 +676,9 @@ private constructor(
             require(!chanceAlignmentTrial || cardTerritoryRollouts) {
                 "The chance alignment trial belongs to the declared card versus territory study."
             }
+            require(shortTrainingFutures == 0 || cardTerritoryRollouts) {
+                "Short rollout training futures belong to the declared card versus territory study."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -688,6 +704,7 @@ private constructor(
                     lookaheadCheckpoints,
                     cardTerritoryEpochs,
                     chanceAlignmentTrial,
+                    shortTrainingFutures,
                     seeds,
                     start,
                     count,

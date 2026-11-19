@@ -19,6 +19,7 @@ internal class PairedActionRolloutObserver(
     private val traceLookahead: Boolean = false,
     private val territoryEpoch: Int? = null,
     private val compareChance: Boolean = false,
+    private val shortTrainingFutures: Int = 0,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -156,7 +157,16 @@ internal class PairedActionRolloutObserver(
                 "attack" to (move is BoardCommand.Attack),
                 "recordedChance" to (offer.competitionWinProbability ?: 1.0),
                 "finalTurn" to view.endingTriggered,
-            ),
+            ) +
+                if (shortTrainingFutures > 0) {
+                    val market = observation.candidates.single { it.command == command }
+                    val card = observation.candidates.single { it.command == "buy-expansion-card" }
+                    val features =
+                        observation.context.mapKeys { (name, _) -> "state." + name } +
+                            market.features.mapKeys { (name, _) -> "market." + name } +
+                            card.features.mapKeys { (name, _) -> "card." + name }
+                    mapOf("rootTrainingFeatures" to features)
+                } else emptyMap(),
         )
     }
 
@@ -212,18 +222,9 @@ internal class PairedActionRolloutObserver(
                         )
                     val terminal =
                         continuation.finish(session, seat, configuration, chanceSeed, record)
-                    val canonical = session.entries.map(Entry::toText)
-                    val replayed =
-                        canonical.fold(captured.state) { state, entry ->
-                            checkTokenValueDeadline(deadline)
-                            state.step(TextCodec.parse(entry))
-                        }
-                    check(replayed == session.state) {
-                        "The paired continuation must replay exactly."
-                    }
                     mapOf(
                         "terminal" to terminal,
-                        "canonicalSha256" to CpePairedDigest.json(canonical),
+                        "canonicalSha256" to verifiedCanonical(session, captured.state, deadline),
                     ) +
                         if (checkpoints != null) {
                             val atEnd = checkpoint(session.state, actor, session.decisions)
@@ -245,10 +246,55 @@ internal class PairedActionRolloutObserver(
             "tails" to outcomes(ExperimentChanceMode.SEQUENTIAL),
         ) +
             captured.context +
-            if (compareChance) {
+            (if (compareChance) {
                 mapOf("alignedChanceTails" to outcomes(ExperimentChanceMode.BY_TURN_AND_EVENT))
+            } else emptyMap()) +
+            if (shortTrainingFutures > 0) {
+                val short =
+                    captured.actions.mapValues { (_, action) ->
+                        (0 until shortTrainingFutures).map { replicate ->
+                            val shortSeed = shortChanceSeed(seed, replicate)
+                            val session =
+                                ExperimentSession(captured.state, shortSeed, recordEntries = true)
+                            session.apply(mapOf(actor to action), deadline)
+                            FrozenPolicyContinuation(
+                                    models,
+                                    controllers(),
+                                    seed,
+                                    deadline,
+                                    decisionOffset = captured.number,
+                                )
+                                .reachTurn(session, originTurn + 3)
+                            mapOf(
+                                "checkpoint" to checkpoint(session.state, actor, session.decisions),
+                                "canonicalSha256" to
+                                    verifiedCanonical(session, captured.state, deadline),
+                                "seed" to shortSeed,
+                            )
+                        }
+                    }
+                mapOf("shortTrainingTails" to short)
             } else emptyMap()
     }
+
+    private fun verifiedCanonical(
+        session: ExperimentSession,
+        initial: GameState,
+        deadline: Long,
+    ): String {
+        val canonical = session.entries.map(Entry::toText)
+        val replayed =
+            canonical.fold(initial) { state, entry ->
+                checkTokenValueDeadline(deadline)
+                state.step(TextCodec.parse(entry))
+            }
+        check(replayed == session.state) { "The paired continuation must replay exactly." }
+        return CpePairedDigest.json(canonical)
+    }
+
+    /** Separate positive range from the signed seeds used by the full terminal futures. */
+    private fun shortChanceSeed(seed: Int, replicate: Int): Long =
+        0x1F70_0000_0000_0000L + ((seed.toLong() and 0xFFFF_FFFFL) shl 4) + replicate
 
     private fun checkpoint(state: GameState, actor: PlayerId, decisions: Int): Map<String, Any> {
         val view = state.publicView()

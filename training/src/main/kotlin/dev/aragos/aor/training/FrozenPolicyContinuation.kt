@@ -62,18 +62,7 @@ internal class FrozenPolicyContinuation(
         chanceSeed: Long,
         onNewTurn: ((GameState, Int) -> Unit)? = null,
     ): TokenValueOutcome {
-        var observedTurn = session.state.turnNumber
-        while (session.state.stage != Stage.FINISHED) {
-            check(session)
-            session.apply(
-                commands(session, session.actors().associateWith(session::observation)),
-                deadlineNanos,
-            )
-            if (onNewTurn != null && session.state.turnNumber != observedTurn) {
-                observedTurn = session.state.turnNumber
-                onNewTurn(session.state, session.decisions)
-            }
-        }
+        advance(session, null, onNewTurn)
         val game =
             SimulatedGame(
                 configuration,
@@ -98,5 +87,33 @@ internal class FrozenPolicyContinuation(
             game.steps,
             chanceSeed,
         )
+    }
+
+    /** Stop at the first decision of the requested turn or an earlier terminal. */
+    fun reachTurn(session: ExperimentSession, turn: Int) {
+        require(turn > 0) { "An abbreviated continuation requires a positive target turn." }
+        advance(session, turn, null)
+    }
+
+    private fun advance(
+        session: ExperimentSession,
+        target: Int?,
+        onNewTurn: ((GameState, Int) -> Unit)?,
+    ) {
+        var observedTurn = session.state.turnNumber
+        while (
+            session.state.stage != Stage.FINISHED &&
+                (target == null || (session.state.turnNumber ?: 0) < target)
+        ) {
+            check(session)
+            session.apply(
+                commands(session, session.actors().associateWith(session::observation)),
+                deadlineNanos,
+            )
+            if (onNewTurn != null && session.state.turnNumber != observedTurn) {
+                observedTurn = session.state.turnNumber
+                onNewTurn(session.state, session.decisions)
+            }
+        }
     }
 }
