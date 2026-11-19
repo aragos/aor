@@ -156,7 +156,7 @@ class Campaign:
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
 
-    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None):
+    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None, rival_offsets=(1,2,3)):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -166,7 +166,8 @@ class Campaign:
         if len(set(streams)) != len(streams):
             raise ValueError("Each declared stage bank requires distinct seed streams.")
         declared = dict(stage=label, configs=configs, banks=banks, paired=paired,
-                        replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline, rival=rival)
+                        replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline,
+                        rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [])
         write(stage / "method.json", declared)
         choices = configs if paired else {"control": None, **configs}
         jobs = []
@@ -188,7 +189,7 @@ class Campaign:
                     if mode == "INDEPENDENT_INITIATIVE":
                         if rival is None:
                             raise ValueError("This ecology requires its frozen independently tuned rival.")
-                        spec["initiativeRival"] = dict(kind="public-initiative-lineup-1",offsets=[1,2,3],policy=rival)
+                        spec["initiativeRival"] = dict(kind="public-initiative-lineup-1",offsets=list(rival_offsets),policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
                     write(source, spec)
@@ -273,6 +274,25 @@ def main(root, initial):
             bidModeShare=max(bid_counts.values())/sum(bid_counts.values()))
     write(root / "result.json", dict(status="mirrored-table-complete", results=tiers,
         pairedComparison=result, initialResultSha256=sha(initial/"result.json")))
+
+    if campaign.remaining() < 1000:
+        return
+    response_path = initial.parent / "automata-initiative-crossplay-20261118/independent-response/summary.json"
+    if not response_path.is_file():
+        return
+    # This rival had the same development score as the cheaper one but can give up three tokens.
+    responder = read(response_path)["r1"]["config"]
+    check = campaign.stage("deeper-undercut-check", {"response":responder},
+                           384, ECOLOGIES[:1], paired=True)
+    response_result = check["response"]["outcomes"]["QUALIFIED"]
+    if response_result["lower95"] <= 0 or campaign.remaining() < 450:
+        write(root / "extra-result.json", dict(status="deeper-undercut-screen-complete", response=check))
+        return
+    challenge = campaign.stage("deeper-undercut-crossplay", {"policy":champion},
+                               512, ECOLOGIES[-1:], paired=True, rival=responder, rival_offsets=(1,))
+    write(root / "extra-result.json", dict(status="deeper-undercut-crossplay-complete",
+        response=check, comparison=challenge))
+
 
 
 if __name__ == "__main__":
