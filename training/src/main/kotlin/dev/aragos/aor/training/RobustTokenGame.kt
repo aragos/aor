@@ -304,6 +304,7 @@ internal object RobustTokenGame {
                     if (candidate) input.initiative else rivalPolicies[player],
                     if (candidate) input.leadingRivalRetargeting
                     else input.rivalTargetingLineup?.policy?.takeIf { player in targetingRivals },
+                    if (candidate) input.leadFrontierDefense else null,
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {

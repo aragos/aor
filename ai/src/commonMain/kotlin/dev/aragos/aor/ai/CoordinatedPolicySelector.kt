@@ -43,6 +43,7 @@ class CoordinatedPolicySelector(
     private val tokenAnchoredResidual: TokenAnchoredResidual? = null,
     private val initiative: InitiativePolicyConfig? = null,
     private val leadingRivalRetargeting: LeadingRivalRetargetingConfig? = null,
+    private val leadFrontierDefense: LeadFrontierDefenseConfig? = null,
 ) {
     private val joint =
         JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
@@ -143,9 +144,13 @@ class CoordinatedPolicySelector(
                             .command
                     }
                     ?: deterministic.command
-            return leadingRivalRetargeting?.let {
-                LeadingRivalRetargeting.choose(view, player, observation, selected, it)
-            } ?: selected
+            val targeted =
+                leadingRivalRetargeting?.let {
+                    LeadingRivalRetargeting.choose(view, player, observation, selected, it)
+                } ?: selected
+            return leadFrontierDefense?.let {
+                LeadFrontierDefense.choose(view, observation, player, targeted, it)
+            } ?: targeted
         }
         val encoded =
             TokenObservationEncoder.from(

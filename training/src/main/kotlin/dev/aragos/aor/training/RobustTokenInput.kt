@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.InitiativePolicyConfig
+import dev.aragos.aor.ai.LeadFrontierDefenseConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
@@ -197,6 +198,7 @@ private constructor(
     val secondCapitalGeography: Boolean,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val rivalTargetingLineup: RivalTargetingLineup?,
+    val leadFrontierDefense: LeadFrontierDefenseConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -303,6 +305,15 @@ private constructor(
                 mapOf(
                     "rivalTargetingLineup" to
                         mapOf("kind" to RivalTargetingLineup.VERSION, "policy" to it)
+                )
+            } ?: emptyMap()) +
+            (leadFrontierDefense?.let {
+                mapOf(
+                    "leadFrontierDefense" to
+                        mapOf(
+                            "kind" to LeadFrontierDefenseConfig.VERSION,
+                            "minimumProtectedMarkets" to it.minimumProtectedMarkets,
+                        )
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -628,6 +639,7 @@ private constructor(
                     "expansionDenial",
                     "leadingRivalRetargeting",
                     "rivalTargetingLineup",
+                    "leadFrontierDefense",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -687,6 +699,19 @@ private constructor(
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val leadFrontierDefense =
+                node["leadFrontierDefense"]?.let { defense ->
+                    PurchaseJson.fields(defense, setOf("kind", "minimumProtectedMarkets"))
+                    require(defense["kind"]?.asText() == LeadFrontierDefenseConfig.VERSION) {
+                        "Frontier defense requires its versioned public position policy."
+                    }
+                    LeadFrontierDefenseConfig(
+                        PurchaseJson.integer(
+                            defense["minimumProtectedMarkets"],
+                            "protected markets",
+                        )
+                    )
+                }
             val rivalTargetingLineup =
                 node["rivalTargetingLineup"]?.let { lineup ->
                     PurchaseJson.fields(lineup, setOf("kind", "offsets", "policy"))
@@ -929,6 +954,7 @@ private constructor(
                     secondCapitalGeography,
                     leadingRivalRetargeting,
                     rivalTargetingLineup,
+                    leadFrontierDefense,
                     seeds,
                     start,
                     count,
