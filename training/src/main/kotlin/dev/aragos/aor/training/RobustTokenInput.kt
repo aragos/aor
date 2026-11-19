@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.CommodityLeadTimingConfig
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
@@ -199,6 +200,7 @@ private constructor(
     val capitalAuction: CapitalAuctionConfig?,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val leadingRivalTable: LeadingRivalTable?,
+    val commodityLeadTiming: CommodityLeadTimingConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -300,6 +302,15 @@ private constructor(
                         mapOf(
                             "kind" to LeadingRivalTable.VERSION,
                             "configuration" to it,
+                        )
+                )
+            } ?: emptyMap()) +
+            (commodityLeadTiming?.let {
+                mapOf(
+                    "commodityLeadTiming" to
+                        mapOf(
+                            "kind" to CommodityLeadTimingConfig.VERSION,
+                            "maximumPayout" to it.maximumPayout,
                         )
                 )
             } ?: emptyMap()) +
@@ -619,6 +630,7 @@ private constructor(
                     "expansionDenial",
                     "leadingRivalRetargeting",
                     "leadingRivalTable",
+                    "commodityLeadTiming",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -677,6 +689,16 @@ private constructor(
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
             val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val commodityLeadTiming =
+                node["commodityLeadTiming"]?.let { policy ->
+                    PurchaseJson.fields(policy, setOf("kind", "maximumPayout"))
+                    require(policy["kind"]?.asText() == CommodityLeadTimingConfig.VERSION) {
+                        "Declare the versioned commodity-timing challenger."
+                    }
+                    CommodityLeadTimingConfig(
+                        PurchaseJson.integer(policy["maximumPayout"], "maximum payout")
+                    )
+                }
             val leadingRivalTable =
                 node["leadingRivalTable"]?.let { table ->
                     PurchaseJson.fields(table, setOf("kind", "offsets", "policy"))
@@ -889,6 +911,7 @@ private constructor(
                     capitalAuction,
                     leadingRivalRetargeting,
                     leadingRivalTable,
+                    commodityLeadTiming,
                     seeds,
                     start,
                     count,

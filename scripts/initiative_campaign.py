@@ -291,7 +291,7 @@ class Campaign:
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
               rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
               counter_variants=None, lineup=None, capital_variants=None, series_priors=None,
-              leading_rival_variants=None, leading_rival_tables=None):
+              leading_rival_variants=None, leading_rival_tables=None, commodity_lead_variants=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -323,6 +323,8 @@ class Campaign:
             declared["leadingRivalRetargetingVariants"] = leading_rival_variants
         if leading_rival_tables:
             declared["leadingRivalTableVariants"] = leading_rival_tables
+        if commodity_lead_variants:
+            declared["commodityLeadTimingVariants"] = commodity_lead_variants
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -361,6 +363,8 @@ class Campaign:
                         spec["leadingRivalRetargeting"] = leading_rival_variants[key]
                     if leading_rival_tables and key in leading_rival_tables:
                         spec["leadingRivalTable"] = leading_rival_tables[key]
+                    if commodity_lead_variants and key in commodity_lead_variants:
+                        spec["commodityLeadTiming"] = commodity_lead_variants[key]
                     declare(source, spec)
                     jobs.append((name, source))
         pending = []
