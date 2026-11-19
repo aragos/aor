@@ -96,8 +96,8 @@ data class TokenValueSpecification(
         require(arena.tokenOrder == null) {
             "Token-value collection cannot apply a tokenOrder overlay."
         }
-        require(arena.purpose == ArenaPurpose.SCREENING && arena.configurations.size == 1) {
-            "A token-value pilot requires one SCREENING configuration."
+        require(arena.purpose == ArenaPurpose.SCREENING) {
+            "A token-value pilot requires a SCREENING arena."
         }
         require(arena.candidate == arena.incumbent) {
             "Token-value collection requires identical candidate and incumbent baseline models."
@@ -105,6 +105,12 @@ data class TokenValueSpecification(
         require(arena.seed < 100_000_000) { "Token-value validation needs the next seed offset." }
         require(trainingRoots in 2..8192 && validationRoots in 2..8192) {
             "Token-value banks require two through 8192 origin games each."
+        }
+        require(
+            trainingRoots % arena.configurations.size == 0 &&
+                validationRoots % arena.configurations.size == 0
+        ) {
+            "Each token-value bank needs an equal positive number of origins per setup."
         }
         require(continuationReplicates in 1..TOKEN_VALUE_MAX_CONTINUATION_REPLICATES) {
             "A token-value pilot supports one through four paired continuation streams."
@@ -140,13 +146,20 @@ data class TokenValueSpecification(
 
     internal fun lineup(index: Int): StrategyArena.Lineup {
         val split = split(index)
-        return StrategyArena.lineup(
-            arena.copy(
-                seed = arena.seed + split.ordinal,
-                pairsPerConfiguration =
-                    if (split == TokenValueSplit.TRAINING) trainingRoots else validationRoots,
-            ),
-            bankIndex(index),
+        val bankSize = if (split == TokenValueSplit.TRAINING) trainingRoots else validationRoots
+        val perConfiguration = bankSize / arena.configurations.size
+        val arenaIndex = bankIndex(index)
+        val lineup =
+            StrategyArena.lineup(
+                arena.copy(
+                    seed = arena.seed + split.ordinal,
+                    pairsPerConfiguration = perConfiguration,
+                ),
+                arenaIndex,
+            )
+        val configurationIndex = arenaIndex / perConfiguration
+        return lineup.copy(
+            seat = (lineup.seat + configurationIndex) % lineup.configuration.playerCount
         )
     }
 
@@ -154,7 +167,7 @@ data class TokenValueSpecification(
         TokenValueRootRequest.from(lineup(index).seed, bankIndex(index))
 
     fun identity(): String =
-        listOf(
+        (listOf(
                 arena.identity(),
                 trainingRoots,
                 validationRoots,
@@ -165,7 +178,11 @@ data class TokenValueSpecification(
                 TokenValueSelectionProtocol.PRECOMMITTED_ORDINAL_V1,
                 TOKEN_VALUE_ORIGIN_SCHEMA_VERSION,
                 TOKEN_VALUE_MEAN_ZERO_TOLERANCE,
-            )
+            ) +
+                listOfNotNull(
+                    "balanced-configurations-seat-rotation-1"
+                        .takeIf { arena.configurations.size > 1 }
+                ))
             .joinToString("\n") +
             if (learningMode == TokenValueLearningMode.REPLACEMENT) {
                 ""

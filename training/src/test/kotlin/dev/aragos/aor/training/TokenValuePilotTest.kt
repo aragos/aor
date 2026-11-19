@@ -21,6 +21,35 @@ import kotlin.test.assertFailsWith
 
 class TokenValuePilotTest {
     @Test
+    fun multiSetupBanksKeepEqualCoverageAndUseDisjointChanceStreams() {
+        val initial = specification()
+        val setups =
+            listOf(
+                TrainingMatrix.stratified.first(),
+                TrainingMatrix.stratified.first {
+                    it.playerCount == 6 && it.rules.drawThreeKeepTwo
+                },
+            )
+        val study =
+            initial.copy(
+                arena = initial.arena.copy(configurations = setups),
+                trainingRoots = 8,
+                validationRoots = 4,
+            )
+
+        val training = (0 until study.trainingRoots).map(study::lineup)
+        val validation = (study.trainingRoots until study.origins).map(study::lineup)
+
+        assertThat(training.groupingBy { it.configuration }.eachCount())
+            .containsExactly(setups[0], 4, setups[1], 4)
+        assertThat(validation.groupingBy { it.configuration }.eachCount())
+            .containsExactly(setups[0], 2, setups[1], 2)
+        assertThat(training.filter { it.configuration == setups[1] }.map { it.seat })
+            .containsExactly(1, 2, 3, 4)
+        assertThat((training + validation).map { it.seed }.distinct()).hasSize(study.origins)
+    }
+
+    @Test
     fun correctionFitPreservesTheEnabledIncumbentAndRecordsItsMode() {
         val directory = Files.createTempDirectory("aor-token-correction-fit-")
         try {

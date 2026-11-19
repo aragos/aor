@@ -978,6 +978,10 @@ python3 .aor-training/executors/token-value-v2/bin/train-opponents.py \
   --output .aor-training/token-value-signal --hours 3
 ```
 
+An arena may select several setups. Both origin banks then allocate an equal number of roots to
+each setup, rotate the controlled seat across setups and report collected and skipped roots by
+configuration.
+
 Each independently generated game contributes at most one controlled-seat root. The executor commits
 to its epoch and within-epoch ordinal before creating the game, stops at that decision, and records
 unreached or ineligible requests as skips. It never substitutes a root after inspecting later play.

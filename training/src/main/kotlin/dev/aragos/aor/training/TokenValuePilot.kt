@@ -85,6 +85,13 @@ internal class TokenValuePilotRunner(
                         TokenValueSplit.entries.associate { split ->
                             split.name to counts(origins.filter { it.split == split })
                         },
+                    "countsByConfiguration" to
+                        origins.groupBy(TokenValueOrigin::configuration).toSortedMap().mapValues {
+                            (_, configured) ->
+                            configured.groupBy(TokenValueOrigin::split).mapValues { (_, rows) ->
+                                counts(rows)
+                            }
+                        },
                     "rootSelection" to
                         "Precommitted epoch bankIndex%3+1 and uniform ordinal 1..6 (epochs 1/2) or 1..4 (epoch 3); no fallback",
                     "selectionRng" to "Kotlin Random(gameSeed xor 0x2e59c17), before game creation",
