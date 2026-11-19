@@ -17,6 +17,7 @@ internal class BotCommodityPortfolio(
     private val commodities: List<BotPlanningCommodity>,
     private val heldCards: List<Set<Commodity>>,
 ) {
+    private val forecasts by lazy { commodities.associateBy(BotPlanningCommodity::commodity) }
     private val basePayouts = commodities.associate { it.commodity to payout(it, it.markets) }
     private val baselineHeld = heldValue(basePayouts)
 
@@ -36,6 +37,15 @@ internal class BotCommodityPortfolio(
                         (basePayouts[forecast.commodity] ?: 0.0)) * forecast.outsideCards
                 },
         )
+    }
+
+    /** Current first adjustment, with [marketChange] applied to the visible market count. */
+    fun projectedPayout(commodity: Commodity, marketChange: Int = 0): Double {
+        val base =
+            checkNotNull(forecasts[commodity]) {
+                "A projected payout requires the commodity's public forecast."
+            }
+        return payout(base, (base.markets + marketChange).coerceAtLeast(0))
     }
 
     private fun heldValue(payouts: Map<Commodity, Double>): Double = heldCards.sumOf { choices ->

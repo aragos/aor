@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.HeldCommodityExpansionConfig
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
@@ -171,6 +172,7 @@ private constructor(
     val initiativeRival: InitiativeRival?,
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
+    val heldCommodityExpansion: HeldCommodityExpansionConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -256,6 +258,15 @@ private constructor(
             } ?: emptyMap()) +
             (capitalAuction?.let {
                 mapOf("capitalAuction" to it.science())
+            } ?: emptyMap()) +
+            (heldCommodityExpansion?.let {
+                mapOf(
+                    "heldCommodityExpansion" to
+                        mapOf(
+                            "kind" to HeldCommodityExpansionConfig.VERSION,
+                            "maximumScoreGap" to it.maximumScoreGap,
+                        )
+                )
             } ?: emptyMap()) +
             (initiative?.let {
                 mapOf(
@@ -554,6 +565,7 @@ private constructor(
                     "controlBundle",
                     "controlSelector",
                     "expansionDenial",
+                    "heldCommodityExpansion",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -611,6 +623,17 @@ private constructor(
             val candidateSampler = sampler(node.required("selector"))
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
+            val heldCommodityExpansion =
+                node["heldCommodityExpansion"]?.let { expansion ->
+                    PurchaseJson.fields(expansion, setOf("kind", "maximumScoreGap"))
+                    require(
+                        expansion["kind"]?.asText() == HeldCommodityExpansionConfig.VERSION &&
+                            expansion["maximumScoreGap"].isNumber
+                    ) {
+                        "Declare the versioned held-commodity expansion and its score gap."
+                    }
+                    HeldCommodityExpansionConfig(expansion["maximumScoreGap"].doubleValue())
+                }
             val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)
             val seeds = node.required("seeds").map { PurchaseJson.integer(it, "world seed") }
             require(seeds.size in 1..16384 && seeds.distinct().size == seeds.size) {
@@ -807,6 +830,7 @@ private constructor(
                     initiativeRival,
                     initiativeLineup,
                     capitalAuction,
+                    heldCommodityExpansion,
                     seeds,
                     start,
                     count,
