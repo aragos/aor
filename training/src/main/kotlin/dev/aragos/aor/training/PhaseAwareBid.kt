@@ -20,6 +20,7 @@ internal enum class PhaseBidProfile(
     BALANCED("balanced", 3, 1.0),
     WIDE("wide", 5, 1.4),
     CASH_CONSCIOUS("cash-conscious", 4, .75),
+    REPEATED_UNDERCUT("repeated-undercut", 5, 1.4),
 }
 
 /** Spend and rank estimates need either an imminent card opportunity or a board incentive. */
@@ -45,6 +46,9 @@ internal class PhaseAwareBid(
         val history = view.pastTokenPurchases.takeLast(4)
         if (history.size < 2) return ordinary
         val actor = PlayerId(decision.observation.playerId)
+        if (profile == PhaseBidProfile.REPEATED_UNDERCUT && !repeatedUndercut(history, actor)) {
+            return ordinary
+        }
         val forecast = view.expansionForecast ?: return ordinary
         val pool =
             view.tokenPurchaseOffers.firstOrNull { it.amount == paid.amount } ?: return ordinary
@@ -114,6 +118,13 @@ internal class PhaseAwareBid(
     }
 
     fun evidence(): List<Map<String, Any>> = choices
+
+    private fun repeatedUndercut(history: List<Map<PlayerId, Int>>, actor: PlayerId): Boolean {
+        if (history.size != 4) return false
+        return history.first().keys.any { rival ->
+            rival != actor && history.count { row -> (row[rival] ?: Int.MIN_VALUE) in 15..17 } >= 3
+        }
+    }
 
     private fun rank(history: List<Map<PlayerId, Int>>, actor: PlayerId, amount: Int): Double =
         history.sumOf { row ->
