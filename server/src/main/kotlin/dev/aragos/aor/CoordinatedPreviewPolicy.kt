@@ -17,14 +17,17 @@ import dev.aragos.aor.ai.CoordinatedPolicyModels
 import dev.aragos.aor.ai.CoordinatedPolicySelector
 import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
+import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.JointSupportProfile
+import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.PurchaseObservationEncoder
 import dev.aragos.aor.ai.PurchasePolicyModel
 import dev.aragos.aor.ai.PurchasePolicyScope
+import dev.aragos.aor.ai.SecondCapitalGeography
 import dev.aragos.aor.ai.TerritoryEncoder
 import dev.aragos.aor.ai.TerritoryPolicyModel
 import dev.aragos.aor.ai.TokenNeighborAdmission
@@ -34,10 +37,37 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.security.MessageDigest
+import kotlin.math.sqrt
 
 /** The source-frozen study95 executable; another native build needs separate qualification. */
 internal const val LOCAL_BID_MIXTURE_NATIVE_JAR_SHA256 =
     "6d7a056095ad5f886171823a29b23e466f4f89ad948bfc2f8e6999a71c4a6097"
+
+private const val INITIATIVE_BASE_PREVIEW_SHA256 =
+    "b812daf05170b3a41ee5164667dcb24877b6ced582dc9475d89e18e16c815f81"
+private const val INITIATIVE_NATIVE_JAR_SHA256 =
+    "a179ea273c8153a5cd9b61f4f4bd2ec7851b6ca1d62f1764c34105637bb73fed"
+private val INITIATIVE_OPPONENTS = listOf("QUALIFIED", "REVEALED_UNDERCUT", "REVEALED_TIE_UNDERCUT")
+private const val MIXED_INITIATIVE_NATIVE_JAR_SHA256 =
+    "eb2690aeced7c9c47eaaebbc7016c5ae1aae19c5612f67d3fa8e9047b30089b2"
+private const val MIXED_INITIATIVE_AUDIT_SHA256 =
+    "f156a89b0c9fda35de170fdb98b98b32fb054d1e05eab2724eefddfd3ad43f05"
+private const val MIXED_INITIATIVE_CERTIFICATE_SHA256 =
+    "ddadaa3f4c2f990078cdae90eed35c4fbe707525645a9cfe82903743ff980e98"
+private val MIXED_INITIATIVE_TABLES = listOf("mixed-table", "adaptive-table")
+private const val MIXED_PREVIEW_MANIFEST_SHA256 =
+    "a5c2c88cf9d5de620304cd976c92c41dea5d1026e8cc9c27fe8436c98d917da4"
+private const val RETARGETING_CERTIFICATE_SHA256 =
+    "7b22ba487b110275d326c969f828e5ab80a6da86c51c2e5d3735a886d51b48a2"
+private const val CAPITAL_GEOGRAPHY_BASE_SHA256 =
+    "6ae7f2033f72a4830e70a6f88271a2cf72fb3a8d1778608615bf010eb0cfe97b"
+private const val CAPITAL_GEOGRAPHY_CERTIFICATE_SHA256 =
+    "4f9a6618930784d3bb7a0bc8f2152266e4bfa2fe67f21c62f5da5e4a27072dc1"
+private const val RETARGETING_TRAINING_SHA256 =
+    "fcaae16011c32bebfdc0617777a3ffe8cfb80a7b0c83666d31cd916a5dec0630"
+private const val RETARGETING_AUDIT_SHA256 =
+    "b760171f77df67a656cd402c84d4581aebce2d9840d95fda709149fba9ddcbf0"
+private val VALID_WIN_SHARES = setOf(0.0, .25, 1.0 / 3.0, .5, 1.0)
 
 /**
  * Immutable local asset. All portable subjects are verified and decoded once at startup. The
@@ -83,6 +113,29 @@ private class CachedCoordinatedPreviewPolicy(
 /** Loads one complete immutable manifest; callers retain the returned inference object. */
 object CoordinatedPreviewPolicy {
     fun read(path: Path): ServerBotPolicy = CoordinatedAssetReader(path).read()
+}
+
+private class CapitalGeographyPreview(
+    private val base: ServerBotPolicy,
+    override val assetSha256: String,
+) : ServerBotPolicy by base {
+    override fun choose(view: GameView, observation: BotObservation, seed: Int): String =
+        capitalChoice(view, observation) ?: base.choose(view, observation, seed)
+
+    override fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        tokenQuote: TokenNeighborQuote,
+    ): String = capitalChoice(view, observation) ?: base.choose(view, observation, seed, tokenQuote)
+
+    private fun capitalChoice(view: GameView, observation: BotObservation): String? =
+        if (
+            observation.decision == SecondCapitalGeography.DECISION &&
+                profile.supports(observation, BotDifficulty.HARD)
+        ) {
+            SecondCapitalGeography.choose(view, observation)
+        } else null
 }
 
 private enum class PreviewHead {
@@ -148,6 +201,168 @@ private class CoordinatedAssetReader(path: Path) {
     fun read(): ServerBotPolicy {
         val manifest = document(manifestPath)
         val root = node(manifest)
+        return when (text(root, "kind")) {
+            "coordinated-initiative-preview-1" -> readInitiative(manifest, root)
+            "coordinated-leading-rival-preview-1" -> readLeadingRival(manifest, root)
+            "coordinated-second-capital-preview-1" -> readSecondCapital(manifest, root)
+            else -> readCoordinated(manifest, root)
+        }
+    }
+
+    private fun readLeadingRival(manifest: Document, root: JsonNode): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(
+            text(root, "kind") == "coordinated-leading-rival-preview-1" &&
+                integer(root, "schemaVersion") == 1
+        ) {
+            "The leading-rival preview requires its exact versioned schema."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == MIXED_PREVIEW_MANIFEST_SHA256) {
+            "Retargeting must preserve the exact mixed-table incumbent."
+        }
+        val qualification = subject(manifest, root["qualification"])
+        return readInitiative(
+            base,
+            node(base),
+            manifest.sha256,
+            retargetingQualification(qualification, base),
+        )
+    }
+
+    private fun readSecondCapital(manifest: Document, root: JsonNode): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "The second-capital preview requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == CAPITAL_GEOGRAPHY_BASE_SHA256) {
+            "The capital rule must extend the exact live attack-targeting preview."
+        }
+        val evidence = subject(manifest, root["qualification"])
+        validateSecondCapitalQualification(evidence, base)
+        return CapitalGeographyPreview(readLeadingRival(base, node(base)), manifest.sha256)
+    }
+
+    private fun validateSecondCapitalQualification(evidence: Document, base: Document) {
+        require(evidence.sha256 == CAPITAL_GEOGRAPHY_CERTIFICATE_SHA256) {
+            "The capital rule requires the audited whole-game qualification certificate."
+        }
+        val receipt = node(evidence)
+        fields(
+            receipt,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "auditSha256",
+            "comparisons",
+        )
+        require(
+            text(receipt, "kind") == SecondCapitalGeography.VERSION &&
+                hash(receipt, "basePreviewSha256") == base.sha256
+        ) {
+            "The certificate must match the second-capital policy and the live starting policy."
+        }
+        hash(receipt, "nativeJarSha256")
+        hash(receipt, "auditSha256")
+        val modes = listOf("mixed", "experienced", "known-16", "contested-second")
+        val comparisons = receipt["comparisons"]
+        fields(comparisons, *modes.toTypedArray())
+        val used = mutableSetOf<Int>()
+        val results = modes.map { mode ->
+            val test = comparisons[mode]
+            fields(test, "worlds", "evidenceSha256")
+            hash(test, "evidenceSha256")
+            val worlds = test["worlds"]
+            require(worlds.isArray && worlds.size() == 1536) {
+                "The capital qualification requires all 1,536 paired worlds in $mode."
+            }
+            var eligible = 0
+            var changed = 0
+            val effects = worlds.map { row ->
+                fields(row, "seed", "position", "changed", "candidate", "control")
+                require(used.add(integer(row, "seed"))) {
+                    "Every qualified capital world may appear only once."
+                }
+                val position = integer(row, "position")
+                val replaced = truth(row, "changed")
+                val candidate = number(row["candidate"], "candidate win share")
+                val baseline = number(row["control"], "control win share")
+                require(
+                    position in 0..3 &&
+                        (!replaced || position == 1) &&
+                        candidate in VALID_WIN_SHARES &&
+                        baseline in VALID_WIN_SHARES &&
+                        (replaced || candidate == baseline)
+                ) {
+                    "A capital intervention must be an offered second choice with valid win shares."
+                }
+                if (position == 1) eligible++
+                if (replaced) changed++
+                candidate - baseline
+            }
+            require(eligible >= 100 && changed >= 60) {
+                "The capital qualification needs adequate second-chooser coverage in $mode."
+            }
+            val independent =
+                if (mode == "experienced") {
+                    val histories = effects.chunked(4)
+                    (0 until 64).map { group ->
+                        histories
+                            .filterIndexed { index, _ -> index % 64 == group }
+                            .flatten()
+                            .average()
+                    }
+                } else effects
+            winLowerBound(independent)
+        }
+        require(
+            results.minOf { it.second } > -.02 &&
+                results.map { it.first }.average() >= .015 &&
+                results.count { it.second > 0.0 } >= 2
+        ) {
+            "The second-capital policy must clear the fresh paired win thresholds."
+        }
+    }
+
+    private fun winLowerBound(effects: List<Double>): Pair<Double, Double> {
+        val mean = effects.average()
+        val error =
+            sqrt(effects.sumOf { (it - mean) * (it - mean) } / ((effects.size - 1) * effects.size))
+        return mean to (mean - 1.96 * error)
+    }
+
+    private fun readInitiative(
+        manifest: Document,
+        root: JsonNode,
+        assetHash: String = manifest.sha256,
+        retargeting: LeadingRivalRetargetingConfig? = null,
+    ): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "The initiative preview requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == INITIATIVE_BASE_PREVIEW_SHA256) {
+            "Initiative requires the exact qualified incumbent preview."
+        }
+        val qualification = subject(manifest, root["qualification"])
+        return readCoordinated(
+            base,
+            node(base),
+            initiativeQualification(qualification, base),
+            assetHash,
+            retargeting,
+        )
+    }
+
+    private fun readCoordinated(
+        manifest: Document,
+        root: JsonNode,
+        initiative: InitiativePolicyConfig? = null,
+        assetHash: String = manifest.sha256,
+        retargeting: LeadingRivalRetargetingConfig? = null,
+    ): ServerBotPolicy {
         val robust = text(root, "kind") == "coordinated-robust-support-preview-1"
         val winOnly = text(root, "kind") == "coordinated-win-support-preview-1"
         val selectedProfile =
@@ -219,7 +434,7 @@ private class CoordinatedAssetReader(path: Path) {
             tokenNeighborMixture(node(it)["tokenNeighborMixture"])
         }
         return CachedCoordinatedPreviewPolicy(
-            manifest.sha256,
+            assetHash,
             selectedProfile,
             packed,
             CoordinatedPolicySelector(
@@ -234,8 +449,193 @@ private class CoordinatedAssetReader(path: Path) {
                 expansionDenial =
                     robustDefinition?.let { expansionDenial(node(it)["expansionDenial"]) },
                 tokenNeighborMixture = neighborMixture,
+                initiative = initiative,
+                leadingRivalRetargeting = retargeting,
             ),
             neighborMixture,
+        )
+    }
+
+    private fun retargetingQualification(
+        document: Document,
+        base: Document,
+    ): LeadingRivalRetargetingConfig {
+        val receipt = node(document)
+        fields(
+            receipt,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "auditSha256",
+            "retargeting",
+            "comparisons",
+        )
+        require(
+            text(receipt, "kind") == "public-leading-rival-qualification-1" &&
+                document.sha256 == RETARGETING_CERTIFICATE_SHA256 &&
+                hash(receipt, "basePreviewSha256") == base.sha256 &&
+                hash(receipt, "nativeJarSha256") == RETARGETING_TRAINING_SHA256 &&
+                hash(receipt, "auditSha256") == RETARGETING_AUDIT_SHA256
+        ) {
+            "The retargeting certificate must match the complete independently audited comparisons."
+        }
+        val cases =
+            mapOf(
+                "mixed" to 1024,
+                "adaptive" to 1024,
+                "familiar" to 1024,
+                "experienced" to 512,
+                "known16" to 768,
+            )
+        val comparisons = receipt["comparisons"]
+        fields(comparisons, *cases.keys.toTypedArray())
+        val allSeeds = mutableSetOf<Int>()
+        val performance = cases.mapValues { (name, count) ->
+            val case = comparisons[name]
+            fields(case, "worlds", "evidenceSha256")
+            hash(case, "evidenceSha256")
+            val worlds = case["worlds"]
+            require(worlds.isArray && worlds.size() == count) {
+                "The retargeting test needs every declared game in $name."
+            }
+            val deltas = worlds.map { row ->
+                fields(row, "seed", "candidate", "control")
+                require(allSeeds.add(integer(row, "seed"))) {
+                    "Each qualified world must occur once across all retargeting comparisons."
+                }
+                val candidate = number(row["candidate"], "candidate win share")
+                val control = number(row["control"], "control win share")
+                require(candidate in VALID_WIN_SHARES && control in VALID_WIN_SHARES) {
+                    "Each retargeting result must use a valid four-seat winner share."
+                }
+                candidate - control
+            }
+            val independent =
+                if (name == "experienced") deltas.chunked(4).map { it.average() } else deltas
+            val mean = independent.average()
+            val error =
+                sqrt(
+                    independent.sumOf { (it - mean) * (it - mean) } /
+                        ((independent.size - 1) * independent.size)
+                )
+            mean to (mean - 1.96 * error)
+        }
+        val ordinary =
+            listOf("mixed", "adaptive", "familiar").map { name ->
+                checkNotNull(performance[name]) {
+                    "The retargeting test needs the $name comparison."
+                }
+            }
+        require(
+            ordinary.minOf { it.second } > -.025 &&
+                ordinary.map { it.first }.average() >= .015 &&
+                ordinary.count { it.second > 0.0 } >= 2 &&
+                (performance["experienced"]?.second ?: -1.0) > 0.0 &&
+                (performance["known16"]?.second ?: -1.0) > -.025
+        ) {
+            "The retargeting candidate must meet both fresh and informed-rival win thresholds."
+        }
+        val policy = receipt["retargeting"]
+        fields(policy, "kind", "maximumTrailingPoints", "requireGreaterCommodityDenial")
+        require(text(policy, "kind") == LeadingRivalRetargetingConfig.VERSION) {
+            "The retargeting certificate must identify its shared expansion rule."
+        }
+        return LeadingRivalRetargetingConfig(
+            maximumTrailingPoints = integer(policy, "maximumTrailingPoints"),
+            requireGreaterCommodityDenial = truth(policy, "requireGreaterCommodityDenial"),
+        )
+    }
+
+    private fun initiativeQualification(
+        subject: Document,
+        base: Document,
+    ): InitiativePolicyConfig {
+        val certificate = node(subject)
+        val kind = text(certificate, "kind")
+        val mixed = kind == "public-initiative-mixed-qualification-1"
+        val trainingHash =
+            if (mixed) MIXED_INITIATIVE_NATIVE_JAR_SHA256 else INITIATIVE_NATIVE_JAR_SHA256
+        fields(
+            certificate,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "auditMethodSha256",
+            "initiative",
+            "comparisons",
+        )
+        require(
+            (mixed || kind == "public-initiative-qualification-1") &&
+                hash(certificate, "basePreviewSha256") == base.sha256 &&
+                hash(certificate, "nativeJarSha256") == trainingHash
+        ) {
+            "The initiative certificate must bind the exact incumbent and tested native runtime."
+        }
+        val method = hash(certificate, "auditMethodSha256")
+        require(
+            !mixed ||
+                method == MIXED_INITIATIVE_AUDIT_SHA256 &&
+                    subject.sha256 == MIXED_INITIATIVE_CERTIFICATE_SHA256
+        ) {
+            "The mixed-table certificate must match both independently rechecked fresh audits."
+        }
+        val opponents = if (mixed) MIXED_INITIATIVE_TABLES else INITIATIVE_OPPONENTS
+        val comparisons = certificate["comparisons"]
+        fields(comparisons, *opponents.toTypedArray())
+        val comparisonSeeds = mutableSetOf<Int>()
+        for (style in opponents) {
+            val comparison = comparisons[style]
+            fields(comparison, "worlds", "evidenceSha256")
+            hash(comparison, "evidenceSha256")
+            val worlds = comparison["worlds"]
+            require(worlds.isArray && worlds.size() == 768) {
+                "Every initiative opponent requires exactly 768 fresh paired games."
+            }
+            val deltas = worlds.map { row ->
+                fields(row, "seed", "candidate", "control")
+                require(comparisonSeeds.add(integer(row, "seed"))) {
+                    "The initiative certificate must use distinct worlds for every opponent."
+                }
+                val candidate = number(row["candidate"], "candidate win share")
+                val control = number(row["control"], "control win share")
+                require(candidate in VALID_WIN_SHARES && control in VALID_WIN_SHARES) {
+                    "Each result must be an authoritative four-seat winner share."
+                }
+                candidate - control
+            }
+            val mean = deltas.average()
+            val standardError =
+                sqrt(deltas.sumOf { (it - mean) * (it - mean) } / ((deltas.size - 1) * deltas.size))
+            val minimum = if (style == "QUALIFIED") -.075 else 0.0
+            require(mean - 1.96 * standardError > minimum) {
+                "The initiative candidate did not clear its fresh win threshold against $style."
+            }
+        }
+        val policy = certificate["initiative"]
+        val commonFields =
+            listOf(
+                "kind",
+                "maximumTokenLoss",
+                "tokenPenalty",
+                "participation",
+                "requireAffordableContest",
+                "attackBonus",
+            )
+        val policyFields =
+            if (mixed) commonFields + listOf("bidScoreTolerance", "openingSpread") else commonFields
+        fields(policy, *policyFields.toTypedArray())
+        require(text(policy, "kind") == InitiativePolicyConfig.VERSION) {
+            "The initiative certificate requires its versioned policy."
+        }
+        return InitiativePolicyConfig(
+            maximumTokenLoss = integer(policy, "maximumTokenLoss"),
+            tokenPenalty = number(policy["tokenPenalty"], "token penalty"),
+            participation = number(policy["participation"], "participation"),
+            requireAffordableContest = truth(policy, "requireAffordableContest"),
+            attackBonus = number(policy["attackBonus"], "attack bonus"),
+            bidScoreTolerance =
+                if (mixed) number(policy["bidScoreTolerance"], "bid score tolerance") else 0.0,
+            openingSpread = if (mixed) integer(policy, "openingSpread") else 0,
         )
     }
 

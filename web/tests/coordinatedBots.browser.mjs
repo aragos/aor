@@ -5,6 +5,7 @@ import {open} from './browser-support.mjs';
 // The configured server loads only the explicitly constructed JVM asset fixture for this suite.
 const expectedProfile = process.env.AOR_TEST_COORDINATED_PROFILE ?? 'aor-coordinated-83-support-1';
 assert(['aor-coordinated-83-support-1', 'aor-coordinated-win-support-1', 'aor-coordinated-robust-support-1'].includes(expectedProfile));
+const capitalPreview = process.env.AOR_TEST_CAPITAL_GEOGRAPHY_SHA;
 const api = process.env.MAP_API_URL;
 const web = process.env.MAP_WEB_URL;
 const cdp = process.env.MAP_CDP_URL;
@@ -115,7 +116,7 @@ try {
         assert(!snapshot.automation.paused && snapshot.game.turnNumber <= 5, 'Constructed profile remains live within the bounded partial game');
         if (snapshot.prompt?.players.includes(snapshot.viewerId) && !snapshot.submitted.includes(snapshot.viewerId)) {
             const choices = snapshot.legalChoices.commands;
-            const command = choices.includes('bid-capital') ? 'bid-capital 0'
+            const command = choices.includes('bid-capital') ? (capitalPreview ? 'bid-capital 39' : 'bid-capital 0')
                 : choices.includes('buy-tokens') ? 'buy-tokens 0'
                 : choices.includes('pass') ? 'pass'
                 : choices.find(value => value.startsWith('choose-capital ')) ?? choices[0];
@@ -126,6 +127,16 @@ try {
     const proof = await page.evaluate('window.coordinatedProof');
     assert(decisions.every(decision => proof.jobs.some(job => job.observation.decision === decision)), 'Live server work covers C/P/E/T');
     assert.deepEqual(proof.workerJobs, [], 'All four phases use the cached shared server chooser');
+    if (capitalPreview) {
+        const secondChoice = proof.jobs.find(job => job.observation.decision === 'choose-capital'
+            && job.observation.candidates.length === 3);
+        assert(secondChoice, 'A live bot makes the second capital choice.');
+        const options = secondChoice.observation.candidates;
+        const best = options.reduce((a, b) => (b.features.capitalOpportunity ?? 0)
+            > (a.features.capitalOpportunity ?? 0) ? b : a);
+        assert.equal(secondChoice.proposal.command, best.command);
+        assert.equal(secondChoice.proposal.assetSha256, capitalPreview);
+    }
     for (const job of [...initialProof.jobs, ...proof.jobs]) {
         assert.equal(job.proposal.profile, expectedProfile);
         assert.match(job.proposal.assetSha256, /^[0-9a-f]{64}$/);
