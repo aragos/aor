@@ -235,7 +235,10 @@ internal object RobustTokenGame {
                 val players = (1..4).map { number -> PlayerId("p$number") }
                 RevealedTokenCounterLeague(players[seat], players, it)
             }
-        fun controllers(log: RobustTokenDiagnostics): Map<Int, SimulationController> {
+        fun controllers(
+            log: RobustTokenDiagnostics,
+            restoredLeague: RevealedTokenCounterLeague? = league,
+        ): Map<Int, SimulationController> {
             val references =
                 arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
             return references.mapValues { (player, reference) ->
@@ -312,7 +315,7 @@ internal object RobustTokenGame {
                         }
                     }
                 val controller =
-                    league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+                    restoredLeague?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
                 object : SimulationController by controller {
                     override fun choose(decision: SimulationDecision): String? =
                         controller.choose(decision)?.also { log.chosen(decision, it) }
@@ -364,8 +367,12 @@ internal object RobustTokenGame {
                 )
             }
         val midgame =
-            if (input.midgameBidRollouts) MidgameBidRollout(seat, 5 + (index / 4) % 4, deadline)
-            else null
+            when {
+                input.adaptiveMidgameBidRollouts ->
+                    MidgameBidRollout(seat, 5 + (index / 4) % 4, deadline, adaptiveRival = league)
+                input.midgameBidRollouts -> MidgameBidRollout(seat, 5 + (index / 4) % 4, deadline)
+                else -> null
+            }
         val canonical =
             if (index in input.replayIndices) RobustCanonicalTrace(seat, midgame) else null
         val game =
@@ -405,7 +412,7 @@ internal object RobustTokenGame {
                                 arena.configurations.single().id,
                                 input.seeds[index],
                                 competitors.map(Competitor::model),
-                                { controllers(RobustTokenDiagnostics(seat)) },
+                                { restored -> controllers(RobustTokenDiagnostics(seat), restored) },
                             )
                     )
                 }

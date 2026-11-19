@@ -112,6 +112,7 @@ private constructor(
     val commodityRollouts: Boolean,
     val commodityExpansionRollouts: Boolean,
     val midgameBidRollouts: Boolean,
+    val adaptiveMidgameBidRollouts: Boolean,
     val rivalMarketDenialRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
@@ -215,6 +216,9 @@ private constructor(
                 mapOf("commodityExpansionRollouts" to "hold-expand-play-1")
             else emptyMap()) +
             (if (midgameBidRollouts) mapOf("midgameBidRollouts" to "sealed-bid-neighbors-1")
+            else emptyMap()) +
+            (if (adaptiveMidgameBidRollouts)
+                mapOf("adaptiveMidgameBidRollouts" to "public-and-sealed-responses-1")
             else emptyMap()) +
             (if (rivalMarketDenialRollouts)
                 mapOf("rivalMarketDenialRollouts" to "matched-rival-market-denial-1")
@@ -419,6 +423,7 @@ private constructor(
                     "commodityRollouts",
                     "commodityExpansionRollouts",
                     "midgameBidRollouts",
+                    "adaptiveMidgameBidRollouts",
                     "rivalMarketDenialRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
@@ -638,6 +643,13 @@ private constructor(
                     require(setting.isBoolean) { "The midgame bid study requires a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val adaptiveMidgameBidRollouts =
+                node["adaptiveMidgameBidRollouts"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "Adaptive midgame bid rollouts require a boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
             val rivalMarketDenialRollouts =
                 node["rivalMarketDenialRollouts"]?.let { setting ->
                     require(setting.isBoolean) { "The rival market study requires a boolean." }
@@ -717,17 +729,28 @@ private constructor(
                 "Rival market denial requires a fixed mixed table and one candidate-only comparison."
             }
             require(
-                !midgameBidRollouts ||
+                !(midgameBidRollouts || adaptiveMidgameBidRollouts) ||
                     !commodityRollouts &&
                         !expansionCardRollouts &&
                         !cardTerritoryRollouts &&
                         !reliefUnlockRollouts &&
+                        !rivalMarketDenialRollouts &&
                         candidateOnly &&
-                        style == RobustOpponentStyle.MIXED &&
                         tokenNeighborMixture == null &&
                         anchored == null
             ) {
-                "Midgame bid rollouts require a fixed mixed table and one candidate-only comparison."
+                "Midgame bid rollouts require one fixed candidate-only comparison."
+            }
+            require(!midgameBidRollouts || style == RobustOpponentStyle.MIXED) {
+                "The ordinary midgame bid study requires fixed mixed rivals."
+            }
+            require(
+                !adaptiveMidgameBidRollouts ||
+                    !midgameBidRollouts &&
+                        style == RobustOpponentStyle.REVEALED_UNDERCUT &&
+                        adaptiveOpponent?.targetedRivalCount == 1
+            ) {
+                "The adaptive midgame bid study requires exactly one public-history undercutter."
             }
             require(
                 !expansionCardRollouts ||
@@ -802,6 +825,7 @@ private constructor(
                     commodityRollouts,
                     commodityExpansionRollouts,
                     midgameBidRollouts,
+                    adaptiveMidgameBidRollouts,
                     rivalMarketDenialRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
