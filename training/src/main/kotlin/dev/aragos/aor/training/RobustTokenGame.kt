@@ -290,6 +290,7 @@ internal object RobustTokenGame {
             val candidate = player == seat && role == "CANDIDATE"
             val offset = (player - seat + 4) % 4
             val previewPeer = offset in input.previewPeerOffsets
+            val openingFallback = input.openingAuctionFallback?.takeIf { candidate || previewPeer }
             val chooseGeography = (candidate || previewPeer) && input.secondCapitalGeography
             val capitalBids = input.capitalAuction?.bidsFor(offset).orEmpty()
             val qualified =
@@ -305,10 +306,11 @@ internal object RobustTokenGame {
                     if (candidate) input.expansionDenial else null,
                     if (candidate) input.tokenNeighborMixture else null,
                     if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
-                    if (candidate) input.initiative else rivalPolicies[player],
+                    if (candidate || openingFallback != null) input.initiative
+                    else rivalPolicies[player],
                     if (candidate) input.leadingRivalRetargeting
                     else input.rivalTargetingLineup?.policy?.takeIf { player in targetingRivals },
-                    if (candidate) input.openingAuctionFallback else null,
+                    openingFallback,
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {
