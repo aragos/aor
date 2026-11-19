@@ -165,11 +165,11 @@ class Campaign:
         target = stage / name
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
-        worker_count, heap, java = (8, "5g", MAC_JAVA) if host == "MAC" else (16, "7g", "/usr/bin/java")
+        worker_count, heap, java = (2, "3g", MAC_JAVA) if host == "MAC" else (4, "4g", "/usr/bin/java")
         if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
             raise WorkerUnavailable("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
-        command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
+        command = ["nice", "-n", "8", "env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
                    java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
                    "-cp", f"{folder}/lib/*", MODE, "--mode", "robust-token-screen-chunk",
                    "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
@@ -222,7 +222,8 @@ class Campaign:
         return done["completedGames"]
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
-              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False):
+              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
+              counter_variants=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -242,6 +243,8 @@ class Campaign:
                         rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [], baseline=baseline)
         if opening_bid_prior is not None:
             declared["openingBidPrior"] = opening_bid_prior
+        if counter_variants:
+            declared["counterVariants"] = counter_variants
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -262,6 +265,8 @@ class Campaign:
                             minimumObservations=2,lookbackTurns=8,targetedRivalCount=1)
                         if opening_bid_prior is not None:
                             spec["adaptiveOpponent"]["openingBidPrior"] = opening_bid_prior
+                        if counter_variants:
+                            spec["adaptiveOpponent"].update(counter_variants.get(key, {}))
                     if mode == "INDEPENDENT_INITIATIVE":
                         if rival is None:
                             raise ValueError("This ecology requires its frozen independently tuned rival.")

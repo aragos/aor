@@ -41,6 +41,16 @@ class RevealedTokenCounterTest {
     }
 
     @Test
+    fun theLowerQuantileAnticipatesARepeatedLowBidEvenWhenTheModeIsHigher() {
+        val counter = counter(RevealedTokenCounterConfig(2, 8, 1, forecastQuantile = 0.25))
+        counter.observe(PublicTokenReveal(1, 19))
+        counter.observe(PublicTokenReveal(2, 21))
+        counter.observe(PublicTokenReveal(3, 21))
+
+        assertThat(bid(counter, turn = 4).command).isEqualTo("buy-tokens 18")
+    }
+
+    @Test
     fun repeatedViewsOfOneRevealDoNotSatisfyTheObservationMinimum() {
         val counter = counter()
         repeat(10) { counter.observe(PublicTokenReveal(1, 21)) }

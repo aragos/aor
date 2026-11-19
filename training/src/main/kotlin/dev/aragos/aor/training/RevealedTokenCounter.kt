@@ -10,18 +10,26 @@ import dev.aragos.aor.ai.LocalTokenNeighborPolicy
 /**
  * Bounded learning from public token purchases. An optional [openingBidPrior] represents a
  * prediction a rival acquired across completed games and fixed before the simulated game starts.
+ * [forecastQuantile] selects a lower or upper order statistic of recent bids. Omission uses the
+ * observed mode and breaks equal frequencies by recency.
  */
 internal data class RevealedTokenCounterConfig(
     val minimumObservations: Int,
     val lookbackTurns: Int,
     val targetedRivalCount: Int,
     val openingBidPrior: Int? = null,
+    val forecastQuantile: Double? = null,
 ) {
     init {
         require(lookbackTurns in 1..16 && minimumObservations in 1..lookbackTurns) {
             "Public counter learning requires 1–16 retained turns and a feasible observation minimum."
         }
         require(targetedRivalCount in 1..3) { "A public counter targets one to three rival seats." }
+        require(
+            forecastQuantile == null || forecastQuantile.isFinite() && forecastQuantile in 0.0..1.0
+        ) {
+            "A public counter quantile must be between zero and one."
+        }
     }
 
     val identity: Map<String, Any>
@@ -31,7 +39,9 @@ internal data class RevealedTokenCounterConfig(
                 "minimumObservations" to minimumObservations,
                 "lookbackTurns" to lookbackTurns,
                 "targetedRivalCount" to targetedRivalCount,
-            ) + (openingBidPrior?.let { mapOf("openingBidPrior" to it) } ?: emptyMap())
+            ) +
+                (openingBidPrior?.let { mapOf("openingBidPrior" to it) } ?: emptyMap()) +
+                (forecastQuantile?.let { mapOf("forecastQuantile" to it) } ?: emptyMap())
 
     companion object {
         const val VERSION = "public-token-history-counter-1"
@@ -45,7 +55,7 @@ internal data class RevealedTokenCounterConfig(
                     "lookbackTurns",
                     "targetedRivalCount",
                 ),
-                optional = setOf("openingBidPrior"),
+                optional = setOf("openingBidPrior", "forecastQuantile"),
             )
             require(node["kind"]?.asText() == VERSION) {
                 "Declare the exact public counter version."
@@ -55,6 +65,9 @@ internal data class RevealedTokenCounterConfig(
                 PurchaseJson.integer(node["lookbackTurns"], "public lookback turns"),
                 PurchaseJson.integer(node["targetedRivalCount"], "targeted rival count"),
                 node["openingBidPrior"]?.let { PurchaseJson.integer(it, "opening bid prior") },
+                node["forecastQuantile"]?.let {
+                    PurchaseJson.number(it, "public bid forecast quantile")
+                },
             )
         }
     }
@@ -329,7 +342,10 @@ internal class RevealedTokenCounter(
         val history = recent.filter { it.turn < turn }
         val prediction =
             if (history.size < config.minimumObservations) config.openingBidPrior
-            else {
+            else if (config.forecastQuantile != null) {
+                val index = (config.forecastQuantile * (history.size - 1)).toInt()
+                history.map(PublicTokenReveal::amount).sorted()[index]
+            } else {
                 val counts = history.groupingBy(PublicTokenReveal::amount).eachCount()
                 val maximum = counts.values.max()
                 history.last { counts[it.amount] == maximum }.amount
