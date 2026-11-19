@@ -236,7 +236,7 @@ fun main(arguments: Array<String>) {
             AoR standalone offline opponent trainer (JDK 21+).
             Use train-opponents.py for enforced CPU, memory and elapsed-time limits.
             --mode coverage|train|evaluate  --output PATH  --hours HOURS (maximum 72)
-            --workers N  --configurations 1..128  --seeds N  --seed N
+            --workers N  --configurations 1..${TrainingMatrix.configurations.size}  --seeds N  --seed N
             --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
             --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
             --mode pilot-diagnose --source PATH --output PATH --samples N --seed N
@@ -325,6 +325,7 @@ fun main(arguments: Array<String>) {
                         seedsPerConfiguration = options.seeds,
                         seedOffset = options.seed,
                         heldOut = true,
+                        reportMatrix = { artifacts.write("evaluation-matrix.json", it) },
                         completed = completed,
                     )
                 artifacts.write("evaluation.json", comparison)
@@ -453,6 +454,7 @@ private fun train(
             seedOffset = options.seed + 1_000_000_000,
             opponentPool = population.take(2),
             heldOut = true,
+            reportMatrix = { artifacts.write("evaluation-matrix.json", it) },
             completed = completed,
         )
     val completeCoverage =
@@ -466,7 +468,8 @@ private fun train(
             "promoted" to promoted,
             "comparison" to heldOut,
             "criterion" to
-                "All 128 configurations, cards and decision types; paired 95% lower reward bound above zero",
+                "All ${TrainingMatrix.configurations.size} setups, cards and decisions " +
+                    "with a positive paired 95% lower reward bound",
             "missingDecisionTypes" to ledger.missingDecisionTypes.sorted(),
             "missingCards" to ledger.missingCards.sorted(),
         ),
@@ -528,7 +531,8 @@ private data class TrainingOptions(
                     workers =
                         fields["--workers"]?.toInt() ?: ((cpus * 0.8).toInt() - 2).coerceAtLeast(1),
                     hours = fields["--hours"]?.toDouble() ?: 12.0,
-                    configurations = fields["--configurations"]?.toInt() ?: 128,
+                    configurations =
+                        fields["--configurations"]?.toInt() ?: TrainingMatrix.configurations.size,
                     seeds = fields["--seeds"]?.toInt() ?: 1,
                     seed = fields["--seed"]?.toInt() ?: 19790531,
                     rounds = fields["--rounds"]?.toInt() ?: 96,
@@ -541,10 +545,15 @@ private data class TrainingOptions(
             require(options.hours.isFinite() && options.hours > 0.0 && options.hours <= 72.0) {
                 "A training invocation may run for more than zero and at most 72 hours."
             }
-            require(options.configurations in 1..128) { "Use between 1 and 128 configurations." }
+            val maxConfigurations = TrainingMatrix.configurations.size
+            require(options.configurations in 1..maxConfigurations) {
+                "Use between 1 and $maxConfigurations configurations."
+            }
             require(options.seeds in 1..1000) { "Use between 1 and 1000 seeds per configuration." }
             require(options.rounds in 0..100000) { "Use between 0 and 100000 exploration rounds." }
-            require(options.batch in 1..128) { "Use between 1 and 128 configurations per round." }
+            require(options.batch in 1..maxConfigurations) {
+                "Use between 1 and $maxConfigurations configurations per round."
+            }
             require(options.seed in 0..100_000_000) { "The initial seed must be 0–100000000." }
             return options
         }

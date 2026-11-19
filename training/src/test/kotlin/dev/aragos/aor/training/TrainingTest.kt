@@ -19,20 +19,22 @@ class TrainingTest {
     @Test
     fun matrixIncludesEveryPlayerCountAndVariantCombinationExactlyOnce() {
         val configurations = TrainingMatrix.configurations
-        assertThat(configurations).hasSize(128)
-        assertThat(configurations.map { it.id }.distinct()).hasSize(128)
+        assertThat(configurations).hasSize(248)
+        assertThat(configurations.map { it.id }.distinct()).hasSize(248)
         for (count in 3..6) {
             for (map in MapRule.entries) {
                 for (initial in InitialCardRule.entries) {
                     for (deck in listOf(false, true)) {
                         for (art in listOf(false, true)) {
-                            assertThat(configurations)
-                                .contains(
-                                    TrainingConfiguration(
-                                        count,
-                                        RuleOptions(deck, initial, art, map),
-                                    )
-                                )
+                            val rules = RuleOptions(deck, initial, art, map)
+                            assertThat(configurations).contains(TrainingConfiguration(count, rules))
+                            val drawingThree =
+                                TrainingConfiguration(count, rules.copy(drawThreeKeepTwo = true))
+                            if (count == 6 && initial == InitialCardRule.COMMODITY_ONLY) {
+                                assertThat(configurations).doesNotContain(drawingThree)
+                            } else {
+                                assertThat(configurations).contains(drawingThree)
+                            }
                         }
                     }
                 }
@@ -46,6 +48,15 @@ class TrainingTest {
         assertThat(firstEight.map { it.playerCount }.toSet()).containsExactly(3, 4, 5, 6)
         assertThat(firstEight.map { it.rules.map }.toSet())
             .containsExactly(MapRule.STANDARD, MapRule.EUROPEAN)
+    }
+
+    @Test
+    fun expandedMatrixRetainsTheOriginalConfigurationIdsAndSeedIndices() {
+        val historical = TrainingMatrix.stratified.take(128)
+
+        assertThat(historical.all { !it.rules.drawThreeKeepTwo }).isTrue()
+        assertThat(historical.first().id).isEqualTo("players-3/standard/any/deck-false/art-false")
+        assertThat(TrainingMatrix.stratified.drop(128).all { it.rules.drawThreeKeepTwo }).isTrue()
     }
 
     @Test
@@ -154,7 +165,7 @@ class TrainingTest {
                 "civil-war-loss",
                 "immediate-master-art-discard",
             )
-        assertThat(ledger.report()["probedConfigurations"]).isEqualTo(128)
+        assertThat(ledger.report()["probedConfigurations"]).isEqualTo(248)
         assertThat(ledger.report()["observedConfigurations"]).isEqualTo(0)
         assertThat(probes.regret(BotModels.default).isFinite()).isTrue()
     }

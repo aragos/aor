@@ -86,10 +86,13 @@ It records wall time, thread CPU and allocated bytes separately for games and re
 replay in warmup, and checks outcomes, coverage and regret against the baseline. Use the same JDK
 and an idle machine for both runs. These fixed development games do not measure playing strength.
 
-The default matrix covers 128 historical player-count/variant combinations, with draw-three-keep-two
-disabled. `coverage.json` distinguishes
+The default matrix covers all 248 legal combinations across 3–6 players and current variants.
+The six-player commodities-only opening requires Draw Three Keep Two to be disabled. Configuration
+IDs and seed indices for the original 128 single-card setups are preserved. `coverage.json` distinguishes
 observed/missing decisions, cards and configurations; directed probes do not establish exhaustive
-position coverage. `rounds.jsonl` records exploration; `evaluation.json` records independent comparison.
+position coverage. `rounds.jsonl` records exploration. `evaluation.json` records the independent
+comparison and `evaluation-matrix.json` reports the same paired results by setup, player count and
+opening-deal variant.
 Review independent evaluation and coverage gates before publishing a model. Limit its
 [browser bundle entry](design.md#automated-seats) to qualified configurations, preserve compatible
 legacy entries, then build and check the web client. Failed promotion retains the prior model and

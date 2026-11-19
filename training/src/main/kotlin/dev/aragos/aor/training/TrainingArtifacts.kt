@@ -290,6 +290,7 @@ class CoverageLedger {
                 "windmill",
                 "offer-card",
                 "immediate-master-art-discard",
+                "return-card",
             )
 
         private fun mergeCounts(target: MutableMap<String, Int>, source: Map<String, Int>) {

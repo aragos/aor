@@ -106,8 +106,8 @@ def parse_options(arguments):
     if not math.isfinite(options.hours) or not 0 < options.hours <= MAX_HOURS:
         parser.error("--hours must be finite, positive and at most 72.")
     for name, minimum, maximum in (
-            ("configurations", 1, 128), ("seeds", 1, 1000), ("seed", 0, 100_000_000),
-            ("rounds", 0, 100000), ("batch", 1, 128),
+            ("configurations", 1, 256), ("seeds", 1, 1000), ("seed", 0, 100_000_000),
+            ("rounds", 0, 100000), ("batch", 1, 256),
             ("benchmark_games", 1, 10000), ("positions", 2, 10000),
             ("samples", 1, 256), ("pairs", 1, 100000)):
         value = getattr(options, name)

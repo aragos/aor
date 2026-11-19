@@ -20,6 +20,20 @@ data class ModelComparison(
     val incumbentWinShare: Double,
 )
 
+/** Matched held-out games grouped by the setup dimensions needed for interpreting transfer. */
+data class MatrixModelComparison(
+    val byPlayerCount: Map<Int, ModelComparison>,
+    val byDrawThreeKeepTwo: Map<Boolean, ModelComparison>,
+    val byConfiguration: Map<String, ModelComparison>,
+)
+
+private data class PairResult(
+    val configuration: TrainingConfiguration,
+    val difference: Double,
+    val candidateWins: Double,
+    val incumbentWins: Double,
+)
+
 /**
  * Bounded offline game workers. Reserve two of the permitted CPU slots for GC and coordination.
  * [deadlineNanos] is checked both between jobs and at every simulated player decision.
@@ -99,14 +113,10 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
         seedOffset: Int,
         opponentPool: List<BotModel> = listOf(BotModels.default, incumbent),
         heldOut: Boolean = false,
+        reportMatrix: ((MatrixModelComparison) -> Unit)? = null,
         completed: (SimulatedGame) -> Unit = {},
     ): ModelComparison {
         require(opponentPool.isNotEmpty()) { "A tournament requires an opponent population." }
-        data class PairResult(
-            val difference: Double,
-            val candidateWins: Double,
-            val incumbentWins: Double,
-        )
         val pairs =
             run(
                 configurations.flatMapIndexed { index, configuration ->
@@ -143,6 +153,7 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
                                 completed(incumbentGame)
                             }
                             PairResult(
+                                configuration,
                                 candidateGame.reward(controlledSeat) -
                                     incumbentGame.reward(controlledSeat),
                                 candidateGame.winShare(controlledSeat),
@@ -152,27 +163,54 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
                     }
                 }
             )
-        val mean = pairs.map(PairResult::difference).average()
-        val variance =
-            if (pairs.size <= 1) 0.0
-            else {
-                pairs.sumOf { (it.difference - mean) * (it.difference - mean) } / (pairs.size - 1)
-            }
-        val margin = 1.96 * sqrt(variance / pairs.size)
-        return ModelComparison(
-            pairs = pairs.size,
-            rewardDifference = mean,
-            lower95 = mean - margin,
-            upper95 = mean + margin,
-            candidateWinShare = pairs.map(PairResult::candidateWins).average(),
-            incumbentWinShare = pairs.map(PairResult::incumbentWins).average(),
+        reportMatrix?.invoke(
+            MatrixModelComparison(
+                byPlayerCount =
+                    pairs
+                        .groupBy { it.configuration.playerCount }
+                        .toSortedMap()
+                        .mapValues {
+                            summarize(it.value)
+                        },
+                byDrawThreeKeepTwo =
+                    pairs
+                        .groupBy { it.configuration.rules.drawThreeKeepTwo }
+                        .toSortedMap()
+                        .mapValues { summarize(it.value) },
+                byConfiguration =
+                    pairs
+                        .groupBy { it.configuration.id }
+                        .toSortedMap()
+                        .mapValues {
+                            summarize(it.value)
+                        },
+            )
         )
+        return summarize(pairs)
     }
 
     override fun close() {
         executor.shutdownNow()
         executor.awaitTermination(30, TimeUnit.SECONDS)
     }
+}
+
+private fun summarize(pairs: List<PairResult>): ModelComparison {
+    val mean = pairs.map(PairResult::difference).average()
+    val variance =
+        if (pairs.size <= 1) 0.0
+        else {
+            pairs.sumOf { (it.difference - mean) * (it.difference - mean) } / (pairs.size - 1)
+        }
+    val margin = 1.96 * sqrt(variance / pairs.size)
+    return ModelComparison(
+        pairs = pairs.size,
+        rewardDifference = mean,
+        lower95 = mean - margin,
+        upper95 = mean + margin,
+        candidateWinShare = pairs.map(PairResult::candidateWins).average(),
+        incumbentWinShare = pairs.map(PairResult::incumbentWins).average(),
+    )
 }
 
 /** Reserve a disjoint positive seed range for final evaluation, including after integer wrap. */

@@ -10,6 +10,12 @@ data class RuleOptions(
     val map: MapRule = MapRule.STANDARD,
     val drawThreeKeepTwo: Boolean = false,
 ) {
+    /** Whether the opening deck can supply the configured draw and return sequence. */
+    fun supportsInitialDeal(playerCount: Int): Boolean =
+        !drawThreeKeepTwo ||
+            cardsForEpoch(Epoch.ONE).count { initialCard.accepts(CardData.definition(it)) } >=
+                playerCount * 2 + 1
+
     /** Physical cards assigned to an epoch before recycled discards are added. */
     fun cardsForEpoch(epoch: Epoch): List<String> = decks.assigned[epoch.ordinal]
 
