@@ -26,6 +26,7 @@ internal class PairedActionRolloutObserver(
     private val shortTrainingFutures: Int = 0,
     private val resampledDrawStudy: Boolean = false,
     private val reliefUnlock: Boolean = false,
+    private val commodityExpansion: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -33,12 +34,14 @@ internal class PairedActionRolloutObserver(
         val chosen: String,
         val actions: Map<String, String>,
         val context: Map<String, Any>,
+        val commodityPlan: CommodityExpansionPlan? = null,
     )
 
     private var root: Root? = null
     val evidenceKey: String
         get() =
             when {
+                commodityExpansion -> "commodityExpansionRollouts"
                 timing != null -> "commodityRollouts"
                 compareTerritory -> "cardTerritoryRollouts"
                 reliefUnlock -> "reliefUnlockRollouts"
@@ -71,9 +74,10 @@ internal class PairedActionRolloutObserver(
         if (state.stage != Stage.PLAY_CARDS) return null
         if (observation.candidates.none { it.command == "pass" }) return null
         val actor = state.playerIds[seat]
+        val view = state.viewForDecision(actor)
         val choices =
             CommodityTimingPolicy.opportunities(
-                state.viewForDecision(actor),
+                view,
                 actor,
                 observation,
                 timing,
@@ -83,12 +87,19 @@ internal class PairedActionRolloutObserver(
                 choices.entries.maxWithOrNull(compareBy({ it.value }, { it.key }))
             } else choices.entries.singleOrNull { it.key == command }
         if (selected == null) return null
+        val plan =
+            if (commodityExpansion) CommodityExpansionPlan.capture(view, actor, selected.key)
+            else null
+        val ordinaryArms = mapOf("play" to selected.key, "hold" to "pass")
         return Root(
             state,
             number,
             command,
-            mapOf("play" to selected.key, "hold" to "pass"),
-            mapOf("play" to selected.key, "projectedGrowth" to selected.value),
+            if (plan == null) ordinaryArms
+            else ordinaryArms + mapOf("hold-and-expand" to "pass", "hold-expand-play" to "pass"),
+            mapOf("play" to selected.key, "projectedGrowth" to selected.value) +
+                (if (plan == null) emptyMap() else mapOf("currentPayout" to plan.currentPayout)),
+            plan,
         )
     }
 
@@ -287,12 +298,28 @@ internal class PairedActionRolloutObserver(
                         }
                     }
                     record?.invoke(session.state, session.decisions)
+                    val originalControllers = controllers()
+                    val commodityController =
+                        captured.commodityPlan
+                            ?.takeIf { arm == "hold-and-expand" || arm == "hold-expand-play" }
+                            ?.controller(
+                                requireNotNull(originalControllers[seat]) {
+                                    "A commodity plan needs the actor's reference policy."
+                                },
+                                actor,
+                                originTurn,
+                                redeem = arm == "hold-expand-play",
+                            )
                     val continuation =
                         FrozenPolicyContinuation(
                             models,
-                            if (arm == "purchase-and-relieve") {
-                                preferRelief(controllers(), originTurn)
-                            } else controllers(),
+                            when {
+                                arm == "purchase-and-relieve" ->
+                                    preferRelief(originalControllers, originTurn)
+                                commodityController != null ->
+                                    originalControllers + (seat to commodityController)
+                                else -> originalControllers
+                            },
                             seed,
                             deadline,
                             decisionOffset = captured.number,
@@ -303,6 +330,12 @@ internal class PairedActionRolloutObserver(
                         "terminal" to terminal,
                         "canonicalSha256" to verifiedCanonical(session, captured.state, deadline),
                     ) +
+                        (commodityController?.let {
+                            mapOf(
+                                "plannedMarkets" to it.selectedMarkets,
+                                "plannedCardPlay" to it.scheduledPlay,
+                            )
+                        } ?: emptyMap()) +
                         (if (reliefUnlock) {
                             val spaces =
                                 session.entries

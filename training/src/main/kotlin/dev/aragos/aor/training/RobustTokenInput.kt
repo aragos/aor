@@ -110,6 +110,7 @@ private constructor(
     val initiativeRival: InitiativeRival?,
     val commodityTiming: CommodityTimingConfig?,
     val commodityRollouts: Boolean,
+    val commodityExpansionRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -207,6 +208,9 @@ private constructor(
                 )
             } ?: emptyMap()) +
             (if (commodityRollouts) mapOf("commodityRollouts" to "play-versus-hold-1")
+            else emptyMap()) +
+            (if (commodityExpansionRollouts)
+                mapOf("commodityExpansionRollouts" to "hold-expand-play-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -406,6 +410,7 @@ private constructor(
                     "initiative",
                     "commodityTiming",
                     "commodityRollouts",
+                    "commodityExpansionRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -612,6 +617,13 @@ private constructor(
                     require(setting.isBoolean) { "The commodity rollout switch must be boolean." }
                     setting.booleanValue()
                 } ?: false
+            val commodityExpansionRollouts =
+                node["commodityExpansionRollouts"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The commodity expansion study requires a boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -667,6 +679,9 @@ private constructor(
                         anchored == null
             ) {
                 "Commodity rollouts require a fixed candidate-only league and a declared timing trigger."
+            }
+            require(!commodityExpansionRollouts || commodityRollouts) {
+                "A commodity expansion plan requires a declared ordinary holding opportunity."
             }
             require(
                 !expansionCardRollouts ||
@@ -739,6 +754,7 @@ private constructor(
                     initiativeRival,
                     commodityTiming,
                     commodityRollouts,
+                    commodityExpansionRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

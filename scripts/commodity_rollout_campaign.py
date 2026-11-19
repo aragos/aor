@@ -14,8 +14,8 @@ TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
                         lookahead=False, epochs=(), chance_trial=False, short_training_futures=0,
-                        relief_unlock=False):
-    if sum((expansion, territory, relief_unlock)) > 1:
+                        relief_unlock=False, commodity_expansion=False):
+    if sum((expansion, territory, relief_unlock, commodity_expansion)) > 1:
         raise ValueError("A paired study requires one root intervention.")
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
@@ -24,6 +24,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         topic, bank = "buy-or-expand", "card-versus-territory-v1"
     elif relief_unlock:
         topic, bank = "unlock-relief", "first-tier-relief-v1"
+    elif commodity_expansion:
+        topic, bank = "commodity-sequence", "hold-expand-play-v1"
     if lookahead:
         if not territory:
             raise ValueError("Short lookahead requires the card versus territory comparison.")
@@ -56,6 +58,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
     elif relief_unlock:
         method["kind"] = "first-tier-relief-1"
         method.pop("commodityTiming")
+    elif commodity_expansion:
+        method["kind"] = "hold-expand-play-1"
     if lookahead:
         method["checkpointTurns"] = [1, 3]
     if epochs:
@@ -95,6 +99,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
             request["reliefUnlockRollouts"] = True
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
+            if commodity_expansion:
+                request["commodityExpansionRollouts"] = True
         if not source.exists():
             write(source, request)
         elif read(source) != request:

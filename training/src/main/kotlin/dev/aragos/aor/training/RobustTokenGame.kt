@@ -313,7 +313,11 @@ internal object RobustTokenGame {
             input.commodityTiming
                 ?.takeIf { input.commodityRollouts }
                 ?.let { timing ->
-                    PairedActionRolloutObserver(seat, timing)
+                    PairedActionRolloutObserver(
+                        seat,
+                        timing,
+                        commodityExpansion = input.commodityExpansionRollouts,
+                    )
                 }
                 ?: when {
                     input.expansionCardRollouts -> PairedActionRolloutObserver(seat)
