@@ -116,6 +116,7 @@ private constructor(
     val reserveExpansionCardRollouts: Boolean,
     val capitalChoiceRollouts: Boolean,
     val leaderProtectionRollouts: Boolean,
+    val nextTurnBaseRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -229,6 +230,9 @@ private constructor(
             else emptyMap()) +
             (if (leaderProtectionRollouts)
                 mapOf("leaderProtectionRollouts" to "matched-protection-escrow-1")
+            else emptyMap()) +
+            (if (nextTurnBaseRollouts)
+                mapOf("nextTurnBaseRollouts" to "colored-base-followthrough-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -434,6 +438,7 @@ private constructor(
                     "reserveExpansionCardRollouts",
                     "capitalChoiceRollouts",
                     "leaderProtectionRollouts",
+                    "nextTurnBaseRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -674,6 +679,11 @@ private constructor(
                     require(setting.isBoolean) { "The protection escrow study requires a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val nextTurnBaseRollouts =
+                node["nextTurnBaseRollouts"]?.let { setting ->
+                    require(setting.isBoolean) { "The next-turn base study requires a boolean." }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -732,6 +742,24 @@ private constructor(
             }
             require(!commodityExpansionRollouts || commodityRollouts) {
                 "A commodity expansion plan requires a declared ordinary holding opportunity."
+            }
+            require(
+                !nextTurnBaseRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        !cardTerritoryRollouts &&
+                        !reliefUnlockRollouts &&
+                        !midgameBidRollouts &&
+                        !rivalMarketDenialRollouts &&
+                        !reserveExpansionCardRollouts &&
+                        !capitalChoiceRollouts &&
+                        !leaderProtectionRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.MIXED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "The next-turn base study requires one fixed mixed candidate-only comparison."
             }
             require(
                 !leaderProtectionRollouts ||
@@ -885,6 +913,7 @@ private constructor(
                     reserveExpansionCardRollouts,
                     capitalChoiceRollouts,
                     leaderProtectionRollouts,
+                    nextTurnBaseRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

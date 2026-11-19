@@ -345,6 +345,8 @@ internal object RobustTokenGame {
                         PairedActionRolloutObserver(seat, compareCapitals = true)
                     input.leaderProtectionRollouts ->
                         PairedActionRolloutObserver(seat, compareLeaderProtection = true)
+                    input.nextTurnBaseRollouts ->
+                        PairedActionRolloutObserver(seat, compareNextTurnBase = true)
                     input.cardTerritoryRollouts ->
                         PairedActionRolloutObserver(
                             seat,
