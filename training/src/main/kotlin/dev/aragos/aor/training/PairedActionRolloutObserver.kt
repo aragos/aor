@@ -10,19 +10,21 @@ import dev.aragos.aor.ai.CommodityTimingConfig
 import dev.aragos.aor.ai.CommodityTimingPolicy
 
 /** Offline paired continuations from the same simulated deal and permitted actor observation. */
-internal class CommodityRolloutObserver(
+internal class PairedActionRolloutObserver(
     override val seat: Int,
-    private val timing: CommodityTimingConfig,
+    private val timing: CommodityTimingConfig? = null,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
         val number: Int,
-        val offeredPlay: String,
         val chosen: String,
-        val projectedGrowth: Double,
+        val actions: Map<String, String>,
+        val context: Map<String, Any>,
     )
 
     private var root: Root? = null
+    val evidenceKey: String
+        get() = if (timing != null) "commodityRollouts" else "expansionCardRollouts"
 
     override fun chosen(
         state: GameState,
@@ -30,8 +32,21 @@ internal class CommodityRolloutObserver(
         observation: BotObservation,
         command: String,
     ) {
-        if (root != null || state.stage != Stage.PLAY_CARDS) return
-        if (observation.candidates.none { it.command == "pass" }) return
+        if (root != null) return
+        root =
+            if (timing != null) commodityRoot(state, number, observation, command, timing)
+            else expansionCardRoot(state, number, observation, command)
+    }
+
+    private fun commodityRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+        timing: CommodityTimingConfig,
+    ): Root? {
+        if (state.stage != Stage.PLAY_CARDS) return null
+        if (observation.candidates.none { it.command == "pass" }) return null
         val actor = state.playerIds[seat]
         val choices =
             CommodityTimingPolicy.opportunities(
@@ -44,8 +59,48 @@ internal class CommodityRolloutObserver(
             if (command == "pass") {
                 choices.entries.maxWithOrNull(compareBy({ it.value }, { it.key }))
             } else choices.entries.singleOrNull { it.key == command }
-        if (selected == null) return
-        root = Root(state, number, selected.key, command, selected.value)
+        if (selected == null) return null
+        return Root(
+            state,
+            number,
+            command,
+            mapOf("play" to selected.key, "hold" to "pass"),
+            mapOf("play" to selected.key, "projectedGrowth" to selected.value),
+        )
+    }
+
+    private fun expansionCardRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (state.stage != Stage.EXPANSION || command !in setOf("pass", "buy-expansion-card"))
+            return null
+        val actions = mapOf("buy" to "buy-expansion-card", "pass" to "pass")
+        if (!actions.values.all { choice -> observation.candidates.any { it.command == choice } })
+            return null
+        val actor = state.playerIds[seat]
+        val view = state.viewForDecision(actor)
+        val price =
+            requireNotNull(view.expansionCardCost) { "An offered expansion card needs its price." }
+        val markets =
+            view.expansionOffers.count { offer ->
+                offer.establishesMarker && offer.blockers.isEmpty() && !offer.uncertain
+            }
+        return Root(
+            state,
+            number,
+            command,
+            actions,
+            mapOf(
+                "price" to price,
+                "pool" to observation.availableTokens,
+                "handSize" to view.hand.size,
+                "completePeacefulMarkets" to markets,
+                "finalTurn" to view.endingTriggered,
+            ),
+        )
     }
 
     fun evidence(
@@ -58,7 +113,7 @@ internal class CommodityRolloutObserver(
         val captured = root ?: return mapOf("status" to "no-eligible-root")
         val actor = captured.state.playerIds[seat]
         val tails =
-            mapOf("play" to captured.offeredPlay, "hold" to "pass").mapValues { (_, action) ->
+            captured.actions.mapValues { (_, action) ->
                 (0..1).map { replicate ->
                     val chanceSeed = CardAdvantageExecutor.chanceSeed(seed, replicate)
                     val session =
@@ -80,7 +135,7 @@ internal class CommodityRolloutObserver(
                             state.step(TextCodec.parse(entry))
                         }
                     check(replayed == session.state) {
-                        "The commodity continuation must replay exactly."
+                        "The paired continuation must replay exactly."
                     }
                     mapOf(
                         "terminal" to terminal,
@@ -94,10 +149,8 @@ internal class CommodityRolloutObserver(
             "turn" to
                 requireNotNull(captured.state.turnNumber) { "A card root needs its live turn." },
             "epoch" to captured.state.currentEpoch.number,
-            "play" to captured.offeredPlay,
             "ordinary" to captured.chosen,
-            "projectedGrowth" to captured.projectedGrowth,
             "tails" to tails,
-        )
+        ) + captured.context
     }
 }

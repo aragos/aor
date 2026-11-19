@@ -8,16 +8,21 @@ from initiative_campaign import Campaign, interval, read, seed_bank, sha, write
 
 
 REMOTE = "/home/aragos/aor-worker/commodity-rollouts-20261118"
+EXPANSION_REMOTE = "/home/aragos/aor-worker/expansion-card-rollouts-20261118"
 
 
-def simulated_positions(campaign, root, baseline, count):
-    stage = root / "play-or-hold"
+def simulated_positions(campaign, root, baseline, count, *, expansion=False):
+    topic = "buy-or-pass" if expansion else "play-or-hold"
+    stage = root / topic
     stage.mkdir(exist_ok=campaign.resume)
-    seeds = seed_bank("commodity-play-or-hold-v1", count)
+    seeds = seed_bank("expansion-buy-or-pass-v1" if expansion else "commodity-play-or-hold-v1", count)
     timing = {"kind": "affordable-commodity-retention-1", "futureWeight": .10,
               "minimumGrowth": 8, "currentPayoutLimit": 10}
     method = {"kind": "natural-commodity-root-screen-1", "seeds": seeds, "initiative": baseline,
               "commodityTiming": timing, "tailReplicates": 2, "runtime": campaign.runtime}
+    if expansion:
+        method["kind"] = "natural-card-purchase-root-screen-1"
+        method.pop("commodityTiming")
     declared = stage / "method.json"
     if not declared.exists():
         write(declared, method)
@@ -32,8 +37,11 @@ def simulated_positions(campaign, root, baseline, count):
                     for key, value in campaign.template.items()}
         request = dict(template, protocolSha256=sha(declared), seeds=seeds, globalStart=start,
                        count=min(32,count-start), opponentStyle="QUALIFIED", candidateOnly=True,
-                       replayIndices=[0,count-1], initiative=baseline, commodityTiming=timing,
-                       commodityRollouts=True)
+                       replayIndices=[0,count-1], initiative=baseline)
+        if expansion:
+            request["expansionCardRollouts"] = True
+        else:
+            request.update(commodityTiming=timing, commodityRollouts=True)
         if not source.exists():
             write(source, request)
         elif read(source) != request:
@@ -45,6 +53,7 @@ def simulated_positions(campaign, root, baseline, count):
         else:
             pending.append((name, source))
     campaign.execute_jobs(stage, pending)
+    return stage
 
 
 def report(stage):
@@ -76,12 +85,40 @@ def report(stage):
                                 if any(lower <= growth < upper for _,growth,_ in points)}}
 
 
-def main(root, previous, count, resume):
-    campaign = Campaign(root, remote=REMOTE, resume=resume)
+def expansion_report(stage):
+    observations = []
+    origins = 0
+    for file in sorted(stage.glob("root-*/worlds.jsonl")):
+        with file.open() as stream:
+            for line in stream:
+                record = json.loads(line)["diagnostics"]["CANDIDATE"]["expansionCardRollouts"]
+                origins += 1
+                if record["status"] != "paired":
+                    continue
+                gain = statistics.mean(buy["terminal"]["winShare"] - passed["terminal"]["winShare"]
+                    for buy, passed in zip(record["tails"]["buy"],record["tails"]["pass"],strict=True))
+                observations.append((record, gain))
+    groups = {}
+    for label,filtration in (
+        ("all",lambda row: True),
+        ("declined-by-policy",lambda row: row["ordinary"] == "pass"),
+        ("no-peaceful-market",lambda row: row["completePeacefulMarkets"] == 0),
+        ("three-token-card",lambda row: row["price"] == 3),
+        ("later-card",lambda row: row["price"] > 3),
+    ):
+        shifts = [gain for row,gain in observations if filtration(row)]
+        if shifts:
+            groups[label] = interval(shifts)
+    return {"origins":origins,"eligible":len(observations),"terminalRollouts":4*len(observations),
+            "buyWinShareDelta":groups}
+
+
+def main(root, previous, count, resume, expansion):
+    campaign = Campaign(root, remote=EXPANSION_REMOTE if expansion else REMOTE, resume=resume)
     campaign.validate_runtime()
     first = read(previous / "automata-initiative-20261118/result.json")
-    simulated_positions(campaign, root, first["comparison"]["config"], count)
-    write(root / "result.json", report(root / "play-or-hold"))
+    stage = simulated_positions(campaign, root, first["comparison"]["config"], count, expansion=expansion)
+    write(root / "result.json", expansion_report(stage) if expansion else report(stage))
 
 
 if __name__ == "__main__":
@@ -89,8 +126,9 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--previous", type=Path, required=True)
     parser.add_argument("--count", type=int, default=384)
+    parser.add_argument("--expansion-card", action="store_true")
     parser.add_argument("--resume", action="store_true")
     arguments = parser.parse_args()
     if arguments.count not in range(32,1537):
         parser.error("--count must be between 32 and 1536")
-    main(arguments.root.resolve(), arguments.previous.resolve(), arguments.count, arguments.resume)
+    main(arguments.root.resolve(),arguments.previous.resolve(),arguments.count,arguments.resume,arguments.expansion_card)

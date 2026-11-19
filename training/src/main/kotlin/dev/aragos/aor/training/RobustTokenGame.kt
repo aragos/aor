@@ -313,8 +313,8 @@ internal object RobustTokenGame {
             input.commodityTiming
                 ?.takeIf { input.commodityRollouts }
                 ?.let { timing ->
-                    CommodityRolloutObserver(seat, timing)
-                }
+                    PairedActionRolloutObserver(seat, timing)
+                } ?: if (input.expansionCardRollouts) PairedActionRolloutObserver(seat) else null
         val competitors =
             List(4) { player ->
                 Competitor(
@@ -340,7 +340,7 @@ internal object RobustTokenGame {
             observer
                 ?.let {
                     mapOf(
-                        "commodityRollouts" to
+                        it.evidenceKey to
                             it.evidence(
                                 arena.configurations.single().id,
                                 input.seeds[index],

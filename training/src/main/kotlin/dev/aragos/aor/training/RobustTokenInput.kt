@@ -110,6 +110,7 @@ private constructor(
     val initiativeRival: InitiativeRival?,
     val commodityTiming: CommodityTimingConfig?,
     val commodityRollouts: Boolean,
+    val expansionCardRollouts: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -199,6 +200,8 @@ private constructor(
                 )
             } ?: emptyMap()) +
             (if (commodityRollouts) mapOf("commodityRollouts" to "play-versus-hold-1")
+            else emptyMap()) +
+            (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -381,6 +384,7 @@ private constructor(
                     "initiative",
                     "commodityTiming",
                     "commodityRollouts",
+                    "expansionCardRollouts",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -468,6 +472,13 @@ private constructor(
                         "Candidate-only collection requires an explicit JSON boolean."
                     }
                     it.booleanValue()
+                } ?: false
+            val expansionCardRollouts =
+                node["expansionCardRollouts"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The expansion card rollout switch must be boolean."
+                    }
+                    setting.booleanValue()
                 } ?: false
             val adaptiveOpponent =
                 node["adaptiveOpponent"]?.takeUnless(JsonNode::isNull)?.let {
@@ -571,6 +582,16 @@ private constructor(
             ) {
                 "Commodity rollouts require a fixed candidate-only league and a declared timing trigger."
             }
+            require(
+                !expansionCardRollouts ||
+                    !commodityRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.QUALIFIED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "Expansion card rollouts require a fixed candidate-only league and one comparison."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -591,6 +612,7 @@ private constructor(
                     initiativeRival,
                     commodityTiming,
                     commodityRollouts,
+                    expansionCardRollouts,
                     seeds,
                     start,
                     count,
