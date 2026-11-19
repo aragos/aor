@@ -291,7 +291,7 @@ class Campaign:
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
               rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
               counter_variants=None, lineup=None, capital_variants=None, series_priors=None,
-              leading_rival_variants=None):
+              leading_rival_variants=None, control_bundle=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -321,6 +321,8 @@ class Campaign:
             declared["seriesOpeningPriors"] = series_priors
         if leading_rival_variants:
             declared["leadingRivalRetargetingVariants"] = leading_rival_variants
+        if control_bundle:
+            declared["controlAndRivalsBundle"] = control_bundle
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -336,6 +338,8 @@ class Campaign:
                                 replayIndices=declared["replayIndices"])
                     spec = {key: dict(value, path="../"+value["path"]) if isinstance(value,dict) and
                             set(value)=={"path", "sha256"} else value for key,value in spec.items()}
+                    if control_bundle:
+                        spec["controlBundle"] = dict(control_bundle, path="../" + control_bundle["path"])
                     if mode.startswith("REVEALED_"):
                         spec["adaptiveOpponent"] = dict(kind="public-token-history-counter-1",
                             minimumObservations=2,lookbackTurns=8,targetedRivalCount=1)
