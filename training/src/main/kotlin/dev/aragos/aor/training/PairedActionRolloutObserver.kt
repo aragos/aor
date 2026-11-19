@@ -33,6 +33,7 @@ internal class PairedActionRolloutObserver(
     private val compareCapitals: Boolean = false,
     private val compareLeaderProtection: Boolean = false,
     private val compareNextTurnBase: Boolean = false,
+    private val compareEventTargets: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -57,6 +58,7 @@ internal class PairedActionRolloutObserver(
                 compareCapitals -> "capitalChoiceRollouts"
                 compareLeaderProtection -> "leaderProtectionRollouts"
                 compareNextTurnBase -> "nextTurnBaseRollouts"
+                compareEventTargets -> "eventTargetRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -77,8 +79,43 @@ internal class PairedActionRolloutObserver(
                 compareCapitals -> capitalRoot(state, number, observation, command)
                 compareLeaderProtection -> protectionRoot(state, number, observation, command)
                 compareNextTurnBase -> baseRoot(state, number, observation, command)
+                compareEventTargets -> eventRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
+    }
+
+    private fun eventRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (
+            state.stage != Stage.PLAY_CARDS ||
+                (state.turnNumber ?: 0) < 3 ||
+                !command.startsWith("play ")
+        ) {
+            return null
+        }
+        val actor = state.playerIds[seat]
+        val plan =
+            LeadingRivalEvent.select(state.viewForDecision(actor), actor, observation, command)
+                ?: return null
+        return Root(
+            state = state,
+            number = number,
+            chosen = command,
+            actions = mapOf("ordinary" to command, "score-leader" to plan.command),
+            context =
+                mapOf(
+                    "eventId" to plan.card.cardId,
+                    "target" to plan.target.value,
+                    "ordinaryTarget" to plan.ordinaryTarget.value,
+                    "behindBy" to plan.trailingPoints,
+                    "ordinaryDisruption" to plan.ordinaryDamage,
+                    "leaderDisruption" to plan.damage,
+                ),
+        )
     }
 
     private fun baseRoot(

@@ -117,6 +117,7 @@ private constructor(
     val capitalChoiceRollouts: Boolean,
     val leaderProtectionRollouts: Boolean,
     val nextTurnBaseRollouts: Boolean,
+    val eventTargetRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -233,6 +234,8 @@ private constructor(
             else emptyMap()) +
             (if (nextTurnBaseRollouts)
                 mapOf("nextTurnBaseRollouts" to "colored-base-followthrough-1")
+            else emptyMap()) +
+            (if (eventTargetRollouts) mapOf("eventTargetRollouts" to "leading-rival-event-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -439,6 +442,7 @@ private constructor(
                     "capitalChoiceRollouts",
                     "leaderProtectionRollouts",
                     "nextTurnBaseRollouts",
+                    "eventTargetRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -684,6 +688,11 @@ private constructor(
                     require(setting.isBoolean) { "The next-turn base study requires a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val eventTargetRollouts =
+                node["eventTargetRollouts"]?.let { setting ->
+                    require(setting.isBoolean) { "The event target study requires a boolean." }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -744,8 +753,9 @@ private constructor(
                 "A commodity expansion plan requires a declared ordinary holding opportunity."
             }
             require(
-                !nextTurnBaseRollouts ||
+                !(nextTurnBaseRollouts || eventTargetRollouts) ||
                     !commodityRollouts &&
+                        !(nextTurnBaseRollouts && eventTargetRollouts) &&
                         !expansionCardRollouts &&
                         !cardTerritoryRollouts &&
                         !reliefUnlockRollouts &&
@@ -759,7 +769,7 @@ private constructor(
                         tokenNeighborMixture == null &&
                         anchored == null
             ) {
-                "The next-turn base study requires one fixed mixed candidate-only comparison."
+                "Each new action study requires one fixed mixed candidate-only comparison."
             }
             require(
                 !leaderProtectionRollouts ||
@@ -914,6 +924,7 @@ private constructor(
                     capitalChoiceRollouts,
                     leaderProtectionRollouts,
                     nextTurnBaseRollouts,
+                    eventTargetRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,
