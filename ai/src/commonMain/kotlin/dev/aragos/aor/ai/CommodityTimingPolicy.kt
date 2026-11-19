@@ -39,35 +39,12 @@ object CommodityTimingPolicy {
         evaluation: CardPolicyEvaluation,
         config: CommodityTimingConfig,
     ): CardPolicyEvaluation {
-        if (view.stage != Stage.PLAY_CARDS || view.endingTriggered || config.futureWeight == 0.0) {
-            return evaluation
-        }
-        val commodityReferences =
-            view.hand
-                .filter { it.definition.kind == CardKind.COMMODITY }
-                .map { it.reference }
-                .toSet()
-        if (commodityReferences.isEmpty()) return evaluation
-        val choices =
-            view.cardOffers
-                .filter { it.reference in commodityReferences }
-                .flatMap { it.choices }
-                .associateBy { it.command }
-        val candidates = observation.candidates.associateBy(BotCandidate::command)
+        if (config.futureWeight == 0.0) return evaluation
+        val opportunities = opportunities(view, player, observation, config)
+        if (opportunities.isEmpty()) return evaluation
         val penalties =
             encoded.actions.map { action ->
-                val quote = choices[action.command] ?: return@map 0.0
-                val current =
-                    quote.cashChanges.filter { it.player == player }.sumOf { it.after - it.before }
-                if (current > config.currentPayoutLimit) return@map 0.0
-                val features = candidates[action.command]?.features ?: return@map 0.0
-                val growth =
-                    maxOf(
-                        -(features[BotEconomicFeature.RETAINED_COMMODITY.key] ?: 0.0),
-                        -(features[BotEconomicFeature.REACHABLE_RETENTION.key] ?: 0.0),
-                    )
-                if (growth < config.minimumGrowth) return@map 0.0
-                (config.futureWeight * growth).coerceAtMost(4.0)
+                (config.futureWeight * (opportunities[action.command] ?: 0.0)).coerceAtMost(4.0)
             }
         if (penalties.all { it == 0.0 }) return evaluation
         val adjusted =
@@ -79,5 +56,41 @@ object CommodityTimingPolicy {
             logits = evaluation.logits.zip(penalties, Double::minus),
             probabilities = adjusted.map { it / total },
         )
+    }
+
+    /** Legal commodity plays that would consume an affordable future payout opportunity. */
+    fun opportunities(
+        view: GameView,
+        player: PlayerId,
+        observation: BotObservation,
+        config: CommodityTimingConfig,
+    ): Map<String, Double> {
+        if (view.stage != Stage.PLAY_CARDS || view.endingTriggered) return emptyMap()
+        val commodityReferences =
+            view.hand
+                .filter { it.definition.kind == CardKind.COMMODITY }
+                .map { it.reference }
+                .toSet()
+        if (commodityReferences.isEmpty()) return emptyMap()
+        val choices =
+            view.cardOffers
+                .filter { it.reference in commodityReferences }
+                .flatMap { it.choices }
+                .associateBy { it.command }
+        val candidates = observation.candidates.associateBy(BotCandidate::command)
+        return buildMap {
+            for ((action, candidate) in candidates) {
+                val quote = choices[action] ?: continue
+                val current =
+                    quote.cashChanges.filter { it.player == player }.sumOf { it.after - it.before }
+                if (current > config.currentPayoutLimit) continue
+                val growth =
+                    maxOf(
+                        -(candidate.features[BotEconomicFeature.RETAINED_COMMODITY.key] ?: 0.0),
+                        -(candidate.features[BotEconomicFeature.REACHABLE_RETENTION.key] ?: 0.0),
+                    )
+                if (growth >= config.minimumGrowth) put(action, growth)
+            }
+        }
     }
 }

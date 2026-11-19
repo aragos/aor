@@ -109,6 +109,7 @@ private constructor(
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
     val commodityTiming: CommodityTimingConfig?,
+    val commodityRollouts: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -196,7 +197,9 @@ private constructor(
                     "commodityTiming" to
                         mapOf("kind" to CommodityTimingConfig.VERSION, "configuration" to it)
                 )
-            } ?: emptyMap())
+            } ?: emptyMap()) +
+            (if (commodityRollouts) mapOf("commodityRollouts" to "play-versus-hold-1")
+            else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
     fun verify() {
@@ -377,6 +380,7 @@ private constructor(
                     "expansionDenial",
                     "initiative",
                     "commodityTiming",
+                    "commodityRollouts",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -506,6 +510,11 @@ private constructor(
                 }
             val initiative = node["initiative"]?.let(::initiative)
             val commodityTiming = node["commodityTiming"]?.let(::commodityTiming)
+            val commodityRollouts =
+                node["commodityRollouts"]?.let { setting ->
+                    require(setting.isBoolean) { "The commodity rollout switch must be boolean." }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -552,6 +561,16 @@ private constructor(
                     } +
                     mapOf(source.path.toString() to source.sha256) +
                     (anchored?.pins ?: emptyMap())
+            require(
+                !commodityRollouts ||
+                    candidateOnly &&
+                        style == RobustOpponentStyle.QUALIFIED &&
+                        commodityTiming != null &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "Commodity rollouts require a fixed candidate-only league and a declared timing trigger."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -571,6 +590,7 @@ private constructor(
                     initiative,
                     initiativeRival,
                     commodityTiming,
+                    commodityRollouts,
                     seeds,
                     start,
                     count,

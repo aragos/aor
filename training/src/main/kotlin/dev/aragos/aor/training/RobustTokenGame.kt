@@ -214,8 +214,6 @@ internal object RobustTokenGame {
         val seat = index % 4
         val initiativeRivalSeats = input.initiativeRival?.seats(seat).orEmpty()
         val style = input.opponentStyle.at(index, seat)
-        val references =
-            arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
         val diagnostics = RobustTokenDiagnostics(seat, input.tokenNeighborMixture != null)
         val league =
             input.adaptiveOpponent?.let {
@@ -223,111 +221,144 @@ internal object RobustTokenGame {
                 val players = (1..4).map { number -> PlayerId("p$number") }
                 RevealedTokenCounterLeague(players[seat], players, it)
             }
-        val controllers = references.mapValues { (player, reference) ->
-            val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
-            val candidate = player == seat && role == "CANDIDATE"
-            val qualified =
-                CoordinatedEsController(
-                    reference,
-                    ordinary,
-                    input.asset.baseline.model,
-                    if (candidate) input.candidate.models else input.control.models,
-                    input.asset.original.models,
-                    input.asset.calibration.selectors,
-                    JointSupportProfile.KNOWN_OWN_CHAOS_1,
-                    if (candidate) input.sampler else input.controlSampler,
-                    if (candidate) input.expansionDenial else null,
-                    if (candidate) input.tokenNeighborMixture else null,
-                    if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
-                    when {
-                        candidate -> input.initiative
-                        player in initiativeRivalSeats ->
-                            requireNotNull(input.initiativeRival) {
-                                    "Every configured rival has one frozen initiative policy."
-                                }
-                                .policy
-                        else -> null
-                    },
-                    commodityTiming = input.commodityTiming.takeIf { candidate },
-                )
-            val rival =
-                if (style == RobustOpponentStyle.MIXED) {
-                    val position = (player - seat + 4) % 4
-                    listOf(
-                        RobustOpponentStyle.QUALIFIED,
-                        RobustOpponentStyle.UNDERCUT,
-                        RobustOpponentStyle.OVERBID,
-                    )[(position - 1).coerceAtLeast(0)]
-                } else style
-            val baseline =
-                object : SimulationController {
-                    override fun controls(decision: String): Boolean = qualified.controls(decision)
+        fun controllers(log: RobustTokenDiagnostics): Map<Int, SimulationController> {
+            val references =
+                arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
+            return references.mapValues { (player, reference) ->
+                val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
+                val candidate = player == seat && role == "CANDIDATE"
+                val qualified =
+                    CoordinatedEsController(
+                        reference,
+                        ordinary,
+                        input.asset.baseline.model,
+                        if (candidate) input.candidate.models else input.control.models,
+                        input.asset.original.models,
+                        input.asset.calibration.selectors,
+                        JointSupportProfile.KNOWN_OWN_CHAOS_1,
+                        if (candidate) input.sampler else input.controlSampler,
+                        if (candidate) input.expansionDenial else null,
+                        if (candidate) input.tokenNeighborMixture else null,
+                        if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
+                        when {
+                            candidate -> input.initiative
+                            player in initiativeRivalSeats ->
+                                requireNotNull(input.initiativeRival) {
+                                        "Every configured rival has one frozen initiative policy."
+                                    }
+                                    .policy
+                            else -> null
+                        },
+                        commodityTiming =
+                            input.commodityTiming.takeIf { candidate && !input.commodityRollouts },
+                    )
+                val rival =
+                    if (style == RobustOpponentStyle.MIXED) {
+                        val position = (player - seat + 4) % 4
+                        listOf(
+                            RobustOpponentStyle.QUALIFIED,
+                            RobustOpponentStyle.UNDERCUT,
+                            RobustOpponentStyle.OVERBID,
+                        )[(position - 1).coerceAtLeast(0)]
+                    } else style
+                val baseline =
+                    object : SimulationController {
+                        override fun controls(decision: String): Boolean =
+                            qualified.controls(decision)
 
-                    override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
-                        qualified.tokenNeighborMixture()
+                        override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
+                            qualified.tokenNeighborMixture()
 
-                    override fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) {
-                        check(player == seat && candidate) {
-                            "Only the evaluated candidate may admit a new quoted token neighbor."
+                        override fun acceptedTokenQuote(admission: SimulationTokenQuoteAdmission) {
+                            check(player == seat && candidate) {
+                                "Only the evaluated candidate may admit a new quoted token neighbor."
+                            }
+                            log.admitted(admission)
                         }
-                        diagnostics.admitted(admission)
-                    }
 
-                    override fun choose(decision: SimulationDecision): String? {
-                        val original = qualified.choose(decision) ?: return null
-                        val command =
-                            if (
-                                player != seat &&
-                                    !rival.isRevealedCounter &&
-                                    decision.observation.decision == "buy-tokens"
-                            ) {
-                                RobustTokenIntervention.command(
-                                    original,
-                                    decision.observation.candidates.map(BotCandidate::command),
-                                    rival,
-                                    decision.view.turnNumber ?: 0,
-                                    decision.view.players
-                                        .single { it.id.value == decision.observation.playerId }
-                                        .stockTokens,
-                                )
-                            } else original
-                        return command
+                        override fun choose(decision: SimulationDecision): String? {
+                            val original = qualified.choose(decision) ?: return null
+                            val command =
+                                if (
+                                    player != seat &&
+                                        !rival.isRevealedCounter &&
+                                        decision.observation.decision == "buy-tokens"
+                                ) {
+                                    RobustTokenIntervention.command(
+                                        original,
+                                        decision.observation.candidates.map(BotCandidate::command),
+                                        rival,
+                                        decision.view.turnNumber ?: 0,
+                                        decision.view.players
+                                            .single { it.id.value == decision.observation.playerId }
+                                            .stockTokens,
+                                    )
+                                } else original
+                            return command
+                        }
                     }
+                val controller =
+                    league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
+                object : SimulationController by controller {
+                    override fun choose(decision: SimulationDecision): String? =
+                        controller.choose(decision)?.also { log.chosen(decision, it) }
                 }
-            val controller = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
-            object : SimulationController by controller {
-                override fun choose(decision: SimulationDecision): String? =
-                    controller.choose(decision)?.also { diagnostics.chosen(decision, it) }
             }
         }
-        require(controllers.keys == setOf(0, 1, 2, 3)) {
+        val evaluatedControllers = controllers(diagnostics)
+        require(evaluatedControllers.keys == setOf(0, 1, 2, 3)) {
             "Every robust league seat must retain a complete reference controller."
         }
+        val observer =
+            input.commodityTiming
+                ?.takeIf { input.commodityRollouts }
+                ?.let { timing ->
+                    CommodityRolloutObserver(seat, timing)
+                }
+        val competitors =
+            List(4) { player ->
+                Competitor(
+                    if (player == seat) arena.candidate else arena.opponents.first(),
+                    BotDifficulty.HARD,
+                )
+            }
         val trace = if (index in input.replayIndices) RobustCanonicalTrace(seat) else null
         val game =
             Simulation()
                 .play(
                     arena.configurations.single(),
                     input.seeds[index],
-                    List(4) { player ->
-                        Competitor(
-                            if (player == seat) arena.candidate else arena.opponents.first(),
-                            BotDifficulty.HARD,
-                        )
-                    },
+                    competitors,
                     deadlineNanos = deadline,
-                    controllers = controllers,
+                    controllers = evaluatedControllers,
                     trace = trace,
+                    stateObserver = observer,
                 )
         val terminal = ArenaGame.from(game).copy(elapsedMillis = 0)
         CoordinatedEsAttempts.terminal(terminal)
+        val rolloutEvidence =
+            observer
+                ?.let {
+                    mapOf(
+                        "commodityRollouts" to
+                            it.evidence(
+                                arena.configurations.single().id,
+                                input.seeds[index],
+                                competitors.map(Competitor::model),
+                                { controllers(RobustTokenDiagnostics(seat)) },
+                                deadline,
+                            )
+                    )
+                }
+                .orEmpty()
         return RobustTokenGameResult(
             terminal,
             diagnostics.result() +
                 (if (initiativeRivalSeats.isEmpty()) emptyMap()
                 else mapOf("initiativeRivalSeats" to initiativeRivalSeats)) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
-                    ?: emptyMap()),
+                    ?: emptyMap()) +
+                rolloutEvidence,
             trace?.sha256,
         )
     }
