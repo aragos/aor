@@ -106,13 +106,41 @@ internal data class InitiativeLineup(val policiesByOffset: Map<Int, InitiativePo
     }
 }
 
-/** [fixedBid] is the acting seat's setup bid in dollars, or null to observe the baseline. */
-internal data class CapitalAuctionConfig(val fixedBid: Int?) {
+/**
+ * Setup bids in dollars. [rivalBids] maps registration offsets from the measured actor to fixed
+ * public-training rival bids. A null [fixedBid] and empty [mixedBids] observe the baseline actor.
+ */
+internal data class CapitalAuctionConfig(
+    val fixedBid: Int?,
+    val mixedBids: List<Int> = emptyList(),
+    val rivalBids: Map<Int, Int> = emptyMap(),
+) {
     init {
         require(fixedBid == null || fixedBid in 0..40) {
             "A capital auction bid must be between zero and 40 dollars."
         }
+        require(
+            mixedBids.isEmpty() ||
+                fixedBid == null &&
+                    mixedBids.size in 2..8 &&
+                    mixedBids.distinct().size == mixedBids.size &&
+                    mixedBids.all { it in 0..40 }
+        ) {
+            "A capital mixture requires two through eight distinct legal bids and no fixed bid."
+        }
+        require(rivalBids.all { (offset, bid) -> offset in 1..3 && bid in 0..40 }) {
+            "Each capital study rival needs an opponents' registration offset and an affordable bid."
+        }
     }
+
+    fun bidsFor(offset: Int): List<Int> =
+        if (offset == 0 && mixedBids.isNotEmpty()) mixedBids
+        else listOfNotNull(if (offset == 0) fixedBid else rivalBids[offset])
+
+    fun science(): Map<String, Any?> =
+        mapOf("kind" to VERSION, "bid" to fixedBid) +
+            (if (mixedBids.isEmpty()) emptyMap() else mapOf("mixedBids" to mixedBids)) +
+            (if (rivalBids.isEmpty()) emptyMap() else mapOf("rivals" to rivalBids.toSortedMap()))
 
     companion object {
         const val VERSION = "capital-auction-study-1"
@@ -223,10 +251,7 @@ private constructor(
                 )
             } ?: emptyMap()) +
             (capitalAuction?.let {
-                mapOf(
-                    "capitalAuction" to
-                        mapOf("kind" to CapitalAuctionConfig.VERSION, "bid" to it.fixedBid)
-                )
+                mapOf("capitalAuction" to it.science())
             } ?: emptyMap()) +
             (initiative?.let {
                 mapOf(
@@ -429,6 +454,38 @@ private constructor(
             return InitiativeLineup(policies.toSortedMap())
         }
 
+        private fun readCapitalAuction(node: JsonNode): CapitalAuctionConfig {
+            val bid =
+                node["bid"]?.takeUnless(JsonNode::isNull)?.let {
+                    PurchaseJson.integer(it, "capital bid")
+                }
+            val mix =
+                node["mixedBids"]
+                    ?.let { value ->
+                        PurchaseJson.array(value, "candidate capital bids").map {
+                            PurchaseJson.integer(it, "candidate capital bid")
+                        }
+                    }
+                    .orEmpty()
+            val rivals =
+                node["rivals"]
+                    ?.let { value ->
+                        buildMap {
+                            for (rival in PurchaseJson.array(value, "capital bid rivals")) {
+                                PurchaseJson.fields(rival, setOf("offset", "bid"))
+                                val offset =
+                                    PurchaseJson.integer(rival["offset"], "rival capital offset")
+                                require(offset !in this) {
+                                    "Capital bid rivals need distinct offsets."
+                                }
+                                put(offset, PurchaseJson.integer(rival["bid"], "rival capital bid"))
+                            }
+                        }
+                    }
+                    .orEmpty()
+            return CapitalAuctionConfig(bid, mix, rivals)
+        }
+
         fun read(path: Path): RobustTokenInput {
             val source = CoordinatedEsWire.source(path)
             val node = PurchaseJson.read(source.path)
@@ -589,17 +646,17 @@ private constructor(
             val initiativeLineup = node["initiativeLineup"]?.let(::initiativeLineup)
             val capitalAuction =
                 node["capitalAuction"]?.let { setting ->
-                    PurchaseJson.fields(setting, setOf("kind", "bid"))
+                    PurchaseJson.fields(
+                        setting,
+                        setOf("kind", "bid"),
+                        optional = setOf("mixedBids", "rivals"),
+                    )
                     require(
                         candidateOnly && setting["kind"]?.asText() == CapitalAuctionConfig.VERSION
                     ) {
                         "Use the typed capital auction study on the declared candidate-only world."
                     }
-                    CapitalAuctionConfig(
-                        setting["bid"]?.takeUnless(JsonNode::isNull)?.let {
-                            PurchaseJson.integer(it, "capital bid")
-                        }
-                    )
+                    readCapitalAuction(setting)
                 }
             require(
                 initiativeLineup == null ||

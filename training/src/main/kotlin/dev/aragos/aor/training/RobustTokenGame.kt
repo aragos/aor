@@ -135,15 +135,22 @@ internal class RobustTokenDiagnostics(
                 )
             if (recordCapital) {
                 capital =
-                mapOf(
-                    "paid" to
-                        requireNotNull(view.revealedBids[player]) {
-                            "Setup must reveal the paid capital bid."
-                        },
-                    "capital" to capitalId,
-                    "choicePosition" to (capitalPosition + 1),
-                    "cashBeforeFirstBid" to own.cash,
-                )
+                    mapOf(
+                        "paid" to
+                            requireNotNull(view.revealedBids[player]) {
+                                "Setup must reveal the paid capital bid."
+                            },
+                        "capital" to capitalId,
+                        "choicePosition" to (capitalPosition + 1),
+                        "cashBeforeFirstBid" to own.cash,
+                        "rivalPaid" to
+                            (1..3).map { offset ->
+                                val rival = view.players[(controlledSeat + offset) % 4].id
+                                requireNotNull(view.revealedBids[rival]) {
+                                    "A completed capital auction must reveal the rival's paid bid."
+                                }
+                            },
+                    )
             }
         }
         if (
@@ -266,7 +273,7 @@ internal object RobustTokenGame {
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
-            val fixedCapitalBid = input.capitalAuction?.fixedBid?.takeIf { candidate }
+            val capitalBids = input.capitalAuction?.bidsFor((player - seat + 4) % 4).orEmpty()
             val qualified =
                 CoordinatedEsController(
                     reference,
@@ -294,7 +301,7 @@ internal object RobustTokenGame {
             val baseline =
                 object : SimulationController {
                     override fun controls(decision: String): Boolean =
-                        fixedCapitalBid != null && decision == "bid-capital" ||
+                        capitalBids.isNotEmpty() && decision == "bid-capital" ||
                             qualified.controls(decision)
 
                     override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
@@ -309,10 +316,12 @@ internal object RobustTokenGame {
 
                     override fun choose(decision: SimulationDecision): String? {
                         if (
-                            fixedCapitalBid != null &&
+                            capitalBids.isNotEmpty() &&
                                 decision.observation.decision == "bid-capital"
                         ) {
-                            val command = Command.BidCapital(fixedCapitalBid).toText()
+                            val index =
+                                Math.floorMod(decision.seed xor 0x6F7B1AC9, capitalBids.size)
+                            val command = Command.BidCapital(capitalBids[index]).toText()
                             check(decision.observation.candidates.any { it.command == command }) {
                                 "The experimental capital bid must belong to the legal batch offers."
                             }
