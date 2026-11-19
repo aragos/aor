@@ -115,6 +115,7 @@ private constructor(
     val rivalMarketDenialRollouts: Boolean,
     val reserveExpansionCardRollouts: Boolean,
     val capitalChoiceRollouts: Boolean,
+    val capitalChoicePosition: Int?,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -226,6 +227,7 @@ private constructor(
             else emptyMap()) +
             (if (capitalChoiceRollouts) mapOf("capitalChoiceRollouts" to "all-offered-capitals-1")
             else emptyMap()) +
+            (capitalChoicePosition?.let { mapOf("capitalChoicePosition" to it) } ?: emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
             (if (cardTerritoryRollouts) mapOf("cardTerritoryRollouts" to "buy-versus-territory-1")
@@ -429,6 +431,7 @@ private constructor(
                     "rivalMarketDenialRollouts",
                     "reserveExpansionCardRollouts",
                     "capitalChoiceRollouts",
+                    "capitalChoicePosition",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -664,6 +667,14 @@ private constructor(
                     require(setting.isBoolean) { "The capital choice study requires a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val capitalChoicePosition =
+                node["capitalChoicePosition"]?.let { position ->
+                    PurchaseJson.integer(position, "zero-based capital selection place").also {
+                        require(capitalChoiceRollouts && it in 0..2) {
+                            "Focused capital positions must have at least two choices in the four-seat study."
+                        }
+                    }
+                }
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -857,6 +868,7 @@ private constructor(
                     rivalMarketDenialRollouts,
                     reserveExpansionCardRollouts,
                     capitalChoiceRollouts,
+                    capitalChoicePosition,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

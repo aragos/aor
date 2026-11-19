@@ -342,7 +342,11 @@ internal object RobustTokenGame {
                     input.reserveExpansionCardRollouts ->
                         PairedActionRolloutObserver(seat, reserveExpansionCard = true)
                     input.capitalChoiceRollouts ->
-                        PairedActionRolloutObserver(seat, compareCapitals = true)
+                        PairedActionRolloutObserver(
+                            seat,
+                            compareCapitals = true,
+                            capitalChoicePosition = input.capitalChoicePosition,
+                        )
                     input.cardTerritoryRollouts ->
                         PairedActionRolloutObserver(
                             seat,

@@ -30,6 +30,7 @@ internal class PairedActionRolloutObserver(
     private val compareRivalDenial: Boolean = false,
     private val reserveExpansionCard: Boolean = false,
     private val compareCapitals: Boolean = false,
+    private val capitalChoicePosition: Int? = null,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -88,6 +89,7 @@ internal class PairedActionRolloutObserver(
         val actor = state.playerIds[seat]
         val position = state.capitalOrder.indexOf(actor)
         check(position >= 0) { "An observed capital choice requires the actor's auction place." }
+        if (capitalChoicePosition != null && position != capitalChoicePosition) return null
         val options =
             observation.candidates.associateBy { candidate ->
                 candidate.command.removePrefix("choose-capital ")
