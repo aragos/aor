@@ -11,8 +11,13 @@ import kotlin.math.pow
 /**
  * Absolute bids for the first turn. An optional second mix applies to players in the later half of
  * capital selection, when they can place themselves relative to more rivals on tied bids.
+ * [retainOrdinaryForLaterCapital] keeps the regular opening behavior for that group.
  */
-data class OpeningBidMix(val bids: List<Int>, val laterCapitalBids: List<Int> = emptyList()) {
+data class OpeningBidMix(
+    val bids: List<Int>,
+    val laterCapitalBids: List<Int> = emptyList(),
+    val retainOrdinaryForLaterCapital: Boolean = false,
+) {
     init {
         require(bids.isNotEmpty()) { "An opening mix requires at least one default bid." }
         require(
@@ -21,6 +26,9 @@ data class OpeningBidMix(val bids: List<Int>, val laterCapitalBids: List<Int> = 
             }
         ) {
             "An opening mix requires distinct bids between zero and 36 in each group."
+        }
+        require(!retainOrdinaryForLaterCapital || laterCapitalBids.isEmpty()) {
+            "A later-capital mix cannot also request the regular opening behavior."
         }
     }
 }
@@ -112,10 +120,13 @@ object InitiativePolicy {
             val mix = config.openingMix
             val capitalPosition = view.capitalOrder.indexOf(player)
             val later = capitalPosition >= (view.capitalOrder.size + 1) / 2
-            val amounts =
-                if (later && mix.laterCapitalBids.isNotEmpty()) mix.laterCapitalBids else mix.bids
-            val legal = view.tokenPurchaseOffers.filter { it.amount in amounts }
-            if (legal.isNotEmpty()) return bidCommand(sampleBid(legal, seed))
+            if (!later || !mix.retainOrdinaryForLaterCapital) {
+                val amounts =
+                    if (later && mix.laterCapitalBids.isNotEmpty()) mix.laterCapitalBids
+                    else mix.bids
+                val legal = view.tokenPurchaseOffers.filter { it.amount in amounts }
+                if (legal.isNotEmpty()) return bidCommand(sampleBid(legal, seed))
+            }
         }
         val originalAmount = LocalTokenNeighborPolicy.amount(normal)
         val original = view.tokenPurchaseOffers.single { it.amount == originalAmount }

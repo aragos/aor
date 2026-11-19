@@ -117,6 +117,27 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun anEarlierCapitalMixPreservesEveryRegularLaterCapitalBid() {
+        val opening =
+            view.copy(
+                turnNumber = 1,
+                capitalOrder = players.reversed(),
+                pastTokenPurchases = emptyList(),
+            )
+        val ordinary = config.copy(openingSpread = 2)
+        val earlyMix =
+            ordinary.copy(
+                openingMix = OpeningBidMix(listOf(16, 17), retainOrdinaryForLaterCapital = true)
+            )
+        val seeds = 1..32
+
+        assertEquals(
+            seeds.map { InitiativePolicy.bid(opening, seat, "buy-tokens 21", it, ordinary) },
+            seeds.map { InitiativePolicy.bid(opening, seat, "buy-tokens 21", it, earlyMix) },
+        )
+    }
+
+    @Test
     fun absoluteOpeningBidsDoNotApplyOnLaterTurnsWithoutHistory() {
         val oldSave = view.copy(pastTokenPurchases = emptyList())
         val tested = config.copy(openingMix = OpeningBidMix(listOf(18)))

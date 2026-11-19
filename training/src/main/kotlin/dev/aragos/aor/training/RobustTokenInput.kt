@@ -430,12 +430,24 @@ private constructor(
         }
 
         private fun openingMix(node: JsonNode): OpeningBidMix {
-            PurchaseJson.fields(node, setOf("bids"), optional = setOf("laterCapitalBids"))
+            PurchaseJson.fields(
+                node,
+                setOf("bids"),
+                optional = setOf("laterCapitalBids", "retainOrdinaryForLaterCapital"),
+            )
             fun bids(field: String): List<Int> =
                 PurchaseJson.array(node[field], field).map { PurchaseJson.integer(it, field) }
             return OpeningBidMix(
-                bids("bids"),
-                node["laterCapitalBids"]?.let { bids("laterCapitalBids") } ?: emptyList(),
+                bids = bids("bids"),
+                laterCapitalBids =
+                    node["laterCapitalBids"]?.let { bids("laterCapitalBids") } ?: emptyList(),
+                retainOrdinaryForLaterCapital =
+                    node["retainOrdinaryForLaterCapital"]?.let { setting ->
+                        require(setting.isBoolean) {
+                            "Keeping regular later-capital bids requires a JSON boolean."
+                        }
+                        setting.booleanValue()
+                    } ?: false,
             )
         }
 
