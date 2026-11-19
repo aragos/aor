@@ -17,6 +17,7 @@ import dev.aragos.aor.ai.CoordinatedPolicyModels
 import dev.aragos.aor.ai.CoordinatedPolicySelector
 import dev.aragos.aor.ai.ExpansionObservationEncoder
 import dev.aragos.aor.ai.IncumbentResidualSelector
+import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.JointPolicyScope
 import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
@@ -34,10 +35,18 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.security.MessageDigest
+import kotlin.math.sqrt
 
 /** The source-frozen study95 executable; another native build needs separate qualification. */
 internal const val LOCAL_BID_MIXTURE_NATIVE_JAR_SHA256 =
     "6d7a056095ad5f886171823a29b23e466f4f89ad948bfc2f8e6999a71c4a6097"
+
+private const val INITIATIVE_BASE_PREVIEW_SHA256 =
+    "b812daf05170b3a41ee5164667dcb24877b6ced582dc9475d89e18e16c815f81"
+private const val INITIATIVE_NATIVE_JAR_SHA256 =
+    "a179ea273c8153a5cd9b61f4f4bd2ec7851b6ca1d62f1764c34105637bb73fed"
+private val INITIATIVE_OPPONENTS = listOf("QUALIFIED", "REVEALED_UNDERCUT", "REVEALED_TIE_UNDERCUT")
+private val VALID_WIN_SHARES = setOf(0.0, .25, 1.0 / 3.0, .5, 1.0)
 
 /**
  * Immutable local asset. All portable subjects are verified and decoded once at startup. The
@@ -148,6 +157,32 @@ private class CoordinatedAssetReader(path: Path) {
     fun read(): ServerBotPolicy {
         val manifest = document(manifestPath)
         val root = node(manifest)
+        if (text(root, "kind") != "coordinated-initiative-preview-1") {
+            return readCoordinated(manifest, root)
+        }
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "The initiative preview requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == INITIATIVE_BASE_PREVIEW_SHA256) {
+            "Initiative requires the exact qualified incumbent preview."
+        }
+        val qualification = subject(manifest, root["qualification"])
+        return readCoordinated(
+            base,
+            node(base),
+            initiativeQualification(qualification, base),
+            manifest.sha256,
+        )
+    }
+
+    private fun readCoordinated(
+        manifest: Document,
+        root: JsonNode,
+        initiative: InitiativePolicyConfig? = null,
+        assetHash: String = manifest.sha256,
+    ): ServerBotPolicy {
         val robust = text(root, "kind") == "coordinated-robust-support-preview-1"
         val winOnly = text(root, "kind") == "coordinated-win-support-preview-1"
         val selectedProfile =
@@ -219,7 +254,7 @@ private class CoordinatedAssetReader(path: Path) {
             tokenNeighborMixture(node(it)["tokenNeighborMixture"])
         }
         return CachedCoordinatedPreviewPolicy(
-            manifest.sha256,
+            assetHash,
             selectedProfile,
             packed,
             CoordinatedPolicySelector(
@@ -234,8 +269,84 @@ private class CoordinatedAssetReader(path: Path) {
                 expansionDenial =
                     robustDefinition?.let { expansionDenial(node(it)["expansionDenial"]) },
                 tokenNeighborMixture = neighborMixture,
+                initiative = initiative,
             ),
             neighborMixture,
+        )
+    }
+
+    private fun initiativeQualification(
+        subject: Document,
+        base: Document,
+    ): InitiativePolicyConfig {
+        val certificate = node(subject)
+        fields(
+            certificate,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "auditMethodSha256",
+            "initiative",
+            "comparisons",
+        )
+        require(
+            text(certificate, "kind") == "public-initiative-qualification-1" &&
+                hash(certificate, "basePreviewSha256") == base.sha256 &&
+                hash(certificate, "nativeJarSha256") == INITIATIVE_NATIVE_JAR_SHA256
+        ) {
+            "The initiative certificate must bind the exact incumbent and tested native runtime."
+        }
+        hash(certificate, "auditMethodSha256")
+        val comparisons = certificate["comparisons"]
+        fields(comparisons, *INITIATIVE_OPPONENTS.toTypedArray())
+        val comparisonSeeds = mutableSetOf<Int>()
+        for (style in INITIATIVE_OPPONENTS) {
+            val comparison = comparisons[style]
+            fields(comparison, "worlds", "evidenceSha256")
+            hash(comparison, "evidenceSha256")
+            val worlds = comparison["worlds"]
+            require(worlds.isArray && worlds.size() == 768) {
+                "Every initiative opponent requires exactly 768 fresh paired games."
+            }
+            val deltas = worlds.map { row ->
+                fields(row, "seed", "candidate", "control")
+                require(comparisonSeeds.add(integer(row, "seed"))) {
+                    "The initiative certificate must use distinct worlds for every opponent."
+                }
+                val candidate = number(row["candidate"], "candidate win share")
+                val control = number(row["control"], "control win share")
+                require(candidate in VALID_WIN_SHARES && control in VALID_WIN_SHARES) {
+                    "Each result must be an authoritative four-seat winner share."
+                }
+                candidate - control
+            }
+            val mean = deltas.average()
+            val standardError =
+                sqrt(deltas.sumOf { (it - mean) * (it - mean) } / ((deltas.size - 1) * deltas.size))
+            val minimum = if (style == "QUALIFIED") -.075 else 0.0
+            require(mean - 1.96 * standardError > minimum) {
+                "The initiative candidate did not clear its fresh win threshold against $style."
+            }
+        }
+        val policy = certificate["initiative"]
+        fields(
+            policy,
+            "kind",
+            "maximumTokenLoss",
+            "tokenPenalty",
+            "participation",
+            "requireAffordableContest",
+            "attackBonus",
+        )
+        require(text(policy, "kind") == InitiativePolicyConfig.VERSION) {
+            "The initiative certificate requires its versioned policy."
+        }
+        return InitiativePolicyConfig(
+            maximumTokenLoss = integer(policy, "maximumTokenLoss"),
+            tokenPenalty = number(policy["tokenPenalty"], "token penalty"),
+            participation = number(policy["participation"], "participation"),
+            requireAffordableContest = truth(policy, "requireAffordableContest"),
+            attackBonus = number(policy["attackBonus"], "attack bonus"),
         )
     }
 
