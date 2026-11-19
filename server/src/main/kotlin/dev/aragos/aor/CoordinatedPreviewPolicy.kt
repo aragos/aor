@@ -46,6 +46,13 @@ private const val INITIATIVE_BASE_PREVIEW_SHA256 =
 private const val INITIATIVE_NATIVE_JAR_SHA256 =
     "a179ea273c8153a5cd9b61f4f4bd2ec7851b6ca1d62f1764c34105637bb73fed"
 private val INITIATIVE_OPPONENTS = listOf("QUALIFIED", "REVEALED_UNDERCUT", "REVEALED_TIE_UNDERCUT")
+private const val MIXED_INITIATIVE_NATIVE_JAR_SHA256 =
+    "eb2690aeced7c9c47eaaebbc7016c5ae1aae19c5612f67d3fa8e9047b30089b2"
+private const val MIXED_INITIATIVE_AUDIT_SHA256 =
+    "f156a89b0c9fda35de170fdb98b98b32fb054d1e05eab2724eefddfd3ad43f05"
+private const val MIXED_INITIATIVE_CERTIFICATE_SHA256 =
+    "ddadaa3f4c2f990078cdae90eed35c4fbe707525645a9cfe82903743ff980e98"
+private val MIXED_INITIATIVE_TABLES = listOf("mixed-table", "adaptive-table")
 private val VALID_WIN_SHARES = setOf(0.0, .25, 1.0 / 3.0, .5, 1.0)
 
 /**
@@ -280,6 +287,10 @@ private class CoordinatedAssetReader(path: Path) {
         base: Document,
     ): InitiativePolicyConfig {
         val certificate = node(subject)
+        val kind = text(certificate, "kind")
+        val mixed = kind == "public-initiative-mixed-qualification-1"
+        val trainingHash =
+            if (mixed) MIXED_INITIATIVE_NATIVE_JAR_SHA256 else INITIATIVE_NATIVE_JAR_SHA256
         fields(
             certificate,
             "kind",
@@ -290,17 +301,25 @@ private class CoordinatedAssetReader(path: Path) {
             "comparisons",
         )
         require(
-            text(certificate, "kind") == "public-initiative-qualification-1" &&
+            (mixed || kind == "public-initiative-qualification-1") &&
                 hash(certificate, "basePreviewSha256") == base.sha256 &&
-                hash(certificate, "nativeJarSha256") == INITIATIVE_NATIVE_JAR_SHA256
+                hash(certificate, "nativeJarSha256") == trainingHash
         ) {
             "The initiative certificate must bind the exact incumbent and tested native runtime."
         }
-        hash(certificate, "auditMethodSha256")
+        val method = hash(certificate, "auditMethodSha256")
+        require(
+            !mixed ||
+                method == MIXED_INITIATIVE_AUDIT_SHA256 &&
+                    subject.sha256 == MIXED_INITIATIVE_CERTIFICATE_SHA256
+        ) {
+            "The mixed-table certificate must match both independently rechecked fresh audits."
+        }
+        val opponents = if (mixed) MIXED_INITIATIVE_TABLES else INITIATIVE_OPPONENTS
         val comparisons = certificate["comparisons"]
-        fields(comparisons, *INITIATIVE_OPPONENTS.toTypedArray())
+        fields(comparisons, *opponents.toTypedArray())
         val comparisonSeeds = mutableSetOf<Int>()
-        for (style in INITIATIVE_OPPONENTS) {
+        for (style in opponents) {
             val comparison = comparisons[style]
             fields(comparison, "worlds", "evidenceSha256")
             hash(comparison, "evidenceSha256")
@@ -329,15 +348,18 @@ private class CoordinatedAssetReader(path: Path) {
             }
         }
         val policy = certificate["initiative"]
-        fields(
-            policy,
-            "kind",
-            "maximumTokenLoss",
-            "tokenPenalty",
-            "participation",
-            "requireAffordableContest",
-            "attackBonus",
-        )
+        val commonFields =
+            listOf(
+                "kind",
+                "maximumTokenLoss",
+                "tokenPenalty",
+                "participation",
+                "requireAffordableContest",
+                "attackBonus",
+            )
+        val policyFields =
+            if (mixed) commonFields + listOf("bidScoreTolerance", "openingSpread") else commonFields
+        fields(policy, *policyFields.toTypedArray())
         require(text(policy, "kind") == InitiativePolicyConfig.VERSION) {
             "The initiative certificate requires its versioned policy."
         }
@@ -347,6 +369,9 @@ private class CoordinatedAssetReader(path: Path) {
             participation = number(policy["participation"], "participation"),
             requireAffordableContest = truth(policy, "requireAffordableContest"),
             attackBonus = number(policy["attackBonus"], "attack bonus"),
+            bidScoreTolerance =
+                if (mixed) number(policy["bidScoreTolerance"], "bid score tolerance") else 0.0,
+            openingSpread = if (mixed) integer(policy, "openingSpread") else 0,
         )
     }
 
