@@ -10,14 +10,25 @@ import dev.aragos.aor.TextCodec
 /**
  * Use public score points to bound how far behind the acting seat can be. The additional commodity
  * condition admits only targets with at least five dollars more projected public denial.
+ * [maximumAdditionalTokens] and [maximumOddsDrop] bound a substitute's extra cost and reduction in
+ * its authoritative dice probability. [earliestTurn] counts normal game turns from one.
  */
 data class LeadingRivalRetargetingConfig(
     val maximumTrailingPoints: Int,
     val requireGreaterCommodityDenial: Boolean,
+    val maximumAdditionalTokens: Int = 2,
+    val maximumOddsDrop: Double = .15,
+    val earliestTurn: Int = 4,
 ) {
     init {
         require(maximumTrailingPoints in 1..10000) {
             "Retargeting requires a positive score gap of at most 10,000 points."
+        }
+        require(maximumAdditionalTokens in 0..6 && maximumOddsDrop in 0.0..0.35) {
+            "An alternative attack can add at most six tokens and lose at most 35 points of dice probability."
+        }
+        require(earliestTurn in 2..8) {
+            "Retargeting must begin between normal game turns two and eight."
         }
     }
 
@@ -35,7 +46,9 @@ internal object LeadingRivalRetargeting {
         ordinary: String,
         config: LeadingRivalRetargetingConfig,
     ): String {
-        if ((view.turnNumber ?: 0) < 4 || !ordinary.startsWith("attack ")) return ordinary
+        if ((view.turnNumber ?: 0) < config.earliestTurn || !ordinary.startsWith("attack ")) {
+            return ordinary
+        }
         val original = TextCodec.parseCommand(ordinary) as? BoardCommand.Attack ?: return ordinary
         val scores =
             view.scores
@@ -80,8 +93,8 @@ internal object LeadingRivalRetargeting {
             .filter { province -> marketOwners[province]?.let { scores[it] == lead } == true }
             .mapNotNull(::action)
             .filter { move ->
-                move.cost <= baseline.cost + 2 &&
-                    move.odds >= baseline.odds - .15 &&
+                move.cost <= baseline.cost + config.maximumAdditionalTokens &&
+                    move.odds >= baseline.odds - config.maximumOddsDrop &&
                     (!config.requireGreaterCommodityDenial || move.denial >= baseline.denial + 5)
             }
             .maxWithOrNull(
