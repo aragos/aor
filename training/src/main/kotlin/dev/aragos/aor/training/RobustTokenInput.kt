@@ -1,11 +1,13 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.Epoch
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
+import dev.aragos.aor.ai.PeacefulExpansionAlternativeConfig
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
 import dev.aragos.aor.ai.RevealedCounterResponse
 import dev.aragos.aor.ai.TokenNeighborAdmission
@@ -173,6 +175,7 @@ private constructor(
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
+    val peacefulExpansionAlternative: PeacefulExpansionAlternativeConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -265,6 +268,15 @@ private constructor(
                         mapOf(
                             "kind" to LeadingRivalRetargetingConfig.VERSION,
                             "configuration" to it,
+                        )
+                )
+            } ?: emptyMap()) +
+            (peacefulExpansionAlternative?.let {
+                mapOf(
+                    "peacefulExpansionAlternative" to
+                        mapOf(
+                            "kind" to PeacefulExpansionAlternativeConfig.VERSION,
+                            "throughEpoch" to it.through.number,
                         )
                 )
             } ?: emptyMap()) +
@@ -566,6 +578,7 @@ private constructor(
                     "controlSelector",
                     "expansionDenial",
                     "leadingRivalRetargeting",
+                    "peacefulExpansionAlternative",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -623,6 +636,20 @@ private constructor(
             val candidateSampler = sampler(node.required("selector"))
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
+            val peacefulExpansionAlternative =
+                node["peacefulExpansionAlternative"]?.let { rule ->
+                    PurchaseJson.fields(rule, setOf("kind", "throughEpoch"))
+                    require(rule["kind"]?.asText() == PeacefulExpansionAlternativeConfig.VERSION) {
+                        "Declare the exact version of the peaceful expansion alternative."
+                    }
+                    val through =
+                        PurchaseJson.integer(rule["throughEpoch"], "last substitution epoch")
+                    PeacefulExpansionAlternativeConfig(
+                        requireNotNull(Epoch.entries.singleOrNull { it.number == through }) {
+                            "The expansion alternative requires a known final epoch."
+                        }
+                    )
+                }
             val leadingRivalRetargeting =
                 node["leadingRivalRetargeting"]?.let { rule ->
                     PurchaseJson.fields(
@@ -840,6 +867,7 @@ private constructor(
                     initiativeLineup,
                     capitalAuction,
                     leadingRivalRetargeting,
+                    peacefulExpansionAlternative,
                     seeds,
                     start,
                     count,
