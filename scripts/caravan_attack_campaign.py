@@ -1,4 +1,4 @@
-"""Measure attack sequencing through a contested Caravan gateway with paired futures."""
+"""Compare two-move Caravan routes by expected captures and matched terminal outcomes."""
 
 import argparse
 import json
@@ -9,9 +9,13 @@ from commodity_rollout_campaign import simulated_positions
 from initiative_campaign import Campaign, interval, read, write
 
 
-REMOTE = "/home/aragos/aor-worker/caravan-followthrough-v2-20261119"
+REMOTE = "/home/aragos/aor-worker/caravan-expected-routes-20261119"
 KEY = "caravanAttackRollouts"
 ARMS = ("ordinary", "attack-gateway", "attack-and-place")
+
+
+def efficiency(first_odds, second_odds, first_cost, second_cost):
+    return first_odds * (1 + second_odds) / (first_cost + first_odds * second_cost)
 
 
 def collect(stage, count):
@@ -27,14 +31,26 @@ def collect(stage, count):
             if root["status"] != "paired":
                 continue
             tails = root["tails"]
+            efficient = "market-efficient-route"
+            if (efficient in tails) != root["differentRoute"]:
+                raise ValueError("Only a distinct route requires additional matched futures.")
+            arms = (*ARMS, efficient) if efficient in tails else ARMS
             seeds = [[sample["terminal"]["continuationSeed"] for sample in tails[arm]]
-                     for arm in ARMS]
+                     for arm in arms]
             if len(seeds[0]) != 2 or any(pair != seeds[0] for pair in seeds[1:]):
                 raise ValueError("All legal alternatives must replay both matched futures.")
             if not .45 <= root["attackChance"] <= 1 or not 2 <= root["targetCost"] <= 10:
                 raise ValueError("The selected gateway must meet the declared cost and risk range.")
-            wins = [statistics.mean(sample["terminal"]["winShare"] for sample in tails[arm])
-                    for arm in ARMS]
+            old_efficiency = efficiency(root["attackChance"], root["targetChance"],
+                                        root["gatewayCost"], root["targetCost"])
+            new_efficiency = efficiency(root["efficientGatewayChance"], root["efficientTargetChance"],
+                                        root["efficientGatewayCost"], root["efficientTargetCost"])
+            if new_efficiency + 1e-12 < old_efficiency:
+                raise ValueError("The new route must improve or tie the declared expected capture rate.")
+            wins = {arm: statistics.mean(sample["terminal"]["winShare"] for sample in tails[arm])
+                    for arm in arms}
+            planned = wins["attack-and-place"]
+            selected = wins.get(efficient, planned)
             rows.append({
                 "turn": root["turn"],
                 "chance": root["attackChance"],
@@ -42,9 +58,13 @@ def collect(stage, count):
                 "redirectedFirstAttack": root["redirectedFirstAttack"],
                 "followThrough": statistics.mean(
                     sample["followedThrough"] for sample in tails["attack-and-place"]),
-                "gatewayEffect": wins[1] - wins[0],
-                "planEffect": wins[2] - wins[0],
-                "followThroughEffect": wins[2] - wins[1],
+                "gatewayEffect": wins["attack-gateway"] - wins["ordinary"],
+                "planEffect": planned - wins["ordinary"],
+                "followThroughEffect": planned - wins["attack-gateway"],
+                "efficiencyEffect": selected - planned,
+                "efficientPlanEffect": selected - wins["ordinary"],
+                "differentRoute": root["differentRoute"],
+                "expectedEfficiencyChange": new_efficiency - old_efficiency,
             })
     if seen != set(range(count)):
         raise ValueError("The report needs all scheduled worlds, including ineligible games.")
@@ -58,8 +78,10 @@ def summary(rows):
         "eligible": len(rows),
         "averageQuotedChance": statistics.mean(row["chance"] for row in rows),
         "followThroughRate": statistics.mean(row["followThrough"] for row in rows),
+        "expectedEfficiencyChange": statistics.mean(row["expectedEfficiencyChange"] for row in rows),
         **{name: interval([row[name] for row in rows])
-           for name in ("gatewayEffect", "planEffect", "followThroughEffect")},
+           for name in ("gatewayEffect", "planEffect", "followThroughEffect",
+                        "efficiencyEffect", "efficientPlanEffect")},
     }
 
 
@@ -74,6 +96,7 @@ def main(root, previous, count, resume):
     write(root / "result.json", {
         "worlds": count,
         "all": summary(evidence),
+        "changedRoutes": summary([row for row in evidence if row["differentRoute"]]),
         "nextAttack": summary([row for row in evidence if row["secondAction"] == "ATTACK"]),
         "redirectedFirstAttack": summary([row for row in evidence if row["redirectedFirstAttack"]]),
         "throughTurn6": summary([row for row in evidence if row["turn"] <= 6]),

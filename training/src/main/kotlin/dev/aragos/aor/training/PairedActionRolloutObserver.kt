@@ -43,7 +43,7 @@ internal class PairedActionRolloutObserver(
         val context: Map<String, Any>,
         val commodityPlan: CommodityExpansionPlan? = null,
         val basePlan: NextTurnBasePlan? = null,
-        val caravanPlan: CaravanAttackPlan? = null,
+        val caravanPlans: Map<String, CaravanAttackPlan> = emptyMap(),
     )
 
     private var root: Root? = null
@@ -98,9 +98,15 @@ internal class PairedActionRolloutObserver(
         ) {
             return null
         }
-        val plan =
+        val options =
             CaravanAttackPlan.select(state, state.playerIds[seat], observation, command)
                 ?: return null
+        val plan = options.ordinary
+        val efficient = options.efficient
+        val plans = buildMap {
+            put("attack-and-place", plan)
+            if (efficient != plan) put("market-efficient-route", efficient)
+        }
         return Root(
             state = state,
             number = number,
@@ -109,8 +115,7 @@ internal class PairedActionRolloutObserver(
                 mapOf(
                     "ordinary" to command,
                     "attack-gateway" to plan.attack.toText(),
-                    "attack-and-place" to plan.attack.toText(),
-                ),
+                ) + plans.mapValues { (_, route) -> route.attack.toText() },
             context =
                 mapOf(
                     "gateway" to plan.attack.province.value,
@@ -120,8 +125,16 @@ internal class PairedActionRolloutObserver(
                     "targetAction" to plan.secondAction.name,
                     "redirectedFirstAttack" to (plan.attack.toText() != command),
                     "attackChance" to plan.chance,
+                    "targetChance" to plan.secondChance,
+                    "efficientGateway" to efficient.attack.province.value,
+                    "efficientTarget" to efficient.destination.value,
+                    "efficientGatewayCost" to efficient.firstCost,
+                    "efficientTargetCost" to efficient.secondCost,
+                    "efficientGatewayChance" to efficient.chance,
+                    "efficientTargetChance" to efficient.secondChance,
+                    "differentRoute" to (efficient != plan),
                 ),
-            caravanPlan = plan,
+            caravanPlans = plans,
         )
     }
 
@@ -518,8 +531,9 @@ internal class PairedActionRolloutObserver(
                                         originTurn + 1,
                                     )
                                 }
-                            "attack-and-place" ->
-                                captured.caravanPlan?.let { plan ->
+                            "attack-and-place",
+                            "market-efficient-route" ->
+                                captured.caravanPlans[arm]?.let { plan ->
                                     PlannedMarketContinuation(
                                         requireRouteReference(originalControllers),
                                         plan.destination,

@@ -23,14 +23,21 @@ internal data class CaravanAttackPlan(
     val secondCost: Int,
     val secondAction: ExpansionAction,
     val chance: Double,
+    val secondChance: Double,
 ) {
+    /** Expected markets captured per expected token committed, from the original decision. */
+    private val marketEfficiency: Double
+        get() = chance * (1.0 + secondChance) / (firstCost + chance * secondCost)
+
+    data class Choices(val ordinary: CaravanAttackPlan, val efficient: CaravanAttackPlan)
+
     companion object {
         fun select(
             state: GameState,
             actor: PlayerId,
             observation: BotObservation,
             ordinary: String,
-        ): CaravanAttackPlan? {
+        ): Choices? {
             val current = TextCodec.parseCommand(ordinary) as? BoardCommand.Attack ?: return null
             if (!state.playerState(actor).advances.owns(AdvanceId.CARAVAN)) return null
             if (observation.availableTokens < 7) return null
@@ -61,47 +68,71 @@ internal data class CaravanAttackPlan(
                     }
                     .toSet()
             val commands = observation.candidates.map { it.command }.toSet()
-            return public.expansionOffers
-                .asSequence()
-                .filter { quote ->
-                    quote.destination in gateways &&
-                        quote.primaryAction == ExpansionAction.ATTACK &&
-                        quote.blockers.isEmpty() &&
-                        quote.requiredTokens <= reference.requiredTokens + 2 &&
-                        quote.requiredTokens + 2 <= observation.availableTokens &&
-                        (quote.competitionWinProbability ?: 0.0) >= maxOf(.45, minimumChance)
-                }
-                .sortedWith(compareBy({ it.requiredTokens }, { it.destination.value }))
-                .take(6)
-                .mapNotNull { quote ->
-                    val attack = BoardCommand.Attack(quote.destination)
-                    if (attack.toText() !in commands) return@mapNotNull null
-                    val successful =
-                        successfulAttack(state, actor, attack) ?: return@mapNotNull null
-                    val access =
+            val branches =
+                public.expansionOffers
+                    .asSequence()
+                    .filter { quote ->
+                        quote.destination in gateways &&
+                            quote.primaryAction == ExpansionAction.ATTACK &&
+                            quote.blockers.isEmpty() &&
+                            quote.requiredTokens <= reference.requiredTokens + 2 &&
+                            quote.requiredTokens + 2 <= observation.availableTokens &&
+                            (quote.competitionWinProbability ?: 0.0) >= maxOf(.45, minimumChance)
+                    }
+                    .sortedWith(compareBy({ it.requiredTokens }, { it.destination.value }))
+                    .take(6)
+                    .mapNotNull { quote ->
+                        val attack = BoardCommand.Attack(quote.destination)
+                        if (attack.toText() !in commands) return@mapNotNull null
+                        val successful =
+                            successfulAttack(state, actor, attack) ?: return@mapNotNull null
+                        val chance =
+                            requireNotNull(quote.competitionWinProbability) {
+                                "A shortlisted attack must have a quoted dice probability."
+                            }
                         successful.expansionOffers
                             .filter { offer ->
                                 offer.destination in closed && offer.admitsPlannedMarket()
                             }
-                            .minWithOrNull(
-                                compareBy({ it.requiredTokens }, { it.destination.value })
-                            ) ?: return@mapNotNull null
-                    CaravanAttackPlan(
-                        attack,
-                        access.destination,
-                        quote.requiredTokens,
-                        access.requiredTokens,
-                        access.primaryAction,
-                        requireNotNull(quote.competitionWinProbability) {
-                            "A shortlisted attack must have a quoted dice probability."
-                        },
+                            .mapNotNull followUp@{ access ->
+                                val secondChance =
+                                    if (access.primaryAction == ExpansionAction.ATTACK) {
+                                        access.competitionWinProbability ?: return@followUp null
+                                    } else 1.0
+                                CaravanAttackPlan(
+                                    attack,
+                                    access.destination,
+                                    quote.requiredTokens,
+                                    access.requiredTokens,
+                                    access.primaryAction,
+                                    chance,
+                                    secondChance,
+                                )
+                            }
+                            .takeIf { it.isNotEmpty() }
+                    }
+                    .toList()
+            val ordinary =
+                branches
+                    .map { paths ->
+                        paths.minWith(compareBy({ it.secondCost }, { it.destination.value }))
+                    }
+                    .maxWithOrNull(
+                        compareBy<CaravanAttackPlan> { it.chance }
+                            .thenByDescending { it.firstCost + it.secondCost }
+                            .thenByDescending { it.attack.province.value }
+                    ) ?: return null
+            val efficient =
+                branches
+                    .asSequence()
+                    .flatten()
+                    .maxWith(
+                        compareBy<CaravanAttackPlan> { it.marketEfficiency }
+                            .thenBy { it.chance }
+                            .thenByDescending { it.attack.province.value }
+                            .thenByDescending { it.destination.value }
                     )
-                }
-                .maxWithOrNull(
-                    compareBy<CaravanAttackPlan> { it.chance }
-                        .thenByDescending { it.firstCost + it.secondCost }
-                        .thenByDescending { it.attack.province.value }
-                )
+            return Choices(ordinary, efficient)
         }
 
         /**

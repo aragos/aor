@@ -43,7 +43,7 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
     elif next_turn_bases:
         topic, bank = "next-turn-base", "colored-base-followthrough-v1"
     elif caravan_attacks:
-        topic, bank = "caravan-attack", "caravan-attack-followthrough-v2"
+        topic, bank = "caravan-attack", "caravan-attack-expected-route-v3"
     if lookahead:
         if not territory:
             raise ValueError("Short lookahead requires the card versus territory comparison.")
@@ -98,7 +98,7 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         method["kind"] = "colored-base-followthrough-1"
         method.pop("commodityTiming")
     elif caravan_attacks:
-        method["kind"] = "caravan-attack-followthrough-2"
+        method["kind"] = "caravan-attack-expected-route-3"
         method.pop("commodityTiming")
     if lookahead:
         method["checkpointTurns"] = [1, 3]
