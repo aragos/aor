@@ -49,7 +49,7 @@ class EuropeanMapGameTest {
         val board = state.board.placeMarker(ProvinceId("loire"), owner).board
 
         val payment =
-            CardRules.commodityPayment(state.copy(board = board).cardContext(), Commodity.WINE)
+            CardRules.commodityPayment(state.copy(board = board).cardContext, Commodity.WINE)
 
         assertThat(payment.payments[owner]).isEqualTo(5)
     }

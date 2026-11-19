@@ -18,7 +18,7 @@ data class PatronageOfferView(
                     state.flow.decisions.isNotEmpty()
             )
                 return emptyList()
-            val context = state.cardContext()
+            val context = state.cardContext
             return state.effects.leaders.mapNotNull { played ->
                 try {
                     val claim = LeaderRules.claim(context, actor, played.leader)

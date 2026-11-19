@@ -126,6 +126,8 @@ data class GameState(
 ) {
     /** Derived board queries are shared only within this immutable game snapshot. */
     internal val boardContext: BoardRulesContext by lazy { BoardGame.context(this) }
+    /** Card resolution and previews reuse the exact inputs from this immutable snapshot. */
+    internal val cardContext: CardContext by lazy { buildCardContext() }
     internal val commonView: GameView.Common by lazy { GameView.Common(this) }
 
     val catalog: CatalogConfiguration by lazy {

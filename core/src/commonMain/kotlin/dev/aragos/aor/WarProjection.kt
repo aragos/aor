@@ -13,7 +13,7 @@ object WarProjection {
     /** Uses the same rule calculation as execution, before misery or cession changes occur. */
     fun outcome(state: GameState, dice: WarDice): WarOutcomeView? {
         val frame = state.flow.decisions.lastOrNull() as? CardDecision.WarRoll ?: return null
-        val result = WarRules.roll(state.cardContext(), frame.war, dice)
+        val result = WarRules.roll(state.cardContext, frame.war, dice)
         return when (result) {
             is WarResult.Tie ->
                 WarOutcomeView(
