@@ -92,6 +92,7 @@ def parse_options(arguments):
     parser.add_argument("--player-count", type=int, choices=(3, 4, 5, 6))
     parser.add_argument("--round-seeds", type=int, choices=range(1, 9))
     parser.add_argument("--opponents", type=Path, help="Ordered JSON array of frozen rival model paths.")
+    parser.add_argument("--challenger", type=Path, help="Frozen model for guarded bidding evaluation.")
     parser.add_argument("--seeds", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--rounds", type=int)
@@ -143,6 +144,8 @@ def parse_options(arguments):
         forbidden = legacy_options + ("source",)
     else:
         forbidden = pilot_options + ("source",)
+    if options.mode != "evaluate-initiative":
+        forbidden += ("challenger",)
     if options.mode != "train":
         forbidden += ("round_seeds",)
     if options.mode not in ("train", "train-initiative", "evaluate-initiative"):
@@ -157,6 +160,8 @@ def parse_options(arguments):
     options.output = options.output.expanduser().resolve()
     if options.model is not None:
         options.model = options.model.expanduser().resolve()
+    if options.challenger is not None:
+        options.challenger = options.challenger.expanduser().resolve()
     if options.opponents is not None:
         options.opponents = options.opponents.expanduser().resolve()
     if options.source is not None:
@@ -289,7 +294,7 @@ def trainer_arguments(options, budget, remaining_hours):
         arguments += ["--model", str(model)]
     if options.source is not None:
         arguments += ["--source", str(options.source)]
-    for name in ("configurations", "player_count", "opponents", "seeds", "seed",
+    for name in ("configurations", "player_count", "opponents", "challenger", "seeds", "seed",
                  "rounds", "round_seeds", "batch", "difficulty",
                  "benchmark_games", "positions", "samples", "pairs", "index", "side", "pair"):
         value = getattr(options, name)

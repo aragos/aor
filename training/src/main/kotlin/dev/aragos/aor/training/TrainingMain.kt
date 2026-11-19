@@ -239,7 +239,7 @@ fun main(arguments: Array<String>) {
             --mode coverage|train|evaluate|evaluate-finish|train-opening|train-initiative
                 --output PATH --hours HOURS (maximum 72)
             --workers N  --configurations 1..${TrainingMatrix.configurations.size}  --seeds N  --seed N
-            --mode evaluate-initiative --opponents PATH --model PATH
+            --mode evaluate-initiative --opponents PATH --model PATH [--challenger PATH]
             --player-count 3..6
             --rounds N  --batch N  --round-seeds N  --model PATH  --difficulty EASY|NORMAL|HARD
             --opponents PATH  (ordered JSON array of model paths relative to the list)
@@ -286,6 +286,13 @@ fun main(arguments: Array<String>) {
     val configurations = options.scope.take(options.configurations)
     val opponents = options.opponents?.let(FrozenTrainingOpponents::read)
     opponents?.snapshot(artifacts)
+    val challenger =
+        options.challenger?.let { path ->
+            val hash = PurchaseJson.hash(path)
+            val model = TrainingArtifacts.readModel(path)
+            artifacts.ensureFileSnapshot(path, hash, "challenger.json")
+            model
+        }
     artifacts.write(
         "run.json",
         mapOf(
@@ -380,6 +387,7 @@ fun main(arguments: Array<String>) {
                     ledger,
                     opponents?.models.orEmpty(),
                     confirmWithFinishGuard = options.mode == "evaluate-initiative",
+                    challenger = challenger,
                 )
             else -> error("Unknown training mode ${options.mode}.")
         }
@@ -551,6 +559,7 @@ private data class TrainingOptions(
     val playerCount: Int?,
     val scope: List<TrainingConfiguration>,
     val opponents: Path?,
+    val challenger: Path?,
     val seeds: Int,
     val seed: Int,
     val rounds: Int,
@@ -573,6 +582,7 @@ private data class TrainingOptions(
                     "--configurations",
                     "--player-count",
                     "--opponents",
+                    "--challenger",
                     "--seeds",
                     "--seed",
                     "--rounds",
@@ -604,6 +614,7 @@ private data class TrainingOptions(
                     playerCount = playerCount,
                     scope = scope,
                     opponents = fields["--opponents"]?.let(Path::of),
+                    challenger = fields["--challenger"]?.let(Path::of),
                     seeds = fields["--seeds"]?.toInt() ?: 1,
                     seed = fields["--seed"]?.toInt() ?: 19790531,
                     rounds = fields["--rounds"]?.toInt() ?: 96,
@@ -647,6 +658,9 @@ private data class TrainingOptions(
             }
             require(options.mode != "evaluate-initiative" || options.opponents != null) {
                 "Initiative confirmation with the endgame guard requires a frozen opponent roster."
+            }
+            require(options.mode == "evaluate-initiative" || options.challenger == null) {
+                "A challenger model is available only in evaluate-initiative mode."
             }
             require(options.rounds in 0..100000) { "Use between 0 and 100000 exploration rounds." }
             require(options.batch in 1..maxConfigurations) {

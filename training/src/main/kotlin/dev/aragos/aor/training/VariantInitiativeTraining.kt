@@ -19,7 +19,11 @@ internal object VariantInitiativeTraining {
         SWITCHING,
     }
 
-    private data class Design(val name: String, val config: PhaseInitiativeConfig)
+    private data class Design(
+        val name: String,
+        val config: PhaseInitiativeConfig? = null,
+        val model: BotModel? = null,
+    )
 
     private data class Game(
         val configuration: TrainingConfiguration,
@@ -61,6 +65,7 @@ internal object VariantInitiativeTraining {
         ledger: CoverageLedger,
         opponentModels: List<BotModel>,
         confirmWithFinishGuard: Boolean,
+        challenger: BotModel?,
     ) {
         if (confirmWithFinishGuard) {
             evaluate(
@@ -72,7 +77,7 @@ internal object VariantInitiativeTraining {
                 artifacts,
                 ledger,
                 opponentModels,
-                designs.first(),
+                challenger?.let { Design("challenger-model", model = it) } ?: designs.first(),
                 FinalAdvanceGuard(currentLead = 100, projectedLead = 250),
             )
             return
@@ -168,7 +173,7 @@ internal object VariantInitiativeTraining {
         best: Design,
         finishGuard: FinalAdvanceGuard? = null,
     ) {
-        artifacts.write("initiative-candidate.json", best.config)
+        best.config?.let { artifacts.write("initiative-candidate.json", it) }
         println(
             "Testing ${best.name} on fresh seeds in all ${configurations.size} selected setups."
         )
@@ -288,7 +293,7 @@ internal object VariantInitiativeTraining {
                                 simulate(
                                     game,
                                     incumbent,
-                                    design.config,
+                                    design,
                                     tournaments.deadlineNanos,
                                     ledger,
                                     opponentModels,
@@ -305,7 +310,7 @@ internal object VariantInitiativeTraining {
     private fun simulate(
         game: Game,
         incumbent: BotModel,
-        policy: PhaseInitiativeConfig?,
+        design: Design?,
         deadline: Long,
         ledger: CoverageLedger,
         opponentModels: List<BotModel>,
@@ -315,7 +320,7 @@ internal object VariantInitiativeTraining {
         val competitors =
             List(count) { seat ->
                 if (seat == game.seat) {
-                    Competitor(incumbent, BotDifficulty.HARD)
+                    Competitor(design?.model ?: incumbent, BotDifficulty.HARD)
                 } else if (opponentModels.isNotEmpty()) {
                     val modelIndex = Math.floorMod(game.seed xor (seat * 31), opponentModels.size)
                     Competitor(opponentModels[modelIndex], BotDifficulty.HARD)
@@ -330,20 +335,25 @@ internal object VariantInitiativeTraining {
         val adversary = (game.seat + 1) % count
         var changes = 0
         val controllers = buildMap {
-            if (policy != null) {
+            if (design != null) {
                 put(
                     game.seat,
                     tokenController { decision ->
-                        val ordinary = ordinary(decision, competitors[game.seat])
+                        val nominal = ordinary(decision, competitors[game.seat])
                         val selected =
-                            PhaseInitiativePolicy.bid(
-                                decision.view,
-                                actor,
-                                ordinary,
-                                decision.seed,
-                                policy,
-                            )
-                        if (selected != ordinary) changes++
+                            design.config?.let { config ->
+                                PhaseInitiativePolicy.bid(
+                                    decision.view,
+                                    actor,
+                                    nominal,
+                                    decision.seed,
+                                    config,
+                                )
+                            } ?: nominal
+                        val baseline =
+                            if (design.model == null) nominal
+                            else ordinary(decision, Competitor(incumbent, BotDifficulty.HARD))
+                        if (selected != baseline) changes++
                         selected
                     },
                 )

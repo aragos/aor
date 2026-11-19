@@ -112,6 +112,8 @@ using earlier public bids. Final evaluation uses fresh seeds across the full sel
 includes an opponent that changes its preferred order as the game develops. Use
 `--mode evaluate-initiative --model PATH --opponents PATH` for a fresh comparison of the
 conservative candidate against the frozen Hard roster with the advance guard in both arms.
+Set `--challenger PATH` to compare ordinary serialized model weights, including learned bid weights,
+against the same four bidding styles.
 
 ### Portable simulation benchmark
 
