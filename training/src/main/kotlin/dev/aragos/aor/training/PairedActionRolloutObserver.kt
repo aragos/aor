@@ -33,6 +33,7 @@ internal class PairedActionRolloutObserver(
     private val compareCapitals: Boolean = false,
     private val compareLeaderProtection: Boolean = false,
     private val compareNextTurnBase: Boolean = false,
+    private val compareEndingTrigger: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -57,6 +58,7 @@ internal class PairedActionRolloutObserver(
                 compareCapitals -> "capitalChoiceRollouts"
                 compareLeaderProtection -> "leaderProtectionRollouts"
                 compareNextTurnBase -> "nextTurnBaseRollouts"
+                compareEndingTrigger -> "triggerEndingRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -77,8 +79,49 @@ internal class PairedActionRolloutObserver(
                 compareCapitals -> capitalRoot(state, number, observation, command)
                 compareLeaderProtection -> protectionRoot(state, number, observation, command)
                 compareNextTurnBase -> baseRoot(state, number, observation, command)
+                compareEndingTrigger -> endingTriggerRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
+    }
+
+    private fun endingTriggerRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (
+            observation.decision != "expand" ||
+                state.currentEpoch.number != 3 ||
+                state.endingTriggered ||
+                command == "buy-expansion-card" ||
+                observation.candidates.none { it.command == "buy-expansion-card" }
+        ) {
+            return null
+        }
+        val actor = state.playerIds[seat]
+        val view = state.viewForDecision(actor)
+        if (view.deckRemaining != 1) return null
+        val own = view.scores.firstOrNull { it.player == actor }?.total ?: return null
+        val rival =
+            view.scores.filterNot { it.player == actor }.mapNotNull { it.total }.maxOrNull()
+                ?: return null
+        return Root(
+            state = state,
+            number = number,
+            chosen = command,
+            actions = mapOf("ordinary" to command, "take-final-card" to "buy-expansion-card"),
+            context =
+                mapOf(
+                    "scoreMargin" to (own - rival),
+                    "poolTokens" to observation.availableTokens,
+                    "cardCost" to
+                        checkNotNull(view.expansionCardCost) {
+                            "An offered expansion card requires its public token quote."
+                        },
+                    "heldCards" to view.hand.size,
+                ),
+        )
     }
 
     private fun baseRoot(
@@ -444,6 +487,12 @@ internal class PairedActionRolloutObserver(
                             chanceMode = chanceMode,
                         )
                     session.apply(mapOf(actor to action), deadline)
+                    val endingAfterRoot = session.state.endingTriggered
+                    if (compareEndingTrigger && arm == "take-final-card") {
+                        check(endingAfterRoot) {
+                            "Buying the final normal deck card must trigger the game's ending."
+                        }
+                    }
                     val checkpoints =
                         if (traceLookahead && chanceMode == ExperimentChanceMode.SEQUENTIAL) {
                             mutableMapOf<Int, Map<String, Any>>()
@@ -514,6 +563,8 @@ internal class PairedActionRolloutObserver(
                         } ?: emptyMap()) +
                         (baseController?.let { mapOf("followedThrough" to it.followedThrough) }
                             ?: emptyMap()) +
+                        (if (compareEndingTrigger) mapOf("endingAfterRoot" to endingAfterRoot)
+                        else emptyMap()) +
                         (if (reserveExpansionCard) {
                             val cardReceived =
                                 session.entries

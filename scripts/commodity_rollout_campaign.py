@@ -16,9 +16,10 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
                         lookahead=False, epochs=(), chance_trial=False, short_training_futures=0,
                         relief_unlock=False, commodity_expansion=False, midgame_bids=False,
                         rival_denial=False, reserve_card=False, capital_choices=False,
-                        leader_protection=False, next_turn_bases=False):
+                        leader_protection=False, next_turn_bases=False, trigger_ending=False):
     if sum((expansion, territory, relief_unlock, commodity_expansion, midgame_bids,
-            rival_denial, reserve_card, capital_choices, leader_protection, next_turn_bases)) > 1:
+            rival_denial, reserve_card, capital_choices, leader_protection, next_turn_bases,
+            trigger_ending)) > 1:
         raise ValueError("A paired study requires one root intervention.")
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
@@ -41,6 +42,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         topic, bank = "leader-protection", "matched-protection-escrow-v1"
     elif next_turn_bases:
         topic, bank = "next-turn-base", "colored-base-followthrough-v1"
+    elif trigger_ending:
+        topic, bank = "ending-trigger", "take-last-card-v1"
     if lookahead:
         if not territory:
             raise ValueError("Short lookahead requires the card versus territory comparison.")
@@ -94,6 +97,9 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
     elif next_turn_bases:
         method["kind"] = "colored-base-followthrough-1"
         method.pop("commodityTiming")
+    elif trigger_ending:
+        method["kind"] = "take-last-card-1"
+        method.pop("commodityTiming")
     if lookahead:
         method["checkpointTurns"] = [1, 3]
     if epochs:
@@ -143,6 +149,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
             request.update(opponentStyle="MIXED", leaderProtectionRollouts=True)
         elif next_turn_bases:
             request.update(opponentStyle="MIXED", nextTurnBaseRollouts=True)
+        elif trigger_ending:
+            request.update(opponentStyle="MIXED", triggerEndingRollouts=True)
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
             if commodity_expansion:
