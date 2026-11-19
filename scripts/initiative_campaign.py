@@ -102,9 +102,10 @@ def score(records, controls, role="CANDIDATE"):
 
 
 class Campaign:
-    def __init__(self, root, *, remote=REMOTE):
+    def __init__(self, root, *, remote=REMOTE, mac_reserve_gib=16):
         self.root = root.resolve()
         self.remote = remote
+        self.mac_reserve = mac_reserve_gib * (1024 ** 3)
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
@@ -136,8 +137,8 @@ class Campaign:
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
         worker_count, heap, java = (8, "5g", MAC_JAVA) if host == "MAC" else (16, "7g", "/usr/bin/java")
-        if host == "MAC" and shutil.disk_usage(self.root).free < 16*(1024**3):
-            raise RuntimeError("Mac free disk space fell below the 16 GiB floor.")
+        if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
+            raise RuntimeError("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
         command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
                    java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
