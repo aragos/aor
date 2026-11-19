@@ -53,7 +53,7 @@ def main(root, previous, resume):
             ),
         )
         outcomes[case] = score(root / stage, "response", WORLDS)
-        write(root / "outcomes.json", outcomes)
+        write(root / "outcomes.json", outcomes, replace=True)
     write(root / "result.json", {"diagnostic": True, "outcomes": outcomes})
 
 
