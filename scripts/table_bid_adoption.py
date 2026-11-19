@@ -16,8 +16,8 @@ WORLDS = 640
 PEERS = [2, 3]
 
 
-def compare(folder):
-    before, after = (load_games(folder, role) for role in ARMS)
+def compare(folder, roles=ARMS):
+    before, after = (load_games(folder, role) for role in roles)
     if set(before) != set(after) or set(before) != set(range(WORLDS)):
         raise ValueError("Measure the entire common seed bank with three automated seats.")
     challenger = []
@@ -75,7 +75,7 @@ def main(root, previous, resume):
             ),
         )
         outcomes[case] = compare(root / stage)
-        write(root / "outcomes.json", outcomes)
+        write(root / "outcomes.json", outcomes, replace=True)
     write(root / "result.json", {"diagnostic": True, "outcomes": outcomes})
 
 

@@ -28,6 +28,7 @@ internal data class CapitalOrderOpeningBid(val earlyBid: Int, val lateBid: Int) 
  * [forecastQuantile] selects a lower or upper order statistic of recent bids. Omission uses the
  * observed mode and breaks equal frequencies by recency. [seriesMidgamePrior] is an amount learned
  * from completed previous games and fixed for turns three through ten before play starts.
+ * [midgamePriorCycle] contains predeclared test forecasts, cycled from turn three through ten.
  */
 internal data class RevealedTokenCounterConfig(
     val minimumObservations: Int,
@@ -38,6 +39,7 @@ internal data class RevealedTokenCounterConfig(
     val capitalOrderOpeningPrior: CapitalOrderOpeningBid? = null,
     val capitalOrderOpeningResponse: CapitalOrderOpeningBid? = null,
     val seriesMidgamePrior: Int? = null,
+    val midgamePriorCycle: List<Int> = emptyList(),
 ) {
     init {
         require(lookbackTurns in 1..16 && minimumObservations in 1..lookbackTurns) {
@@ -51,6 +53,14 @@ internal data class RevealedTokenCounterConfig(
         }
         require(seriesMidgamePrior == null || seriesMidgamePrior in -40..100) {
             "A prior midgame amount must fit the declared signed experiment range."
+        }
+        require(
+            midgamePriorCycle.isEmpty() ||
+                seriesMidgamePrior == null &&
+                    midgamePriorCycle.size in 2..8 &&
+                    midgamePriorCycle.all { it in 1..41 }
+        ) {
+            "A midgame forecast cycle requires two to eight positive forecasts and no fixed prior."
         }
     }
 
@@ -68,7 +78,9 @@ internal data class RevealedTokenCounterConfig(
                     ?: emptyMap()) +
                 (capitalOrderOpeningResponse?.let { mapOf("capitalOrderOpeningResponse" to it) }
                     ?: emptyMap()) +
-                (seriesMidgamePrior?.let { mapOf("seriesMidgamePrior" to it) } ?: emptyMap())
+                (seriesMidgamePrior?.let { mapOf("seriesMidgamePrior" to it) } ?: emptyMap()) +
+                (if (midgamePriorCycle.isEmpty()) emptyMap()
+                else mapOf("midgamePriorCycle" to midgamePriorCycle))
 
     companion object {
         const val VERSION = "public-token-history-counter-1"
@@ -82,7 +94,7 @@ internal data class RevealedTokenCounterConfig(
                     "lookbackTurns",
                     "targetedRivalCount",
                 ),
-                optional = setOf("openingBidPrior", "forecastQuantile"),
+                optional = setOf("openingBidPrior", "forecastQuantile", "midgamePriorCycle"),
             )
             require(node["kind"]?.asText() == VERSION) {
                 "Declare the exact public counter version."
@@ -95,6 +107,14 @@ internal data class RevealedTokenCounterConfig(
                 node["forecastQuantile"]?.let {
                     PurchaseJson.number(it, "public bid forecast quantile")
                 },
+                midgamePriorCycle =
+                    node["midgamePriorCycle"]
+                        ?.let { cycle ->
+                            PurchaseJson.array(cycle, "midgame forecast cycle").map {
+                                PurchaseJson.integer(it, "midgame forecast")
+                            }
+                        }
+                        .orEmpty(),
             )
         }
     }
@@ -369,7 +389,15 @@ internal class RevealedTokenCounter(
             "Only a distinct rival in an explicit public counter style may counter a token bid."
         }
         val history = recent.filter { it.turn < turn }
-        val prior = config.seriesMidgamePrior?.takeIf { turn in 3..10 }
+        val prior =
+            if (turn in 3..10) {
+                config.seriesMidgamePrior
+                    ?: config.midgamePriorCycle
+                        .takeIf { it.isNotEmpty() }
+                        ?.let {
+                            it[(turn - 3) % it.size]
+                        }
+            } else null
         val prediction =
             prior
                 ?: if (history.size < config.minimumObservations) {

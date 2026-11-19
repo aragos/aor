@@ -21,6 +21,7 @@ internal enum class PhaseBidProfile(
     WIDE("wide", 5, 1.4),
     CASH_CONSCIOUS("cash-conscious", 4, .75),
     REPEATED_UNDERCUT("repeated-undercut", 5, 1.4),
+    ALTERNATING_UNDERCUT("alternating-undercut", 5, 1.4),
 }
 
 /** Spend and rank estimates need either an imminent card opportunity or a board incentive. */
@@ -46,8 +47,16 @@ internal class PhaseAwareBid(
         val history = view.pastTokenPurchases.takeLast(4)
         if (history.size < 2) return ordinary
         val actor = PlayerId(decision.observation.playerId)
-        if (profile == PhaseBidProfile.REPEATED_UNDERCUT && !repeatedUndercut(history, actor)) {
-            return ordinary
+        when (profile) {
+            PhaseBidProfile.REPEATED_UNDERCUT -> {
+                if (!repeatedUndercut(history, actor)) return ordinary
+            }
+            PhaseBidProfile.ALTERNATING_UNDERCUT -> {
+                if (!repeatedUndercut(history, actor) && !alternatingUndercut(history, actor)) {
+                    return ordinary
+                }
+            }
+            else -> Unit
         }
         val forecast = view.expansionForecast ?: return ordinary
         val pool =
@@ -123,6 +132,17 @@ internal class PhaseAwareBid(
         if (history.size != 4) return false
         return history.first().keys.any { rival ->
             rival != actor && history.count { row -> (row[rival] ?: Int.MIN_VALUE) in 15..17 } >= 3
+        }
+    }
+
+    private fun alternatingUndercut(history: List<Map<PlayerId, Int>>, actor: PlayerId): Boolean {
+        if (history.size != 4) return false
+        return history.first().keys.any { rival ->
+            if (rival == actor) return@any false
+            val bids = history.mapNotNull { it[rival] }
+            bids.size == 4 &&
+                bids.all { it in 15..20 } &&
+                bids.zipWithNext().all { (left, right) -> (left in 15..17) != (right in 15..17) }
         }
     }
 
