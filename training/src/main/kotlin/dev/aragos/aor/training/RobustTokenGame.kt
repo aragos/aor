@@ -360,6 +360,8 @@ internal object RobustTokenGame {
             "Every robust league seat must retain a complete reference controller."
         }
         val trace = if (index in input.replayIndices) RobustCanonicalTrace(seat) else null
+        val publicPositions =
+            if (input.collectPublicPositions) PublicPositionCollector(seat) else null
         val game =
             Simulation()
                 .play(
@@ -374,6 +376,7 @@ internal object RobustTokenGame {
                     deadlineNanos = deadline,
                     controllers = controllers,
                     trace = trace,
+                    stateObserver = publicPositions,
                 )
         val terminal = ArenaGame.from(game).copy(elapsedMillis = 0)
         CoordinatedEsAttempts.terminal(terminal)
@@ -383,6 +386,8 @@ internal object RobustTokenGame {
                 (if (rivalPolicies.isEmpty()) emptyMap()
                 else mapOf("initiativeRivalSeats" to rivalPolicies.keys.toList())) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
+                    ?: emptyMap()) +
+                (publicPositions?.let { mapOf("publicWinningPositions" to it.result()) }
                     ?: emptyMap()),
             trace?.sha256,
         )

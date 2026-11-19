@@ -7,6 +7,7 @@ import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
+import dev.aragos.aor.ai.PublicWinningPosition
 import dev.aragos.aor.ai.RevealedCounterResponse
 import dev.aragos.aor.ai.TokenNeighborAdmission
 import java.nio.file.Path
@@ -173,6 +174,7 @@ private constructor(
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
+    val collectPublicPositions: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -268,6 +270,9 @@ private constructor(
                         )
                 )
             } ?: emptyMap()) +
+            (if (collectPublicPositions)
+                mapOf("collectPublicPositions" to PublicWinningPosition.VERSION)
+            else emptyMap()) +
             (initiative?.let {
                 mapOf(
                     "initiative" to
@@ -566,6 +571,7 @@ private constructor(
                     "controlSelector",
                     "expansionDenial",
                     "leadingRivalRetargeting",
+                    "collectPublicPositions",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -677,6 +683,16 @@ private constructor(
                     }
                     it.booleanValue()
                 } ?: false
+            val collectPublicPositions =
+                node["collectPublicPositions"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The public position collector requires a boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
+            require(!collectPublicPositions || candidateOnly && leadingRivalRetargeting == null) {
+                "Public position collection uses the declared original unmodified candidate."
+            }
             val adaptiveOpponent =
                 node["adaptiveOpponent"]?.takeUnless(JsonNode::isNull)?.let {
                     RevealedTokenCounterConfig.read(it)
@@ -840,6 +856,7 @@ private constructor(
                     initiativeLineup,
                     capitalAuction,
                     leadingRivalRetargeting,
+                    collectPublicPositions,
                     seeds,
                     start,
                     count,
