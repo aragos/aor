@@ -150,6 +150,31 @@ internal data class CapitalAuctionConfig(
 }
 
 /** A bounded paired shard; the source owns all streams and immutable inference subjects. */
+/** A shared expansion rule for named offsets relative to the seat being evaluated. */
+internal data class LeadingRivalTable(
+    val offsets: List<Int>,
+    val policy: LeadingRivalRetargetingConfig,
+) {
+    init {
+        require(
+            offsets.isNotEmpty() &&
+                offsets == offsets.distinct().sorted() &&
+                offsets.all { it in 1..3 }
+        ) {
+            "Leading-rival tables require distinct sorted relative offsets from one to three."
+        }
+    }
+
+    fun policiesAround(seat: Int): Map<Int, LeadingRivalRetargetingConfig> =
+        offsets.associate { offset ->
+            (seat + offset) % 4 to policy
+        }
+
+    companion object {
+        const val VERSION = "leading-rival-table-1"
+    }
+}
+
 internal class RobustTokenInput
 private constructor(
     val source: TokenPairedSubject,
@@ -173,6 +198,7 @@ private constructor(
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
     val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
+    val leadingRivalTable: LeadingRivalTable?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -268,6 +294,15 @@ private constructor(
                         )
                 )
             } ?: emptyMap()) +
+            (leadingRivalTable?.let {
+                mapOf(
+                    "leadingRivalTable" to
+                        mapOf(
+                            "kind" to LeadingRivalTable.VERSION,
+                            "configuration" to it,
+                        )
+                )
+            } ?: emptyMap()) +
             (initiative?.let {
                 mapOf(
                     "initiative" to
@@ -306,6 +341,23 @@ private constructor(
         )
 
     companion object {
+        private fun retargeting(rule: JsonNode): LeadingRivalRetargetingConfig {
+            PurchaseJson.fields(
+                rule,
+                setOf("kind", "maximumTrailingPoints", "requireGreaterCommodityDenial"),
+            )
+            require(
+                rule["kind"]?.asText() == LeadingRivalRetargetingConfig.VERSION &&
+                    rule["requireGreaterCommodityDenial"].isBoolean
+            ) {
+                "Declare the specific retargeting policy and its boolean commodity condition."
+            }
+            return LeadingRivalRetargetingConfig(
+                PurchaseJson.integer(rule["maximumTrailingPoints"], "maximum trailing points"),
+                rule["requireGreaterCommodityDenial"].booleanValue(),
+            )
+        }
+
         private fun neighborMixture(node: JsonNode): LocalTokenNeighborMixture? {
             if (node.isNull) return null
             PurchaseJson.fields(node, setOf("kind", "departureProbability", "radius", "admission"))
@@ -566,6 +618,7 @@ private constructor(
                     "controlSelector",
                     "expansionDenial",
                     "leadingRivalRetargeting",
+                    "leadingRivalTable",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -623,24 +676,19 @@ private constructor(
             val candidateSampler = sampler(node.required("selector"))
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
-            val leadingRivalRetargeting =
-                node["leadingRivalRetargeting"]?.let { rule ->
-                    PurchaseJson.fields(
-                        rule,
-                        setOf("kind", "maximumTrailingPoints", "requireGreaterCommodityDenial"),
-                    )
-                    require(
-                        rule["kind"]?.asText() == LeadingRivalRetargetingConfig.VERSION &&
-                            rule["requireGreaterCommodityDenial"].isBoolean
-                    ) {
-                        "Declare the specific retargeting policy and its boolean commodity condition."
+            val leadingRivalRetargeting = node["leadingRivalRetargeting"]?.let(::retargeting)
+            val leadingRivalTable =
+                node["leadingRivalTable"]?.let { table ->
+                    PurchaseJson.fields(table, setOf("kind", "offsets", "policy"))
+                    require(table["kind"]?.asText() == LeadingRivalTable.VERSION) {
+                        "A retargeting table requires the exact versioned lineup."
                     }
-                    LeadingRivalRetargetingConfig(
-                        PurchaseJson.integer(
-                            rule["maximumTrailingPoints"],
-                            "maximum trailing points",
-                        ),
-                        rule["requireGreaterCommodityDenial"].booleanValue(),
+                    LeadingRivalTable(
+                        offsets =
+                            PurchaseJson.array(table["offsets"], "relative seats").map {
+                                PurchaseJson.integer(it, "relative seat")
+                            },
+                        policy = retargeting(table["policy"]),
                     )
                 }
             val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)
@@ -840,6 +888,7 @@ private constructor(
                     initiativeLineup,
                     capitalAuction,
                     leadingRivalRetargeting,
+                    leadingRivalTable,
                     seeds,
                     start,
                     count,

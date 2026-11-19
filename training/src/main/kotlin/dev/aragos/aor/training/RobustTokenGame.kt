@@ -248,6 +248,7 @@ internal object RobustTokenGame {
         }
         val arena = input.arena
         val seat = index % 4
+        val retargetingRivals = input.leadingRivalTable?.policiesAround(seat).orEmpty()
         val rivalPolicies =
             input.initiativeLineup?.seated(seat)
                 ?: input.initiativeRival
@@ -290,7 +291,7 @@ internal object RobustTokenGame {
                     if (candidate) input.tokenNeighborMixture else null,
                     if (candidate) input.candidateTokenAnchoredPolicy?.residual else null,
                     if (candidate) input.initiative else rivalPolicies[player],
-                    if (candidate) input.leadingRivalRetargeting else null,
+                    if (candidate) input.leadingRivalRetargeting else retargetingRivals[player],
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {
@@ -380,6 +381,8 @@ internal object RobustTokenGame {
         return RobustTokenGameResult(
             terminal,
             diagnostics.result() +
+                (if (retargetingRivals.isEmpty()) emptyMap()
+                else mapOf("retargetingRivalSeats" to retargetingRivals.keys.toList())) +
                 (if (rivalPolicies.isEmpty()) emptyMap()
                 else mapOf("initiativeRivalSeats" to rivalPolicies.keys.toList())) +
                 (league?.diagnostics()?.plus("publicCounterResolvedStyle" to style.name)
