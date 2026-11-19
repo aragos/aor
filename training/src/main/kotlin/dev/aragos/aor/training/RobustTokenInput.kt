@@ -753,7 +753,11 @@ private constructor(
                     .orEmpty()
             val midgameBidMix =
                 node["midgameBidMix"]?.let { mix ->
-                    PurchaseJson.fields(mix, setOf("kind", "bids", "weights", "respectPublicOrder"))
+                    PurchaseJson.fields(
+                        mix,
+                        required = setOf("kind", "bids", "weights", "respectPublicOrder"),
+                        optional = setOf("requireRepeatedEvidence", "focusScoreLeader"),
+                    )
                     require(
                         candidateOnly &&
                             mix["kind"]?.asText() == MidgameBidMix.VERSION &&
@@ -765,10 +769,17 @@ private constructor(
                         PurchaseJson.array(mix[field], field).map {
                             PurchaseJson.integer(it, field)
                         }
+                    fun flag(field: String): Boolean =
+                        mix[field]?.let {
+                            require(it.isBoolean) { "$field must be a JSON Boolean." }
+                            it.booleanValue()
+                        } ?: false
                     MidgameBidMix(
                         bids = integers("bids"),
                         weights = integers("weights"),
                         respectPublicOrder = mix["respectPublicOrder"].booleanValue(),
+                        requireRepeatedEvidence = flag("requireRepeatedEvidence"),
+                        focusScoreLeader = flag("focusScoreLeader"),
                     )
                 }
             require(
