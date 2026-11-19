@@ -98,6 +98,36 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun buysOneMoreTokenWhenItUnlocksTheBetterExpansionPlanAtTheSameOrder() {
+        val extended =
+            view.copy(
+                pastTokenPurchases = listOf(players.associateWith { 20 }),
+                tokenPurchaseOffers =
+                    view.tokenPurchaseOffers + TokenPurchaseOfferView(22, 22, 22, 18, 14, 22),
+            )
+        val plan =
+            TerritoryObservation(
+                encoderVersion = TerritoryEncoder.TOKEN_2.version,
+                stateFeatures = emptyMap(),
+                actions =
+                    extended.tokenPurchaseOffers.map { offer ->
+                        val features =
+                            if (offer.amount == 22) {
+                                mapOf(BotTokenPlanFeature.INCOME.key to 0.10)
+                            } else emptyMap()
+                        TerritoryAction("buy-tokens ${offer.amount}", features)
+                    },
+                baselineIndex = 3,
+            )
+        val budget = config.copy(maximumTokenLoss = 0, maximumExtraTokens = 1, planWeight = 0.1)
+
+        assertEquals(
+            "buy-tokens 22",
+            InitiativePolicy.bid(extended, seat, "buy-tokens 21", 7, budget, plan),
+        )
+    }
+
+    @Test
     fun respectsTheContestedPoolRequirement() {
         val forecast =
             ExpansionForecastView(

@@ -298,7 +298,15 @@ private constructor(
                     "requireAffordableContest",
                     "attackBonus",
                 ),
-                optional = setOf("historyDecay", "bidScoreTolerance", "openingSpread"),
+                optional =
+                    setOf(
+                        "historyDecay",
+                        "bidScoreTolerance",
+                        "openingSpread",
+                        "maximumExtraTokens",
+                        "planWeight",
+                        "extraCashPenalty",
+                    ),
             )
             require(
                 node["kind"]?.asText() == InitiativePolicyConfig.VERSION &&
@@ -321,6 +329,17 @@ private constructor(
                     } ?: 0.0,
                 openingSpread =
                     node["openingSpread"]?.let { PurchaseJson.integer(it, "opening spread") } ?: 0,
+                maximumExtraTokens =
+                    node["maximumExtraTokens"]?.let {
+                        PurchaseJson.integer(it, "maximum extra tokens")
+                    } ?: 0,
+                planWeight =
+                    node["planWeight"]?.let { PurchaseJson.number(it, "expansion plan weight") }
+                        ?: 0.0,
+                extraCashPenalty =
+                    node["extraCashPenalty"]?.let {
+                        PurchaseJson.number(it, "extra token cash penalty")
+                    } ?: 0.15,
             )
         }
 
