@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.InitiativePolicyConfig
+import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
@@ -171,6 +172,7 @@ private constructor(
     val initiativeRival: InitiativeRival?,
     val initiativeLineup: InitiativeLineup?,
     val capitalAuction: CapitalAuctionConfig?,
+    val leadingRivalRetargeting: LeadingRivalRetargetingConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -258,6 +260,15 @@ private constructor(
             } ?: emptyMap()) +
             (capitalAuction?.let {
                 mapOf("capitalAuction" to it.science())
+            } ?: emptyMap()) +
+            (leadingRivalRetargeting?.let {
+                mapOf(
+                    "leadingRivalRetargeting" to
+                        mapOf(
+                            "kind" to LeadingRivalRetargetingConfig.VERSION,
+                            "configuration" to it,
+                        )
+                )
             } ?: emptyMap()) +
             (initiative?.let {
                 mapOf(
@@ -547,6 +558,7 @@ private constructor(
                     "controlBundle",
                     "controlSelector",
                     "expansionDenial",
+                    "leadingRivalRetargeting",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -604,6 +616,26 @@ private constructor(
             val candidateSampler = sampler(node.required("selector"))
             val controlSampler = node["controlSelector"]?.let(::sampler)
             val expansionDenial = node["expansionDenial"]?.let(::denial)
+            val leadingRivalRetargeting =
+                node["leadingRivalRetargeting"]?.let { rule ->
+                    PurchaseJson.fields(
+                        rule,
+                        setOf("kind", "maximumTrailingPoints", "requireGreaterCommodityDenial"),
+                    )
+                    require(
+                        rule["kind"]?.asText() == LeadingRivalRetargetingConfig.VERSION &&
+                            rule["requireGreaterCommodityDenial"].isBoolean
+                    ) {
+                        "Declare the specific retargeting policy and its boolean commodity condition."
+                    }
+                    LeadingRivalRetargetingConfig(
+                        PurchaseJson.integer(
+                            rule["maximumTrailingPoints"],
+                            "maximum trailing points",
+                        ),
+                        rule["requireGreaterCommodityDenial"].booleanValue(),
+                    )
+                }
             val tokenNeighborMixture = node["tokenNeighborMixture"]?.let(::neighborMixture)
             val seeds = node.required("seeds").map { PurchaseJson.integer(it, "world seed") }
             require(seeds.size in 1..16384 && seeds.distinct().size == seeds.size) {
@@ -805,6 +837,7 @@ private constructor(
                     initiativeRival,
                     initiativeLineup,
                     capitalAuction,
+                    leadingRivalRetargeting,
                     seeds,
                     start,
                     count,
