@@ -12,6 +12,7 @@ import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.JointSupportProfile
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.LocalTokenNeighborPolicy
+import dev.aragos.aor.ai.MidgameBidMixPolicy
 import dev.aragos.aor.ai.SecondCapitalGeography
 import java.security.MessageDigest
 import kotlin.math.abs
@@ -355,6 +356,19 @@ internal object RobustTokenGame {
                             return command
                         }
                         val original = qualified.choose(decision) ?: return null
+                        if (
+                            candidate &&
+                                input.midgameBidMix != null &&
+                                decision.observation.decision == "buy-tokens"
+                        ) {
+                            return MidgameBidMixPolicy.choose(
+                                decision.view,
+                                PlayerId(decision.observation.playerId),
+                                original,
+                                decision.seed,
+                                input.midgameBidMix,
+                            )
+                        }
                         val command =
                             if (
                                 player != seat &&

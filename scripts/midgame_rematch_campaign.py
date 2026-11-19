@@ -24,16 +24,18 @@ def public_reveals(row):
     return {entry["turn"]: entry for entry in entries if entry["phase"] == "order-revealed"}
 
 
-def earlier_games(stage):
+def earlier_games(stage, *, start=0, count=WORLDS):
     for path in stage.glob("geography-0-*/worlds.jsonl"):
         Campaign.validate_result(path.parent, stage / f"{path.parent.name}.json")
     worlds = load_games(stage, "geography")
     if set(worlds) != set(range(1536)):
         raise ValueError("Repeated-game learning needs the full completed live-policy trial.")
+    if start < 0 or count <= 0 or start + count > len(worlds) or count % GAMES_PER_GROUP:
+        raise ValueError("History groups must fit the completed earlier games in groups of four.")
     histories, learned = [], []
-    for start in range(0, WORLDS, GAMES_PER_GROUP):
+    for first in range(start, start + count, GAMES_PER_GROUP):
         records = []
-        for i in range(start, start + GAMES_PER_GROUP):
+        for i in range(first, first + GAMES_PER_GROUP):
             row = worlds[i]
             amounts = {str(turn): entry["actualTargetBid"]
                        for turn, entry in public_reveals(row).items() if turn in TURNS}

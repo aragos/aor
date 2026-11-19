@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LeadingRivalRetargetingConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
+import dev.aragos.aor.ai.MidgameBidMix
 import dev.aragos.aor.ai.NearOptimalTokenSampler
 import dev.aragos.aor.ai.OpeningBidMix
 import dev.aragos.aor.ai.PublicLeaderAttackConfig
@@ -169,6 +170,7 @@ private constructor(
     val seriesOpeningPriors: List<CapitalOrderOpeningBid>,
     val seriesOpeningResponses: List<CapitalOrderOpeningBid>,
     val seriesMidgamePriors: List<Int>,
+    val midgameBidMix: MidgameBidMix?,
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
@@ -249,6 +251,9 @@ private constructor(
             else mapOf("seriesOpeningResponses" to seriesOpeningResponses)) +
             (if (seriesMidgamePriors.isEmpty()) emptyMap()
             else mapOf("seriesMidgamePriors" to seriesMidgamePriors)) +
+            (midgameBidMix?.let {
+                mapOf("midgameBidMix" to mapOf("kind" to MidgameBidMix.VERSION, "policy" to it))
+            } ?: emptyMap()) +
             (candidateTokenAnchoredPolicy?.let {
                 mapOf("candidateTokenAnchoredPolicy" to it.identity)
             } ?: emptyMap()) +
@@ -563,6 +568,7 @@ private constructor(
                     "seriesOpeningPriors",
                     "seriesOpeningResponses",
                     "seriesMidgamePriors",
+                    "midgameBidMix",
                     "candidateTokenAnchoredPolicy",
                     "controlBundle",
                     "controlSelector",
@@ -731,6 +737,26 @@ private constructor(
                         amounts
                     }
                     .orEmpty()
+            val midgameBidMix =
+                node["midgameBidMix"]?.let { mix ->
+                    PurchaseJson.fields(mix, setOf("kind", "bids", "weights", "respectPublicOrder"))
+                    require(
+                        candidateOnly &&
+                            mix["kind"]?.asText() == MidgameBidMix.VERSION &&
+                            mix["respectPublicOrder"].isBoolean
+                    ) {
+                        "Use the versioned candidate-only midgame mix with a Boolean order setting."
+                    }
+                    fun integers(field: String): List<Int> =
+                        PurchaseJson.array(mix[field], field).map {
+                            PurchaseJson.integer(it, field)
+                        }
+                    MidgameBidMix(
+                        bids = integers("bids"),
+                        weights = integers("weights"),
+                        respectPublicOrder = mix["respectPublicOrder"].booleanValue(),
+                    )
+                }
             require(
                 expansionDenial == null ||
                     !candidateOnly &&
@@ -868,6 +894,7 @@ private constructor(
                     seriesOpeningPriors,
                     seriesOpeningResponses,
                     seriesMidgamePriors,
+                    midgameBidMix,
                     anchored,
                     initiative,
                     initiativeRival,
