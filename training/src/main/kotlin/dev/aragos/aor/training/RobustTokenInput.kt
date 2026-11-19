@@ -200,6 +200,7 @@ private constructor(
     val finalAdvanceMargin: Int?,
     val finalAdvancePassLead: Int?,
     val phaseBidProfile: PhaseBidProfile?,
+    val previewPeerOffsets: Set<Int>,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -323,6 +324,8 @@ private constructor(
                     "phaseAwareBids" to mapOf("kind" to "phase-aware-bids-1", "profile" to it.wire)
                 )
             } ?: emptyMap()) +
+            (if (previewPeerOffsets.isEmpty()) emptyMap()
+            else mapOf("previewPeerOffsets" to previewPeerOffsets.sorted())) +
             (initiative?.let {
                 mapOf(
                     "initiative" to
@@ -648,6 +651,7 @@ private constructor(
                     "rivalTargetingLineup",
                     "finalAdvancePlan",
                     "phaseAwareBids",
+                    "previewPeerOffsets",
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
@@ -870,6 +874,27 @@ private constructor(
                 }
             val initiative = node["initiative"]?.let(::initiative)
             val initiativeLineup = node["initiativeLineup"]?.let(::initiativeLineup)
+            val previewPeerOffsets =
+                node["previewPeerOffsets"]
+                    ?.let { setting ->
+                        val offsets =
+                            PurchaseJson.array(setting, "preview peer offsets").map {
+                                PurchaseJson.integer(it, "preview peer offset")
+                            }
+                        require(
+                            candidateOnly &&
+                                offsets.isNotEmpty() &&
+                                offsets.distinct() == offsets &&
+                                offsets.all {
+                                    it in 1..3 &&
+                                        initiativeLineup?.policiesByOffset?.containsKey(it) == true
+                                }
+                        ) {
+                            "Preview peers must be distinct seats using the declared fixed initiative lineup."
+                        }
+                        offsets.toSet()
+                    }
+                    .orEmpty()
             val capitalAuction =
                 node["capitalAuction"]?.let { setting ->
                     PurchaseJson.fields(
@@ -984,6 +1009,7 @@ private constructor(
                     finalAdvanceMargin,
                     finalAdvancePassLead,
                     phaseBidProfile,
+                    previewPeerOffsets,
                     seeds,
                     start,
                     count,

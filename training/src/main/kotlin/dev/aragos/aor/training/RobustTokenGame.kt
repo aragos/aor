@@ -288,8 +288,10 @@ internal object RobustTokenGame {
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
-            val chooseGeography = candidate && input.secondCapitalGeography
-            val capitalBids = input.capitalAuction?.bidsFor((player - seat + 4) % 4).orEmpty()
+            val offset = (player - seat + 4) % 4
+            val previewPeer = offset in input.previewPeerOffsets
+            val chooseGeography = (candidate || previewPeer) && input.secondCapitalGeography
+            val capitalBids = input.capitalAuction?.bidsFor(offset).orEmpty()
             val qualified =
                 CoordinatedEsController(
                     reference,
@@ -381,17 +383,19 @@ internal object RobustTokenGame {
             val regular = league?.wrap(PlayerId("p${player + 1}"), rival, baseline) ?: baseline
             val finishing =
                 input.finalAdvanceMargin
-                    ?.takeIf { candidate }
+                    ?.takeIf { candidate || previewPeer }
                     ?.let { margin ->
                         FinalAdvanceController(regular, margin, input.finalAdvancePassLead).also {
-                            finalAdvanceController = it
+                            if (candidate) finalAdvanceController = it
                         }
                     } ?: regular
             val controller =
                 input.phaseBidProfile
-                    ?.takeIf { candidate }
+                    ?.takeIf { candidate || previewPeer }
                     ?.let { profile ->
-                        PhaseAwareBid(finishing, profile).also { phaseBids = it }
+                        PhaseAwareBid(finishing, profile).also {
+                            if (candidate) phaseBids = it
+                        }
                     } ?: finishing
             object : SimulationController by controller {
                 override fun choose(decision: SimulationDecision): String? =
