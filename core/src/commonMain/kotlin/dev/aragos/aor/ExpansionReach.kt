@@ -40,35 +40,29 @@ object ExpansionReach {
         destination: ProvinceId,
     ): List<ExpansionRoute> {
         val profile = context.player(player)
-        if (
-            profile.chaos ||
-                destination !in context.provinceIds ||
-                !canEnter(profile, context.province(destination))
-        ) {
-            return emptyList()
-        }
-        return context
-            .bases(player)
-            .flatMap { base ->
-                listOfNotNull(
-                    ExpansionRoute.Local(base).takeIf { base == destination },
-                    ExpansionRoute.Land(base).takeIf {
-                        connected(context.configuration.landBorders, base, destination)
-                    },
-                ) +
-                    caravanRoutes(context, profile, base, destination) +
-                    shippingRoutes(context, profile, base, destination)
+        if (profile.chaos || destination !in context.provinceIds) return emptyList()
+        val target = context.province(destination)
+        if (!canEnter(profile, target)) return emptyList()
+        val neighbors = context.configuration.landNeighbors[destination].orEmpty()
+        val shipsAvailable = target.coastal && profile.ships.fleet != ShippingFleet.NONE
+        val routes = buildList {
+            for (base in context.bases(player)) {
+                if (base == destination) add(ExpansionRoute.Local(base))
+                if (base in neighbors) add(ExpansionRoute.Land(base))
+                addAll(caravanRoutes(context, profile, base, destination, neighbors))
+                if (shipsAvailable) addAll(shippingRoutes(context, profile, base, target))
             }
-            .distinct()
-            .sortedWith(
-                compareBy<ExpansionRoute>(
-                    { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
-                    ::routeLength,
-                    { route -> route.base.value },
-                    ::routeKey,
-                )
-            )
+        }
+        return if (routes.size < 2) routes else routes.distinct().sortedWith(routeOrder)
     }
+
+    private val routeOrder =
+        compareBy<ExpansionRoute>(
+            { route -> if (route is ExpansionRoute.Shipping) 1 else 0 },
+            ::routeLength,
+            { route -> route.base.value },
+            ::routeKey,
+        )
 
     private fun routeLength(route: ExpansionRoute): Int =
         when (route) {
@@ -205,13 +199,14 @@ object ExpansionReach {
         profile: BoardPlayerProfile,
         base: ProvinceId,
         destination: ProvinceId,
+        neighbors: Set<ProvinceId>,
     ): List<ExpansionRoute.Caravan> {
         if (AdvanceId.CARAVAN !in profile.advances) return emptyList()
         return context.configuration.landNeighbors[base]
             .orEmpty()
             .filter { via ->
                 via != destination &&
-                    connected(context.configuration.landBorders, via, destination) &&
+                    via in neighbors &&
                     canEnter(profile, context.province(via)) &&
                     !opponentFills(context, profile.player, via)
             }
@@ -222,25 +217,19 @@ object ExpansionReach {
         context: BoardRulesContext,
         profile: BoardPlayerProfile,
         base: ProvinceId,
-        destination: ProvinceId,
+        target: ProvinceDefinition,
     ): List<ExpansionRoute.Shipping> {
-        if (
-            !context.province(base).coastal ||
-                !context.province(destination).coastal ||
-                base == destination
-        ) {
-            return emptyList()
-        }
+        if (base == target.id || !context.province(base).coastal) return emptyList()
         return when (profile.ships.fleet) {
             ShippingFleet.NONE -> emptyList()
-            ShippingFleet.GALLEY -> context.galleyRoutes(profile.player, base, destination)
+            ShippingFleet.GALLEY -> context.galleyRoutes(profile.player, base, target.id)
             ShippingFleet.SEAWORTHY ->
-                if (context.province(destination).overseas == null) {
-                    listOf(directShipping(base, destination))
+                if (target.overseas == null) {
+                    listOf(directShipping(base, target.id))
                 } else {
                     emptyList()
                 }
-            ShippingFleet.OCEAN -> listOf(directShipping(base, destination))
+            ShippingFleet.OCEAN -> listOf(directShipping(base, target.id))
         }
     }
 
