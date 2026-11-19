@@ -28,7 +28,7 @@ class Origin:
     short_decisions: int
 
 
-def collect(stage, teacher):
+def collect(stage, teacher, *, alternative_futures=None):
     origins = []
     for file in sorted(stage.glob("root-*/worlds.jsonl")):
         with file.open() as stream:
@@ -39,7 +39,10 @@ def collect(stage, teacher):
                     continue
                 full = data["tails"]
                 terminal = list(zip(full["buy"],full["territory"],strict=True))
-                abbreviated = data["shortTrainingTails"]
+                abbreviated = (
+                    data["shortTrainingTails"] if alternative_futures is None
+                    else alternative_futures[game["index"]]
+                )
                 short = list(zip(abbreviated["buy"],abbreviated["territory"],strict=True))
                 if len(terminal)!=2 or len(short)!=SHORT_FUTURES:
                     raise ValueError("Each training position must contain the fixed full and short futures.")

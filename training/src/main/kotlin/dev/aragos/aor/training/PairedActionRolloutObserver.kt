@@ -10,6 +10,7 @@ import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.CommodityTimingConfig
 import dev.aragos.aor.ai.CommodityTimingPolicy
+import kotlin.random.Random
 
 /** Offline paired continuations from the same simulated deal and permitted actor observation. */
 internal class PairedActionRolloutObserver(
@@ -20,6 +21,7 @@ internal class PairedActionRolloutObserver(
     private val territoryEpoch: Int? = null,
     private val compareChance: Boolean = false,
     private val shortTrainingFutures: Int = 0,
+    private val resampledDrawStudy: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -186,6 +188,29 @@ internal class PairedActionRolloutObserver(
             requireNotNull(captured.state.turnNumber) {
                 "A rollout requires an active origin turn."
             }
+        val rootFacts =
+            mapOf(
+                "status" to "paired",
+                "decision" to captured.number,
+                "turn" to originTurn,
+                "epoch" to captured.state.currentEpoch.number,
+                "ordinary" to captured.chosen,
+            ) + captured.context
+        if (resampledDrawStudy) {
+            return rootFacts +
+                mapOf(
+                    "resampledTrainingTails" to
+                        shortFutures(
+                            captured,
+                            actor,
+                            originTurn,
+                            models,
+                            controllers,
+                            seed,
+                            deadline,
+                        )
+                )
+        }
         fun outcomes(chanceMode: ExperimentChanceMode) =
             captured.actions.mapValues { (_, action) ->
                 (0..1).map { replicate ->
@@ -237,44 +262,75 @@ internal class PairedActionRolloutObserver(
                         } else emptyMap()
                 }
             }
-        return mapOf(
-            "status" to "paired",
-            "decision" to captured.number,
-            "turn" to originTurn,
-            "epoch" to captured.state.currentEpoch.number,
-            "ordinary" to captured.chosen,
-            "tails" to outcomes(ExperimentChanceMode.SEQUENTIAL),
-        ) +
-            captured.context +
+        return rootFacts +
+            mapOf("tails" to outcomes(ExperimentChanceMode.SEQUENTIAL)) +
             (if (compareChance) {
                 mapOf("alignedChanceTails" to outcomes(ExperimentChanceMode.BY_TURN_AND_EVENT))
             } else emptyMap()) +
             if (shortTrainingFutures > 0) {
-                val short =
-                    captured.actions.mapValues { (_, action) ->
-                        (0 until shortTrainingFutures).map { replicate ->
-                            val shortSeed = shortChanceSeed(seed, replicate)
-                            val session =
-                                ExperimentSession(captured.state, shortSeed, recordEntries = true)
-                            session.apply(mapOf(actor to action), deadline)
-                            FrozenPolicyContinuation(
-                                    models,
-                                    controllers(),
-                                    seed,
-                                    deadline,
-                                    decisionOffset = captured.number,
-                                )
-                                .reachTurn(session, originTurn + 3)
-                            mapOf(
-                                "checkpoint" to checkpoint(session.state, actor, session.decisions),
-                                "canonicalSha256" to
-                                    verifiedCanonical(session, captured.state, deadline),
-                                "seed" to shortSeed,
-                            )
+                mapOf(
+                    "shortTrainingTails" to
+                        shortFutures(
+                            captured,
+                            actor,
+                            originTurn,
+                            models,
+                            controllers,
+                            seed,
+                            deadline,
+                        )
+                )
+            } else emptyMap()
+    }
+
+    private fun shortFutures(
+        captured: Root,
+        actor: PlayerId,
+        originTurn: Int,
+        models: List<BotModel>,
+        controllers: () -> Map<Int, SimulationController>,
+        seed: Int,
+        deadline: Long,
+    ): Map<String, List<Map<String, Any>>> {
+        val visible = if (resampledDrawStudy) captured.state.viewForPlayer(actor) else null
+        val replicas =
+            List(shortTrainingFutures) { replicate ->
+                val shortSeed = shortChanceSeed(seed, replicate)
+                val start =
+                    if (visible == null) captured.state
+                    else {
+                        val unseen =
+                            captured.state.deck.shuffled(Random(shortSeed xor 0x35E4CA1517L))
+                        captured.state.copy(deck = unseen).also { hypothetical ->
+                            check(hypothetical.viewForPlayer(actor) == visible) {
+                                "Permuting hidden draws must preserve the complete acting-seat view."
+                            }
                         }
                     }
-                mapOf("shortTrainingTails" to short)
-            } else emptyMap()
+                shortSeed to start
+            }
+        return captured.actions.mapValues { (_, action) ->
+            replicas.map { (shortSeed, start) ->
+                val session = ExperimentSession(start, shortSeed, recordEntries = true)
+                session.apply(mapOf(actor to action), deadline)
+                FrozenPolicyContinuation(
+                        models,
+                        controllers(),
+                        seed,
+                        deadline,
+                        decisionOffset = captured.number,
+                    )
+                    .reachTurn(session, originTurn + 3)
+                mapOf(
+                    "checkpoint" to checkpoint(session.state, actor, session.decisions),
+                    "canonicalSha256" to verifiedCanonical(session, start, deadline),
+                    "seed" to shortSeed,
+                ) +
+                    if (resampledDrawStudy) {
+                        mapOf("drawOrderChanged" to (start.deck != captured.state.deck))
+                    } else emptyMap()
+            }
+        }
     }
 
     private fun verifiedCanonical(

@@ -116,6 +116,7 @@ private constructor(
     val cardTerritoryEpochs: List<Int>,
     val chanceAlignmentTrial: Boolean,
     val shortTrainingFutures: Int,
+    val resampledDrawStudy: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -218,6 +219,8 @@ private constructor(
             (if (chanceAlignmentTrial) mapOf("chanceAlignmentTrial" to "turn-and-outcome-channel-1")
             else emptyMap()) +
             (if (shortTrainingFutures > 0) mapOf("shortTrainingFutures" to shortTrainingFutures)
+            else emptyMap()) +
+            (if (resampledDrawStudy) mapOf("resampledDrawStudy" to "hidden-draw-order-1")
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -406,6 +409,7 @@ private constructor(
                     "cardTerritoryEpochs",
                     "chanceAlignmentTrial",
                     "shortTrainingFutures",
+                    "resampledDrawStudy",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -527,6 +531,13 @@ private constructor(
                         }
                     }
                 } ?: 0
+            val resampledDrawStudy =
+                node["resampledDrawStudy"]?.let { setting ->
+                    require(setting.isBoolean) {
+                        "The resampled draw study requires a JSON boolean."
+                    }
+                    setting.booleanValue()
+                } ?: false
             val cardTerritoryEpochs =
                 node["cardTerritoryEpochs"]
                     ?.let { setting ->
@@ -679,6 +690,12 @@ private constructor(
             require(shortTrainingFutures == 0 || cardTerritoryRollouts) {
                 "Short rollout training futures belong to the declared card versus territory study."
             }
+            require(
+                !resampledDrawStudy ||
+                    (shortTrainingFutures > 0 && !lookaheadCheckpoints && !chanceAlignmentTrial)
+            ) {
+                "Resampled draws compare only the independently declared short training futures."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -705,6 +722,7 @@ private constructor(
                     cardTerritoryEpochs,
                     chanceAlignmentTrial,
                     shortTrainingFutures,
+                    resampledDrawStudy,
                     seeds,
                     start,
                     count,
