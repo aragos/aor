@@ -18,8 +18,9 @@ PATTERNS = {"control": [17, 17], "pairs": [17, 17, 20, 20],
             "wide": [15, 17, 18, 22], "outside": [14, 21]}
 
 
-def main(root, previous, resume):
-    campaign = Campaign(root, remote=REMOTE, background=True, batch_size=2, resume=resume)
+def main(root, previous, resume, confirm_pairs):
+    remote = REMOTE.replace("evasion", "evasion-confirm") if confirm_pairs else REMOTE
+    campaign = Campaign(root, remote=remote, background=True, batch_size=2, resume=resume)
     campaign.validate_runtime()
     withheld = previous / "automata-alternating-bid-holdout-20261119/result.json"
     if not read(withheld)["passed"]:
@@ -28,35 +29,38 @@ def main(root, previous, resume):
     attack = read(previous / "automata-retargeting-coevolution-20261119/result.json")["configuration"]
     guard = read(previous / "automata-guarded-finishes-20261119/result.json")["policy"]
     declaration = root / "plan.json"
-    plan = {"worlds": WORLDS, "challengerBids": PATTERNS, "qualificationSha256": sha(withheld),
+    patterns = {arm: PATTERNS[arm] for arm in ("control", "pairs")} if confirm_pairs else PATTERNS
+    worlds = 640 if confirm_pairs else WORLDS
+    stage = f"{STAGE}-confirmed-pairs" if confirm_pairs else STAGE
+    plan = {"worlds": worlds, "challengerBids": patterns, "qualificationSha256": sha(withheld),
             "automata": MODELS["alternating"], "finish": guard, "attack": attack}
     if not declaration.exists():
         write(declaration, plan)
     elif read(declaration) != plan:
         raise ValueError("A resumed challenge must face the exact same target rules and bid cycles.")
-    style, setup, _ = selection_context(basis, "known-16", WORLDS, True)
-    candidates = dict.fromkeys((name for name in PATTERNS if name != "control"), basis["baseline"])
+    style, setup, _ = selection_context(basis, "known-16", worlds, True)
+    candidates = dict.fromkeys((name for name in patterns if name != "control"), basis["baseline"])
     campaign.stage(
-        STAGE, candidates, WORLDS, (style,), shard=128, baseline=basis["baseline"],
+        stage, candidates, worlds, (style,), shard=128, baseline=basis["baseline"],
         lineup=lineup(dict.fromkeys(PEERS, basis["baseline"])), preview_peer_offsets=PEERS,
-        leading_rival_variants=dict.fromkeys(PATTERNS, attack),
-        final_advance_variants=dict.fromkeys(PATTERNS, guard), capital_geography_variants=PATTERNS,
-        phase_bid_variants=dict.fromkeys(PATTERNS, MODELS["alternating"]),
+        leading_rival_variants=dict.fromkeys(patterns, attack),
+        final_advance_variants=dict.fromkeys(patterns, guard), capital_geography_variants=patterns,
+        phase_bid_variants=dict.fromkeys(patterns, MODELS["alternating"]),
         counter_variants={name:dict(setup["counter"], midgamePriorCycle=[bid+1 for bid in pattern])
-                          for name,pattern in PATTERNS.items()},
+                          for name,pattern in patterns.items()},
         rival_targeting_lineups=dict.fromkeys(
-            PATTERNS, {"kind": "leading-rival-table-1", "offsets": [1, *PEERS], "policy": attack},
+            patterns, {"kind": "leading-rival-table-1", "offsets": [1, *PEERS], "policy": attack},
         ),
     )
-    folder = root / STAGE
+    folder = root / stage
     before = load_games(folder, "control")
     results = {}
     for name in candidates:
         after = load_games(folder, name)
-        if set(before) != set(after) or set(before) != set(range(WORLDS)):
+        if set(before) != set(after) or set(before) != set(range(worlds)):
             raise ValueError("Each prepared rival must face the same complete simulation bank.")
         changes, challenger_wins, fixed_wins = [], [], []
-        for index in range(WORLDS):
+        for index in range(worlds):
             a, b = before[index], after[index]
             seat = a["seat"]
             if ((a["seed"], seat, a["diagnostics"]["CANDIDATE"]["openingBid"]) !=
@@ -78,5 +82,6 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--previous", type=Path, required=True)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--confirm-pairs", action="store_true")
     args = parser.parse_args()
-    main(args.root.resolve(), args.previous.resolve(), args.resume)
+    main(args.root.resolve(), args.previous.resolve(), args.resume, args.confirm_pairs)
