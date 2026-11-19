@@ -102,6 +102,12 @@ object CompetitionRules {
         context: BoardRulesContext,
         attacker: PlayerId,
         province: ProvinceId,
+    ): AttackBreakdown = context.competitionRequirement(attacker, province)
+
+    internal fun computeRequirement(
+        context: BoardRulesContext,
+        attacker: PlayerId,
+        province: ProvinceId,
     ): AttackBreakdown {
         val profile = context.player(attacker)
         val definition = context.province(province)
@@ -147,20 +153,22 @@ object CompetitionRules {
             } else {
                 0
             }
+        val attackingCards = context.militaryCards(attacker)
+        val defendingCards = defenders.map(context::militaryCards)
         val offensiveMilitary =
-            MilitaryCard.entries
-                .filter { card ->
-                    defenders.all { defender ->
-                        card in effectiveMilitary(context, attacker, defender)
-                    }
+            if (attackingCards.isEmpty()) emptySet()
+            else
+                MilitaryCard.entries.filterTo(linkedSetOf()) { card ->
+                    card in attackingCards &&
+                        defendingCards.none { opposing -> counters(card, opposing) }
                 }
-                .toSet()
-        val defensiveMilitary =
-            defenders
-                .flatMap { defender ->
-                    effectiveMilitary(context, defender, attacker)
+        val defensiveMilitary = buildSet {
+            for (cards in defendingCards) {
+                for (card in cards) {
+                    if (!counters(card, attackingCards)) add(card)
                 }
-                .toSet()
+            }
+        }
         return AttackBreakdown(
             marketNumber = definition.marketNumber,
             defenderStrength =
@@ -360,28 +368,15 @@ object CompetitionRules {
         AdvanceId.NATIONALISM in profile.advances &&
             province.area == context.province(profile.capital).area
 
-    private fun effectiveMilitary(
-        context: BoardRulesContext,
-        owner: PlayerId,
-        opponent: PlayerId,
-    ): Set<MilitaryCard> {
-        val owned =
-            context.militaryPlays.filter { play -> play.player == owner }.map(MilitaryPlay::card)
-        val opposing =
-            context.militaryPlays.filter { play -> play.player == opponent }.map(MilitaryPlay::card)
-        return owned
-            .filter { card ->
-                when (card) {
-                    MilitaryCard.ARMOR ->
-                        MilitaryCard.LONG_BOW !in opposing && MilitaryCard.GUNPOWDER !in opposing
-                    MilitaryCard.STIRRUPS ->
-                        MilitaryCard.ARMOR !in opposing &&
-                            MilitaryCard.LONG_BOW !in opposing &&
-                            MilitaryCard.GUNPOWDER !in opposing
-                    MilitaryCard.LONG_BOW -> MilitaryCard.GUNPOWDER !in opposing
-                    MilitaryCard.GUNPOWDER -> true
-                }
-            }
-            .toSet()
-    }
+    private fun counters(card: MilitaryCard, opposing: Set<MilitaryCard>): Boolean =
+        when (card) {
+            MilitaryCard.ARMOR ->
+                MilitaryCard.LONG_BOW in opposing || MilitaryCard.GUNPOWDER in opposing
+            MilitaryCard.STIRRUPS ->
+                MilitaryCard.ARMOR in opposing ||
+                    MilitaryCard.LONG_BOW in opposing ||
+                    MilitaryCard.GUNPOWDER in opposing
+            MilitaryCard.LONG_BOW -> MilitaryCard.GUNPOWDER in opposing
+            MilitaryCard.GUNPOWDER -> false
+        }
 }

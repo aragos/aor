@@ -58,6 +58,32 @@ data class BoardRulesContext(
         return routes[destination]?.value.orEmpty()
     }
 
+    private val competitionsByPlayer by lazy {
+        players.keys.associateWith { player ->
+            lazy {
+                board.pieces.keys.associateWith { province ->
+                    lazy { CompetitionRules.computeRequirement(this, player, province) }
+                }
+            }
+        }
+    }
+
+    /** Strength and modifiers depend on this snapshot, independently of a route or new tokens. */
+    internal fun competitionRequirement(player: PlayerId, province: ProvinceId): AttackBreakdown {
+        val requirements = competitionsByPlayer[player]?.value.orEmpty()
+        return requirements[province]?.value
+            ?: CompetitionRules.computeRequirement(this, player, province)
+    }
+
+    private val militaryByPlayer by lazy {
+        militaryPlays.groupBy(MilitaryPlay::player, MilitaryPlay::card).mapValues { (_, cards) ->
+            cards.toSet()
+        }
+    }
+
+    internal fun militaryCards(player: PlayerId): Set<MilitaryCard> =
+        militaryByPlayer[player].orEmpty()
+
     private val galleyRoutesByPlayer by lazy {
         players.mapValues { (_, profile) ->
             lazy {
