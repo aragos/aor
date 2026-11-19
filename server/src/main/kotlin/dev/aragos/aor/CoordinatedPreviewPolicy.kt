@@ -75,6 +75,10 @@ private const val GUARDED_FINISH_BASE_SHA256 =
     "81cabbabc39721924422ccfc0f83e7d0d76468f508eaa93d720f0e819b8556af"
 private const val GUARDED_FINISH_CERTIFICATE_SHA256 =
     "9efb2d1422ff6fba85ce734b87cb11a9ff9ef52ea09f9ed4bc3c48937b0175ea"
+private const val REPEATED_UNDERCUT_BASE_SHA256 =
+    "9b12cafae44a4f9af59fb616a06809efc28292a3b60157173a463a4ff4d15c0d"
+private const val REPEATED_UNDERCUT_CERTIFICATE_SHA256 =
+    "25039bc7f6eeddd4f6671c80ec7316ba7285f44402b2b7fc0199db3c9acd7968"
 private const val RETARGETING_TRAINING_SHA256 =
     "fcaae16011c32bebfdc0617777a3ffe8cfb80a7b0c83666d31cd916a5dec0630"
 private const val RETARGETING_AUDIT_SHA256 =
@@ -132,6 +136,27 @@ private class GuardedFinishPreview(
     override val assetSha256: String,
     override val finalAdvanceGuard: FinalAdvanceGuard,
 ) : ServerBotPolicy by base
+
+private class RepeatedUndercutPreview(
+    private val base: ServerBotPolicy,
+    override val assetSha256: String,
+) : ServerBotPolicy by base {
+    override fun choose(view: GameView, observation: BotObservation, seed: Int): String =
+        RepeatedUndercutBid.choose(view, observation, seed, base.choose(view, observation, seed))
+
+    override fun choose(
+        view: GameView,
+        observation: BotObservation,
+        seed: Int,
+        tokenQuote: TokenNeighborQuote,
+    ): String =
+        RepeatedUndercutBid.choose(
+            view,
+            observation,
+            seed,
+            base.choose(view, observation, seed, tokenQuote),
+        )
+}
 
 private class CapitalGeographyPreview(
     private val base: ServerBotPolicy,
@@ -226,8 +251,51 @@ private class CoordinatedAssetReader(path: Path) {
             "coordinated-evolved-targeting-preview-1" -> readEvolvedTargeting(manifest, root)
             "coordinated-adopting-targeting-preview-1" -> readAdoptingTargeting(manifest, root)
             "coordinated-guarded-finish-preview-1" -> readGuardedFinish(manifest, root)
+            "coordinated-repeated-undercut-preview-1" -> readRepeatedUndercut(manifest, root)
             else -> readCoordinated(manifest, root)
         }
+    }
+
+    private fun readRepeatedUndercut(manifest: Document, root: JsonNode): ServerBotPolicy {
+        fields(root, "kind", "schemaVersion", "basePreview", "qualification")
+        require(integer(root, "schemaVersion") == 1) {
+            "The repeated-undercut preview requires schema version 1."
+        }
+        val base = subject(manifest, root["basePreview"])
+        require(base.sha256 == REPEATED_UNDERCUT_BASE_SHA256) {
+            "The bid response must extend the exact qualified guarded-finish strategy."
+        }
+        val evidence = subject(manifest, root["qualification"])
+        require(evidence.sha256 == REPEATED_UNDERCUT_CERTIFICATE_SHA256) {
+            "The bid response requires its pinned independent qualification."
+        }
+        val certificate = node(evidence)
+        fields(
+            certificate,
+            "kind",
+            "basePreviewSha256",
+            "nativeJarSha256",
+            "policySha256",
+            "comparisons",
+        )
+        require(
+            text(certificate, "kind") == "repeated-undercut-qualification-1" &&
+                hash(certificate, "basePreviewSha256") == base.sha256
+        ) {
+            "The bid certificate must identify the exact previous strategy."
+        }
+        hash(certificate, "nativeJarSha256")
+        hash(certificate, "policySha256")
+        val cases = listOf("ordinary", "fixed-17", "fixed-16", "rolling")
+        val wins = verifiedTargetingWins(certificate["comparisons"], cases, 768)
+        require(
+            wins.minOf { it.second } > -.03 &&
+                wins[cases.indexOf("fixed-17")].second > 0.0 &&
+                wins.map { it.first }.average() >= .012
+        ) {
+            "The adaptive response must improve against repeated low bids and stay competitive elsewhere."
+        }
+        return RepeatedUndercutPreview(readGuardedFinish(base, node(base)), manifest.sha256)
     }
 
     private fun readGuardedFinish(manifest: Document, root: JsonNode): ServerBotPolicy {
