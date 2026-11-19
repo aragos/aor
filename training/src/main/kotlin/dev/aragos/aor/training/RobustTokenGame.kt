@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.Command
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameView
 import dev.aragos.aor.PlayerId
@@ -50,6 +51,7 @@ internal object RobustTokenIntervention {
 internal class RobustTokenDiagnostics(
     private val controlledSeat: Int,
     private val recordTokenAdmissions: Boolean = false,
+    private val recordCapital: Boolean = false,
 ) {
     private val controlledBids = mutableMapOf<Int, Int>()
     private val rivalBids = mutableMapOf<Int, Int>()
@@ -65,6 +67,7 @@ internal class RobustTokenDiagnostics(
     private val decisions = MessageDigest.getInstance("SHA-256")
     private val quotedBids = mutableMapOf<Int, Int>()
     private val quoteAdmissions = mutableListOf<Map<String, Any>>()
+    private var capital: Map<String, Any>? = null
 
     fun admitted(value: SimulationTokenQuoteAdmission) {
         val amount = value.quote.amount
@@ -121,14 +124,27 @@ internal class RobustTokenDiagnostics(
         val own = view.players.single { it.id == player }
         val turn = view.turnNumber
         if (turn == 1 && view.stage == Stage.TOKEN_PURCHASE) {
+            val capitalId = requireNotNull(own.capital) { "An opening bidder needs a capital." }
+            val capitalPosition = view.capitalOrder.indexOf(player)
             opening =
                 mapOf(
                     "bid" to LocalTokenNeighborPolicy.amount(command),
-                    "capital" to
-                        requireNotNull(own.capital) { "An opening bidder needs a capital." },
-                    "capitalPosition" to view.capitalOrder.indexOf(player),
+                    "capital" to capitalId,
+                    "capitalPosition" to capitalPosition,
                     "cash" to own.cash,
                 )
+            if (recordCapital) {
+                capital =
+                mapOf(
+                    "paid" to
+                        requireNotNull(view.revealedBids[player]) {
+                            "Setup must reveal the paid capital bid."
+                        },
+                    "capital" to capitalId,
+                    "choicePosition" to (capitalPosition + 1),
+                    "cashBeforeFirstBid" to own.cash,
+                )
+            }
         }
         if (
             turn != null &&
@@ -176,13 +192,14 @@ internal class RobustTokenDiagnostics(
                 decisions.digest().joinToString("") { "%02x".format(it) },
         ) +
             (opening?.let { mapOf("openingBid" to it) } ?: emptyMap()) +
-            if (recordTokenAdmissions)
+            (if (recordTokenAdmissions)
                 mapOf(
                     "controlledUnofferedTokenBidCounts" to
                         quotedBids.toSortedMap().mapKeys { it.key.toString() },
                     "controlledTokenQuoteAdmissions" to quoteAdmissions.toList(),
                 )
-            else emptyMap()
+            else emptyMap()) +
+            (capital?.let { mapOf("capitalAuction" to it) } ?: emptyMap())
 }
 
 /** Only prescribed reproduction roots retain and verify the complete canonical authority text. */
@@ -234,7 +251,12 @@ internal object RobustTokenGame {
         val style = input.opponentStyle.at(index, seat)
         val references =
             arena.controllers(4, seat, ArenaSide.CANDIDATE, arena.candidate, List(4) { 0 })
-        val diagnostics = RobustTokenDiagnostics(seat, input.tokenNeighborMixture != null)
+        val diagnostics =
+            RobustTokenDiagnostics(
+                seat,
+                input.tokenNeighborMixture != null,
+                recordCapital = input.capitalAuction != null,
+            )
         val league =
             input.adaptiveOpponent?.let {
                 // Simulation owns the documented p1..p4 registration identifiers.
@@ -244,6 +266,7 @@ internal object RobustTokenGame {
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()
             val candidate = player == seat && role == "CANDIDATE"
+            val fixedCapitalBid = input.capitalAuction?.fixedBid?.takeIf { candidate }
             val qualified =
                 CoordinatedEsController(
                     reference,
@@ -270,7 +293,9 @@ internal object RobustTokenGame {
                 } else style
             val baseline =
                 object : SimulationController {
-                    override fun controls(decision: String): Boolean = qualified.controls(decision)
+                    override fun controls(decision: String): Boolean =
+                        fixedCapitalBid != null && decision == "bid-capital" ||
+                            qualified.controls(decision)
 
                     override fun tokenNeighborMixture(): LocalTokenNeighborMixture? =
                         qualified.tokenNeighborMixture()
@@ -283,6 +308,16 @@ internal object RobustTokenGame {
                     }
 
                     override fun choose(decision: SimulationDecision): String? {
+                        if (
+                            fixedCapitalBid != null &&
+                                decision.observation.decision == "bid-capital"
+                        ) {
+                            val command = Command.BidCapital(fixedCapitalBid).toText()
+                            check(decision.observation.candidates.any { it.command == command }) {
+                                "The experimental capital bid must belong to the legal batch offers."
+                            }
+                            return command
+                        }
                         val original = qualified.choose(decision) ?: return null
                         val command =
                             if (

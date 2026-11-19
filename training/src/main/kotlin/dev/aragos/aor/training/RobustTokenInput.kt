@@ -106,6 +106,19 @@ internal data class InitiativeLineup(val policiesByOffset: Map<Int, InitiativePo
     }
 }
 
+/** [fixedBid] is the acting seat's setup bid in dollars, or null to observe the baseline. */
+internal data class CapitalAuctionConfig(val fixedBid: Int?) {
+    init {
+        require(fixedBid == null || fixedBid in 0..40) {
+            "A capital auction bid must be between zero and 40 dollars."
+        }
+    }
+
+    companion object {
+        const val VERSION = "capital-auction-study-1"
+    }
+}
+
 /** A bounded paired shard; the source owns all streams and immutable inference subjects. */
 internal class RobustTokenInput
 private constructor(
@@ -127,6 +140,7 @@ private constructor(
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
     val initiativeLineup: InitiativeLineup?,
+    val capitalAuction: CapitalAuctionConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -206,6 +220,12 @@ private constructor(
             (initiativeLineup?.let {
                 mapOf(
                     "initiativeLineup" to mapOf("kind" to InitiativeLineup.VERSION, "rivals" to it)
+                )
+            } ?: emptyMap()) +
+            (capitalAuction?.let {
+                mapOf(
+                    "capitalAuction" to
+                        mapOf("kind" to CapitalAuctionConfig.VERSION, "bid" to it.fixedBid)
                 )
             } ?: emptyMap()) +
             (initiative?.let {
@@ -438,6 +458,7 @@ private constructor(
                     "initiative",
                     "initiativeRival",
                     "initiativeLineup",
+                    "capitalAuction",
                     "tokenNeighborMixture",
                 ),
             )
@@ -566,6 +587,20 @@ private constructor(
                 }
             val initiative = node["initiative"]?.let(::initiative)
             val initiativeLineup = node["initiativeLineup"]?.let(::initiativeLineup)
+            val capitalAuction =
+                node["capitalAuction"]?.let { setting ->
+                    PurchaseJson.fields(setting, setOf("kind", "bid"))
+                    require(
+                        candidateOnly && setting["kind"]?.asText() == CapitalAuctionConfig.VERSION
+                    ) {
+                        "Use the typed capital auction study on the declared candidate-only world."
+                    }
+                    CapitalAuctionConfig(
+                        setting["bid"]?.takeUnless(JsonNode::isNull)?.let {
+                            PurchaseJson.integer(it, "capital bid")
+                        }
+                    )
+                }
             require(
                 initiativeLineup == null ||
                     initiativeRival == null &&
@@ -647,6 +682,7 @@ private constructor(
                     initiative,
                     initiativeRival,
                     initiativeLineup,
+                    capitalAuction,
                     seeds,
                     start,
                     count,
