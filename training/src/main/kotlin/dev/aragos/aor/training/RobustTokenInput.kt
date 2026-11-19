@@ -112,6 +112,7 @@ private constructor(
     val commodityRollouts: Boolean,
     val commodityExpansionRollouts: Boolean,
     val midgameBidRollouts: Boolean,
+    val rivalMarketDenialRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
@@ -214,6 +215,9 @@ private constructor(
                 mapOf("commodityExpansionRollouts" to "hold-expand-play-1")
             else emptyMap()) +
             (if (midgameBidRollouts) mapOf("midgameBidRollouts" to "sealed-bid-neighbors-1")
+            else emptyMap()) +
+            (if (rivalMarketDenialRollouts)
+                mapOf("rivalMarketDenialRollouts" to "matched-rival-market-denial-1")
             else emptyMap()) +
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
@@ -415,6 +419,7 @@ private constructor(
                     "commodityRollouts",
                     "commodityExpansionRollouts",
                     "midgameBidRollouts",
+                    "rivalMarketDenialRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
@@ -633,6 +638,11 @@ private constructor(
                     require(setting.isBoolean) { "The midgame bid study requires a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val rivalMarketDenialRollouts =
+                node["rivalMarketDenialRollouts"]?.let { setting ->
+                    require(setting.isBoolean) { "The rival market study requires a boolean." }
+                    setting.booleanValue()
+                } ?: false
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -691,6 +701,20 @@ private constructor(
             }
             require(!commodityExpansionRollouts || commodityRollouts) {
                 "A commodity expansion plan requires a declared ordinary holding opportunity."
+            }
+            require(
+                !rivalMarketDenialRollouts ||
+                    !commodityRollouts &&
+                        !expansionCardRollouts &&
+                        !cardTerritoryRollouts &&
+                        !reliefUnlockRollouts &&
+                        !midgameBidRollouts &&
+                        candidateOnly &&
+                        style == RobustOpponentStyle.MIXED &&
+                        tokenNeighborMixture == null &&
+                        anchored == null
+            ) {
+                "Rival market denial requires a fixed mixed table and one candidate-only comparison."
             }
             require(
                 !midgameBidRollouts ||
@@ -778,6 +802,7 @@ private constructor(
                     commodityRollouts,
                     commodityExpansionRollouts,
                     midgameBidRollouts,
+                    rivalMarketDenialRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,

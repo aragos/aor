@@ -27,6 +27,7 @@ internal class PairedActionRolloutObserver(
     private val resampledDrawStudy: Boolean = false,
     private val reliefUnlock: Boolean = false,
     private val commodityExpansion: Boolean = false,
+    private val compareRivalDenial: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -45,6 +46,7 @@ internal class PairedActionRolloutObserver(
                 timing != null -> "commodityRollouts"
                 compareTerritory -> "cardTerritoryRollouts"
                 reliefUnlock -> "reliefUnlockRollouts"
+                compareRivalDenial -> "rivalMarketDenialRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -60,6 +62,7 @@ internal class PairedActionRolloutObserver(
                 timing != null -> commodityRoot(state, number, observation, command, timing)
                 compareTerritory -> cardTerritoryRoot(state, number, observation, command)
                 reliefUnlock -> reliefRoot(state, number, observation, command)
+                compareRivalDenial -> denialRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
     }
@@ -135,6 +138,29 @@ internal class PairedActionRolloutObserver(
                 "finalTurn" to view.endingTriggered,
             ),
         )
+    }
+
+    private fun denialRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (
+            observation.decision != "expand" ||
+                (state.turnNumber ?: 0) < 4 ||
+                !command.startsWith("attack ")
+        )
+            return null
+        val player = state.playerIds[seat]
+        val nominated =
+            RivalMarketDenial.from(
+                state.viewForDecision(player),
+                player,
+                observation,
+                command,
+            ) ?: return null
+        return Root(state, number, command, nominated.actions, nominated.facts)
     }
 
     private fun cardTerritoryRoot(

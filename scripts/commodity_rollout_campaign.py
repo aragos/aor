@@ -14,8 +14,9 @@ TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
                         lookahead=False, epochs=(), chance_trial=False, short_training_futures=0,
-                        relief_unlock=False, commodity_expansion=False, midgame_bids=False):
-    if sum((expansion, territory, relief_unlock, commodity_expansion, midgame_bids)) > 1:
+                        relief_unlock=False, commodity_expansion=False, midgame_bids=False,
+                        rival_denial=False):
+    if sum((expansion, territory, relief_unlock, commodity_expansion, midgame_bids, rival_denial)) > 1:
         raise ValueError("A paired study requires one root intervention.")
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
@@ -28,6 +29,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
         topic, bank = "commodity-sequence", "hold-expand-play-v1"
     elif midgame_bids:
         topic, bank = "midgame-bids", "sealed-bid-neighbors-v1"
+    elif rival_denial:
+        topic, bank = "rival-market-denial", "matched-rival-market-denial-v1"
     if lookahead:
         if not territory:
             raise ValueError("Short lookahead requires the card versus territory comparison.")
@@ -65,6 +68,9 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
     elif midgame_bids:
         method["kind"] = "sealed-bid-neighbors-1"
         method["turns"] = [5,6,7,8]
+        method.pop("commodityTiming")
+    elif rival_denial:
+        method["kind"] = "matched-rival-market-denial-1"
         method.pop("commodityTiming")
     if lookahead:
         method["checkpointTurns"] = [1, 3]
@@ -105,6 +111,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
             request["reliefUnlockRollouts"] = True
         elif midgame_bids:
             request.update(opponentStyle="MIXED",midgameBidRollouts=True)
+        elif rival_denial:
+            request.update(opponentStyle="MIXED", rivalMarketDenialRollouts=True)
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
             if commodity_expansion:

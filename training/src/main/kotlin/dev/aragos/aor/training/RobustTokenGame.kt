@@ -337,6 +337,8 @@ internal object RobustTokenGame {
                     input.expansionCardRollouts -> PairedActionRolloutObserver(seat)
                     input.reliefUnlockRollouts ->
                         PairedActionRolloutObserver(seat, reliefUnlock = true)
+                    input.rivalMarketDenialRollouts ->
+                        PairedActionRolloutObserver(seat, compareRivalDenial = true)
                     input.cardTerritoryRollouts ->
                         PairedActionRolloutObserver(
                             seat,
