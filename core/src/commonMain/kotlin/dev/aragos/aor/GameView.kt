@@ -152,6 +152,7 @@ data class GameView(
         val catalog: PublicCatalog = PublicCatalog.from(state.catalog)
         val scores: List<ScoreView> = ScoreView.from(state)
         val commodityPayouts: List<CommodityPayoutView> by lazy { CommodityPayoutView.from(state) }
+        val unplayedCards: List<CardDefinition> by lazy { CardAvailability.unplayed(state) }
     }
 
     companion object {
@@ -204,7 +205,7 @@ data class GameView(
                         .orEmpty(),
                 activity = common.activity,
                 deckRemaining = state.deck.size,
-                unplayedCards = if (decisionOnly) emptyList() else CardAvailability.unplayed(state),
+                unplayedCards = if (decisionOnly) emptyList() else common.unplayedCards,
                 endingTriggered = state.endingTriggered,
                 scores = common.scores,
                 adjustments = state.adjustments,
