@@ -12,12 +12,17 @@ EXPANSION_REMOTE = "/home/aragos/aor-worker/expansion-card-rollouts-20261118"
 TERRITORY_REMOTE = "/home/aragos/aor-worker/card-territory-rollouts-20261119"
 
 
-def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False):
+def simulated_positions(campaign, root, baseline, count, *, expansion=False, territory=False,
+                        lookahead=False):
     topic, bank = "play-or-hold", "commodity-play-or-hold-v1"
     if expansion:
         topic, bank = "buy-or-pass", "expansion-buy-or-pass-v1"
     elif territory:
         topic, bank = "buy-or-expand", "card-versus-territory-v1"
+    if lookahead:
+        if not territory:
+            raise ValueError("Short lookahead requires the card versus territory comparison.")
+        topic, bank = "lookahead-checkpoints", "card-territory-lookahead-checkpoints-v1"
     stage = root / topic
     stage.mkdir(exist_ok=campaign.resume)
     seeds = seed_bank(bank, count)
@@ -31,6 +36,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
     elif territory:
         method["kind"] = "natural-card-versus-territory-root-screen-1"
         method.pop("commodityTiming")
+    if lookahead:
+        method["checkpointTurns"] = [1, 3]
     declared = stage / "method.json"
     if not declared.exists():
         write(declared, method)
@@ -50,6 +57,8 @@ def simulated_positions(campaign, root, baseline, count, *, expansion=False, ter
             request["expansionCardRollouts"] = True
         elif territory:
             request["cardTerritoryRollouts"] = True
+            if lookahead:
+                request["lookaheadCheckpoints"] = True
         else:
             request.update(commodityTiming=timing, commodityRollouts=True)
         if not source.exists():

@@ -318,7 +318,11 @@ internal object RobustTokenGame {
                 ?: when {
                     input.expansionCardRollouts -> PairedActionRolloutObserver(seat)
                     input.cardTerritoryRollouts ->
-                        PairedActionRolloutObserver(seat, compareTerritory = true)
+                        PairedActionRolloutObserver(
+                            seat,
+                            compareTerritory = true,
+                            traceLookahead = input.lookaheadCheckpoints,
+                        )
                     else -> null
                 }
         val competitors =

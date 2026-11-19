@@ -3,6 +3,7 @@ package dev.aragos.aor.training
 import dev.aragos.aor.BoardCommand
 import dev.aragos.aor.Entry
 import dev.aragos.aor.GameState
+import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.TextCodec
 import dev.aragos.aor.ai.BotModel
@@ -15,6 +16,7 @@ internal class PairedActionRolloutObserver(
     override val seat: Int,
     private val timing: CommodityTimingConfig? = null,
     private val compareTerritory: Boolean = false,
+    private val traceLookahead: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -164,6 +166,10 @@ internal class PairedActionRolloutObserver(
     ): Map<String, Any> {
         val captured = root ?: return mapOf("status" to "no-eligible-root")
         val actor = captured.state.playerIds[seat]
+        val originTurn =
+            requireNotNull(captured.state.turnNumber) {
+                "A rollout requires an active origin turn."
+            }
         val tails =
             captured.actions.mapValues { (_, action) ->
                 (0..1).map { replicate ->
@@ -171,6 +177,18 @@ internal class PairedActionRolloutObserver(
                     val session =
                         ExperimentSession(captured.state, chanceSeed, recordEntries = true)
                     session.apply(mapOf(actor to action), deadline)
+                    val checkpoints =
+                        if (traceLookahead) mutableMapOf<Int, Map<String, Any>>() else null
+                    val record: ((GameState, Int) -> Unit)? = checkpoints?.let { values ->
+                        { state, decisions ->
+                            val turn = state.turnNumber ?: originTurn
+                            val ahead = turn - originTurn
+                            if (ahead in CHECKPOINT_TURNS) {
+                                values[ahead] = checkpoint(state, actor, decisions)
+                            }
+                        }
+                    }
+                    record?.invoke(session.state, session.decisions)
                     val continuation =
                         FrozenPolicyContinuation(
                             models,
@@ -179,7 +197,8 @@ internal class PairedActionRolloutObserver(
                             deadline,
                             decisionOffset = captured.number,
                         )
-                    val terminal = continuation.finish(session, seat, configuration, chanceSeed)
+                    val terminal =
+                        continuation.finish(session, seat, configuration, chanceSeed, record)
                     val canonical = session.entries.map(Entry::toText)
                     val replayed =
                         canonical.fold(captured.state) { state, entry ->
@@ -192,17 +211,51 @@ internal class PairedActionRolloutObserver(
                     mapOf(
                         "terminal" to terminal,
                         "canonicalSha256" to CpePairedDigest.json(canonical),
-                    )
+                    ) +
+                        if (checkpoints != null) {
+                            val atEnd = checkpoint(session.state, actor, session.decisions)
+                            mapOf(
+                                "checkpoints" to
+                                    CHECKPOINT_TURNS.associateWith { horizon ->
+                                        checkpoints[horizon] ?: atEnd
+                                    }
+                            )
+                        } else emptyMap()
                 }
             }
         return mapOf(
             "status" to "paired",
             "decision" to captured.number,
-            "turn" to
-                requireNotNull(captured.state.turnNumber) { "A card root needs its live turn." },
+            "turn" to originTurn,
             "epoch" to captured.state.currentEpoch.number,
             "ordinary" to captured.chosen,
             "tails" to tails,
         ) + captured.context
+    }
+
+    private fun checkpoint(state: GameState, actor: PlayerId, decisions: Int): Map<String, Any> {
+        val view = state.publicView()
+        val own = view.players.single { it.id == actor }
+        val score = view.scores.single { it.player == actor }
+        val rival =
+            view.scores.filter { it.player != actor }.mapNotNull { it.total }.maxOrNull() ?: 0
+        val markets = view.players.filter { it.id != actor }.maxOf { it.boardMarkers }
+        return mapOf(
+            "decisions" to decisions,
+            "cash" to score.cash,
+            "advances" to score.advancePoints,
+            "misery" to (score.misery ?: 1000),
+            "chaos" to (score.total == null),
+            "scoreMargin" to ((score.total ?: -1000) - rival),
+            "markers" to own.boardMarkers,
+            "markerMargin" to (own.boardMarkers - markets),
+            "handCount" to own.handCount,
+            "finished" to (state.stage == Stage.FINISHED),
+            "finishedWinShare" to if (score.winner) 1.0 / view.scores.count { it.winner } else 0.0,
+        )
+    }
+
+    private companion object {
+        val CHECKPOINT_TURNS = listOf(1, 3)
     }
 }

@@ -112,6 +112,7 @@ private constructor(
     val commodityRollouts: Boolean,
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
+    val lookaheadCheckpoints: Boolean,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -205,6 +206,8 @@ private constructor(
             (if (expansionCardRollouts) mapOf("expansionCardRollouts" to "buy-versus-pass-1")
             else emptyMap()) +
             (if (cardTerritoryRollouts) mapOf("cardTerritoryRollouts" to "buy-versus-territory-1")
+            else emptyMap()) +
+            (if (lookaheadCheckpoints) mapOf("lookaheadCheckpoints" to "public-turn-horizons-1")
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -389,6 +392,7 @@ private constructor(
                     "commodityRollouts",
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
+                    "lookaheadCheckpoints",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -489,6 +493,11 @@ private constructor(
                     require(setting.isBoolean) {
                         "The card versus territory rollout switch must be boolean."
                     }
+                    setting.booleanValue()
+                } ?: false
+            val lookaheadCheckpoints =
+                node["lookaheadCheckpoints"]?.let { setting ->
+                    require(setting.isBoolean) { "Short lookahead checkpoints require a boolean." }
                     setting.booleanValue()
                 } ?: false
             val adaptiveOpponent =
@@ -614,6 +623,9 @@ private constructor(
             ) {
                 "Card versus territory rollouts require a fixed candidate-only league and one comparison."
             }
+            require(!lookaheadCheckpoints || cardTerritoryRollouts) {
+                "Short lookahead checkpoints belong to the declared card versus territory study."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -636,6 +648,7 @@ private constructor(
                     commodityRollouts,
                     expansionCardRollouts,
                     cardTerritoryRollouts,
+                    lookaheadCheckpoints,
                     seeds,
                     start,
                     count,

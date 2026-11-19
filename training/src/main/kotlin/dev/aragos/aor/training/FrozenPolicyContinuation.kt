@@ -1,5 +1,6 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.GameState
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.ai.BotDifficulty
@@ -59,13 +60,19 @@ internal class FrozenPolicyContinuation(
         seat: Int,
         configuration: String,
         chanceSeed: Long,
+        onNewTurn: ((GameState, Int) -> Unit)? = null,
     ): TokenValueOutcome {
+        var observedTurn = session.state.turnNumber
         while (session.state.stage != Stage.FINISHED) {
             check(session)
             session.apply(
                 commands(session, session.actors().associateWith(session::observation)),
                 deadlineNanos,
             )
+            if (onNewTurn != null && session.state.turnNumber != observedTurn) {
+                observedTurn = session.state.turnNumber
+                onNewTurn(session.state, session.decisions)
+            }
         }
         val game =
             SimulatedGame(
