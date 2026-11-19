@@ -60,7 +60,7 @@ def fit(features, terminal):
     scale[constant] = 0
     normalized = np.divide(features - mean, scale, out=np.zeros_like(features), where=scale > 0)
     design = np.column_stack((np.ones(len(features)), normalized))
-    penalty = np.diag([0.0] + [.08] * len(FEATURES))
+    penalty = np.diag([0.0] + [.08] * features.shape[1])
     coefficients = np.linalg.solve(
         design.T @ design / len(design) + penalty,
         design.T @ terminal / len(design),
