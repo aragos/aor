@@ -19,6 +19,8 @@ import kotlin.math.pow
  * [maximumExtraTokens] also permits buying this many more tokens, for no more extra dollars.
  * [planWeight] scores each dollar of projected peaceful expansion opportunity in box units.
  * [extraCashPenalty] charges those same score units per dollar above the original bid.
+ * [counterAnticipation] is the weight of a forecast when a rival repeatedly tracks our usual bid.
+ * [respectRivalCash] clips historical predictions to each rival's currently published cash.
  */
 data class InitiativePolicyConfig(
     val maximumTokenLoss: Int,
@@ -32,6 +34,8 @@ data class InitiativePolicyConfig(
     val maximumExtraTokens: Int = 0,
     val planWeight: Double = 0.0,
     val extraCashPenalty: Double = 0.15,
+    val counterAnticipation: Double = 0.0,
+    val respectRivalCash: Boolean = false,
 ) {
     init {
         require(maximumTokenLoss in 0..8) { "Initiative may give up at most eight tokens." }
@@ -59,6 +63,9 @@ data class InitiativePolicyConfig(
         }
         require(extraCashPenalty.isFinite() && extraCashPenalty in 0.0..1.0) {
             "The extra token cash penalty must be between zero and one."
+        }
+        require(counterAnticipation.isFinite() && counterAnticipation in 0.0..1.0) {
+            "The counter anticipation weight must be between zero and one."
         }
     }
 
@@ -124,7 +131,9 @@ object InitiativePolicy {
                     if (rival.misery == MiseryStep.CHAOS) 0
                     else
                         requireNotNull(bids[rival.id]) { "A revealed row needs every rival's bid." }
-                bid to
+                val cash = rival.cash.coerceAtLeast(0)
+                val forecast = if (config.respectRivalCash) bid.coerceIn(-cash, cash) else bid
+                forecast to
                     (requireNotNull(priority[rival.id]) { "Rivals need capital choice order." } >
                         priorityOfPlayer)
             }
@@ -132,14 +141,32 @@ object InitiativePolicy {
         val weights =
             DoubleArray(rows.size) { index -> config.historyDecay.pow(rows.lastIndex - index) }
         val totalWeight = weights.sum()
-        fun expectedBox(amount: Int): Double =
-            predictions.withIndex().sumOf { (index, row) ->
+        val expectedCounters =
+            if (config.counterAnticipation > 0.0) {
+                BidResponseForecast.next(view.pastTokenPurchases, player, rivals)
+            } else emptyMap()
+        val responses =
+            if (expectedCounters.isEmpty()) null
+            else
+                predictions.map { row ->
+                    row.mapIndexed { index, (bid, tiePriority) ->
+                        (expectedCounters[rivals[index].id] ?: bid) to tiePriority
+                    }
+                }
+        fun meanBox(amount: Int, scenarios: List<List<Pair<Int, Boolean>>>): Double =
+            scenarios.withIndex().sumOf { (index, row) ->
                 weights[index] *
                     boxes[
                         row.count { (bid, tiePriority) ->
                             bid < amount || bid == amount && tiePriority
                         }]
             } / totalWeight
+        fun expectedBox(amount: Int): Double {
+            val historical = meanBox(amount, predictions)
+            if (responses == null) return historical
+            return historical +
+                config.counterAnticipation * (meanBox(amount, responses) - historical)
+        }
         val baselineBox = expectedBox(original.amount)
         fun gain(quote: TokenPurchaseOfferView): Double =
             baselineBox -

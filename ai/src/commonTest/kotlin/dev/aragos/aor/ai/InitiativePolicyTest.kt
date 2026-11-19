@@ -131,6 +131,37 @@ class InitiativePolicyTest {
     }
 
     @Test
+    fun forecastsTheNextBidOfARepeatUndercutter() {
+        val bidder = players[1]
+        val history =
+            responseHistory(bidder, listOf(21, 21, 19, 19, 19), listOf(21, 21, 20, 20, 18))
+        val rivals = view.players.filter { it.id != seat }
+
+        assertEquals(mapOf(bidder to 18), BidResponseForecast.next(history, seat, rivals))
+    }
+
+    @Test
+    fun recognizesWhenARivalTracksTheMostRecentBid() {
+        val bidder = players[1]
+        val history =
+            responseHistory(bidder, listOf(21, 21, 20, 19, 20), listOf(21, 21, 20, 19, 18))
+        val rivals = view.players.filter { it.id != seat }
+
+        assertEquals(mapOf(bidder to 19), BidResponseForecast.next(history, seat, rivals))
+    }
+
+    private fun responseHistory(bidder: PlayerId, earlier: List<Int>, counters: List<Int>) =
+        earlier.zip(counters).map { (own, counter) ->
+            players.associateWith { player ->
+                when (player) {
+                    seat -> own
+                    bidder -> counter
+                    else -> 21
+                }
+            }
+        }
+
+    @Test
     fun respectsTheContestedPoolRequirement() {
         val forecast =
             ExpansionForecastView(
