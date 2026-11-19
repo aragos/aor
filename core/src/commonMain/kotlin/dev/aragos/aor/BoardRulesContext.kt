@@ -58,13 +58,13 @@ data class BoardRulesContext(
         return routes[destination]?.value.orEmpty()
     }
 
-    private val galleyRoutesByPlayer by lazy {
+    private val shippingGraph by lazy { configuration.map.shippingGraph(configuration.playerCount) }
+
+    private data class GalleyProfile(val permissions: Int, val level: Int)
+
+    private val galleyProfiles by lazy {
         players.mapValues { (_, profile) ->
-            lazy {
-                bases(profile.player)
-                    .filter { province(it).coastal }
-                    .associateWith { base -> ExpansionReach.galleyRoutes(this, profile, base) }
-            }
+            GalleyProfile(ShippingGraph.galleyPermissions(profile.advances), profile.ships.level)
         }
     }
 
@@ -73,8 +73,8 @@ data class BoardRulesContext(
         base: ProvinceId,
         destination: ProvinceId,
     ): List<ExpansionRoute.Shipping> {
-        val routesByBase = galleyRoutesByPlayer[player]?.value ?: return emptyList()
-        return routesByBase[base]?.let { routes -> routes[destination] }.orEmpty()
+        val profile = galleyProfiles[player] ?: return emptyList()
+        return shippingGraph.galleyRoutes(base, destination, profile.permissions, profile.level)
     }
 
     private val basesByPlayer by lazy {

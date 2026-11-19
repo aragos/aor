@@ -296,57 +296,6 @@ object ExpansionReach {
         }
     }
 
-    /** One traversal records both sea-free and one-sea paths to every reachable coast. */
-    internal fun galleyRoutes(
-        context: BoardRulesContext,
-        profile: BoardPlayerProfile,
-        base: ProvinceId,
-    ): Map<ProvinceId, List<ExpansionRoute.Shipping>> {
-        data class Visit(val space: ShippingSpace, val seas: Int)
-        val start = Visit(ShippingSpace.Coast(base), 0)
-        val paths = mutableMapOf(start to listOf(start.space))
-        val queue = ArrayDeque<Visit>().apply { addLast(start) }
-        while (queue.isNotEmpty()) {
-            val current = queue.removeFirst()
-            val path =
-                requireNotNull(paths[current]) {
-                    "Every queued shipping visit must have a recorded path: ${current}."
-                }
-            if (path.size - 1 >= profile.ships.level) continue
-            for (neighbor in waterNeighbors(context, current.space)) {
-                val seaCount = current.seas + if (neighbor is ShippingSpace.Sea) 1 else 0
-                if (
-                    neighbor is ShippingSpace.Sea &&
-                        (seaCount > 1 ||
-                            neighbor.sea.isOcean ||
-                            AdvanceId.THE_HEAVENS !in profile.advances)
-                ) {
-                    continue
-                }
-                if (
-                    neighbor is ShippingSpace.Coast &&
-                        !canEnter(profile, context.province(neighbor.province))
-                ) {
-                    continue
-                }
-                val visit = Visit(neighbor, seaCount)
-                if (visit in paths) continue
-                paths[visit] = path + neighbor
-                queue.addLast(visit)
-            }
-        }
-        return paths.entries
-            .mapNotNull { (visit, path) ->
-                (visit.space as? ShippingSpace.Coast)?.let { coast ->
-                    coast.province to ExpansionRoute.Shipping(base, path)
-                }
-            }
-            .groupBy(Pair<ProvinceId, ExpansionRoute.Shipping>::first)
-            .mapValues { (_, routes) ->
-                routes.map(Pair<ProvinceId, ExpansionRoute.Shipping>::second)
-            }
-    }
-
     private fun waterNeighbors(
         context: BoardRulesContext,
         from: ShippingSpace,
