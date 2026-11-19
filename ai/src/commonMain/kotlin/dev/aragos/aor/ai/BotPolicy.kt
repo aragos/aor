@@ -107,13 +107,43 @@ object BotPolicy {
         val value: Double,
         val cash: Int,
         val tokens: Int,
-        val groups: Set<String>,
+        val groups: Int,
         val commands: Set<String>,
         val markers: Int,
         val overseasSlots: Int,
         val interaction: Double,
         val interest: Double,
     )
+
+    /** One bit per distinct group among the at most 32 planning options. */
+    private data class SearchOption(
+        val candidate: BotCandidate,
+        val group: Int,
+        val markerCost: Int,
+        val overseasCost: Int,
+        val intrinsic: Double,
+    )
+
+    private val frontierOrder =
+        compareByDescending<SearchNode> { it.value }.thenBy { it.first.command }
+
+    /** Bounded stable insertion, preserving generation order whenever the comparator ties. */
+    private fun MutableList<SearchNode>.offer(node: SearchNode) {
+        val limit = 12
+        if (size == limit && frontierOrder.compare(node, last()) >= 0) return
+        var lower = 0
+        var upper = size
+        while (lower < upper) {
+            val middle = (lower + upper) / 2
+            if (frontierOrder.compare(node, this[middle]) < 0) {
+                upper = middle
+            } else {
+                lower = middle + 1
+            }
+        }
+        if (size == limit) removeAt(lastIndex)
+        add(lower, node)
+    }
 
     private fun plan(
         observation: BotObservation,
@@ -134,12 +164,12 @@ object BotPolicy {
                 "expand" -> "expansion"
                 else -> return highest
             }
-        val options = ranked.filter { it.family == planningFamily }.take(32)
+        val eligible = ranked.asSequence().filter { it.family == planningFamily }.take(32).toList()
         val interest =
             if (planningFamily == "advance") {
                 BotAdvanceInterest.forObservation(observation, model)
             } else null
-        if (options.isEmpty() || options.size < 2 && interest == null) return highest
+        if (eligible.isEmpty() || eligible.size < 2 && interest == null) return highest
         val expansion = observation.expansionPlanning
         val interactions =
             if (planningFamily == "expansion") {
@@ -162,46 +192,59 @@ object BotPolicy {
             if (planningFamily == "advance") {
                 ((reserve - cash).coerceAtLeast(0) - originalShortfall) * reserveCoefficient
             } else 0.0
-        val intrinsicScores = options.associate { candidate ->
-            candidate.command to
-                candidate.features.entries
-                    .filterNot { (name, _) ->
+        val groups =
+            eligible.map(BotCandidate::group).distinct().withIndex().associate { (index, group) ->
+                group to (1 shl index)
+            }
+        val options = eligible.map { candidate ->
+            val step = expansion?.steps[candidate.command]
+            val intrinsic =
+                candidate.features.entries.sumOf { (name, value) ->
+                    if (
                         name == "reserveShortfall" ||
                             name.endsWith(".reserveShortfall") ||
                             BotModels.reservedFeature(name) ||
                             (interest != null && name == BotEconomicFeature.FOREGONE_INTEREST.key)
-                    }
-                    .sumOf { (name, value) -> value * (model.weights[name] ?: 0.0) }
+                    ) {
+                        0.0
+                    } else value * (model.weights[name] ?: 0.0)
+                }
+            SearchOption(
+                candidate,
+                checkNotNull(groups[candidate.group]) {
+                    "Every planning option requires its group bit."
+                },
+                step?.markerCost ?: 0,
+                step?.newOverseasCost ?: 0,
+                intrinsic,
+            )
         }
-        fun intrinsic(candidate: BotCandidate): Double =
-            checkNotNull(intrinsicScores[candidate.command]) {
-                "Every planning option requires a cached intrinsic score."
-            }
-        var frontier = options.mapNotNull { candidate ->
-            val step = expansion?.steps[candidate.command]
-            val markerCost = step?.markerCost ?: 0
-            val overseasCost = step?.newOverseasCost ?: 0
+        val markerStock = expansion?.markerStock ?: Int.MAX_VALUE
+        val overseasSlots = expansion?.overseasSlots ?: Int.MAX_VALUE
+        val needsCommands = interactions != null || interest != null || sequencing != null
+        var frontier = options.mapNotNull { option ->
+            val candidate = option.candidate
             if (
                 candidate.cashCost > observation.availableCash ||
                     candidate.tokenCost > observation.availableTokens ||
-                    markerCost > (expansion?.markerStock ?: Int.MAX_VALUE) ||
-                    overseasCost > (expansion?.overseasSlots ?: Int.MAX_VALUE)
+                    option.markerCost > markerStock ||
+                    option.overseasCost > overseasSlots
             ) {
                 null
             } else {
                 val cash = observation.availableCash - candidate.cashCost
-                val commands = setOf(candidate.command)
+                val commands = if (needsCommands) setOf(candidate.command) else emptySet()
                 val interestValue = interest?.value(cash, commands) ?: 0.0
-                val ordinaryValue = intrinsic(candidate) + reserveValue(cash)
+                val ordinaryValue = option.intrinsic + reserveValue(cash)
                 SearchNode(
                     first = candidate,
                     value = if (interest == null) ordinaryValue else ordinaryValue + interestValue,
                     cash = cash,
                     tokens = observation.availableTokens - candidate.tokenCost,
-                    groups = setOf(candidate.group),
+                    groups = option.group,
                     commands = commands,
-                    markers = (expansion?.markerStock ?: Int.MAX_VALUE) - markerCost,
-                    overseasSlots = (expansion?.overseasSlots ?: Int.MAX_VALUE) - overseasCost,
+                    markers = markerStock - option.markerCost,
+                    overseasSlots = overseasSlots - option.overseasCost,
                     interaction = 0.0,
                     interest = interestValue,
                 )
@@ -210,69 +253,56 @@ object BotPolicy {
         var best = frontier.maxByOrNull(SearchNode::value) ?: return highest
         // Fewer than 2200 expansions. No full-game search or hidden-state simulation.
         repeat(4) {
-            frontier =
-                frontier
-                    .flatMap { node ->
-                        options.mapNotNull { candidate ->
-                            val price =
-                                sequencing?.price(candidate, node.commands) ?: candidate.cashCost
-                            val step = expansion?.steps[candidate.command]
-                            val markerCost = step?.markerCost ?: 0
-                            val overseasCost = step?.newOverseasCost ?: 0
-                            if (
-                                candidate.command in node.commands ||
-                                    candidate.group in node.groups ||
-                                    price > node.cash ||
-                                    candidate.tokenCost > node.tokens ||
-                                    markerCost > node.markers ||
-                                    overseasCost > node.overseasSlots
-                            ) {
-                                null
-                            } else {
-                                val cash = node.cash - price
-                                val commands = node.commands + candidate.command
-                                val interaction = interactions?.value(commands) ?: 0.0
-                                val interestValue = interest?.value(cash, commands) ?: 0.0
-                                val continuation =
-                                    if (sequencing == null) intrinsic(candidate)
-                                    else
-                                        intrinsic(candidate) +
-                                            sequencing.value(candidate, node.commands)
-                                val ordinaryValue =
-                                    node.value + continuation * 0.92 + reserveValue(cash) -
-                                        reserveValue(node.cash)
-                                val correctedValue =
-                                    if (interest == null) ordinaryValue
-                                    else ordinaryValue + interestValue - node.interest
-                                node.copy(
-                                    value =
-                                        if (interactions == null) correctedValue
-                                        else
-                                            correctedValue +
-                                                0.92 * (interaction - node.interaction),
-                                    cash = cash,
-                                    tokens = node.tokens - candidate.tokenCost,
-                                    groups = node.groups + candidate.group,
-                                    commands = commands,
-                                    markers = node.markers - markerCost,
-                                    overseasSlots = node.overseasSlots - overseasCost,
-                                    interaction = interaction,
-                                    interest = interestValue,
-                                )
-                            }
-                        }
+            val continuations = ArrayList<SearchNode>(12)
+            for (node in frontier) {
+                val reserved = reserveValue(node.cash)
+                for (option in options) {
+                    val candidate = option.candidate
+                    if (
+                        (option.group and node.groups) != 0 ||
+                            candidate.tokenCost > node.tokens ||
+                            option.markerCost > node.markers ||
+                            option.overseasCost > node.overseasSlots
+                    ) {
+                        continue
                     }
-                    .sortedWith(
-                        compareByDescending<SearchNode> { it.value }.thenBy { it.first.command }
+                    val price = sequencing?.price(candidate, node.commands) ?: candidate.cashCost
+                    if (price > node.cash) continue
+                    val cash = node.cash - price
+                    val commands =
+                        if (needsCommands) node.commands + candidate.command else emptySet()
+                    val interaction = interactions?.value(commands) ?: 0.0
+                    val interestValue = interest?.value(cash, commands) ?: 0.0
+                    val continuation =
+                        if (sequencing == null) option.intrinsic
+                        else option.intrinsic + sequencing.value(candidate, node.commands)
+                    val ordinaryValue =
+                        node.value + continuation * 0.92 + reserveValue(cash) - reserved
+                    val correctedValue =
+                        if (interest == null) ordinaryValue
+                        else ordinaryValue + interestValue - node.interest
+                    continuations.offer(
+                        node.copy(
+                            value =
+                                if (interactions == null) correctedValue
+                                else correctedValue + 0.92 * (interaction - node.interaction),
+                            cash = cash,
+                            tokens = node.tokens - candidate.tokenCost,
+                            groups = node.groups or option.group,
+                            commands = commands,
+                            markers = node.markers - option.markerCost,
+                            overseasSlots = node.overseasSlots - option.overseasCost,
+                            interaction = interaction,
+                            interest = interestValue,
+                        )
                     )
-                    .take(12)
+                }
+            }
+            frontier = continuations
             val next = frontier.maxByOrNull(SearchNode::value)
             if (next != null && next.value > best.value) best = next
         }
-        val highestScore =
-            checkNotNull(scores[ranked.first().command]) {
-                "The highest-ranked candidate requires a cached score."
-            }
-        return if (best.value > highestScore) BotPlanEvaluation(best.first, best.value) else highest
+        return if (best.value > highest.value) BotPlanEvaluation(best.first, best.value)
+        else highest
     }
 }
