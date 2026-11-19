@@ -165,7 +165,7 @@ class Campaign:
         target = stage / name
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
-        worker_count, heap, java = (2, "3g", MAC_JAVA) if host == "MAC" else (4, "4g", "/usr/bin/java")
+        worker_count, heap, java = (6, "4g", MAC_JAVA) if host == "MAC" else (12, "6g", "/usr/bin/java")
         if host == "MAC" and shutil.disk_usage(self.root).free < self.mac_reserve:
             raise WorkerUnavailable("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
