@@ -1,5 +1,7 @@
 package dev.aragos.aor.training
 
+import dev.aragos.aor.AdvanceData
+import dev.aragos.aor.FinalAdvanceGuard
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
 import dev.aragos.aor.ai.BotModels
@@ -18,7 +20,12 @@ data class ModelComparison(
     val upper95: Double,
     val candidateWinShare: Double,
     val incumbentWinShare: Double,
+    val winEffect: PairedEffect,
+    val advanceCompletionEffect: PairedEffect,
 )
+
+/** Mean candidate-minus-incumbent outcome and its paired 95% interval. */
+data class PairedEffect(val mean: Double, val lower95: Double, val upper95: Double)
 
 /** Matched held-out games grouped by the setup dimensions needed for interpreting transfer. */
 data class MatrixModelComparison(
@@ -32,6 +39,7 @@ private data class PairResult(
     val difference: Double,
     val candidateWins: Double,
     val incumbentWins: Double,
+    val completeAdvancesDifference: Double,
 )
 
 /**
@@ -114,6 +122,7 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
         opponentPool: List<BotModel> = listOf(BotModels.default, incumbent),
         heldOut: Boolean = false,
         reportMatrix: ((MatrixModelComparison) -> Unit)? = null,
+        candidateFinishGuard: FinalAdvanceGuard? = null,
         completed: (SimulatedGame) -> Unit = {},
     ): ModelComparison {
         require(opponentPool.isNotEmpty()) { "A tournament requires an opponent population." }
@@ -133,7 +142,7 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
                                         else BotDifficulty.NORMAL,
                                     )
                                 }
-                            fun play(model: BotModel): SimulatedGame =
+                            fun play(model: BotModel, guard: FinalAdvanceGuard?): SimulatedGame =
                                 Simulation()
                                     .play(
                                         configuration = configuration,
@@ -145,9 +154,11 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
                                                 else opponent
                                             },
                                         deadlineNanos = deadlineNanos,
+                                        finalAdvanceGuards =
+                                            guard?.let { mapOf(controlledSeat to it) }.orEmpty(),
                                     )
-                            val candidateGame = play(candidate)
-                            val incumbentGame = play(incumbent)
+                            val candidateGame = play(candidate, candidateFinishGuard)
+                            val incumbentGame = play(incumbent, null)
                             synchronized(completed) {
                                 completed(candidateGame)
                                 completed(incumbentGame)
@@ -158,6 +169,8 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
                                     incumbentGame.reward(controlledSeat),
                                 candidateGame.winShare(controlledSeat),
                                 incumbentGame.winShare(controlledSeat),
+                                candidateGame.fullAdvanceSet(controlledSeat) -
+                                    incumbentGame.fullAdvanceSet(controlledSeat),
                             )
                         }
                     }
@@ -196,22 +209,34 @@ class Tournaments(val workers: Int, val deadlineNanos: Long) : AutoCloseable {
 }
 
 private fun summarize(pairs: List<PairResult>): ModelComparison {
-    val mean = pairs.map(PairResult::difference).average()
-    val variance =
-        if (pairs.size <= 1) 0.0
-        else {
-            pairs.sumOf { (it.difference - mean) * (it.difference - mean) } / (pairs.size - 1)
-        }
-    val margin = 1.96 * sqrt(variance / pairs.size)
+    val reward = pairedEffect(pairs.map(PairResult::difference))
     return ModelComparison(
         pairs = pairs.size,
-        rewardDifference = mean,
-        lower95 = mean - margin,
-        upper95 = mean + margin,
+        rewardDifference = reward.mean,
+        lower95 = reward.lower95,
+        upper95 = reward.upper95,
         candidateWinShare = pairs.map(PairResult::candidateWins).average(),
         incumbentWinShare = pairs.map(PairResult::incumbentWins).average(),
+        winEffect = pairedEffect(pairs.map { it.candidateWins - it.incumbentWins }),
+        advanceCompletionEffect = pairedEffect(pairs.map(PairResult::completeAdvancesDifference)),
     )
 }
+
+private fun pairedEffect(values: List<Double>): PairedEffect {
+    val mean = values.average()
+    val variance =
+        if (values.size <= 1) 0.0
+        else {
+            values.sumOf { (it - mean) * (it - mean) } / (values.size - 1)
+        }
+    val margin = 1.96 * sqrt(variance / values.size)
+    return PairedEffect(mean, mean - margin, mean + margin)
+}
+
+private val ALL_ADVANCE_POINTS = AdvanceData.definitions.sumOf { it.cost }
+
+private fun SimulatedGame.fullAdvanceSet(seat: Int): Double =
+    if (scores[seat].advancePoints == ALL_ADVANCE_POINTS) 1.0 else 0.0
 
 /** Reserve a disjoint positive seed range for final evaluation, including after integer wrap. */
 internal fun tournamentSeed(offset: Int, index: Int, repetition: Int, heldOut: Boolean): Int {

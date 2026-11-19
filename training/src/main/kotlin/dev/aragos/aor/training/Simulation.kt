@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.DieRoll
 import dev.aragos.aor.Entry
+import dev.aragos.aor.FinalAdvanceGuard
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameOutcome
 import dev.aragos.aor.GameState
@@ -164,6 +165,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
         trace: SimulationTrace? = null,
         controllers: Map<Int, SimulationController> = emptyMap(),
         stateObserver: SimulationStateObserver? = null,
+        finalAdvanceGuards: Map<Int, FinalAdvanceGuard> = emptyMap(),
     ): SimulatedGame {
         require(competitors.size == configuration.playerCount) {
             "Every simulated seat requires one competitor."
@@ -173,6 +175,9 @@ class Simulation(private val maxDecisions: Int = 12000) {
         }
         require(controllers.keys.all { it in competitors.indices }) {
             "A simulation controller requires a registered seat."
+        }
+        require(finalAdvanceGuards.keys.all { it in competitors.indices }) {
+            "A final advance guard requires a registered seat."
         }
         require(stateObserver == null || stateObserver.seat in competitors.indices) {
             "A simulation state observer requires a registered seat."
@@ -260,7 +265,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
                             .admit(command)
                     } else null
                 val acceptedObservation = accepted?.accepted ?: observation
-                val candidate =
+                val ordinary =
                     if (command == null) {
                         BotPolicy.chooseCandidate(
                             observation = observation,
@@ -275,6 +280,17 @@ class Simulation(private val maxDecisions: Int = 12000) {
                             "An experiment controller must select one of its ordinary offered commands."
                         }
                     }
+                val guardedCommand =
+                    finalAdvanceGuards[seat]
+                        ?.takeIf {
+                            observation.decision == "purchase-advances" &&
+                                ordinary.command == "pass"
+                        }
+                        ?.choose(state, view ?: state.viewForPlayer(actor), actor, ordinary.command)
+                val candidate =
+                    guardedCommand?.let { command ->
+                        acceptedObservation.candidates.firstOrNull { it.command == command }
+                    } ?: ordinary
                 if (trace != null && trace.seat == seat) {
                     val snapshotEntryCount =
                         checkNotNull(entries) {
