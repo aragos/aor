@@ -7,17 +7,17 @@ import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.ai.LocalTokenNeighborPolicy
 
-/** First-turn predictions learned before this game, for earlier and later capital choosers. */
-internal data class CapitalOrderOpeningPrior(val earlyBid: Int, val lateBid: Int) {
+/** First-turn amounts fixed before this game, for earlier and later capital choosers. */
+internal data class CapitalOrderOpeningBid(val earlyBid: Int, val lateBid: Int) {
     init {
         require(earlyBid in -40..40 && lateBid in -40..40) {
-            "Series opening predictions must fit the initial signed bid range."
+            "Series opening amounts must fit the initial signed bid range."
         }
     }
 
     fun amount(target: PlayerId, capitalOrder: List<PlayerId>): Int {
         val position = capitalOrder.indexOf(target)
-        require(position >= 0) { "A series prediction needs the target's public capital order." }
+        require(position >= 0) { "A series response needs the target's public capital order." }
         return if (position < (capitalOrder.size + 1) / 2) earlyBid else lateBid
     }
 }
@@ -34,7 +34,8 @@ internal data class RevealedTokenCounterConfig(
     val targetedRivalCount: Int,
     val openingBidPrior: Int? = null,
     val forecastQuantile: Double? = null,
-    val capitalOrderOpeningPrior: CapitalOrderOpeningPrior? = null,
+    val capitalOrderOpeningPrior: CapitalOrderOpeningBid? = null,
+    val capitalOrderOpeningResponse: CapitalOrderOpeningBid? = null,
 ) {
     init {
         require(lookbackTurns in 1..16 && minimumObservations in 1..lookbackTurns) {
@@ -59,6 +60,8 @@ internal data class RevealedTokenCounterConfig(
                 (openingBidPrior?.let { mapOf("openingBidPrior" to it) } ?: emptyMap()) +
                 (forecastQuantile?.let { mapOf("forecastQuantile" to it) } ?: emptyMap()) +
                 (capitalOrderOpeningPrior?.let { mapOf("capitalOrderOpeningPrior" to it) }
+                    ?: emptyMap()) +
+                (capitalOrderOpeningResponse?.let { mapOf("capitalOrderOpeningResponse" to it) }
                     ?: emptyMap())
 
     companion object {
@@ -259,6 +262,7 @@ internal enum class CounterBidReason {
     WARMUP,
     STRICT_NEIGHBOR,
     CAPITAL_PRIORITY_TIE,
+    LEARNED_OPENING_RESPONSE,
     TARGET_NOT_OFFERED,
 }
 
@@ -266,7 +270,8 @@ internal data class RevealedCounterBid(val command: String, val reason: CounterB
     val active: Boolean
         get() =
             reason == CounterBidReason.STRICT_NEIGHBOR ||
-                reason == CounterBidReason.CAPITAL_PRIORITY_TIE
+                reason == CounterBidReason.CAPITAL_PRIORITY_TIE ||
+                reason == CounterBidReason.LEARNED_OPENING_RESPONSE
 }
 
 /**
@@ -370,8 +375,21 @@ internal class RevealedTokenCounter(
                 val maximum = counts.values.max()
                 history.last { counts[it.amount] == maximum }.amount
             }
+        val learned =
+            config.capitalOrderOpeningResponse
+                ?.takeIf { turn == 1 }
+                ?.let { response ->
+                    Command.BuyTokens(response.amount(target, capitalOrder)).toText()
+                }
         val result =
-            if (prediction == null) {
+            if (learned != null) {
+                if (learned in offered) {
+                    RevealedCounterBid(learned, CounterBidReason.LEARNED_OPENING_RESPONSE)
+                } else {
+                    unavailable++
+                    RevealedCounterBid(original, CounterBidReason.TARGET_NOT_OFFERED)
+                }
+            } else if (prediction == null) {
                 warmups++
                 RevealedCounterBid(original, CounterBidReason.WARMUP)
             } else {

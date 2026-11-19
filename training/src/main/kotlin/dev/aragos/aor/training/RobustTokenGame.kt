@@ -269,7 +269,14 @@ internal object RobustTokenGame {
                 // Simulation owns the documented p1..p4 registration identifiers.
                 val players = (1..4).map { number -> PlayerId("p$number") }
                 val prior = input.seriesOpeningPriors.getOrNull(index)
-                val learned = if (prior == null) it else it.copy(capitalOrderOpeningPrior = prior)
+                val response = input.seriesOpeningResponses.getOrNull(index)
+                val learned =
+                    if (prior == null && response == null) it
+                    else
+                        it.copy(
+                            capitalOrderOpeningPrior = prior,
+                            capitalOrderOpeningResponse = response,
+                        )
                 RevealedTokenCounterLeague(players[seat], players, learned)
             }
         val controllers = references.mapValues { (player, reference) ->
