@@ -88,11 +88,14 @@ internal data class NextTurnBasePlan(
     }
 }
 
-/** Acts on the planned destination only if the subsequent real turn still offers it peacefully. */
-internal class NextTurnBaseContinuation(
+/**
+ * Places a planned marker in the declared turn, contingent on a successful gateway attack if set.
+ */
+internal class PlannedMarketContinuation(
     private val reference: SimulationController,
     private val target: ProvinceId,
-    private val nextTurn: Int,
+    private val turn: Int,
+    private val gateway: ProvinceId? = null,
 ) : SimulationController by reference {
     var followedThrough = false
         private set
@@ -101,7 +104,11 @@ internal class NextTurnBaseContinuation(
         if (
             !followedThrough &&
                 decision.observation.decision == "expand" &&
-                decision.view.turnNumber == nextTurn
+                decision.view.turnNumber == turn &&
+                (gateway == null ||
+                    decision.view.board.any {
+                        it.id == gateway && it.marker?.owner?.value == decision.observation.playerId
+                    })
         ) {
             val quote = decision.view.expansionOffers.singleOrNull { it.destination == target }
             if (

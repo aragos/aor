@@ -33,6 +33,7 @@ internal class PairedActionRolloutObserver(
     private val compareCapitals: Boolean = false,
     private val compareLeaderProtection: Boolean = false,
     private val compareNextTurnBase: Boolean = false,
+    private val compareCaravanAttack: Boolean = false,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -42,6 +43,7 @@ internal class PairedActionRolloutObserver(
         val context: Map<String, Any>,
         val commodityPlan: CommodityExpansionPlan? = null,
         val basePlan: NextTurnBasePlan? = null,
+        val caravanPlan: CaravanAttackPlan? = null,
     )
 
     private var root: Root? = null
@@ -57,6 +59,7 @@ internal class PairedActionRolloutObserver(
                 compareCapitals -> "capitalChoiceRollouts"
                 compareLeaderProtection -> "leaderProtectionRollouts"
                 compareNextTurnBase -> "nextTurnBaseRollouts"
+                compareCaravanAttack -> "caravanAttackRollouts"
                 else -> "expansionCardRollouts"
             }
 
@@ -77,8 +80,47 @@ internal class PairedActionRolloutObserver(
                 compareCapitals -> capitalRoot(state, number, observation, command)
                 compareLeaderProtection -> protectionRoot(state, number, observation, command)
                 compareNextTurnBase -> baseRoot(state, number, observation, command)
+                compareCaravanAttack -> caravanRoot(state, number, observation, command)
                 else -> expansionCardRoot(state, number, observation, command)
             }
+    }
+
+    private fun caravanRoot(
+        state: GameState,
+        number: Int,
+        observation: BotObservation,
+        command: String,
+    ): Root? {
+        if (
+            observation.decision != "expand" ||
+                (state.turnNumber ?: 0) < 3 ||
+                !command.startsWith("attack ")
+        ) {
+            return null
+        }
+        val plan =
+            CaravanAttackPlan.select(state, state.playerIds[seat], observation, command)
+                ?: return null
+        return Root(
+            state = state,
+            number = number,
+            chosen = command,
+            actions =
+                mapOf(
+                    "ordinary" to command,
+                    "attack-gateway" to plan.attack.toText(),
+                    "attack-and-place" to plan.attack.toText(),
+                ),
+            context =
+                mapOf(
+                    "gateway" to plan.attack.province.value,
+                    "target" to plan.destination.value,
+                    "gatewayCost" to plan.firstCost,
+                    "targetCost" to plan.secondCost,
+                    "attackChance" to plan.chance,
+                ),
+            caravanPlan = plan,
+        )
     }
 
     private fun baseRoot(
@@ -393,6 +435,11 @@ internal class PairedActionRolloutObserver(
         )
     }
 
+    private fun requireRouteReference(controllers: Map<Int, SimulationController>) =
+        checkNotNull(controllers[seat]) {
+            "A route plan needs the exact ordinary reference policy."
+        }
+
     fun evidence(
         configuration: String,
         seed: Int,
@@ -459,18 +506,27 @@ internal class PairedActionRolloutObserver(
                     }
                     record?.invoke(session.state, session.decisions)
                     val originalControllers = controllers()
-                    val baseController =
-                        captured.basePlan
-                            ?.takeIf { arm == "move-base-and-expand" }
-                            ?.let { plan ->
-                                NextTurnBaseContinuation(
-                                    checkNotNull(originalControllers[seat]) {
-                                        "A route plan needs the exact ordinary reference policy."
-                                    },
-                                    plan.target,
-                                    originTurn + 1,
-                                )
-                            }
+                    val routeController =
+                        when (arm) {
+                            "move-base-and-expand" ->
+                                captured.basePlan?.let { plan ->
+                                    PlannedMarketContinuation(
+                                        requireRouteReference(originalControllers),
+                                        plan.target,
+                                        originTurn + 1,
+                                    )
+                                }
+                            "attack-and-place" ->
+                                captured.caravanPlan?.let { plan ->
+                                    PlannedMarketContinuation(
+                                        requireRouteReference(originalControllers),
+                                        plan.destination,
+                                        originTurn,
+                                        gateway = plan.attack.province,
+                                    )
+                                }
+                            else -> null
+                        }
                     val commodityController =
                         captured.commodityPlan
                             ?.takeIf { arm == "hold-and-expand" || arm == "hold-expand-play" }
@@ -492,8 +548,8 @@ internal class PairedActionRolloutObserver(
                                     preferExpansionCard(originalControllers, originTurn)
                                 commodityController != null ->
                                     originalControllers + (seat to commodityController)
-                                baseController != null ->
-                                    originalControllers + (seat to baseController)
+                                routeController != null ->
+                                    originalControllers + (seat to routeController)
                                 else -> originalControllers
                             },
                             seed,
@@ -512,7 +568,7 @@ internal class PairedActionRolloutObserver(
                                 "plannedCardPlay" to it.scheduledPlay,
                             )
                         } ?: emptyMap()) +
-                        (baseController?.let { mapOf("followedThrough" to it.followedThrough) }
+                        (routeController?.let { mapOf("followedThrough" to it.followedThrough) }
                             ?: emptyMap()) +
                         (if (reserveExpansionCard) {
                             val cardReceived =
