@@ -208,7 +208,6 @@ class CoordinatedPolicySelector(
             tokenSampler?.let {
                 NearOptimalTokenPolicy.choose(encoded, deterministic, it, seed).command
             } ?: deterministic.command
-        return initiative?.let { InitiativePolicy.bid(view, player, normal, seed, it, encoded) }
-            ?: normal
+        return initiative?.let { InitiativePolicy.bid(view, player, normal, seed, it) } ?: normal
     }
 }

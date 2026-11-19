@@ -4,6 +4,7 @@ import dev.aragos.aor.ContestedExpansionProspectView
 import dev.aragos.aor.ExpansionForecastView
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameState
+import dev.aragos.aor.PeacefulExpansionProspectView
 import dev.aragos.aor.Player
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ProvinceId
@@ -99,31 +100,33 @@ class InitiativePolicyTest {
 
     @Test
     fun buysOneMoreTokenWhenItUnlocksTheBetterExpansionPlanAtTheSameOrder() {
+        val markets =
+            state.catalog.provinces.zip(listOf(5, 5, 6, 6)).map { (province, cost) ->
+                PeacefulExpansionProspectView(
+                    province.id,
+                    cost,
+                    shipping = false,
+                    usesOverseasSlot = false,
+                )
+            }
         val extended =
             view.copy(
                 pastTokenPurchases = listOf(players.associateWith { 20 }),
                 tokenPurchaseOffers =
                     view.tokenPurchaseOffers + TokenPurchaseOfferView(22, 22, 22, 18, 14, 22),
+                expansionForecast = ExpansionForecastView(markets, overseasSlots = 0),
             )
-        val plan =
-            TerritoryObservation(
-                encoderVersion = TerritoryEncoder.TOKEN_2.version,
-                stateFeatures = emptyMap(),
-                actions =
-                    extended.tokenPurchaseOffers.map { offer ->
-                        val features =
-                            if (offer.amount == 22) {
-                                mapOf(BotTokenPlanFeature.INCOME.key to 0.10)
-                            } else emptyMap()
-                        TerritoryAction("buy-tokens ${offer.amount}", features)
-                    },
-                baselineIndex = 3,
+        val budget =
+            config.copy(
+                maximumTokenLoss = 0,
+                maximumExtraTokens = 1,
+                tokenPenalty = 0.0,
+                planWeight = 0.1,
             )
-        val budget = config.copy(maximumTokenLoss = 0, maximumExtraTokens = 1, planWeight = 0.1)
 
         assertEquals(
             "buy-tokens 22",
-            InitiativePolicy.bid(extended, seat, "buy-tokens 21", 7, budget, plan),
+            InitiativePolicy.bid(extended, seat, "buy-tokens 21", 7, budget),
         )
     }
 

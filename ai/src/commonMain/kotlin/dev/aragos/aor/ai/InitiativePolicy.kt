@@ -75,7 +75,6 @@ object InitiativePolicy {
         normal: String,
         seed: Int,
         config: InitiativePolicyConfig,
-        tokenObservation: TerritoryObservation? = null,
     ): String {
         require(view.stage == Stage.TOKEN_PURCHASE) { "Initiative bids require a purchase window." }
         if (config.participation == 0.0) return normal
@@ -108,18 +107,11 @@ object InitiativePolicy {
                         quote.cost - original.cost in 1..config.maximumExtraTokens
                 }
             }
-        val planScores =
-            if (config.planWeight == 0.0) emptyMap()
-            else {
-                requireNotNull(tokenObservation) {
-                        "Budgeted bids require their token-plan projections."
-                    }
-                    .actions
-                    .associate { action ->
-                        action.command to BotTokenPlan.opportunity(action.features)
-                    }
-            }
-        val originalPlan = planScores[normal] ?: 0.0
+        val plans =
+            if (config.planWeight > 0.0 && view.expansionForecast != null) {
+                BotTokenPlanProjection(view, player)
+            } else null
+        val originalPlan = plans?.plan(original.poolAfter)?.opportunity ?: 0.0
         val boxes = OrderBoxes.forPlayers(view.players.size)
         val priority = view.capitalOrder.withIndex().associate { it.value to it.index }
         val priorityOfPlayer =
@@ -153,7 +145,8 @@ object InitiativePolicy {
             baselineBox -
                 expectedBox(quote.amount) -
                 config.tokenPenalty * (original.tokensReceived - quote.tokensReceived) +
-                config.planWeight * ((planScores[bidCommand(quote)] ?: 0.0) - originalPlan) -
+                config.planWeight *
+                    ((plans?.plan(quote.poolAfter)?.opportunity ?: 0.0) - originalPlan) -
                 config.extraCashPenalty * (quote.cost - original.cost).coerceAtLeast(0)
         val scored = (smaller + larger).map { it to gain(it) }.filter { it.second > 0.0 }
         val (best, bestScore) =

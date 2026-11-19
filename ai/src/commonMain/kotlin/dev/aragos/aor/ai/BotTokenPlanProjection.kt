@@ -30,20 +30,7 @@ internal data class BotTokenPlan(
 ) {
     /** Fixed ordering heuristic, separate from the offline-fitted value of each feature. */
     val opportunity: Double
-        get() = opportunity(heldGain, publicGain, incomeGain.toDouble())
-
-    companion object {
-        fun opportunity(held: Double, public: Double, income: Double): Double =
-            held + 0.15 * public + 3.2 * income
-
-        /** Reconstruct the same opportunity from the existing normalized token-plan projection. */
-        fun opportunity(features: Map<String, Double>): Double =
-            opportunity(
-                100.0 * (features[BotTokenPlanFeature.HELD_COMMODITY.key] ?: 0.0),
-                200.0 * (features[BotTokenPlanFeature.PUBLIC_COMMODITY.key] ?: 0.0),
-                100.0 * (features[BotTokenPlanFeature.INCOME.key] ?: 0.0),
-            )
-    }
+        get() = heldGain + 0.15 * publicGain + 3.2 * incomeGain
 }
 
 /**
@@ -60,7 +47,7 @@ internal data class BotTokenPlan(
 internal class BotTokenPlanProjection(
     view: GameView,
     seat: PlayerId,
-    private val endgame: Double,
+    private val endgame: Double = 0.0,
 ) {
     private data class Market(
         val destination: ProvinceId,
@@ -100,7 +87,7 @@ internal class BotTokenPlanProjection(
                     prospect.usesOverseasSlot,
                     definition.commodities,
                     gain.held,
-                    BotTokenPlan.opportunity(gain.held, gain.public, income.toDouble()),
+                    gain.held + 0.15 * gain.public + 3.2 * income,
                 )
             }
     }
