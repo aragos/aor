@@ -10,18 +10,26 @@ import java.util.concurrent.TimeUnit
 
 /** Small streaming executor for explicit frozen-policy league experiments, independent of a UI. */
 object RobustTokenMain {
-    val modes = setOf("robust-token-prepare", "robust-token-screen-chunk")
+    val modes = setOf("robust-token-prepare", "robust-token-screen-chunk", RobustTokenBatch.MODE)
 
     fun run(arguments: List<String>) {
         require(arguments.size % 2 == 0) { "Robust arguments must be option/value pairs." }
         val fields = arguments.chunked(2).associate { it[0] to it[1] }
         val mode = requireNotNull(fields["--mode"]) { "An explicit robust mode is required." }
         val required =
-            setOf("--mode", "--source", "--output") +
-                if (mode == "robust-token-screen-chunk") setOf("--seconds", "--workers")
-                else emptySet()
+            when (mode) {
+                RobustTokenBatch.MODE -> setOf("--mode", "--plan", "--seconds", "--workers")
+                "robust-token-screen-chunk" ->
+                    setOf("--mode", "--source", "--output", "--seconds", "--workers")
+                else -> setOf("--mode", "--source", "--output")
+            }
         require(mode in modes && fields.size * 2 == arguments.size && fields.keys == required) {
             "Supply exactly the declared robust mode's nonrepeating options."
+        }
+        if (mode == RobustTokenBatch.MODE) {
+            val plan = Path.of(requireNotNull(fields["--plan"]) { "A batch requires its plan." })
+            RobustTokenBatch.run(plan, seconds(fields), workers(fields))
+            return
         }
         val input =
             RobustTokenInput.read(
@@ -39,18 +47,8 @@ object RobustTokenMain {
         val artifacts = TrainingArtifacts(output)
         artifacts.write("prepared.json", input.prepared())
         if (mode == "robust-token-prepare") return
-        val seconds =
-            requireNotNull(fields["--seconds"]?.toLongOrNull()) {
-                "Remaining science seconds must be integral."
-            }
-        require(seconds in 1..32400) {
-            "A robust native stage cannot exceed the original nine-hour allowance."
-        }
-        val workers =
-            requireNotNull(fields["--workers"]?.toIntOrNull()) {
-                "An explicit integral worker count is required."
-            }
-        require(workers in 1..32) { "Robust native workers must be bounded between 1 and 32." }
+        val seconds = seconds(fields)
+        val workers = workers(fields)
         val deadline = System.nanoTime() + seconds * 1_000_000_000L
         val attempts = CoordinatedEsAttempts(deadline)
         val executor = Executors.newFixedThreadPool(workers)
@@ -150,6 +148,24 @@ object RobustTokenMain {
                 "Robust workers did not exit after bounded cancellation."
             }
         }
+    }
+
+    private fun seconds(fields: Map<String, String>): Long {
+        val value =
+            requireNotNull(fields["--seconds"]?.toLongOrNull()) {
+                "Remaining science seconds must be integral."
+            }
+        require(value in 1..32400) { "A robust native stage cannot exceed nine hours." }
+        return value
+    }
+
+    private fun workers(fields: Map<String, String>): Int {
+        val value =
+            requireNotNull(fields["--workers"]?.toIntOrNull()) {
+                "An explicit integral worker count is required."
+            }
+        require(value in 1..32) { "Robust native workers must be bounded between 1 and 32." }
+        return value
     }
 
     private data class RobustWorld(
