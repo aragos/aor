@@ -7,11 +7,15 @@ import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.ai.LocalTokenNeighborPolicy
 
-/** Bounded within-game learning from the controlled seat's already revealed token purchases. */
+/**
+ * Bounded learning from public token purchases. An optional [openingBidPrior] represents a
+ * prediction a rival acquired across completed games and fixed before the simulated game starts.
+ */
 internal data class RevealedTokenCounterConfig(
     val minimumObservations: Int,
     val lookbackTurns: Int,
     val targetedRivalCount: Int,
+    val openingBidPrior: Int? = null,
 ) {
     init {
         require(lookbackTurns in 1..16 && minimumObservations in 1..lookbackTurns) {
@@ -27,7 +31,7 @@ internal data class RevealedTokenCounterConfig(
                 "minimumObservations" to minimumObservations,
                 "lookbackTurns" to lookbackTurns,
                 "targetedRivalCount" to targetedRivalCount,
-            )
+            ) + (openingBidPrior?.let { mapOf("openingBidPrior" to it) } ?: emptyMap())
 
     companion object {
         const val VERSION = "public-token-history-counter-1"
@@ -41,6 +45,7 @@ internal data class RevealedTokenCounterConfig(
                     "lookbackTurns",
                     "targetedRivalCount",
                 ),
+                optional = setOf("openingBidPrior"),
             )
             require(node["kind"]?.asText() == VERSION) {
                 "Declare the exact public counter version."
@@ -49,6 +54,7 @@ internal data class RevealedTokenCounterConfig(
                 PurchaseJson.integer(node["minimumObservations"], "public observation minimum"),
                 PurchaseJson.integer(node["lookbackTurns"], "public lookback turns"),
                 PurchaseJson.integer(node["targetedRivalCount"], "targeted rival count"),
+                node["openingBidPrior"]?.let { PurchaseJson.integer(it, "opening bid prior") },
             )
         }
     }
@@ -322,7 +328,7 @@ internal class RevealedTokenCounter(
         }
         val history = recent.filter { it.turn < turn }
         val prediction =
-            if (history.size < config.minimumObservations) null
+            if (history.size < config.minimumObservations) config.openingBidPrior
             else {
                 val counts = history.groupingBy(PublicTokenReveal::amount).eachCount()
                 val maximum = counts.values.max()

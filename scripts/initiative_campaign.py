@@ -175,7 +175,8 @@ class Campaign:
         write(stage / f"{name}.receipt.json", receipt)
         print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
 
-    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None, rival_offsets=(1,2,3), baseline=None):
+    def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
+              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -187,6 +188,8 @@ class Campaign:
         declared = dict(stage=label, configs=configs, banks=banks, paired=paired,
                         replayIndices=[0,count-1], runtime=self.runtime, endEpoch=self.deadline,
                         rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [], baseline=baseline)
+        if opening_bid_prior is not None:
+            declared["openingBidPrior"] = opening_bid_prior
         write(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -205,6 +208,8 @@ class Campaign:
                     if mode.startswith("REVEALED_"):
                         spec["adaptiveOpponent"] = dict(kind="public-token-history-counter-1",
                             minimumObservations=2,lookbackTurns=8,targetedRivalCount=1)
+                        if opening_bid_prior is not None:
+                            spec["adaptiveOpponent"]["openingBidPrior"] = opening_bid_prior
                     if mode == "INDEPENDENT_INITIATIVE":
                         if rival is None:
                             raise ValueError("This ecology requires its frozen independently tuned rival.")

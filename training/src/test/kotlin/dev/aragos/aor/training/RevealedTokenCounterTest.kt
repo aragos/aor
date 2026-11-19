@@ -34,6 +34,13 @@ class RevealedTokenCounterTest {
     }
 
     @Test
+    fun anExplicitOpeningPriorCanCounterBeforeAnyInGameReveal() {
+        val counter = counter(RevealedTokenCounterConfig(2, 8, 1, openingBidPrior = 21))
+
+        assertThat(bid(counter).command).isEqualTo("buy-tokens 20")
+    }
+
+    @Test
     fun repeatedViewsOfOneRevealDoNotSatisfyTheObservationMinimum() {
         val counter = counter()
         repeat(10) { counter.observe(PublicTokenReveal(1, 21)) }

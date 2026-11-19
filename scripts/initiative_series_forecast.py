@@ -51,7 +51,9 @@ def compare(games):
             estimates["roundAndPrevious"][actual == forecast] += 1
             if turn == 1:
                 estimates["opening"][actual == forecast] += 1
-    return {"priorGamesPerForecast": 4, "testGames": test_games, "accuracy": {
+    openings = Counter(game[1] for game in games if 1 in game)
+    return {"priorGamesPerForecast": 4, "testGames": test_games, "openingBidCounts": openings,
+            "accuracy": {
         kind: {"hits": results[True], "predictions": results.total(),
                "fraction": results[True] / results.total()}
         for kind, results in estimates.items()
