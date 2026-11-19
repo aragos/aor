@@ -96,11 +96,15 @@ object TokenValuePilotMain {
             )
         require(remaining > 0L) { "The token-value pilot exhausted its three-day allowance." }
         val deadline = System.nanoTime() + remaining
+        val configurations = specification.arena.configurations.map(TrainingConfiguration::id)
+        val setupMetadata =
+            configurations.singleOrNull()?.let { mapOf("configuration" to it) }
+                ?: mapOf("configurations" to configurations)
         val metadata =
             identity +
+                setupMetadata +
                 mapOf(
                     "source" to source.toString(),
-                    "configuration" to specification.arena.configurations.single().id,
                     "workers" to workerCount,
                     "opponentModels" to specification.arena.opponents.size,
                     "difficulty" to "HARD",
