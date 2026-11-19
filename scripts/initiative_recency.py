@@ -17,10 +17,10 @@ def predictability_drop(case):
     return min(reduction(undercut["counterAccuracy"]), reduction(mirrored["bidModeShare"]))
 
 
-def main(root, primary):
+def main(root, primary, reuse_screen):
     campaign = Campaign(root, remote=REMOTE)
     campaign.validate_runtime()
-    if campaign.remaining() < 820:
+    if campaign.remaining() < 820 and not reuse_screen:
         write(root / "result.json", {"status": "insufficient-time"})
         return
     initial = read(primary / "result.json")
@@ -35,7 +35,7 @@ def main(root, primary):
         "wider-mixture": dict(live, maximumTokenLoss=3, bidScoreTolerance=0.35, openingSpread=2),
     }
     screen = campaign.stage("history-screen", choices, 176, LINEUPS,
-                            shard=88, rival=live, baseline=live)
+                            shard=88, rival=live, baseline=live, reuse_complete=reuse_screen)
     eligible = [case for case in screen.values()
                 if min(row["mean"] for row in case["outcomes"].values()) >= -0.025
                 and (max(row["mean"] for row in case["outcomes"].values()) >= 0.025
@@ -53,5 +53,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--primary", type=Path, required=True)
+    parser.add_argument("--reuse-screen", action="store_true",
+                        help="validate and summarize previously completed screen shards")
     args = parser.parse_args()
-    main(args.root.resolve(), args.primary.resolve())
+    main(args.root.resolve(), args.primary.resolve(), args.reuse_screen)

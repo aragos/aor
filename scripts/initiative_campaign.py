@@ -91,7 +91,7 @@ def score(records, controls, role="CANDIDATE"):
     result["bidModeShare"] = dict(candidate=bid_mode_share(changes),
                                   baseline=bid_mode_share(baselines))
     def counter_accuracy(rows):
-        counters = [row["publicTokenCounter"] for row in rows if row["publicTokenCounter"]]
+        counters = [row["publicTokenCounter"] for row in rows if row.get("publicTokenCounter")]
         predictions = sum(counter["resolvedPredictions"] for counter in counters)
         hits = sum(counter["predictionHits"] for counter in counters)
         return hits / predictions if predictions else None
@@ -158,6 +158,14 @@ class Campaign:
                     timeout=max(2,self.remaining()))
                 with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as stream:
                     stream.extractall(stage, filter="data")
+        games = self.validate_result(target, source)
+        receipt = dict(host=host, seconds=time.monotonic() - started, games=games)
+        write(stage / f"{name}.receipt.json", receipt)
+        print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
+
+    @staticmethod
+    def validate_result(target, source):
+        name = target.name
         done = read(target / "finished.json")
         definition = read(source)
         if not done["complete"] or done["sourceSha256"] != sha(source):
@@ -171,16 +179,21 @@ class Campaign:
             row["seed"] != definition["seeds"][i] or row["scienceSha256"] != done["scienceSha256"]
             for i, row in zip(wanted, rows, strict=True)):
             raise ValueError(f"{name} incomplete seed/index/science identity.")
-        receipt = dict(host=host, seconds=time.monotonic()-started, games=done["completedGames"])
-        write(stage / f"{name}.receipt.json", receipt)
-        print(json.dumps(dict(stage=stage_dir, job=name, **receipt)), flush=True)
+        return done["completedGames"]
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
-              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None):
+              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
-        stage.mkdir()
+        if not reuse_complete:
+            stage.mkdir()
+
+        def declare(path, value):
+            if not reuse_complete:
+                write(path, value)
+            elif read(path) != value:
+                raise ValueError(f"The existing declaration does not match {path}.")
         banks = {mode: seed_bank(f"{label}/{mode}", count) for mode in ecologies}
         streams = [seed for bank in banks.values() for seed in bank]
         if len(set(streams)) != len(streams):
@@ -190,7 +203,7 @@ class Campaign:
                         rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [], baseline=baseline)
         if opening_bid_prior is not None:
             declared["openingBidPrior"] = opening_bid_prior
-        write(stage / "method.json", declared)
+        declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
         for key, policy in choices.items():
@@ -216,28 +229,15 @@ class Campaign:
                         spec["initiativeRival"] = dict(kind="public-initiative-lineup-1",offsets=list(rival_offsets),policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
-                    write(source, spec)
+                    declare(source, spec)
                     jobs.append((name, source))
-        todo = queue.SimpleQueue()
-        for job in jobs:
-            todo.put(job)
-
-        def run_host(host):
-            try:
-                while not self.stop.is_set():
-                    try:
-                        task = todo.get_nowait()
-                    except queue.Empty:
-                        return
-                    self.execute(stage, task, host)
-            except Exception:
-                self.stop.set()
-                raise
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(run_host, host) for host in ("MAC", "DESKTOP")]
-            for future in futures:
-                future.result()
+        if reuse_complete:
+            for name, source in jobs:
+                games = self.validate_result(stage / name, source)
+                if read(stage / f"{name}.receipt.json")["games"] != games:
+                    raise ValueError(f"The existing receipt does not match {name}.")
+        else:
+            self.execute_jobs(stage, jobs)
 
         def records(name, case):
             result = []
@@ -265,6 +265,28 @@ class Campaign:
                                  rankScore=.5*(ordinary+adaptive))
         write(stage / "summary.json", outcomes)
         return outcomes
+
+    def execute_jobs(self, stage, jobs):
+        todo = queue.SimpleQueue()
+        for job in jobs:
+            todo.put(job)
+
+        def run_host(host):
+            try:
+                while not self.stop.is_set():
+                    try:
+                        task = todo.get_nowait()
+                    except queue.Empty:
+                        return
+                    self.execute(stage, task, host)
+            except Exception:
+                self.stop.set()
+                raise
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(run_host, host) for host in ("MAC", "DESKTOP")]
+            for future in futures:
+                future.result()
 
 
 def ranked(outcomes):

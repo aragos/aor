@@ -32,6 +32,23 @@ def main(root, primary, mix):
     write(root / "result.json", {"status": "opening-prior-complete", "comparison": results,
                                 "priorEvidenceSha256": sha(evidence)})
 
+    check_deeper_rival(campaign, primary, first["comparison"]["config"], strongest)
+
+
+def check_deeper_rival(campaign, primary, baseline, candidate):
+    if campaign.remaining() < 345:
+        return
+    mirror = primary.parent / "automata-initiative-mirror-20261118"
+    validation = read(mirror / "extra-result.json")
+    response = validation["response"]["response"]
+    if response["outcomes"]["QUALIFIED"]["lower95"] <= 0:
+        return
+    comparison = campaign.stage(
+        "deeper-rival", {"mixture": candidate}, 192, ("INDEPENDENT_INITIATIVE",),
+        shard=64, baseline=baseline, rival=response["config"], rival_offsets=(1,),
+    )
+    write(campaign.root / "deeper-rival/result.json", comparison)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
