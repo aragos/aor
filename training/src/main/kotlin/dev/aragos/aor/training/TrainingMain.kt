@@ -236,7 +236,7 @@ fun main(arguments: Array<String>) {
             """
             AoR standalone offline opponent trainer (JDK 21+).
             Use train-opponents.py for enforced CPU, memory and elapsed-time limits.
-            --mode coverage|train|evaluate|evaluate-finish|train-opening
+            --mode coverage|train|evaluate|evaluate-finish|train-opening|train-initiative
                 --output PATH --hours HOURS (maximum 72)
             --workers N  --configurations 1..${TrainingMatrix.configurations.size}  --seeds N  --seed N
             --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
@@ -342,6 +342,16 @@ fun main(arguments: Array<String>) {
             "train" -> train(options, initial, tournaments, artifacts, ledger, completed)
             "train-opening" ->
                 OpeningHandTraining.run(
+                    tournaments,
+                    configurations,
+                    options.seeds,
+                    options.seed,
+                    initial,
+                    artifacts,
+                    ledger,
+                )
+            "train-initiative" ->
+                VariantInitiativeTraining.run(
                     tournaments,
                     configurations,
                     options.seeds,
@@ -559,9 +569,16 @@ private data class TrainingOptions(
                 )
             require(
                 options.mode in
-                    setOf("coverage", "train", "evaluate", "evaluate-finish", "train-opening")
+                    setOf(
+                        "coverage",
+                        "train",
+                        "evaluate",
+                        "evaluate-finish",
+                        "train-opening",
+                        "train-initiative",
+                    )
             ) {
-                "Mode must be coverage, train, evaluate, evaluate-finish, or train-opening."
+                "Unknown training mode ${options.mode}. See --help for the available modes."
             }
             require(options.hours.isFinite() && options.hours > 0.0 && options.hours <= 72.0) {
                 "A training invocation may run for more than zero and at most 72 hours."

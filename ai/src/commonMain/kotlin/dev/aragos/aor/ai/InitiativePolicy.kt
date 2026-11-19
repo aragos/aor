@@ -138,8 +138,10 @@ object InitiativePolicy {
         normal: String,
         seed: Int,
         config: InitiativePolicyConfig,
+        orderWeight: Double = 1.0,
     ): String {
         require(view.stage == Stage.TOKEN_PURCHASE) { "Initiative bids require a purchase window." }
+        require(orderWeight.isFinite()) { "Initiative order weight must be finite." }
         if (config.participation == 0.0) return normal
         val hasHistory = view.pastTokenPurchases.isNotEmpty()
         if (!hasHistory && config.openingSpread == 0 && config.openingMix == null) return normal
@@ -246,8 +248,7 @@ object InitiativePolicy {
         }
         val baselineBox = expectedBox(original.amount)
         fun gain(quote: TokenPurchaseOfferView): Double =
-            baselineBox -
-                expectedBox(quote.amount) -
+            orderWeight * (baselineBox - expectedBox(quote.amount)) -
                 config.tokenPenalty * (original.tokensReceived - quote.tokensReceived) +
                 config.planWeight *
                     ((plans?.plan(quote.poolAfter)?.opportunity ?: 0.0) - originalPlan) -
