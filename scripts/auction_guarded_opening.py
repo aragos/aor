@@ -77,7 +77,7 @@ def main(root, previous, resume):
             capital_geography_variants=ARMS, auction_fallback_variants={"protected": fallback},
         )
         outcomes[case] = measure(root / stage, require_unchanged=capital is not None)
-        write(root / "outcomes.json", outcomes)
+        write(root / "outcomes.json", outcomes, replace=True)
     effects = [outcomes[case]["winEffect"] for case in CASES if case != "contested-steep"]
     passed = (min(effect["lower95"] for effect in effects) > plan["minimumLower95"]
               and statistics.mean(effect["mean"] for effect in effects) >= plan["minimumMean"]
