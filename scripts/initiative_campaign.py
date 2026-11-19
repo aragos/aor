@@ -102,9 +102,10 @@ def score(records, controls, role="CANDIDATE"):
 
 
 class Campaign:
-    def __init__(self, root, *, remote=REMOTE):
+    def __init__(self, root, *, remote=REMOTE, resume=False):
         self.root = root.resolve()
         self.remote = remote
+        self.resume = resume
         self.deadline = read(self.root / "window.json")["endEpoch"]
         self.runtime = read(self.root / "runtime.json")
         self.template = read(self.root / "template.json")
@@ -135,17 +136,17 @@ class Campaign:
         target = stage / name
         if target.exists():
             raise ValueError("Refusing to overwrite a native result directory.")
-        worker_count, heap, java = (8, "5g", MAC_JAVA) if host == "MAC" else (16, "7g", "/usr/bin/java")
-        if host == "MAC" and shutil.disk_usage(self.root).free < 16*(1024**3):
-            raise RuntimeError("Mac free disk space fell below the 16 GiB floor.")
+        worker_count, heap, java = (2, "3g", MAC_JAVA) if host == "MAC" else (4, "4g", "/usr/bin/java")
+        if host == "MAC" and shutil.disk_usage(self.root).free < 10*(1024**3):
+            raise RuntimeError("Mac free disk space fell below the campaign reserve.")
         folder = str(self.root) if host == "MAC" else self.remote
-        command = ["env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
+        command = ["nice", "-n", "8", "env", "-u", "JAVA_TOOL_OPTIONS", "-u", "JDK_JAVA_OPTIONS", "-u", "_JAVA_OPTIONS",
                    java, f"-Xmx{heap}", "-Xms128m", f"-XX:ActiveProcessorCount={worker_count}",
                    "-cp", f"{folder}/lib/*", MODE, "--mode", "robust-token-screen-chunk",
                    "--source", f"{folder}/{relative_source}", "--output", f"{folder}/{relative_output}",
                    "--workers", str(worker_count), "--seconds", str(min(32400, int(self.remaining())))]
         started = time.monotonic()
-        with (stage / f"{name}.log").open("xb") as log:
+        with (stage / f"{name}.log").open("ab" if self.resume else "xb") as log:
             if host == "MAC":
                 self.call(command, stdout=log)
             else:
@@ -182,15 +183,15 @@ class Campaign:
         return done["completedGames"]
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
-              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False):
+              rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
+              card_timing=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
-        if not reuse_complete:
-            stage.mkdir()
+        stage.mkdir(exist_ok=self.resume or reuse_complete)
 
         def declare(path, value):
-            if not reuse_complete:
+            if not reuse_complete and not (self.resume and path.exists()):
                 write(path, value)
             elif read(path) != value:
                 raise ValueError(f"The existing declaration does not match {path}.")
@@ -203,6 +204,8 @@ class Campaign:
                         rival=rival, rivalOffsets=list(rival_offsets) if rival is not None else [], baseline=baseline)
         if opening_bid_prior is not None:
             declared["openingBidPrior"] = opening_bid_prior
+        if card_timing:
+            declared["cardTiming"] = card_timing
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -229,15 +232,21 @@ class Campaign:
                         spec["initiativeRival"] = dict(kind="public-initiative-lineup-1",offsets=list(rival_offsets),policy=rival)
                     if policy is not None:
                         spec["initiative"] = policy
+                    if card_timing and key in card_timing:
+                        spec["commodityTiming"] = card_timing[key]
                     declare(source, spec)
                     jobs.append((name, source))
-        if reuse_complete:
-            for name, source in jobs:
+        pending = []
+        for name, source in jobs:
+            receipt = stage / f"{name}.receipt.json"
+            if reuse_complete or self.resume and receipt.exists():
                 games = self.validate_result(stage / name, source)
-                if read(stage / f"{name}.receipt.json")["games"] != games:
+                if read(receipt)["games"] != games:
                     raise ValueError(f"The existing receipt does not match {name}.")
-        else:
-            self.execute_jobs(stage, jobs)
+            else:
+                pending.append((name, source))
+        if pending:
+            self.execute_jobs(stage, pending)
 
         def records(name, case):
             result = []
@@ -263,7 +272,7 @@ class Campaign:
             adaptive = statistics.mean(adaptive_rows) if adaptive_rows else ordinary
             outcomes[key] = dict(config=config, outcomes=summary, ordinary=ordinary, adaptive=adaptive,
                                  rankScore=.5*(ordinary+adaptive))
-        write(stage / "summary.json", outcomes)
+        declare(stage / "summary.json", outcomes)
         return outcomes
 
     def execute_jobs(self, stage, jobs):

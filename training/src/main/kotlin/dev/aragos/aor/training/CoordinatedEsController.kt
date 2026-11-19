@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ai.BotModel
+import dev.aragos.aor.ai.CommodityTimingConfig
 import dev.aragos.aor.ai.CoordinatedPolicyModels
 import dev.aragos.aor.ai.CoordinatedPolicySelector
 import dev.aragos.aor.ai.ExpansionObservationEncoder
@@ -31,6 +32,7 @@ internal class CoordinatedEsController(
     private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
     tokenAnchoredResidual: TokenAnchoredResidual? = null,
     initiative: InitiativePolicyConfig? = null,
+    commodityTiming: CommodityTimingConfig? = null,
 ) : SimulationController {
     init {
         current.validateFrozenValues(original)
@@ -57,6 +59,7 @@ internal class CoordinatedEsController(
             tokenNeighborMixture,
             tokenAnchoredResidual,
             initiative,
+            commodityTiming,
         )
 
     override fun controls(decision: String): Boolean =

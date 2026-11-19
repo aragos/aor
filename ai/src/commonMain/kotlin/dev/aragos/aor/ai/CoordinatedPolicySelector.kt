@@ -42,9 +42,17 @@ class CoordinatedPolicySelector(
     private val tokenNeighborMixture: LocalTokenNeighborMixture? = null,
     private val tokenAnchoredResidual: TokenAnchoredResidual? = null,
     private val initiative: InitiativePolicyConfig? = null,
+    commodityTiming: CommodityTimingConfig? = null,
 ) {
     private val joint =
-        JointPolicySelector(ordinary, purchaseBaseline, current.card, current.purchase, support)
+        JointPolicySelector(
+            ordinary,
+            purchaseBaseline,
+            current.card,
+            current.purchase,
+            support,
+            commodityTiming,
+        )
 
     init {
         require(

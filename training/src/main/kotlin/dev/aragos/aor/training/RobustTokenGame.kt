@@ -248,6 +248,7 @@ internal object RobustTokenGame {
                                 .policy
                         else -> null
                     },
+                    commodityTiming = input.commodityTiming.takeIf { candidate },
                 )
             val rival =
                 if (style == RobustOpponentStyle.MIXED) {

@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import com.fasterxml.jackson.databind.JsonNode
+import dev.aragos.aor.ai.CommodityTimingConfig
 import dev.aragos.aor.ai.InitiativePolicyConfig
 import dev.aragos.aor.ai.LocalTokenNeighborMixture
 import dev.aragos.aor.ai.NearOptimalTokenSampler
@@ -107,6 +108,7 @@ private constructor(
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
+    val commodityTiming: CommodityTimingConfig?,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -187,6 +189,12 @@ private constructor(
                 mapOf(
                     "initiative" to
                         mapOf("kind" to InitiativePolicyConfig.VERSION, "configuration" to it)
+                )
+            } ?: emptyMap()) +
+            (commodityTiming?.let {
+                mapOf(
+                    "commodityTiming" to
+                        mapOf("kind" to CommodityTimingConfig.VERSION, "configuration" to it)
                 )
             } ?: emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
@@ -324,6 +332,23 @@ private constructor(
             )
         }
 
+        private fun commodityTiming(node: JsonNode): CommodityTimingConfig {
+            PurchaseJson.fields(
+                node,
+                setOf("kind", "futureWeight", "minimumGrowth", "currentPayoutLimit"),
+            )
+            require(node["kind"]?.asText() == CommodityTimingConfig.VERSION) {
+                "Declare the exact commodity timing policy version."
+            }
+            return CommodityTimingConfig(
+                futureWeight = PurchaseJson.number(node["futureWeight"], "future payout weight"),
+                minimumGrowth =
+                    PurchaseJson.integer(node["minimumGrowth"], "minimum future growth"),
+                currentPayoutLimit =
+                    PurchaseJson.integer(node["currentPayoutLimit"], "current payout limit"),
+            )
+        }
+
         fun read(path: Path): RobustTokenInput {
             val source = CoordinatedEsWire.source(path)
             val node = PurchaseJson.read(source.path)
@@ -351,6 +376,7 @@ private constructor(
                     "controlSelector",
                     "expansionDenial",
                     "initiative",
+                    "commodityTiming",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -479,6 +505,7 @@ private constructor(
                     InitiativeRival(offsets, initiative(rival.required("policy")))
                 }
             val initiative = node["initiative"]?.let(::initiative)
+            val commodityTiming = node["commodityTiming"]?.let(::commodityTiming)
             require(
                 initiative == null ||
                     expansionDenial == null &&
@@ -543,6 +570,7 @@ private constructor(
                     anchored,
                     initiative,
                     initiativeRival,
+                    commodityTiming,
                     seeds,
                     start,
                     count,

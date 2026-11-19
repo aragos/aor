@@ -19,6 +19,7 @@ class JointPolicySelector(
     private val card: CardPolicyModel,
     private val purchase: PurchasePolicyModel,
     private val support: JointSupportProfile? = null,
+    private val commodityTiming: CommodityTimingConfig? = null,
 ) {
     fun controls(decision: String): Boolean =
         decision == "play-cards" ||
@@ -40,14 +41,14 @@ class JointPolicySelector(
             )
         if (isCard) {
             val encoded = CardObservationEncoder.from(view, player, observation, recommendation)
-            val actorSeed = CardPolicy.actorSeed(seed)
-            if (support == null) return CardPolicy.choose(encoded, card, actorSeed).command
-            return KnownOwnChaosSupport.card(
-                    encoded,
-                    CardPolicy.evaluate(encoded, card),
-                    CardPolicy.uniform(actorSeed),
-                )
-                .command
+            val uniform = CardPolicy.uniform(CardPolicy.actorSeed(seed))
+            val original = CardPolicy.evaluate(encoded, card)
+            val evaluation =
+                commodityTiming?.let {
+                    CommodityTimingPolicy.adjust(view, player, observation, encoded, original, it)
+                } ?: original
+            if (support == null) return CardPolicy.select(encoded, evaluation, uniform).command
+            return KnownOwnChaosSupport.card(encoded, evaluation, uniform).command
         }
         val encoded = PurchaseObservationEncoder.from(view, player, observation, recommendation)
         val actorSeed = PurchasePolicy.actorSeed(seed)
