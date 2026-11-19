@@ -21,8 +21,9 @@ fun chooseBotMove(
     seed: Int,
 ): String {
     val observation = readBotObservation(observationJson)
-    val model = readBotModel(modelJson, observation)
-    return BotPolicy.choose(observation, BotDifficulty.valueOf(difficulty.uppercase()), seed, model)
+    val level = BotDifficulty.valueOf(difficulty.uppercase())
+    val model = readBotModel(modelJson, observation, level)
+    return BotPolicy.choose(observation, level, seed, model)
 }
 
 internal fun readBotObservation(observationJson: String): BotObservation {
@@ -124,7 +125,11 @@ private fun readPlayerTarget(raw: dynamic): PlayerId? {
     return PlayerId(raw as String)
 }
 
-internal fun readBotModel(modelJson: String, observation: BotObservation): BotModel {
+internal fun readBotModel(
+    modelJson: String,
+    observation: BotObservation,
+    difficulty: BotDifficulty,
+): BotModel {
     if (modelJson.isBlank() || modelJson == "{}" || modelJson.length > 1_000_000) {
         return BotModels.default
     }
@@ -141,10 +146,10 @@ internal fun readBotModel(modelJson: String, observation: BotObservation): BotMo
             require(models.size in 1..16) {
                 "A bot model bundle requires one through sixteen entries."
             }
-            models.firstNotNullOfOrNull { entry -> compatibleModel(entry, observation) }
+            models.firstNotNullOfOrNull { entry -> compatibleModel(entry, observation, difficulty) }
                 ?: BotModels.default
         } else {
-            compatibleModel(document, observation) ?: BotModels.default
+            compatibleModel(document, observation, difficulty) ?: BotModels.default
         }
     } catch (_: Throwable) {
         // Cached policies are replaceable assets. An invalid download must not strand a game.
@@ -156,17 +161,23 @@ internal fun readBotModel(modelJson: String, observation: BotObservation): BotMo
  * Bundles select the first valid compatible entry. Legacy unscoped single-model documents remain
  * supported; a scoped entry must declare exact rules/catalog identities as well as its setup.
  */
-private fun compatibleModel(document: dynamic, observation: BotObservation): BotModel? =
+private fun compatibleModel(
+    document: dynamic,
+    observation: BotObservation,
+    difficulty: BotDifficulty,
+): BotModel? =
     try {
         val raw = if (document.model != null) document.model else document
         val rules = raw.rulesVersion ?: document.rulesVersion
         val data = raw.dataVersion ?: document.dataVersion
+        val level = raw.difficulty ?: document.difficulty
         val schemaVersion = readModelSchema(raw.schemaVersion)
         val configuration = readConfiguration(raw.configuration ?: document.configuration)
         if (
             schemaVersion != observation.schemaVersion ||
                 (rules != null && rules != observation.rulesVersion) ||
                 (data != null && data != observation.dataVersion) ||
+                (level != null && level != difficulty.name) ||
                 (configuration != null &&
                     (rules == null || data == null || configuration != observation.configuration))
         ) {

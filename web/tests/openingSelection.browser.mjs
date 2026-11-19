@@ -96,7 +96,45 @@ try {
         body:JSON.stringify({players:['A','B','C','D','E','F'],options:{'draw-three-keep-two':'enabled','initial-card':'commodity-only'}})});
     assert.equal(rejected.status, 422);
     assert.equal((await rejected.json()).code, 'INSUFFICIENT_INITIAL_CARDS');
-    console.log('Passed: preserved filters, five-option creation, private opening choice, desktop/phone confirmation, reference/focus, rejection/polling preservation, commit cleanup, reload, capital bidding and six-player guard.');
+
+    const automatic = await fetch(`${api}/api/games`, {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:'Six seats with opening returns', players:['Ada'],
+            bots:Array.from({length:5}, () => ({difficulty:'HARD'})),
+            options:{'draw-three-keep-two':'enabled', 'initial-card':'no-events', map:'european'}})});
+    assert(automatic.ok, await automatic.clone().text());
+    const game = await automatic.json();
+    const privateLink = game.links[0].path;
+    const ownerToken = new URLSearchParams(privateLink.split('#')[1]).get('token');
+    await page.send('Page.navigate', {url:web + privateLink});
+    await page.wait(`document.querySelectorAll('[data-hand-card]').length === 3`, 'six-seat human opening hand');
+    await page.evaluate(`(() => {
+        window.openingBotJobs = [];
+        const OriginalWorker = window.Worker;
+        window.Worker = class extends OriginalWorker {
+            postMessage(input, ...args) {
+                if (input.observation.decision === 'return-card') {
+                    window.openingBotJobs.push({
+                        playerId: input.observation.playerId,
+                        difficulty: input.difficulty,
+                        configuration: input.observation.configuration,
+                    });
+                }
+                super.postMessage(input, ...args);
+            }
+        };
+    })()`);
+    const ownerState = await fetch(`${api}/api/games/${game.gameId}`,
+        {headers:{Authorization:`Bearer ${ownerToken}`}}).then(response => response.json());
+    const returnedCard = ownerState.game.hand[0].reference;
+    await page.evaluate(`document.querySelector('[data-hand-card="${returnedCard}"]').click()`);
+    await page.wait(`document.querySelector('.selected-action-confirmation')`, 'six-seat return confirmation');
+    await page.evaluate(`document.querySelector('.selected-action-confirmation').click()`);
+    await page.wait(`document.querySelector('#bid')`, 'five Hard automata return their opening cards');
+    const automatedChoices = await page.evaluate('window.openingBotJobs');
+    assert.equal(new Set(automatedChoices.map(job => job.playerId)).size, 5);
+    assert(automatedChoices.every(job => job.difficulty === 'HARD' &&
+        job.configuration.playerCount === 6 && job.configuration.drawThreeKeepTwo));
+    console.log('Passed opening selection, including private returns from five Hard automata.');
 } finally {
     page.ws.close();
     await fetch(`${process.env.MAP_CDP_URL}/json/close/${page.target.id}`);

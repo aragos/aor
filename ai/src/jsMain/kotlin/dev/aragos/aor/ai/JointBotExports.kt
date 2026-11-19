@@ -35,7 +35,7 @@ class JointBotSelector(
         if (
             selected == null ||
                 !JointPolicyScope.supports(observation, level) ||
-                selected.ordinaryBaseline != readBotModel(baselineJson, observation)
+                selected.ordinaryBaseline != readBotModel(baselineJson, observation, level)
         ) {
             return incumbent.choose(observationJson, purchaseJson, difficulty, seed)
         }

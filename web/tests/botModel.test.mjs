@@ -42,8 +42,8 @@ function observation(config = configuration, dataVersion = 'ah1996-catalog-16') 
     };
 }
 
-function choose(input, model) {
-    return chooseBotMove(JSON.stringify(input), JSON.stringify(model), 'NORMAL', 0);
+function choose(input, model, difficulty = 'NORMAL') {
+    return chooseBotMove(JSON.stringify(input), JSON.stringify(model), difficulty, 0);
 }
 
 test('the generated worker module activates an exactly qualified fixture model', () => {
@@ -71,8 +71,8 @@ test('the actual shipped asset retains the prior outside the current qualified p
     assert.equal(choose(input, shipped), choose(input, {}));
 });
 
-test('every shipped current-catalog model explicitly limits itself to the qualified setup', () => {
-    const current = (shipped.models ?? [shipped]).filter(model => model.dataVersion === 'ah1996-catalog-16');
+test('the originally qualified models retain their exact setup and catalog', () => {
+    const current = shipped.models.filter(model => model.dataVersion === 'ah1996-catalog-16' && model.configuration);
 
     assert.deepEqual(current.map(model => model.rulesVersion),
         ['ah1996-three-epoch-5', 'ah1996-three-epoch-4']);
@@ -80,6 +80,36 @@ test('every shipped current-catalog model explicitly limits itself to the qualif
         assert.deepEqual({drawThreeKeepTwo: false, ...model.configuration},
             {drawThreeKeepTwo: false, ...configuration});
     }
+});
+
+test('the broad model applies to Hard bots across supported player counts', () => {
+    const broad = shipped.models.filter(model =>
+        model.rulesVersion === 'ah1996-three-epoch-5' && model.dataVersion === 'ah1996-catalog-16' &&
+        !model.configuration);
+    assert.equal(broad.length, 1);
+    assert.equal(broad[0].difficulty, 'HARD');
+
+    for (const playerCount of [3, 4, 5, 6]) {
+        const input = observation({...configuration, playerCount, map: 'EUROPEAN',
+            initialCard: 'NO_EVENTS', drawThreeKeepTwo: true});
+        input.rulesVersion = broad[0].rulesVersion;
+        input.candidates[0].features = {};
+        input.candidates[1].features = {'count.6.action.cathedral': -1};
+
+        assert.equal(choose(input, shipped, 'HARD'), 'points-choice');
+        assert.equal(choose(input, shipped, 'NORMAL'), 'cash-choice');
+    }
+});
+
+test('the current scoped model retains priority in its exact setup', () => {
+    const scoped = shipped.models.find(model => model.configuration &&
+        model.rulesVersion === 'ah1996-three-epoch-5');
+    const input = observation(configuration);
+    input.rulesVersion = scoped.rulesVersion;
+    input.candidates[0].features = {};
+    input.candidates[1].features = {'count.6.action.cathedral': -1};
+
+    assert.equal(choose(input, shipped, 'HARD'), choose(input, scoped, 'HARD'));
 });
 
 test('the actual shipped current model changes choices in its qualified setup', () => {

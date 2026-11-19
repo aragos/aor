@@ -26,7 +26,7 @@ class PurchaseBotSelector(baselineModelJson: String, purchaseModelJson: String) 
     ): String {
         val observation = readBotObservation(observationJson)
         val level = BotDifficulty.valueOf(difficulty.uppercase())
-        val baselineModel = readBotModel(baselineJson, observation)
+        val baselineModel = readBotModel(baselineJson, observation, level)
         val baseline = BotPolicy.choose(observation, level, seed, baselineModel)
         val actor =
             purchases.firstOrNull { it.rulesVersion == observation.rulesVersion } ?: return baseline
