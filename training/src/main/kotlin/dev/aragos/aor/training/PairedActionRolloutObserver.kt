@@ -17,6 +17,7 @@ internal class PairedActionRolloutObserver(
     private val timing: CommodityTimingConfig? = null,
     private val compareTerritory: Boolean = false,
     private val traceLookahead: Boolean = false,
+    private val territoryEpoch: Int? = null,
 ) : SimulationStateObserver {
     private data class Root(
         val state: GameState,
@@ -122,6 +123,7 @@ internal class PairedActionRolloutObserver(
         command: String,
     ): Root? {
         if (state.stage != Stage.EXPANSION) return null
+        if (territoryEpoch != null && state.currentEpoch.number != territoryEpoch) return null
         if (observation.candidates.none { it.command == "buy-expansion-card" }) return null
         val actor = state.playerIds[seat]
         val move = TextCodec.parseAction(command, state, actor).command
@@ -164,7 +166,10 @@ internal class PairedActionRolloutObserver(
         controllers: () -> Map<Int, SimulationController>,
         deadline: Long,
     ): Map<String, Any> {
-        val captured = root ?: return mapOf("status" to "no-eligible-root")
+        val captured =
+            root
+                ?: return mapOf("status" to "no-eligible-root") +
+                    (territoryEpoch?.let { mapOf("requestedEpoch" to it) } ?: emptyMap())
         val actor = captured.state.playerIds[seat]
         val originTurn =
             requireNotNull(captured.state.turnNumber) {

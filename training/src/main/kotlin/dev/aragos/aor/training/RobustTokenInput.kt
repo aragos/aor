@@ -113,6 +113,7 @@ private constructor(
     val expansionCardRollouts: Boolean,
     val cardTerritoryRollouts: Boolean,
     val lookaheadCheckpoints: Boolean,
+    val cardTerritoryEpochs: List<Int>,
     val seeds: List<Int>,
     val start: Int,
     val count: Int,
@@ -208,6 +209,9 @@ private constructor(
             (if (cardTerritoryRollouts) mapOf("cardTerritoryRollouts" to "buy-versus-territory-1")
             else emptyMap()) +
             (if (lookaheadCheckpoints) mapOf("lookaheadCheckpoints" to "public-turn-horizons-1")
+            else emptyMap()) +
+            (if (cardTerritoryEpochs.isNotEmpty())
+                mapOf("cardTerritoryEpochs" to cardTerritoryEpochs)
             else emptyMap())
     val scienceSha256 = CpePairedDigest.json(scienceIdentity)
 
@@ -393,6 +397,7 @@ private constructor(
                     "expansionCardRollouts",
                     "cardTerritoryRollouts",
                     "lookaheadCheckpoints",
+                    "cardTerritoryEpochs",
                     "initiativeRival",
                     "tokenNeighborMixture",
                 ),
@@ -500,6 +505,23 @@ private constructor(
                     require(setting.isBoolean) { "Short lookahead checkpoints require a boolean." }
                     setting.booleanValue()
                 } ?: false
+            val cardTerritoryEpochs =
+                node["cardTerritoryEpochs"]
+                    ?.let { setting ->
+                        val epochs =
+                            PurchaseJson.array(setting, "card territory epochs").map {
+                                PurchaseJson.integer(it, "card territory epoch")
+                            }
+                        require(
+                            epochs.isNotEmpty() &&
+                                epochs.distinct().size == epochs.size &&
+                                epochs.all { it in 1..3 }
+                        ) {
+                            "Card versus territory roots require distinct requested epochs 1 through 3."
+                        }
+                        epochs
+                    }
+                    .orEmpty()
             val adaptiveOpponent =
                 node["adaptiveOpponent"]?.takeUnless(JsonNode::isNull)?.let {
                     RevealedTokenCounterConfig.read(it)
@@ -626,6 +648,9 @@ private constructor(
             require(!lookaheadCheckpoints || cardTerritoryRollouts) {
                 "Short lookahead checkpoints belong to the declared card versus territory study."
             }
+            require(cardTerritoryEpochs.isEmpty() || cardTerritoryRollouts) {
+                "Requested root epochs belong to the declared card versus territory study."
+            }
             return RobustTokenInput(
                     source,
                     protocol,
@@ -649,6 +674,7 @@ private constructor(
                     expansionCardRollouts,
                     cardTerritoryRollouts,
                     lookaheadCheckpoints,
+                    cardTerritoryEpochs,
                     seeds,
                     start,
                     count,
