@@ -130,19 +130,14 @@ data class ExpansionForecastView(
             destination: ProvinceId,
             required: Int,
         ): PlacementPlan? =
-            ExpansionReach.routesTo(context, player, destination).firstNotNullOfOrNull { route ->
-                try {
-                    BoardPlacementRules.evaluate(
-                        context = context,
-                        player = player,
-                        destination = destination,
-                        addedTokens = required,
-                        route = route,
-                        poolTokens = required,
-                    )
-                } catch (_: RuleViolation) {
-                    null
-                }
-            }
+            BoardPlacementRules.assessGeneratedRoutes(
+                    context = context,
+                    player = player,
+                    destination = destination,
+                    addedTokens = required,
+                    poolTokens = required,
+                    routes = ExpansionReach.routesTo(context, player, destination),
+                )
+                .plan
     }
 }

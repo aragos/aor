@@ -142,25 +142,38 @@ object ExpansionReach {
         destination: ProvinceId,
         newlyShipped: Int,
     ) {
+        val blocker = shippingCapacityBlocker(context, player, destination, newlyShipped) ?: return
+        val affected =
+            if (blocker == ViolationCode.SHIPPING_CAPACITY_EXCEEDED) listOf(destination.value)
+            else emptyList()
+        throw RuleViolation(code = blocker, entityIds = affected)
+    }
+
+    /** Capacity is separate from route reach, both for placement forecasts and commands. */
+    internal fun shippingCapacityBlocker(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
+        newlyShipped: Int,
+    ): ViolationCode? {
         val profile = context.player(player)
         val previous = context.shipped[player].orEmpty()[destination] ?: 0
-        checkRule(
-            newlyShipped >= 0 &&
-                profile.ships.fleet != ShippingFleet.NONE &&
-                (profile.ships.fleet == ShippingFleet.OCEAN ||
-                    previous.toLong() + newlyShipped <= profile.ships.level),
-            ViolationCode.SHIPPING_CAPACITY_EXCEEDED,
-            listOf(destination.value),
-        )
+        if (
+            newlyShipped < 0 ||
+                profile.ships.fleet == ShippingFleet.NONE ||
+                profile.ships.fleet != ShippingFleet.OCEAN &&
+                    previous.toLong() + newlyShipped > profile.ships.level
+        ) {
+            return ViolationCode.SHIPPING_CAPACITY_EXCEEDED
+        }
         if (
             context.province(destination).overseas != null &&
-                !context.board.hasPresence(player, destination)
+                !context.board.hasPresence(player, destination) &&
+                remainingOverseasSlots(context, player) <= 0
         ) {
-            checkRule(
-                remainingOverseasSlots(context, player) > 0,
-                ViolationCode.OVERSEAS_LIMIT_EXCEEDED,
-            )
+            return ViolationCode.OVERSEAS_LIMIT_EXCEEDED
         }
+        return null
     }
 
     /**
