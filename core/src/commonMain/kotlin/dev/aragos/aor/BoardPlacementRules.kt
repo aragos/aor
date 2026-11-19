@@ -86,7 +86,7 @@ object BoardPlacementRules {
         val definition = context.province(destination)
         val occupants = context.board.pieces[destination]
         val holdings = (occupants as? ProvincePieces.Tokens)?.holdings.orEmpty()
-        val totalTokens = holdings.values.sumOf(TokenHolding::total).toLong() + addedTokens
+        val remaining = peacefulCapacity(occupants, definition.marketNumber)
         val existing = holdings[player]?.total ?: 0
         val defenders =
             when (occupants) {
@@ -99,7 +99,7 @@ object BoardPlacementRules {
         )
         val competition =
             defenders.isNotEmpty() &&
-                (occupants is ProvincePieces.Marker || totalTokens > definition.marketNumber)
+                (occupants is ProvincePieces.Marker || addedTokens > remaining)
         if (competition) {
             val breakdown = CompetitionRules.requirement(context, player, destination)
             breakdown.requirement.validateCommitment(existing, addedTokens)
@@ -116,7 +116,7 @@ object BoardPlacementRules {
             )
         }
         checkRule(
-            addedTokens > 0 && totalTokens <= definition.marketNumber,
+            addedTokens in 1..remaining,
             ViolationCode.INVALID_PLACEMENT,
         )
         if (defenders.isEmpty() && existing + addedTokens == definition.marketNumber) {
@@ -124,6 +124,14 @@ object BoardPlacementRules {
         }
         return PlacementPlan.Peaceful(player, destination, addedTokens, route, context.board)
     }
+
+    /** Number of additional tokens the province's pieces can accept without competition. */
+    internal fun peacefulCapacity(occupants: ProvincePieces?, marketNumber: Int): Int =
+        when (occupants) {
+            is ProvincePieces.Marker -> 0
+            is ProvincePieces.Tokens -> marketNumber - occupants.total
+            null -> marketNumber
+        }
 
     /** Peaceful placement spends [BoardChange.tokensRequired] from the expansion pool. */
     fun applyPeaceful(context: BoardRulesContext, plan: PlacementPlan.Peaceful): BoardChange {
