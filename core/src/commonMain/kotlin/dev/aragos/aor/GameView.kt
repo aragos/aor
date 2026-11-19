@@ -227,7 +227,7 @@ data class GameView(
                                 card.definition.id == EventId.PIRATES_VIKINGS.cardId
                             } == true
                     ) {
-                        val context = state.cardContext()
+                        val context = state.cardContext
                         PirateTargetsView(
                             CardRules.piratesRequiredCount(context),
                             CardRules.pirateTargets(context),
@@ -366,7 +366,7 @@ data class GameView(
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
             if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()
-            val context = state.cardContext()
+            val context = state.cardContext
             return viewer.hand
                 .filter { card -> CardRules.isBurden(context, card.definition.id) }
                 .map(HandCard::reference)
@@ -432,7 +432,7 @@ data class WarCessionView(
         internal fun from(state: GameState): WarCessionView? {
             val decision =
                 state.flow.decisions.lastOrNull() as? CardDecision.WarSurrender ?: return null
-            val context = state.cardContext()
+            val context = state.cardContext
             val victory = decision.victory
             val eligible = WarRules.eligibleProvinces(context, victory.winner, victory.loser)
             val capacity = WarRules.overseasCapacity(context, victory.winner)

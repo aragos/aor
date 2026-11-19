@@ -54,7 +54,7 @@ data class CommodityPayoutView(
                     )
                 }
             }
-            val context = state.cardContext()
+            val context = state.cardContext
             val basis = CommodityHoldingBasis.CURRENT_MARKERS
             return Commodity.entries.map { commodity ->
                 val payment = CardRules.commodityPayment(context, commodity, basis)

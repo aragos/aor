@@ -144,7 +144,7 @@ internal object CardProjection {
 
     fun offers(state: GameState, viewer: PlayerState): List<CardOfferView> {
         if (state.turnNumber == null) return emptyList()
-        val context = state.cardContext()
+        val context = state.cardContext
         return viewer.hand.map { card -> offer(state, viewer, card, context) }
     }
 
