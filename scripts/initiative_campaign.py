@@ -290,7 +290,7 @@ class Campaign:
 
     def stage(self, label, configs, count, ecologies, *, paired=False, shard=96, rival=None,
               rival_offsets=(1,2,3), baseline=None, opening_bid_prior=None, reuse_complete=False,
-              counter_variants=None, lineup=None, capital_variants=None):
+              counter_variants=None, lineup=None, capital_variants=None, series_priors=None):
         if self.remaining() < 300:
             raise RuntimeError("The original window has too little time for a new stage.")
         stage = self.root / label
@@ -316,6 +316,8 @@ class Campaign:
             declared["initiativeLineup"] = lineup
         if capital_variants:
             declared["capitalAuctionVariants"] = capital_variants
+        if series_priors:
+            declared["seriesOpeningPriors"] = series_priors
         declare(stage / "method.json", declared)
         choices = configs if paired else {"control": baseline, **configs}
         jobs = []
@@ -348,6 +350,8 @@ class Campaign:
                         spec["initiativeLineup"] = lineup
                     if capital_variants and key in capital_variants:
                         spec["capitalAuction"] = capital_variants[key]
+                    if series_priors and key in series_priors:
+                        spec["seriesOpeningPriors"] = series_priors[key]
                     declare(source, spec)
                     jobs.append((name, source))
         pending = []

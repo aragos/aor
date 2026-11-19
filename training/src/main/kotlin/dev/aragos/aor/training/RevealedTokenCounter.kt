@@ -7,6 +7,21 @@ import dev.aragos.aor.PlayerId
 import dev.aragos.aor.Stage
 import dev.aragos.aor.ai.LocalTokenNeighborPolicy
 
+/** First-turn predictions learned before this game, for earlier and later capital choosers. */
+internal data class CapitalOrderOpeningPrior(val earlyBid: Int, val lateBid: Int) {
+    init {
+        require(earlyBid in -40..40 && lateBid in -40..40) {
+            "Series opening predictions must fit the initial signed bid range."
+        }
+    }
+
+    fun amount(target: PlayerId, capitalOrder: List<PlayerId>): Int {
+        val position = capitalOrder.indexOf(target)
+        require(position >= 0) { "A series prediction needs the target's public capital order." }
+        return if (position < (capitalOrder.size + 1) / 2) earlyBid else lateBid
+    }
+}
+
 /**
  * Bounded learning from public token purchases. An optional [openingBidPrior] represents a
  * prediction a rival acquired across completed games and fixed before the simulated game starts.
@@ -19,6 +34,7 @@ internal data class RevealedTokenCounterConfig(
     val targetedRivalCount: Int,
     val openingBidPrior: Int? = null,
     val forecastQuantile: Double? = null,
+    val capitalOrderOpeningPrior: CapitalOrderOpeningPrior? = null,
 ) {
     init {
         require(lookbackTurns in 1..16 && minimumObservations in 1..lookbackTurns) {
@@ -41,7 +57,9 @@ internal data class RevealedTokenCounterConfig(
                 "targetedRivalCount" to targetedRivalCount,
             ) +
                 (openingBidPrior?.let { mapOf("openingBidPrior" to it) } ?: emptyMap()) +
-                (forecastQuantile?.let { mapOf("forecastQuantile" to it) } ?: emptyMap())
+                (forecastQuantile?.let { mapOf("forecastQuantile" to it) } ?: emptyMap()) +
+                (capitalOrderOpeningPrior?.let { mapOf("capitalOrderOpeningPrior" to it) }
+                    ?: emptyMap())
 
     companion object {
         const val VERSION = "public-token-history-counter-1"
@@ -341,8 +359,10 @@ internal class RevealedTokenCounter(
         }
         val history = recent.filter { it.turn < turn }
         val prediction =
-            if (history.size < config.minimumObservations) config.openingBidPrior
-            else if (config.forecastQuantile != null) {
+            if (history.size < config.minimumObservations) {
+                config.capitalOrderOpeningPrior?.amount(target, capitalOrder)
+                    ?: config.openingBidPrior
+            } else if (config.forecastQuantile != null) {
                 val index = (config.forecastQuantile * (history.size - 1)).toInt()
                 history.map(PublicTokenReveal::amount).sorted()[index]
             } else {

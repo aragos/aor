@@ -268,7 +268,9 @@ internal object RobustTokenGame {
             input.adaptiveOpponent?.let {
                 // Simulation owns the documented p1..p4 registration identifiers.
                 val players = (1..4).map { number -> PlayerId("p$number") }
-                RevealedTokenCounterLeague(players[seat], players, it)
+                val prior = input.seriesOpeningPriors.getOrNull(index)
+                val learned = if (prior == null) it else it.copy(capitalOrderOpeningPrior = prior)
+                RevealedTokenCounterLeague(players[seat], players, learned)
             }
         val controllers = references.mapValues { (player, reference) ->
             val ordinary = if (player == seat) arena.candidate else arena.opponents.first()

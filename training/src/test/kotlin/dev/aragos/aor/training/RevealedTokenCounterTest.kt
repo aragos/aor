@@ -41,6 +41,48 @@ class RevealedTokenCounterTest {
     }
 
     @Test
+    fun aSeriesForecastUsesTheTargetsPublicEarlyCapitalPosition() {
+        val counter =
+            counter(
+                RevealedTokenCounterConfig(
+                    1,
+                    1,
+                    1,
+                    capitalOrderOpeningPrior = CapitalOrderOpeningPrior(17, 21),
+                )
+            )
+
+        assertThat(bid(counter, turn = 1).command).isEqualTo("buy-tokens 16")
+    }
+
+    @Test
+    fun aSeriesForecastUsesTheTargetsPublicLateCapitalPosition() {
+        val counter =
+            counter(
+                RevealedTokenCounterConfig(
+                    1,
+                    1,
+                    1,
+                    capitalOrderOpeningPrior = CapitalOrderOpeningPrior(17, 21),
+                )
+            )
+
+        assertThat(
+                counter
+                    .bid(
+                        "buy-tokens 8",
+                        offers,
+                        1,
+                        rival,
+                        players.reversed(),
+                        RobustOpponentStyle.REVEALED_UNDERCUT,
+                    )
+                    .command
+            )
+            .isEqualTo("buy-tokens 20")
+    }
+
+    @Test
     fun theLowerQuantileAnticipatesARepeatedLowBidEvenWhenTheModeIsHigher() {
         val counter = counter(RevealedTokenCounterConfig(2, 8, 1, forecastQuantile = 0.25))
         counter.observe(PublicTokenReveal(1, 19))

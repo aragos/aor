@@ -164,6 +164,7 @@ private constructor(
     val tokenNeighborMixture: LocalTokenNeighborMixture?,
     val opponentStyle: RobustOpponentStyle,
     val adaptiveOpponent: RevealedTokenCounterConfig?,
+    val seriesOpeningPriors: List<CapitalOrderOpeningPrior>,
     val candidateTokenAnchoredPolicy: TokenAnchoredPolicyInput?,
     val initiative: InitiativePolicyConfig?,
     val initiativeRival: InitiativeRival?,
@@ -236,6 +237,8 @@ private constructor(
                         else 0.0,
                 )
             } ?: emptyMap()) +
+            (if (seriesOpeningPriors.isEmpty()) emptyMap()
+            else mapOf("seriesOpeningPriors" to seriesOpeningPriors)) +
             (candidateTokenAnchoredPolicy?.let {
                 mapOf("candidateTokenAnchoredPolicy" to it.identity)
             } ?: emptyMap()) +
@@ -508,6 +511,7 @@ private constructor(
                     "candidateBundle",
                     "candidateOnly",
                     "adaptiveOpponent",
+                    "seriesOpeningPriors",
                     "candidateTokenAnchoredPolicy",
                     "controlBundle",
                     "controlSelector",
@@ -609,6 +613,30 @@ private constructor(
                 }
             require(style.isRevealedCounter == (adaptiveOpponent != null)) {
                 "Public-history rival styles require their explicit identity-bound adaptiveOpponent config."
+            }
+            val seriesOpeningPriors =
+                node["seriesOpeningPriors"]
+                    ?.let { definition ->
+                        require(adaptiveOpponent != null) {
+                            "Series opening priors require an explicit public-history opponent."
+                        }
+                        PurchaseJson.array(definition, "series opening priors").map { opening ->
+                            PurchaseJson.fields(opening, setOf("earlyBid", "lateBid"))
+                            CapitalOrderOpeningPrior(
+                                PurchaseJson.integer(
+                                    opening["earlyBid"],
+                                    "earlier chooser opening bid",
+                                ),
+                                PurchaseJson.integer(
+                                    opening["lateBid"],
+                                    "later chooser opening bid",
+                                ),
+                            )
+                        }
+                    }
+                    .orEmpty()
+            require(seriesOpeningPriors.isEmpty() || seriesOpeningPriors.size == seeds.size) {
+                "The series study needs one frozen opening profile per declared world."
             }
             require(
                 expansionDenial == null ||
@@ -735,6 +763,7 @@ private constructor(
                     tokenNeighborMixture,
                     style,
                     adaptiveOpponent,
+                    seriesOpeningPriors,
                     anchored,
                     initiative,
                     initiativeRival,
