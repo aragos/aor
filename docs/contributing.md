@@ -92,7 +92,10 @@ IDs and seed indices for the original 128 single-card setups are preserved. `cov
 observed/missing decisions, cards and configurations; directed probes do not establish exhaustive
 position coverage. `rounds.jsonl` records exploration. `evaluation.json` records the independent
 comparison and `evaluation-matrix.json` reports the same paired results by setup, player count and
-opening-deal variant.
+opening-deal variant. Use `--player-count 6` to train only the 56 legal six-player setups.
+A scoped promotion covers only its selected player count. Use `--opponents PATH` with an ordered
+JSON array of model files relative to that list for a frozen rival roster. Resume requires the same
+scope and roster. Use `--round-seeds N` to compare each proposal across more worlds per setup.
 Review independent evaluation and coverage gates before publishing a model. Limit its
 [browser bundle entry](design.md#automated-seats) to qualified configurations, preserve compatible
 legacy entries, then build and check the web client. Failed promotion retains the prior model and
@@ -106,7 +109,9 @@ for evaluation. Its `candidate.json` contains ordinary model weights scoped to t
 
 Run `--mode train-initiative --seeds 3` to tune token bids against ordinary play and opponents
 using earlier public bids. Final evaluation uses fresh seeds across the full selected matrix and
-includes an opponent that changes its preferred order as the game develops.
+includes an opponent that changes its preferred order as the game develops. Use
+`--mode evaluate-initiative --model PATH --opponents PATH` for a fresh comparison of the
+conservative candidate against the frozen Hard roster with the advance guard in both arms.
 
 ### Portable simulation benchmark
 

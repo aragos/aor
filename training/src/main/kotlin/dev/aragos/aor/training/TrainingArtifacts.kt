@@ -151,7 +151,9 @@ class TrainingArtifacts(val directory: Path) {
 }
 
 /** Coverage remains explicit: a variant sweep does not imply every rare event occurred. */
-class CoverageLedger {
+class CoverageLedger(
+    private val requiredConfigurations: List<TrainingConfiguration> = TrainingMatrix.configurations
+) {
     private data class ConfigurationCoverage(
         var games: Int = 0,
         var probes: Int = 0,
@@ -206,13 +208,11 @@ class CoverageLedger {
             "dataVersion" to DATA_VERSION,
             "games" to configurations.values.sumOf { it.games },
             "directedProbes" to configurations.values.sumOf { it.probes },
-            "requiredConfigurations" to TrainingMatrix.configurations.size,
+            "requiredConfigurations" to requiredConfigurations.size,
             "observedConfigurations" to completedConfigurations.size,
             "probedConfigurations" to configurations.filterValues { it.probes > 0 }.size,
             "missingConfigurations" to
-                TrainingMatrix.configurations
-                    .map { it.id }
-                    .filterNot(completedConfigurations::contains),
+                requiredConfigurations.map { it.id }.filterNot(completedConfigurations::contains),
             "observedDecisions" to observed.sorted(),
             "missingDecisionTypes" to missingDecisionTypes.sorted(),
             "missingCards" to missingCards.sorted(),

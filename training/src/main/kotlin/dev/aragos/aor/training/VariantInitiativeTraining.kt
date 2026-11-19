@@ -1,6 +1,7 @@
 package dev.aragos.aor.training
 
 import dev.aragos.aor.Command
+import dev.aragos.aor.FinalAdvanceGuard
 import dev.aragos.aor.PlayerId
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
@@ -58,7 +59,24 @@ internal object VariantInitiativeTraining {
         incumbent: BotModel,
         artifacts: TrainingArtifacts,
         ledger: CoverageLedger,
+        opponentModels: List<BotModel>,
+        confirmWithFinishGuard: Boolean,
     ) {
+        if (confirmWithFinishGuard) {
+            evaluate(
+                tournaments,
+                configurations,
+                seeds,
+                seedOffset,
+                incumbent,
+                artifacts,
+                ledger,
+                opponentModels,
+                designs.first(),
+                FinalAdvanceGuard(currentLead = 100, projectedLead = 250),
+            )
+            return
+        }
         // Train on complete player-count blocks spread through both opening variants.
         val development =
             configurations
@@ -84,6 +102,7 @@ internal object VariantInitiativeTraining {
                 designs,
                 incumbent,
                 ledger,
+                opponentModels,
                 heldOut = false,
             )
         val byOpponent = screening.groupBy { it.game.opposition }
@@ -124,6 +143,31 @@ internal object VariantInitiativeTraining {
             println("The initiative screen produced no candidate for a held-out test.")
             return
         }
+        evaluate(
+            tournaments,
+            configurations,
+            seeds,
+            seedOffset,
+            incumbent,
+            artifacts,
+            ledger,
+            opponentModels,
+            best,
+        )
+    }
+
+    private fun evaluate(
+        tournaments: Tournaments,
+        configurations: List<TrainingConfiguration>,
+        seeds: Int,
+        seedOffset: Int,
+        incumbent: BotModel,
+        artifacts: TrainingArtifacts,
+        ledger: CoverageLedger,
+        opponentModels: List<BotModel>,
+        best: Design,
+        finishGuard: FinalAdvanceGuard? = null,
+    ) {
         artifacts.write("initiative-candidate.json", best.config)
         println(
             "Testing ${best.name} on fresh seeds in all ${configurations.size} selected setups."
@@ -138,8 +182,23 @@ internal object VariantInitiativeTraining {
                 listOf(best),
                 incumbent,
                 ledger,
+                opponentModels,
                 heldOut = true,
+                finishGuard = finishGuard,
             )
+        artifacts.write(
+            "paired-worlds.json",
+            holdout.map { world ->
+                mapOf(
+                    "configuration" to world.game.configuration.id,
+                    "seed" to world.game.seed,
+                    "seat" to world.game.seat,
+                    "opponent" to world.game.opposition,
+                    "control" to world.control,
+                    "candidate" to world.candidates[best.name],
+                )
+            },
+        )
         val overall = compare(holdout, best.name)
         val groups =
             holdout
@@ -159,6 +218,7 @@ internal object VariantInitiativeTraining {
             mapOf(
                 "qualified" to qualified,
                 "selected" to best.name,
+                "finishGuard" to finishGuard,
                 "comparison" to overall,
                 "byOpponent" to groups,
                 "byPlayerCount" to byCount,
@@ -185,7 +245,9 @@ internal object VariantInitiativeTraining {
         designs: List<Design>,
         incumbent: BotModel,
         ledger: CoverageLedger,
+        opponentModels: List<BotModel>,
         heldOut: Boolean,
+        finishGuard: FinalAdvanceGuard? = null,
     ): List<World> {
         val games = opponents.flatMap { opposition ->
             configurations.flatMapIndexed { index, configuration ->
@@ -212,7 +274,15 @@ internal object VariantInitiativeTraining {
                 games.map { game ->
                     {
                         val control =
-                            simulate(game, incumbent, null, tournaments.deadlineNanos, ledger)
+                            simulate(
+                                game,
+                                incumbent,
+                                null,
+                                tournaments.deadlineNanos,
+                                ledger,
+                                opponentModels,
+                                finishGuard,
+                            )
                         val outcomes = designs.associate { design ->
                             design.name to
                                 simulate(
@@ -221,6 +291,8 @@ internal object VariantInitiativeTraining {
                                     design.config,
                                     tournaments.deadlineNanos,
                                     ledger,
+                                    opponentModels,
+                                    finishGuard,
                                 )
                         }
                         World(game, control, outcomes)
@@ -236,14 +308,23 @@ internal object VariantInitiativeTraining {
         policy: PhaseInitiativeConfig?,
         deadline: Long,
         ledger: CoverageLedger,
+        opponentModels: List<BotModel>,
+        finishGuard: FinalAdvanceGuard?,
     ): Outcome {
         val count = game.configuration.playerCount
         val competitors =
             List(count) { seat ->
-                val difficulty =
-                    if (seat == game.seat || (seat + game.seed) % 3 == 0) BotDifficulty.HARD
-                    else BotDifficulty.NORMAL
-                Competitor(incumbent, difficulty)
+                if (seat == game.seat) {
+                    Competitor(incumbent, BotDifficulty.HARD)
+                } else if (opponentModels.isNotEmpty()) {
+                    val modelIndex = Math.floorMod(game.seed xor (seat * 31), opponentModels.size)
+                    Competitor(opponentModels[modelIndex], BotDifficulty.HARD)
+                } else {
+                    val difficulty =
+                        if ((seat + game.seed) % 3 == 0) BotDifficulty.HARD
+                        else BotDifficulty.NORMAL
+                    Competitor(incumbent, difficulty)
+                }
             }
         val actor = PlayerId("p${game.seat + 1}")
         val adversary = (game.seat + 1) % count
@@ -285,6 +366,10 @@ internal object VariantInitiativeTraining {
                     competitors,
                     deadline,
                     controllers = controllers,
+                    finalAdvanceGuards =
+                        finishGuard
+                            ?.let { guard -> competitors.indices.associateWith { guard } }
+                            .orEmpty(),
                 )
         synchronized(ledger) { ledger.add(terminal) }
         return Outcome(terminal.winShare(game.seat), terminal.reward(game.seat), changes)

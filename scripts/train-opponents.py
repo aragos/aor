@@ -72,7 +72,7 @@ def parse_options(arguments):
                 "Send SIGTERM to the supervisor PID for graceful shutdown."),
     )
     parser.add_argument("--mode", choices=("coverage", "train", "evaluate", "evaluate-finish",
-                                         "train-opening", "train-initiative",
+                                         "train-opening", "train-initiative", "evaluate-initiative",
                                          "pilot", "pilot-diagnose",
                                          "arena", "strategy-search", "strategy-replay",
                                          "token-value-pilot", "token-order-collect", "purchase-collect", "card-collect", "joint-collect", "territory-collect", "territory-value-collect"),
@@ -89,6 +89,9 @@ def parse_options(arguments):
     parser.add_argument("--side", choices=("candidate", "incumbent"),
                         help="Replacement-seat policy to inspect in strategy-replay.")
     parser.add_argument("--configurations", type=int)
+    parser.add_argument("--player-count", type=int, choices=(3, 4, 5, 6))
+    parser.add_argument("--round-seeds", type=int, choices=range(1, 9))
+    parser.add_argument("--opponents", type=Path, help="Ordered JSON array of frozen rival model paths.")
     parser.add_argument("--seeds", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--rounds", type=int)
@@ -116,7 +119,8 @@ def parse_options(arguments):
         if value is not None and not minimum <= value <= maximum:
             parser.error(f"--{name.replace('_', '-')} must be between {minimum} and {maximum}.")
     pilot_options = ("benchmark_games", "positions", "samples", "pairs")
-    legacy_options = ("configurations", "seeds", "rounds", "batch", "difficulty")
+    legacy_options = ("configurations", "seeds", "rounds", "batch", "difficulty",
+                      "player_count", "round_seeds", "opponents")
     if options.mode == "strategy-replay":
         forbidden = legacy_options + pilot_options + ("model", "seed")
         if options.source is None or options.index is None:
@@ -139,6 +143,10 @@ def parse_options(arguments):
         forbidden = legacy_options + ("source",)
     else:
         forbidden = pilot_options + ("source",)
+    if options.mode != "train":
+        forbidden += ("round_seeds",)
+    if options.mode not in ("train", "train-initiative", "evaluate-initiative"):
+        forbidden += ("opponents",)
     if options.mode != "strategy-replay":
         forbidden += ("index", "side", "pair")
     for name in forbidden:
@@ -149,6 +157,8 @@ def parse_options(arguments):
     options.output = options.output.expanduser().resolve()
     if options.model is not None:
         options.model = options.model.expanduser().resolve()
+    if options.opponents is not None:
+        options.opponents = options.opponents.expanduser().resolve()
     if options.source is not None:
         options.source = options.source.expanduser().resolve()
         if (options.source == options.output or options.source in options.output.parents
@@ -279,7 +289,8 @@ def trainer_arguments(options, budget, remaining_hours):
         arguments += ["--model", str(model)]
     if options.source is not None:
         arguments += ["--source", str(options.source)]
-    for name in ("configurations", "seeds", "seed", "rounds", "batch", "difficulty",
+    for name in ("configurations", "player_count", "opponents", "seeds", "seed",
+                 "rounds", "round_seeds", "batch", "difficulty",
                  "benchmark_games", "positions", "samples", "pairs", "index", "side", "pair"):
         value = getattr(options, name)
         if value is not None:

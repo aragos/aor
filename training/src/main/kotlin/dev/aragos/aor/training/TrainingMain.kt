@@ -239,7 +239,10 @@ fun main(arguments: Array<String>) {
             --mode coverage|train|evaluate|evaluate-finish|train-opening|train-initiative
                 --output PATH --hours HOURS (maximum 72)
             --workers N  --configurations 1..${TrainingMatrix.configurations.size}  --seeds N  --seed N
-            --rounds N  --batch N  --model PATH  --difficulty EASY|NORMAL|HARD
+            --mode evaluate-initiative --opponents PATH --model PATH
+            --player-count 3..6
+            --rounds N  --batch N  --round-seeds N  --model PATH  --difficulty EASY|NORMAL|HARD
+            --opponents PATH  (ordered JSON array of model paths relative to the list)
             --mode pilot --model PATH --benchmark-games N --positions N --samples N --pairs N
             --mode pilot-diagnose --source PATH --output PATH --samples N --seed N
             --mode arena --source COMPARISON_JSON --output PATH --hours HOURS --workers N
@@ -278,9 +281,11 @@ fun main(arguments: Array<String>) {
     val deadline = minOf(maximumDeadline, requestedDeadline)
     require(deadline.isAfter(Instant.now())) { "This run has exhausted its three-day allowance." }
     val deadlineNanos = System.nanoTime() + Duration.between(Instant.now(), deadline).toNanos()
-    val ledger = CoverageLedger()
+    val ledger = CoverageLedger(options.scope)
     val initial = TrainingArtifacts.readModel(options.model)
-    val configurations = TrainingMatrix.stratified.take(options.configurations)
+    val configurations = options.scope.take(options.configurations)
+    val opponents = options.opponents?.let(FrozenTrainingOpponents::read)
+    opponents?.snapshot(artifacts)
     artifacts.write(
         "run.json",
         mapOf(
@@ -289,9 +294,12 @@ fun main(arguments: Array<String>) {
             "mode" to options.mode,
             "workers" to options.workers,
             "maxHeapBytes" to Runtime.getRuntime().maxMemory(),
-            "requiredConfigurations" to TrainingMatrix.configurations.size,
+            "requiredConfigurations" to options.scope.size,
+            "playerCount" to options.playerCount,
+            "opponentModelHashes" to opponents?.hashes,
             "requestedConfigurations" to configurations.size,
             "seedsPerConfiguration" to options.seeds,
+            "baseSeed" to options.seed,
         ),
     )
     val completed: (SimulatedGame) -> Unit = { game ->
@@ -339,7 +347,17 @@ fun main(arguments: Array<String>) {
                 artifacts.write("evaluation.json", comparison)
                 println("Evaluation: $comparison")
             }
-            "train" -> train(options, initial, tournaments, artifacts, ledger, completed)
+            "train" ->
+                train(
+                    options,
+                    configurations,
+                    initial,
+                    opponents,
+                    tournaments,
+                    artifacts,
+                    ledger,
+                    completed,
+                )
             "train-opening" ->
                 OpeningHandTraining.run(
                     tournaments,
@@ -350,7 +368,8 @@ fun main(arguments: Array<String>) {
                     artifacts,
                     ledger,
                 )
-            "train-initiative" ->
+            "train-initiative",
+            "evaluate-initiative" ->
                 VariantInitiativeTraining.run(
                     tournaments,
                     configurations,
@@ -359,6 +378,8 @@ fun main(arguments: Array<String>) {
                     initial,
                     artifacts,
                     ledger,
+                    opponents?.models.orEmpty(),
+                    confirmWithFinishGuard = options.mode == "evaluate-initiative",
                 )
             else -> error("Unknown training mode ${options.mode}.")
         }
@@ -369,7 +390,9 @@ fun main(arguments: Array<String>) {
 
 private fun train(
     options: TrainingOptions,
+    configurations: List<TrainingConfiguration>,
     initial: BotModel,
+    opponents: FrozenTrainingOpponents?,
     tournaments: Tournaments,
     artifacts: TrainingArtifacts,
     ledger: CoverageLedger,
@@ -377,7 +400,10 @@ private fun train(
 ) {
     val signature =
         trainingSignature(
-            "${options.seed}:${options.configurations}:${options.seeds}:${options.batch}"
+            "${options.seed}:${options.configurations}:${options.seeds}:${options.batch}" +
+                options.playerCount?.let { ":players-$it" }.orEmpty() +
+                (if (options.roundSeeds == 1) "" else ":round-seeds-${options.roundSeeds}") +
+                opponents?.hashes?.joinToString(prefix = ":opponents-", separator = ",").orEmpty()
         )
     val restored = artifacts.read("state.json")
     var state =
@@ -393,11 +419,11 @@ private fun train(
     }
     state.save(artifacts, ledger)
     println("Validating rare-decision curriculum across ${options.configurations} configurations.")
-    val probes = DecisionProbes(TrainingMatrix.stratified.take(options.configurations), ledger)
+    val probes = DecisionProbes(configurations, ledger)
     if (!state.warmupComplete) {
         println("Covering ${options.configurations} configurations before parameter exploration.")
         tournaments.sweep(
-            configurations = TrainingMatrix.stratified.take(options.configurations),
+            configurations = configurations,
             seedsPerConfiguration = options.seeds,
             seedOffset = options.seed,
             model = state.initial,
@@ -430,19 +456,19 @@ private fun train(
                 random = Random(options.seed xor (round * 65537)),
                 scale = if (round % 5 == 0) 0.35 else 0.12,
             )
-        val matrix = TrainingMatrix.stratified
-        val configurations =
+        val batch =
             (0 until minOf(options.batch, options.configurations)).map { index ->
-                matrix[(round * options.batch + index) % options.configurations]
+                configurations[(round * options.batch + index) % configurations.size]
             }
         val comparison =
             tournaments.compare(
                 candidate = candidate,
                 incumbent = champion,
-                configurations = configurations,
-                seedsPerConfiguration = 1,
+                configurations = batch,
+                seedsPerConfiguration = options.roundSeeds,
                 seedOffset = options.seed + 100_000_000 + round * 200003,
-                opponentPool = population.toList(),
+                opponentPool =
+                    opponents?.let { (it.models + population).distinct() } ?: population.toList(),
                 completed = completed,
             )
         val candidateRegret = probes.regret(candidate)
@@ -477,16 +503,16 @@ private fun train(
         tournaments.compare(
             candidate = champion,
             incumbent = state.initial,
-            configurations = TrainingMatrix.stratified.take(options.configurations),
+            configurations = configurations,
             seedsPerConfiguration = maxOf(2, options.seeds),
             seedOffset = options.seed + 1_000_000_000,
-            opponentPool = population.take(2),
+            opponentPool = opponents?.models ?: population.take(2),
             heldOut = true,
             reportMatrix = { artifacts.write("evaluation-matrix.json", it) },
             completed = completed,
         )
     val completeCoverage =
-        options.configurations == TrainingMatrix.configurations.size &&
+        configurations.size == options.scope.size &&
             ledger.missingDecisionTypes.isEmpty() &&
             ledger.missingCards.isEmpty()
     val promoted = completeCoverage && heldOut.lower95 > 0.0
@@ -496,7 +522,7 @@ private fun train(
             "promoted" to promoted,
             "comparison" to heldOut,
             "criterion" to
-                "All ${TrainingMatrix.configurations.size} setups, cards and decisions " +
+                "All ${options.scope.size} selected-scope setups, cards and decisions " +
                     "with a positive paired 95% lower reward bound",
             "missingDecisionTypes" to ledger.missingDecisionTypes.sorted(),
             "missingCards" to ledger.missingCards.sorted(),
@@ -522,9 +548,13 @@ private data class TrainingOptions(
     val workers: Int,
     val hours: Double,
     val configurations: Int,
+    val playerCount: Int?,
+    val scope: List<TrainingConfiguration>,
+    val opponents: Path?,
     val seeds: Int,
     val seed: Int,
     val rounds: Int,
+    val roundSeeds: Int,
     val batch: Int,
     val difficulty: BotDifficulty,
 ) {
@@ -541,9 +571,12 @@ private data class TrainingOptions(
                     "--workers",
                     "--hours",
                     "--configurations",
+                    "--player-count",
+                    "--opponents",
                     "--seeds",
                     "--seed",
                     "--rounds",
+                    "--round-seeds",
                     "--batch",
                     "--difficulty",
                 )
@@ -551,6 +584,14 @@ private data class TrainingOptions(
             val cpus =
                 System.getenv("AOR_TRAINING_MACHINE_CPUS")?.toIntOrNull()
                     ?: Runtime.getRuntime().availableProcessors()
+            val playerCount = fields["--player-count"]?.toInt()
+            require(playerCount == null || playerCount in 3..6) {
+                "The training player count must be between three and six."
+            }
+            val scope =
+                TrainingMatrix.stratified.filter {
+                    playerCount == null || it.playerCount == playerCount
+                }
             val options =
                 TrainingOptions(
                     mode = fields["--mode"] ?: "coverage",
@@ -559,11 +600,14 @@ private data class TrainingOptions(
                     workers =
                         fields["--workers"]?.toInt() ?: ((cpus * 0.8).toInt() - 2).coerceAtLeast(1),
                     hours = fields["--hours"]?.toDouble() ?: 12.0,
-                    configurations =
-                        fields["--configurations"]?.toInt() ?: TrainingMatrix.configurations.size,
+                    configurations = fields["--configurations"]?.toInt() ?: scope.size,
+                    playerCount = playerCount,
+                    scope = scope,
+                    opponents = fields["--opponents"]?.let(Path::of),
                     seeds = fields["--seeds"]?.toInt() ?: 1,
                     seed = fields["--seed"]?.toInt() ?: 19790531,
                     rounds = fields["--rounds"]?.toInt() ?: 96,
+                    roundSeeds = fields["--round-seeds"]?.toInt() ?: 1,
                     batch = fields["--batch"]?.toInt() ?: 16,
                     difficulty = BotDifficulty.valueOf(fields["--difficulty"] ?: "NORMAL"),
                 )
@@ -576,6 +620,7 @@ private data class TrainingOptions(
                         "evaluate-finish",
                         "train-opening",
                         "train-initiative",
+                        "evaluate-initiative",
                     )
             ) {
                 "Unknown training mode ${options.mode}. See --help for the available modes."
@@ -583,11 +628,26 @@ private data class TrainingOptions(
             require(options.hours.isFinite() && options.hours > 0.0 && options.hours <= 72.0) {
                 "A training invocation may run for more than zero and at most 72 hours."
             }
-            val maxConfigurations = TrainingMatrix.configurations.size
+            val maxConfigurations = scope.size
             require(options.configurations in 1..maxConfigurations) {
                 "Use between 1 and $maxConfigurations configurations."
             }
             require(options.seeds in 1..1000) { "Use between 1 and 1000 seeds per configuration." }
+            require(options.roundSeeds in 1..8) {
+                "Use between one and eight seeds per exploration round."
+            }
+            require(options.mode == "train" || "--round-seeds" !in fields) {
+                "Round seeds are available only in train mode."
+            }
+            require(
+                options.mode in setOf("train", "train-initiative", "evaluate-initiative") ||
+                    options.opponents == null
+            ) {
+                "An opponent roster requires train, train-initiative, or evaluate-initiative mode."
+            }
+            require(options.mode != "evaluate-initiative" || options.opponents != null) {
+                "Initiative confirmation with the endgame guard requires a frozen opponent roster."
+            }
             require(options.rounds in 0..100000) { "Use between 0 and 100000 exploration rounds." }
             require(options.batch in 1..maxConfigurations) {
                 "Use between 1 and $maxConfigurations configurations per round."
